@@ -1,6 +1,6 @@
 [package]
-authors = ["Philipp Oppermann <dev@phil-opp.com>"]
-name = "blog_os"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "restfulOS"
 version = "0.1.0"
 
 [dependencies]
