@@ -30,6 +30,7 @@ pub struct Page {
 }
 
 impl Page {
+	/// returns the first virtual address as the start of this Page
     pub fn containing_address(address: VirtualAddress) -> Page {
         assert!(address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000,
                 "invalid address: 0x{:x}",
@@ -41,15 +42,24 @@ impl Page {
         self.number * PAGE_SIZE
     }
 
+	/// returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list
     fn p4_index(&self) -> usize {
         (self.number >> 27) & 0o777
     }
+
+    /// returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list
     fn p3_index(&self) -> usize {
         (self.number >> 18) & 0o777
     }
+
+    /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list
     fn p2_index(&self) -> usize {
         (self.number >> 9) & 0o777
     }
+
+    /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
+    /// using this returned usize value as an index into the P1 entries list will give you the final PTE, 
+    /// from which you can extract the physical address using pointed_frame()
     fn p1_index(&self) -> usize {
         (self.number >> 0) & 0o777
     }
@@ -90,6 +100,7 @@ impl Iterator for PageIter {
     }
 }
 
+/// the owner of the recursively defind P4 page table. 
 pub struct ActivePageTable {
     mapper: Mapper,
 }

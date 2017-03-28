@@ -96,6 +96,7 @@ pub struct Frame {
 }
 
 impl Frame {
+	/// returns the Frame containing the given physical address
     fn containing_address(address: usize) -> Frame {
         Frame { number: address / PAGE_SIZE }
     }

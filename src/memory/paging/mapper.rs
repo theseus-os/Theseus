@@ -30,8 +30,11 @@ impl Mapper {
         unsafe { self.p4.get_mut() }
     }
 
+    /// translates a VirtualAddress to a PhysicalAddress
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
         let offset = virtual_address % PAGE_SIZE;
+        // get the frame number of the page containing the given virtual address,
+        // and then the corresponding physical address is that PFN*sizeof(Page) + offset
         self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
                                                                                frame.number *
                                                                                PAGE_SIZE +
@@ -77,6 +80,7 @@ impl Mapper {
             .or_else(huge_page)
     }
 
+    /// creates a mapping for a specific page -> specific frame
     pub fn map_to<A>(&mut self, page: Page, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
@@ -88,6 +92,7 @@ impl Mapper {
         p1[page.p1_index()].set(frame, flags | PRESENT);
     }
 
+    /// creates a mapping for a specific page -> random free frame
     pub fn map<A>(&mut self, page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {

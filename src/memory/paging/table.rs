@@ -33,6 +33,9 @@ impl<L> Table<L>
 impl<L> Table<L>
     where L: HierarchicalLevel
 {
+
+    /// uses 'index' as an index into this table's list of 512 entries
+    /// returns the address of the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1) as a raw u64 pointer
     fn next_table_address(&self, index: usize) -> Option<usize> {
         let entry_flags = self[index].flags();
         if entry_flags.contains(PRESENT) && !entry_flags.contains(HUGE_PAGE) {
@@ -43,7 +46,9 @@ impl<L> Table<L>
         }
     }
 
+    /// returns the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1)
     pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
+        // convert the next table address from a raw pointer back to a Table type
         self.next_table_address(index).map(|address| unsafe { &*(address as *const _) })
     }
 
