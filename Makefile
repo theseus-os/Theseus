@@ -8,11 +8,11 @@
 # except according to those terms.
 
 arch ?= x86_64
-target ?= $(arch)-restfulOS
+target ?= $(arch)-restful_os
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 
-rust_os := target/$(target)/debug/librestfulOS.a
+rust_os := target/$(target)/debug/librestful_os.a
 linker_script := src/arch/$(arch)/linker.ld
 grub_cfg := src/arch/$(arch)/grub.cfg
 assembly_source_files := $(wildcard src/arch/$(arch)/*.asm)

@@ -41,15 +41,20 @@ impl StackAllocator {
                 self.range = range;
 
                 // map stack pages to physical frames
+                // but don't map the guard page, that should be left unmapped
                 for page in Page::range_inclusive(start, end) {
                     active_table.map(page, paging::WRITABLE, frame_allocator);
                 }
 
                 // create a new stack
+                // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
                 Some(Stack::new(top_of_stack, start.start_address()))
             }
-            _ => None, /* not enough pages */
+            _ => {
+                println!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
+                None /* not enough pages */
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "restfulOS"
+name = "restful_os"
 version = "0.1.0"
 
 [dependencies]

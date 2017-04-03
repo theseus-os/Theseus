@@ -57,13 +57,14 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let heap_start_page = Page::containing_address(HEAP_START);
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
 
+    // map the entire heap, which starts from HEAP_START = 0x40000000 (octal 0000010000000000)
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, paging::WRITABLE, &mut frame_allocator);
     }
 
     let stack_allocator = {
-        let stack_alloc_start = heap_end_page + 1;
-        let stack_alloc_end = stack_alloc_start + 100;
+        let stack_alloc_start = heap_end_page + 1; // extra stack pages start right after the heap ends
+        let stack_alloc_end = stack_alloc_start + 100; // 100 pages in size
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
