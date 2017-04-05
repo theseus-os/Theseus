@@ -28,10 +28,10 @@ clean:
 	@rm -rf build
 
 run: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s
+	@qemu-system-x86_64 -cdrom $(iso) -s -serial stdio
 
 debug: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s -S
+	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
 gdb:
 	@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"

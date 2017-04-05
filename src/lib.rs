@@ -17,33 +17,30 @@
 
 extern crate rlibc;
 extern crate volatile;
-extern crate spin;
+extern crate spin; // core spinlocks 
 extern crate multiboot2;
-#[macro_use]
-extern crate bitflags;
+#[macro_use] extern crate bitflags;
 extern crate x86_64;
-#[macro_use]
-extern crate once;
+#[macro_use] extern crate once; // Once type (Singletons)
 extern crate bit_field;
-#[macro_use]
-extern crate lazy_static;
-
-extern crate hole_list_allocator;
+#[macro_use] extern crate lazy_static; // for lazy static initialization
+extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
-#[macro_use]
-extern crate collections;
+#[macro_use] extern crate collections;
+extern crate cpuio; 
 
-#[macro_use]
-mod vga_buffer;
+
+#[macro_use] mod vga_buffer;
 mod memory;
-
 mod interrupts;
+mod drivers; 
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // ATTENTION: we have a very small stack and no guard page
     vga_buffer::clear_screen();
     println!("Hello World{}", "!");
+    drivers::serial_port::serial_out("Hello serial port!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     enable_nxe_bit();
@@ -55,12 +52,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // initialize our IDT
     interrupts::init(&mut memory_controller);
 
-    fn stack_overflow() {
-        stack_overflow(); // for each recursion, the return address is pushed
-    }
 
-    // trigger a stack overflow
-    stack_overflow();
+
 
     println!("It did not crash!");
     loop {}
@@ -98,5 +91,6 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn _Unwind_Resume() -> ! {
+    println!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
