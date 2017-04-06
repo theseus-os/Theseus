@@ -20,7 +20,8 @@ extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
 #[macro_use] extern crate bitflags;
-extern crate x86_64;
+extern crate x86;
+#[macro_use] extern crate x86_64;
 #[macro_use] extern crate once; // Once type (Singletons)
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
@@ -30,6 +31,7 @@ extern crate alloc;
 extern crate cpuio; 
 
 
+
 #[macro_use] mod vga_buffer;
 mod memory;
 mod interrupts;
@@ -37,6 +39,10 @@ mod drivers;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
+	
+	// start the kernel with interrupts disabled
+	unsafe { ::x86_64::instructions::interrupts::disable(); }
+	
     // ATTENTION: we have a very small stack and no guard page
     vga_buffer::clear_screen();
     println!("Hello World{}", "!");
@@ -52,11 +58,18 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // initialize our IDT
     interrupts::init(&mut memory_controller);
 
-
-
-
     println!("It did not crash!");
-    loop {}
+	unsafe{	int!(0x80); }
+	println!("called int 0x80");
+	
+	unsafe{	int!(0x81); }
+	println!("called int 0x81");
+	
+	unsafe { x86::shared::irq::enable();  }
+	println!("enabled interrupts!");
+
+	loop { }
+//    loop { unsafe  {x86_64::instructions::halt(); } }
 }
 
 fn enable_nxe_bit() {

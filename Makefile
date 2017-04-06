@@ -27,8 +27,11 @@ clean:
 	@cargo clean
 	@rm -rf build
 
+orun:
+	@qemu-system-x86_64 -cdrom $(iso) -s -d int -serial stdio
+
 run: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s -serial stdio
+	@qemu-system-x86_64 -cdrom $(iso) -s -d int -serial stdio
 
 debug: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
