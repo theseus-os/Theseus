@@ -5,8 +5,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
-// except according to those terms.
 
+// except according to those terms.
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
 #![feature(alloc, collections)]
@@ -59,16 +59,18 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     interrupts::init(&mut memory_controller);
 
     println!("It did not crash!");
-	unsafe{	int!(0x80); }
-	println!("called int 0x80");
+	// unsafe{	int!(0x80); }
+	// println!("called int 0x80");
 	
-	unsafe{	int!(0x81); }
-	println!("called int 0x81");
+	// unsafe{	int!(0x81); }
+	// println!("called int 0x81");
 	
 	unsafe { x86::shared::irq::enable();  }
 	println!("enabled interrupts!");
 
-	loop { }
+	loop { 
+        let Some(key_ev) = 
+     }
 //    loop { unsafe  {x86_64::instructions::halt(); } }
 }
 

@@ -14,6 +14,8 @@ volatile = "0.1.0"
 x86 = "0.8.1"
 x86_64 = "0.1.0"
 cpuio = "0.2.0"
+queue = "0.1.1"
+
 
 [dependencies.hole_list_allocator]
 path = "libs/hole_list_allocator"
@@ -22,6 +24,8 @@ path = "libs/hole_list_allocator"
 features = ["spin_no_std"]
 version = "0.2.1"
 
+[dependencies.keycodes_ascii]
+path = "libs/keycodes_ascii"
 
 [lib]
 crate-type = ["staticlib"]

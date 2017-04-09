@@ -42,37 +42,38 @@ lazy_static! {
         // missing: 0x0d general protection exception
         idt.page_fault.set_handler_fn(page_fault_handler);
         // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception 
+        // missing: 0x10 floating point exception
         // missing: 0x11 alignment check exception
         // missing: 0x12 machine check exception
         // missing: 0x13 SIMD floating point exception
         // missing: 0x14 virtualization vector 20
         // missing: 0x15 - 0x1d SIMD floating point exception
         // missing: 0x1e security exception
-        // reserved: 0x1f 
-        
-        
+        // reserved: 0x1f
+
+
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
 	        idt[i].set_handler_fn(unimplemented_interrupt_handler);
         }
-        
-        
-        
-		// SET UP CUSTOM INTERRUPT HANDLERS 
+
+
+		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
         idt[0x20].set_handler_fn(timer_handler); // int 32
         idt[0x21].set_handler_fn(keyboard_handler); // int 33
-	
-        
+
+        // TODO: add more 
+
 
         idt // return idt so it's set to the static ref IDT above
     };
 }
 
-/// Interface to our PIC (programmable interrupt controller) chips.  
+/// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static PIC: Mutex<pic::ChainedPics> = Mutex::new(unsafe { pic::ChainedPics::new(0x20, 0x28) });
+static KEYBOARD: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(0x60) } );
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
@@ -106,30 +107,16 @@ pub fn init(memory_controller: &mut MemoryController) {
     unsafe {
         set_cs(code_selector); // reload code segment register
         load_tss(tss_selector); // load TSS
-        
+
 	    PIC.lock().initialize();
     }
 
     IDT.load();
-    
+
 
 }
 
 
-//macro_rules! define_unimplemented_interrupt_handler {
-//	($num: expr) => ( 
-//		extern "x86-interrupt" fn stringify!($num)(stack_frame: &mut ExceptionStackFrame) {
-//			println!("caught unhandled interrupt {}: {:#?}", $num, stack_frame);
-//		}
-//	);
-//}
-//
-//
-//define_unimplemented_interrupt_handler!(32, );
-//
-//
-//
-//define_all_interrupt_handlers!();
 
 /// interrupt 0x00
 extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
@@ -158,7 +145,7 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
     println!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
-    
+
 	// TODO: handle this
 	/* When any IRQ7 is received, simply read the In-Service Register
 		 outb(0x20, 0x0B); unsigned char irr = inb(0x20);
@@ -195,28 +182,29 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
 //             control_regs::cr2(),
              error_code,
              stack_frame);
-    
+
     loop {}
 }
 
 
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 //	println!("\nTIMER interrupt:\n{:#?}", stack_frame);
-	unsafe { PIC.lock().notify_end_of_interrupt(0x20u8); }
+	unsafe { PIC.lock().notify_end_of_interrupt(0x20); }
 }
 
 
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-	println!("\nKEYBOARD interrupt:\n{:#?}", stack_frame);
-	
-	
-	
-	unsafe { PIC.lock().notify_end_of_interrupt(0x21u8); }
+
+    let mut scan_code: u8 = KEYBOARD.lock().read()); 
+
+	println!("KBD: {:?}", scan_code);
+    handle_keyboard_input(scan_code);
+
+	unsafe { PIC.lock().notify_end_of_interrupt(0x21); }
 }
 
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 	println!("caught unhandled interrupt: {:#?}", stack_frame);
-	
-}
 
+}
