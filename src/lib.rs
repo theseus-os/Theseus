@@ -29,7 +29,7 @@ extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
 #[macro_use] extern crate collections;
 extern crate cpuio; 
-
+extern crate keycodes_ascii; // our own crate for keyboard 
 
 
 #[macro_use] mod vga_buffer;
@@ -69,7 +69,13 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	println!("enabled interrupts!");
 
 	loop { 
-        let Some(key_ev) = 
+        let keyevent = drivers::keyboard::pop_key_event();
+        match keyevent {
+            Some(keyevent) => { 
+                print!("{:?}  ", keyevent.keycode.to_ascii(&keyevent.modifiers));
+            }
+            _ => { } 
+        }
      }
 //    loop { unsafe  {x86_64::instructions::halt(); } }
 }

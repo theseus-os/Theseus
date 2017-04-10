@@ -3,18 +3,32 @@
 
 
 
+
 // TODO: use these tables and tips:
 // https://sourceforge.net/p/oszur11/code/ci/master/tree/Chapter_06_Shell/04_Makepp/arch/i386/arch/devices/i8042.c
 
+// TODO: seems like we actually can use phf crates
+// we can use the "core" feature enables libcore instead of libstd
+// you can use number literals like so: 
+/*
+static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
+    0u8 => Keycode::BLAH,
+    1u8 => Keycode::BLAH2,
+    ... etc ...
+}
+*/
+
+// the implementation here follows the rule of representation, 
+// which is to use complicated data structures to permit simpler logic. 
 
 
 #[derive(Debug, Copy, Clone)]
 pub struct KeyboardModifiers {
-    control: bool,
-    alt: bool, 
-    shift: bool,
-    caps_lock: bool,
-    num_lock: bool,
+    pub control: bool,
+    pub alt: bool, 
+    pub shift: bool,
+    pub caps_lock: bool,
+    pub num_lock: bool,
 }
 
 impl KeyboardModifiers {

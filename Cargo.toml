@@ -14,7 +14,7 @@ volatile = "0.1.0"
 x86 = "0.8.1"
 x86_64 = "0.1.0"
 cpuio = "0.2.0"
-queue = "0.1.1"
+# queue = "0.1.1"
 
 
 [dependencies.hole_list_allocator]

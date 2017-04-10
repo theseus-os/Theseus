@@ -1,15 +1,20 @@
 extern crate keycodes_ascii; // our own crate in "libs/" dir
-extern crate queue;
+// extern crate queue; // using my own no_std version of queue now
+// #[macro_use]
+// extern crate lazy_static;
 
-use keycodes_ascii::*;
-use queue::Queue; // from crate 'queue'
-use spin::Mutex;
-use std::convert::TryFrom;
 
-const KBD_QUEUE_SIZE: usize = 100;
+use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
+use spin::{Mutex, Once};
+use drivers::keyboard::queue::Queue;  // why is this "self" in front?
 
-static KEYBOARD_MGR: KeyboardManager = KeyboardManager::new(); // TODO: may need to use "Once"
 
+
+static KBD_QUEUE_SIZE: usize = 256;
+
+lazy_static! {
+    static ref KEYBOARD_MGR: KeyboardManager = KeyboardManager::new(); 
+}
 
 #[derive(Debug)]
 /// should be a singleton. 
@@ -23,84 +28,98 @@ struct KeyboardManager {
 
 impl KeyboardManager {
     pub fn new() -> KeyboardManager {
-        let bq: Queue<KeyEvent> = Queue::with_capacity(KBD_QUEUE_SIZE);
+        let mut bq: Queue<KeyEvent> = Queue::with_capacity(KBD_QUEUE_SIZE);
         bq.set_capacity(KBD_QUEUE_SIZE); // max size KBD_QUEUE_SIZE
 
+        println!("Created new KEYBOARD_MGR with buffer size {}", KBD_QUEUE_SIZE);
+
         KeyboardManager {
-            modifiers = Mutex::new(KeyboardModifiers::new()),
-            buffer_queue = Mutex::new(bq),
+            modifiers: Mutex::new(KeyboardModifiers::new()),
+            buffer_queue: Mutex::new(bq),
         }
     }
 }
 
-#[derive(Debug, Copy)]
-enum KeyAction {
+#[derive(Debug, Copy, Clone)]
+pub enum KeyAction {
     Pressed,
     Released,
 }
 
-#[derive(Debug, Copy)]
-struct KeyEvent {
-    keycode: Keycode,
-    action: KeyAction,
-    modifiers: KeyboardModifiers,
+/// the KeyEvent that should be delivered to applications upon a keyboard action
+#[derive(Debug, Copy, Clone)]
+pub struct KeyEvent {
+    pub keycode: Keycode,
+    pub action: KeyAction,
+    pub modifiers: KeyboardModifiers,
 }
 
-
-
-
-
-
-
-pub const fn handle_keyboard_input(scan_code: u8) {
-    match scan_code {
-        Keycode.Control => { KEYBOARD_MGR.modifiers.lock().control = true }
-        Keycode.Control + KEY_RELEASED_OFFSET => { KEYBOARD_MGR.modifiers.lock().control = false }
-        Keycode.Alt => { KEYBOARD_MGR.modifiers.lock().alt = true }
-        Keycode.Alt + KEY_RELEASED_OFFSET => { KEYBOARD_MGR.modifiers.lock().alt = false }
-        Keycode.Shift => { KEYBOARD_MGR.modifiers.lock().shift = true }
-        Keycode.Shift + KEY_RELEASED_OFFSET => { KEYBOARD_MGR.modifiers.lock().shift = false }
-
-        // if not a modifier key, just put the keycode and it's action (pressed or released) in the buffer
-        x < KEY_RELEASED_OFFSET =>  { KEYBOARD_MGR.buffer_queue.lock().queue( KeyEvent { 
-                                            get_keycode(scan_code)), 
-                                            KeyAction.Pressed,
-                                            modifiers, // will be copied
-                                        } 
-                                    }
-        x >= KEY_RELEASED_OFFSET =>  { KEYBOARD_MGR.buffer_queue.lock().queue( KeyEvent { 
-                                            get_keycode(scan_code - KEY_RELEASED_OFFSET)), 
-                                            KeyAction.Released,
-                                            modifiers, // will be copied
-                                        } 
-                                    }
-        // _ => ;
+impl KeyEvent {
+    pub fn new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers,) -> KeyEvent {
+        KeyEvent {
+            keycode, 
+            action,
+            modifiers,
+        }
     }
 }
 
 
 
-pub const fn pop_key_event() -> KeyEvent {
-    KEYBOARD_MGR.buffer_queue.lock().dequeue()
+pub enum KeyboardInputError {
+    QueueFull,
+    UnknownScancode,
+}
+
+
+/// returns Ok(()) if everything was handled properly.
+/// returns KeyboardInputError 
+pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
+    match scan_code {
+        x if x == Keycode::Control as u8 => { KEYBOARD_MGR.modifiers.lock().control = true }
+        x if x == Keycode::Alt     as u8 => { KEYBOARD_MGR.modifiers.lock().alt = true }
+        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { KEYBOARD_MGR.modifiers.lock().shift = true }
+        
+        x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { KEYBOARD_MGR.modifiers.lock().control = false }
+        x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { KEYBOARD_MGR.modifiers.lock().alt = false }
+        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { KEYBOARD_MGR.modifiers.lock().shift = false }
+
+        // if not a modifier key, just put the keycode and it's action (pressed or released) in the buffer
+        x => { 
+            let (adjusted_scan_code, action) = 
+                if x < KEY_RELEASED_OFFSET { 
+                    (scan_code, KeyAction::Pressed) 
+                } else { 
+                    (scan_code - KEY_RELEASED_OFFSET, KeyAction::Released) 
+                };
+
+            
+            let keycode = Keycode::from_scancode(adjusted_scan_code); 
+            match keycode {
+                Some(keycode) => { // this re-scopes keycode              
+                    let result = KEYBOARD_MGR.buffer_queue.lock().queue( 
+                        KeyEvent::new(keycode, action, KEYBOARD_MGR.modifiers.lock().clone())); 
+                    match result {
+                        Ok(n) => { return Ok(()); } 
+                        Err(_) => { 
+                            println!("Error: keyboard queue is full, discarding {}!", scan_code);
+                            return Err(KeyboardInputError::QueueFull);
+                        }
+                    }
+                }
+
+                _ => { return Err(KeyboardInputError::UnknownScancode); }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 
 
-
-
-// /// apply a shift to the Keycode
-// const fn apply_shift(&keycode: Keycode) -> Option(std::char) {
-//     // matching based off physical layout of keyboard
-//     let ksc: Keycode = key.scan_code as Keycode;
-//     match ksc {
-//         Keycode.Num1 ... Keycode.Equals |
-//         Keycode.Q ... Keycode.RightBracket | 
-//         Keycode.A ... Keycode.Quote | 
-//         Keycode.Backtick | 
-//         Keycode.Backslash | 
-//         Keycode.Z ... Keycode.Slash => Some('x'), // TODO get ascii value
-//         _ => None,
-//     }
-// }
+pub fn pop_key_event() -> Option<KeyEvent> {
+    KEYBOARD_MGR.buffer_queue.lock().dequeue()
+}
 
 

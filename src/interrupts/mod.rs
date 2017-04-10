@@ -11,6 +11,8 @@ use memory::MemoryController;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
+use cpuio::Port;
+use drivers::keyboard;
 
 
 mod gdt;
@@ -195,10 +197,10 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
 
-    let mut scan_code: u8 = KEYBOARD.lock().read()); 
+    let mut scan_code: u8 = KEYBOARD.lock().read(); 
 
 	println!("KBD: {:?}", scan_code);
-    handle_keyboard_input(scan_code);
+    keyboard::handle_keyboard_input(scan_code);
 
 	unsafe { PIC.lock().notify_end_of_interrupt(0x21); }
 }
