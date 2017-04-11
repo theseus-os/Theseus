@@ -23,7 +23,7 @@ extern crate multiboot2;
 #[macro_use] extern crate bitflags;
 extern crate x86;
 #[macro_use] extern crate x86_64;
-#[macro_use] extern crate once; // Once type (Singletons)
+#[macro_use] extern crate once; // 
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 extern crate hole_list_allocator; // our own allocator
@@ -59,12 +59,13 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // initialize our IDT
     interrupts::init(&mut memory_controller);
 
-    println!("It did not crash!");
-	// unsafe{	int!(0x80); }
-	// println!("called int 0x80");
-	
-	// unsafe{	int!(0x81); }
-	// println!("called int 0x81");
+
+    // let mut kbd_state: KeyboardState = drivers::keyboard::indirection_layer::KeyboardState::new();
+    // drivers::keyboard::indirection_layer::init(&mut kbd_state);
+    drivers::keyboard::indirection_layer::init();
+
+    println!("initialization done!");
+
 	
 	unsafe { x86::shared::irq::enable();  }
 	println!("enabled interrupts!");
@@ -72,7 +73,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // loop { }
 
 
-    // FIXME:  this loop causes a deadlock for some dumbass reason
+    // FIXME:  this loop causes a deadlock for some dumbass reason, which is the use of Mutex.lock in the interrupt handler
 	loop { 
         let keyevent = drivers::keyboard::pop_key_event();
         match keyevent {
