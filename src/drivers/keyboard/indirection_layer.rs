@@ -6,21 +6,43 @@ extern crate keycodes_ascii; // our own crate in "libs/" dir
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
 use spin::{Mutex, Once};
-use drivers::keyboard::queue::Queue;  // why is this "self" in front?
-
+// use drivers::keyboard::queue::Queue;  // why is this "self" in front?
+use core::cell::{Ref, RefMut, RefCell};
+use collections::Vec;
 
 
 static KBD_QUEUE_SIZE: usize = 256;
 
-lazy_static! {
-    static ref KBD_MODIFIERS: Mutex<KeyboardModifiers> = Mutex::new( KeyboardModifiers::new() );
-    static ref KBD_QUEUE: Mutex<Queue<KeyEvent>> = { 
-        let mut q = Queue::with_capacity(KBD_QUEUE_SIZE);
-        q.set_capacity(KBD_QUEUE_SIZE);
-        Mutex::new( q ) // return this to KBD_QUEUE
-    };
-    // static KBD_SCANCODE_QUEUE // if we want a separate queue to buffer the raw scancodes...
+
+/// the singleton instance of KeyboardState, constructed in init() below
+static KBD_STATE: Once<KeyboardState> = Once::new();
+
+
+struct KeyboardState {
+    queue: RefCell<Vec<KeyEvent>>,
+    modifiers: RefCell<KeyboardModifiers>,
 }
+
+
+pub fn init() {
+    KBD_STATE.call_once( || {
+         KeyboardState {
+            queue:  RefCell::from(Vec::with_capacity(KBD_QUEUE_SIZE)),  // return this to "queue"
+            modifiers: RefCell::from(KeyboardModifiers::new())
+        }
+    });
+}
+
+
+// lazy_static! {
+//     static ref KBD_MODIFIERS: Mutex<KeyboardModifiers> = Mutex::new( KeyboardModifiers::new() );
+//     static ref KBD_QUEUE: Mutex<Queue<KeyEvent>> = { 
+//         let mut q = Queue::with_capacity(KBD_QUEUE_SIZE);
+//         q.set_capacity(KBD_QUEUE_SIZE);
+//         Mutex::new( q ) // return this to KBD_QUEUE
+//     };
+//     // static KBD_SCANCODE_QUEUE // if we want a separate queue to buffer the raw scancodes...
+// }
 
 
 
@@ -67,20 +89,28 @@ impl KeyEvent {
 pub enum KeyboardInputError {
     QueueFull,
     UnknownScancode,
+    TryAcquireFailed,
 }
 
 
 /// returns Ok(()) if everything was handled properly.
 /// returns KeyboardInputError 
 pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
+    let kbd_state = KBD_STATE.try();
+    if kbd_state.is_none() {
+        println!("Error: KBD_STATE.try() failed, discarding {}!", scan_code);
+        return Err(KeyboardInputError::TryAcquireFailed);
+    }
+    let kbd_state: &KeyboardState = kbd_state.unwrap(); // safe, cuz we already checked for is_none()
+
     match scan_code {
-        x if x == Keycode::Control as u8 => { KBD_MODIFIERS.lock().control = true }
-        x if x == Keycode::Alt     as u8 => { KBD_MODIFIERS.lock().alt = true }
-        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { KBD_MODIFIERS.lock().shift = true }
+        x if x == Keycode::Control as u8 => { kbd_state.modifiers.borrow_mut().control = true }
+        x if x == Keycode::Alt     as u8 => { kbd_state.modifiers.borrow_mut().alt = true }
+        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { kbd_state.modifiers.borrow_mut().shift = true }
         
-        x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { KBD_MODIFIERS.lock().control = false }
-        x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { KBD_MODIFIERS.lock().alt = false }
-        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { KBD_MODIFIERS.lock().shift = false }
+        x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { kbd_state.modifiers.borrow_mut().control = false }
+        x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { kbd_state.modifiers.borrow_mut().alt = false }
+        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { kbd_state.modifiers.borrow_mut().shift = false }
 
         // if not a modifier key, just put the keycode and it's action (pressed or released) in the buffer
         x => { 
@@ -91,21 +121,16 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
                     (scan_code - KEY_RELEASED_OFFSET, KeyAction::Released) 
                 };
 
-            
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
-                Some(keycode) => { // this re-scopes keycode              
-                    let result = KBD_QUEUE.lock().queue( 
-                        KeyEvent::new(keycode, action, KBD_MODIFIERS.lock().clone())); 
-                    match result {
-                        Ok(n) => { 
-                            // println!("kbd buffer front: {:?}", KEYBOARD_MGR.buffer_queue.lock().peek());
-                            return Ok(()); 
-                        } 
-                        Err(_) => { 
-                            println!("Error: keyboard queue is full, discarding {}!", scan_code);
-                            return Err(KeyboardInputError::QueueFull);
-                        }
+                Some(keycode) => { // this re-scopes (shadows) keycode
+                    if kbd_state.queue.borrow().len() < KBD_QUEUE_SIZE {
+                        kbd_state.queue.borrow_mut().push(KeyEvent::new(keycode, action, kbd_state.modifiers.clone().into_inner())); 
+                        return Ok(());  // successfully queued up KeyEvent 
+                    }
+                    else {
+                        println!("Error: keyboard queue is full, discarding {}!", scan_code);
+                        return Err(KeyboardInputError::QueueFull);
                     }
                 }
 
@@ -120,7 +145,27 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
 
 
 pub fn pop_key_event() -> Option<KeyEvent> {
-    KBD_QUEUE.lock().dequeue()
+    // this approach avoids a mutex by basically saying it we cannot get a mutable reference to the kbd queue,
+    // then just do nothing until we can. 
+    if let Some(ks) = KBD_STATE.try() {
+        let res = ks.queue.try_borrow_mut(); 
+        match res {
+            Ok(mut qref) => {
+                let ref mut q = *qref;
+                if q.len() > 0 {
+                    Some(q.remove(0)) // pop the first item
+                }
+                else { 
+                    None // queue vector is empty
+                }
+            }
+            Err(e) => { 
+                println!("couldn't borrow queue as mut: {}", e);
+                None
+            }
+        }
+    }
+    else {
+        None
+    }
 }
-
-

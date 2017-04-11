@@ -2,7 +2,7 @@
 #![no_std] // use core instead of std
 
 
-
+// use core::cell::RefCell;
 
 // TODO: use these tables and tips:
 // https://sourceforge.net/p/oszur11/code/ci/master/tree/Chapter_06_Shell/04_Makepp/arch/i386/arch/devices/i8042.c
@@ -42,6 +42,8 @@ impl KeyboardModifiers {
         }
     }
 }
+
+unsafe impl Sync for KeyboardModifiers {}
 
 
 pub static KEY_RELEASED_OFFSET: u8 = 128;
