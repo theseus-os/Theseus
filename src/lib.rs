@@ -68,13 +68,22 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	unsafe { x86::shared::irq::enable();  }
 	println!("enabled interrupts!");
 
+    loop { }
+
+
+    // FIXME:  this loop causes a deadlock for some dumbass reason
 	loop { 
         let keyevent = drivers::keyboard::pop_key_event();
         match keyevent {
             Some(keyevent) => { 
-                print!("{:?}  ", keyevent.keycode.to_ascii(&keyevent.modifiers));
+                let ascii = keyevent.keycode.to_ascii(&keyevent.modifiers);
+                println!("{:?}", ascii);
+                match ascii {
+                    Some(c) => { println!("{}", c); }
+                    _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
+                }
             }
-            _ => { } 
+            _ => { }
         }
      }
 //    loop { unsafe  {x86_64::instructions::halt(); } }

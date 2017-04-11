@@ -2,6 +2,9 @@
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "keycodes_ascii"
 version = "0.1.0"
+keywords = ["keyboard", "ascii", "ps2", "scan codes", "scancode"]
+categories = ["no-std", "hardware-support"]
+license = "MIT"
 
 [dependencies]
 
