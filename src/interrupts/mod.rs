@@ -197,11 +197,13 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
 
-    let mut scan_code: u8 = KEYBOARD.lock().read(); 
+    let mut scan_code: u8 = { 
+        KEYBOARD.lock().read() 
+    };
 
-	println!("KBD: {:?}", scan_code);
-    println!("{:?}", keyboard::handle_keyboard_input(scan_code));
-
+	// println!("KBD: {:?}", scan_code);
+    
+    keyboard::handle_keyboard_input(scan_code);
 	unsafe { PIC.lock().notify_end_of_interrupt(0x21); }
 }
 

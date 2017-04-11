@@ -50,7 +50,7 @@ pub static KEY_RELEASED_OFFSET: u8 = 128;
 
 
 /// convenience function for obtaining the ascii value for a raw scancode under the given modifiers
-pub fn scancode_to_ascii(modifiers: &KeyboardModifiers, scan_code: u8) -> Option<char> {
+pub fn scancode_to_ascii(modifiers: KeyboardModifiers, scan_code: u8) -> Option<char> {
 	// FIXME: this whole let if stmt can likely be replaced by an "and_then" flow
     if let Some(keycode) = Keycode::from_scancode(scan_code) {
         keycode.to_ascii(modifiers)
@@ -270,7 +270,7 @@ impl Keycode {
 
 
     // obtains the ascii value for a keycode under the given modifiers
-    pub fn to_ascii(&self, modifiers: &KeyboardModifiers) -> Option<char> {
+    pub fn to_ascii(&self, modifiers: KeyboardModifiers) -> Option<char> {
         // handle shift key being pressed
         if modifiers.shift {
             // if shift is pressed and caps lock is on, give a regular lowercase letter
