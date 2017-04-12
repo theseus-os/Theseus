@@ -16,6 +16,7 @@
 #![feature(drop_types_in_const)] // unsure about this, prompted to add by rust compiler for Once<>
 #![no_std]
 
+
 extern crate rlibc;
 extern crate volatile;
 extern crate spin; // core spinlocks 
@@ -23,7 +24,7 @@ extern crate multiboot2;
 #[macro_use] extern crate bitflags;
 extern crate x86;
 #[macro_use] extern crate x86_64;
-#[macro_use] extern crate once; // 
+#[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 extern crate hole_list_allocator; // our own allocator
@@ -33,13 +34,13 @@ extern crate cpuio;
 extern crate keycodes_ascii; // our own crate for keyboard 
 
 
-#[macro_use] mod vga_buffer;
+
+#[macro_use] mod drivers; 
 mod memory;
 mod interrupts;
-mod drivers; 
 
 
-use drivers::keyboard::indirection_layer::KeyAction;
+use drivers::input::keyboard::KeyAction;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
@@ -47,25 +48,23 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    // ATTENTION: we have a very small stack and no guard page
-    vga_buffer::clear_screen();
-    println!("Hello World{}", "!");
-    drivers::serial_port::serial_out("Hello serial port!");
+    // early initialization of things like vga console
+    drivers::early_init();
+    
 
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    // set up guard page and map the heap pages
+    // set up stack guard page and map the heap pages
     let mut memory_controller = memory::init(boot_info);
 
-    // initialize our IDT
+    // initialize our interrupts and IDT
     interrupts::init(&mut memory_controller);
 
-
-    // let mut kbd_state: KeyboardState = drivers::keyboard::indirection_layer::KeyboardState::new();
-    // drivers::keyboard::indirection_layer::init(&mut kbd_state);
-    drivers::keyboard::indirection_layer::init();
+    // initialize the rest of our drivers
+    drivers::init();
+    
 
     println!("initialization done!");
 
@@ -73,17 +72,14 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	unsafe { x86::shared::irq::enable();  }
 	println!("enabled interrupts!");
 
-    // loop { }
 
-
-    // FIXME:  this loop causes a deadlock for some dumbass reason, which is the use of Mutex.lock in the interrupt handler
 	'top: loop { 
-        let keyevent = drivers::keyboard::pop_key_event();
+        let keyevent = drivers::input::keyboard::pop_key_event();
         match keyevent {
             Some(keyevent) => { 
                 // only print ascii values on a key press down
                 if keyevent.action != KeyAction::Pressed {
-                    continue 'top;
+                    continue 'top; // aren't Rust's loop labels cool? 
                 }
 
                 let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);

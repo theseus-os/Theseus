@@ -5,9 +5,8 @@ extern crate keycodes_ascii; // our own crate in "libs/" dir
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
-use spin::{Mutex, Once, RwLock};
-// use drivers::keyboard::queue::Queue;  // why is this "self" in front?
-use core::cell::{Ref, RefMut, RefCell};
+// use spin::{Mutex, Once, RwLock};
+// use core::cell::{Ref, RefMut, RefCell};
 use collections::VecDeque;
 
 
@@ -20,8 +19,8 @@ use collections::VecDeque;
 static KBD_QUEUE_SIZE: usize = 256;
 
 
-static mut kbd_queue: Option<VecDeque<KeyEvent>> = None;
-static mut kbd_modifiers: Option<KeyboardModifiers> = None; 
+static mut KBD_QUEUE: Option<VecDeque<KeyEvent>> = None;
+static mut KBD_MODIFIERS: Option<KeyboardModifiers> = None; 
 
 // impl KeyboardState {
 //     pub fn new() -> KeyboardState {
@@ -40,8 +39,8 @@ pub fn init() {
     assert_has_not_been_called!("keyboard init was called more than once!");
     
     unsafe {
-        kbd_queue = Some(VecDeque::with_capacity(KBD_QUEUE_SIZE));
-        kbd_modifiers = Some(KeyboardModifiers::new());
+        KBD_QUEUE = Some(VecDeque::with_capacity(KBD_QUEUE_SIZE));
+        KBD_MODIFIERS = Some(KeyboardModifiers::new());
     }
 
 }
@@ -90,7 +89,7 @@ impl KeyEvent {
 pub enum KeyboardInputError {
     QueueFull,
     UnknownScancode,
-    TryAcquireFailed,
+    // TryAcquireFailed,
 }
 
 
@@ -105,7 +104,7 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
     //     return Err(KeyboardInputError::TryAcquireFailed);
     // }
     // let kbd_state = kbd_state.unwrap(); // safe, cuz we already checked for is_none()
-    let mut modifiers = unsafe { kbd_modifiers.as_mut().expect("Error: kbd_modifiers was uninitialized") };
+    let mut modifiers = unsafe { KBD_MODIFIERS.as_mut().expect("Error: KBD_MODIFIERS was uninitialized") };
    
     // first, update the modifier keys
     match scan_code {
@@ -137,13 +136,13 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    let mut queue = unsafe{ kbd_queue.as_mut().expect("kbd_queue was uninitialized") };
+                    let mut queue = unsafe{ KBD_QUEUE.as_mut().expect("KBD_QUEUE was uninitialized") };
                     if queue.len() < KBD_QUEUE_SIZE {
                         queue.push_back(KeyEvent::new(keycode, action, modifiers.clone())); 
                         return Ok(());  // successfully queued up KeyEvent 
                     }
                     else {
-                        println!("Error: keyboard queue is full, discarding {}!", scan_code);
+                        // println!("Error: keyboard queue is full, discarding {}!", scan_code);
                         return Err(KeyboardInputError::QueueFull);
                     }
                 }
@@ -153,13 +152,12 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
         }
     }
 
-    Ok(())
 }
 
 
 
 pub fn pop_key_event() -> Option<KeyEvent> {
-    let mut kq = unsafe { kbd_queue.as_mut() };
+    let kq = unsafe { KBD_QUEUE.as_mut() };
 
     if let Some(queue) = kq {
         queue.pop_front()

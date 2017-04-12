@@ -12,8 +12,7 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use cpuio::Port;
-use drivers::keyboard;
-use x86;
+use drivers::input::keyboard;
 
 
 mod gdt;

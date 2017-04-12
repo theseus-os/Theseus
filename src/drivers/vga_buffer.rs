@@ -16,20 +16,22 @@ const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
 pub static WRITER: Mutex<Writer> = Mutex::new(Writer {
-                                                  column_position: 0,
-                                                  color_code: ColorCode::new(Color::LightGreen,
-                                                                             Color::Black),
-                                                  buffer: unsafe { Unique::new(0xb8000 as *mut _) },
-                                              });
+                    column_position: 0,
+                    color_code: ColorCode::new(Color::LightGreen,
+                                                Color::Black),
+                    buffer: unsafe { Unique::new(0xb8000 as *mut _) },
+                });
 
+#[macro_export]
 macro_rules! println {
     ($fmt:expr) => (print!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
 
+#[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-            $crate::vga_buffer::print(format_args!($($arg)*));
+            $crate::drivers::vga_buffer::print(format_args!($($arg)*));
     });
 }
 
@@ -42,6 +44,11 @@ pub fn clear_screen() {
     for _ in 0..BUFFER_HEIGHT {
         println!("");
     }
+}
+
+pub fn show_splash_screen() {
+    clear_screen();
+    println!("{}", WELCOME_STRING);
 }
 
 #[allow(dead_code)]
@@ -152,3 +159,13 @@ struct ScreenChar {
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
+
+
+
+static WELCOME_STRING: &'static str = "\n
+  ____           _    __       _        ___  ____  
+ |  _ \\ ___  ___| |_ / _|_   _| |      / _ \\/ ___| 
+ | |_) / _ \\/ __| __| |_| | | | |     | | | \\___ \\ 
+ |  _ <  __/\\__ \\ |_|  _| |_| | |     | |_| |___) |
+ |_| \\_\\___||___/\\__|_|  \\__,_|_|      \\___/|____/ \n";
+                                                   

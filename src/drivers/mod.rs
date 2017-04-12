@@ -1,4 +1,12 @@
 pub mod serial_port;
-pub mod keyboard; 
+pub mod input; 
+#[macro_use] pub mod vga_buffer;
 
-// TODO: call any driver initialization routines here
+
+pub fn early_init() {
+    vga_buffer::show_splash_screen();
+
+}
+
+pub fn init() {
+    input::keyboard::init();}
