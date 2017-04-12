@@ -5,8 +5,17 @@
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
-
 // except according to those terms.
+
+
+// Copyright 2017 Kevin Boos. 
+// Licensed under the  MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>,
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
+
+
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
 #![feature(alloc, collections)]
@@ -31,16 +40,20 @@ extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
 #[macro_use] extern crate collections;
 extern crate cpuio; 
+#[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
 
 
 
-#[macro_use] mod drivers; 
+
+#[macro_use] mod drivers;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+mod logger;
 mod memory;
 mod interrupts;
 
 
-use drivers::input::keyboard::KeyAction;
+
+
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
@@ -48,7 +61,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    // early initialization of things like vga console
+    // early initialization of things like vga console and logging
+    logger::init_logger();
     drivers::early_init();
     
 
@@ -64,7 +78,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // initialize the rest of our drivers
     drivers::init();
-    
+
 
     println!("initialization done!");
 
@@ -73,13 +87,23 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	println!("enabled interrupts!");
 
 
-	'top: loop { 
+	'outer: loop { 
         let keyevent = drivers::input::keyboard::pop_key_event();
         match keyevent {
             Some(keyevent) => { 
+                use drivers::input::keyboard::KeyAction;
+                use keycodes_ascii::Keycode;
+
+                // Ctrl+D or Ctrl+Alt+Del kills the OS
+                if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
+                        keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
+                    break 'outer;
+                }
+
+
                 // only print ascii values on a key press down
                 if keyevent.action != KeyAction::Pressed {
-                    continue 'top; // aren't Rust's loop labels cool? 
+                    continue 'outer; // aren't Rust's loop labels cool? 
                 }
 
                 let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
@@ -93,6 +117,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         }
 
      }
+
+
+     // cleanup here
+     logger::shutdown();
 
 }
 

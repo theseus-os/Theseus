@@ -115,7 +115,7 @@ pub fn init(memory_controller: &mut MemoryController) {
 
     IDT.load();
 
-
+    info!("loaded interrupt descriptor table.");
 }
 
 
