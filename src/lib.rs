@@ -38,6 +38,9 @@ mod memory;
 mod interrupts;
 mod drivers; 
 
+
+use drivers::keyboard::indirection_layer::KeyAction;
+
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	
@@ -74,20 +77,21 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
 
     // FIXME:  this loop causes a deadlock for some dumbass reason, which is the use of Mutex.lock in the interrupt handler
-	loop { 
+	'top: loop { 
         let keyevent = drivers::keyboard::pop_key_event();
         match keyevent {
             Some(keyevent) => { 
-                println!("{:?}", keyevent);
-                
-                /*
-                let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
-                println!("{:?}", ascii);
-                match ascii {
-                    Some(c) => { println!("{}", c); }
-                    _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
+                // only print ascii values on a key press down
+                if keyevent.action != KeyAction::Pressed {
+                    continue 'top;
                 }
-                */
+
+                let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
+                match ascii {
+                    Some(c) => { print!("{}", c); }
+                    // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
+                    _ => { } 
+                }
             }
             _ => { }
         }

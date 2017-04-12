@@ -296,7 +296,8 @@ impl Keycode {
             }
         }
 
-        None
+        // default to regular ascii value
+        self.as_ascii()
         
         // TODO: handle numlock
     }

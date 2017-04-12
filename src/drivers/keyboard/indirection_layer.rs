@@ -12,6 +12,11 @@ use collections::VecDeque;
 
 
 
+// TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
+
+
+
+
 static KBD_QUEUE_SIZE: usize = 256;
 
 
@@ -56,7 +61,7 @@ pub fn init() {
 
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum KeyAction {
     Pressed,
     Released,
@@ -91,8 +96,6 @@ pub enum KeyboardInputError {
 
 
 
-
-
 /// returns Ok(()) if everything was handled properly.
 /// returns KeyboardInputError 
 pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
@@ -103,18 +106,26 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
     // }
     // let kbd_state = kbd_state.unwrap(); // safe, cuz we already checked for is_none()
     let mut modifiers = unsafe { kbd_modifiers.as_mut().expect("Error: kbd_modifiers was uninitialized") };
-
-
+   
+    // first, update the modifier keys
     match scan_code {
         x if x == Keycode::Control as u8 => { modifiers.control = true }
         x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
         x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { modifiers.shift = true }
-        
+
+        // trigger caps lock on press only
+        x if x == Keycode::CapsLock as u8 => { modifiers.caps_lock ^= true }
+
         x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
         x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { modifiers.alt = false }
         x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { modifiers.shift = false }
 
-        // if not a modifier key, just put the keycode and it's action (pressed or released) in the buffer
+        _ => { } // do nothing
+    }
+
+
+    // second,  put the keycode and it's action (pressed or released) in the keyboard queue
+    match scan_code {
         x => { 
             let (adjusted_scan_code, action) = 
                 if x < KEY_RELEASED_OFFSET { 
@@ -156,35 +167,4 @@ pub fn pop_key_event() -> Option<KeyEvent> {
     else {
         None
     }
-
-
-    // let ref q = KBD_STATE.read().queue;
-    // if q.len() > 0 {
-    //     Some(q.remove(0)) // pop the first item
-    // }
-    // else { 
-    //     None // queue vector is empty
-    // }
-    
-    // if let Some(ks) = KBD_STATE.try_read() {  
-        // let res = ks.queue.try_borrow_mut(); 
-        // match res {
-        //     Ok(mut qref) => {
-        //         let ref mut q = *qref;
-        //         if q.len() > 0 {
-        //             Some(q.remove(0)) // pop the first item
-        //         }
-        //         else { 
-        //             None // queue vector is empty
-        //         }
-        //     }
-        //     Err(e) => { 
-        //         println!("couldn't borrow queue as mut: {}", e);
-        //         None
-        //     }
-        // }
-    // }
-    // else {
-    //     None
-    // }
 }
