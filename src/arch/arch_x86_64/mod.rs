@@ -1,5 +1,5 @@
 
-struct ArchTaskState {
+pub struct ArchTaskState {
     registers: Registers,
 }
 
@@ -7,8 +7,25 @@ impl ArchTaskState {
 
     pub fn new() -> ArchTaskState {
         ArchTaskState { 
-            register: Registers::new(),
+            registers: Registers::new(),
         }
+    }
+
+
+    /// Set the page table address.
+    pub fn set_page_table(&mut self, address: usize) {
+        self.registers.set_page_table(address);
+    }
+
+    /// Get the page table address.
+    pub fn get_page_table(&self) -> usize {
+        self.registers.get_page_table()
+    }
+
+
+    /// Set the stack address.
+    pub fn set_stack(&mut self, address: usize) {
+        self.registers.set_stack(address);
     }
 
 
@@ -72,50 +89,50 @@ impl ArchTaskState {
 
 
 #[repr(C, packed)] // only really necessary if we're writing to it from an .asm/.S file, which we're currently not doing
-struct Registers {
+pub struct Registers {
     // docs here: http://cons.mit.edu/sp17/x86-64-architecture-guide.html
 
     
     /// 64-bit register destination index (destination of data copy instructions), first argument to functions
-    rdi: u64, 
+    rdi: usize, 
     /// 64-bit register source index (source of data copy instructions), second argument to functions
-    rsi: u64, 
+    rsi: usize, 
 
     /// 64-bit register A (accumulator), temp register usually used for passing back the return value
-    rax: u64, 
+    rax: usize, 
     /// 64-bit register B (base)
-    rbx: u64, 
+    rbx: usize, 
     /// 64-bit register C (counter), fourth argument to functions
-    rcx: u64, 
+    rcx: usize, 
     /// 64-bit register D (data), third argument to functions
-    rdx: u64, 
+    rdx: usize, 
     
     /// 64-bit stack pointer register
-    rsp: u64, 
+    rsp: usize, 
     /// 64-bit stack base pointer register
-    rbp: u64,
+    rbp: usize,
 
     /// used as 5th argument to functions
-    r8: u64, 
+    r8: usize, 
     /// used as 6th argument to functions (final arg)
-    r9: u64, 
+    r9: usize, 
     /// temporary register
-    r10: u64, 
+    r10: usize, 
     /// temporary register
-    r11: u64, 
+    r11: usize, 
 
     // r12-r15 must be saved 
-    r12: u64, 
-    r13: u64, 
-    r14: u64, 
-    r15: u64, 
+    r12: usize, 
+    r13: usize, 
+    r14: usize, 
+    r15: usize, 
 
     /// 64-bit instruction pointer register
-    rip: u64,
+    rip: usize,
     /// 64-bit flags register
-    rflags: u64,
+    rflags: usize,
     /// 64-bit control register 3 (contains page dir pointer)
-    cr3: u64,
+    cr3: usize,
 }
 
 impl Registers {
@@ -145,7 +162,7 @@ impl Registers {
         }
     }
 
-    pub fn create(page_table: u64, stack: u64) {
+    pub fn create(page_table: usize, stack: usize) -> Registers {
         let mut regs = Registers::new();
         regs.set_page_table(page_table);
         regs.set_stack(stack);
@@ -153,13 +170,18 @@ impl Registers {
     }
 
     /// Set the page table address.
-    pub fn set_page_table(&mut self, address: u64) {
+    pub fn set_page_table(&mut self, address: usize) {
         debug_assert!(self.cr3 == 0, "cr3 was already set!");
         self.cr3 = address;
     }
 
+    /// Get the page table address.
+    pub fn get_page_table(&self) -> usize {
+        self.cr3
+    }
+
     /// Set the stack address.
-    pub fn set_stack(&mut self, address: u64) {
+    pub fn set_stack(&mut self, address: usize) {
         debug_assert!(self.rsp == 0, "stack pointer (rsp) was already set!");
         self.rsp = address;
     }

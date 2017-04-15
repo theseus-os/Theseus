@@ -14,6 +14,9 @@ use collections::VecDeque;
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
 
 
+// TODO: use a lock-free queue (a la Michael Scott): https://aturon.github.io/blog/2015/08/27/epoch/
+
+
 
 
 static KBD_QUEUE_SIZE: usize = 256;

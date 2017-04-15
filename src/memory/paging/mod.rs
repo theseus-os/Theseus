@@ -100,7 +100,7 @@ impl Iterator for PageIter {
     }
 }
 
-/// the owner of the recursively defind P4 page table. 
+/// the owner of the recursively defined P4 page table. 
 pub struct ActivePageTable {
     mapper: Mapper,
 }

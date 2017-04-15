@@ -1,47 +1,46 @@
-/// pick the next task and then context switch to it. 
+use core::ops::DerefMut;
+
+/// This function picks the next task and then context switch to it. 
+/// This is unsafe because we have to maintain references to the current and next tasks
+/// beyond the duration of their task locks and the singular task_list lock.
 pub unsafe fn schedule() -> bool {
+    
+    let current_taskid: AtomicTaskId = CURRENT_TASK.load(, Ordering::SeqCst);
+    let mut current_task = 0 as *mut Task; // a null Task ptr
+    let mut next_task = 0 as *mut Task; // a null Task ptr
+    
 
-    // TODO FIX THIS 
-    let current_task: &Task = task_list.get where task.id == CURRENT_TASK
-
-    let next_task: Option<&Task> = None;
-
-    //// old code start
-    let mut to_ptr = 0 as *mut Context;
+    // this is scoped to ensure that the tasklist's RwLock is released at the end.
+    // we only request a read lock cuz we're not modifying the list here, 
+    // rather just trying to find one that is runnable 
     {
-        // get the list of context
-        let contexts = contexts();
-
-        // get the current context
-        {
-            let context_lock = contexts.current().expect("context::switch: not inside of context");
-            let mut context = context_lock.write();
-            from_prt = context.deref_mut() as *mut Context;
-        }
-
-        // TODO we must create a mechanism to prevent switch processors from other CPU's
-
-        // find the next context to be executed
-        for (pid, context_lock) in contexts.iter() {
-            if *pid > (*from_prt).id {
-                let mut context = context_lock.write();
-                to_ptr = context.deref_mut() as *mut Context;
+        for (taskid, locked_task) in super::get_tasklist().read().iter() {
+            if taskid == current_taskid {
+                continue;
             }
-        }
-    }
-    //// old code end
+            let task = &locked_task.write();
+            if task.runstate == super::RunState::RUNNABLE {
+                // we use an unsafe deref_mut() operation to ensure that this reference
+                // can remain beyond the lifetime of the tasklist RwLock being held.
+                next_task = task.deref_mut() as *mut Task;
+            }
+        } // writable locked_task is released here
+    } // read-only tasklist lock is released here
 
-
-    match next_task {
-        Some(next) => {
-            current_task.contex_switch(next);
-            true
-        }
-        _ => { 
-            warn!("schedule(): next task was None!"); 
-            false
-        }
+    if next_task as usize == 0 {
+        warn!("schedule(): next task was None!"); 
+        return false;
     }
 
-  
+    // same scoping reasons as above: to release the tasklist lock and the lock around current_task
+    {
+        current_task = super::get_tasklist().write().deref_mut() as *mut Task; 
+    }
+
+    // we want mutable references to mutable tasks
+    let mut curr = &mut (&mut *current_task); // as &mut Task; 
+    let mut next = &mut (&mut *next_task); // as &mut Task; 
+    curr.context_switch(next); 
+
+    true
 }

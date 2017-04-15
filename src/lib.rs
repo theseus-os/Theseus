@@ -48,7 +48,9 @@ extern crate keycodes_ascii; // our own crate for keyboard
 
 #[macro_use] mod drivers;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod util;
+mod arch;
 mod logger;
+mod task;
 mod memory;
 mod interrupts;
 
