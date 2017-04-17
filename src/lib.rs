@@ -55,7 +55,21 @@ mod memory;
 mod interrupts;
 
 
+use spin::RwLockWriteGuard;
+use task::TaskList;
 
+
+fn second_thr(a: u64) -> u64 {
+    return a * 2;
+}
+
+extern fn second_thread_main() {
+    println!("Hello from second thread!!");
+    println!("calling second_thr(3) = {}", second_thr(3u64));
+
+    loop { }
+
+}
 
 
 #[no_mangle]
@@ -65,7 +79,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
     // early initialization of things like vga console and logging
-    logger::init_logger();
+    logger::init_logger().expect("WTF: couldn't init logger.");
     drivers::early_init();
     
 
@@ -88,6 +102,35 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	
 	unsafe { x86::shared::irq::enable();  }
 	println!("enabled interrupts!");
+
+    // create the initial `Task`, called task_zero
+    // this is scoped in order to automatically release the tasklist RwLock
+    {
+        let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();
+        let task_zero = tasklist_mut.init_first_task();
+    }
+
+    // create a second task to test context switching
+    {
+        let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
+        let second_task = tasklist_mut.spawn(second_thread_main); 
+        match second_task {
+            Ok(_) => {
+                println!("successfully spawned and queued second task!");
+            }
+            Err(err) => { 
+                println!("Failed to spawn second task: {}", err); 
+            }
+        }
+    }
+
+    // try to schedule in the second task
+    println!("attempting to schedule second task");
+    unsafe {
+        ::x86_64::instructions::interrupts::disable();
+        task::schedule();
+        ::x86_64::instructions::interrupts::enable();
+    }
 
 
 	'outer: loop { 
@@ -123,7 +166,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
 
      // cleanup here
-     logger::shutdown();
+     logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 
 }
 

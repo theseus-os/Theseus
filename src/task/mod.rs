@@ -4,23 +4,25 @@ use collections::BTreeMap;
 use collections::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
-use arch::{pause, ArchTaskState};
+use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
+
+
+mod scheduler;
+pub use self::scheduler::schedule;
+
 
 // declare types "TaskId" as a usize and AtomicTaskId as an Atomic usize
 int_like!(TaskId, AtomicTaskId, usize, AtomicUsize);
 
 
 // #[thread_local] // not sure thread_local is a valid attribute
-pub static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
+static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
 
 
 /// Used to ensure that context switches are done atomically
 static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
-
-
-
 
 
 
@@ -42,7 +44,7 @@ struct Task {
     pub id: TaskId,
     pub runstate: RunState, 
     pub arch_state: ArchTaskState,
-    /// the kernel stack
+    /// [unused] the kernel stack
     pub kstack: Option<Box<[u8]>>,
     pub name: String,
 }
@@ -77,11 +79,13 @@ impl Task {
     /// switches from the current (`self`)  to the `next` `Task`
     /// the lock on 
     pub fn context_switch(&mut self, mut next: &mut Task) {
+        debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
         }
 
+        debug!("context_switch [1], testing runstates.");
         assert!(next.runstate != RunState::BLOCKED, "scheduler bug: chosen 'next' Task was BLOCKED!");
         assert!(next.runstate != RunState::RUNNING, "scheduler bug: chosen 'next' Task was already RUNNING!");
 
@@ -89,12 +93,14 @@ impl Task {
         self.runstate = RunState::RUNNABLE; 
         next.runstate = RunState::RUNNING; 
 
-        // store the current context ID
+        debug!("context_switch [2], setting CURRENT_TASK.");
+        // update the current task to `next`
         CURRENT_TASK.store(next.id, Ordering::SeqCst);
 
         // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
+        debug!("context_switch [3], calling switch_to.");
 
         // perform the actual context switch
         unsafe {
@@ -135,11 +141,9 @@ impl TaskList {
         self.list.iter()
     }
 
-    /// Create a new context.
-    ///
-    /// ## Returns
-    /// A Result with a reference counter for the created Context.
-    pub fn create_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
+    /// instantiate a new `Task`, wraps it in a RwLock and an Arc, and then adds it to the `TaskList`.
+    /// this function doesn't actually set up the task's members, e.g., stack, registers, memory areas. 
+    pub fn new_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
 
         // first, find a free task id! 
         if self.taskid_counter >= MAX_NR_TASKS {
@@ -162,7 +166,7 @@ impl TaskList {
         match self.list.insert(new_id, Arc::new(RwLock::new(Task::new(new_id)))) {
             None => { // None indicates that the insertion didn't overwrite anything, which is what we want
                 debug!("Successfully created task {}", new_id.into());
-                Ok(self.list.get(&new_id).unwrap())
+                Ok(self.list.get(&new_id).expect("new_task(): couldn't find new task in tasklist"))
             }
             _ => Err("Error: overwrote task id!")
         }
@@ -170,24 +174,59 @@ impl TaskList {
     }
 
 
+    /// initialize the first `Task` with special id = 0. 
+    /// basically just sets up a Task structure around the bootstrapped kernel thread,
+    /// the one that enters`rust_main()`.
+    /// Returns a reference to the `Task`, protected by a `RwLock`
+    pub fn init_first_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
+        assert_has_not_been_called!("init_first_task was already called once!");
+
+        let id_zero = TaskId::from(0);
+
+        let mut task_zero = Task::new(id_zero);
+        CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
+        task_zero.runstate == RunState::RUNNING; // it's the one currently running!
+        
+        // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
+        // but we still have to set its page table to the current value 
+        task_zero.arch_state.set_page_table(get_page_table_register());
+        
+        
+        // insert the new context into the list
+        match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
+            None => { // None indicates that the insertion didn't overwrite anything, which is what we want
+                debug!("Successfully created initial task0");
+                Ok(self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist"))
+            }
+            _ => Err("WTF: task_zero already existed?!?")
+        }
+    }
+
     /// Spawn a new task that enters the given function `func`.
+    /// FIXME: does it need to be an extern fn()??
     pub fn spawn(&mut self, func: extern fn()) -> Result<&Arc<RwLock<Task>>, &str> {
 
-        let mut curr_cr3: usize = 0;
+        // right now we only have one page table (memory area) shared between the kernel,
+        // so just get the current page table value and set the new task's value to the same thing
+        let mut curr_pgtbl: usize = 0;
         {
-            curr_cr3 = self.get_current().unwrap().read().arch_state.get_page_table();
+            curr_pgtbl = self.get_current().expect("spawn(): get_current failed in getting curr_pgtbl")
+                        .read().arch_state.get_page_table();
         }
 
-        let locked_new_task = self.create_task().expect("couldn't create task in spawn()!");
+        let locked_new_task = self.new_task().expect("couldn't create task in spawn()!");
         {
             // request a mutable reference
             let mut new_task = locked_new_task.write();
             
-            // allocate a vector of 16 KB
+            // this line would be useful if we wish to create an entirely new address space:
+            // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
+            // for now, just use the same address space because we're creating a new kernel thread
+            new_task.arch_state.set_page_table(curr_pgtbl); 
+
+
+            // create and set up a new 16KB stack 
             let mut stack = vec![0; 16384].into_boxed_slice(); // `stack` is the bottom of the stack
-
-
-            // TODO: is there a better way to represent function pointers in Rust?
 
             // Place the `func` function pointer in the first spot on the stack
             let offset = stack.len() - mem::size_of::<usize>();
@@ -197,10 +236,6 @@ impl TaskList {
                 *(func_ptr as *mut usize) = func as usize;
             }
 
-            // this line would be useful if we wish to create an entirely new address space:
-            // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
-
-            // for now, just use the same address space because we're creating a new kernel thread
             new_task.arch_state.set_stack((stack.as_ptr() as usize) + offset); // the top of the stack
             new_task.kstack = Some(stack);
 

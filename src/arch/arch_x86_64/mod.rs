@@ -1,3 +1,10 @@
+use x86_64;
+
+/// get the real, current value of cr3
+pub fn get_page_table_register() -> usize {
+    x86_64::registers::control_regs::cr3().0 as usize
+}
+
 
 pub struct ArchTaskState {
     registers: Registers,
@@ -34,6 +41,9 @@ impl ArchTaskState {
     #[inline(never)]
     #[naked]
     pub unsafe fn switch_to(&mut self, next: &ArchTaskState) {
+
+        debug!("switch_to [0]");
+
         // The following registers must be saved on x86_64:  (http://cons.mit.edu/sp17/x86-64-architecture-guide.html)
         // rbx, r12, r13, r14, r15, rsp, rbp
         // We also save rflags and the pdrp (cr3), both of which need to be saved
@@ -50,7 +60,11 @@ impl ArchTaskState {
         // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space)
         asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
         if next.registers.cr3 != self.registers.cr3 {
+            debug!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
             asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
+        }
+        else {
+            debug!("cr3 was the same as expected.");
         }
 
         // save & restore rflags
