@@ -11,8 +11,7 @@ use core::any::Any;
 use core::fmt;
 
 
-mod scheduler;
-pub use self::scheduler::schedule;
+#[macro_use] pub mod scheduler;
 
 
 // declare types "TaskId" as a usize and AtomicTaskId as an Atomic usize
@@ -42,11 +41,22 @@ pub enum RunState {
     EXITED(i8), 
 }
 
-
+#[derive(Debug)]
 struct KthreadCall<A, R> {
-    pub arg: A,
+    /// comes from Box::into_raw(Box<A>)
+    pub arg: *mut A,
     pub func: fn(arg: A) -> R,
 }
+
+impl<A, R> KthreadCall<A, R> {
+    pub fn new(a: A, f: fn(arg: A) -> R) -> KthreadCall<A, R> {
+        KthreadCall {
+            arg: Box::into_raw(Box::new(a)),
+            func: f,
+        }
+    }
+}
+
 
 struct Task {
     pub id: TaskId,
@@ -215,7 +225,7 @@ impl TaskList {
     }
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`
-    pub fn spawn<A: fmt::Debug, R: fmt::Debug>(&mut self, 
+    pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
             func: fn(arg: A) -> R, arg: A) 
             -> Result<&Arc<RwLock<Task>>, &str> {
 
@@ -247,21 +257,26 @@ impl TaskList {
                 // put it on the top of the stack
                 let func_ptr = stack.as_mut_ptr().offset(offset as isize);
                 *(func_ptr as *mut usize) = kthread_wrapper::<A, R> as usize;
+
+                // debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
             }
 
 
             // set up the kthread stuff
-            let kthread_call = Box::new(KthreadCall {
-                arg: arg,
-                func: func,
-            });
+            let kthread_call = Box::new( KthreadCall::new(arg, func) );
+            debug!("Creating kthread_call: {:?}", kthread_call); 
 
-            // if you want something else to run, put it in the second spot on the stack.
-            // but currently we're using that space for kthread arguments
-            let offset2 = offset + mem::size_of::<usize>();
+
+            // currently we're using the very bottom of the stack for kthread arguments
+            let offset2: isize = 0;
             unsafe {
-                let arg_ptr = stack.as_mut_ptr().offset(offset2 as isize);
-                *(arg_ptr as *mut usize) = Box::into_raw(kthread_call) as *const _ as usize; // consumes the kthread_call Box!
+                let arg_ptr = stack.as_mut_ptr().offset(offset2);
+                let mut kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);
+                *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize; // consumes the kthread_call Box!
+
+                debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, *kthread_ptr);
+                // let recovered_kthread = Box::from_raw(kthread_ptr);
+                // debug!("recovered_kthread: {:?}", recovered_kthread);
             }
 
 
@@ -320,32 +335,40 @@ pub fn get_tasklist() -> &'static RwLock<TaskList> {
 
 use core::ops::Deref;
 /// this does not return
-// pub fn kthread_wrapper<T: Any, U: Any + fmt::Debug>(func: fn(arg: Option<T>) -> Option<U>, arg: Option<T>) -> ! {
 pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     debug!("kthread_wrapper [0], looping indefinitely");
 
-    let mut kthread_call_stack_ptr: usize = 0;
+    let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
         let tasklist = get_tasklist().read();
         unsafe {
             let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
-            let kstack = currtask.get_kstack().expect("kthread_wrapper():O get_kstack failed.");
-            kthread_call_stack_ptr = kstack.as_ptr().offset(kstack.len() as isize) as usize;
+            let kstack = currtask.get_kstack().expect("kthread_wrapper(): get_kstack failed.");
+            // in spawn() above, we use the very bottom of the stack to hold the pointer to the kthread_call
+            let off: isize = 0;
+            // dereference it once to get the raw pointer (from the Box<KthreadCall>)
+            kthread_call_stack_ptr = *(kstack.as_ptr().offset(off) as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>;
         }
     }
 
-    println!("kthread_call_stack_ptr = {}", kthread_call_stack_ptr);
+    println!("kthread_call_stack_ptr = {:#x}", kthread_call_stack_ptr as usize);
 
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
-    let kthread_call: Box<KthreadCall<A, R>> = unsafe { 
-        Box::from_raw((kthread_call_stack_ptr as *mut KthreadCall<A, R>)) 
+    let kthread_call: Box<KthreadCall<A, R>> = unsafe {
+        Box::from_raw(kthread_call_stack_ptr) 
     };
-    let arg = &kthread_call.arg as &A;
-    let func = &kthread_call.func as &(fn(A) -> R);
+    let kthread_call_val: KthreadCall<A, R> = *kthread_call;
 
-    debug!("kthread_wrapper [0.1]:arg {:?}", arg);
-    debug!("kthread_wrapper [0.2]:func {:?}", func);
-    let exit_status = 3; //func(arg); // FIXME: this is broken
+    debug!("recovered kthread_call: {:?}", kthread_call_val);
+
+    let arg: Box<A> = unsafe {
+        Box::from_raw(kthread_call_val.arg)
+    };
+    let func: fn(arg: A) -> R = kthread_call_val.func;
+
+    // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
+    // debug!("kthread_wrapper [0.2]: func {:?}", func);
+    let exit_status = func(*arg); // FIXME: this works for objects but not primitives like u64
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
 
@@ -357,11 +380,7 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 
     debug!("attempting to unschedule kthread...");
-    unsafe {
-        ::x86_64::instructions::interrupts::disable();
-        self::schedule();
-        ::x86_64::instructions::interrupts::enable();
-    }    
+    schedule!();
 
     loop { }
 }

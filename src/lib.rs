@@ -50,18 +50,20 @@ extern crate keycodes_ascii; // our own crate for keyboard
 #[macro_use] mod util;
 mod arch;
 mod logger;
-mod task;
+#[macro_use] mod task;
 mod memory;
 mod interrupts;
 
 
 use spin::RwLockWriteGuard;
 use task::TaskList;
-
+use collections::string::String;
 
 fn second_thr(a: u64) -> u64 {
     return a * 2;
 }
+
+
 
 fn second_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from second thread!!");
@@ -69,6 +71,36 @@ fn second_thread_main(arg: Option<u64>) -> u64  {
     println!("calling second_thr({}) = {}", arg.unwrap(), res);
     res
 }
+
+fn second_thread_u64_main(arg: u64) -> u64  {
+    println!("Hello from second thread!!");
+    let res = second_thr(arg);
+    println!("calling second_thr({}) = {}", arg, res);
+    res
+}
+
+
+// fn second_thread_str_main(arg: Option<String>) -> String {
+//     println!("Hello from second thread str version!!");
+//     let arg: String = arg.unwrap();
+//     let res = arg.to_uppercase();
+//     println!("arg: {:?}, res:{:?}", arg.into_bytes(), res.as_ptr());
+//     res
+// }
+
+fn second_thread_str_main(arg: String) -> String {
+    println!("Hello from second thread str version!!");
+    let res = arg.to_uppercase();
+    println!("arg: {:?}, res:{:?}", arg, res);
+    res
+}
+
+
+fn second_thread_none_main(_: u64) -> String {
+    println!("Hello from second thread None version!!");
+    String::from("returned None")
+}
+
 
 
 #[no_mangle]
@@ -112,8 +144,15 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
-        let second_task = tasklist_mut.spawn(second_thread_main, Some(555)); 
-        println!("second_thread_main: {:#x}", second_thread_main as usize);
+        // let second_task = tasklist_mut.spawn(second_thread_main, Some(6));
+        let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
+
+        // let arg = String::from("hello");
+        // let res = arg.to_uppercase();
+        // println!("creating arg: {:?}, res: {:?}", arg, res);
+        // let second_task = tasklist_mut.spawn(second_thread_str_main, arg);
+
+        // let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");
@@ -126,11 +165,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // try to schedule in the second task
     println!("attempting to schedule second task");
-    unsafe {
-        ::x86_64::instructions::interrupts::disable();
-        task::schedule();
-        ::x86_64::instructions::interrupts::enable();
-    }
+    schedule!();
 
 
 	'outer: loop { 

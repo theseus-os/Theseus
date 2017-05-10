@@ -54,3 +54,15 @@ pub unsafe fn schedule() -> bool {
 
     true
 }
+
+
+#[macro_export]
+macro_rules! schedule {
+    () => (    
+        unsafe {
+            ::x86_64::instructions::interrupts::disable();
+            $crate::task::scheduler::schedule();
+            ::x86_64::instructions::interrupts::enable();
+        }   
+    )
+}
