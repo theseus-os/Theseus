@@ -63,12 +63,11 @@ fn second_thr(a: u64) -> u64 {
     return a * 2;
 }
 
-extern fn second_thread_main() {
+fn second_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from second thread!!");
-    println!("calling second_thr(3) = {}", second_thr(3u64));
-
-    loop { }
-
+    let res = second_thr(arg.unwrap());
+    println!("calling second_thr({}) = {}", arg.unwrap(), res);
+    res
 }
 
 
@@ -113,7 +112,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
-        let second_task = tasklist_mut.spawn(second_thread_main); 
+        let second_task = tasklist_mut.spawn(second_thread_main, Some(555)); 
+        println!("second_thread_main: {:#x}", second_thread_main as usize);
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");

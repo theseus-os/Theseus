@@ -60,7 +60,7 @@ impl ArchTaskState {
         // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space)
         asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
         if next.registers.cr3 != self.registers.cr3 {
-            debug!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
+            warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
             asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
         }
         else {
