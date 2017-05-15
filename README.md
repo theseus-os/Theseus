@@ -28,12 +28,12 @@ We also need to install Xargo, a drop-in replacement wrapper for Cargo that make
 
 ## Additional Build Environment Setup
 Currently we only support building on 64-bit Debian-like Linux distributions (e.g., Ubuntu 16.04). You will need to install the following packages:  
-* `nasm`   
-* `grub-mkrescue`   
-* `grub-pc-bin`   
-* `mtools`    
-* `xorriso`   
-* `qemu`   
++ `nasm`   
++ `grub-mkrescue`   
++ `grub-pc-bin`   
++ `mtools`    
++ `xorriso`   
++ `qemu`   
 
 To build and run Theseus in QEMU, simply run:   
 `$ make run`
