@@ -1,50 +1,55 @@
-# Blog OS
+# Theseus OS
 
+Theseus is a new OS that tackles the problem of *state spill*, the harmful yet ubiquitous phenomenon described in our [research paper from EuroSys 2017 here](http://kevinaboos.web.rice.edu/statespy.html).
+
+We have build Theseus from scratch using Rust to completely rethink state management in an OS, with the intention of avoiding state spill or mitigating its effects to the fullest extent possible. 
+
+The design of Theseus's components and subsystems is frequently inspired by RESTful architectures used across the Web, so there are also references to its previous name `restful_OS` throughout the repository. 
+
+<!--
+## Build Status
 [![Build Status](https://travis-ci.org/phil-opp/blog_os.svg?branch=master)](https://travis-ci.org/phil-opp/blog_os) [![Join the chat at https://gitter.im/phil-opp/blog_os](https://badges.gitter.im/phil-opp/blog_os.svg)](https://gitter.im/phil-opp/blog_os?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+-->
 
-This repository contains the source code for the _Writing an OS in Rust_ series at [os.phil-opp.com](http://os.phil-opp.com).
 
-## Bare Bones
-- [A Minimal x86 Kernel](http://os.phil-opp.com/multiboot-kernel.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/multiboot_bootstrap))
-- [Entering Long Mode](http://os.phil-opp.com/entering-longmode.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/entering_longmode))
-- [Set Up Rust](http://os.phil-opp.com/set-up-rust.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/set_up_rust))
-- [Printing to Screen](http://os.phil-opp.com/printing-to-screen.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/printing_to_screen))
+## Setting up Rust
 
-## Memory Management
-- [Allocating Frames](http://os.phil-opp.com/allocating-frames.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/allocating_frames))
-- [Page Tables](http://os.phil-opp.com/modifying-page-tables.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/page_tables))
-- [Remap the Kernel](http://os.phil-opp.com/remap-the-kernel.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/remap_the_kernel))
-- [Kernel Heap](http://os.phil-opp.com/kernel-heap.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/kernel_heap))
+As our OS is based off of [Philipp Oppermann's fantastic Blog OS](htpp://os,phil-opp.com), our setup process is similar to his (taken in part from [his instructions](http://os.phil-opp.com/set-up-rust.html)). We highly encourage you to follow along with his excellent series of blog posts to understand the initial boot-up procedure of our OS on x86-64 architectures. 
 
-## Exceptions
-- [Catching Exceptions](http://os.phil-opp.com/catching-exceptions.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/catching_exceptions))
-- [Better Exception Messages](http://os.phil-opp.com/better-exception-messages.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/better_exception_messages))
-- [Returning from Exceptions](http://os.phil-opp.com/returning-from-exceptions.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/returning_from_exceptions))
-- [Double Faults](http://os.phil-opp.com/double-faults.html)
-      ([source code](https://github.com/phil-opp/blog_os/tree/double_faults))
+You will need the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html).
 
-## Additional Resources
-- [Cross Compile Binutils](http://os.phil-opp.com/cross-compile-binutils.html)
-- [Cross Compile libcore](http://os.phil-opp.com/cross-compile-libcore.html)
-- [Set Up GDB](http://os.phil-opp.com/set-up-gdb.html)
+Basically, just run this command and follow the instructions: <br>
+`$ curl https://sh.rustup.rs -sSf | sh`
 
-## Building
-You need to have `nasm`, `grub-mkrescue`, `mformat` (included in `mtools`), `xorriso`, `qemu`, a nighly Rust compiler, and [xargo] installed. Then you can run it using `make run`.
+Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with: <br>
+`$ rustup default nightly`
 
-[xargo]: https://github.com/japaric/xargo
+Since we're cross compiling for a custom target triple, we need to install the Rust source code: <br>
+`$ rustup component add rust-src`
 
-Please file an issue if you run into any problems.
+We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier: <br>
+`$ cargo install xargo`
+
+
+## Additional Build Environment Setup
+Currently we only support building on 64-bit Debian-like Linux distributions (e.g., Ubuntu 16.04). You will need to install the following packages:
+- `nasm`
+- `grub-mkrescue` 
+- `grub-pc-bin`
+- `mtools` 
+- `xorriso`
+- `qemu`
+
+To build and run Theseus in QEMU, simply run: <br>
+`$ make run`
+
+To run it without rebuilding the whole project: <br>
+`$ make orun`
+
+
+
+## IDE Setup
+The developer's personal preference is to use Visual Studio Code (VS Code), which is officially supported on Rust's [Are We IDE Yet](https://areweideyet.com/) website. Other good options include Atom, Sublime, Eclipse, and Intellij, but we have had the most success developing with VS Code. You'll need to install several plugins, like racer and rust-fmt, to allow whichever IDE you choose to properly understand Rust source code.
 
 ## License
-The source code is dual-licensed under MIT or the Apache License (Version 2.0). This excludes the `blog` directory.
+The source code is licensed under the MIT License. See the LICENSE-MIT file for more. 
