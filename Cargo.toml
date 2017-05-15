@@ -1,0 +1,34 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "restful_os"
+version = "0.1.0"
+
+[dependencies]
+bit_field = "0.7.0"
+bitflags = "0.7.0"
+multiboot2 = "0.1.0"
+once = "0.3.2"
+rlibc = "1.0.0"
+spin = "0.4.5"
+volatile = "0.1.0"
+x86 = "0.8.1"
+x86_64 = "0.1.0"
+cpuio = "0.2.0"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.hole_list_allocator]
+path = "libs/hole_list_allocator"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.keycodes_ascii]
+path = "libs/keycodes_ascii"
+
+[lib]
+crate-type = ["staticlib"]
