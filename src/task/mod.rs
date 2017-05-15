@@ -333,7 +333,6 @@ pub fn get_tasklist() -> &'static RwLock<TaskList> {
     }) 
 }
 
-use core::ops::Deref;
 /// this does not return
 pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     debug!("kthread_wrapper [0], looping indefinitely");

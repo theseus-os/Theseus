@@ -56,6 +56,8 @@ pub unsafe fn schedule() -> bool {
 }
 
 
+/// invokes the scheduler to pick a new task with interrupts disabled. 
+/// The current thread may be picked again, it doesn't affect the current thread's runnability.
 #[macro_export]
 macro_rules! schedule {
     () => (    

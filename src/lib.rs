@@ -80,14 +80,6 @@ fn second_thread_u64_main(arg: u64) -> u64  {
 }
 
 
-// fn second_thread_str_main(arg: Option<String>) -> String {
-//     println!("Hello from second thread str version!!");
-//     let arg: String = arg.unwrap();
-//     let res = arg.to_uppercase();
-//     println!("arg: {:?}, res:{:?}", arg.into_bytes(), res.as_ptr());
-//     res
-// }
-
 fn second_thread_str_main(arg: String) -> String {
     println!("Hello from second thread str version!!");
     let res = arg.to_uppercase();
@@ -96,9 +88,10 @@ fn second_thread_str_main(arg: String) -> String {
 }
 
 
-fn second_thread_none_main(_: u64) -> String {
+fn second_thread_none_main(_: u64) -> Option<String> {
     println!("Hello from second thread None version!!");
-    String::from("returned None")
+    // String::from("returned None")
+    None
 }
 
 
@@ -145,14 +138,11 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     {
         let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
         // let second_task = tasklist_mut.spawn(second_thread_main, Some(6));
-        let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
+        // let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
 
-        // let arg = String::from("hello");
-        // let res = arg.to_uppercase();
-        // println!("creating arg: {:?}, res: {:?}", arg, res);
-        // let second_task = tasklist_mut.spawn(second_thread_str_main, arg);
+        // let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"));
 
-        // let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
+        let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");
