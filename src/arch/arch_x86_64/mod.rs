@@ -49,15 +49,18 @@ impl ArchTaskState {
         // We also save rflags and the pdrp (cr3), both of which need to be saved
 
         // NOTE: xv6 saves rbx, rsp, rbp, rsi, rdi 
-        // ..... do we need to save rsi and rdi? 
+        // ..... do we need to save rsi and rdi?  
+        // No, I don't think so. 
         
         // NOTE: osdev wiki saves rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags, cr3
         // http://wiki.osdev.org/Kernel_Multitasking
         // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
+        // No, I don't think so. 
 
         // swap the pdrp (page tables) iff they're different
         // threads within the same process will have the same cr3
-        // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space)
+        // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space).
+        // currently our kernel shares one address space, so the cr3 should only change between user processes
         asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
         if next.registers.cr3 != self.registers.cr3 {
             warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
