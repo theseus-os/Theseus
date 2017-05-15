@@ -6,11 +6,6 @@ We have build Theseus from scratch using Rust to completely rethink state manage
 
 The design of Theseus's components and subsystems is frequently inspired by RESTful architectures used across the Web, so there are also references to its previous name `restful_OS` throughout the repository. 
 
-<!--
-## Build Status
-[![Build Status](https://travis-ci.org/phil-opp/blog_os.svg?branch=master)](https://travis-ci.org/phil-opp/blog_os) [![Join the chat at https://gitter.im/phil-opp/blog_os](https://badges.gitter.im/phil-opp/blog_os.svg)](https://gitter.im/phil-opp/blog_os?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
--->
-
 
 ## Setting up Rust
 
@@ -18,32 +13,32 @@ As our OS is based off of [Philipp Oppermann's fantastic Blog OS](htpp://os,phil
 
 You will need the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html).
 
-Basically, just run this command and follow the instructions: <br>
+Basically, just run this command and follow the instructions:   
 `$ curl https://sh.rustup.rs -sSf | sh`
 
-Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with: <br>
+Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with:   
 `$ rustup default nightly`
 
-Since we're cross compiling for a custom target triple, we need to install the Rust source code: <br>
+Since we're cross compiling for a custom target triple, we need to install the Rust source code:   
 `$ rustup component add rust-src`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier: <br>
+We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   
 `$ cargo install xargo`
 
 
 ## Additional Build Environment Setup
 Currently we only support building on 64-bit Debian-like Linux distributions (e.g., Ubuntu 16.04). You will need to install the following packages:
-- `nasm`
-- `grub-mkrescue` 
-- `grub-pc-bin`
-- `mtools` 
-- `xorriso`
-- `qemu`
+* `nasm`
+* `grub-mkrescue` 
+* `grub-pc-bin`
+* `mtools` 
+* `xorriso`
+* `qemu`
 
-To build and run Theseus in QEMU, simply run: <br>
+To build and run Theseus in QEMU, simply run:   
 `$ make run`
 
-To run it without rebuilding the whole project: <br>
+To run it without rebuilding the whole project:   
 `$ make orun`
 
 
