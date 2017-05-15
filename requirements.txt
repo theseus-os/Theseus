@@ -1,3 +1,0 @@
-pygments
-pygments-github-lexers
-PyGithub
