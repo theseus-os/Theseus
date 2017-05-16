@@ -121,6 +121,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     drivers::init();
 
 
+
     println!("initialization done!");
 
 	
@@ -171,11 +172,19 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
                     break 'outer;
                 }
 
-
                 // only print ascii values on a key press down
                 if keyevent.action != KeyAction::Pressed {
                     continue 'outer; // aren't Rust's loop labels cool? 
                 }
+
+                if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
+                    unsafe { debug!("TICKS = {}", interrupts::pit_clock::TICKS); }
+                    continue 'outer;
+                }
+
+
+                // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
+
 
                 let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
                 match ascii {
