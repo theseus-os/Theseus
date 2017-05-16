@@ -17,6 +17,8 @@ use drivers::input::keyboard;
 
 mod gdt;
 mod pic;
+pub mod pit_clock; // TODO: shouldn't be pub
+
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
@@ -114,8 +116,10 @@ pub fn init(memory_controller: &mut MemoryController) {
     }
 
     IDT.load();
-
     info!("loaded interrupt descriptor table.");
+
+    // init PIT clock to 1000 Hz
+    pit_clock::init(100);
 }
 
 
@@ -188,24 +192,28 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
     loop {}
 }
 
-
+// 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-//	println!("\nTIMER interrupt:\n{:#?}", stack_frame);
+    // trace!("TIMER!");
+
+    pit_clock::handle_timer_interrupt();
+
 	unsafe { PIC.lock().notify_end_of_interrupt(0x20); }
 }
 
 
+// 0x21
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
-	// println!("KBD: {:?}", scan_code);
+	// trace!("KBD: {:?}", scan_code);
     keyboard::handle_keyboard_input(scan_code);
 	unsafe { PIC.lock().notify_end_of_interrupt(0x21); }
 }
 
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-	println!("caught unhandled interrupt: {:#?}", stack_frame);
+	error!("caught unhandled interrupt: {:#?}", stack_frame);
 
 }
