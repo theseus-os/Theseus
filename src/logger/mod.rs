@@ -1,7 +1,7 @@
 
 use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 
-static LOG_LEVEL: LogLevel = LogLevel::Debug;
+static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 struct Logger;
 
@@ -12,7 +12,7 @@ impl ::log::Log for Logger {
 
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
-            println!("[{}] {}", record.level(), record.args());
+            ::drivers::serial_port::serial_out(format!("[{}] {}\n", record.level(), record.args()).as_str());
         }
     }
 }
