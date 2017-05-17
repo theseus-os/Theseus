@@ -44,7 +44,7 @@ To run it without rebuilding the whole project:
 
 
 
-## IDE Setup
+## IDE Setup  
 The developer's personal preference is to use Visual Studio Code (VS Code), which is officially supported on Rust's [Are We IDE Yet](https://areweideyet.com/) website. Other good options include Atom, Sublime, Eclipse, and Intellij, but we have had the most success developing with VS Code. You'll need to install several plugins, like racer and rust-fmt, to allow whichever IDE you choose to properly understand Rust source code.
 
 ## License
