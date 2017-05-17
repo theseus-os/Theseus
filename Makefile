@@ -1,3 +1,7 @@
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly (75b056812 2017-05-15)
+RUSTC_OUTPUT=$(shell rustc --version)
+
+
 
 arch ?= x86_64
 target ?= $(arch)-restful_os
@@ -12,6 +16,13 @@ assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.asm, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
 
 .PHONY: all clean run debug iso cargo gdb
+
+test_rustc: 	
+ifneq (${RUSTC_OUTPUT}, ${RUSTC_CURRENT_SUPPORTED_VERSION})
+	# @echo '   Error: must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)"!!\n\n'
+	$(error must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)")
+	# @exit 1
+endif
 
 all: $(kernel)
 
@@ -46,7 +57,7 @@ $(iso): $(kernel) $(grub_cfg)
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
-cargo:
+cargo:  test_rustc
 	@xargo build --target $(target)
 
 # compile assembly files
