@@ -27,7 +27,7 @@ static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
 
 
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum RunState {
     /// in the midst of setting up the task
     INITING,
@@ -40,6 +40,7 @@ pub enum RunState {
     /// includes the exit code (i8)
     EXITED(i8), 
 }
+
 
 #[derive(Debug)]
 struct KthreadCall<A, R> {
@@ -58,7 +59,7 @@ impl<A, R> KthreadCall<A, R> {
 }
 
 
-struct Task {
+pub struct Task {
     pub id: TaskId,
     pub runstate: RunState, 
     pub arch_state: ArchTaskState,
@@ -80,6 +81,9 @@ impl Task {
         }
     }
 
+    pub fn set_name(&mut self, n: String) {
+        self.name = n;
+    }
 
     // TODO: implement this 
     /*
@@ -97,13 +101,13 @@ impl Task {
     /// switches from the current (`self`)  to the `next` `Task`
     /// the lock on 
     pub fn context_switch(&mut self, mut next: &mut Task) {
-        debug!("context_switch [0], getting lock.");
+        // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
         }
 
-        debug!("context_switch [1], testing runstates.");
+        // debug!("context_switch [1], testing runstates.");
         assert!(next.runstate != RunState::BLOCKED, "scheduler bug: chosen 'next' Task was BLOCKED!");
         assert!(next.runstate != RunState::RUNNING, "scheduler bug: chosen 'next' Task was already RUNNING!");
 
@@ -111,14 +115,14 @@ impl Task {
         self.runstate = RunState::RUNNABLE; 
         next.runstate = RunState::RUNNING; 
 
-        debug!("context_switch [2], setting CURRENT_TASK.");
+        // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
         CURRENT_TASK.store(next.id, Ordering::SeqCst);
 
         // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
-        debug!("context_switch [3], calling switch_to().");
+        // debug!("context_switch [3], calling switch_to().");
 
         // perform the actual context switch
         unsafe {
@@ -133,6 +137,12 @@ impl Task {
     }
 }
 
+
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{{{}}}", self.name, self.id.into())
+    }
+}
 
 
 
@@ -190,7 +200,10 @@ impl TaskList {
                 debug!("Successfully created task {}", new_id.into());
                 Ok(self.list.get(&new_id).expect("new_task(): couldn't find new task in tasklist"))
             }
-            _ => Err("Error: overwrote task id!")
+            _ => {
+                error!("failed to create task {}", new_id.into());
+                Err("Error: overwrote task id!")
+            }
         }
 
     }
@@ -198,7 +211,7 @@ impl TaskList {
 
     /// initialize the first `Task` with special id = 0. 
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
-    /// the one that enters`rust_main()`.
+    /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
     pub fn init_first_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
         assert_has_not_been_called!("init_first_task was already called once!");
@@ -210,17 +223,21 @@ impl TaskList {
         task_zero.runstate == RunState::RUNNING; // it's the one currently running!
         
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
-        // but we still have to set its page table to the current value 
+        // but we still have to initialize its page table to the current value 
         task_zero.arch_state.set_page_table(get_page_table_register());
         
         
         // insert the new context into the list
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
-            None => { // None indicates that the insertion didn't overwrite anything, which is what we want
+            None => { 
+                // None indicates that the insertion didn't overwrite anything, which is what we want
                 debug!("Successfully created initial task0");
                 Ok(self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist"))
             }
-            _ => Err("WTF: task_zero already existed?!?")
+            _ => {
+                panic!("WTF: task_zero already existed?!?");
+                Err("WTF: task_zero already existed?!?")
+            }
         }
     }
 
@@ -241,6 +258,7 @@ impl TaskList {
         {
             // request a mutable reference
             let mut new_task = locked_new_task.write();
+            new_task.set_name(String::from(stringify!(func)));
             
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
@@ -367,15 +385,17 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
-    let exit_status = func(*arg); // FIXME: this works for objects but not primitives like u64
-    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
-
+    let exit_status = func(*arg); 
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
         let tasklist = get_tasklist().read();
         tasklist.get_current().unwrap().write().runstate = RunState::EXITED(3);
     }
+    
+    
+    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
+
 
 
     debug!("attempting to unschedule kthread...");

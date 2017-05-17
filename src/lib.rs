@@ -59,9 +59,40 @@ use spin::RwLockWriteGuard;
 use task::TaskList;
 use collections::string::String;
 
+
+
+
+
+fn test_loop_1(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_1!");
+    loop {
+        println!("1");
+    }
+}
+
+
+fn test_loop_2(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_2!");
+    loop {
+        println!("2");
+    }
+}
+
+
+fn test_loop_3(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_3!");
+    loop {
+        println!("3");
+    }
+}
+
+
+
 fn second_thr(a: u64) -> u64 {
     return a * 2;
 }
+
+
 
 
 
@@ -121,13 +152,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     drivers::init();
 
 
-
-    println!("initialization done!");
-
-	
-	unsafe { x86::shared::irq::enable();  }
-	println!("enabled interrupts!");
-
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLock
     {
@@ -135,14 +159,21 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         let task_zero = tasklist_mut.init_first_task();
     }
 
+
+    println!("initialization done!");
+
+	
+	unsafe { x86_64::instructions::interrupts::enable();  }
+	println!("enabled interrupts!");
+
     // create a second task to test context switching
     {
-        let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
+        let ref mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
         // let second_task = tasklist_mut.spawn(second_thread_main, Some(6));
         // let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
 
         // let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"));
-
+        {
         let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
         match second_task {
             Ok(_) => {
@@ -152,11 +183,20 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
                 println!("Failed to spawn second task: {}", err); 
             }
         }
+        }
+
+        { tasklist_mut.spawn(test_loop_1, None); }
+        { tasklist_mut.spawn(test_loop_2, None); } 
+        { tasklist_mut.spawn(test_loop_3, None); } 
     }
 
     // try to schedule in the second task
     println!("attempting to schedule second task");
     schedule!();
+
+
+
+
 
 
 	'outer: loop { 

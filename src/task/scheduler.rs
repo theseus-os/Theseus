@@ -9,7 +9,7 @@ use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 pub unsafe fn schedule() -> bool {
     
     let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    debug!("schedule(): current_taskid={}", current_taskid.into());
+    debug!("schedule [0]: current_taskid={}", current_taskid.into());
 
     let mut current_task = 0 as *mut Task; // a null Task ptr
     let mut next_task = 0 as *mut Task; // a null Task ptr
@@ -20,23 +20,25 @@ pub unsafe fn schedule() -> bool {
     // rather just trying to find one that is runnable 
     {
         let tasklist_immut = &get_tasklist().read(); // no need to modify the tasklist
-        for (taskid, locked_task) in tasklist_immut.iter() {
-            debug!("considering task {}", (*taskid).into());
-            if *taskid == current_taskid {
-                debug!("skipping taskid={}", (*taskid).into());
-                continue;
-            }
-            let mut task = locked_task.write();
-            if task.runstate == RunState::RUNNABLE {
-                // we use an unsafe deref_mut() operation to ensure that this reference
-                // can remain beyond the lifetime of the tasklist RwLock being held.
-                next_task = task.deref_mut() as *mut Task;
-            }
-        } // writable locked_task is released here
-        
+        { 
+            // iterate over all tasks EXCEPT the current one
+            for (taskid, locked_task) in tasklist_immut.iter().filter(|x| *(x.0) != current_taskid) {
+                let id_considered = (*taskid).into();
+
+                let mut task = locked_task.write();
+                debug!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
+                if task.runstate == RunState::RUNNABLE {
+                    // we use an unsafe deref_mut() operation to ensure that this reference
+                    // can remain beyond the lifetime of the tasklist RwLock being held.
+                    next_task = task.deref_mut() as *mut Task;
+                    debug!("schedule [2]: chose task {}", *task);
+                    break;
+                }
+            } // writable locked_task is released here
+        }
 
         if next_task as usize == 0 {
-            warn!("schedule(): next task was None!"); 
+            warn!("schedule [3]: next task was None!"); 
             return false; // tasklist is automatically unlocked here, thanks RwLockReadGuard!
         }
 

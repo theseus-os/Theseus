@@ -41,15 +41,23 @@ pub fn init(freq_hertz: u32) {
 }
 
 
+/// this occurs on every PIT timer tick, which is currently 100 Hz
 pub fn handle_timer_interrupt() {
     let ticks = unsafe {
         TICKS += 1;
         TICKS
     };
 
+    // preemption timeslice = 1sec (every 100 ticks)
+    // FIXME: this needs to be MUCH faster (see below FIXME)
+    if (ticks % 500) == 0 {
+        // FIXME: if we call schedule() too frequently, like on every tick,
+        // the system locks up!
+        schedule!();
+    }
 
-    // print every second
-    if ((ticks + 1) % 100) == 0 {
+    // heartbeat: print every 5 seconds
+    if (ticks % 500) == 0 {
         trace!("1 second has passed (ticks={})", ticks);
         // info!("1 second has passed (ticks={})", ticks);
     }
