@@ -38,6 +38,15 @@ pub extern fn __rust_allocate(size: usize, align: usize) -> *mut u8 {
 }
 
 #[no_mangle]
+pub extern fn __rust_allocate_zeroed(size: usize, align: usize) -> *mut u8 {
+    unsafe {
+        let result = __rust_allocate(size, align);
+        core::intrinsics::write_bytes(result, 0, size);
+        result
+    }
+}
+
+#[no_mangle]
 pub extern fn __rust_deallocate(ptr: *mut u8, size: usize, align: usize) {
     unsafe { HEAP.lock().deallocate(ptr, size, align) };
 }
