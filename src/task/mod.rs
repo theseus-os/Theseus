@@ -9,7 +9,7 @@ use alloc::boxed::Box;
 use core::mem;
 use core::any::Any;
 use core::fmt;
-
+use x86_64::instructions::halt;
 
 #[macro_use] pub mod scheduler;
 
@@ -26,19 +26,19 @@ static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
 static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
 
 
-
-#[derive(PartialEq, Debug)]
+#[repr(u8)] // one byte
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum RunState {
     /// in the midst of setting up the task
-    INITING,
+    INITING = 0,
     /// able to be scheduled in, but not currently running 
     RUNNABLE, 
     /// actually running 
     RUNNING,
     /// blocked on something, like I/O or a wait event
     BLOCKED, 
-    /// includes the exit code (i8)
-    EXITED(i8), 
+    /// thread has completed and is ready for cleanup
+    EXITED, 
 }
 
 
@@ -61,7 +61,9 @@ impl<A, R> KthreadCall<A, R> {
 
 pub struct Task {
     pub id: TaskId,
-    pub runstate: RunState, 
+    pub runstate: RunState,
+    pub prev_runstate: RunState,
+    pub test: u64, 
     pub arch_state: ArchTaskState,
     /// [unused] the kernel stack
     pub kstack: Option<Box<[u8]>>,
@@ -72,9 +74,13 @@ pub struct Task {
 impl Task {
 
     fn new(task_id: TaskId) -> Task { 
+        use core::mem;
+        info!("\n\n    Size of RunState: {:?}", mem::size_of::<RunState>());
         Task {
             id: task_id, 
             runstate: RunState::INITING, 
+            prev_runstate: RunState::INITING,
+            test: 0xDEADBEEFDEADBEEF,
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
             kstack: None,
@@ -83,6 +89,10 @@ impl Task {
 
     pub fn set_name(&mut self, n: String) {
         self.name = n;
+    }
+
+    pub fn set_runstate(&mut self, rs: RunState) {
+        self.runstate = rs;
     }
 
     // TODO: implement this 
@@ -112,7 +122,10 @@ impl Task {
         assert!(next.runstate != RunState::RUNNING, "scheduler bug: chosen 'next' Task was already RUNNING!");
 
         // update runstates
-        self.runstate = RunState::RUNNABLE; 
+        self.runstate = self.prev_runstate; // FIX ME: You can't jsut do this, because if the current thread called schedule!() on itself
+                                            ////       to exit (e.g., kthread_wrapper), then we're overwriting the intended future runstate (EXITED) with its previous runstate RUNNABLE
+                                            ////        so it will never reach it's intended runstate...
+        next.prev_runstate = next.runstate;
         next.runstate = RunState::RUNNING; 
 
         // debug!("context_switch [2], setting CURRENT_TASK.");
@@ -220,7 +233,8 @@ impl TaskList {
 
         let mut task_zero = Task::new(id_zero);
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
-        task_zero.runstate == RunState::RUNNING; // it's the one currently running!
+        task_zero.prev_runstate = RunState::RUNNABLE;
+        task_zero.runstate = RunState::RUNNING; // it's the one currently running!
         
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
         // but we still have to initialize its page table to the current value 
@@ -243,7 +257,7 @@ impl TaskList {
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`
     pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
-            func: fn(arg: A) -> R, arg: A) 
+            func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
 
         // right now we only have one page table (memory area) shared between the kernel,
@@ -258,7 +272,7 @@ impl TaskList {
         {
             // request a mutable reference
             let mut new_task = locked_new_task.write();
-            new_task.set_name(String::from(stringify!(func)));
+            new_task.set_name(String::from(thread_name));
             
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
@@ -382,17 +396,26 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         Box::from_raw(kthread_call_val.arg)
     };
     let func: fn(arg: A) -> R = kthread_call_val.func;
-
     // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
+
+
+
+    // actually invoke the function spawned in this kernel thread
     let exit_status = func(*arg); 
+
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
         let tasklist = get_tasklist().read();
-        tasklist.get_current().unwrap().write().runstate = RunState::EXITED(3);
+        tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
     }
     
+    {
+        let tasklist = get_tasklist().read();
+        let curtask = tasklist.get_current().unwrap().write();
+        debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
+    }
     
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
@@ -401,5 +424,11 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     debug!("attempting to unschedule kthread...");
     schedule!();
 
-    loop { }
+
+    // we really shouldn't ever reach this point
+    loop { 
+        error!("STUCK IN KTHREAD_WRAPPER INF LOOP!!!");
+        // FIXME: i don't think this halt should be necessary
+        unsafe { /*x86_64::instructions::*/ halt(); }
+    }
 }

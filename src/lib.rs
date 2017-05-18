@@ -166,15 +166,18 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	unsafe { x86_64::instructions::interrupts::enable();  }
 	println!("enabled interrupts!");
 
+
+
     // create a second task to test context switching
     {
         let ref mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
-        // let second_task = tasklist_mut.spawn(second_thread_main, Some(6));
-        // let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
+        { let second_task = tasklist_mut.spawn(second_thread_main, Some(6),  "second_main"); }
+        { let second_task = tasklist_mut.spawn(second_thread_u64_main, 6, "second_u64"); }
 
-        // let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"));
+        { let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"), "second_str"); } 
+
         {
-        let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
+        let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64, "second_thread_none_main");
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");
@@ -185,9 +188,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         }
         }
 
-        { tasklist_mut.spawn(test_loop_1, None); }
-        { tasklist_mut.spawn(test_loop_2, None); } 
-        { tasklist_mut.spawn(test_loop_3, None); } 
+        // must be lexically scoped like this to avoid the "multiple mutable borrows" error
+        // { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
+        // { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
+        // { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
     }
 
     // try to schedule in the second task
