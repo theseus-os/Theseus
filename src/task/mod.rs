@@ -33,8 +33,6 @@ pub enum RunState {
     INITING = 0,
     /// able to be scheduled in, but not currently running 
     RUNNABLE, 
-    /// actually running 
-    RUNNING,
     /// blocked on something, like I/O or a wait event
     BLOCKED, 
     /// thread has completed and is ready for cleanup
@@ -61,6 +59,9 @@ impl<A, R> KthreadCall<A, R> {
 
 pub struct Task {
     pub id: TaskId,
+    /// which cpu core the Task is currently running on. 
+    /// negative if not currently running. 
+    pub running_on_cpu: i8,
     pub runstate: RunState,
     pub prev_runstate: RunState,
     pub test: u64, 
@@ -81,6 +82,7 @@ impl Task {
             runstate: RunState::INITING, 
             prev_runstate: RunState::INITING,
             test: 0xDEADBEEFDEADBEEF,
+            running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
             kstack: None,
@@ -118,15 +120,13 @@ impl Task {
         }
 
         // debug!("context_switch [1], testing runstates.");
-        assert!(next.runstate != RunState::BLOCKED, "scheduler bug: chosen 'next' Task was BLOCKED!");
-        assert!(next.runstate != RunState::RUNNING, "scheduler bug: chosen 'next' Task was already RUNNING!");
+        assert!(next.runstate == RunState::RUNNABLE, "scheduler bug: chosen 'next' Task was not RUNNABLE!");
+
 
         // update runstates
-        self.runstate = self.prev_runstate; // FIX ME: You can't jsut do this, because if the current thread called schedule!() on itself
-                                            ////       to exit (e.g., kthread_wrapper), then we're overwriting the intended future runstate (EXITED) with its previous runstate RUNNABLE
-                                            ////        so it will never reach it's intended runstate...
-        next.prev_runstate = next.runstate;
-        next.runstate = RunState::RUNNING; 
+        self.running_on_cpu = -1; // no longer running
+        next.running_on_cpu = 0; // only one CPU right now
+
 
         // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
@@ -233,8 +233,8 @@ impl TaskList {
 
         let mut task_zero = Task::new(id_zero);
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
-        task_zero.prev_runstate = RunState::RUNNABLE;
-        task_zero.runstate = RunState::RUNNING; // it's the one currently running!
+        task_zero.runstate = RunState::RUNNABLE;
+        task_zero.running_on_cpu = 0; // only one CPU core is up right now
         
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
         // but we still have to initialize its page table to the current value 
@@ -367,7 +367,6 @@ pub fn get_tasklist() -> &'static RwLock<TaskList> {
 
 /// this does not return
 pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
-    debug!("kthread_wrapper [0], looping indefinitely");
 
     let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {

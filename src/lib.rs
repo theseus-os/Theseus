@@ -96,31 +96,25 @@ fn second_thr(a: u64) -> u64 {
 
 
 
-fn second_thread_main(arg: Option<u64>) -> u64  {
+fn first_thread_main(arg: Option<u64>) -> u64  {
+    println!("Hello from first thread!!");
+    1
+}
+
+fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread!!");
-    let res = second_thr(arg.unwrap());
-    println!("calling second_thr({}) = {}", arg.unwrap(), res);
-    res
-}
-
-fn second_thread_u64_main(arg: u64) -> u64  {
-    println!("Hello from second thread!!");
-    let res = second_thr(arg);
-    println!("calling second_thr({}) = {}", arg, res);
-    res
+    2
 }
 
 
-fn second_thread_str_main(arg: String) -> String {
-    println!("Hello from second thread str version!!");
-    let res = arg.to_uppercase();
-    println!("arg: {:?}, res:{:?}", arg, res);
-    res
+fn third_thread_main(arg: String) -> String {
+    println!("Hello from third thread!!");
+    String::from("3")
 }
 
 
-fn second_thread_none_main(_: u64) -> Option<String> {
-    println!("Hello from second thread None version!!");
+fn fourth_thread_main(_: u64) -> Option<String> {
+    println!("Hello from fourth thread!!");
     // String::from("returned None")
     None
 }
@@ -171,13 +165,13 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // create a second task to test context switching
     {
         let ref mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let second_task = tasklist_mut.spawn(second_thread_main, Some(6),  "second_main"); }
-        { let second_task = tasklist_mut.spawn(second_thread_u64_main, 6, "second_u64"); }
+        { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
+        { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
 
-        { let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"), "second_str"); } 
+        { let second_task = tasklist_mut.spawn(third_thread_main, String::from("hello"), "third_thread"); } 
 
         {
-        let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64, "second_thread_none_main");
+        let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread");
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");
