@@ -57,23 +57,29 @@ impl<A, R> KthreadCall<A, R> {
 }
 
 
-pub struct Task {
+pub struct Task {   
+    /// the unique id of this Task, similar to Linux's pid. 
     pub id: TaskId,
     /// which cpu core the Task is currently running on. 
     /// negative if not currently running. 
     pub running_on_cpu: i8,
+    /// the runnability status of this task, basically whether it's allowed to be scheduled in. 
     pub runstate: RunState,
+    /// unused
     pub prev_runstate: RunState,
     pub test: u64, 
+    /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
-    /// [unused] the kernel stack
+    /// [unused] the kernel stack.  Wrapped in Option<> so we can initialize it to None.
     pub kstack: Option<Box<[u8]>>,
+    /// the simple name of this Task
     pub name: String,
 }
 
 
 impl Task {
-
+    
+    /// creates a new Task structure and initializes it to be non-Runnable.
     fn new(task_id: TaskId) -> Task { 
         use core::mem;
         info!("\n\n    Size of RunState: {:?}", mem::size_of::<RunState>());
@@ -89,12 +95,19 @@ impl Task {
         }
     }
 
+    /// set the name of this Task
     pub fn set_name(&mut self, n: String) {
         self.name = n;
     }
 
+    /// set the RunState of this Task
     pub fn set_runstate(&mut self, rs: RunState) {
         self.runstate = rs;
+    }
+
+    /// returns true if this Task is currently runnig on any cpu.
+    pub fn is_running(&self) -> bool {
+        (self.running_on_cpu >= 0)
     }
 
     // TODO: implement this 

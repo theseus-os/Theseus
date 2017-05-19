@@ -28,13 +28,7 @@ We also need to install Xargo, a drop-in replacement wrapper for Cargo that make
 
 ## Additional Build Environment Setup
 Currently we only support building on 64-bit Debian-like Linux distributions (e.g., Ubuntu 16.04). You will need to install the following packages:  
-- `nasm`  
-- `grub-mkrescue`   
-- `grub-pc-bin`   
-- `mtools`    
-- `xorriso`   
-- `qemu`   
-- others may be required as well, TBD.   
+`$ sudo apt-get install nasm grub-mkrescue grub-pc-bin mtools xorriso qemu`   
 
 To build and run Theseus in QEMU, simply run:   
 `$ make run`
@@ -43,9 +37,24 @@ To run it without rebuilding the whole project:
 `$ make orun`
 
 
+## Debugging 
+GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
+
+First, install the following packages:  
+`$ sudo apt-get install texinfo flex bison python-dev ncurses-dev`
+
+Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:  
+`$ curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh`  
+
+After that, you should have a `rust-os-gdb` directory that contains the `gdb` executables and scripts. 
+
+Then, simply run `make debug` to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.   
+To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
+Try setting a breakpoint at the kernel's entry function using `b rust_main` or at a specific file/line, e.g., `b scheduler.rs:40`.
 
 ## IDE Setup  
 The developer's personal preference is to use Visual Studio Code (VS Code), which is officially supported on Rust's [Are We IDE Yet](https://areweideyet.com/) website. Other good options include Atom, Sublime, Eclipse, and Intellij, but we have had the most success developing with VS Code. You'll need to install several plugins, like racer and rust-fmt, to allow whichever IDE you choose to properly understand Rust source code.
+
 
 ## License
 The source code is licensed under the MIT License. See the LICENSE-MIT file for more. 

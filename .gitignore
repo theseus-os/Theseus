@@ -12,3 +12,6 @@
 
 # Build directory
 /build/
+
+# patched GDB directory
+/rust-os-gdb/
