@@ -63,4 +63,5 @@ pub fn handle_timer_interrupt() {
         trace!("10 seconds have passed (ticks={})", ticks);
         // info!("1 second has passed (ticks={})", ticks);
     }
+    ticks;
 }
