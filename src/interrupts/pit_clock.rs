@@ -49,7 +49,7 @@ pub fn handle_timer_interrupt() {
 
 
     // print every second
-    if ((ticks + 1) % 100) == 0 {
+    if ((ticks + 1) % 1000) == 0 {
         trace!("1 second has passed (ticks={})", ticks);
         // info!("1 second has passed (ticks={})", ticks);
     }

@@ -119,7 +119,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     info!("loaded interrupt descriptor table.");
 
     // init PIT clock to 1000 Hz
-    pit_clock::init(100);
+    pit_clock::init(1000);
 }
 
 
