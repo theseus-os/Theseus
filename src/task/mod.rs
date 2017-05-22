@@ -437,9 +437,9 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     schedule!();
 
 
-    // we really shouldn't ever reach this point
+    // we shouldn't ever reach this point
     loop { 
-        error!("STUCK IN KTHREAD_WRAPPER INF LOOP!!!");
+        error!("STUCK IN KTHREAD_WRAPPER INFINITE LOOP!!!");
         // FIXME: i don't think this halt should be necessary
         unsafe { /*x86_64::instructions::*/ halt(); }
     }
