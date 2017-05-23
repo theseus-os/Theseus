@@ -42,7 +42,7 @@ impl ArchTaskState {
     #[naked]
     pub unsafe fn switch_to(&mut self, next: &ArchTaskState) {
 
-        debug!("switch_to [0]");
+        // debug!("switch_to [0]");
 
         // The following registers must be saved on x86_64:  (http://cons.mit.edu/sp17/x86-64-architecture-guide.html)
         // rbx, r12, r13, r14, r15, rsp, rbp

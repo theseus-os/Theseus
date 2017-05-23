@@ -76,7 +76,7 @@ lazy_static! {
 
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
-static PIC: Mutex<pic::ChainedPics> = Mutex::new(unsafe { pic::ChainedPics::new(0x20, 0x28) });
+static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(0x60) } );
 
 static TSS: Once<TaskStateSegment> = Once::new();
@@ -112,14 +112,19 @@ pub fn init(memory_controller: &mut MemoryController) {
         set_cs(code_selector); // reload code segment register
         load_tss(tss_selector); // load TSS
 
-	    PIC.lock().initialize();
+        PIC.initialize();
     }
 
     IDT.load();
     info!("loaded interrupt descriptor table.");
 
+<<<<<<< HEAD
     // init PIT clock to 1000 Hz
     pit_clock::init(1000);
+=======
+    // init PIT clock to 100 Hz
+    pit_clock::init(100);
+>>>>>>> bbc638a7542162db514dce7efb273ab627eeceb1
 }
 
 
@@ -198,7 +203,7 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 
     pit_clock::handle_timer_interrupt();
 
-	unsafe { PIC.lock().notify_end_of_interrupt(0x20); }
+	unsafe { PIC.notify_end_of_interrupt(0x20); }
 }
 
 
@@ -209,7 +214,8 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
     };
 	// trace!("KBD: {:?}", scan_code);
     keyboard::handle_keyboard_input(scan_code);
-	unsafe { PIC.lock().notify_end_of_interrupt(0x21); }
+	
+    unsafe { PIC.notify_end_of_interrupt(0x21); }
 }
 
 

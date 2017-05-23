@@ -59,37 +59,62 @@ use spin::RwLockWriteGuard;
 use task::TaskList;
 use collections::string::String;
 
+
+
+
+
+fn test_loop_1(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_1!");
+    loop {
+        println!("1");
+    }
+}
+
+
+fn test_loop_2(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_2!");
+    loop {
+        println!("2");
+    }
+}
+
+
+fn test_loop_3(_: Option<u64>) -> Option<u64> {
+    debug!("Entered test_loop_3!");
+    loop {
+        println!("3");
+    }
+}
+
+
+
 fn second_thr(a: u64) -> u64 {
     return a * 2;
 }
 
 
 
-fn second_thread_main(arg: Option<u64>) -> u64  {
+
+
+fn first_thread_main(arg: Option<u64>) -> u64  {
+    println!("Hello from first thread!!");
+    1
+}
+
+fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread!!");
-    let res = second_thr(arg.unwrap());
-    println!("calling second_thr({}) = {}", arg.unwrap(), res);
-    res
-}
-
-fn second_thread_u64_main(arg: u64) -> u64  {
-    println!("Hello from second thread!!");
-    let res = second_thr(arg);
-    println!("calling second_thr({}) = {}", arg, res);
-    res
+    2
 }
 
 
-fn second_thread_str_main(arg: String) -> String {
-    println!("Hello from second thread str version!!");
-    let res = arg.to_uppercase();
-    println!("arg: {:?}, res:{:?}", arg, res);
-    res
+fn third_thread_main(arg: String) -> String {
+    println!("Hello from third thread!!");
+    String::from("3")
 }
 
 
-fn second_thread_none_main(_: u64) -> Option<String> {
-    println!("Hello from second thread None version!!");
+fn fourth_thread_main(_: u64) -> Option<String> {
+    println!("Hello from fourth thread!!");
     // String::from("returned None")
     None
 }
@@ -121,13 +146,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     drivers::init();
 
 
-
-    println!("initialization done!");
-
-	
-	unsafe { x86::shared::irq::enable();  }
-	println!("enabled interrupts!");
-
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLock
     {
@@ -135,15 +153,25 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         let task_zero = tasklist_mut.init_first_task();
     }
 
+
+    println!("initialization done!");
+
+	
+	unsafe { x86_64::instructions::interrupts::enable();  }
+	println!("enabled interrupts!");
+
+
+
     // create a second task to test context switching
     {
-        let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
-        // let second_task = tasklist_mut.spawn(second_thread_main, Some(6));
-        // let second_task = tasklist_mut.spawn(second_thread_u64_main, 6);
+        let ref mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
+        { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
+        { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
 
-        // let second_task = tasklist_mut.spawn(second_thread_str_main, String::from("hello"));
+        { let second_task = tasklist_mut.spawn(third_thread_main, String::from("hello"), "third_thread"); } 
 
-        let second_task = tasklist_mut.spawn(second_thread_none_main, 12345u64);
+        {
+        let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread");
         match second_task {
             Ok(_) => {
                 println!("successfully spawned and queued second task!");
@@ -152,11 +180,21 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
                 println!("Failed to spawn second task: {}", err); 
             }
         }
+        }
+
+        // must be lexically scoped like this to avoid the "multiple mutable borrows" error
+        // { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
+        // { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
+        // { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
     }
 
     // try to schedule in the second task
     println!("attempting to schedule second task");
     schedule!();
+
+
+
+
 
 
 	'outer: loop { 

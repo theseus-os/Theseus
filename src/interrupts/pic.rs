@@ -57,8 +57,11 @@ impl Pic {
 
     /// Notify us that an interrupt has been handled and that we're ready
     /// for more.
-    unsafe fn end_of_interrupt(&mut self) {
-        self.command.write(CMD_END_OF_INTERRUPT);
+    fn end_of_interrupt(&mut self) {
+        // SAFE because 
+        unsafe {
+            self.command.write(CMD_END_OF_INTERRUPT);
+        }
     }
 }
 
@@ -97,41 +100,41 @@ impl ChainedPics {
         // older versions of Linux and other PC operating systems have
         // worked around this by writing garbage data to port 0x80, which
         // allegedly takes long enough to make everything work on most
-        // hardware.  Here, `wait` is a closure.
+        // hardware.  Here, `io_wait` is a closure.
         let mut wait_port: cpuio::Port<u8> = cpuio::Port::new(0x80);
-        let mut wait = || { wait_port.write(0) };
+        let mut io_wait = || { wait_port.write(0) };
 
         // Save our original interrupt masks, because I'm too lazy to
         // figure out reasonable values.  We'll restore these when we're
         // done.
         let saved_mask1 = self.pics[0].data.read();
         let saved_mask2 = self.pics[1].data.read();
-        println!("saved masks: {:#?}, {:#?}", saved_mask1, saved_mask2); 
+        println!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
 
         // Tell each PIC that we're going to send it a three-byte
         // initialization sequence on its data port.
         self.pics[0].command.write(CMD_INIT);
-        wait();
+        io_wait();
         self.pics[1].command.write(CMD_INIT);
-        wait();
+        io_wait();
 
         // Byte 1: Set up our base offsets.
         self.pics[0].data.write(self.pics[0].offset);
-        wait();
+        io_wait();
         self.pics[1].data.write(self.pics[1].offset);
-        wait();
+        io_wait();
 
         // Byte 2: Configure chaining between PIC1 and PIC2.
         self.pics[0].data.write(4);
-        wait();
+        io_wait();
         self.pics[1].data.write(2);
-        wait();
+        io_wait();
 
         // Byte 3: Set our mode.
         self.pics[0].data.write(MODE_8086);
-        wait();
+        io_wait();
         self.pics[1].data.write(MODE_8086);
-        wait();
+        io_wait();
 
         // Restore our saved masks.
         self.pics[0].data.write(saved_mask1);
@@ -139,14 +142,14 @@ impl ChainedPics {
     }
 
     /// Do we handle this interrupt?
-    pub fn handles_interrupt(&self, interrupt_id: u8) -> bool {
+    fn handles_interrupt(&self, interrupt_id: u8) -> bool {
         self.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
     }
 
     /// Figure out which (if any) PICs in our chain need to know about this
     /// interrupt.  This is tricky, because all interrupts from `pics[1]`
     /// get chained through `pics[0]`.
-    pub unsafe fn notify_end_of_interrupt(&mut self, interrupt_id: u8) {
+    pub fn notify_end_of_interrupt(&mut self, interrupt_id: u8) {
         if self.handles_interrupt(interrupt_id) {
             if self.pics[1].handles_interrupt(interrupt_id) {
                 self.pics[1].end_of_interrupt();

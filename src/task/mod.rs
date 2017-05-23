@@ -9,7 +9,7 @@ use alloc::boxed::Box;
 use core::mem;
 use core::any::Any;
 use core::fmt;
-
+use x86_64::instructions::halt;
 
 #[macro_use] pub mod scheduler;
 
@@ -26,20 +26,19 @@ static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
 static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
 
 
-
-#[derive(PartialEq)]
+#[repr(u8)] // one byte
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum RunState {
     /// in the midst of setting up the task
-    INITING,
+    INITING = 0,
     /// able to be scheduled in, but not currently running 
     RUNNABLE, 
-    /// actually running 
-    RUNNING,
     /// blocked on something, like I/O or a wait event
     BLOCKED, 
-    /// includes the exit code (i8)
-    EXITED(i8), 
+    /// thread has completed and is ready for cleanup
+    EXITED, 
 }
+
 
 #[derive(Debug)]
 struct KthreadCall<A, R> {
@@ -58,28 +57,58 @@ impl<A, R> KthreadCall<A, R> {
 }
 
 
-struct Task {
+pub struct Task {   
+    /// the unique id of this Task, similar to Linux's pid. 
     pub id: TaskId,
-    pub runstate: RunState, 
+    /// which cpu core the Task is currently running on. 
+    /// negative if not currently running. 
+    pub running_on_cpu: i8,
+    /// the runnability status of this task, basically whether it's allowed to be scheduled in. 
+    pub runstate: RunState,
+    /// unused
+    pub prev_runstate: RunState,
+    pub test: u64, 
+    /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
-    /// [unused] the kernel stack
+    /// [unused] the kernel stack.  Wrapped in Option<> so we can initialize it to None.
     pub kstack: Option<Box<[u8]>>,
+    /// the simple name of this Task
     pub name: String,
 }
 
 
 impl Task {
-
+    
+    /// creates a new Task structure and initializes it to be non-Runnable.
     fn new(task_id: TaskId) -> Task { 
+        use core::mem;
+        info!("\n\n    Size of RunState: {:?}", mem::size_of::<RunState>());
         Task {
             id: task_id, 
             runstate: RunState::INITING, 
+            prev_runstate: RunState::INITING,
+            test: 0xDEADBEEFDEADBEEF,
+            running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
             kstack: None,
         }
     }
 
+    /// set the name of this Task
+    pub fn set_name(&mut self, n: String) {
+        self.name = n;
+    }
+
+    /// set the RunState of this Task
+    pub fn set_runstate(&mut self, rs: RunState) {
+        self.runstate = rs;
+    }
+
+    /// returns true if this Task is currently runnig on any cpu.
+    pub fn is_running(&self) -> bool {
+        (self.running_on_cpu >= 0)
+    }
 
     // TODO: implement this 
     /*
@@ -97,28 +126,29 @@ impl Task {
     /// switches from the current (`self`)  to the `next` `Task`
     /// the lock on 
     pub fn context_switch(&mut self, mut next: &mut Task) {
-        debug!("context_switch [0], getting lock.");
+        // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
         }
 
-        debug!("context_switch [1], testing runstates.");
-        assert!(next.runstate != RunState::BLOCKED, "scheduler bug: chosen 'next' Task was BLOCKED!");
-        assert!(next.runstate != RunState::RUNNING, "scheduler bug: chosen 'next' Task was already RUNNING!");
+        // debug!("context_switch [1], testing runstates.");
+        assert!(next.runstate == RunState::RUNNABLE, "scheduler bug: chosen 'next' Task was not RUNNABLE!");
+
 
         // update runstates
-        self.runstate = RunState::RUNNABLE; 
-        next.runstate = RunState::RUNNING; 
+        self.running_on_cpu = -1; // no longer running
+        next.running_on_cpu = 0; // only one CPU right now
 
-        debug!("context_switch [2], setting CURRENT_TASK.");
+
+        // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
         CURRENT_TASK.store(next.id, Ordering::SeqCst);
 
         // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
-        debug!("context_switch [3], calling switch_to().");
+        // debug!("context_switch [3], calling switch_to().");
 
         // perform the actual context switch
         unsafe {
@@ -133,6 +163,12 @@ impl Task {
     }
 }
 
+
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{{{}}}", self.name, self.id.into())
+    }
+}
 
 
 
@@ -190,7 +226,10 @@ impl TaskList {
                 debug!("Successfully created task {}", new_id.into());
                 Ok(self.list.get(&new_id).expect("new_task(): couldn't find new task in tasklist"))
             }
-            _ => Err("Error: overwrote task id!")
+            _ => {
+                error!("failed to create task {}", new_id.into());
+                Err("Error: overwrote task id!")
+            }
         }
 
     }
@@ -198,7 +237,7 @@ impl TaskList {
 
     /// initialize the first `Task` with special id = 0. 
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
-    /// the one that enters`rust_main()`.
+    /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
     pub fn init_first_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
         assert_has_not_been_called!("init_first_task was already called once!");
@@ -207,26 +246,31 @@ impl TaskList {
 
         let mut task_zero = Task::new(id_zero);
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
-        task_zero.runstate == RunState::RUNNING; // it's the one currently running!
+        task_zero.runstate = RunState::RUNNABLE;
+        task_zero.running_on_cpu = 0; // only one CPU core is up right now
         
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
-        // but we still have to set its page table to the current value 
+        // but we still have to initialize its page table to the current value 
         task_zero.arch_state.set_page_table(get_page_table_register());
         
         
         // insert the new context into the list
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
-            None => { // None indicates that the insertion didn't overwrite anything, which is what we want
+            None => { 
+                // None indicates that the insertion didn't overwrite anything, which is what we want
                 debug!("Successfully created initial task0");
                 Ok(self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist"))
             }
-            _ => Err("WTF: task_zero already existed?!?")
+            _ => {
+                panic!("WTF: task_zero already existed?!?");
+                Err("WTF: task_zero already existed?!?")
+            }
         }
     }
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`
     pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
-            func: fn(arg: A) -> R, arg: A) 
+            func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
 
         // right now we only have one page table (memory area) shared between the kernel,
@@ -241,6 +285,7 @@ impl TaskList {
         {
             // request a mutable reference
             let mut new_task = locked_new_task.write();
+            new_task.set_name(String::from(thread_name));
             
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
@@ -335,7 +380,6 @@ pub fn get_tasklist() -> &'static RwLock<TaskList> {
 
 /// this does not return
 pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
-    debug!("kthread_wrapper [0], looping indefinitely");
 
     let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
@@ -364,22 +408,39 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         Box::from_raw(kthread_call_val.arg)
     };
     let func: fn(arg: A) -> R = kthread_call_val.func;
-
     // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
-    let exit_status = func(*arg); // FIXME: this works for objects but not primitives like u64
-    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
+
+
+
+    // actually invoke the function spawned in this kernel thread
+    let exit_status = func(*arg); 
 
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
         let tasklist = get_tasklist().read();
-        tasklist.get_current().unwrap().write().runstate = RunState::EXITED(3);
+        tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
     }
+    
+    {
+        let tasklist = get_tasklist().read();
+        let curtask = tasklist.get_current().unwrap().write();
+        debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
+    }
+    
+    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
+
 
 
     debug!("attempting to unschedule kthread...");
     schedule!();
 
-    loop { }
+
+    // we shouldn't ever reach this point
+    loop { 
+        error!("STUCK IN KTHREAD_WRAPPER INFINITE LOOP!!!");
+        // FIXME: i don't think this halt should be necessary
+        unsafe { /*x86_64::instructions::*/ halt(); }
+    }
 }
