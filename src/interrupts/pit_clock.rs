@@ -74,8 +74,16 @@ pub fn handle_timer_interrupt() {
 
     // heartbeat: print every 10 seconds
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
+        
+        //initializing TimeKeeping struct to "count"" ticks passed
+        let mut test: time_tools::TimeKeeping = time_tools::TimeKeeping{start_time:ticks, end_time: 9000};
+
         trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, ticks);
-        time_tools::return_ticks();
+        
+
+        test.end_time = time_tools::get_ticks();
+        trace!("[tester]{} ticks passed during heartbeat statement({} = starting number), ({} = ending number)" , test.end_time-test.start_time, test.start_time, test.end_time);
+        //time_tools::return_ticks();
         // info!("1 second has passed (ticks={})", ticks);
     }
 }

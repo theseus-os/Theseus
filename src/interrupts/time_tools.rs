@@ -27,17 +27,27 @@ pub fn end_track(){
 }
 */
 
-pub fn return_ticks(){
-    unsafe{
-        trace!("{} ticks have passed ", TICKS);
-        
-    }   
+
+pub fn get_ticks() -> u64{
     
+    //was used to test ticks were being received by this function
+    /*
+    unsafe{
+    trace!("{} ticks have passed ", TICKS);
+    }
+    */
+
+    unsafe{return TICKS;}
+    
+    
+    
+       
+    
+
 }
 
-
-struct time_keeping{
-    start_time: u64,
-    end_time: u64,
+pub struct TimeKeeping{
+    pub start_time: u64,
+    pub end_time: u64,
 
 }
