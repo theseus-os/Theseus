@@ -1,4 +1,4 @@
-// taken from the toyos pic8259_simple crate
+// modified from the toyos pic8259_simple crate
 
 //! Support for the 8259 Programmable Interrupt Controller, which handles
 //! basic I/O interrupts.  In multicore mode, we would apparently need to
@@ -24,7 +24,7 @@
 #![feature(const_fn)]
 #![no_std]
 
-extern crate cpuio;
+extern crate port_io;
 
 /// Command sent to begin PIC initialization.
 const CMD_INIT: u8 = 0x11;
@@ -42,10 +42,10 @@ struct Pic {
     offset: u8,
 
     /// The processor I/O port on which we send commands.
-    command: cpuio::UnsafePort<u8>,
+    command: port_io::Port<u8>,
 
     /// The processor I/O port on which we send and receive data.
-    data: cpuio::UnsafePort<u8>,
+    data: port_io::Port<u8>,
 }
 
 impl Pic {
@@ -78,13 +78,13 @@ impl ChainedPics {
             pics: [
                 Pic {
                     offset: offset1,
-                    command: cpuio::UnsafePort::new(0x20),
-                    data: cpuio::UnsafePort::new(0x21),
+                    command: port_io::Port::new(0x20),
+                    data: port_io::Port::new(0x21),
                 },
                 Pic {
                     offset: offset2,
-                    command: cpuio::UnsafePort::new(0xA0),
-                    data: cpuio::UnsafePort::new(0xA1),
+                    command: port_io::Port::new(0xA0),
+                    data: port_io::Port::new(0xA1),
                 },
             ]
         }
@@ -101,7 +101,7 @@ impl ChainedPics {
         // worked around this by writing garbage data to port 0x80, which
         // allegedly takes long enough to make everything work on most
         // hardware.  Here, `io_wait` is a closure.
-        let mut wait_port: cpuio::Port<u8> = cpuio::Port::new(0x80);
+        let mut wait_port: port_io::Port<u8> = port_io::Port::new(0x80);
         let mut io_wait = || { wait_port.write(0) };
 
         // Save our original interrupt masks, because I'm too lazy to

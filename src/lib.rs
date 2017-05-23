@@ -39,7 +39,7 @@ extern crate bit_field;
 extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
 #[macro_use] extern crate collections;
-extern crate cpuio; 
+extern crate port_io; 
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
 

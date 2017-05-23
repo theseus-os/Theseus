@@ -11,7 +11,7 @@ use memory::MemoryController;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
-use cpuio::Port;
+use port_io::Port;
 use drivers::input::keyboard;
 
 

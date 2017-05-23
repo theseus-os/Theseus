@@ -81,8 +81,6 @@ impl Task {
     
     /// creates a new Task structure and initializes it to be non-Runnable.
     fn new(task_id: TaskId) -> Task { 
-        use core::mem;
-        info!("\n\n    Size of RunState: {:?}", mem::size_of::<RunState>());
         Task {
             id: task_id, 
             runstate: RunState::INITING, 
