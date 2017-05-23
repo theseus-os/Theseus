@@ -69,7 +69,7 @@ impl<T: InOut> Port<T> {
     }
 
     /// Write data to the port. This is unsafe because writing to an arbitrary port may cause problems.
-    pub unsafe fn write(&mut self, value: T) {
+    pub unsafe fn write(&self, value: T) {
         T::port_out(self.port, value);
     }
 }
