@@ -30,8 +30,6 @@ pub fn end_track(){
 pub fn return_ticks(){
     unsafe{
         trace!("{} ticks have passed ", TICKS);
-        trace!("\n tick tick");
-        trace!("\n tick tick");
         
     }   
     
