@@ -65,9 +65,6 @@ pub struct Task {
     pub running_on_cpu: i8,
     /// the runnability status of this task, basically whether it's allowed to be scheduled in. 
     pub runstate: RunState,
-    /// unused
-    pub prev_runstate: RunState,
-    pub test: u64, 
     /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
     /// [unused] the kernel stack.  Wrapped in Option<> so we can initialize it to None.
@@ -84,8 +81,6 @@ impl Task {
         Task {
             id: task_id, 
             runstate: RunState::INITING, 
-            prev_runstate: RunState::INITING,
-            test: 0xDEADBEEFDEADBEEF,
             running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
