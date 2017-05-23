@@ -19,8 +19,8 @@ const COMMAND_REGISTER: u16 = 0x43;
 /// the timer's default frequency is 1.19 MHz
 const PIT_DIVIDEND_HZ: u32 = 1193182; 
 
-static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(COMMAND_REGISTER) } );
-static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(CHANNEL0) } );
+static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( Port::new(COMMAND_REGISTER) );
+static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( Port::new(CHANNEL0) );
 
 
 // static TICKS: AtomicUsize = AtomicUsize::new(0); // default()??

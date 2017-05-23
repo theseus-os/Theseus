@@ -1,5 +1,4 @@
 use port_io::Port;
-use spin::Mutex;
 
 const SERIAL_PORT_COM1: u16 = 0x3F8;
 const SERIAL_PORT_COM1_READY: u16 = SERIAL_PORT_COM1 + 5;
