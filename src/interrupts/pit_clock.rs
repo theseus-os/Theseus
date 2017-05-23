@@ -1,7 +1,7 @@
 /// Handles the Programmable Interval Timer (PIT) system clock,
 /// which allows us to configure the frequency of timer interrupts. 
 
-use cpuio::Port;
+use port_io::Port;
 use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::time_tools;
@@ -29,16 +29,19 @@ pub static mut TICKS: u64 = 0;
 
 pub fn init(freq_hertz: u32) {
     let divisor = PIT_DIVIDEND_HZ / freq_hertz;
-    PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
-    // PIT_COMMAND.lock().write(0x34); // some other mode that we don't want
-
-    if (divisor > u16::max_value() as u32) {
+    if divisor > (u16::max_value() as u32) {
         panic!("The chosen PIT frequency ({} Hz) is too small, it must be higher than 18 Hz!", freq_hertz);
     }
 
-    // must write the low byte and then the high byte
-    PIT_CHANNEL_0.lock().write(divisor as u8);
-    PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
+    // SAFE because we're simply configuring the PIT clock, and the code below is correct.
+    unsafe {
+        PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
+        // PIT_COMMAND.lock().write(0x34); // some other mode that we don't want
+
+        // must write the low byte and then the high byte
+        PIT_CHANNEL_0.lock().write(divisor as u8);
+        PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
+    }
 }
 
 
@@ -66,7 +69,7 @@ pub fn handle_timer_interrupt() {
         // FIXME: if we call schedule() too frequently, like on every tick,  the system locks up!
         // Most likely because we acquire locks in the scheduler/context switching routines
         schedule!();
-
+        debug!("done with preemptive schedule call");
     }
 
     // heartbeat: print every 10 seconds
