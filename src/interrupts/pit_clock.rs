@@ -72,5 +72,4 @@ pub fn handle_timer_interrupt() {
         trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, ticks);
         // info!("1 second has passed (ticks={})", ticks);
     }
-    ticks;
 }
