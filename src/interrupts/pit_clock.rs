@@ -4,6 +4,7 @@
 use cpuio::Port;
 use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use interrupts::time_tools;
 
 /// the main interrupt channel
 const CHANNEL0: u16 = 0x40;
@@ -50,7 +51,7 @@ const PIT_FREQUENCY_HZ: u64 = 100;
 const timeslice_period_ms: u64 = 100; 
 
 /// the heartbeatperiod in milliseconds
-const heartbeat_period_ms: u64 = 10000;
+const heartbeat_period_ms: u64 = 1000;
 
 /// this occurs on every PIT timer tick, which is currently 100 Hz
 pub fn handle_timer_interrupt() {
@@ -65,11 +66,13 @@ pub fn handle_timer_interrupt() {
         // FIXME: if we call schedule() too frequently, like on every tick,  the system locks up!
         // Most likely because we acquire locks in the scheduler/context switching routines
         schedule!();
+
     }
 
     // heartbeat: print every 10 seconds
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, ticks);
+        time_tools::return_ticks();
         // info!("1 second has passed (ticks={})", ticks);
     }
 }

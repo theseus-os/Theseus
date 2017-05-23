@@ -13,12 +13,13 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use cpuio::Port;
 use drivers::input::keyboard;
+//use interrupts::time_tools;
 
 
 mod gdt;
 mod pic;
 pub mod pit_clock; // TODO: shouldn't be pub
-
+mod time_tools; //testing whether including a module makes any difference
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
@@ -199,6 +200,7 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
 	unsafe { PIC.notify_end_of_interrupt(0x20); }
+    //time_tools::return_ticks();
 }
 
 
@@ -211,6 +213,7 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
     keyboard::handle_keyboard_input(scan_code);
 	
     unsafe { PIC.notify_end_of_interrupt(0x21); }
+    
 }
 
 
