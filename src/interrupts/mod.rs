@@ -77,7 +77,7 @@ lazy_static! {
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(0x60) } );
+static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
