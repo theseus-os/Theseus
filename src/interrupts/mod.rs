@@ -17,8 +17,8 @@ use arch;
 
 
 mod gdt;
-mod pic;
 pub mod pit_clock; // TODO: shouldn't be pub
+mod pic;
 mod time_tools; //testing whether including a module makes any difference
 
 
