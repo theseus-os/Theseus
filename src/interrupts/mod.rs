@@ -13,11 +13,13 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
+use arch;
 
 
 mod gdt;
 mod pic;
 pub mod pit_clock; // TODO: shouldn't be pub
+
 
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
@@ -217,4 +219,51 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 	error!("caught unhandled interrupt: {:#?}", stack_frame);
 
+}
+
+
+
+
+
+
+
+
+
+
+/// A handle for frozen interrupts
+pub struct HeldInterrupts(bool);
+
+
+/// Prevent interrupts from firing until return value is dropped
+pub fn hold_interrupts() -> HeldInterrupts {
+	let retval = HeldInterrupts(interrupts_enabled());
+    disable_interrupts();
+    retval
+}
+
+
+impl ::core::ops::Drop for HeldInterrupts {
+	fn drop(&mut self)
+	{		
+		if self.0 {
+			enable_interrupts();
+			// unsafe { asm!("sti" : : : "memory" : "volatile"); }
+		}
+	}
+}
+
+
+/// disable interrupts
+pub fn disable_interrupts() {
+    arch::disable_interrupts();
+}
+
+/// enable interrupts
+pub fn enable_interrupts() {
+    arch::enable_interrupts();
+}
+
+/// returns true if interrupts are currently enabled
+pub fn interrupts_enabled() -> bool {
+    arch::interrupts_enabled()
 }

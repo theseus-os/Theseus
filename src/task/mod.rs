@@ -261,7 +261,8 @@ impl TaskList {
         }
     }
 
-    /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`
+    /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
+    /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
     pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
             func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
