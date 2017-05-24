@@ -359,6 +359,34 @@ const MAX_NR_TASKS: usize = usize::max_value() - 1;
 // }
 
 
+/* 
+
+fn init_tasklist() -> RwLock<TaskList> {
+    RwLock::new(TaskList::new())
+}
+
+/// get a locked, immutable reference to the global `TaskList`.
+/// Returns a `RwLockReadGuard` containing the `TaskList`.
+/// to modify the task list, call `get_tasklist_mut()` instead of this. 
+pub fn get_tasklist() -> RwLockReadGuard<'static, TaskList> {
+    // the first time this is called, the tasklist will be inited
+    // on future invocations, that inited task list is simply returned
+    TASK_LIST.call_once(init_tasklist).read()
+}
+
+
+/// get a locked, mutable reference to the global `TaskList`.
+/// Returns a `RwLockWriteGuard` containing the `TaskList`.
+/// For read-only access of the task list, call `get_tasklist()` instead of this.
+pub fn get_tasklist_mut() -> RwLockWriteGuard<'static, TaskList> {
+    // the first time this is called, the tasklist will be inited
+    // on future invocations, that inited task list is simply returned
+    TASK_LIST.call_once(init_tasklist).write()
+}
+
+*/
+
+
 
 /// get a reference to the global `TaskList`.
 /// Returns a `RwLock` containing the `TaskList`.
@@ -373,7 +401,7 @@ pub fn get_tasklist() -> &'static RwLock<TaskList> {
 }
 
 /// this does not return
-pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
+fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
@@ -434,7 +462,5 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // we shouldn't ever reach this point
     loop { 
         error!("STUCK IN KTHREAD_WRAPPER INFINITE LOOP!!!");
-        // FIXME: i don't think this halt should be necessary
-        unsafe { /*x86_64::instructions::*/ halt(); }
     }
 }

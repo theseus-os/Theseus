@@ -231,10 +231,11 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut Exce
 
 
 /// A handle for frozen interrupts
+#[derive(Default)]
 pub struct HeldInterrupts(bool);
 
-
-/// Prevent interrupts from firing until return value is dropped
+/// Prevent interrupts from firing until return value is dropped (goes out of scope). 
+/// After it is dropped, the interrupts are returned to their prior state, not blindly re-enabled. 
 pub fn hold_interrupts() -> HeldInterrupts {
 	let retval = HeldInterrupts(interrupts_enabled());
     disable_interrupts();
