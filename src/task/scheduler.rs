@@ -9,7 +9,7 @@ use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 pub unsafe fn schedule() -> bool {
     
     let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // debug!("schedule [0]: current_taskid={}", current_taskid.into());
+    // trace!("schedule [0]: current_taskid={}", current_taskid.into());
 
     let mut current_task = 0 as *mut Task; // a null Task ptr
     let mut next_task = 0 as *mut Task; // a null Task ptr
@@ -26,12 +26,12 @@ pub unsafe fn schedule() -> bool {
                 let id_considered = (*taskid).into();
 
                 let mut task = locked_task.write();
-                // debug!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
+                // trace!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
                 if task.runstate == RunState::RUNNABLE {
                     // we use an unsafe deref_mut() operation to ensure that this reference
                     // can remain beyond the lifetime of the tasklist RwLock being held.
                     next_task = task.deref_mut() as *mut Task;
-                    // debug!("schedule [2]: chose task {}", *task);
+                    // trace!("schedule [2]: chose task {}", *task);
                     break;
                 }
             } // writable locked_task is released here
@@ -64,9 +64,10 @@ pub unsafe fn schedule() -> bool {
 macro_rules! schedule {
     () => (    
         unsafe {
-            ::x86_64::instructions::interrupts::disable();
-            $crate::task::scheduler::schedule();
-            ::x86_64::instructions::interrupts::enable();
+            { 
+                let held_interrupts = $crate::interrupts::hold_interrupts();
+                $crate::task::scheduler::schedule();
+            }
         }   
     )
 }

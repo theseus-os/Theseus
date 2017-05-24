@@ -51,7 +51,7 @@ pub fn init(freq_hertz: u32) {
 const PIT_FREQUENCY_HZ: u64 = 100; 
 
 /// the timeslice period in milliseconds
-const timeslice_period_ms: u64 = 100; 
+const timeslice_period_ms: u64 = 10; 
 
 /// the heartbeatperiod in milliseconds
 const heartbeat_period_ms: u64 = 1000;
@@ -69,7 +69,7 @@ pub fn handle_timer_interrupt() {
         // FIXME: if we call schedule() too frequently, like on every tick,  the system locks up!
         // Most likely because we acquire locks in the scheduler/context switching routines
         schedule!();
-        debug!("done with preemptive schedule call");
+        // trace!("done with preemptive schedule call (ticks={})", ticks);
     }
 
     // heartbeat: print every 10 seconds
