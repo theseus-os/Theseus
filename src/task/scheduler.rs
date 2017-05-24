@@ -65,7 +65,7 @@ macro_rules! schedule {
     () => (    
         unsafe {
             { 
-                let held_interrupts = $crate::interrupts::hold_interrupts();
+                let _held_interrupts = $crate::interrupts::hold_interrupts();
                 $crate::task::scheduler::schedule();
             }
         }   

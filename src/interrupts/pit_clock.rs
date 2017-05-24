@@ -64,15 +64,11 @@ pub fn handle_timer_interrupt() {
     };
 
 
-    // preemption timeslice = 1sec (every 100 ticks)
     if (ticks % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
-        // FIXME: if we call schedule() too frequently, like on every tick,  the system locks up!
-        // Most likely because we acquire locks in the scheduler/context switching routines
         schedule!();
         // trace!("done with preemptive schedule call (ticks={})", ticks);
     }
 
-    // heartbeat: print every 10 seconds
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         
         //initializing TimeKeeping struct to "count"" ticks passed
