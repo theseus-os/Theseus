@@ -23,6 +23,7 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 #![feature(drop_types_in_const)] // unsure about this, prompted to add by rust compiler for Once<>
+#![feature(manually_drop)]
 #![no_std]
 
 
@@ -67,7 +68,7 @@ use collections::string::String;
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
-        println!("1");
+        print!("1");
     }
 }
 
@@ -75,7 +76,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
 fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
-        println!("2");
+        print!("2");
     }
 }
 
@@ -83,7 +84,7 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
 fn test_loop_3(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_3!");
     loop {
-        println!("3");
+        print!("3");
     }
 }
 
@@ -158,32 +159,20 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     println!("initialization done!");
 
 	
-	unsafe { x86_64::instructions::interrupts::enable();  }
+	interrupts::enable_interrupts();
 	println!("enabled interrupts!");
 
 
 
     // create a second task to test context switching
     {
-        let held_interrupts = interrupts::hold_interrupts();
+        // let held_interrupts = interrupts::hold_interrupts();
         
-        let ref mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
         { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
-
         { let second_task = tasklist_mut.spawn(third_thread_main, String::from("hello"), "third_thread"); } 
-
-        {
-        let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread");
-        match second_task {
-            Ok(_) => {
-                println!("successfully spawned and queued second task!");
-            }
-            Err(err) => { 
-                println!("Failed to spawn second task: {}", err); 
-            }
-        }
-        }
+        { let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
         // { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
@@ -192,7 +181,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     }
 
     // try to schedule in the second task
-    println!("attempting to schedule second task");
+    info!("attempting to schedule away from zeroth init task");
     schedule!();
 
 
