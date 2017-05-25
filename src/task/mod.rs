@@ -1,5 +1,6 @@
 
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use collections::BTreeMap;
 use collections::string::String;
 use alloc::arc::Arc;
@@ -7,9 +8,7 @@ use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
 use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
-use core::any::Any;
 use core::fmt;
-use x86_64::instructions::halt;
 
 #[macro_use] pub mod scheduler;
 
@@ -344,8 +343,8 @@ impl TaskList {
 
 
 /// the main task list, a singleton that is hidden 
-/// and should only be accessed using the get_tasklist() function
-/* private*/ static TASK_LIST: Once<RwLock<TaskList>> = Once::new(); 
+/// and should only be accessed using the `get_tasklist()` function
+/* private*/ static TASK_LIST: Once<RwLockIrqSafe<TaskList>> = Once::new(); 
 
 // the max number of tasks
 const MAX_NR_TASKS: usize = usize::max_value() - 1;
@@ -361,14 +360,14 @@ const MAX_NR_TASKS: usize = usize::max_value() - 1;
 
 /* 
 
-fn init_tasklist() -> RwLock<TaskList> {
-    RwLock::new(TaskList::new())
+fn init_tasklist() -> RwLockIrqSafe<TaskList> {
+    RwLockIrqSafe::new(TaskList::new())
 }
 
 /// get a locked, immutable reference to the global `TaskList`.
-/// Returns a `RwLockReadGuard` containing the `TaskList`.
+/// Returns a `RwLockIrqSafeReadGuard` containing the `TaskList`.
 /// to modify the task list, call `get_tasklist_mut()` instead of this. 
-pub fn get_tasklist() -> RwLockReadGuard<'static, TaskList> {
+pub fn get_tasklist() -> RwLockIrqSafeReadGuard<'static, TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
     TASK_LIST.call_once(init_tasklist).read()
@@ -376,9 +375,9 @@ pub fn get_tasklist() -> RwLockReadGuard<'static, TaskList> {
 
 
 /// get a locked, mutable reference to the global `TaskList`.
-/// Returns a `RwLockWriteGuard` containing the `TaskList`.
+/// Returns a `RwLockIrqSafeWriteGuard` containing the `TaskList`.
 /// For read-only access of the task list, call `get_tasklist()` instead of this.
-pub fn get_tasklist_mut() -> RwLockWriteGuard<'static, TaskList> {
+pub fn get_tasklist_mut() -> RwLockIrqSafeWriteGuard<'static, TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
     TASK_LIST.call_once(init_tasklist).write()
@@ -389,14 +388,14 @@ pub fn get_tasklist_mut() -> RwLockWriteGuard<'static, TaskList> {
 
 
 /// get a reference to the global `TaskList`.
-/// Returns a `RwLock` containing the `TaskList`.
+/// Returns a `RwLockIrqSafe` containing the `TaskList`.
 /// to modify the task list, call `.write()` on the returned value.
 /// To read the task list, call `.read()` on the returned value. 
-pub fn get_tasklist() -> &'static RwLock<TaskList> {
+pub fn get_tasklist() -> &'static RwLockIrqSafe<TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
     TASK_LIST.call_once( || { 
-        RwLock::new(TaskList::new())
+        RwLockIrqSafe::new(TaskList::new())
     }) 
 }
 
@@ -441,15 +440,15 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
-        let tasklist = get_tasklist().read();
+        let tasklist: RwLockIrqSafeReadGuard<_> = get_tasklist().read();
         tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
     }
     
-    {
-        let tasklist = get_tasklist().read();
-        let curtask = tasklist.get_current().unwrap().write();
-        debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
-    }
+    // {
+    //     let tasklist = get_tasklist().read();
+    //     let curtask = tasklist.get_current().unwrap().write();
+    //     debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
+    // }
     
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
