@@ -1,7 +1,7 @@
 /// Handles the Programmable Interval Timer (PIT) system clock,
 /// which allows us to configure the frequency of timer interrupts. 
 
-use cpuio::Port;
+use port_io::Port;
 use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::time_tools;
@@ -19,8 +19,8 @@ const COMMAND_REGISTER: u16 = 0x43;
 /// the timer's default frequency is 1.19 MHz
 const PIT_DIVIDEND_HZ: u32 = 1193182; 
 
-static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(COMMAND_REGISTER) } );
-static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(CHANNEL0) } );
+static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( Port::new(COMMAND_REGISTER) );
+static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( Port::new(CHANNEL0) );
 
 
 // static TICKS: AtomicUsize = AtomicUsize::new(0); // default()??
@@ -29,16 +29,19 @@ pub static mut TICKS: u64 = 0;
 
 pub fn init(freq_hertz: u32) {
     let divisor = PIT_DIVIDEND_HZ / freq_hertz;
-    PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
-    // PIT_COMMAND.lock().write(0x34); // some other mode that we don't want
-
-    if (divisor > u16::max_value() as u32) {
+    if divisor > (u16::max_value() as u32) {
         panic!("The chosen PIT frequency ({} Hz) is too small, it must be higher than 18 Hz!", freq_hertz);
     }
 
-    // must write the low byte and then the high byte
-    PIT_CHANNEL_0.lock().write(divisor as u8);
-    PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
+    // SAFE because we're simply configuring the PIT clock, and the code below is correct.
+    unsafe {
+        PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
+        // PIT_COMMAND.lock().write(0x34); // some other mode that we don't want
+
+        // must write the low byte and then the high byte
+        PIT_CHANNEL_0.lock().write(divisor as u8);
+        PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
+    }
 }
 
 
@@ -48,7 +51,7 @@ pub fn init(freq_hertz: u32) {
 const PIT_FREQUENCY_HZ: u64 = 100; 
 
 /// the timeslice period in milliseconds
-const timeslice_period_ms: u64 = 100; 
+const timeslice_period_ms: u64 = 10; 
 
 /// the heartbeatperiod in milliseconds
 const heartbeat_period_ms: u64 = 1000;
@@ -61,15 +64,15 @@ pub fn handle_timer_interrupt() {
     };
 
 
-    // preemption timeslice = 1sec (every 100 ticks)
     if (ticks % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
-        // FIXME: if we call schedule() too frequently, like on every tick,  the system locks up!
-        // Most likely because we acquire locks in the scheduler/context switching routines
         schedule!();
+<<<<<<< HEAD
 
+=======
+        // trace!("done with preemptive schedule call (ticks={})", ticks);
+>>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
     }
 
-    // heartbeat: print every 10 seconds
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         
         //initializing TimeKeeping struct to "count"" ticks passed

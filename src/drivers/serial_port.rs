@@ -1,41 +1,26 @@
-use cpuio::Port;
-use spin::Mutex;
+use port_io::Port;
 
 const SERIAL_PORT_COM1: u16 = 0x3F8;
 const SERIAL_PORT_COM1_READY: u16 = SERIAL_PORT_COM1 + 5;
 const SERIAL_PORT_READY_MASK: u8 = 0x20;
 
-static serial_com1: Mutex<Port<u8>> = Mutex::new( unsafe { Port::new(SERIAL_PORT_COM1) } );
-static serial_com1_ready: Mutex<Port<u8>> = Mutex::new( unsafe { Port::new(SERIAL_PORT_COM1_READY) } );
+static COM1: Port<u8> = Port::new(SERIAL_PORT_COM1);
+static COM1_READY: Port<u8> = Port::new(SERIAL_PORT_COM1_READY);
 
-//struct SerialPort {
-//	port: Port<u8>
-//}
-//
-//impl SerialPort {
-//	
-//}
 
 pub fn serial_out(s: &str) {
-	//&* is necessary:  * is required to dereference the MutexGuard obtained from .lock() above,
-	//                  & is required to borrow the Port<u8> object as a reference
-	let mut serial_com1_locked_mutex_guard = serial_com1.lock();
-	let locked = &mut *serial_com1_locked_mutex_guard;
-	
 	for b in s.bytes() {
-		write_locked(locked, b); 
-	}
-	
-}
+		wait_for_ready();
 
-fn write_locked(locked_port: &mut Port<u8>, b: u8) {
-	wait_for_ready();
-	locked_port.write(b);
+		// SAFE because we're just writing to the serial port. 
+		// worst-case effects here are simple out-of-order characters in the serial log.
+		unsafe { COM1.write(b); }
+	}
 }
 
 
 fn wait_for_ready() {
-	while serial_com1_ready.lock().read() & SERIAL_PORT_READY_MASK == 0 {
+	while COM1_READY.read() & SERIAL_PORT_READY_MASK == 0 {
 		// do nothing
 	}
 }

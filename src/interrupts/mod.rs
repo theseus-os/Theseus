@@ -11,9 +11,13 @@ use memory::MemoryController;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
-use cpuio::Port;
+use port_io::Port;
 use drivers::input::keyboard;
+<<<<<<< HEAD
 //use interrupts::time_tools;
+=======
+use arch;
+>>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
 
 
 mod gdt;
@@ -21,6 +25,7 @@ pub mod pit_clock; // TODO: shouldn't be pub
 mod pic;
 mod time_tools; //testing whether including a module makes any difference
 mod rtc;
+
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
@@ -79,7 +84,7 @@ lazy_static! {
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new( unsafe{ Port::new(0x60) } );
+static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
@@ -221,4 +226,52 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 	error!("caught unhandled interrupt: {:#?}", stack_frame);
 
+}
+
+
+
+
+
+
+
+
+
+
+/// A handle for frozen interrupts
+#[derive(Default)]
+pub struct HeldInterrupts(bool);
+
+/// Prevent interrupts from firing until return value is dropped (goes out of scope). 
+/// After it is dropped, the interrupts are returned to their prior state, not blindly re-enabled. 
+pub fn hold_interrupts() -> HeldInterrupts {
+	let retval = HeldInterrupts(interrupts_enabled());
+    disable_interrupts();
+    retval
+}
+
+
+impl ::core::ops::Drop for HeldInterrupts {
+	fn drop(&mut self)
+	{		
+		if self.0 {
+			enable_interrupts();
+			// unsafe { asm!("sti" : : : "memory" : "volatile"); }
+		}
+	}
+}
+
+
+/// disable interrupts
+pub fn disable_interrupts() {
+    arch::disable_interrupts();
+}
+
+/// enable interrupts
+pub fn enable_interrupts() {
+    arch::enable_interrupts();
+}
+
+/// returns true if interrupts are currently enabled
+pub fn interrupts_enabled() -> bool {
+    arch::interrupts_enabled()
 }

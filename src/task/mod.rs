@@ -1,5 +1,6 @@
 
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use collections::BTreeMap;
 use collections::string::String;
 use alloc::arc::Arc;
@@ -7,9 +8,7 @@ use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
 use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
-use core::any::Any;
 use core::fmt;
-use x86_64::instructions::halt;
 
 #[macro_use] pub mod scheduler;
 
@@ -65,9 +64,6 @@ pub struct Task {
     pub running_on_cpu: i8,
     /// the runnability status of this task, basically whether it's allowed to be scheduled in. 
     pub runstate: RunState,
-    /// unused
-    pub prev_runstate: RunState,
-    pub test: u64, 
     /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
     /// [unused] the kernel stack.  Wrapped in Option<> so we can initialize it to None.
@@ -81,13 +77,9 @@ impl Task {
     
     /// creates a new Task structure and initializes it to be non-Runnable.
     fn new(task_id: TaskId) -> Task { 
-        use core::mem;
-        info!("\n\n    Size of RunState: {:?}", mem::size_of::<RunState>());
         Task {
             id: task_id, 
             runstate: RunState::INITING, 
-            prev_runstate: RunState::INITING,
-            test: 0xDEADBEEFDEADBEEF,
             running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
@@ -268,7 +260,8 @@ impl TaskList {
         }
     }
 
-    /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`
+    /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
+    /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
     pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
             func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
@@ -350,8 +343,8 @@ impl TaskList {
 
 
 /// the main task list, a singleton that is hidden 
-/// and should only be accessed using the get_tasklist() function
-/* private*/ static TASK_LIST: Once<RwLock<TaskList>> = Once::new(); 
+/// and should only be accessed using the `get_tasklist()` function
+/* private*/ static TASK_LIST: Once<RwLockIrqSafe<TaskList>> = Once::new(); 
 
 // the max number of tasks
 const MAX_NR_TASKS: usize = usize::max_value() - 1;
@@ -365,21 +358,49 @@ const MAX_NR_TASKS: usize = usize::max_value() - 1;
 // }
 
 
+/* 
+
+fn init_tasklist() -> RwLockIrqSafe<TaskList> {
+    RwLockIrqSafe::new(TaskList::new())
+}
+
+/// get a locked, immutable reference to the global `TaskList`.
+/// Returns a `RwLockIrqSafeReadGuard` containing the `TaskList`.
+/// to modify the task list, call `get_tasklist_mut()` instead of this. 
+pub fn get_tasklist() -> RwLockIrqSafeReadGuard<'static, TaskList> {
+    // the first time this is called, the tasklist will be inited
+    // on future invocations, that inited task list is simply returned
+    TASK_LIST.call_once(init_tasklist).read()
+}
+
+
+/// get a locked, mutable reference to the global `TaskList`.
+/// Returns a `RwLockIrqSafeWriteGuard` containing the `TaskList`.
+/// For read-only access of the task list, call `get_tasklist()` instead of this.
+pub fn get_tasklist_mut() -> RwLockIrqSafeWriteGuard<'static, TaskList> {
+    // the first time this is called, the tasklist will be inited
+    // on future invocations, that inited task list is simply returned
+    TASK_LIST.call_once(init_tasklist).write()
+}
+
+*/
+
+
 
 /// get a reference to the global `TaskList`.
-/// Returns a `RwLock` containing the `TaskList`.
+/// Returns a `RwLockIrqSafe` containing the `TaskList`.
 /// to modify the task list, call `.write()` on the returned value.
 /// To read the task list, call `.read()` on the returned value. 
-pub fn get_tasklist() -> &'static RwLock<TaskList> {
+pub fn get_tasklist() -> &'static RwLockIrqSafe<TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
     TASK_LIST.call_once( || { 
-        RwLock::new(TaskList::new())
+        RwLockIrqSafe::new(TaskList::new())
     }) 
 }
 
 /// this does not return
-pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
+fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
@@ -419,15 +440,15 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
-        let tasklist = get_tasklist().read();
+        let tasklist: RwLockIrqSafeReadGuard<_> = get_tasklist().read();
         tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
     }
     
-    {
-        let tasklist = get_tasklist().read();
-        let curtask = tasklist.get_current().unwrap().write();
-        debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
-    }
+    // {
+    //     let tasklist = get_tasklist().read();
+    //     let curtask = tasklist.get_current().unwrap().write();
+    //     debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
+    // }
     
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
@@ -440,7 +461,5 @@ pub fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // we shouldn't ever reach this point
     loop { 
         error!("STUCK IN KTHREAD_WRAPPER INFINITE LOOP!!!");
-        // FIXME: i don't think this halt should be necessary
-        unsafe { /*x86_64::instructions::*/ halt(); }
     }
 }

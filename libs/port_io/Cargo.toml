@@ -1,0 +1,11 @@
+[package]
+name = "port_io"
+version = "0.2.1"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Eric Kidd <git@randomhacks.net>"]
+
+description = "Bare metal (no_std) inb, outb, inw, outw, inl, outw instructions with Rust-like API"
+homepage = "https://github.com/emk/toyos.rs/tree/master/crates/cpuio"
+repository = "https://github.com/emk/toyos.rs"
+readme = "README.md"
+keywords = ["no_std", "kernel", "io"]
+license = "MIT"

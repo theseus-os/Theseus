@@ -39,7 +39,7 @@ extern crate bit_field;
 extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
 #[macro_use] extern crate collections;
-extern crate cpuio; 
+extern crate port_io; 
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
 
@@ -56,6 +56,7 @@ mod interrupts;
 
 
 use spin::RwLockWriteGuard;
+use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
 use collections::string::String;
 
@@ -147,9 +148,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
 
     // create the initial `Task`, called task_zero
-    // this is scoped in order to automatically release the tasklist RwLock
+    // this is scoped in order to automatically release the tasklist RwLockIrqSafe
     {
-        let mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
         let task_zero = tasklist_mut.init_first_task();
     }
 
@@ -164,7 +165,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // create a second task to test context switching
     {
-        let ref mut tasklist_mut: RwLockWriteGuard<TaskList> = task::get_tasklist().write();    
+        let held_interrupts = interrupts::hold_interrupts();
+        
+        let ref mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
         { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
 

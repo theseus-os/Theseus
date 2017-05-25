@@ -212,3 +212,24 @@ impl Registers {
 pub fn pause() {
     unsafe { asm!("pause" : : : : "intel", "volatile"); }
 }
+
+#[inline(always)]
+pub fn enable_interrupts() {
+    unsafe { x86_64::instructions::interrupts::enable(); }
+}
+
+
+#[inline(always)]
+pub fn disable_interrupts() {
+    unsafe { x86_64::instructions::interrupts::disable(); }
+}
+
+
+#[inline(always)]
+pub fn interrupts_enabled() -> bool {
+    unsafe { 
+        let flags: u64;
+		asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
+		(flags & 0x200) != 0
+     }
+}
