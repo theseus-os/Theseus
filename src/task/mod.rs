@@ -415,15 +415,13 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         }
     }
 
-    println!("kthread_call_stack_ptr = {:#x}", kthread_call_stack_ptr as usize);
-
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
     let kthread_call: Box<KthreadCall<A, R>> = unsafe {
         Box::from_raw(kthread_call_stack_ptr) 
     };
     let kthread_call_val: KthreadCall<A, R> = *kthread_call;
 
-    debug!("recovered kthread_call: {:?}", kthread_call_val);
+    // debug!("recovered kthread_call: {:?}", kthread_call_val);
 
     let arg: Box<A> = unsafe {
         Box::from_raw(kthread_call_val.arg)
@@ -454,7 +452,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 
 
-    debug!("attempting to unschedule kthread...");
+    trace!("attempting to unschedule kthread...");
     schedule!();
 
 

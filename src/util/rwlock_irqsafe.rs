@@ -1,13 +1,13 @@
 use core::ops::{Deref, DerefMut};
 use core::fmt;
 use core::default::Default;
+use core::mem::ManuallyDrop;
 
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use interrupts::{HeldInterrupts, hold_interrupts};
 
-/// A wrapper around a `RwLock`
+/// A simple wrapper around a `RwLock` whose guards disable interrupts properly 
 pub struct RwLockIrqSafe<T: ?Sized> {
-    held_irq: HeldInterrupts,
     rwlock: RwLock<T>,
 }
 
@@ -15,27 +15,26 @@ pub struct RwLockIrqSafe<T: ?Sized> {
 /// A guard to which the protected data can be read
 ///
 /// When the guard falls out of scope it will decrement the read count,
-/// potentially releasing the lock.
+/// potentially releasing the lock and potentially re-enabling interrupts.
 pub struct RwLockIrqSafeReadGuard<'a, T: 'a + ?Sized>
 {
-    held_irq: HeldInterrupts,
-    guard: RwLockReadGuard<'a, T>,
+    held_irq: ManuallyDrop<HeldInterrupts>,
+    guard: ManuallyDrop<RwLockReadGuard<'a, T>>,
 }
 
 /// A guard to which the protected data can be written
 ///
-/// When the guard falls out of scope it will release the lock.
+/// When the guard falls out of scope it will release the lock and potentially re-enable interrupts.
 pub struct RwLockIrqSafeWriteGuard<'a, T: 'a + ?Sized>
 {
-    held_irq: HeldInterrupts,
-    guard: RwLockWriteGuard<'a, T>,
+    held_irq: ManuallyDrop<HeldInterrupts>,
+    guard: ManuallyDrop<RwLockWriteGuard<'a, T>>,
 }
 
 // Same unsafe impls as `std::sync::RwLock`
 unsafe impl<T: ?Sized + Send + Sync> Send for RwLockIrqSafe<T> {}
 unsafe impl<T: ?Sized + Send + Sync> Sync for RwLockIrqSafe<T> {}
 
-const USIZE_MSB: usize = ::core::isize::MIN as usize;
 
 impl<T> RwLockIrqSafe<T>
 {
@@ -61,7 +60,6 @@ impl<T> RwLockIrqSafe<T>
         RwLockIrqSafe
         {
             rwlock: RwLock::new(user_data),
-            held_irq: Default::default(), // default is false; it's a harmless noop to drop a false HeldInterrupts
         }
     }
 
@@ -85,7 +83,6 @@ impl<T> RwLockIrqSafe<T>
         RwLockIrqSafe
         {
             rwlock: RwLock::new(user_data),
-            held_irq: Default::default(), // default is false; it's a harmless noop to drop a false HeldInterrupts
         }
     }
 
@@ -123,8 +120,8 @@ impl<T: ?Sized> RwLockIrqSafe<T>
     pub fn read<'a>(&'a self) -> RwLockIrqSafeReadGuard<'a, T>
     {
         RwLockIrqSafeReadGuard {
-            guard:  self.rwlock.read(),
-            held_irq: hold_interrupts(),
+            held_irq: ManuallyDrop::new(hold_interrupts()),
+            guard:  ManuallyDrop::new(self.rwlock.read()),
         }
     }
 
@@ -156,10 +153,12 @@ impl<T: ?Sized> RwLockIrqSafe<T>
         match self.rwlock.try_read() {
             None => None,
             success => {
-                Some(RwLockIrqSafeReadGuard {
-                    held_irq: hold_interrupts(),
-                    guard: success.unwrap(),
-                })
+                Some(
+                    RwLockIrqSafeReadGuard {
+                        held_irq: ManuallyDrop::new(hold_interrupts()),
+                        guard: ManuallyDrop::new(success.unwrap()),
+                    }
+                )
             }
         }
     }
@@ -205,8 +204,8 @@ impl<T: ?Sized> RwLockIrqSafe<T>
     pub fn write<'a>(&'a self) -> RwLockIrqSafeWriteGuard<'a, T>
     {
         RwLockIrqSafeWriteGuard {
-            guard:  self.rwlock.write(),
-            held_irq: hold_interrupts(),
+            held_irq: ManuallyDrop::new(hold_interrupts()),
+            guard:  ManuallyDrop::new(self.rwlock.write()),
         }
     }
 
@@ -235,13 +234,16 @@ impl<T: ?Sized> RwLockIrqSafe<T>
         match self.rwlock.try_write() {
             None => None,
             success => {
-                Some(RwLockIrqSafeWriteGuard {
-                    held_irq: hold_interrupts(),
-                    guard: success.unwrap(),
-                })
+                Some(
+                    RwLockIrqSafeWriteGuard {
+                        held_irq: ManuallyDrop::new(hold_interrupts()),
+                        guard: ManuallyDrop::new(success.unwrap()),
+                    }
+                )
             }
         }
     }
+
 }
 
 impl<T: ?Sized + fmt::Debug> fmt::Debug for RwLockIrqSafe<T>
@@ -284,19 +286,23 @@ impl<'rwlock, T: ?Sized> DerefMut for RwLockIrqSafeWriteGuard<'rwlock, T> {
     }
 }
 
-// NOTE: we don't need explicit calls to .drop() because it will be automatically called
-//       when the guards fall out of scope.
 
-// impl<'rwlock, T: ?Sized> Drop for RwLockIrqSafeReadGuard<'rwlock, T> {
-//     fn drop(&mut self) {
-//         self.guard.drop();
-//         self.held_irq.drop();
-//     }
-// }
+// NOTE: we need explicit calls to .drop() to ensure that HeldInterrupts are not released 
+//       until the inner lock is also released.
+impl<'rwlock, T: ?Sized> Drop for RwLockIrqSafeReadGuard<'rwlock, T> {
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.guard);
+            ManuallyDrop::drop(&mut self.held_irq);
+        }
+    }
+}
 
-// impl<'rwlock, T: ?Sized> Drop for RwLockIrqSafeWriteGuard<'rwlock, T> {
-//     fn drop(&mut self) {
-//         self.guard.drop();
-//         self.held_irq.drop();
-//     }
-// }
+impl<'rwlock, T: ?Sized> Drop for RwLockIrqSafeWriteGuard<'rwlock, T> {
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.guard);
+            ManuallyDrop::drop(&mut self.held_irq);
+        }
+    }
+}
