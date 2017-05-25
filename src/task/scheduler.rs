@@ -15,7 +15,7 @@ pub unsafe fn schedule() -> bool {
     let mut next_task = 0 as *mut Task; // a null Task ptr
     
 
-    // this is scoped to ensure that the tasklist's RwLock is released at the end.
+    // this is scoped to ensure that the tasklist's RwLockIrqSafe is released at the end.
     // we only request a read lock cuz we're not modifying the list here, 
     // rather just trying to find one that is runnable 
     {
@@ -29,7 +29,7 @@ pub unsafe fn schedule() -> bool {
                 // trace!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
                 if task.runstate == RunState::RUNNABLE {
                     // we use an unsafe deref_mut() operation to ensure that this reference
-                    // can remain beyond the lifetime of the tasklist RwLock being held.
+                    // can remain beyond the lifetime of the tasklist RwLockIrqSafe being held.
                     next_task = task.deref_mut() as *mut Task;
                     // trace!("schedule [2]: chose task {}", *task);
                     break;
@@ -39,7 +39,7 @@ pub unsafe fn schedule() -> bool {
 
         if next_task as usize == 0 {
             // keep the same current task
-            return false; // tasklist is automatically unlocked here, thanks RwLockReadGuard!
+            return false; // tasklist is automatically unlocked here, thanks RwLockIrqSafeReadGuard!
         }
 
         // same scoping reasons as above: to release the tasklist lock and the lock around current_task
@@ -50,8 +50,8 @@ pub unsafe fn schedule() -> bool {
     } // read-only tasklist lock is released here
 
     // we want mutable references to mutable tasks
-    let mut curr = &mut (*current_task); // as &mut Task; 
-    let mut next = &mut (*next_task); // as &mut Task; 
+    let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
+    let mut next: &mut Task = &mut (*next_task); // as &mut Task; 
     curr.context_switch(next); 
 
     true
