@@ -13,11 +13,8 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
-//<<<<<<< HEAD
-//use interrupts::time_tools;
-//=======
 use arch;
-//>>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
+
 
 
 mod gdt;
@@ -201,23 +198,26 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
 
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    // trace!("TIMER!");
+    ::drivers::serial_port::serial_out("\n\x1b[33m[W] TIMER! \x1b[0m\n");
 
-    pit_clock::handle_timer_interrupt();
-
+    // we must acknowledge the interrupt first before handling it, which will cause a context switch
 	unsafe { PIC.notify_end_of_interrupt(0x20); }
     //time_tools::return_ticks();
+
+    pit_clock::handle_timer_interrupt();
 }
 
 
 // 0x21
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
+    // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let mut scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
 	// trace!("KBD: {:?}", scan_code);
-    keyboard::handle_keyboard_input(scan_code);
-	
+
+
+    keyboard::handle_keyboard_input(scan_code);	
     unsafe { PIC.notify_end_of_interrupt(0x21); }
     
 }
@@ -244,15 +244,18 @@ pub struct HeldInterrupts(bool);
 /// Prevent interrupts from firing until return value is dropped (goes out of scope). 
 /// After it is dropped, the interrupts are returned to their prior state, not blindly re-enabled. 
 pub fn hold_interrupts() -> HeldInterrupts {
-	let retval = HeldInterrupts(interrupts_enabled());
+    let enabled = interrupts_enabled();
+	let retval = HeldInterrupts(enabled);
     disable_interrupts();
+    // trace!("hold_interrupts(): disabled interrupts, were {}", enabled);
     retval
 }
 
 
 impl ::core::ops::Drop for HeldInterrupts {
 	fn drop(&mut self)
-	{		
+	{
+        // trace!("hold_interrupts(): enabling interrupts? {}", self.0);
 		if self.0 {
 			enable_interrupts();
 			// unsafe { asm!("sti" : : : "memory" : "volatile"); }
