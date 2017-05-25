@@ -140,12 +140,17 @@ impl Task {
         // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
-        // debug!("context_switch [3], calling switch_to().");
+
+
 
         // perform the actual context switch
         unsafe {
             self.arch_state.switch_to(&next.arch_state);
         }
+
+
+        // TODO: FIXME: perhaps this is where we should re-enable interrupts?
+        
     }
 
 
@@ -431,6 +436,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
 
 
+    info!("about to call kthread func, interrupts are {}", ::interrupts::interrupts_enabled());
 
     // actually invoke the function spawned in this kernel thread
     let exit_status = func(*arg); 
