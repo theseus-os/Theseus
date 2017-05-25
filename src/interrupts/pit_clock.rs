@@ -66,11 +66,11 @@ pub fn handle_timer_interrupt() {
 
     if (ticks % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         schedule!();
-<<<<<<< HEAD
+//<<<<<<< HEAD
 
-=======
+//=======
         // trace!("done with preemptive schedule call (ticks={})", ticks);
->>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
+//>>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
     }
 
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {

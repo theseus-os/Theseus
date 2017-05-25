@@ -13,11 +13,11 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
-<<<<<<< HEAD
+//<<<<<<< HEAD
 //use interrupts::time_tools;
-=======
+//=======
 use arch;
->>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
+//>>>>>>> 9cf36e87f1abf2d0aee29c27599cd978741167db
 
 
 mod gdt;
