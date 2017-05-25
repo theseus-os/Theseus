@@ -20,6 +20,7 @@ mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
 mod pic;
 mod time_tools; //testing whether including a module makes any difference
+mod rtc;
 
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
