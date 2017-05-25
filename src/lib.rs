@@ -166,8 +166,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // create a second task to test context switching
     {
-        // let held_interrupts = interrupts::hold_interrupts();
-        
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
         { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
@@ -175,8 +173,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         { let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
-        // { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
-        // { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
+        { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
+        { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
         // { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
     }
 

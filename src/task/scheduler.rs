@@ -52,21 +52,29 @@ pub unsafe fn schedule() -> bool {
     // we want mutable references to mutable tasks
     let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
     let mut next: &mut Task = &mut (*next_task); // as &mut Task; 
+
+    // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid.into(), ::interrupts::interrupts_enabled());
+
     curr.context_switch(next); 
+
+    // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
+    // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current.into(), ::interrupts::interrupts_enabled());
 
     true
 }
 
 
-/// invokes the scheduler to pick a new task with interrupts disabled. 
+/// invokes the scheduler to pick a new task, but first disables interrupts. 
+/// Interrupts will be automatically re-enabled after scheduling. 
 /// The current thread may be picked again, it doesn't affect the current thread's runnability.
 #[macro_export]
 macro_rules! schedule {
     () => (    
-        unsafe {
-            { 
-                let _held_interrupts = $crate::interrupts::hold_interrupts();
+        {
+            unsafe {
+                $crate::interrupts::disable_interrupts();
                 $crate::task::scheduler::schedule();
+                $crate::interrupts::enable_interrupts();
             }
         }   
     )

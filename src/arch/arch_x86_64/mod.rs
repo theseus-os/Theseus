@@ -67,7 +67,7 @@ impl ArchTaskState {
             asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
         }
         else {
-            debug!("cr3 was the same as expected.");
+            // debug!("cr3 was the same as expected.");
         }
 
         // save & restore rflags
@@ -95,6 +95,10 @@ impl ArchTaskState {
         // save & restore the base pointer
         asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
         asm!("mov rbp, $0" : : "r"(next.registers.rbp) : "memory" : "intel", "volatile");
+
+
+        // enable interrupts again
+        asm!("sti" : : : "memory" : "volatile");
     }
 }
 
