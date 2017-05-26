@@ -15,7 +15,7 @@ use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 pub unsafe fn schedule() -> bool {
 
     let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    trace!("schedule [0]: current_taskid={}", current_taskid.into());
+    // trace!("schedule [0]: current_taskid={}", current_taskid.into());
 
     let mut current_task = 0 as *mut Task; // a null Task ptr
     let mut next_task = 0 as *mut Task; // a null Task ptr
@@ -25,35 +25,27 @@ pub unsafe fn schedule() -> bool {
     // we only request a read lock cuz we're not modifying the list here, 
     // rather just trying to find one that is runnable 
     {
+        if let Some(selected_next_task) = select_next_task(&mut RUNQUEUE.write()) {
+            next_task = selected_next_task.write().deref_mut();  // as *mut Task;
+        }
+        else {
+            return false;
+        }
+    } // RUNQUEUE is released here
+
+
+    if next_task as usize == 0 {
+        // keep the same current task
+        return false; // tasklist is automatically unlocked here, thanks RwLockIrqSafeReadGuard!
+    }
+    
+    // same scoping reasons as above: to release the tasklist lock and the lock around current_task
+    {
         let tasklist_immut = &get_tasklist().read(); // no need to modify the tasklist
-        { 
-            // iterate over all tasks EXCEPT the current one
-            for (taskid, locked_task) in tasklist_immut.iter().filter(|x| *(x.0) != current_taskid) {
-                let id_considered = (*taskid).into();
+        current_task = tasklist_immut.get_current().expect("spawn(): get_current failed in getting current_task")
+                        .write().deref_mut() as *mut Task; 
+    }
 
-                let mut task = locked_task.write();
-                trace!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
-                if task.runstate == RunState::RUNNABLE {
-                    // we use an unsafe deref_mut() operation to ensure that this reference
-                    // can remain beyond the lifetime of the tasklist RwLockIrqSafe being held.
-                    next_task = task.deref_mut() as *mut Task;
-                    trace!("schedule [2]: chose task {}", *task);
-                    break;
-                }
-            } // writable locked_task is released here
-        }
-
-        if next_task as usize == 0 {
-            // keep the same current task
-            return false; // tasklist is automatically unlocked here, thanks RwLockIrqSafeReadGuard!
-        }
-
-        // same scoping reasons as above: to release the tasklist lock and the lock around current_task
-        {
-            current_task = tasklist_immut.get_current().expect("spawn(): get_current failed in getting current_task")
-                           .write().deref_mut() as *mut Task; 
-        }
-    } // read-only tasklist lock is released here
 
     // we want mutable references to mutable tasks
     let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
@@ -105,7 +97,7 @@ pub fn remove_task_from_runqueue(task: TaskRef) {
 
 
 /// this defines the scheduler policy.
-
+/// returns None if there is no schedule-able task
 fn select_next_task(runqueue_locked: &mut RwLockIrqSafeWriteGuard<RunQueue>) -> Option<TaskRef>  {
     
     let mut index_chosen: Option<usize> = None;

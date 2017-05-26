@@ -196,7 +196,10 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
 
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    ::drivers::serial_port::serial_out("\n\x1b[33m[W] TIMER! \x1b[0m\n");
+    // this is how to write something with literally ZERO locking
+    // TODO: FIXME: establish non-locking debug messages, with compile-time string literals only!
+    // we still do not know how to print runtime values without locking, due to the format!() macro needing allocation.
+    // ::drivers::serial_port::serial_out("\n\x1b[33m[W] TIMER! \x1b[0m\n");
 
     // we must acknowledge the interrupt first before handling it, which will cause a context switch
 	unsafe { PIC.notify_end_of_interrupt(0x20); }

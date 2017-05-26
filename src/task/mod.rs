@@ -265,7 +265,9 @@ impl TaskList {
             None => { 
                 // None indicates that the insertion didn't overwrite anything, which is what we want
                 debug!("Successfully created initial task0");
-                Ok(self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist"))
+                let tz = self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist");
+                scheduler::add_task_to_runqueue(tz.clone());
+                Ok(tz)
             }
             _ => {
                 panic!("WTF: task_zero already existed?!?");
@@ -336,7 +338,10 @@ impl TaskList {
             new_task.kstack = Some(stack);
 
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
+
         }
+
+        scheduler::add_task_to_runqueue(locked_new_task.clone());
 
         Ok(locked_new_task)
     }
