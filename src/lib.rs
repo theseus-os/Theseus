@@ -23,7 +23,6 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 #![feature(drop_types_in_const)] // unsure about this, prompted to add by rust compiler for Once<>
-#![feature(manually_drop)]
 #![no_std]
 
 
@@ -40,7 +39,8 @@ extern crate bit_field;
 extern crate hole_list_allocator; // our own allocator
 extern crate alloc;
 #[macro_use] extern crate collections;
-extern crate port_io; 
+extern crate port_io; // our own crate for port_io, replaces exising "cpu_io"
+extern crate irq_safety; // our own crate for irq-safe locking and interrupt utilities
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
 
@@ -57,7 +57,7 @@ mod interrupts;
 
 
 use spin::RwLockWriteGuard;
-use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
+use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
 use collections::string::String;
 

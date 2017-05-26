@@ -2,7 +2,7 @@ use core::ops::DerefMut;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
 use collections::VecDeque;
-use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
+use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use spin::RwLock;
 
 use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};

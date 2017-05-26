@@ -1,6 +1,6 @@
 
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
+use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use collections::BTreeMap;
 use collections::string::String;
 use alloc::arc::Arc;
