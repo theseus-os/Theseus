@@ -4,7 +4,7 @@ use core::default::Default;
 use core::mem::ManuallyDrop;
 
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use interrupts::{HeldInterrupts, hold_interrupts};
+use held_interrupts::{HeldInterrupts, hold_interrupts};
 
 /// A simple wrapper around a `RwLock` whose guards disable interrupts properly 
 pub struct RwLockIrqSafe<T: ?Sized> {

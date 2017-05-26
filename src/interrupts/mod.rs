@@ -15,10 +15,13 @@ use port_io::Port;
 use drivers::input::keyboard;
 use arch;
 
+// expose these functions from within this interrupt module
+pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
 mod gdt;
 mod pic;
 pub mod pit_clock; // TODO: shouldn't be pub
+
 
 
 
@@ -226,55 +229,4 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 	error!("caught unhandled interrupt: {:#?}", stack_frame);
 
-}
-
-
-
-
-
-
-
-
-
-
-/// A handle for frozen interrupts
-#[derive(Default)]
-pub struct HeldInterrupts(bool);
-
-/// Prevent interrupts from firing until return value is dropped (goes out of scope). 
-/// After it is dropped, the interrupts are returned to their prior state, not blindly re-enabled. 
-pub fn hold_interrupts() -> HeldInterrupts {
-    let enabled = interrupts_enabled();
-	let retval = HeldInterrupts(enabled);
-    disable_interrupts();
-    // trace!("hold_interrupts(): disabled interrupts, were {}", enabled);
-    retval
-}
-
-
-impl ::core::ops::Drop for HeldInterrupts {
-	fn drop(&mut self)
-	{
-        // trace!("hold_interrupts(): enabling interrupts? {}", self.0);
-		if self.0 {
-			enable_interrupts();
-			// unsafe { asm!("sti" : : : "memory" : "volatile"); }
-		}
-	}
-}
-
-
-/// disable interrupts
-pub fn disable_interrupts() {
-    arch::disable_interrupts();
-}
-
-/// enable interrupts
-pub fn enable_interrupts() {
-    arch::enable_interrupts();
-}
-
-/// returns true if interrupts are currently enabled
-pub fn interrupts_enabled() -> bool {
-    arch::interrupts_enabled()
 }
