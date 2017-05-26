@@ -252,8 +252,8 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for RwLockIrqSafe<T>
     {
         match self.rwlock.try_read()
         {
-            Some(guard) => write!(f, "RwLock {{ data: {:?} }}", &*guard),
-            None => write!(f, "RwLock {{ <locked> }}"),
+            Some(guard) => write!(f, "RwLockIrqSafe {{ data: {:?} }}", &*guard),
+            None => write!(f, "RwLockIrqSafe {{ <locked> }}"),
         }
     }
 }

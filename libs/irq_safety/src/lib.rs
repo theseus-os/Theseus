@@ -8,9 +8,10 @@
 extern crate x86;
 extern crate spin;
 
+pub use mutex_irqsafe::*;
 pub use rwlock_irqsafe::*;
 pub use held_interrupts::*;
 
-// pub mod mutex_irqsafe; // TODO
+mod mutex_irqsafe;
 mod rwlock_irqsafe;
 mod held_interrupts;
