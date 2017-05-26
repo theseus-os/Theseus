@@ -102,6 +102,10 @@ impl Task {
         (self.running_on_cpu >= 0)
     }
 
+    pub fn is_runnable(&self) -> bool {
+        (self.runstate == RunState::RUNNABLE)
+    }
+
     // TODO: implement this 
     /*
     fn clone_task(&self, new_id: TaskId) -> Task {
@@ -144,13 +148,14 @@ impl Task {
 
 
         // perform the actual context switch
+        // interrupts are automatically enabled at the end of switch_to
         unsafe {
             self.arch_state.switch_to(&next.arch_state);
         }
 
 
         // TODO: FIXME: perhaps this is where we should re-enable interrupts?
-        
+
     }
 
 
@@ -189,6 +194,10 @@ impl TaskList {
 
     fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(&CURRENT_TASK.load(Ordering::SeqCst))
+    }
+
+    pub fn get_task(&self, task_id: &TaskId) -> Option<&Arc<RwLock<Task>>> {
+        self.list.get(task_id)
     }
 
     /// Get a iterator for the list of contexts.
