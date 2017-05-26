@@ -1,5 +1,5 @@
 [package]
-authors = ["Philipp Oppermann <dev@phil-opp.com>"]
+authors = ["Philipp Oppermann <dev@phil-opp.com>", "Kevin Boos <kevinaboos@gmail.com>"]
 name = "hole_list_allocator"
 version = "0.1.0"
 
@@ -10,3 +10,7 @@ spin = "0.4.5"
 [dependencies.lazy_static]
 version = "0.2.1"
 features = ["spin_no_std"]
+
+[dependencies.irq_safety]
+version = "0.1.0"
+path = "../irq_safety"

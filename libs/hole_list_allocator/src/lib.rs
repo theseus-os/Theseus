@@ -7,27 +7,34 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+// modified by Kevin Boos
+
 #![feature(allocator)]
 #![feature(const_fn)]
 
 #![allocator]
 #![no_std]
 
-use spin::Mutex;
-use linked_list_allocator::Heap;
 
-extern crate spin;
+extern crate irq_safety; // extern crate spin;
 extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
 
+use irq_safety::MutexIrqSafe; // use spin::Mutex;
+use linked_list_allocator::Heap;
+
+
+
+
 pub const HEAP_START: usize = 0o_000_001_000_000_0000;
 // pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
-pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 KiB
+pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 
 
 lazy_static! {
-    static ref HEAP: Mutex<Heap> = Mutex::new(unsafe {
+    // static ref HEAP: Mutex<Heap> = Mutex::new(unsafe {
+    static ref HEAP: MutexIrqSafe<Heap> = MutexIrqSafe::new(unsafe {
         Heap::new(HEAP_START, HEAP_SIZE)
     });
 }
