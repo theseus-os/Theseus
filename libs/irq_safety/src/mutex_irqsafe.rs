@@ -85,7 +85,7 @@ pub struct MutexIrqSafe<T: ?Sized>
 /// A guard to which the protected data can be accessed
 ///
 /// When the guard falls out of scope it will release the lock.
-pub struct MutexGuardIrqSafe<'a, T: ?Sized + 'a>
+pub struct MutexIrqSafeGuard<'a, T: ?Sized + 'a>
 {
     held_irq: ManuallyDrop<HeldInterrupts>,
     guard: ManuallyDrop<MutexGuard<'a, T>>, 
@@ -180,9 +180,9 @@ impl<T: ?Sized> MutexIrqSafe<T>
     /// }
     ///
     /// ```
-    pub fn lock(&self) -> MutexGuardIrqSafe<T>
+    pub fn lock(&self) -> MutexIrqSafeGuard<T>
     {
-        MutexGuardIrqSafe
+        MutexIrqSafeGuard
         {
             held_irq: ManuallyDrop::new(hold_interrupts()),
             guard: ManuallyDrop::new(self.lock.lock())
@@ -202,13 +202,13 @@ impl<T: ?Sized> MutexIrqSafe<T>
 
     /// Tries to lock the MutexIrqSafe. If it is already locked, it will return None. Otherwise it returns
     /// a guard within Some.
-    pub fn try_lock(&self) -> Option<MutexGuardIrqSafe<T>>
+    pub fn try_lock(&self) -> Option<MutexIrqSafeGuard<T>>
     {
         match self.lock.try_lock() {
             None => None,
             success => {
                 Some(
-                    MutexGuardIrqSafe {
+                    MutexIrqSafeGuard {
                         held_irq: ManuallyDrop::new(hold_interrupts()),
                         guard: ManuallyDrop::new(success.unwrap()),
                     }
@@ -237,7 +237,7 @@ impl<T: ?Sized + Default> Default for MutexIrqSafe<T> {
     }
 }
 
-impl<'a, T: ?Sized> Deref for MutexGuardIrqSafe<'a, T>
+impl<'a, T: ?Sized> Deref for MutexIrqSafeGuard<'a, T>
 {
     type Target = T;
 
@@ -246,7 +246,7 @@ impl<'a, T: ?Sized> Deref for MutexGuardIrqSafe<'a, T>
     }
 }
 
-impl<'a, T: ?Sized> DerefMut for MutexGuardIrqSafe<'a, T>
+impl<'a, T: ?Sized> DerefMut for MutexIrqSafeGuard<'a, T>
 {
     fn deref_mut<'b>(&'b mut self) -> &'b mut T { 
         &mut *(self.guard)
@@ -256,9 +256,9 @@ impl<'a, T: ?Sized> DerefMut for MutexGuardIrqSafe<'a, T>
 
 // NOTE: we need explicit calls to .drop() to ensure that HeldInterrupts are not released 
 //       until the inner lock is also released.
-impl<'a, T: ?Sized> Drop for MutexGuardIrqSafe<'a, T>
+impl<'a, T: ?Sized> Drop for MutexIrqSafeGuard<'a, T>
 {
-    /// The dropping of the MutexGuardIrqSafe will release the lock it was created from.
+    /// The dropping of the MutexIrqSafeGuard will release the lock it was created from.
     fn drop(&mut self) {
         unsafe {
             ManuallyDrop::drop(&mut self.guard);
