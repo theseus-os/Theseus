@@ -1,15 +1,21 @@
 use core::ops::DerefMut;
+use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
+use collections::VecDeque;
+use util::rwlock_irqsafe::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
+use spin::RwLock;
 
 use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 
-/// This function picks the next task and then context switch to it. 
+/// This function performs a context switch.
 /// This is unsafe because we have to maintain references to the current and next tasks
 /// beyond the duration of their task locks and the singular task_list lock.
+///
+/// Interrupts MUST be disabled before this function runs. 
 pub unsafe fn schedule() -> bool {
-    
+
     let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("schedule [0]: current_taskid={}", current_taskid.into());
+    trace!("schedule [0]: current_taskid={}", current_taskid.into());
 
     let mut current_task = 0 as *mut Task; // a null Task ptr
     let mut next_task = 0 as *mut Task; // a null Task ptr
@@ -26,12 +32,12 @@ pub unsafe fn schedule() -> bool {
                 let id_considered = (*taskid).into();
 
                 let mut task = locked_task.write();
-                // trace!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
+                trace!("schedule [1]: considering task {} [{:?}]", id_considered, task.runstate);
                 if task.runstate == RunState::RUNNABLE {
                     // we use an unsafe deref_mut() operation to ensure that this reference
                     // can remain beyond the lifetime of the tasklist RwLockIrqSafe being held.
                     next_task = task.deref_mut() as *mut Task;
-                    // trace!("schedule [2]: chose task {}", *task);
+                    trace!("schedule [2]: chose task {}", *task);
                     break;
                 }
             } // writable locked_task is released here
@@ -76,6 +82,63 @@ macro_rules! schedule {
                 $crate::task::scheduler::schedule();
                 $crate::interrupts::enable_interrupts();
             }
-        }   
+        }
     )
+}
+
+
+type TaskRef = Arc<RwLock<Task>>;
+type RunQueue = VecDeque<TaskRef>;
+
+lazy_static! {
+    static ref RUNQUEUE: RwLockIrqSafe<RunQueue> = RwLockIrqSafe::new(VecDeque::with_capacity(100));
+}
+
+pub fn add_task_to_runqueue(task: TaskRef) {
+    RUNQUEUE.write().push_back(task);
+}
+
+pub fn remove_task_from_runqueue(task: TaskRef) {
+    RUNQUEUE.write().retain(|x| Arc::ptr_eq(&x, &task));
+}
+
+
+
+/// this defines the scheduler policy.
+
+fn select_next_task(runqueue_locked: &mut RwLockIrqSafeWriteGuard<RunQueue>) -> Option<TaskRef>  {
+    
+    let mut index_chosen: Option<usize> = None;
+
+
+    for i in 0..runqueue_locked.len() {
+
+        if let Some(t) = runqueue_locked.get(i) {
+            if t.read().is_runnable() {
+                // found the first runnable task
+                index_chosen = Some(i);
+                break; 
+            }
+        }
+    }
+
+    if let Some(index) = index_chosen {
+        let chosen_task: TaskRef = runqueue_locked.remove(index).unwrap();
+        runqueue_locked.push_back(chosen_task.clone()); 
+        Some(chosen_task)
+    }
+    else {
+        None
+    }
+
+
+
+    // let mut next_task = 0 as *mut Task; // a null Task ptr
+
+    // if next_task as usize == 0 {
+    //    None 
+    // }
+    // else {
+    //     Some(&mut *next_task)
+    // }
 }
