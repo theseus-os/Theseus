@@ -1,7 +1,9 @@
+SHELL := /bin/bash
+
 RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly (75b056812 2017-05-15)
 RUSTC_OUTPUT=$(shell rustc --version)
 
-
+KVM_CMD=$(shell kvm-ok 2>&1 > /dev/null; if [ $$? == 0 ]; then echo "-enable-kvm"; fi)
 
 arch ?= x86_64
 target ?= $(arch)-restful_os
@@ -24,6 +26,7 @@ ifneq (${RUSTC_OUTPUT}, ${RUSTC_CURRENT_SUPPORTED_VERSION})
 	# @exit 1
 endif
 
+
 all: $(kernel)
 
 clean:
@@ -36,8 +39,8 @@ orun:
 odebug:
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
-run: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s  -serial stdio
+run: $(iso) 
+	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio 
 
 debug: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio

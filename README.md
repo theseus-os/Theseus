@@ -37,6 +37,19 @@ To run it without rebuilding the whole project:
 `$ make orun`
 
 
+## Using QEMU 
+QEMU allows us to run Theseus quickly and easily in its own virtual machine, completely segregated from the host machine and OS. 
+To exit Theseus in QEMU, press `Ctrl+Alt`, which releases your keyboard focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU. 
+
+To investigate the state of the running QEMU entry, you can switch to the QEMU console by pressing `Ctrl+Alt+Shift+2`. 
+
+#### KVM Support
+While not strictly required, KVM will *significantly* speed up the execution of Theseus in QEMU.  
+To install KVM, run the following command:  `sudo apt-get install kvm`.  
+If you have KVM installed, it will automatically be enabled by our Makefile.
+
+
+
 ## Debugging 
 GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
 
