@@ -5,6 +5,7 @@ use port_io::Port;
 use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::time_tools;
+use interrupts::rtc;
 
 /// the main interrupt channel
 const CHANNEL0: u16 = 0x40;
@@ -75,10 +76,11 @@ pub fn handle_timer_interrupt() {
         let mut test: time_tools::TimeKeeping = time_tools::TimeKeeping{start_time:ticks, end_time: 9000};
 
         trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, ticks);
-        
 
         test.end_time = time_tools::get_ticks();
-        trace!("[tester]{} ticks passed during heartbeat statement({} = starting number), ({} = ending number)" , test.end_time-test.start_time, test.start_time, test.end_time);
+        rtc::read_rtc();
+        
+        //trace!("[tester]{} ticks passed during heartbeat statement({} = starting number), ({} = ending number)" , test.end_time-test.start_time, test.start_time, test.end_time);
         //time_tools::return_ticks();
         // info!("1 second has passed (ticks={})", ticks);
     }
