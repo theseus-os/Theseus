@@ -4,7 +4,7 @@ use core::default::Default;
 use core::mem::ManuallyDrop;
 
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use interrupts::{HeldInterrupts, hold_interrupts};
+use held_interrupts::{HeldInterrupts, hold_interrupts};
 
 /// A simple wrapper around a `RwLock` whose guards disable interrupts properly 
 pub struct RwLockIrqSafe<T: ?Sized> {
@@ -252,8 +252,8 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for RwLockIrqSafe<T>
     {
         match self.rwlock.try_read()
         {
-            Some(guard) => write!(f, "RwLock {{ data: {:?} }}", &*guard),
-            None => write!(f, "RwLock {{ <locked> }}"),
+            Some(guard) => write!(f, "RwLockIrqSafe {{ data: {:?} }}", &*guard),
+            None => write!(f, "RwLockIrqSafe {{ <locked> }}"),
         }
     }
 }
