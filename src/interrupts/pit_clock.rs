@@ -67,7 +67,6 @@ pub fn handle_timer_interrupt() {
 
     if (ticks % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         schedule!();
-        // trace!("done with preemptive schedule call (ticks={})", ticks);
     }
 
     if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
@@ -79,6 +78,8 @@ pub fn handle_timer_interrupt() {
 
         test.end_time = time_tools::get_ticks();
         rtc::read_rtc();
+        
+        rtc::enable_interrupts();
         
         //trace!("[tester]{} ticks passed during heartbeat statement({} = starting number), ({} = ending number)" , test.end_time-test.start_time, test.start_time, test.end_time);
         //time_tools::return_ticks();
