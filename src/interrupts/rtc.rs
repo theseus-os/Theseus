@@ -7,30 +7,33 @@ pub static mut RTC_TICKS: u64 = 0;
 
 //write a u8 to the CMOS port (0x70)
 fn write_cmos(value: u8){
+    //uses port struct in port_io
     let mut cmos_write: Port<u8> = unsafe { Port::new(0x70)};
     unsafe{cmos_write.write(value)};
 
 }
 
+
 //read a u8 from CMOS port 0x71
 fn read_cmos()->u8{
+    //uses port struct in port_io
     let mut cmos_read: Port<u8> = unsafe { Port::new(0x71)};
     let read_value: u8 = cmos_read.read();
     read_value
 }
 
 
-
 //let mut cmos_read: Port<u8> = unsafe { Port::new(0x71)};
 //returns true if update in progress, false otherwise
 fn get_update_in_progress()-> bool{
     
+    //writing to this register causes cmos to output 1 if rtc update in progress 
     write_cmos(0x0A);
     let is_in_progress: bool = read_cmos() == 1;
     is_in_progress
 
-
 }
+
 
 //register value is entered, rtc's associated value is output, waits for update in progress signal to end
 fn read_register(register: u8)->u8{
@@ -39,7 +42,7 @@ fn read_register(register: u8)->u8{
     while get_update_in_progress() {}
     write_cmos(register);
 
-    //converts bcd value to binary value which is what is used for output
+    //converts bcd value to binary value which is what is used for printing 
     let bcd = read_cmos();
     let bin_mode: u8  = (bcd/16)*10 + (bcd & 0xf);
     bin_mode
@@ -64,7 +67,8 @@ pub fn read_rtc(){
 
 }
 
-//turn on IRQ 8
+
+//turn on IRQ 8, rtc begins sending interrupts 
 pub fn enable_rtc_interrupt()
 {
     disable_interrupts();
@@ -89,21 +93,31 @@ pub fn enable_rtc_interrupt()
 
     trace!("RTC Enabled!");
 
-   
-
-
 }
 
-/// the chosen interrupt frequency (in Hertz) of the PIT clock 
-const PIT_FREQUENCY_HZ: u64 = 1000; 
-
-/// the timeslice period in milliseconds
-const timeslice_period_ms: u64 = 10; 
 
 /// the heartbeatperiod in milliseconds
 const heartbeat_period_ms: u64 = 1000;
 
+//used to change periodic interrupt rate of RTC, ranges from 3 to 15, 3 is 8khz 15 is 2 HZ
+pub fn change_rtc_frequency(rate: u8){
 
+    disable_interrupts();
+    
+    //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
+    write_cmos(0x8A);
+    let prev = read_cmos();
+    write_cmos(0x8A);
+    //writing to port 71 here so write_cmos can't be used 
+    let mut cmos_write: Port<u8> = unsafe { Port::new(0x71)};
+    unsafe{cmos_write.write(((prev & 0xF0)|rate))};
+
+    enable_interrupts();
+    trace!("rtc rate frequency changed!");
+}
+
+
+//handles rtc interrupts
 pub fn handle_rtc_interrupt() {
     
     write_cmos(0x0C);
@@ -112,27 +126,11 @@ pub fn handle_rtc_interrupt() {
         RTC_TICKS += 1;
         RTC_TICKS
     };
-    //trace!("wow inside! {}", rtc_ticks);
-
-
+  
+    
     if (rtc_ticks % 1024) == 0 {
-        schedule!();
-    }
-
-    if (rtc_ticks % 1024) == 0 {
-        
-        //initializing TimeKeeping struct to "count"" ticks passed
-        //let mut test: time_tools::TimeKeeping = time_tools::TimeKeeping{start_time:rtc_ticks, end_time: 9000};
-
         trace!("[rtc heartbeat] {} seconds have passed (rtc ticks={})", heartbeat_period_ms/1000, rtc_ticks);
-
-        //test.end_time = time_tools::get_ticks();
-        //rtc::read_rtc();
-        
-        //rtc::enable_interrupts();
-        
-        //trace!("[tester]{} ticks passed during heartbeat statement({} = starting number), ({} = ending number)" , test.end_time-test.start_time, test.start_time, test.end_time);
-        //time_tools::return_ticks();
-        // info!("1 second has passed (ticks={})", ticks);
     }
+
+
 }
