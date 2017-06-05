@@ -43,6 +43,7 @@ extern crate port_io; // our own crate for port_io, replaces exising "cpu_io"
 extern crate irq_safety; // our own crate for irq-safe locking and interrupt utilities
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
+//extern crate atomic;
 
 
 
@@ -60,6 +61,7 @@ use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
 use collections::string::String;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 
 
@@ -218,7 +220,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
                 }
 
                 if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-                    unsafe { debug!("TICKS = {}", interrupts::pit_clock::TICKS); }
+                    //getting value from TICKS atomic value
+                    let tick_val = interrupts::pit_clock::TICKS.fetch_add(0,Ordering::SeqCst);
+                    debug!("TICKS = {}", tick_val); 
                     continue 'outer;
                 }
 

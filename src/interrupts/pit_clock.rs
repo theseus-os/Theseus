@@ -7,6 +7,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::time_tools;
 use interrupts::rtc;
 
+
 /// the main interrupt channel
 const CHANNEL0: u16 = 0x40;
 /// DO NOT USE
@@ -24,8 +25,8 @@ static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( Port::new(COMMAND_REGISTER) );
 static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( Port::new(CHANNEL0) );
 
 
-// static TICKS: AtomicUsize = AtomicUsize::new(0); // default()??
-pub static mut TICKS: u64 = 0;
+pub static TICKS: AtomicUsize = AtomicUsize::new(0); // default()??
+//pub static mut TICKS: u64 = 0;
 
 
 pub fn init(freq_hertz: u32) {
@@ -49,34 +50,31 @@ pub fn init(freq_hertz: u32) {
 // these should be moved to a config file
 
 /// the chosen interrupt frequency (in Hertz) of the PIT clock 
-const PIT_FREQUENCY_HZ: u64 = 100; 
+const PIT_FREQUENCY_HZ: usize = 100; 
 
 /// the timeslice period in milliseconds
-const timeslice_period_ms: u64 = 10; 
+const timeslice_period_ms: usize = 10; 
 
 /// the heartbeatperiod in milliseconds
-const heartbeat_period_ms: u64 = 1000;
+const heartbeat_period_ms: usize = 1000;
 
 /// this occurs on every PIT timer tick, which is currently 100 Hz
 pub fn handle_timer_interrupt() {
-    let ticks = unsafe {
-        TICKS += 1;
-        TICKS
-    };
 
-
-    if (ticks % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
+    let old_tick = TICKS.fetch_add(1,Ordering::SeqCst);
+    let new_tick = old_tick+1;
+    if (new_tick % (timeslice_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         schedule!();
     }
 
-    if (ticks % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
+    if (new_tick % (heartbeat_period_ms * PIT_FREQUENCY_HZ / 1000)) == 0 {
         
         //initializing TimeKeeping struct to "count"" ticks passed
-        let mut test: time_tools::TimeKeeping = time_tools::TimeKeeping{start_time:ticks, end_time: 9000};
+        //let mut test: time_tools::TimeKeeping = time_tools::TimeKeeping{start_time:new_tick, end_time: 9000};
 
-        trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, ticks);
+        trace!("[heartbeat] {} seconds have passed (ticks={})", heartbeat_period_ms/1000, new_tick);
 
-        test.end_time = time_tools::get_ticks();
+        //test.end_time = time_tools::get_ticks();
         rtc::read_rtc();
         
         rtc::enable_interrupts();

@@ -2,6 +2,7 @@
 name = "restful_os"
 version = "0.1.0"
 dependencies = [
+ "atomic 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hole_list_allocator 0.1.0",
@@ -18,6 +19,11 @@ dependencies = [
  "x86 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "atomic"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bit_field"
@@ -290,6 +296,7 @@ dependencies = [
 ]
 
 [metadata]
+"checksum atomic 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "81e4fe666ae9dd4eea17160116a5f0d1e52f74504669bfc034e22850d6b7d406"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
