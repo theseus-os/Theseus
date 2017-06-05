@@ -40,7 +40,7 @@ odebug:
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
 run: $(iso) 
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio 
+	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
 
 debug: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio

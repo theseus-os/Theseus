@@ -52,7 +52,7 @@ impl StackAllocator {
                 Some(Stack::new(top_of_stack, start.start_address()))
             }
             _ => {
-                println!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
+                error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
                 None /* not enough pages */
             }
         }

@@ -4,9 +4,11 @@ pub mod input;
 
 
 pub fn early_init() {
+    assert_has_not_been_called!("drivers::early_init was called more than once!");
     vga_buffer::show_splash_screen();
-
 }
 
 pub fn init() {
-    input::keyboard::init();}
+    assert_has_not_been_called!("drivers::init was called more than once!");
+    input::keyboard::init();
+}

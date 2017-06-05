@@ -109,7 +109,7 @@ impl ChainedPics {
         // done.
         let saved_mask1 = self.pics[0].data.read();
         let saved_mask2 = self.pics[1].data.read();
-        println!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
+        info!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
 
         // Tell each PIC that we're going to send it a three-byte
         // initialization sequence on its data port.

@@ -94,6 +94,8 @@ static GDT: Once<gdt::Gdt> = Once::new();
 
 
 pub fn init(memory_controller: &mut MemoryController) {
+    assert_has_not_been_called!("interrupts::init was called more than once!");
+
     use x86_64::structures::gdt::SegmentSelector;
     use x86_64::instructions::segmentation::set_cs;
     use x86_64::instructions::tables::load_tss;
@@ -129,7 +131,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     }
 
     IDT.load();
-    info!("loaded interrupt descriptor table.");
+    println_unsafe!("loaded interrupt descriptor table.");
 
     // init PIT clock to 100 Hz
     pit_clock::init(100);
@@ -141,20 +143,20 @@ pub fn init(memory_controller: &mut MemoryController) {
 
 /// interrupt 0x00
 extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
+    println_unsafe!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
     loop {}
 }
 
 /// interrupt 0x03
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
+    println_unsafe!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 }
 
 /// interrupt 0x06
 extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
+    println_unsafe!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
     loop {}
@@ -163,7 +165,7 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStac
 /// interrupt 0x07
 /// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
 extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
+    println_unsafe!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 
@@ -180,7 +182,7 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
 
 extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
-    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}",
              control_regs::cr2(),
              error_code,
@@ -189,7 +191,7 @@ extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFra
 }
 
 extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    println_unsafe!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
     loop {}
 }
 
@@ -199,7 +201,7 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackF
 /// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
 extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     use x86_64::registers::control_regs;
-    println!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
+    println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",
 //             control_regs::cr2(),
              error_code,

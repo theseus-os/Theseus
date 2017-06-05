@@ -48,7 +48,8 @@ extern crate keycodes_ascii; // our own crate for keyboard
 
 
 
-#[macro_use] mod drivers;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+#[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+#[macro_use] mod drivers;  
 #[macro_use] mod util;
 mod arch;
 mod logger;
@@ -71,7 +72,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
         let mut i = 10000000; // usize::max_value();
-        while (i > 0) {
+        while i > 0 {
             i -= 1;
         }
         print!("1");
@@ -83,7 +84,7 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
         let mut i = 10000000; // usize::max_value();
-        while (i > 0) {
+        while i > 0 {
             i -= 1;
         }
         print!("2");
@@ -95,7 +96,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_3!");
     loop {
         let mut i = 10000000; // usize::max_value();
-        while (i > 0) {
+        while i > 0 {
             i -= 1;
         }
         print!("3");
@@ -145,6 +146,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	
     // early initialization of things like vga console and logging
     logger::init_logger().expect("WTF: couldn't init logger.");
+    println_unsafe!("Logger initialized.");
+    
     drivers::early_init();
     
 
@@ -158,16 +161,19 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // initialize our interrupts and IDT
     interrupts::init(&mut memory_controller);
 
-    // initialize the rest of our drivers
-    drivers::init();
-
-
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        let task_zero = tasklist_mut.init_first_task();
+        tasklist_mut.init_first_task();
     }
+
+    // initialize the kernel console
+    console::console_init(task::get_tasklist().write());
+
+    // initialize the rest of our drivers
+    drivers::init();
+
 
 
     println!("initialization done!");
@@ -176,6 +182,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	interrupts::enable_interrupts();
 	println!("enabled interrupts!");
 
+     
 
 
     // create a second task to test context switching
@@ -200,45 +207,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
 
 
-
+    // the idle thread's (Task 0) busy loop
+    trace!("Entering Task0's idle loop");
 	'outer: loop { 
-        let keyevent = drivers::input::keyboard::pop_key_event();
-        match keyevent {
-            Some(keyevent) => { 
-                use drivers::input::keyboard::KeyAction;
-                use keycodes_ascii::Keycode;
-
-                // Ctrl+D or Ctrl+Alt+Del kills the OS
-                if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
-                        keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
-                    break 'outer;
-                }
-
-                // only print ascii values on a key press down
-                if keyevent.action != KeyAction::Pressed {
-                    continue 'outer; // aren't Rust's loop labels cool? 
-                }
-
-                if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-                    //getting value from TICKS atomic value
-                    let tick_val = interrupts::pit_clock::TICKS.fetch_add(0,Ordering::SeqCst);
-                    debug!("TICKS = {}", tick_val); 
-                    continue 'outer;
-                }
-
-
-                // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
-
-
-                let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
-                match ascii {
-                    Some(c) => { print!("{}", c); }
-                    // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
-                    _ => { } 
-                }
-            }
-            _ => { }
-        }
+        
 
      }
 
@@ -272,14 +244,14 @@ extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    println!("\n\nPANIC in {} at line {}:", file, line);
-    println!("    {}", fmt);
+    println_unsafe!("\n\nPANIC in {} at line {}:", file, line);
+    println_unsafe!("    {}", fmt);
     loop {}
 }
 
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn _Unwind_Resume() -> ! {
-    println!("\n\nin _Unwind_Resume, unimplemented!");
+    println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
