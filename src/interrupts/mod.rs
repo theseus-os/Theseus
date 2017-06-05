@@ -134,6 +134,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     // init PIT clock to 100 Hz
     pit_clock::init(100);
     rtc::enable_rtc_interrupt();
+    rtc::change_rtc_frequency(0x09);
 }
 
 

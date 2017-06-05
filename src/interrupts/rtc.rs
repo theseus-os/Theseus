@@ -1,9 +1,11 @@
 use port_io::Port;
-
+use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
+use interrupts::rtc;
 
 
 pub static mut RTC_TICKS: u64 = 0;
+pub static TICKS: AtomicUsize = AtomicUsize::new(0);
 
 //write a u8 to the CMOS port (0x70)
 fn write_cmos(value: u8){
@@ -117,18 +119,16 @@ pub fn change_rtc_frequency(rate: u8){
 }
 
 
-//handles rtc interrupts
+//counts interrupts from RTC
 pub fn handle_rtc_interrupt() {
     
     write_cmos(0x0C);
     read_cmos();
-    let rtc_ticks = unsafe {
-        RTC_TICKS += 1;
-        RTC_TICKS
-    };
+    let old_tick = TICKS.fetch_add(1,Ordering::SeqCst);
+    let rtc_ticks = old_tick +1;
   
     
-    if (rtc_ticks % 1024) == 0 {
+    if (rtc_ticks % 128) == 0 {
         trace!("[rtc heartbeat] {} seconds have passed (rtc ticks={})", heartbeat_period_ms/1000, rtc_ticks);
     }
 
