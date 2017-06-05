@@ -22,7 +22,7 @@ static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
 // which is to use complicated data structures to permit simpler logic. 
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct KeyboardModifiers {
     pub control: bool,
     pub alt: bool, 
@@ -31,17 +31,6 @@ pub struct KeyboardModifiers {
     pub num_lock: bool,
 }
 
-impl KeyboardModifiers {
-    pub fn new() -> KeyboardModifiers {
-        KeyboardModifiers {
-            control: false,
-            alt: false, 
-            shift: false,
-            caps_lock: false,
-            num_lock: false,
-        }
-    }
-}
 
 unsafe impl Sync for KeyboardModifiers {}
 

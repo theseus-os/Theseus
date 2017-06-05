@@ -1,54 +1,66 @@
-// Copyright 2016 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
+// Adapted from Phillip Opperman's blog os. 
 
 use core::ptr::Unique;
 use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
+use collections::string::String;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
-pub static WRITER: Mutex<Writer> = Mutex::new(Writer {
+static WRITER: Mutex<Writer> = Mutex::new(Writer {
                     column_position: 0,
                     color_code: ColorCode::new(Color::LightGreen,
                                                 Color::Black),
                     buffer: unsafe { Unique::new(0xb8000 as *mut _) },
                 });
 
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
 
+/// This is UNSAFE and can cause deadlocks. Use print!() instead. 
+/// Should only be used in exception contexts and early bring-up code 
+/// before the console-based print!() macro is available. 
 #[macro_export]
-macro_rules! print {
+macro_rules! print_unsafe {
     ($($arg:tt)*) => ({
-            $crate::drivers::vga_buffer::print(format_args!($($arg)*));
+            $crate::drivers::vga_buffer::print_args(format_args!($($arg)*));
     });
 }
 
-pub fn print(args: fmt::Arguments) {
+/// This is UNSAFE and can cause deadlocks. Use println!() instead. 
+/// Should only be used in exception contexts and early bring-up code
+/// before the console-based println!() macro is available. 
+#[macro_export]
+macro_rules! println_unsafe {
+    ($fmt:expr) => (print_unsafe!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print_unsafe!(concat!($fmt, "\n"), $($arg)*));
+}
+
+
+
+pub fn print_string(s: String) -> ::core::fmt::Result {
+    print_str(s.as_str())
+}
+
+pub fn print_str(s: &str) -> ::core::fmt::Result {
     use core::fmt::Write;
-    WRITER.lock().write_fmt(args).unwrap();
+    WRITER.lock().write_str(s)
+}
+
+pub fn print_args(args: fmt::Arguments) -> ::core::fmt::Result {
+    use core::fmt::Write;
+    WRITER.lock().write_fmt(args)
 }
 
 pub fn clear_screen() {
+    let mut locked_writer = WRITER.lock(); 
     for _ in 0..BUFFER_HEIGHT {
-        println!("");
+        locked_writer.new_line();
     }
 }
 
 pub fn show_splash_screen() {
-    clear_screen();
-    println!("{}", WELCOME_STRING);
+    print_str(WELCOME_STRING);
 }
 
 #[allow(dead_code)]

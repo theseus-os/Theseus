@@ -264,7 +264,7 @@ impl TaskList {
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
             None => { 
                 // None indicates that the insertion didn't overwrite anything, which is what we want
-                debug!("Successfully created initial task0");
+                println_unsafe!("Successfully created initial task0");
                 let tz = self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist");
                 scheduler::add_task_to_runqueue(tz.clone());
                 Ok(tz)
@@ -278,7 +278,7 @@ impl TaskList {
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
     /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
-    pub fn spawn<A: fmt::Debug + , R: fmt::Debug>(&mut self, 
+    pub fn spawn<A: fmt::Debug, R: fmt::Debug>(&mut self, 
             func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
 

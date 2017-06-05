@@ -1,13 +1,9 @@
 extern crate keycodes_ascii; // our own crate in "libs/" dir
-// extern crate queue; // using my own no_std version of queue now
-// #[macro_use]
-// extern crate lazy_static;
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
-// use spin::{Mutex, Once, RwLock};
-// use core::cell::{Ref, RefMut, RefCell};
 use collections::VecDeque;
+use core::default::Default;
 
 
 
@@ -15,52 +11,20 @@ use collections::VecDeque;
 
 
 // TODO: use a lock-free queue (a la Michael Scott): https://aturon.github.io/blog/2015/08/27/epoch/
+//                                                   https://blog.rust-lang.org/2015/04/10/Fearless-Concurrency.html
 
 
+static mut KBD_MODIFIERS: Option<KeyboardModifiers> = None;
 
-
-static KBD_QUEUE_SIZE: usize = 256;
-
-
-static mut KBD_QUEUE: Option<VecDeque<KeyEvent>> = None;
-static mut KBD_MODIFIERS: Option<KeyboardModifiers> = None; 
-
-// impl KeyboardState {
-//     pub fn new() -> KeyboardState {
-//         println!("Created new KeyboardState with buffer size {}", KBD_QUEUE_SIZE);
-        
-//         KeyboardState {
-//             queue:      Mutex::new(Vec::with_capacity(KBD_QUEUE_SIZE)),
-//             modifiers:  Mutex::new(KeyboardModifiers::new()),
-//         }
-//     }
-// }
-
-// pub fn init(&mut kbd_state: &KeyboardState) {
 
 pub fn init() { 
     assert_has_not_been_called!("keyboard init was called more than once!");
     
     unsafe {
-        KBD_QUEUE = Some(VecDeque::with_capacity(KBD_QUEUE_SIZE));
-        KBD_MODIFIERS = Some(KeyboardModifiers::new());
+        KBD_MODIFIERS = Some(KeyboardModifiers::default());
     }
 
 }
-
-
-// lazy_static! {
-//     static ref KBD_MODIFIERS: Mutex<KeyboardModifiers> = Mutex::new( KeyboardModifiers::new() );
-//     static ref KBD_QUEUE: Mutex<Queue<KeyEvent>> = { 
-//         let mut q = Queue::with_capacity(KBD_QUEUE_SIZE);
-//         q.set_capacity(KBD_QUEUE_SIZE);
-//         Mutex::new( q ) // return this to KBD_QUEUE
-//     };
-//     // static KBD_SCANCODE_QUEUE // if we want a separate queue to buffer the raw scancodes...
-// }
-
-
-
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -90,9 +54,7 @@ impl KeyEvent {
 
 #[derive(Debug)]
 pub enum KeyboardInputError {
-    QueueFull,
     UnknownScancode,
-    // TryAcquireFailed,
 }
 
 
@@ -139,33 +101,22 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    let mut queue = unsafe{ KBD_QUEUE.as_mut().expect("KBD_QUEUE was uninitialized") };
-                    if queue.len() < KBD_QUEUE_SIZE {
-                        queue.push_back(KeyEvent::new(keycode, action, modifiers.clone())); 
-                        return Ok(());  // successfully queued up KeyEvent 
-                    }
-                    else {
-                        // println!("Error: keyboard queue is full, discarding {}!", scan_code);
-                        return Err(KeyboardInputError::QueueFull);
-                    }
+                    use console;
+                    use console::{ConsoleEvent, ConsoleInputEvent};
+                    console::queue_event(
+                        ConsoleEvent::InputEvent(
+                            ConsoleInputEvent::new(KeyEvent::new(keycode, action, modifiers.clone()))
+                        )
+                    );
+                    return Ok(());  // successfully queued up KeyEvent 
                 }
 
-                _ => { return Err(KeyboardInputError::UnknownScancode); }
+                _ => { 
+                    warn!("Unknown keycode: {:?}", keycode);
+                    return Err(KeyboardInputError::UnknownScancode); 
+                }
             }
         }
     }
 
-}
-
-
-
-pub fn pop_key_event() -> Option<KeyEvent> {
-    let kq = unsafe { KBD_QUEUE.as_mut() };
-
-    if let Some(queue) = kq {
-        queue.pop_front()
-    }
-    else {
-        None
-    }
 }

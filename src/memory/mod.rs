@@ -36,10 +36,10 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         .max()
         .unwrap();
 
-    println!("kernel start: {:#x}, kernel end: {:#x}",
+    println_unsafe!("kernel start: {:#x}, kernel end: {:#x}",
              kernel_start,
              kernel_end);
-    println!("multiboot start: {:#x}, multiboot end: {:#x}",
+    println_unsafe!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
 
