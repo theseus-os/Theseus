@@ -154,7 +154,9 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        unsafe { debug!("TICKS = {}", ::interrupts::pit_clock::TICKS); }
+        debug!("PIT_TICKS={}, RTC_TICKS={}", 
+                ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+                ::interrupts::rtc::RTC_TICKS.load(Ordering::Relaxed));
         return; 
     }
 
