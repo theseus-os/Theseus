@@ -2,30 +2,40 @@ use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use interrupts::rtc;
+use spin::Mutex;
+
+//standard port to write to on CMOS to select registers
+const CMOS_WRITE_PORT: u16 = 0x70;
+//standard port to read register values from on CMOS or write to to change settings
+const CMOS_READ_PORT: u16 = 0x71;
 
 
-pub static mut RTC_TICKS: u64 = 0;
-pub static TICKS: AtomicUsize = AtomicUsize::new(0);
+pub static RTC_TICKS: AtomicUsize = AtomicUsize::new(0);
+//used to select register
+static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_WRITE_PORT));
+//used to change cmos settings
+static CMOS_WRITE_SETTINGS: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_PORT));
+//used to read from cmos register
+static CMOS_READ: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_READ_PORT));
+
 
 //write a u8 to the CMOS port (0x70)
 fn write_cmos(value: u8){
-    //uses port struct in port_io
-    let mut cmos_write: Port<u8> = unsafe { Port::new(0x70)};
-    unsafe{cmos_write.write(value)};
+
+    unsafe{CMOS_WRITE.lock().write(value)}
 
 }
 
 
 //read a u8 from CMOS port 0x71
 fn read_cmos()->u8{
-    //uses port struct in port_io
-    let mut cmos_read: Port<u8> = unsafe { Port::new(0x71)};
-    let read_value: u8 = cmos_read.read();
-    read_value
+    
+    CMOS_READ.lock().read()
+    
 }
 
 
-//let mut cmos_read: Port<u8> = unsafe { Port::new(0x71)};
+
 //returns true if update in progress, false otherwise
 fn get_update_in_progress()-> bool{
     
@@ -46,26 +56,37 @@ fn read_register(register: u8)->u8{
 
     //converts bcd value to binary value which is what is used for printing 
     let bcd = read_cmos();
-    let bin_mode: u8  = (bcd/16)*10 + (bcd & 0xf);
-    bin_mode
+    
+    (bcd/16)*10 + (bcd & 0xf)
+
 
 }
 
+pub struct time{
+    seconds: u8,
+    minutes: u8,
+    hours: u8,
+    days: u8,
+    months: u8,
+    years: u8,
+
+}
 
 //call this function to print RTC's date and time
-pub fn read_rtc(){
+pub fn read_rtc()->time{
 
     //calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which outputs correct value
-    let seconds = read_register(0x00);
-    let minutes = read_register(0x02);
+    let second = read_register(0x00);
+    let minute = read_register(0x02);
     let hour = read_register(0x04);
     let day = read_register(0x07);
     let month = read_register(0x08);
     let year = read_register(0x09);
 
     
-    trace!("Time - {}:{}:{} {}/{}/{}", hour, minutes,seconds, month, day, year);
+    trace!("Time - {}:{}:{} {}/{}/{}", hour, minute,second, month, day, year);
 
+    time{seconds:second, minutes: minute, hours: hour, days: day, months: month, years: year}
 
 }
 
@@ -87,8 +108,8 @@ pub fn enable_rtc_interrupt()
 
     //here we don't use the cmos_write function because that only writes to port 0x70, in this case we need to write to 0x71
     //writing to 0x71 because not selecting register, setting rtc
-    let mut cmos_write: Port<u8> = unsafe { Port::new(0x71)};
-    unsafe{cmos_write.write(prev | 0x40)};
+    
+    unsafe{CMOS_WRITE_SETTINGS.lock().write(prev | 0x40)};
 
     
     enable_interrupts();
@@ -109,10 +130,9 @@ pub fn change_rtc_frequency(rate: u8){
     //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
     let prev = read_cmos();
-    write_cmos(0x8A);
-    //writing to port 71 here so write_cmos can't be used 
-    let mut cmos_write: Port<u8> = unsafe { Port::new(0x71)};
-    unsafe{cmos_write.write(((prev & 0xF0)|rate))};
+    write_cmos(0x8A); 
+
+    unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|rate))};
 
     enable_interrupts();
     trace!("rtc rate frequency changed!");
