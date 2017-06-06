@@ -4,6 +4,7 @@ use drivers::vga_buffer;
 use collections::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
 use task::TaskList;
+use core::sync::atomic::Ordering;
 
 
 // TODO: transform this into a generic producer and consumer template, 
@@ -154,7 +155,7 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        unsafe { debug!("TICKS = {}", ::interrupts::pit_clock::TICKS); }
+        debug!("PIT_TICKS = {}", ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed));
         return; 
     }
 

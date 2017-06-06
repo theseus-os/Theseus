@@ -18,10 +18,12 @@ use arch;
 // expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
-mod gdt;
-mod pic;
-pub mod pit_clock; // TODO: shouldn't be pub
 
+mod gdt;
+pub mod pit_clock; // TODO: shouldn't be pub
+mod pic;
+mod time_tools; //testing whether including a module makes any difference
+mod rtc;
 
 
 
@@ -71,6 +73,10 @@ lazy_static! {
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
         idt[0x20].set_handler_fn(timer_handler); // int 32
         idt[0x21].set_handler_fn(keyboard_handler); // int 33
+        
+        //if interrupt is correct, will send to rtc_handler function rtc-test
+        idt[0x28].set_handler_fn(rtc_handler);//int 112?
+
 
         // TODO: add more 
 
@@ -120,6 +126,9 @@ pub fn init(memory_controller: &mut MemoryController) {
         load_tss(tss_selector); // load TSS
 
         PIC.initialize();
+
+        //rtc-test
+    
     }
 
     IDT.load();
@@ -127,6 +136,8 @@ pub fn init(memory_controller: &mut MemoryController) {
 
     // init PIT clock to 100 Hz
     pit_clock::init(100);
+    rtc::enable_rtc_interrupt();
+    rtc::change_rtc_frequency(0x09);
 }
 
 
@@ -169,6 +180,7 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
 }
 
 
+
 extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
@@ -208,7 +220,7 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 
     // we must acknowledge the interrupt first before handling it, which will cause a context switch
 	unsafe { PIC.notify_end_of_interrupt(0x20); }
-
+    //time_tools::return_ticks();
 
     pit_clock::handle_timer_interrupt();
 }
@@ -225,6 +237,19 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 
     keyboard::handle_keyboard_input(scan_code);	
     unsafe { PIC.notify_end_of_interrupt(0x21); }
+    
+}
+
+//0x28
+extern "x86-interrupt" fn rtc_handler(stack_frame:&mut ExceptionStackFrame ) {
+    unsafe { PIC.notify_end_of_interrupt(0x28); }
+
+    //let placeholder = 2;
+    //trace!("wow");
+    rtc::handle_rtc_interrupt();
+
+    
+
 }
 
 

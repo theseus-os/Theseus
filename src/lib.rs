@@ -43,6 +43,7 @@ extern crate port_io; // our own crate for port_io, replaces exising "cpu_io"
 extern crate irq_safety; // our own crate for irq-safe locking and interrupt utilities
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
+//extern crate atomic;
 
 
 
@@ -61,6 +62,7 @@ use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
 use collections::string::String;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 
 
@@ -202,19 +204,16 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     schedule!();
 
 
-
-
-
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
-	'outer: loop { 
-        
+	
+    loop { 
+        // TODO: exit this loop cleanly upon a shutdown signal
+    }
 
-     }
 
-
-     // cleanup here
-     logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
+    // cleanup here
+    logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 
 }
 
