@@ -99,8 +99,9 @@ pub fn init(memory_controller: &mut MemoryController) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
     use x86_64::structures::gdt::SegmentSelector;
-    use x86_64::instructions::segmentation::set_cs;
+    use x86_64::instructions::segmentation::{set_cs, load_ds};
     use x86_64::instructions::tables::load_tss;
+    use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
 
     let double_fault_stack =
@@ -112,18 +113,24 @@ pub fn init(memory_controller: &mut MemoryController) {
                                 tss
                             });
 
-    let mut code_selector = SegmentSelector(0);
+    let mut kernel_code_selector = SegmentSelector(0);
+    let mut kernel_data_selector = SegmentSelector(0);
     let mut tss_selector = SegmentSelector(0);
+    1
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
-        code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment());
-        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(&tss));
+        kernel_code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
+        kernel_data_selector = gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
+        let _user_code       = gdt.add_entry(gdt::Descriptor::user_code_segment(), PrivilegeLevel::Ring3);
+        let _user_data       = gdt.add_entry(gdt::Descriptor::user_data_segment(), PrivilegeLevel::Ring3);
+        tss_selector         = gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0);
         gdt
     });
     gdt.load();
 
     unsafe {
-        set_cs(code_selector); // reload code segment register
+        set_cs(kernel_code_selector); // reload code segment register
+        load_ds(kernel_data_selector); // unsure if necessary
         load_tss(tss_selector); // load TSS
 
         PIC.initialize();
