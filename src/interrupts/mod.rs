@@ -14,6 +14,7 @@ use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
 use arch;
+use CONFIG::*;
 
 // expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
@@ -23,7 +24,7 @@ mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
 mod pic;
 mod time_tools; //testing whether including a module makes any difference
-mod rtc;
+pub mod rtc; // TODO: shouldn't be pub
 
 
 
@@ -126,18 +127,15 @@ pub fn init(memory_controller: &mut MemoryController) {
         load_tss(tss_selector); // load TSS
 
         PIC.initialize();
-
-        //rtc-test
-    
     }
 
     IDT.load();
     println_unsafe!("loaded interrupt descriptor table.");
 
-    // init PIT clock to 100 Hz
-    pit_clock::init(100);
+    // init PIT and RTC interrupts
+    pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     rtc::enable_rtc_interrupt();
-    rtc::change_rtc_frequency(0x09);
+    rtc::change_rtc_frequency(CONFIG_RTC_FREQUENCY_HZ);
 }
 
 

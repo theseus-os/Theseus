@@ -2,13 +2,14 @@ use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use interrupts::rtc;
+use util;
+use CONFIG::*;
 use spin::Mutex;
 
 //standard port to write to on CMOS to select registers
 const CMOS_WRITE_PORT: u16 = 0x70;
 //standard port to read register values from on CMOS or write to to change settings
 const CMOS_READ_PORT: u16 = 0x71;
-
 
 pub static RTC_TICKS: AtomicUsize = AtomicUsize::new(0);
 //used to select register
@@ -91,7 +92,7 @@ pub fn read_rtc()->time{
 }
 
 
-//turn on IRQ 8, rtc begins sending interrupts 
+/// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 pub fn enable_rtc_interrupt()
 {
     disable_interrupts();
@@ -122,36 +123,47 @@ pub fn enable_rtc_interrupt()
 /// the heartbeatperiod in milliseconds
 const heartbeat_period_ms: u64 = 1000;
 
-//used to change periodic interrupt rate of RTC, ranges from 3 to 15, 3 is 8khz 15 is 2 HZ
-pub fn change_rtc_frequency(rate: u8){
+/// changes the period of the RTC interrupt. 
+/// `rate` must be a power of 2, between 2 and 8192 inclusive.
+pub fn change_rtc_frequency(rate: usize){
+
+    let ispow2: bool = rate.is_power_of_two();
+
+    if (!rate.is_power_of_two()) || rate < 2 || rate > 8192 {
+        panic!("RTC rate was {}, must be a power of two between [2: 8192]");
+    }
 
     disable_interrupts();
     
+    // formula is "rate = 32768 Hz >> (dividor - 1)"
+    let dividor: u8 = util::log2(rate) as u8 + 2; 
+
     //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
     let prev = read_cmos();
     write_cmos(0x8A); 
 
-    unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|rate))};
+    unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|dividor))};
 
     enable_interrupts();
     trace!("rtc rate frequency changed!");
 }
 
 
-//counts interrupts from RTC
+/// counts interrupts from RTC
 pub fn handle_rtc_interrupt() {
-    
+    // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
     write_cmos(0x0C);
     read_cmos();
-    let old_tick = RTC_TICKS.fetch_add(1,Ordering::SeqCst);
-    let rtc_ticks = old_tick +1;
-  
+
+    let ticks = RTC_TICKS.fetch_add(1, Ordering::SeqCst) + 1; // +1 because fetch_add returns previous value
     
-    if (rtc_ticks % 128) == 0 {
-        trace!("[rtc heartbeat] {} seconds have passed (rtc ticks={})", heartbeat_period_ms/1000, rtc_ticks);
+    if (ticks % (CONFIG_TIMESLICE_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
+        schedule!();
     }
 
-    // TODO: use this for scheduling
+    if (ticks % (CONFIG_HEARTBEAT_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
+        trace!("[heartbeat] {} seconds have passed (RTC_TICKS={})", CONFIG_HEARTBEAT_PERIOD_MS/1000, ticks);
+    }
 
 }
