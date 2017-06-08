@@ -15,6 +15,8 @@ use port_io::Port;
 use drivers::input::keyboard;
 use arch;
 use CONFIG::*;
+use x86_64::structures::gdt::SegmentSelector;
+
 
 // expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
@@ -29,6 +31,14 @@ pub mod rtc; // TODO: shouldn't be pub
 
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
+
+
+static KERNEL_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
+static KERNEL_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
+
 
 lazy_static! {
     static ref IDT: Idt = {
@@ -86,6 +96,13 @@ lazy_static! {
     };
 }
 
+/// Stupid hack because SegmentSelector is not Cloneable/Copyable
+fn copySegmentSelector(selector: &SegmentSelector) -> SegmentSelector {
+    SegmentSelector::new(selector.index(), selector.rpl())
+}
+
+
+
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
@@ -98,7 +115,7 @@ static GDT: Once<gdt::Gdt> = Once::new();
 pub fn init(memory_controller: &mut MemoryController) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
-    use x86_64::structures::gdt::SegmentSelector;
+    
     use x86_64::instructions::segmentation::{set_cs, load_ds};
     use x86_64::instructions::tables::load_tss;
     use x86_64::PrivilegeLevel;
@@ -113,25 +130,33 @@ pub fn init(memory_controller: &mut MemoryController) {
                                 tss
                             });
 
-    let mut kernel_code_selector = SegmentSelector(0);
-    let mut kernel_data_selector = SegmentSelector(0);
-    let mut tss_selector = SegmentSelector(0);
-    1
+
+
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
-        kernel_code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
-        kernel_data_selector = gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
-        let _user_code       = gdt.add_entry(gdt::Descriptor::user_code_segment(), PrivilegeLevel::Ring3);
-        let _user_data       = gdt.add_entry(gdt::Descriptor::user_data_segment(), PrivilegeLevel::Ring3);
-        tss_selector         = gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0);
+        KERNEL_CODE_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
+        });
+        KERNEL_DATA_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
+        });
+        USER_CODE_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_DATA_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_segment(), PrivilegeLevel::Ring3)
+        });
+        TSS_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0)
+        });
         gdt
     });
     gdt.load();
 
     unsafe {
-        set_cs(kernel_code_selector); // reload code segment register
-        load_ds(kernel_data_selector); // unsure if necessary
-        load_tss(tss_selector); // load TSS
+        set_cs(copySegmentSelector(KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!"))); // reload code segment register
+        load_ds(copySegmentSelector(KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!"))); // unsure if necessary
+        load_tss(copySegmentSelector(TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!"))); // load TSS
 
         PIC.initialize();
     }

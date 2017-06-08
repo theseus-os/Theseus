@@ -15,7 +15,7 @@ impl Gdt {
         }
     }
 
-    pub fn add_entry(&mut self, entry: Descriptor, privelege: PrivilegeLevel) -> SegmentSelector {
+    pub fn add_entry(&mut self, entry: Descriptor, privilege: PrivilegeLevel) -> SegmentSelector {
         let index = match entry {
             Descriptor::UserSegment(value) => self.push(value),
             Descriptor::SystemSegment(value_low, value_high) => {
@@ -24,7 +24,7 @@ impl Gdt {
                 index
             }
         };
-        SegmentSelector::new(index as u16, privelege)
+        SegmentSelector::new(index as u16, privilege)
     }
 
     fn push(&mut self, value: u64) -> usize {
