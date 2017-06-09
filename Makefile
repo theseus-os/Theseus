@@ -37,13 +37,13 @@ orun:
 	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio
 
 odebug:
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s -S -serial stdio
+	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
 run: $(iso) 
 	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
 
 debug: $(iso)
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s -S -serial stdio
+	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
 gdb:
 	@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
