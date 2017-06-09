@@ -95,9 +95,36 @@ lazy_static! {
     };
 }
 
+pub enum AvailableSegmentSelector {
+    KernelCode,
+    KernelData,
+    UserCode,
+    UserData,
+    Tss,
+}
+
+
 /// Stupid hack because SegmentSelector is not Cloneable/Copyable
-fn copySegmentSelector(selector: &SegmentSelector) -> SegmentSelector {
-    SegmentSelector::new(selector.index(), selector.rpl())
+pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
+    let seg: &SegmentSelector = match selector {
+        AvailableSegmentSelector::KernelCode => {
+            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::KernelData => {
+            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserCode => {
+            USER_CODE_SELECTOR.try().expect("USER_CODE_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserData => {
+            USER_DATA_SELECTOR.try().expect("USER_DATA_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::Tss => {
+            TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
+        }
+    };
+
+    SegmentSelector::new(seg.index(), seg.rpl())
 }
 
 
@@ -115,7 +142,7 @@ pub fn init(memory_controller: &mut MemoryController) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
     
-    use x86_64::instructions::segmentation::{set_cs, load_ds};
+    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
     use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
@@ -153,9 +180,10 @@ pub fn init(memory_controller: &mut MemoryController) {
     gdt.load();
 
     unsafe {
-        set_cs(copySegmentSelector(KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!"))); // reload code segment register
-        load_ds(copySegmentSelector(KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!"))); // unsure if necessary
-        load_tss(copySegmentSelector(TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!"))); // load TSS
+        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
+        // load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        // load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
 
         PIC.initialize();
     }

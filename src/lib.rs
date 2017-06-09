@@ -68,6 +68,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 
 
+
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
@@ -188,15 +189,15 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
-        { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
-        { let second_task = tasklist_mut.spawn(third_thread_main, String::from("hello"), "third_thread"); } 
-        { let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
+        { let second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
-        { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
-        { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
-        { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
+        { tasklist_mut.spawn_kthread(test_loop_1, None, "test_loop_1"); }
+        { tasklist_mut.spawn_kthread(test_loop_2, None, "test_loop_2"); } 
+        { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
 
     // try to schedule in the second task
@@ -209,10 +210,20 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
-	'outer: loop { 
-        
+	
 
-     }
+    // create a second task to test context switching
+    {
+        interrupts::disable_interrupts();
+        debug!("disabled interrupts, trying to jump to userspace");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
+        tasklist_mut.spawn_userspace(task::userspace_function as usize, "userspace_thread");
+    }
+
+
+    loop { 
+        // TODO: exit this loop cleanly upon a shutdown signal
+    }
 
 
      // cleanup here
