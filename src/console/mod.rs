@@ -103,7 +103,7 @@ pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> bool
     unsafe { 
         CONSOLE_QUEUE = Some(VecDeque::with_capacity(256));
     }
-    tasklist_mut.spawn(main_loop, unsafe { CONSOLE_QUEUE.as_mut().expect("CONSOLE_QUEUE failed to initialize") }, "console_loop");
+    tasklist_mut.spawn_kthread(main_loop, unsafe { CONSOLE_QUEUE.as_mut().expect("CONSOLE_QUEUE failed to initialize") }, "console_loop");
     true
 }
 

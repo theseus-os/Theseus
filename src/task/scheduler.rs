@@ -90,6 +90,8 @@ pub fn add_task_to_runqueue(task: TaskRef) {
     RUNQUEUE.write().push_back(task);
 }
 
+
+// TODO: test this function
 pub fn remove_task_from_runqueue(task: TaskRef) {
     RUNQUEUE.write().retain(|x| Arc::ptr_eq(&x, &task));
 }

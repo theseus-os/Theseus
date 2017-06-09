@@ -1,4 +1,5 @@
 use x86_64;
+use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
 /// get the real, current value of cr3
 pub fn get_page_table_register() -> usize {
@@ -99,6 +100,48 @@ impl ArchTaskState {
 
         // enable interrupts again
         asm!("sti" : : : "memory" : "volatile");
+    }
+
+
+    /// # Prerequisites for calling this function
+    /// * self.rsp must be set to a new userspace stack before calling this. 
+    pub unsafe fn jump_to_userspace(&self, function_ptr: usize) {
+        // Steps to jumping to userspace:
+        // 1) push stack segment selector (ss), i.e., the user_data segment selector
+        // 2) push rsp, the userspace stack pointer
+        // 3) push rflags, the control flags we wish to use
+        // 4) push the code segment selector (cs), i.e., the user_code segment selector
+        // 5) push the instruction pointer (rip) for the start of userspace, e.g., the function pointer
+        // 6) set all other segment registers (ds, es, fs, gs) to the user_data segment, same as (ss)
+        // 7) issue iret to return to userspace
+
+        let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData).0;
+        let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
+
+        // for now, disable interrupts from userspace
+        let mut flags: usize = 0;
+        asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
+        let rflags = flags & !0x0200;
+
+
+        asm!("push $0" : : "r"(ss as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(rflags) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(cs as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(function_ptr) : "memory" : "intel", "volatile");
+        
+        // for Step 6, save rax before using it below
+        // let mut rax_saved: usize = 0;
+        // asm!("mov $0, rax" : "=r"(rax_saved) : : "memory" : "intel", "volatile");
+        // asm!("mov ax, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov ds, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov es, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov fs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov gs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        // asm!("mov rax, $0" : : "r"(rax_saved) : "memory" : "intel", "volatile");
+
+        // final step, use interrupt return to jump into Ring 3 userspace
+        asm!("iret" : : : "memory" : "intel", "volatile");
     }
 }
 

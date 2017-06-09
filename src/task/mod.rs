@@ -66,10 +66,12 @@ pub struct Task {
     pub runstate: RunState,
     /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
-    /// [unused] the kernel stack.  Wrapped in Option<> so we can initialize it to None.
-    pub kstack: Option<Box<[u8]>>,
     /// the simple name of this Task
     pub name: String,
+    /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
+    pub kstack: Option<Box<[u8]>>,
+    /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
+    pub ustack: Option<Box<[u8]>>,
 }
 
 
@@ -84,6 +86,7 @@ impl Task {
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
             kstack: None,
+            ustack: None,
         }
     }
 
@@ -276,9 +279,11 @@ impl TaskList {
         }
     }
 
+
+
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
     /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
-    pub fn spawn<A: fmt::Debug, R: fmt::Debug>(&mut self, 
+    pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(&mut self, 
             func: fn(arg: A) -> R, arg: A, thread_name: &str) 
             -> Result<&Arc<RwLock<Task>>, &str> {
 
@@ -286,13 +291,12 @@ impl TaskList {
         // so just get the current page table value and set the new task's value to the same thing
         let mut curr_pgtbl: usize = 0;
         {
-            curr_pgtbl = self.get_current().expect("spawn(): get_current failed in getting curr_pgtbl")
+            curr_pgtbl = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_pgtbl")
                         .read().arch_state.get_page_table();
         }
 
-        let locked_new_task = self.new_task().expect("couldn't create task in spawn()!");
+        let locked_new_task = self.new_task().expect("couldn't create task in spawn_kthread()!");
         {
-            // request a mutable reference
             let mut new_task = locked_new_task.write();
             new_task.set_name(String::from(thread_name));
             
@@ -302,14 +306,15 @@ impl TaskList {
             new_task.arch_state.set_page_table(curr_pgtbl); 
 
 
-            // create and set up a new 16KB stack 
-            let mut stack = vec![0; 16384].into_boxed_slice(); // `stack` is the bottom of the stack
+            // create and set up a new 16KB kstack 
+            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kernel stack
 
-            // When scheduled in, the first spot on the stack will 
-            let offset = stack.len() - mem::size_of::<usize>();
+            // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
+            // as such, putting a function pointer on the top of the kstack will cause it to be invoked.
+            let offset = kstack.len() - mem::size_of::<usize>();
             unsafe {
-                // put it on the top of the stack
-                let func_ptr = stack.as_mut_ptr().offset(offset as isize);
+                // put it on the top of the kstack
+                let func_ptr = kstack.as_mut_ptr().offset(offset as isize);
                 *(func_ptr as *mut usize) = kthread_wrapper::<A, R> as usize;
 
                 // debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
@@ -321,11 +326,11 @@ impl TaskList {
             debug!("Creating kthread_call: {:?}", kthread_call); 
 
 
-            // currently we're using the very bottom of the stack for kthread arguments
+            // currently we're using the very bottom of the kstack for kthread arguments
             let offset2: isize = 0;
             unsafe {
-                let arg_ptr = stack.as_mut_ptr().offset(offset2);
-                let mut kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);
+                let arg_ptr = kstack.as_mut_ptr().offset(offset2);
+                let kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);
                 *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize; // consumes the kthread_call Box!
 
                 debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, *kthread_ptr);
@@ -334,8 +339,8 @@ impl TaskList {
             }
 
 
-            new_task.arch_state.set_stack((stack.as_ptr() as usize) + offset); // the top of the stack
-            new_task.kstack = Some(stack);
+            new_task.arch_state.set_stack((kstack.as_ptr() as usize) + offset); // the top of the kstack
+            new_task.kstack = Some(kstack);
 
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
 
@@ -345,6 +350,65 @@ impl TaskList {
 
         Ok(locked_new_task)
     }
+
+
+    pub fn spawn_userspace(&mut self, user_function_ptr: usize, name: &str) -> Result<&Arc<RwLock<Task>>, &str> {
+
+        ::interrupts::disable_interrupts();
+
+         // right now we only have one page table (memory area) shared between the kernel,
+        // so just get the current page table value and set the new task's value to the same thing
+        let mut curr_pgtbl: usize = 0;
+        {
+            curr_pgtbl = self.get_current().expect("spawn_userspace(): get_current failed in getting curr_pgtbl")
+                        .read().arch_state.get_page_table();
+        }
+
+        let locked_new_task = self.new_task().expect("couldn't create task in spawn_userspace()!");
+        {
+            let mut new_task = locked_new_task.write();
+            new_task.set_name(String::from(name));
+            
+            // this line would be useful if we wish to create an entirely new address space:
+            // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
+            // for now, just use the same address space because we're creating a new kernel thread
+            new_task.arch_state.set_page_table(curr_pgtbl); 
+
+
+            // create and set up a new 16KB stack for both kernel and userspace
+            let mut ustack = vec![0; 16384].into_boxed_slice(); // `ustack` is the bottom of the ustack
+            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kstackk
+
+            // we're just setting up this kstack as a backup, i don't think it will be used yet
+            let kstack_offset = kstack.len() - mem::size_of::<usize>();
+            unsafe {
+                let kstack_func_ptr = kstack.as_mut_ptr().offset(kstack_offset as isize);
+                *(kstack_func_ptr as *mut usize) = kstack_placeholder as usize;
+            }
+            new_task.kstack = Some(kstack);
+
+
+            // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
+            let ustack_offset = ustack.len() - mem::size_of::<usize>();
+            unsafe {
+                new_task.arch_state.set_stack((ustack.as_ptr() as usize) + ustack_offset);
+                new_task.ustack = Some(ustack);
+                new_task.arch_state.jump_to_userspace(user_function_ptr);
+            }
+
+            // not quite ready for this one to be scheduled in by our context_switch function
+            // TODO: add this back in
+            // new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
+        }
+
+        // TODO: add this back in
+        // scheduler::add_task_to_runqueue(locked_new_task.clone());
+
+        Ok(locked_new_task)
+    }
+
+
+
 
     /// Remove a task from the list.
     ///
@@ -427,7 +491,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         unsafe {
             let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
             let kstack = currtask.get_kstack().expect("kthread_wrapper(): get_kstack failed.");
-            // in spawn() above, we use the very bottom of the stack to hold the pointer to the kthread_call
+            // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
             let off: isize = 0;
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
             kthread_call_stack_ptr = *(kstack.as_ptr().offset(off) as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>;
@@ -471,13 +535,30 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
 
-
     trace!("attempting to unschedule kthread...");
     schedule!();
 
+    // we should never ever reach this point
+    panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")
+}
 
-    // we shouldn't ever reach this point
-    loop { 
-        error!("STUCK IN KTHREAD_WRAPPER INFINITE LOOP!!!");
+
+
+pub fn userspace_function() -> ! {
+    
+    unsafe {
+        asm!("mov r13, $0" : : "r"(0xF00DCACEDEADBEEF as usize) : "memory" : "intel", "volatile");
+        asm!("mov r14, $0" : : "r"(0xFEEEEEED01234567 as usize) : "memory" : "intel", "volatile");
     }
+
+    panic!("in userspace baby!");
+    // println_unsafe!("HELLO FROM USERSPACE");
+    loop { }
+}
+
+
+fn kstack_placeholder(_: u64) -> Option<u64> { 
+    println_unsafe!("!!! kstack_placeholder !!!");
+    loop { }
+    None
 }
