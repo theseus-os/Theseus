@@ -105,10 +105,10 @@ impl ArchTaskState {
 
     /// # Prerequisites for calling this function
     /// * self.rsp must be set to a new userspace stack before calling this. 
-    pub unsafe fn jump_to_userspace(&self, function_ptr: usize) {
+    pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         // Steps to jumping to userspace:
         // 1) push stack segment selector (ss), i.e., the user_data segment selector
-        // 2) push rsp, the userspace stack pointer
+        // 2) push the userspace stack pointer
         // 3) push rflags, the control flags we wish to use
         // 4) push the code segment selector (cs), i.e., the user_code segment selector
         // 5) push the instruction pointer (rip) for the start of userspace, e.g., the function pointer
@@ -119,17 +119,12 @@ impl ArchTaskState {
         let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
 
         // for now, disable interrupts from userspace
+        // Redox sets ths IOPL and interrupt enable flag using the following:  (3 << 12 | 1 << 9)
         let mut flags: usize = 0;
         asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
         let rflags = flags & !0x0200;
 
 
-        asm!("push $0" : : "r"(ss as usize) : "memory" : "intel", "volatile");
-        asm!("push $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
-        asm!("push $0" : : "r"(rflags) : "memory" : "intel", "volatile");
-        asm!("push $0" : : "r"(cs as usize) : "memory" : "intel", "volatile");
-        asm!("push $0" : : "r"(function_ptr) : "memory" : "intel", "volatile");
-        
         // for Step 6, save rax before using it below
         // let mut rax_saved: usize = 0;
         // asm!("mov $0, rax" : "=r"(rax_saved) : : "memory" : "intel", "volatile");
@@ -140,8 +135,16 @@ impl ArchTaskState {
         asm!("mov gs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         // asm!("mov rax, $0" : : "r"(rax_saved) : "memory" : "intel", "volatile");
 
+
+        asm!("push $0" : : "r"(ss as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(stack_ptr) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(rflags) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(cs as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(function_ptr) : "memory" : "intel", "volatile");
+        
+
         // final step, use interrupt return to jump into Ring 3 userspace
-        asm!("iret" : : : "memory" : "intel", "volatile");
+        asm!("iretq" : : : "memory" : "intel", "volatile");
     }
 }
 
