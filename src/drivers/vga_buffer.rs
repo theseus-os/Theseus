@@ -17,17 +17,23 @@ static WRITER: Mutex<Writer> = Mutex::new(Writer {
                 });
 
 
-/// This is UNSAFE and can cause deadlocks. Use print!() instead. 
+/// This is UNSAFE because it bypasses the VGA Buffer lock. Use print!() instead. 
 /// Should only be used in exception contexts and early bring-up code 
 /// before the console-based print!() macro is available. 
 #[macro_export]
 macro_rules! print_unsafe {
     ($($arg:tt)*) => ({
-            $crate::drivers::vga_buffer::print_args(format_args!($($arg)*));
+            $crate::drivers::vga_buffer::print_args_unsafe(format_args!($($arg)*));
     });
 }
 
-/// This is UNSAFE and can cause deadlocks. Use println!() instead. 
+#[doc(hidden)]
+pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
+    unsafe { WRITER.force_unlock(); }
+    print_args(args)
+}
+
+/// This is UNSAFE because it bypasses the VGA Buffer lock. Use println!() instead. 
 /// Should only be used in exception contexts and early bring-up code
 /// before the console-based println!() macro is available. 
 #[macro_export]
@@ -38,16 +44,16 @@ macro_rules! println_unsafe {
 
 
 
-pub fn print_string(s: String) -> ::core::fmt::Result {
+pub fn print_string(s: String) -> fmt::Result {
     print_str(s.as_str())
 }
 
-pub fn print_str(s: &str) -> ::core::fmt::Result {
+pub fn print_str(s: &str) -> fmt::Result {
     use core::fmt::Write;
     WRITER.lock().write_str(s)
 }
 
-pub fn print_args(args: fmt::Arguments) -> ::core::fmt::Result {
+pub fn print_args(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
     WRITER.lock().write_fmt(args)
 }

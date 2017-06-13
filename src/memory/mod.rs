@@ -42,6 +42,9 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     println_unsafe!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
+    for area in memory_map_tag.memory_areas() {
+        println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+    }
 
     let mut frame_allocator = AreaFrameAllocator::new(kernel_start as usize,
                                                       kernel_end as usize,

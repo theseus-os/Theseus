@@ -391,9 +391,9 @@ impl TaskList {
             // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
             let ustack_offset = ustack.len() - mem::size_of::<usize>();
             unsafe {
-                new_task.arch_state.set_stack((ustack.as_ptr() as usize) + ustack_offset);
+                let ustack_top = (ustack.as_ptr() as usize) + ustack_offset;
                 new_task.ustack = Some(ustack);
-                new_task.arch_state.jump_to_userspace(user_function_ptr);
+                new_task.arch_state.jump_to_userspace(ustack_top, user_function_ptr);
             }
 
             // not quite ready for this one to be scheduled in by our context_switch function
@@ -546,12 +546,12 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 pub fn userspace_function() -> ! {
     
-    unsafe {
-        asm!("mov r13, $0" : : "r"(0xF00DCACEDEADBEEF as usize) : "memory" : "intel", "volatile");
-        asm!("mov r14, $0" : : "r"(0xFEEEEEED01234567 as usize) : "memory" : "intel", "volatile");
-    }
+    // unsafe {
+    //     asm!("mov r13, $0" : : "r"(0xDEADBEEF as usize) : "memory" : "intel", "volatile");
+    //     asm!("mov r14, $0" : : "r"(0xBEEFDEAD as usize) : "memory" : "intel", "volatile");
+    // }
 
-    panic!("in userspace baby!");
+    // panic!("in userspace baby!");
     // println_unsafe!("HELLO FROM USERSPACE");
     loop { }
 }

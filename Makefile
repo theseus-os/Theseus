@@ -3,7 +3,11 @@ SHELL := /bin/bash
 RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly (75b056812 2017-05-15)
 RUSTC_OUTPUT=$(shell rustc --version)
 
-KVM_CMD=$(shell kvm-ok 2>&1 > /dev/null; if [ $$? == 0 ]; then echo "-enable-kvm"; fi)
+
+#### We're disabling KVM for the time being because it breaks some features, like RDMSR
+KVM_CMD=
+#KVM_CMD=$(shell kvm-ok 2>&1 > /dev/null; if [ $$? == 0 ]; then echo "-enable-kvm"; fi)
+
 
 arch ?= x86_64
 target ?= $(arch)-restful_os
