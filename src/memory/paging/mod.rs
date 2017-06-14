@@ -140,14 +140,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE);
+            self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[511].set(backup, PRESENT | WRITABLE);
+            p4_table[511].set(backup, PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
             tlb::flush_all();
         }
 
@@ -180,7 +180,7 @@ impl InactivePageTable {
         {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
-            table[511].set(frame.clone(), PRESENT | WRITABLE);
+            table[511].set(frame.clone(), PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
         }
         temporary_page.unmap(active_table);
 
@@ -215,7 +215,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
                      section.addr,
                      section.size);
 
-            let flags = EntryFlags::from_elf_section_flags(section);
+            let mut flags = EntryFlags::from_elf_section_flags(section);
+
+
+            // TEMPORARY HACK:  make all sections user accessible
+            flags |= entry::USER_ACCESSIBLE;
+
 
             let start_frame = Frame::containing_address(section.start_address());
             let end_frame = Frame::containing_address(section.end_address() - 1);
@@ -226,7 +231,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
 
         // identity map the VGA text buffer
         let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
+        mapper.identity_map(vga_buffer_frame, WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */, allocator);
 
         // identity map the multiboot info structure
         let multiboot_start = Frame::containing_address(boot_info.start_address());

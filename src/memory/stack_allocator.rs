@@ -43,7 +43,7 @@ impl StackAllocator {
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
                 for page in Page::range_inclusive(start, end) {
-                    active_table.map(page, paging::WRITABLE, frame_allocator);
+                    active_table.map(page, paging::WRITABLE | paging::USER_ACCESSIBLE /* TEMPORARY HACK */, frame_allocator);
                 }
 
                 // create a new stack
