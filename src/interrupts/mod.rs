@@ -26,6 +26,7 @@ pub mod pit_clock; // TODO: shouldn't be pub
 mod pic;
 mod time_tools; //testing whether including a module makes any difference
 pub mod rtc; // TODO: shouldn't be pub
+pub mod tsc;
 
 
 
@@ -60,7 +61,7 @@ lazy_static! {
         // missing: 0x0a invalid TSS exception
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
         // missing: 0x0c stack segment exception
-        // missing: 0x0d general protection exception
+        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
         // reserved: 0x0f vector 15
         // missing: 0x10 floating point exception
@@ -238,6 +239,12 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
 
 
 
+extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
+    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT\n{:#?}", stack_frame);
+    loop {}
+}
+
+
 extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
@@ -300,7 +307,7 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 //0x28
 extern "x86-interrupt" fn rtc_handler(stack_frame:&mut ExceptionStackFrame ) {
     //let placeholder = 2;
-    //trace!("wow");
+    
     rtc::handle_rtc_interrupt();
     unsafe{PIC.notify_end_of_interrupt(0x28);}
 

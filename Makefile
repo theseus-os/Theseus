@@ -44,7 +44,8 @@ odebug:
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
 
 run: $(iso) 
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
+	#@qemu-system-x86_64  -cdrom $(iso) -s  -serial stdio  -no-shutdown  -d int
+	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-shutdown -cpu Haswell 
 
 debug: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
