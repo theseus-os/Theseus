@@ -8,8 +8,10 @@
 // except according to those terms.
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
+pub use self::paging::ActivePageTable;
 pub use self::paging::remap_the_kernel;
 pub use self::stack_allocator::Stack;
+
 use self::paging::PhysicalAddress;
 use multiboot2::BootInformation;
 
@@ -18,6 +20,54 @@ mod paging;
 mod stack_allocator;
 
 pub const PAGE_SIZE: usize = 4096;
+
+
+/// An area of physical memory. 
+#[derive(Copy, Clone, Debug, Default)]
+#[repr(C)]
+pub struct PhysicalMemoryArea {
+    pub base_addr: u64,
+    pub length: u64,
+    pub typ: u32,
+    pub acpi: u32
+}
+
+#[derive(Clone)]
+pub struct PhysicalMemoryAreaIter {
+    index: usize
+}
+
+impl PhysicalMemoryAreaIter {
+    pub fn new() -> Self {
+        PhysicalMemoryAreaIter {
+            index: 0
+        }
+    }
+}
+
+impl Iterator for PhysicalMemoryAreaIter {
+    type Item = &'static PhysicalMemoryArea;
+    fn next(&mut self) -> Option<&'static PhysicalMemoryArea> {
+        while self.index < unsafe { PHYSICAL_MEMORY_AREAS.len() } {
+            // get the entry in the current index
+            let entry = unsafe { &PHYSICAL_MEMORY_AREAS[self.index] };
+
+            // increment the index
+            self.index += 1;
+
+            if entry.typ == 1 {
+                return Some(entry)
+            }
+        }
+
+        None
+    }
+}
+
+/// The set of physical memory areas as provided by the bootloader.
+/// It cannot be a Vec or other collection because those allocators aren't available yet
+static mut PHYSICAL_MEMORY_AREAS: [PhysicalMemoryArea; 512] = [PhysicalMemoryArea { base_addr: 0, length: 0, typ: 0, acpi: 0 }; 512];
+
 
 pub fn init(boot_info: &BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
@@ -42,15 +92,30 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     println_unsafe!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
+    
+    
+    // copy the list of physical memory areas from multiboot
+    let mut index = 0;
     for area in memory_map_tag.memory_areas() {
         println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+
+        unsafe {
+            let mut entry = &mut PHYSICAL_MEMORY_AREAS[index];
+
+            entry.base_addr = area.base_addr;
+            entry.length = area.length;
+            entry.typ = 1;
+        }
+        index += 1;
     }
+
+
 
     let mut frame_allocator = AreaFrameAllocator::new(kernel_start as usize,
                                                       kernel_end as usize,
                                                       boot_info.start_address(),
                                                       boot_info.end_address(),
-                                                      memory_map_tag.memory_areas());
+                                                      PhysicalMemoryAreaIter::new());
 
     let mut active_table = paging::remap_the_kernel(&mut frame_allocator, boot_info);
 

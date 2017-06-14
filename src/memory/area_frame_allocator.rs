@@ -7,8 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::{Frame, FrameAllocator};
-use multiboot2::{MemoryAreaIter, MemoryArea};
+use memory::{Frame, FrameAllocator, PhysicalMemoryAreaIter, PhysicalMemoryArea};
 
 /// A frame allocator that uses the memory areas from the multiboot information structure as
 /// source. The {kernel, multiboot}_{start, end} fields are used to avoid returning memory that is
@@ -17,8 +16,8 @@ use multiboot2::{MemoryAreaIter, MemoryArea};
 /// `kernel_end` and `multiboot_end` are _inclusive_ bounds.
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
-    current_area: Option<&'static MemoryArea>,
-    areas: MemoryAreaIter,
+    current_area: Option<&'static PhysicalMemoryArea>,
+    areas: PhysicalMemoryAreaIter,
     kernel_start: Frame,
     kernel_end: Frame,
     multiboot_start: Frame,
@@ -30,7 +29,7 @@ impl AreaFrameAllocator {
                kernel_end: usize,
                multiboot_start: usize,
                multiboot_end: usize,
-               memory_areas: MemoryAreaIter)
+               memory_areas: PhysicalMemoryAreaIter)
                -> AreaFrameAllocator {
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::containing_address(0),
