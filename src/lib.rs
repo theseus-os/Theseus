@@ -63,6 +63,7 @@ use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard}
 use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use interrupts::tsc;
 
 
 
@@ -182,7 +183,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	interrupts::enable_interrupts();
 	println!("enabled interrupts!");
 
-     
+    //tsc::read_msr(0xce);
 
 
     // create a second task to test context switching

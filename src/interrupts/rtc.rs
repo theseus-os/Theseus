@@ -2,6 +2,7 @@ use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use interrupts::rtc;
+use interrupts::tsc;
 use util;
 use CONFIG::*;
 use spin::Mutex;
@@ -162,8 +163,19 @@ pub fn handle_rtc_interrupt() {
         schedule!();
     }
 
-    if (ticks % (CONFIG_HEARTBEAT_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
+    if (ticks % 128) == 0 {
         trace!("[heartbeat] {} seconds have passed (RTC_TICKS={})", CONFIG_HEARTBEAT_PERIOD_MS/1000, ticks);
+        let is_tsc_ready = tsc::invariant_tsc();
+        if is_tsc_ready{
+            trace!("Congrats you have invariant tsc!");
+            
+        }
+        //let current_cycle = tsc::get_tsc_ticks();
+        //trace!("{} total tsc cycles have passed", current_cycle);
+        //tsc::calculate_tsc_frequency();
+    if ticks == 128{
+        tsc::calibrate_tsc();
+    }
     }
 
 }
