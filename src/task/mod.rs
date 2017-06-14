@@ -546,13 +546,14 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 pub fn userspace_function() -> ! {
     
-    // unsafe {
-    //     asm!("mov r13, $0" : : "r"(0xDEADBEEF as usize) : "memory" : "intel", "volatile");
-    //     asm!("mov r14, $0" : : "r"(0xBEEFDEAD as usize) : "memory" : "intel", "volatile");
-    // }
+    unsafe {
+        asm!("mov r13, $0" : : "r"(0xDEADBEEF as usize) : "memory" : "intel", "volatile");
+        asm!("mov r14, $0" : : "r"(0xBEEFDEAD as usize) : "memory" : "intel", "volatile");
+    }
+
+    // println_unsafe!("HELLO FROM USERSPACE");
 
     // panic!("in userspace baby!");
-    // println_unsafe!("HELLO FROM USERSPACE");
     loop { }
 }
 

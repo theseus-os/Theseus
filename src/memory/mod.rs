@@ -127,7 +127,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     // map the entire heap, which starts from HEAP_START = 0x40000000 (octal 0000010000000000)
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, paging::WRITABLE, &mut frame_allocator);
+        active_table.map(page, paging::WRITABLE | paging::USER_ACCESSIBLE /* TEMPORARY HACK */, &mut frame_allocator);
     }
 
     let stack_allocator = {

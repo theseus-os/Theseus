@@ -66,7 +66,7 @@ impl<L> Table<L>
             assert!(!self.entries[index].flags().contains(HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, PRESENT | WRITABLE);
+            self.entries[index].set(frame, PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()
