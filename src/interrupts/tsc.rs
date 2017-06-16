@@ -38,7 +38,7 @@ pub fn get_tsc_frequency()->u64{
 }
 
 //takes a tsc cycle value and returns the number of nanoseconds it represents
-pub fn tsc_cycles_to_time(cycles: u64)-> u64{
+pub fn tsc_cycles_to_nanoseconds(cycles: u64)-> u64{
     
     cycles*1000000000/get_tsc_frequency()
     
