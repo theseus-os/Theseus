@@ -153,11 +153,12 @@ pub fn handle_rtc_interrupt() {
     read_cmos();
 
     let ticks = RTC_TICKS.fetch_add(1, Ordering::SeqCst) + 1; // +1 because fetch_add returns previous value
+
     
     if (ticks % (CONFIG_TIMESLICE_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
         schedule!();
     }
-
+    /*
     if (ticks % 128) == 0 {
         trace!("[heartbeat] {} seconds have passed (RTC_TICKS={})", CONFIG_HEARTBEAT_PERIOD_MS/1000, ticks);
         let is_tsc_ready = tsc::invariant_tsc();
@@ -168,9 +169,8 @@ pub fn handle_rtc_interrupt() {
         //let current_cycle = tsc::get_tsc_ticks();
         //trace!("{} total tsc cycles have passed", current_cycle);
         //tsc::calculate_tsc_frequency();
-    if ticks == 128{
-        tsc::calibrate_tsc();
+   
     }
-    }
-
+    */
+    
 }
