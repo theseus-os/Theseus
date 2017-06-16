@@ -65,7 +65,7 @@ use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 
-
+pub const __KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
 
 
@@ -140,7 +140,7 @@ fn fourth_thread_main(_: u64) -> Option<String> {
 
 
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
@@ -152,7 +152,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     drivers::early_init();
     
 
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address + __KERNEL_OFFSET) };
     enable_nxe_bit();
     enable_write_protect_bit();
 
@@ -209,7 +209,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     trace!("Entering Task0's idle loop");
 	
 
-    // create a second task to test context switching
+    // create and jump to the first userspace thread
     {
         interrupts::disable_interrupts();
         debug!("disabled interrupts, trying to jump to userspace");

@@ -100,6 +100,15 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
+    /// like identity mapping, but the VirtualAddress = PhysicalAddress + offset
+    pub fn map_linear_offset<A>(&mut self, frame: Frame, offset: VirtualAddress, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        let page = Page::containing_address(frame.start_address() + offset);
+        self.map_to(page, frame, flags, allocator)
+    }
+
+
     pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
