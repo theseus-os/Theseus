@@ -9,11 +9,13 @@ use collections::string::String;
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
+const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
+
 static WRITER: Mutex<Writer> = Mutex::new(Writer {
                     column_position: 0,
                     color_code: ColorCode::new(Color::LightGreen,
                                                 Color::Black),
-                    buffer: unsafe { Unique::new(0xb8000 as *mut _) },
+                    buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + ::__KERNEL_OFFSET) as *mut _) },
                 });
 
 

@@ -1,0 +1,79 @@
+/*
+Copyright 2016 Philipp Oppermann. See the README.md
+file at the top-level directory of this distribution.
+
+Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+<LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+option. This file may not be copied, modified, or distributed
+except according to those terms.
+*/
+
+OUTPUT_FORMAT(elf64-x86-64)
+
+ENTRY(start)
+
+KERNEL_OFFSET = 0x0fff_0000_0000_0000;
+
+SECTIONS {
+  . = 1M;
+
+  .boot : 
+  {
+    /* ensure that the multiboot header is at the beginning */
+    KEEP(*(.multiboot_header))
+    *(.boot)
+    *(.bootdata)
+    . = ALIGN(4K);
+  }
+
+  . += KERNEL_OFFSET;
+
+
+  .rodata : AT(ADDR(.rodata) - KERNEL_OFFSET) 
+  {
+    *(.rodata .rodata.*)
+    . = ALIGN(4K);
+  }
+
+  .text : AT(ADDR(.text) - KERNEL_OFFSET) 
+  {
+    *(.text .text.*)
+    . = ALIGN(4K);
+  }
+
+  .data : AT(ADDR(.data) - KERNEL_OFFSET)
+  {
+    *(.data .data.*)
+    . = ALIGN(4K);
+  }
+
+  .bss : AT(ADDR(.bss) - KERNEL_OFFSET) 
+  {
+    *(.bss .bss.*)
+    *(COMMON)
+    . = ALIGN(4K);
+  }
+
+  .got : AT(ADDR(.got) - KERNEL_OFFSET) 
+  {
+    *(.got)
+    . = ALIGN(4K);
+  }
+
+  .got.plt : AT(ADDR(.got.plt) - KERNEL_OFFSET) 
+  {
+    *(.got.plt)
+    . = ALIGN(4K);
+  }
+
+  .data.rel.ro ALIGN(4K) :  AT(ADDR(.data.rel.ro) - KERNEL_OFFSET)  {
+    *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
+    . = ALIGN(4K);
+  }
+
+  .gcc_except_table  ALIGN(4K) :  AT(ADDR(.gcc_except_table) - KERNEL_OFFSET) {
+    *(.gcc_except_table)
+    . = ALIGN(4K);
+  }
+}

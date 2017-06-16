@@ -21,6 +21,11 @@ mod stack_allocator;
 
 pub const PAGE_SIZE: usize = 4096;
 
+/// the virtual address where the kernel is mapped to.
+/// i.e., the linear offset between physical memory and kernel memory
+/// so the VGA buffer will be moved from 0xb8000 to 0xffff8000000b8000.
+pub const KERNEL_OFFSET: usize = 0xffff_8000_0000_0000;
+
 
 /// An area of physical memory. 
 #[derive(Copy, Clone, Debug, Default)]
@@ -127,7 +132,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     // map the entire heap, which starts from HEAP_START = 0x40000000 (octal 0000010000000000)
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, paging::WRITABLE | paging::USER_ACCESSIBLE /* TEMPORARY HACK */, &mut frame_allocator);
+        active_table.map(page, paging::WRITABLE, &mut frame_allocator);
     }
 
     let stack_allocator = {

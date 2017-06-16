@@ -140,14 +140,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
+            self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE);
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[511].set(backup, PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
+            p4_table[511].set(backup, PRESENT | WRITABLE);
             tlb::flush_all();
         }
 
@@ -166,7 +166,32 @@ impl ActivePageTable {
         }
         old_table
     }
+
+
+
+    // pub fn switch_to_higher_half(&mut self, new_cr3: u64, function_jump: usize) -> ! {
+    //     use x86_64::PhysicalAddress;
+
+    //     unsafe {
+    //         asm!("mov $0, %cr3" :: "r" (new_cr3) : "memory");
+    //         asm!("jmp $0" : : "r"(function_jump) : "memory" : "intel", "volatile");
+    //     }
+
+    //     loop { }
+    // }
+
 }
+
+
+// pub fn higher_half_entry() {
+
+//     unsafe {
+//         *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
+//     }
+//     loop { }
+// }
+
+
 
 pub struct InactivePageTable {
     p4_frame: Frame,
@@ -180,7 +205,7 @@ impl InactivePageTable {
         {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
-            table[511].set(frame.clone(), PRESENT | WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */);
+            table[511].set(frame.clone(), PRESENT | WRITABLE);
         }
         temporary_page.unmap(active_table);
 
@@ -202,10 +227,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Memory map tag required");
 
-        // identity map the allocated kernel sections
+        // map the allocated kernel text sections
+        // we're no longer using identity maps, but rather a linear offset 
+        // in which VirtualAddress = PhysicalAddress + KERNEL_OFFSET
         for section in elf_sections_tag.sections() {
             if !section.is_allocated() {
-                // section is not loaded to memory
+                // skip sections that aren't loaded to memory
                 continue;
             }
 
@@ -217,32 +244,40 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
 
             let mut flags = EntryFlags::from_elf_section_flags(section);
 
-
-            // TEMPORARY HACK:  make all sections user accessible
-            flags |= entry::USER_ACCESSIBLE;
-
-
             let start_frame = Frame::containing_address(section.start_address());
             let end_frame = Frame::containing_address(section.end_address() - 1);
             for frame in Frame::range_inclusive(start_frame, end_frame) {
+                mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, flags, allocator);
                 mapper.identity_map(frame, flags, allocator);
             }
         }
 
-        // identity map the VGA text buffer
+        // linear map the VGA text buffer
         let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.identity_map(vga_buffer_frame, WRITABLE | USER_ACCESSIBLE /* TEMPORARY HACK */, allocator);
+        mapper.map_linear_offset(vga_buffer_frame.clone(), super::KERNEL_OFFSET, WRITABLE, allocator);
+        mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
 
-        // identity map the multiboot info structure
-        let multiboot_start = Frame::containing_address(boot_info.start_address());
-        let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
-        for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
-            mapper.identity_map(frame, PRESENT, allocator);
-        }
+        // linear map the multiboot info structure
+        // FIXME: we don't need this anymore because we're not using it (it's copied into PHYSICAL_MEMORY_AREAS)
+        // let multiboot_start = Frame::containing_address(boot_info.start_address());
+        // let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
+        // for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
+        //     mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, PRESENT, allocator);
+        //     mapper.identity_map(frame, PRESENT, allocator);
+        // }
     });
+
+    // active_table.switch_to_higher_half(new_table.p4_frame.start_address() as u64, higher_half_entry as usize);
 
     let old_table = active_table.switch(new_table);
     println_unsafe!("NEW TABLE!!!");
+
+
+    unsafe {
+        *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
+    }
+
+    loop {}
 
     let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
     active_table.unmap(old_p4_page, allocator);
@@ -250,3 +285,5 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
 
     active_table
 }
+
+
