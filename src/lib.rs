@@ -179,12 +179,23 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     println!("initialization done!");
 
+    /*
+    interrupts::disable_interrupts();
+    loop {
+        let start = tsc::get_start_tsc();
+        unsafe { asm!("add r13, r14" : : : "memory" : "intel", "volatile"); }
+        let end = tsc::get_start_tsc();
+        trace!("after one add: {}", end-start);
+    }
+    */
 	
-	interrupts::enable_interrupts();
+	//interrupts::enable_interrupts(); //apparently this line is unecessary
 	println!("enabled interrupts!");
 
+    //tsc::calculate_tsc_frequency();
     //tsc::read_msr(0xce);
-
+    
+    //tsc::calibrate_tsc();
 
     // create a second task to test context switching
     {
@@ -215,6 +226,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     // cleanup here
     logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
+    
+    
 
 }
 
