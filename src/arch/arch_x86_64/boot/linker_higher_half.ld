@@ -1,6 +1,11 @@
 ENTRY(start)
 OUTPUT_FORMAT(elf64-x86-64)
 
+/*  this offset CANNOT be any smaller than 2GiB below the end of the 64-bit address space
+ *  because it must fit within 32-bit address space, 
+ *  otherwise you'll get horribly misleading linker errors.... 
+ *  ask me how I know...
+ */
 KERNEL_OFFSET = 0xFFFFFFFF80000000;
 
 SECTIONS
@@ -17,7 +22,7 @@ SECTIONS
         *(.inittext)
     }
 
-    /* We want to move the kernel to 0xFFFFFFFFF8000000 */
+    /* We want to move the kernel to a higher address */
     . += KERNEL_OFFSET;
 
     .text ALIGN(4K) : AT(ADDR(.text) - KERNEL_OFFSET)
@@ -43,4 +48,7 @@ SECTIONS
     {
         *(.bss .bss.*)
     }
+
+
+    /* TODO: add the other sections here from our old blog-os linker */
 }

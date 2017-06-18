@@ -1,3 +1,7 @@
+# This offset value must correspond to where the 
+# kernel's text section is mapped into virtual memory.
+# Right now, this corresponds to the 510th entry (2nd-to-last)
+# in the top-level page directory P4
 __KERNEL_OFFSET = 0xFFFFFFFF80000000
 
 # Declare Multiboot 2 header in a special section
@@ -142,22 +146,28 @@ start64_high.loop:
     jmp start64_high.loop
 
 # Page tables with identity paging for the first 4MB
-# All identity pages are marked present (1) + writeable (2)
+# All identity pages are marked present (0b01) + writeable (0b10)
+# ^ that's why we have a "+ 3" at the end of each address
 .section .padata
 pml4t:
-    .quad pdpt - __KERNEL_OFFSET + 3
-    .rept 512 - 2
+    .quad pdpt - __KERNEL_OFFSET + 3  #identity map the lowest entry
+    .rept 512 - 3 # minus 3 because there are 3 manually mapped regions (0, 510, and 511)
         .quad 0
     .endr
-    .quad pdpt - __KERNEL_OFFSET + 3
+    # the 510th entry is the recursive mapping for P4
+    # since we use the proper index of 510 for every page table level, we don't need to map it to the 510th entry 
+    .quad pml4t - __KERNEL_OFFSET + 3  
+    .quad pdpt - __KERNEL_OFFSET + 3  # the 511th entry is for the higher-half kernel mapping
 pdpt:
+    # right now we're only mapping the first and last entry (why the last one?)
     .quad pdt - __KERNEL_OFFSET + 3
     .rept 512 - 3
         .quad 0
     .endr
-    .quad pdt - __KERNEL_OFFSET + 3
-    .quad 0
+    .quad pdt - __KERNEL_OFFSET + 3  # maps from -2GiB to -1GiB 
+    .quad 0   # this would map the last GiB (-1 GiB to max)
 pdt:
+    # right now we're just mapping the first 4MB
     # Using 2MB pages via page size extension (PSE 0x80)
     .quad 0x000000 + 0x80 + 3
     .quad 0x200000 + 0x80 + 3

@@ -66,6 +66,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
 
 
+/// maps the kernel to the last 2 GiB of the 64-bit address space
+/// this offset must fit into 32-bits, otherwise it will cause linker errors
 pub const __KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
 
