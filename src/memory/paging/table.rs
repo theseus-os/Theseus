@@ -13,7 +13,17 @@ use memory::FrameAllocator;
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
-pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
+
+// Now that we're using the 511th entry of the P4 table for 
+// mapping the higher-half kernel, we need to use the 510th entry of P4 instead!
+// pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
+//pub const P4: *mut Table<Level4> = 0xffffff7f_fffff000 as *mut _; // the old value minus 512GiB (0x8000000000)
+
+pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; // the old value minus 512GiB (0x8000000000)
+        
+
+// see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
+//      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
 
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRY_COUNT],
@@ -40,7 +50,19 @@ impl<L> Table<L>
         let entry_flags = self[index].flags();
         if entry_flags.contains(PRESENT) && !entry_flags.contains(HUGE_PAGE) {
             let table_address = self as *const _ as usize;
-            Some((table_address << 9) | (index << 12))
+            let mut retval: usize = (table_address << 9) | (index << 12);
+            
+            // if bit 47 is zero, then we must sign extend the top 16 bits as zeroes.
+            if retval & 0x800000000000 == 0 {
+                Some(retval & 0x0000_FFFF_FFFF_FFFF)
+            }
+            else {
+                // otherwise, they should be sign extended as ones.
+                Some(retval | 0xFFFF_0000_0000_0000)
+            }
+
+            //Some(retval)
+
         } else {
             None
         }

@@ -23,8 +23,8 @@ pub const PAGE_SIZE: usize = 4096;
 
 /// the virtual address where the kernel is mapped to.
 /// i.e., the linear offset between physical memory and kernel memory
-/// so the VGA buffer will be moved from 0xb8000 to 0xffff8000000b8000.
-pub const KERNEL_OFFSET: usize = 0xffff_8000_0000_0000;
+/// so the VGA buffer will be moved from 0xb8000 to 0xFFFFFFFF800b8000.
+pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
 
 
 /// An area of physical memory. 

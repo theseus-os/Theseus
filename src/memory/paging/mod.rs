@@ -20,6 +20,7 @@ mod temporary_page;
 mod mapper;
 
 const ENTRY_COUNT: usize = 512;
+const RECURSIVE_INDEX: usize = 510;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
@@ -140,14 +141,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE);
+            self.p4_mut()[RECURSIVE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE);
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[511].set(backup, PRESENT | WRITABLE);
+            p4_table[RECURSIVE_INDEX].set(backup, PRESENT | WRITABLE);
             tlb::flush_all();
         }
 
@@ -205,7 +206,7 @@ impl InactivePageTable {
         {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
-            table[511].set(frame.clone(), PRESENT | WRITABLE);
+            table[RECURSIVE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
         }
         temporary_page.unmap(active_table);
 
@@ -216,7 +217,8 @@ impl InactivePageTable {
 pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
     where A: FrameAllocator
 {
-    let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
+     let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
+    //let mut temporary_page = TemporaryPage::new(Page::containing_address(0xFFFF_FFFF_FFFF_FFF0), allocator);
 
     let mut active_table = unsafe { ActivePageTable::new() };
     let mut new_table = {
@@ -247,12 +249,21 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
             let start_frame = Frame::containing_address(section.start_address());
             let end_frame = Frame::containing_address(section.end_address() - 1);
             for frame in Frame::range_inclusive(start_frame, end_frame) {
-                mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, flags, allocator);
-                mapper.identity_map(frame, flags, allocator);
+                // TEMPORARY HACK:  is there a better way to determine which
+                //                  kernel sections should be mapped to higher half?
+                if section.addr >= (super::KERNEL_OFFSET as u64) {
+                    // this is the common case and will be true for all but the first section,
+                    // because our linker ld script already stipulates that all but the first inittext/boot
+                    // section will be mapped to higher half (phys_addr + KERNEL_OFFSET)
+                    mapper.identity_map(frame, flags, allocator);
+                }
+                else {
+                    mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, flags, allocator);
+                }
             }
         }
 
-        // linear map the VGA text buffer
+        // linear map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_linear_offset(vga_buffer_frame.clone(), super::KERNEL_OFFSET, WRITABLE, allocator);
         mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
