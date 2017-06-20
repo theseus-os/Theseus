@@ -230,10 +230,8 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Memory map tag required");
 
         // map the allocated kernel text sections
-        // we're no longer using identity maps, but rather a linear offset 
-        // in which VirtualAddress = PhysicalAddress + KERNEL_OFFSET
         for section in elf_sections_tag.sections() {
-            if !section.is_allocated() {
+            if section.size == 0 || !section.is_allocated() {
                 // skip sections that aren't loaded to memory
                 continue;
             }
@@ -246,30 +244,32 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
 
             let mut flags = EntryFlags::from_elf_section_flags(section);
 
-            let start_frame = Frame::containing_address(section.start_address());
-            let end_frame = Frame::containing_address(section.end_address() - 1);
-            for frame in Frame::range_inclusive(start_frame, end_frame) {
-                // TEMPORARY HACK:  is there a better way to determine which
-                //                  kernel sections should be mapped to higher half?
-                if section.addr >= (super::KERNEL_OFFSET as u64) {
-                    // this is the common case and will be true for all but the first section,
-                    // because our linker ld script already stipulates that all but the first inittext/boot
-                    // section will be mapped to higher half (phys_addr + KERNEL_OFFSET)
-                    mapper.identity_map(frame, flags, allocator);
-                }
-                else {
-                    mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, flags, allocator);
-                }
+            // even though the linker stipulates that the kernel sections have a higher-half virtual address,
+            // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
+            // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
+            // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
+            let mut start_phys_addr = section.start_address();
+            if start_phys_addr >= super::KERNEL_OFFSET { 
+                // true for all sections but the first section (inittext)
+                start_phys_addr -= super::KERNEL_OFFSET;
             }
+            
+            let mut start_virt_addr = section.start_address();
+            if start_virt_addr < super::KERNEL_OFFSET { 
+                // special case to handle the first section only
+                start_virt_addr += super::KERNEL_OFFSET;
+            }
+
+            // map the whole range of pages to frames in this section
+            mapper.map_contiguous_range(start_virt_addr, start_phys_addr, section.size as usize, flags, allocator);
         }
 
-        // linear map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
+        // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.map_linear_offset(vga_buffer_frame.clone(), super::KERNEL_OFFSET, WRITABLE, allocator);
-        mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
+        mapper.map_virtual_address(0xb8000 + super::KERNEL_OFFSET, vga_buffer_frame, WRITABLE, allocator);
 
+        // REMOVE: we don't need this anymore because we're not using it (it's copied into PHYSICAL_MEMORY_AREAS)
         // linear map the multiboot info structure
-        // FIXME: we don't need this anymore because we're not using it (it's copied into PHYSICAL_MEMORY_AREAS)
         // let multiboot_start = Frame::containing_address(boot_info.start_address());
         // let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
         // for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {

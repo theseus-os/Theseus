@@ -25,7 +25,7 @@ static WRITER: Mutex<Writer> = Mutex::new(Writer {
 #[macro_export]
 macro_rules! print_unsafe {
     ($($arg:tt)*) => ({
-            $crate::drivers::vga_buffer::print_args_unsafe(format_args!($($arg)*));
+            $crate::drivers::vga_buffer::print_args_unsafe(format_args!($($arg)*)).unwrap();
     });
 }
 

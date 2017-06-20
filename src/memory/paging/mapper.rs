@@ -92,7 +92,7 @@ impl Mapper {
         p1[page.p1_index()].set(frame, flags | PRESENT);
     }
 
-    /// creates a mapping for a specific page -> random free frame
+    /// maps the given Page to a randomly selected (newly allocated) Frame
     pub fn map<A>(&mut self, page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
@@ -100,15 +100,37 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
-    /// like identity mapping, but the VirtualAddress = PhysicalAddress + offset
-    pub fn map_linear_offset<A>(&mut self, frame: Frame, offset: VirtualAddress, flags: EntryFlags, allocator: &mut A)
+    /// maps the given VirtualAddress to the contiguous range of Frames 
+    /// corresponding to the given PhysicalAddress.
+    /// `size` specifies the length in bytes of the mapping. 
+    /// for example, a `size` of 4096 would map just a single frame.
+    pub fn map_contiguous_range<A>(&mut self, 
+                             virt_addr: VirtualAddress, 
+                             phys_addr: PhysicalAddress,
+                             size: usize,
+                             flags: EntryFlags, 
+                             allocator: &mut A)
         where A: FrameAllocator
     {
-        let page = Page::containing_address(frame.start_address() + offset);
-        self.map_to(page, frame, flags, allocator)
+        let start_frame = Frame::containing_address(phys_addr);
+        let end_frame = Frame::containing_address(phys_addr + size - 1);
+        let mut frame_counter = 0;
+        for frame in Frame::range_inclusive(start_frame, end_frame) {
+            self.map_virtual_address(virt_addr + frame_counter * PAGE_SIZE, frame, flags, allocator);
+            frame_counter += 1;
+        }
     }
 
 
+    /// maps the Page containing the given virtual address to the given Frame
+    pub fn map_virtual_address<A>(&mut self, virt_addr: VirtualAddress, frame: Frame, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        let page: Page = Page::containing_address(virt_addr);
+        self.map_to(page, frame, flags, allocator)
+    }
+
+    /// maps the given frame's physical address to the same virtual address
     pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
