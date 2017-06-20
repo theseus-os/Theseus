@@ -40,6 +40,7 @@ SECTIONS
     .data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
     {
         *(.padata .padata.*)
+        . = ALIGN(4K);
         *(.data .data.*)
     }
 
@@ -50,5 +51,26 @@ SECTIONS
     }
 
 
-    /* TODO: add the other sections here from our old blog-os linker */
+
+    .got : ALIGN(4K) 
+    {
+        *(.got)
+        . = ALIGN(4K);
+    }
+
+    .got.plt :
+    {
+        *(.got.plt)
+        . = ALIGN(4K);
+    }
+
+    .data.rel.ro : ALIGN(4K) {
+        *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
+        . = ALIGN(4K);
+    }
+
+    .gcc_except_table : ALIGN(4K) {
+        *(.gcc_except_table)
+        . = ALIGN(4K);
+    }
 }
