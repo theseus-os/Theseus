@@ -17,11 +17,6 @@ iso := build/os-$(arch).iso
 rust_os := target/$(target)/debug/librestful_os.a
 linker_script := src/arch/arch_$(arch)/boot/linker_higher_half.ld
 grub_cfg := src/arch/arch_$(arch)/boot/grub.cfg
-
-# assembly_source_files := $(wildcard src/arch/arch_$(arch)/boot/*.asm)
-# assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.asm, \
-# 	build/arch/$(arch)/%.o, $(assembly_source_files))
-
 assembly_source_files := $(wildcard src/arch/arch_$(arch)/boot/*.S)
 assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.S, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
@@ -29,11 +24,12 @@ assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.S, \
 
 # from quantum OS / Tifflin's baremetal rust-os kernel
 LINKFLAGS := -T $(linker_script)
-LINKFLAGS += -Map build/map.txt
+LINKFLAGS += -Map build/map.txt  # optional
 LINKFLAGS += --gc-sections
-LINKFLAGS += -z max-page-size=0x1000
+LINKFLAGS += -z max-page-size=4096
 LINKFLAGS += -n ## from phil's blog_os
 
+CROSSDIR ?= prebuilt/x86_64-elf/bin
 
 
 .PHONY: all clean run debug iso cargo gdb
@@ -77,18 +73,13 @@ $(iso): $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
-# @ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
-	@x86_64-elf-ld $(LINKFLAGS) -o $(kernel) $(assembly_object_files) $(rust_os)
+	@$(CROSSDIR)/x86_64-elf-ld $(LINKFLAGS) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 cargo:  test_rustc
 	@xargo build --target $(target)
 
-### compile assembly files
-# build/arch/$(arch)/%.o: src/arch/arch_$(arch)/boot/%.asm
-# 	@mkdir -p $(shell dirname $@)
-# 	@nasm -felf64 $< -o $@
 
 ### to build x86_664-elf-as, follow this: http://os.phil-opp.com/cross-compile-binutils/
 build/arch/$(arch)/%.o: src/arch/arch_$(arch)/boot/boot.S
 	@mkdir -p $(shell dirname $@)
-	@x86_64-elf-as -o $@ $<
+	@$(CROSSDIR)/x86_64-elf-as -o $@ $<
