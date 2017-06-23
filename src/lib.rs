@@ -66,11 +66,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
 
 
-/// maps the kernel to the last 2 GiB of the 64-bit address space
-/// this offset must fit into 32-bits, otherwise it will cause linker errors
-pub const __KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
-
-
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
@@ -155,7 +150,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     drivers::early_init();
     
 
-    let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address + __KERNEL_OFFSET) };
+    let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address + memory::KERNEL_OFFSET) };
     enable_nxe_bit();
     enable_write_protect_bit();
 

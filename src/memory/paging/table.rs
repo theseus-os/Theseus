@@ -16,14 +16,11 @@ use core::marker::PhantomData;
 
 // Now that we're using the 511th entry of the P4 table for 
 // mapping the higher-half kernel, we need to use the 510th entry of P4 instead!
-// pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
-//pub const P4: *mut Table<Level4> = 0xffffff7f_fffff000 as *mut _; // the old value minus 512GiB (0x8000000000)
-
-pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; // the old value minus 512GiB (0x8000000000)
-        
-
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
+// pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _; // for the 511th (last) entry 
+pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
+                                          // ^ 776 means that we're always looking at the 510 entry recursively
 
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRY_COUNT],
@@ -61,7 +58,7 @@ impl<L> Table<L>
                 Some(retval | 0xFFFF_0000_0000_0000)
             }
 
-            //Some(retval)
+            // Some(retval)
 
         } else {
             None

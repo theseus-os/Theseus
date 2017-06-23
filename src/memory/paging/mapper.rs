@@ -96,7 +96,7 @@ impl Mapper {
     pub fn map<A>(&mut self, page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let frame = allocator.allocate_frame().expect("out of memory");
+        let frame = allocator.allocate_frame().expect("Mapper::map() -- out of memory trying to alloc frame");
         self.map_to(page, frame, flags, allocator)
     }
 

@@ -31,6 +31,7 @@ LINKFLAGS += -n ## from phil's blog_os
 
 CROSSDIR ?= prebuilt/x86_64-elf/bin
 
+QEMU_MEMORY ?= -m 10G
 
 .PHONY: all clean run debug iso cargo gdb
 
@@ -49,17 +50,16 @@ clean:
 	@rm -rf build
 
 orun:
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio
+	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio
 
 odebug:
-	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio
 
 run: $(iso) 
-	#@qemu-system-x86_64  -cdrom $(iso) -s  -serial stdio  -no-shutdown  -d int
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-shutdown -cpu Haswell
+	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
 
 debug: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -s -S -serial stdio
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int
 
 gdb:
 	@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
@@ -80,7 +80,7 @@ cargo:  test_rustc
 	@xargo build --target $(target)
 
 
-### to build x86_664-elf-as, follow this: http://os.phil-opp.com/cross-compile-binutils/
+### to build x86_64-elf-*, follow this: http://os.phil-opp.com/cross-compile-binutils/
 build/arch/$(arch)/%.o: src/arch/arch_$(arch)/boot/boot.S
 	@mkdir -p $(shell dirname $@)
 	@$(CROSSDIR)/x86_64-elf-as -o $@ $<
