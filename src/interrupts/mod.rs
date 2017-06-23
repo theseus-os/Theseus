@@ -182,9 +182,10 @@ pub fn init(memory_controller: &mut MemoryController) {
 
     unsafe {
         set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
-        // load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-        // load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
         load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
+        
+        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
 
         PIC.initialize();
     }

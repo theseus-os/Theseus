@@ -171,9 +171,11 @@ pdt:
     # Using 2MB pages via page size extension (PSE 0x80)
     .quad 0x000000 + 0x80 + 3
     .quad 0x200000 + 0x80 + 3
-    .rept 512 - 2
+    .rept 512 - 2   # 512 - 4
         .quad 0
     .endr
+
+
 
 # setup a temporary stack
 stack_bottom:

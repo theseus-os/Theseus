@@ -53,9 +53,9 @@ impl PhysicalMemoryAreaIter {
 impl Iterator for PhysicalMemoryAreaIter {
     type Item = &'static PhysicalMemoryArea;
     fn next(&mut self) -> Option<&'static PhysicalMemoryArea> {
-        while self.index < unsafe { PHYSICAL_MEMORY_AREAS.len() } {
+        while self.index < unsafe { USABLE_PHYSICAL_MEMORY_AREAS.len() } {
             // get the entry in the current index
-            let entry = unsafe { &PHYSICAL_MEMORY_AREAS[self.index] };
+            let entry = unsafe { &USABLE_PHYSICAL_MEMORY_AREAS[self.index] };
 
             // increment the index
             self.index += 1;
@@ -71,7 +71,7 @@ impl Iterator for PhysicalMemoryAreaIter {
 
 /// The set of physical memory areas as provided by the bootloader.
 /// It cannot be a Vec or other collection because those allocators aren't available yet
-static mut PHYSICAL_MEMORY_AREAS: [PhysicalMemoryArea; 512] = [PhysicalMemoryArea { base_addr: 0, length: 0, typ: 0, acpi: 0 }; 512];
+static mut USABLE_PHYSICAL_MEMORY_AREAS: [PhysicalMemoryArea; 512] = [PhysicalMemoryArea { base_addr: 0, length: 0, typ: 0, acpi: 0 }; 512];
 
 
 pub fn init(boot_info: &BootInformation) -> MemoryController {
@@ -80,20 +80,26 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
 
-    let kernel_start = elf_sections_tag.sections()
+    // our linker script specifies that the kernel will start at 1MB, and end at 1MB + length + KERNEL_OFFSET
+    // so the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
+    // thus, kernel_phys_start is the same as kernel_virt_start
+    let kernel_phys_start = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
         .map(|s| s.addr)
         .min()
         .unwrap();
-    let kernel_end = elf_sections_tag.sections()
+    let kernel_virt_end = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
         .map(|s| s.addr + s.size)
         .max()
         .unwrap();
+    let kernel_phys_end = kernel_virt_end - (KERNEL_OFFSET as u64);
 
-    println_unsafe!("kernel start: {:#x}, kernel end: {:#x}",
-             kernel_start,
-             kernel_end);
+
+    println_unsafe!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
+             kernel_phys_start,
+             kernel_phys_end,
+             kernel_virt_end);
     println_unsafe!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
@@ -103,21 +109,28 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let mut index = 0;
     for area in memory_map_tag.memory_areas() {
         println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+        
+        // we cannot allocate memory from sections beneath the end of the kernel's physical address!!
+        if area.base_addr + area.length < kernel_phys_end {
+            println_unsafe!("  skipping region before kernel_phys_end");
+            continue;
+        }
 
         unsafe {
-            let mut entry = &mut PHYSICAL_MEMORY_AREAS[index];
-
-            entry.base_addr = area.base_addr;
-            entry.length = area.length;
+            let mut entry = &mut USABLE_PHYSICAL_MEMORY_AREAS[index];
+            entry.base_addr = if area.base_addr >= kernel_phys_end { area.base_addr } else { kernel_phys_end };
+            entry.length = (area.base_addr + area.length) - entry.base_addr;
             entry.typ = 1;
+
+            println_unsafe!("  region established: start={:#x}, length={:#x}", entry.base_addr, entry.length);
         }
         index += 1;
     }
 
 
 
-    let mut frame_allocator = AreaFrameAllocator::new(kernel_start as usize,
-                                                      kernel_end as usize,
+    let mut frame_allocator = AreaFrameAllocator::new(kernel_phys_start as usize,
+                                                      kernel_phys_end as usize,
                                                       boot_info.start_address(),
                                                       boot_info.end_address(),
                                                       PhysicalMemoryAreaIter::new());
@@ -130,8 +143,11 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let heap_start_page = Page::containing_address(HEAP_START);
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
 
-    // map the entire heap, which starts from HEAP_START = 0x40000000 (octal 0000010000000000)
+    // map the entire heap to randomly chosen physical Frames
+    let mut ctr = 0;
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
+        // println_unsafe!("mapping heap page {} at virt addr: {:#x}", ctr, page.start_address());
+        ctr += 1;
         active_table.map(page, paging::WRITABLE, &mut frame_allocator);
     }
 

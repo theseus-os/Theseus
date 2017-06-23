@@ -168,19 +168,6 @@ impl ActivePageTable {
         old_table
     }
 
-
-
-    // pub fn switch_to_higher_half(&mut self, new_cr3: u64, function_jump: usize) -> ! {
-    //     use x86_64::PhysicalAddress;
-
-    //     unsafe {
-    //         asm!("mov $0, %cr3" :: "r" (new_cr3) : "memory");
-    //         asm!("jmp $0" : : "r"(function_jump) : "memory" : "intel", "volatile");
-    //     }
-
-    //     loop { }
-    // }
-
 }
 
 
@@ -220,8 +207,8 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
      let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
     //let mut temporary_page = TemporaryPage::new(Page::containing_address(0xFFFF_FFFF_FFFF_FFF0), allocator);
 
-    let mut active_table = unsafe { ActivePageTable::new() };
-    let mut new_table = {
+    let mut active_table: ActivePageTable = unsafe { ActivePageTable::new() };
+    let mut new_table: InactivePageTable = {
         let frame = allocator.allocate_frame().expect("no more frames");
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
@@ -267,34 +254,25 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
         // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_virtual_address(0xb8000 + super::KERNEL_OFFSET, vga_buffer_frame, WRITABLE, allocator);
-
-        // REMOVE: we don't need this anymore because we're not using it (it's copied into PHYSICAL_MEMORY_AREAS)
-        // linear map the multiboot info structure
-        // let multiboot_start = Frame::containing_address(boot_info.start_address());
-        // let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
-        // for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
-        //     mapper.map_linear_offset(frame.clone(), super::KERNEL_OFFSET, PRESENT, allocator);
-        //     mapper.identity_map(frame, PRESENT, allocator);
-        // }
     });
 
-    // active_table.switch_to_higher_half(new_table.p4_frame.start_address() as u64, higher_half_entry as usize);
 
     let old_table = active_table.switch(new_table);
     println_unsafe!("NEW TABLE!!!");
 
 
-    unsafe {
-        *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
-    }
+    // unsafe {
+    //     *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
+    // }
 
-    loop {}
+    // loop {}
 
-    let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
-    active_table.unmap(old_p4_page, allocator);
-    println_unsafe!("guard page at {:#x}", old_p4_page.start_address());
+    // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
+    // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
+    // active_table.unmap(old_p4_page, allocator);
+    // println_unsafe!("guard page at {:#x}", old_p4_page.start_address());
 
-    active_table
+    active_table // now it's the old table
 }
 
 
