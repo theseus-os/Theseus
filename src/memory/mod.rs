@@ -14,6 +14,7 @@ pub use self::stack_allocator::Stack;
 
 use self::paging::PhysicalAddress;
 use multiboot2::BootInformation;
+use spin::Once;
 
 mod area_frame_allocator;
 mod paging;
@@ -53,9 +54,10 @@ impl PhysicalMemoryAreaIter {
 impl Iterator for PhysicalMemoryAreaIter {
     type Item = &'static PhysicalMemoryArea;
     fn next(&mut self) -> Option<&'static PhysicalMemoryArea> {
-        while self.index < unsafe { USABLE_PHYSICAL_MEMORY_AREAS.len() } {
+        let areas = USABLE_PHYSICAL_MEMORY_AREAS.try().expect("USABLE_PHYSICAL_MEMORY_AREAS was used before initialization!");
+        while self.index < areas.len() {
             // get the entry in the current index
-            let entry = unsafe { &USABLE_PHYSICAL_MEMORY_AREAS[self.index] };
+            let entry = &areas[self.index];
 
             // increment the index
             self.index += 1;
@@ -69,30 +71,44 @@ impl Iterator for PhysicalMemoryAreaIter {
     }
 }
 
+#[derive(Copy, Clone, Debug, Default)]
+pub struct ModuleArea {
+    pub mod_start: u32,
+    pub mod_end: u32,
+    pub name: &'static str,
+}
+
+
 /// The set of physical memory areas as provided by the bootloader.
 /// It cannot be a Vec or other collection because those allocators aren't available yet
-static mut USABLE_PHYSICAL_MEMORY_AREAS: [PhysicalMemoryArea; 512] = [PhysicalMemoryArea { base_addr: 0, length: 0, typ: 0, acpi: 0 }; 512];
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; 32]> = Once::new();
+
+/// The set of modules loaded by the bootloader
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static MODULE_AREAS: Once<[ModuleArea; 32]> = Once::new();
 
 
 pub fn init(boot_info: &BootInformation) -> MemoryController {
     assert_has_not_been_called!("memory::init must be called only once");
 
+    // copy the list of modules (currently used for userspace programs)
+    MODULE_AREAS.call_once( || {
+        let mut modules: [ModuleArea; 32] = Default::default();
+        for (i, m) in boot_info.module_tags().enumerate() {
+            println_unsafe!("Module: {:?}", m);
+            modules[i] = ModuleArea {
+                mod_start: m.start_address(), 
+                mod_end:   m.end_address(), 
+                name:      m.name(),
+            };
+        }
+        modules
+    });
+
+
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
-
-
-    // testing module tags
-    use multiboot2::ModuleIter;
-    let mut modules_iter: ModuleIter = boot_info.module_tags();
-    let mut tags_iter = boot_info.tags();
-    for tag in tags_iter {
-        println_unsafe!("Multiboot2 TAG: typ:{} size:{:#x}", tag.typ, tag.size);
-    }
-    for (i, module) in modules_iter.enumerate() {
-        println_unsafe!("Module {}: {:?}", i, module);
-    }
-
-    
 
     // our linker script specifies that the kernel will start at 1MB, and end at 1MB + length + KERNEL_OFFSET
     // so the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
@@ -120,26 +136,29 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     
     
     // copy the list of physical memory areas from multiboot
-    let mut index = 0;
-    for area in memory_map_tag.memory_areas() {
-        println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
-        
-        // we cannot allocate memory from sections beneath the end of the kernel's physical address!!
-        if area.base_addr + area.length < kernel_phys_end {
-            println_unsafe!("  skipping region before kernel_phys_end");
-            continue;
-        }
+    USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
+        let mut areas: [PhysicalMemoryArea; 32] = Default::default();
+        for (index, area) in memory_map_tag.memory_areas().enumerate() {
+            println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+            
+            // we cannot allocate memory from sections below the end of the kernel's physical address!!
+            if area.base_addr + area.length < kernel_phys_end {
+                println_unsafe!("  skipping region before kernel_phys_end");
+                continue;
+            }
 
-        unsafe {
-            let mut entry = &mut USABLE_PHYSICAL_MEMORY_AREAS[index];
-            entry.base_addr = if area.base_addr >= kernel_phys_end { area.base_addr } else { kernel_phys_end };
-            entry.length = (area.base_addr + area.length) - entry.base_addr;
-            entry.typ = 1;
+            let start_addr = if area.base_addr >= kernel_phys_end { area.base_addr } else { kernel_phys_end };
+            areas[index] = PhysicalMemoryArea {
+                base_addr: start_addr,
+                length: (area.base_addr + area.length) - start_addr,
+                typ: 1, // TODO: what does this mean??
+                acpi: 0, // TODO: what does this mean??
+            };
 
-            println_unsafe!("  region established: start={:#x}, length={:#x}", entry.base_addr, entry.length);
+            println_unsafe!("  region established: start={:#x}, length={:#x}", areas[index].base_addr, areas[index].length);
         }
-        index += 1;
-    }
+        areas
+    });
 
 
 
@@ -158,10 +177,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
 
     // map the entire heap to randomly chosen physical Frames
-    let mut ctr = 0;
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        // println_unsafe!("mapping heap page {} at virt addr: {:#x}", ctr, page.start_address());
-        ctr += 1;
         active_table.map(page, paging::WRITABLE, &mut frame_allocator);
     }
 
