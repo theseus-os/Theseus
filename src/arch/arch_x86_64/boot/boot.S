@@ -6,6 +6,7 @@ __KERNEL_OFFSET = 0xFFFFFFFF80000000
 
 # Declare Multiboot 2 header in a special section
 # Multiboot 2 is needed to load 64bit kernel
+# "short" is 16 bit, "long" is 32 bit
 .section .multiboot
 mbStart:
     .align 8
@@ -13,6 +14,17 @@ mbStart:
     .long 0
     .long mbEnd - mbStart
     .long  -(0xe85250d6 + 0 + (mbEnd - mbStart))
+
+    # module alignment tag
+    .word 6 # type
+    .word 0 # flags
+    .long 8 # size should supposedly be 12 because..... why? 
+    .align 8
+
+    
+    # TODO: add module tags here? or just pull them off of multiboot info later?
+
+    # end tag
     .short 0
     .short 0
     .long 8

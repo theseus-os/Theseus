@@ -22,7 +22,7 @@ Because OS development requires many language features that Rust considers to be
 Since we're cross compiling for a custom target triple, we need to install the Rust source code:   
 `$ rustup component add rust-src`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   
+We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   cbs
 `$ cargo install xargo`
 
 

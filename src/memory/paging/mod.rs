@@ -214,7 +214,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> Ac
     };
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
-        let elf_sections_tag = boot_info.elf_sections_tag().expect("Memory map tag required");
+        let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
 
         // map the allocated kernel text sections
         for section in elf_sections_tag.sections() {
