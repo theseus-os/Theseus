@@ -80,6 +80,20 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
 
+
+    // testing module tags
+    use multiboot2::ModuleIter;
+    let mut modules_iter: ModuleIter = boot_info.module_tags();
+    let mut tags_iter = boot_info.tags();
+    for tag in tags_iter {
+        println_unsafe!("Multiboot2 TAG: typ:{} size:{:#x}", tag.typ, tag.size);
+    }
+    for (i, module) in modules_iter.enumerate() {
+        println_unsafe!("Module {}: {:?}", i, module);
+    }
+
+    
+
     // our linker script specifies that the kernel will start at 1MB, and end at 1MB + length + KERNEL_OFFSET
     // so the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
     // thus, kernel_phys_start is the same as kernel_virt_start

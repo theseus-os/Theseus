@@ -33,7 +33,7 @@ CROSSDIR ?= prebuilt/x86_64-elf/bin
 
 QEMU_MEMORY ?= -m 10G
 
-.PHONY: all clean run debug iso cargo gdb
+.PHONY: all clean run debug iso userspace cargo gdb
 
 test_rustc: 	
 ifneq (${RUSTC_OUTPUT}, ${RUSTC_CURRENT_SUPPORTED_VERSION})
@@ -66,12 +66,26 @@ gdb:
 
 iso: $(iso)
 
-$(iso): $(kernel) $(grub_cfg)
+$(iso): $(kernel) userspace $(grub_cfg)
+	@rm -rf build/isofiles 
+### copy userspace build files
+	@mkdir -p build/isofiles/modules
+	@cp userspace/build/* build/isofiles/modules/
+### copy kernel build files
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
 	@cp $(grub_cfg) build/isofiles/boot/grub
-	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
-	@rm -r build/isofiles
+#@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
+	grub-mkrescue -v -o $(iso) build/isofiles
+	
+
+
+### this builds all userspace programs
+userspace: 
+	@echo "======== BUILDING USERSPACE ========"
+	@$(MAKE) -C userspace
+
+
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	@$(CROSSDIR)/x86_64-elf-ld $(LINKFLAGS) -o $(kernel) $(assembly_object_files) $(rust_os)

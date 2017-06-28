@@ -156,6 +156,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // set up stack guard page and map the heap pages
     let mut memory_controller = memory::init(boot_info);
 
+    
     // initialize our interrupts and IDT
     interrupts::init(&mut memory_controller);
 
