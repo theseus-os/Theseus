@@ -1,5 +1,6 @@
 pub mod serial_port;
 pub mod input; 
+pub mod pci;
 #[macro_use] pub mod vga_buffer;
 
 
