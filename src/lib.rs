@@ -211,8 +211,9 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     {
         interrupts::disable_interrupts();
         debug!("disabled interrupts, trying to jump to userspace");
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        tasklist_mut.spawn_userspace(task::userspace_function as usize, "userspace_thread");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(0).expect("Error: no userspace modules found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
 
 
