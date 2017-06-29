@@ -28,6 +28,9 @@ pub const PAGE_SIZE: usize = 4096;
 pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
 
 
+const MAX_MODULES: usize = 32;
+const MAX_PHYSICAL_MEM_AREAS: usize = 32;
+
 /// An area of physical memory. 
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
@@ -82,11 +85,11 @@ pub struct ModuleArea {
 /// The set of physical memory areas as provided by the bootloader.
 /// It cannot be a Vec or other collection because those allocators aren't available yet
 /// we use a max size of 32 because that's the limit of Rust's default array initializers
-static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; 32]> = Once::new();
+static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_PHYSICAL_MEM_AREAS]> = Once::new();
 
 /// The set of modules loaded by the bootloader
 /// we use a max size of 32 because that's the limit of Rust's default array initializers
-static MODULE_AREAS: Once<[ModuleArea; 32]> = Once::new();
+static MODULE_AREAS: Once<[ModuleArea; MAX_MODULES]> = Once::new();
 
 
 pub fn init(boot_info: &BootInformation) -> MemoryController {
@@ -94,7 +97,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
-        let mut modules: [ModuleArea; 32] = Default::default();
+        let mut modules: [ModuleArea; MAX_MODULES] = Default::default();
         for (i, m) in boot_info.module_tags().enumerate() {
             println_unsafe!("Module: {:?}", m);
             modules[i] = ModuleArea {
@@ -137,7 +140,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     
     // copy the list of physical memory areas from multiboot
     USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
-        let mut areas: [PhysicalMemoryArea; 32] = Default::default();
+        let mut areas: [PhysicalMemoryArea; MAX_PHYSICAL_MEM_AREAS] = Default::default();
         for (index, area) in memory_map_tag.memory_areas().enumerate() {
             println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
             
@@ -194,6 +197,19 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         stack_allocator: stack_allocator,
     }
 }
+
+
+/// returns the `ModuleArea` corresponding 
+pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
+    let modules = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+    if index < modules.len() {
+        Some(&modules[index])
+    }
+    else {
+        None
+    }
+}
+
 
 pub struct MemoryController {
     active_table: paging::ActivePageTable,

@@ -201,6 +201,16 @@ impl InactivePageTable {
     }
 }
 
+
+
+pub fn new_address_space<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
+    where A: FrameAllocator
+{
+    
+}
+
+
+
 pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
     where A: FrameAllocator
 {

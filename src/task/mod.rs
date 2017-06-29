@@ -9,6 +9,7 @@ use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
 use core::fmt;
+use memory::ModuleArea;
 
 #[macro_use] pub mod scheduler;
 
@@ -30,12 +31,12 @@ static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
 pub enum RunState {
     /// in the midst of setting up the task
     INITING = 0,
-    /// able to be scheduled in, but not currently running 
-    RUNNABLE, 
+    /// able to be scheduled in, but not currently running
+    RUNNABLE,
     /// blocked on something, like I/O or a wait event
-    BLOCKED, 
+    BLOCKED,
     /// thread has completed and is ready for cleanup
-    EXITED, 
+    EXITED,
 }
 
 
@@ -56,13 +57,13 @@ impl<A, R> KthreadCall<A, R> {
 }
 
 
-pub struct Task {   
-    /// the unique id of this Task, similar to Linux's pid. 
+pub struct Task {
+    /// the unique id of this Task, similar to Linux's pid.
     pub id: TaskId,
-    /// which cpu core the Task is currently running on. 
-    /// negative if not currently running. 
+    /// which cpu core the Task is currently running on.
+    /// negative if not currently running.
     pub running_on_cpu: i8,
-    /// the runnability status of this task, basically whether it's allowed to be scheduled in. 
+    /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
     /// architecture-specific task state, e.g., registers.
     pub arch_state: ArchTaskState,
@@ -76,12 +77,12 @@ pub struct Task {
 
 
 impl Task {
-    
+
     /// creates a new Task structure and initializes it to be non-Runnable.
-    fn new(task_id: TaskId) -> Task { 
+    fn new(task_id: TaskId) -> Task {
         Task {
-            id: task_id, 
-            runstate: RunState::INITING, 
+            id: task_id,
+            runstate: RunState::INITING,
             running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
             name: format!("task{}", task_id.into()),
@@ -109,12 +110,12 @@ impl Task {
         (self.runstate == RunState::RUNNABLE)
     }
 
-    // TODO: implement this 
+    // TODO: implement this
     /*
     fn clone_task(&self, new_id: TaskId) -> Task {
         Task {
-            id: task_id, 
-            runstate: RunState::INITING, 
+            id: task_id,
+            runstate: RunState::INITING,
             arch_state: self.arch_state.clone(),
             name: format!("task{}", task_id.into()),
             kstack: None,
@@ -123,7 +124,7 @@ impl Task {
     */
 
     /// switches from the current (`self`)  to the `next` `Task`
-    /// the lock on 
+    /// the lock on
     pub fn context_switch(&mut self, mut next: &mut Task) {
         // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
@@ -182,7 +183,7 @@ impl fmt::Display for Task {
 /// a singleton that represents all tasks
 pub struct TaskList {
     list: BTreeMap<TaskId, Arc<RwLock<Task>>>,
-    taskid_counter: usize, 
+    taskid_counter: usize,
 }
 
 impl TaskList {
@@ -209,10 +210,10 @@ impl TaskList {
     }
 
     /// instantiate a new `Task`, wraps it in a RwLock and an Arc, and then adds it to the `TaskList`.
-    /// this function doesn't actually set up the task's members, e.g., stack, registers, memory areas. 
+    /// this function doesn't actually set up the task's members, e.g., stack, registers, memory areas.
     pub fn new_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
 
-        // first, find a free task id! 
+        // first, find a free task id!
         if self.taskid_counter >= MAX_NR_TASKS {
             self.taskid_counter = 1;
         }
@@ -244,7 +245,7 @@ impl TaskList {
     }
 
 
-    /// initialize the first `Task` with special id = 0. 
+    /// initialize the first `Task` with special id = 0.
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
     /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
@@ -257,15 +258,15 @@ impl TaskList {
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
-        
+
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
-        // but we still have to initialize its page table to the current value 
+        // but we still have to initialize its page table to the current value
         task_zero.arch_state.set_page_table(get_page_table_register());
-        
-        
+
+
         // insert the new context into the list
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
-            None => { 
+            None => {
                 // None indicates that the insertion didn't overwrite anything, which is what we want
                 println_unsafe!("Successfully created initial task0");
                 let tz = self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist");
@@ -283,8 +284,8 @@ impl TaskList {
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
     /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
-    pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(&mut self, 
-            func: fn(arg: A) -> R, arg: A, thread_name: &str) 
+    pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(&mut self,
+            func: fn(arg: A) -> R, arg: A, thread_name: &str)
             -> Result<&Arc<RwLock<Task>>, &str> {
 
         // right now we only have one page table (memory area) shared between the kernel,
@@ -299,14 +300,14 @@ impl TaskList {
         {
             let mut new_task = locked_new_task.write();
             new_task.set_name(String::from(thread_name));
-            
+
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
             // for now, just use the same address space because we're creating a new kernel thread
-            new_task.arch_state.set_page_table(curr_pgtbl); 
+            new_task.arch_state.set_page_table(curr_pgtbl);
 
 
-            // create and set up a new 16KB kstack 
+            // create and set up a new 16KB kstack
             let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kernel stack
 
             // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
@@ -323,7 +324,7 @@ impl TaskList {
 
             // set up the kthread stuff
             let kthread_call = Box::new( KthreadCall::new(arg, func) );
-            debug!("Creating kthread_call: {:?}", kthread_call); 
+            debug!("Creating kthread_call: {:?}", kthread_call);
 
 
             // currently we're using the very bottom of the kstack for kthread arguments
@@ -352,7 +353,9 @@ impl TaskList {
     }
 
 
-    pub fn spawn_userspace(&mut self, user_function_ptr: usize, name: &str) -> Result<&Arc<RwLock<Task>>, &str> {
+    /// Spawns a new  userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
+    /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
+    pub fn spawn_userspace(&mut self, module: &ModuleArea, name: Option<&str>) -> Result<&Arc<RwLock<Task>>, &str> {
 
         ::interrupts::disable_interrupts();
 
@@ -367,13 +370,25 @@ impl TaskList {
         let locked_new_task = self.new_task().expect("couldn't create task in spawn_userspace()!");
         {
             let mut new_task = locked_new_task.write();
-            new_task.set_name(String::from(name));
-            
+            new_task.set_name(String::from(
+                match name {
+                    Some(x) => x,
+                    None => module.name,
+                }
+            ));
+
+            // create a new address space for the userspace task
+            // memory::new_address_space()
+
+
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
             // for now, just use the same address space because we're creating a new kernel thread
-            new_task.arch_state.set_page_table(curr_pgtbl); 
+            new_task.arch_state.set_page_table(curr_pgtbl);
 
+
+            // map the userspace module into our new address space
+            // TODO: we need access to this process's active page table
 
             // create and set up a new 16KB stack for both kernel and userspace
             let mut ustack = vec![0; 16384].into_boxed_slice(); // `ustack` is the bottom of the ustack
@@ -393,7 +408,7 @@ impl TaskList {
             unsafe {
                 let ustack_top = (ustack.as_ptr() as usize) + ustack_offset;
                 new_task.ustack = Some(ustack);
-                new_task.arch_state.jump_to_userspace(ustack_top, user_function_ptr);
+                new_task.arch_state.jump_to_userspace(ustack_top, 0); FIXME THIS IS DEF WRONG 
             }
 
             // not quite ready for this one to be scheduled in by our context_switch function
@@ -416,7 +431,7 @@ impl TaskList {
     /// - `id`: the TaskId to be removed.
     ///
     /// ## Returns
-    /// An Option with a reference counter for the removed Task. 
+    /// An Option with a reference counter for the removed Task.
     pub fn remove(&mut self, id: TaskId) -> Option<Arc<RwLock<Task>>> {
         self.list.remove(&id)
     }
@@ -425,9 +440,9 @@ impl TaskList {
 
 
 
-/// the main task list, a singleton that is hidden 
+/// the main task list, a singleton that is hidden
 /// and should only be accessed using the `get_tasklist()` function
-/* private*/ static TASK_LIST: Once<RwLockIrqSafe<TaskList>> = Once::new(); 
+/* private*/ static TASK_LIST: Once<RwLockIrqSafe<TaskList>> = Once::new();
 
 // the max number of tasks
 const MAX_NR_TASKS: usize = usize::max_value() - 1;
@@ -441,7 +456,7 @@ const MAX_NR_TASKS: usize = usize::max_value() - 1;
 // }
 
 
-/* 
+/*
 
 fn init_tasklist() -> RwLockIrqSafe<TaskList> {
     RwLockIrqSafe::new(TaskList::new())
@@ -449,7 +464,7 @@ fn init_tasklist() -> RwLockIrqSafe<TaskList> {
 
 /// get a locked, immutable reference to the global `TaskList`.
 /// Returns a `RwLockIrqSafeReadGuard` containing the `TaskList`.
-/// to modify the task list, call `get_tasklist_mut()` instead of this. 
+/// to modify the task list, call `get_tasklist_mut()` instead of this.
 pub fn get_tasklist() -> RwLockIrqSafeReadGuard<'static, TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
@@ -473,13 +488,13 @@ pub fn get_tasklist_mut() -> RwLockIrqSafeWriteGuard<'static, TaskList> {
 /// get a reference to the global `TaskList`.
 /// Returns a `RwLockIrqSafe` containing the `TaskList`.
 /// to modify the task list, call `.write()` on the returned value.
-/// To read the task list, call `.read()` on the returned value. 
+/// To read the task list, call `.read()` on the returned value.
 pub fn get_tasklist() -> &'static RwLockIrqSafe<TaskList> {
     // the first time this is called, the tasklist will be inited
     // on future invocations, that inited task list is simply returned
-    TASK_LIST.call_once( || { 
+    TASK_LIST.call_once( || {
         RwLockIrqSafe::new(TaskList::new())
-    }) 
+    })
 }
 
 /// this does not return
@@ -500,7 +515,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
     let kthread_call: Box<KthreadCall<A, R>> = unsafe {
-        Box::from_raw(kthread_call_stack_ptr) 
+        Box::from_raw(kthread_call_stack_ptr)
     };
     let kthread_call_val: KthreadCall<A, R> = *kthread_call;
 
@@ -517,7 +532,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     info!("about to call kthread func, interrupts are {}", ::interrupts::interrupts_enabled());
 
     // actually invoke the function spawned in this kernel thread
-    let exit_status = func(*arg); 
+    let exit_status = func(*arg);
 
 
     // cleanup current thread: put it into non-runnable mode, save exit status
@@ -525,13 +540,13 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         let tasklist: RwLockIrqSafeReadGuard<_> = get_tasklist().read();
         tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
     }
-    
+
     // {
     //     let tasklist = get_tasklist().read();
     //     let curtask = tasklist.get_current().unwrap().write();
     //     debug!("kthread_wrapper[1.5]: curtask {:?} runstate = {:?}", curtask.id, curtask.runstate);
     // }
-    
+
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
 
@@ -545,7 +560,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 
 pub fn userspace_function() -> ! {
-    
+
     unsafe {
         asm!("mov r13, $0" : : "r"(0xDEADBEEF as usize) : "memory" : "intel", "volatile");
         asm!("mov r14, $0" : : "r"(0xBEEFDEAD as usize) : "memory" : "intel", "volatile");
@@ -558,7 +573,7 @@ pub fn userspace_function() -> ! {
 }
 
 
-fn kstack_placeholder(_: u64) -> Option<u64> { 
+fn kstack_placeholder(_: u64) -> Option<u64> {
     println_unsafe!("!!! kstack_placeholder !!!");
     loop { }
     None
