@@ -64,6 +64,7 @@ use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
+use drivers::pci;
 
 
 
@@ -182,6 +183,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	
 	//interrupts::enable_interrupts(); //apparently this line is unecessary
 	println!("enabled interrupts!");
+
+    println!("PCI configuration value: {}",pci::pciConfigRead(0,0,0,0));
+    println!("Value from ATA identification function: {}", pci::ATADriveExists(0xA0));
+    println!("{} is value", pci::pio_read(1));
 
     // create a second task to test context switching
     {

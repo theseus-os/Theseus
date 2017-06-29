@@ -13,6 +13,7 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
+use drivers::pci;
 use arch;
 use CONFIG::*;
 
@@ -54,7 +55,7 @@ lazy_static! {
         // missing: 0x0c stack segment exception
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
-        // reserved: 0x0f vector 15
+        // reserved: 0x0f vector 15  
         // missing: 0x10 floating point exception
         // missing: 0x11 alignment check exception
         // missing: 0x12 machine check exception
@@ -78,6 +79,7 @@ lazy_static! {
         
         //if interrupt is correct, will send to rtc_handler function rtc-test
         idt[0x28].set_handler_fn(rtc_handler);//int 112?
+        idt[0x2e].set_handler_fn(primary_ata);
 
 
         // TODO: add more 
@@ -257,6 +259,17 @@ extern "x86-interrupt" fn rtc_handler(stack_frame:&mut ExceptionStackFrame ) {
 
 }
 
+//0x2e
+extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
+    unsafe { PIC.notify_end_of_interrupt(0x2e); }
+
+    //let placeholder = 2;
+    
+    pci::handle_primary_interrupt();
+
+    
+
+}
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 	error!("caught unhandled interrupt: {:#?}", stack_frame);

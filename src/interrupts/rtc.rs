@@ -1,8 +1,6 @@
 use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
-use interrupts::rtc;
-use interrupts::tsc;
 use util;
 use CONFIG::*;
 use spin::Mutex;
