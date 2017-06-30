@@ -11,7 +11,7 @@ pub use self::entry::*;
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
 use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
-use core::ops::{Add, Deref, DerefMut};
+use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2::BootInformation;
 
 mod entry;
@@ -21,6 +21,7 @@ mod mapper;
 
 const ENTRY_COUNT: usize = 512;
 const RECURSIVE_INDEX: usize = 510;
+const MAX_PAGE_NUMBER: usize = 0xFFFF_FFFF_FFFF_FFFF / PAGE_SIZE;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
@@ -77,9 +78,36 @@ impl Add<usize> for Page {
     type Output = Page;
 
     fn add(self, rhs: usize) -> Page {
+        assert!(self.number < MAX_PAGE_NUMBER, "Page addition error, cannot go above MAX_PAGE_NUMBER 0x000FFFFFFFFFFFFF!");
         Page { number: self.number + rhs }
     }
 }
+
+impl AddAssign<usize> for Page {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = Page {
+            number: self.number + rhs,
+        };
+    }
+}
+
+impl Sub<usize> for Page {
+    type Output = Page;
+
+    fn sub(self, rhs: usize) -> Page {
+        assert!(self.number > 0, "Page subtraction error, cannot go below zero!");
+        Page { number: self.number - rhs }
+    }
+}
+
+impl SubAssign<usize> for Page {
+    fn sub_assign(&mut self, rhs: usize) {
+        *self = Page {
+            number: self.number - rhs,
+        };
+    }
+}
+
 
 #[derive(Clone)]
 pub struct PageIter {
@@ -203,19 +231,20 @@ impl InactivePageTable {
 
 
 
-pub fn new_address_space<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
-    where A: FrameAllocator
-{
+// pub fn new_address_space<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
+//     where A: FrameAllocator
+// {
     
-}
+// }
 
 
 
 pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
     where A: FrameAllocator
 {
-     let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
-    //let mut temporary_page = TemporaryPage::new(Page::containing_address(0xFFFF_FFFF_FFFF_FFF0), allocator);
+    //  let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
+    // the temporary page uses the very last address of the kernel heap, so it'll pretty much never collide
+    let mut temporary_page = TemporaryPage::new(allocator);
 
     let mut active_table: ActivePageTable = unsafe { ActivePageTable::new() };
     let mut new_table: InactivePageTable = {

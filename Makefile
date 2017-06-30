@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly (75b056812 2017-05-15)
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly
 RUSTC_OUTPUT=$(shell rustc --version)
 
 
@@ -36,7 +36,9 @@ QEMU_MEMORY ?= -m 10G
 .PHONY: all clean run debug iso userspace cargo gdb
 
 test_rustc: 	
-ifneq (${RUSTC_OUTPUT}, ${RUSTC_CURRENT_SUPPORTED_VERSION})
+ifneq (, $(findstring ${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT}))
+	@echo '   Found proper rust compiler version, proceeding with build...'
+else
 	# @echo '   Error: must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)"!!\n\n'
 	$(error must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)")
 	# @exit 1

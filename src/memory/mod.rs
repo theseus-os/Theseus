@@ -14,7 +14,8 @@ pub use self::stack_allocator::Stack;
 
 use self::paging::PhysicalAddress;
 use multiboot2::BootInformation;
-use spin::Once;
+use spin::{Once, Mutex};
+use core::ops::DerefMut;
 
 mod area_frame_allocator;
 mod paging;
@@ -30,6 +31,12 @@ pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
 
 const MAX_MODULES: usize = 32;
 const MAX_PHYSICAL_MEM_AREAS: usize = 32;
+
+
+/// The one and only frame allocator
+static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
+
+
 
 /// An area of physical memory. 
 #[derive(Copy, Clone, Debug, Default)]
@@ -80,6 +87,11 @@ pub struct ModuleArea {
     pub mod_end: u32,
     pub name: &'static str,
 }
+
+
+
+
+
 
 
 /// The set of physical memory areas as provided by the bootloader.
@@ -164,14 +176,18 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     });
 
 
+    // init the frame allocator
+    let frame_allocator_mutex: &Mutex<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
+        Mutex::new( AreaFrameAllocator::new(kernel_phys_start as usize,
+                                kernel_phys_end as usize,
+                                boot_info.start_address(),
+                                boot_info.end_address(),
+                                PhysicalMemoryAreaIter::new()
+                    )
+        )
+    });
 
-    let mut frame_allocator = AreaFrameAllocator::new(kernel_phys_start as usize,
-                                                      kernel_phys_end as usize,
-                                                      boot_info.start_address(),
-                                                      boot_info.end_address(),
-                                                      PhysicalMemoryAreaIter::new());
-
-    let mut active_table = paging::remap_the_kernel(&mut frame_allocator, boot_info);
+    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info);
 
     use self::paging::Page;
     use hole_list_allocator::{HEAP_START, HEAP_SIZE};
@@ -181,7 +197,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     // map the entire heap to randomly chosen physical Frames
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, paging::WRITABLE, &mut frame_allocator);
+        active_table.map(page, paging::WRITABLE, frame_allocator_mutex.lock().deref_mut());
     }
 
     let stack_allocator = {
@@ -193,7 +209,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
 
     MemoryController {
         active_table: active_table,
-        frame_allocator: frame_allocator,
+        frame_allocator_mutex: FRAME_ALLOCATOR.try().expect("FRAME_ALLOCATOR wasn't yet initialized when passing to MemoryController"),
         stack_allocator: stack_allocator,
     }
 }
@@ -213,16 +229,16 @@ pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
 
 pub struct MemoryController {
     active_table: paging::ActivePageTable,
-    frame_allocator: AreaFrameAllocator,
+    frame_allocator_mutex: &'static Mutex<AreaFrameAllocator>,
     stack_allocator: stack_allocator::StackAllocator,
 }
 
 impl MemoryController {
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         let &mut MemoryController { ref mut active_table,
-                                    ref mut frame_allocator,
+                                    ref mut frame_allocator_mutex,
                                     ref mut stack_allocator } = self;
-        stack_allocator.alloc_stack(active_table, frame_allocator, size_in_pages)
+        stack_allocator.alloc_stack(active_table, frame_allocator_mutex.lock().deref_mut(), size_in_pages)
     }
 }
 
