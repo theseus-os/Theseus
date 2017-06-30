@@ -22,7 +22,7 @@
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
-#![feature(drop_types_in_const)] // unsure about this, prompted to add by rust compiler for Once<>
+#![feature(drop_types_in_const)] 
 #![no_std]
 
 
