@@ -67,7 +67,7 @@ run: $(iso)
 	-s  -serial stdio  -no-shutdown -cpu Haswell
 
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int  -no-reboot -no-shutdown
 
 gdb:
 	@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"

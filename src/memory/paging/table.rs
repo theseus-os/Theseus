@@ -19,6 +19,9 @@ use core::marker::PhantomData;
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
 // pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _; // for the 511th (last) entry 
+
+
+// this one is correct when just mapping pml4t[510] to pml4t[0]
 pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
                                           // ^ 776 means that we're always looking at the 510 entry recursively
 
