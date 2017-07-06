@@ -21,7 +21,8 @@ impl TemporaryPage {
         where A: FrameAllocator
     {
         TemporaryPage {
-            page: Page::containing_address(0xFFFF_FF0F_FFFF_FFFF), // the top of the kernel heap region
+            // NOTE: for some reason, the address 0xFFFF_FF0F_FFFF_FFFF does not work here!
+            page: Page::containing_address(0xFFFF_FFFF_FFFF_FFFF), // the top of the address space
             allocator: TinyAllocator::new(allocator),
         }
     }
