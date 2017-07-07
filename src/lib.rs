@@ -184,10 +184,10 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	//interrupts::enable_interrupts(); //apparently this line is unecessary
 	println!("enabled interrupts!");
 
-    println!("PCI configuration value: {}",pci::pciConfigRead(0,0,0,0));
+    //println!("PCI configuration value: {}",pci::pciConfigRead(0,0,0,0));
     println!("Value from ATA identification function: {}", pci::ATADriveExists(0xA0));
-    println!("{} is value", pci::pio_read(1));
-
+    println!("{} is value", pci::pio_read(0));
+    /*
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
@@ -201,7 +201,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
         { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
     }
-
+    */
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
     schedule!();
