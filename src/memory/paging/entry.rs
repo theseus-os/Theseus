@@ -40,6 +40,7 @@ impl Entry {
 }
 
 bitflags! {
+    #[derive(Default)]
     pub flags EntryFlags: u64 {
         const PRESENT =         1 << 0,
         const WRITABLE =        1 << 1,

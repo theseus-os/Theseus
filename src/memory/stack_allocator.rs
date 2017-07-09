@@ -1,5 +1,5 @@
 use memory::paging::{self, Page, PageIter, ActivePageTable};
-use memory::{PAGE_SIZE, FrameAllocator};
+use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
 
 pub struct StackAllocator {
     range: PageIter,
@@ -12,11 +12,12 @@ impl StackAllocator {
 }
 
 impl StackAllocator {
+    /// Returns the newly-allocated stack and a VMA to represent its mapping
     pub fn alloc_stack<FA: FrameAllocator>(&mut self,
                                            active_table: &mut ActivePageTable,
                                            frame_allocator: &mut FA,
                                            size_in_pages: usize)
-                                           -> Option<Stack> {
+                                           -> Option<(Stack, VirtualMemoryArea)> {
         if size_in_pages == 0 {
             return None; /* a zero sized stack makes no sense */
         }
@@ -40,16 +41,24 @@ impl StackAllocator {
                 // success! write back updated range
                 self.range = range;
 
+                let flags = paging::WRITABLE;
+
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
                 for page in Page::range_inclusive(start, end) {
-                    active_table.map(page, paging::WRITABLE, frame_allocator);
+                    active_table.map(page, flags, frame_allocator);
                 }
+
+                let stack_vma = VirtualMemoryArea {
+                    start: start.start_address(),
+                    size: end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
+                    flags: flags, 
+                };
 
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some(Stack::new(top_of_stack, start.start_address()))
+                Some( (Stack::new(top_of_stack, start.start_address()), stack_vma) )
             }
             _ => {
                 error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);

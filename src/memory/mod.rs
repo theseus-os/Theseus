@@ -8,18 +8,18 @@
 // except according to those terms.
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
-pub use self::paging::ActivePageTable;
-pub use self::paging::remap_the_kernel;
+pub use self::paging::{Page, PageIter, PageTable, PhysicalAddress, VirtualAddress, EntryFlags};
 pub use self::stack_allocator::Stack;
-
-use self::paging::PhysicalAddress;
-use multiboot2::BootInformation;
-use spin::{Once, Mutex};
-use core::ops::DerefMut;
 
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
+
+use multiboot2::BootInformation;
+use spin::{Once, Mutex};
+use core::ops::DerefMut;
+use collections::Vec;
+
 
 pub const PAGE_SIZE: usize = 4096;
 
@@ -29,8 +29,7 @@ pub const PAGE_SIZE: usize = 4096;
 pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
 
 
-const MAX_MODULES: usize = 32;
-const MAX_PHYSICAL_MEM_AREAS: usize = 32;
+const MAX_MEMORY_AREAS: usize = 32;
 
 
 /// The one and only frame allocator
@@ -81,6 +80,8 @@ impl Iterator for PhysicalMemoryAreaIter {
     }
 }
 
+/// An area of physical memory that contains a userspace module
+/// as provided by the multiboot2-compliant bootloader
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ModuleArea {
     pub mod_start: u32,
@@ -89,27 +90,106 @@ pub struct ModuleArea {
 }
 
 
+/// A region of virtual memory that is mapped into a `Task`'s address space
+#[derive(Debug, Default, Clone, Copy)]
+pub struct VirtualMemoryArea {
+    start: VirtualAddress,
+    size: usize,
+    flags: EntryFlags,
+}
 
 
+impl VirtualMemoryArea {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags) -> Self {
+        VirtualMemoryArea {
+            start: start,
+            size: size,
+            flags: flags,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
+    /// Get an iterator that covers all the pages in this VirtualMemoryArea
+    pub fn pages(&self) -> PageIter {
+        let start_page = Page::containing_address(self.start);
+        let end_page = Page::containing_address((self.start as usize + self.size - 1) as VirtualAddress);
+        Page::range_inclusive(start_page, end_page)
+    }
+
+    // /// Convert this memory zone to a shared one.
+    // pub fn to_shared(self) -> SharedMemory {
+    //     SharedMemory::Owned(Arc::new(Mutex::new(self)))
+    // }
+
+    // /// Map a new space on the virtual memory for this memory zone.
+    // fn map(&mut self, clean: bool) {
+    //     // create a new active page table
+    //     let mut active_table = unsafe { ActivePageTable::new() };
+
+    //     // get memory controller
+    //     if let Some(ref mut memory_controller) = *::MEMORY_CONTROLLER.lock() {
+    //         for page in self.pages() {
+    //             memory_controller.map(&mut active_table, page, self.flags);
+    //         }
+    //     } else {
+    //         panic!("Memory controller required");
+    //     }
+    // }
+
+    // /// Remap a memory area to another region
+    // pub fn remap(&mut self, new_flags: EntryFlags) {
+    //     // create a new page table
+    //     let mut active_table = unsafe { ActivePageTable::new() };
+
+    //     // get memory controller
+    //     if let Some(ref mut memory_controller) = *::MEMORY_CONTROLLER.lock() {
+    //         // remap all pages
+    //         for page in self.pages() {
+    //             memory_controller.remap(&mut active_table, page, new_flags);
+    //         }
+
+    //         // flush TLB
+    //         memory_controller.flush_all();
+
+    //         self.flags = new_flags;
+    //     } else {
+    //         panic!("Memory controller required");
+    //     }
+    // }
+
+}
 
 
 
 /// The set of physical memory areas as provided by the bootloader.
 /// It cannot be a Vec or other collection because those allocators aren't available yet
 /// we use a max size of 32 because that's the limit of Rust's default array initializers
-static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_PHYSICAL_MEM_AREAS]> = Once::new();
+static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]> = Once::new();
 
 /// The set of modules loaded by the bootloader
 /// we use a max size of 32 because that's the limit of Rust's default array initializers
-static MODULE_AREAS: Once<[ModuleArea; MAX_MODULES]> = Once::new();
+static MODULE_AREAS: Once<[ModuleArea; MAX_MEMORY_AREAS]> = Once::new();
 
 
-pub fn init(boot_info: &BootInformation) -> MemoryController {
+/// initializes the virtual memory management system and returns the MemoryController singleton instance.
+/// Also returns a list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero)
+pub fn init(boot_info: &BootInformation) -> (MemoryController, Vec<VirtualMemoryArea>) {
     assert_has_not_been_called!("memory::init must be called only once");
 
     // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
-        let mut modules: [ModuleArea; MAX_MODULES] = Default::default();
+        let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
         for (i, m) in boot_info.module_tags().enumerate() {
             println_unsafe!("Module: {:?}", m);
             modules[i] = ModuleArea {
@@ -152,7 +232,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     
     // copy the list of physical memory areas from multiboot
     USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
-        let mut areas: [PhysicalMemoryArea; MAX_PHYSICAL_MEM_AREAS] = Default::default();
+        let mut areas: [PhysicalMemoryArea; MAX_MEMORY_AREAS] = Default::default();
         for (index, area) in memory_map_tag.memory_areas().enumerate() {
             println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
             
@@ -187,19 +267,27 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         )
     });
 
-    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info);
+    let mut kernel_vmas: [VirtualMemoryArea; MAX_MEMORY_AREAS] = Default::default();
+    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas);
 
     use self::paging::Page;
     use hole_list_allocator::{HEAP_START, HEAP_SIZE};
 
+    // map the entire heap to randomly chosen physical Frames
     let heap_start_page = Page::containing_address(HEAP_START);
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
-
-    // map the entire heap to randomly chosen physical Frames
+    let heap_flags = paging::WRITABLE;
+    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(HEAP_START, HEAP_SIZE, heap_flags);
+    
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, paging::WRITABLE, frame_allocator_mutex.lock().deref_mut());
+        active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
     }
 
+    // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
+    let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
+    task_zero_vmas.push(heap_vma);
+
+    // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap and grow downwards towards it!
     let stack_allocator = {
         let stack_alloc_start = heap_end_page + 1; // extra stack pages start right after the heap ends
         let stack_alloc_end = stack_alloc_start + 100; // 100 pages in size
@@ -207,15 +295,19 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
 
-    MemoryController {
-        active_table: active_table,
-        frame_allocator_mutex: FRAME_ALLOCATOR.try().expect("FRAME_ALLOCATOR wasn't yet initialized when passing to MemoryController"),
-        stack_allocator: stack_allocator,
-    }
+    // return a tuple of the memory controller and the associated vmas that were created for what will be task zero
+    (
+        MemoryController {
+            active_table: active_table,
+            frame_allocator_mutex: FRAME_ALLOCATOR.try().expect("FRAME_ALLOCATOR wasn't yet initialized when passing to MemoryController"),
+            stack_allocator: stack_allocator,
+        },
+        task_zero_vmas
+    )
 }
 
 
-/// returns the `ModuleArea` corresponding 
+/// returns the `ModuleArea` corresponding to the given `index`
 pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
     let modules = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
     if index < modules.len() {
@@ -226,15 +318,20 @@ pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
     }
 }
 
-
+/// A singleton container that holds all memory management information and interfaces 
 pub struct MemoryController {
+    /// the singleton owner of recursively mapped P4 page table, for the currently running Task
     active_table: paging::ActivePageTable,
+    /// the singleton frame allocator
     frame_allocator_mutex: &'static Mutex<AreaFrameAllocator>,
+    /// the singleton stack allocator, which was given a number of Pages from which to allocate.
+    /// could potentially merge the stack allocator into the frame allocator
     stack_allocator: stack_allocator::StackAllocator,
 }
 
 impl MemoryController {
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+
+    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<(Stack, VirtualMemoryArea)> {
         let &mut MemoryController { ref mut active_table,
                                     ref mut frame_allocator_mutex,
                                     ref mut stack_allocator } = self;

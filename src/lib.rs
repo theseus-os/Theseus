@@ -153,18 +153,21 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    // set up stack guard page and map the heap pages
-    let mut memory_controller = memory::init(boot_info);
+    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
+    let (mut memory_controller, mut task_zero_vmas) = memory::init(boot_info);
 
     
     // initialize our interrupts and IDT
-    interrupts::init(&mut memory_controller);
+    let (double_fault_stack, double_fault_stack_vma) = memory_controller.alloc_stack(1).expect("could not allocate double fault stack");
+    interrupts::init(&mut memory_controller, double_fault_stack.top());
+    task_zero_vmas.push(double_fault_stack_vma);
+
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_first_task();
+        tasklist_mut.init_first_task(task_zero_vmas);
     }
 
     // initialize the kernel console

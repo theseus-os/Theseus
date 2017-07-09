@@ -77,8 +77,7 @@ $(iso): $(kernel) userspace $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
 	@cp $(grub_cfg) build/isofiles/boot/grub
-#@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
-	grub-mkrescue -v -o $(iso) build/isofiles
+	@grub-mkrescue -v -o $(iso) build/isofiles  # 2> /dev/null
 	
 
 

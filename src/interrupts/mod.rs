@@ -139,7 +139,7 @@ static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
 
 
-pub fn init(memory_controller: &mut MemoryController) {
+pub fn init(memory_controller: &mut MemoryController, double_fault_stack_top: usize) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
     
@@ -148,12 +148,11 @@ pub fn init(memory_controller: &mut MemoryController) {
     use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
 
-    let double_fault_stack =
-        memory_controller.alloc_stack(1).expect("could not allocate double fault stack");
+    
 
     let tss = TSS.call_once(|| {
                                 let mut tss = TaskStateSegment::new();
-                                tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack.top());
+                                tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top);
                                 tss
                             });
 
