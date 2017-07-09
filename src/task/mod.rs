@@ -1,7 +1,7 @@
 
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
-use collections::BTreeMap;
+use collections::{BTreeMap, Vec};
 use collections::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
@@ -9,7 +9,7 @@ use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
 use core::fmt;
-use memory::ModuleArea;
+use memory::{ModuleArea, VirtualMemoryArea, PageTable};
 
 #[macro_use] pub mod scheduler;
 
@@ -57,6 +57,8 @@ impl<A, R> KthreadCall<A, R> {
 }
 
 
+
+
 pub struct Task {
     /// the unique id of this Task, similar to Linux's pid.
     pub id: TaskId,
@@ -73,6 +75,10 @@ pub struct Task {
     pub kstack: Option<Box<[u8]>>,
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Box<[u8]>>,
+    /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
+    pub page_table: PageTable,
+    /// the list of virtual memory areas mapped currently in this Task's address space
+    pub vmas: Vec<VirtualMemoryArea>,
 }
 
 
@@ -88,6 +94,8 @@ impl Task {
             name: format!("task{}", task_id.into()),
             kstack: None,
             ustack: None,
+            page_table: PageTable::Uninitialized,
+            vmas: Vec::new(),
         }
     }
 
@@ -196,10 +204,12 @@ impl TaskList {
         }
     }
 
+    /// returns a shared reference to the current `Task`
     fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(&CURRENT_TASK.load(Ordering::SeqCst))
     }
 
+    /// returns a shared reference to the `Task` specified by the given `task_id`
     pub fn get_task(&self, task_id: &TaskId) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(task_id)
     }
@@ -249,7 +259,7 @@ impl TaskList {
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
     /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
-    pub fn init_first_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
+    pub fn init_first_task(&mut self, task_zero_vmas: Vec<VirtualMemoryArea>) -> Result<&Arc<RwLock<Task>>, &str> {
         assert_has_not_been_called!("init_first_task was already called once!");
 
         let id_zero = TaskId::from(0);
@@ -280,7 +290,7 @@ impl TaskList {
         }
     }
 
-
+    
 
     /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
     /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
@@ -358,6 +368,14 @@ impl TaskList {
     pub fn spawn_userspace(&mut self, module: &ModuleArea, name: Option<&str>) -> Result<&Arc<RwLock<Task>>, &str> {
 
         ::interrupts::disable_interrupts();
+
+
+        // TODO: create a new InactivePageTable to represent the new process's address space. 
+        //Then, an enum of either InactivePageTable/ActivePageTable will be added to the Task struct. 
+        //We'll need to use the table switch method to convert the task's page_table enum between Active/Inactive
+        //     as such:     current_task_inactive_table = current_task_active_table.switch(next_task_inactive_table) 
+
+
 
          // right now we only have one page table (memory area) shared between the kernel,
         // so just get the current page table value and set the new task's value to the same thing
@@ -447,13 +465,6 @@ impl TaskList {
 // the max number of tasks
 const MAX_NR_TASKS: usize = usize::max_value() - 1;
 
-
-// /// a convenience function to get the current task from anywhere,
-// /// like Linux's current() macro
-// #[inline(always)]
-// pub fn get_current_task() -> &Arc<RwLock<Task>> {
-//     get_tasklist().read().get_current().expect("failed to get_current_task()")
-// }
 
 
 /*

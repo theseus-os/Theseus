@@ -16,24 +16,22 @@
 #![no_std]
 
 
-extern crate irq_safety; // extern crate spin;
+extern crate irq_safety; 
 extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
 
-use irq_safety::MutexIrqSafe; // use spin::Mutex;
+use irq_safety::MutexIrqSafe; 
 use linked_list_allocator::Heap;
 
 
 
 
-// pub const HEAP_START: usize = 0o_000_001_000_000_0000;
 pub const HEAP_START: usize = 0xFFFF_FF0F_0000_0000; // higher-half heap 
 pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 
 
 lazy_static! {
-    // static ref HEAP: Mutex<Heap> = Mutex::new(unsafe {
     static ref HEAP: MutexIrqSafe<Heap> = MutexIrqSafe::new(unsafe {
         Heap::new(HEAP_START, HEAP_SIZE)
     });
