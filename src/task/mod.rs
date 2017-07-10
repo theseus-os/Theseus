@@ -1,5 +1,5 @@
 
-use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use spin::{Once, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use collections::{BTreeMap, Vec};
 use collections::string::String;
@@ -75,8 +75,9 @@ pub struct Task {
     pub kstack: Option<Box<[u8]>>,
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Box<[u8]>>,
-    /// memory management details: page tables, mappings, allocators, etc
-    pub mmi: Option<MemoryManagementInfo>, 
+    /// memory management details: page tables, mappings, allocators, etc.
+    /// Wrapped in an Arc & Mutex because it's shared between other tasks in the same address space
+    pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
 }
 
 
@@ -106,7 +107,7 @@ impl Task {
         self.runstate = rs;
     }
 
-    /// returns true if this Task is currently runnig on any cpu.
+    /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
         (self.running_on_cpu >= 0)
     }
@@ -263,7 +264,7 @@ impl TaskList {
         let mut task_zero = Task::new(id_zero);
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
-        task_zero.mmi = Some(task_zero_mmi);
+        task_zero.mmi = Some(Arc::new(Mutex::new(task_zero_mmi)));
 
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
         // but we still have to initialize its page table to the current value
@@ -289,18 +290,20 @@ impl TaskList {
 
     
 
-    /// Spawn a new task that enters the given function `func` and passes it the arguments `arg`.
+    /// Spawns a new kernel task with the same address space as the current task. 
+    /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
     /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
     pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(&mut self,
             func: fn(arg: A) -> R, arg: A, thread_name: &str)
             -> Result<&Arc<RwLock<Task>>, &str> {
 
-        // right now we only have one page table (memory area) shared between the kernel,
-        // so just get the current page table value and set the new task's value to the same thing
-        let mut curr_pgtbl: usize = 0;
+        // get the current tasks's memory info
+        let mut curr_pgtbl: usize;
+        let mut curr_mmi_cloned: Option<Arc<Mutex<MemoryManagementInfo>>>;
         {
-            curr_pgtbl = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_pgtbl")
-                        .read().arch_state.get_page_table();
+            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_pgtbl").read();
+            curr_pgtbl = curr_task.arch_state.get_page_table();
+            curr_mmi_cloned = curr_task.mmi.clone();
         }
 
         let locked_new_task = self.new_task().expect("couldn't create task in spawn_kthread()!");
@@ -308,8 +311,9 @@ impl TaskList {
             let mut new_task = locked_new_task.write();
             new_task.set_name(String::from(thread_name));
 
-            // this line would be useful if we wish to create an entirely new address space:
-            // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
+            // the new kernel thread uses the same address space as the current task
+            new_task.mmi = curr_mmi_cloned;
+
             // for now, just use the same address space because we're creating a new kernel thread
             new_task.arch_state.set_page_table(curr_pgtbl);
 

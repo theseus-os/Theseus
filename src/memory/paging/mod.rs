@@ -315,7 +315,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas:
         let vga_buffer_flags = WRITABLE;
         vmas[index] = VirtualMemoryArea {
                 start: vga_buffer_virt_addr,
-                size: 4096,
+                size: PAGE_SIZE,
                 flags: vga_buffer_flags,
         };
         let vga_buffer_frame = Frame::containing_address(0xb8000);
