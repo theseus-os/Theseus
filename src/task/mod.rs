@@ -9,7 +9,7 @@ use arch::{pause, ArchTaskState, get_page_table_register};
 use alloc::boxed::Box;
 use core::mem;
 use core::fmt;
-use memory::{ModuleArea, VirtualMemoryArea, PageTable};
+use memory::{ModuleArea, MemoryManagementInfo};
 
 #[macro_use] pub mod scheduler;
 
@@ -75,10 +75,8 @@ pub struct Task {
     pub kstack: Option<Box<[u8]>>,
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Box<[u8]>>,
-    /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
-    pub page_table: PageTable,
-    /// the list of virtual memory areas mapped currently in this Task's address space
-    pub vmas: Vec<VirtualMemoryArea>,
+    /// memory management details: page tables, mappings, allocators, etc
+    pub mmi: Option<MemoryManagementInfo>, 
 }
 
 
@@ -94,8 +92,7 @@ impl Task {
             name: format!("task{}", task_id.into()),
             kstack: None,
             ustack: None,
-            page_table: PageTable::Uninitialized,
-            vmas: Vec::new(),
+            mmi: None,
         }
     }
 
@@ -259,27 +256,27 @@ impl TaskList {
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
     /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
-    pub fn init_first_task(&mut self, task_zero_vmas: Vec<VirtualMemoryArea>) -> Result<&Arc<RwLock<Task>>, &str> {
-        assert_has_not_been_called!("init_first_task was already called once!");
+    pub fn init_task_zero(&mut self, task_zero_mmi: MemoryManagementInfo) -> Result<&Arc<RwLock<Task>>, &str> {
+        assert_has_not_been_called!("init_task_zero was already called once!");
 
         let id_zero = TaskId::from(0);
-
         let mut task_zero = Task::new(id_zero);
-        CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
+        task_zero.mmi = Some(task_zero_mmi);
 
         // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
         // but we still have to initialize its page table to the current value
         task_zero.arch_state.set_page_table(get_page_table_register());
 
+        CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
 
         // insert the new context into the list
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
             None => {
                 // None indicates that the insertion didn't overwrite anything, which is what we want
                 println_unsafe!("Successfully created initial task0");
-                let tz = self.list.get(&id_zero).expect("init_first_task(): couldn't find task_zero in tasklist");
+                let tz = self.list.get(&id_zero).expect("init_task_zero(): couldn't find task_zero in tasklist");
                 scheduler::add_task_to_runqueue(tz.clone());
                 Ok(tz)
             }
