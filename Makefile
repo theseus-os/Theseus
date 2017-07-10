@@ -43,7 +43,7 @@ run: $(iso)
 	#@qemu-system-x86_64  -cdrom $(iso) -s  -serial stdio  -no-shutdown  -d int
 	#drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 	#@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-shutdown -cpu Haswell -hda README.md
-	@qemu-img resize random_data2.img 10K
+	@qemu-img resize random_data2.img 100K
 	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) \
 	-drive format=raw,file=random_data2.img,if=none,id=mydisk \
 	-device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 \
