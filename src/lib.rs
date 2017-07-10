@@ -188,7 +188,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     //println!("PCI configuration value: {}",pci::pciConfigRead(0,0,0,0));
     println!("Value from ATA identification function: {}", pci::ATADriveExists(0xA0));
-    println!("{} is value", pci::pio_read(0));
+    println!("{} is value", pci::pio_read(0)[0]);
     /*
     // create a second task to test context switching
     {

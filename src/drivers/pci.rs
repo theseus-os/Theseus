@@ -51,17 +51,25 @@ pub fn pciConfigRead(bus: u32, slot: u32, func: u32, offset: u32)->u16{
 
 }
 
-pub fn read_primary_data_port()->u16{
-    while((COMMAND_IO.lock().read()>>3)%2 ==0){trace!("stuck in read_primary_data_port function")}
-    PRIMARY_DATA_PORT.lock().read()
+//reads two bytes from the 
+pub fn read_primary_data_port()-> [u16; 256]{
+    let mut arr: [u16; 256] = [0;256];
+	
+	for word in 0..256{
+    	while((COMMAND_IO.lock().read()>>3)%2 ==0){trace!("stuck in read_primary_data_port function")}
+		arr[word] = PRIMARY_DATA_PORT.lock().read();
+
+    }
+	
+    arr
 
 }
 
-//returns 0 if there is no ATA compatible device connected 
+//returns ATA identify information 
 pub fn ATADriveExists(drive:u8)-> AtaIdentifyData{
     
     let mut command_value: u8 = COMMAND_IO.lock().read();
-    let mut arr: [u16; 256] = [0; 256];
+    //let mut arr: [u16; 256] = [0; 256];
     //set port values for bus 0 to detect ATA device 
     unsafe{PRIMARY_BUS_IO.lock().write(drive);
            
@@ -87,50 +95,38 @@ pub fn ATADriveExists(drive:u8)-> AtaIdentifyData{
     command_value =(COMMAND_IO.lock().read());
     while ((command_value>>7)%2 != 0)  {
         //trace to debug and view value being received
-        trace!("{}: update-in-progress in disk drive", command_value);
+        trace!("{}: update-in-progress in disk drive COMMAND_IO bit 7 not cleared", command_value);
         command_value = (COMMAND_IO.lock().read());
     }
     
     
     //if LBAhi or LBAlo values at this point are nonzero, drive is not ATA compatible
     if LBAMID.lock().read() != 0 || LBAHI.lock().read() !=0 {
-        trace!("got stuck at LBA mid or hi");
-        //return LBAHI.lock().read() as u16;
+        trace!("mid or hi LBA not set to 0 when it should be");
     }
     
+	//waits for error bit or data ready bit to set
     command_value = COMMAND_IO.lock().read();
     while((command_value>>3)%2 ==0 && command_value%2 == 0){
-        trace!("{}",command_value);
-        trace!("{}", command_value>>7);
+        trace!("{} is bit 0 of COMMAND_IO which should be cleared, {} is bit 6 which should be set",command_value, command_value>>3);
         command_value = COMMAND_IO.lock().read();
     }
-    
-    
 
-	//was used to check against results from AtaIdentifyData struct
-	/*
-    let mut arr_sub: [u16; 10] = Default::default(); 
-    arr_sub.copy_from_slice(&arr[10..20]); 
+	if command_value%2 == 1{
+		let identify_data = AtaIdentifyData{..Default::default()};
+		return identify_data;
 
-    let mut arr_bytes: [u8; 20] = unsafe {::core::mem::transmute(arr_sub)};
-    flip_bytes(&mut arr_bytes);
-    trace!("{:?}", arr_bytes);
-	*/
+	}
     
 
-    
 
-	for word in 0..256{
-        arr[word] = read_primary_data_port();
-
-    }
-	let identify_data = AtaIdentifyData::new(arr); 
+	let identify_data = AtaIdentifyData::new(read_primary_data_port()); 
     identify_data 
     
 }
 
 //read from disk at address input 
-pub fn pio_read(lba:u32)->u16{
+pub fn pio_read(lba:u32)->[u16; 256]{
 
     //selects master drive(using 0xE0 value) in primary bus (by writing to PRIMARY_BUS_IO-port 0x1F6)
     let master_select: u8 = 0xE0 | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
@@ -151,18 +147,22 @@ pub fn pio_read(lba:u32)->u16{
     //just returning this during testing to make sure program compiles
     //return COMMAND_IO.lock().read()>>3
 	trace!("got to end of pio_read function");
+	
     read_primary_data_port()
 
 
 
 }
 
+//exists to handle interrupts from PCI
+//could be used later to replace polling system with interrupt system for reading and writing
 pub fn handle_primary_interrupt(){
-    trace!("Got IRQ 14!")
+    trace!("Got IRQ 14!");
 }
 
 
 //AtaIdentifyData struct and implemenations from Tifflin Kernel
+#[repr(C,packed)]
 pub struct AtaIdentifyData
 {
 	pub flags: u16,
@@ -174,13 +174,11 @@ pub struct AtaIdentifyData
 	/// Maximum number of blocks per transfer
 	pub sect_per_int: u16,
 	_unused3: u16,
-	//bit 1 shows if DMA is supported, bit 2 shows if LBA is supported
 	pub capabilities: [u16; 2],
 	_unused4: [u16; 2],
 	/// Bitset of translation fields (next five shorts)
 	pub valid_ext_data: u16,
 	_unused5: [u16; 5],
-	//pub sector_capacity: u16,
 	pub size_of_rw_multiple: u16,
 	/// LBA 28 sector count (if zero, use 48)
 	pub sector_count_28: u32,
@@ -193,7 +191,7 @@ pub struct AtaIdentifyData
 	_unused8: [u16; 9],
 	/// Number of words per logical sector
 	pub words_per_logical_sector: u32,
-	_unusedz: [u16; 256-119],
+	_unusedz: [u16; 257-119],
 }
 
 impl Default for AtaIdentifyData {
@@ -203,44 +201,29 @@ impl Default for AtaIdentifyData {
 	}
 
 }
+
+
 impl AtaIdentifyData{
 
-	//takes an array storing data from ATA IDENTIFY command and returns struct with the relevant information 
+	//takes an array storing data from ATA IDENTIFY command and returns struct with the relevant information
 	fn new(arr: [u16; 256])-> AtaIdentifyData{
 
-		//takes subarray containing ata serial number and flips each pair of bytes
-		let mut arr_sub_serial: [u16; 10] = Default::default(); 
-    	arr_sub_serial.copy_from_slice(&arr[10..20]); 
-    	let mut arr_bytes_serial: [u8; 20] = unsafe {::core::mem::transmute(arr_sub_serial)};
-		flip_bytes(&mut arr_bytes_serial);
-
-		//takes subarray containing firmware version and flips each pair of bytes
-		let mut arr_sub_firmware_ver: [u16; 4] = Default::default(); 
-    	arr_sub_firmware_ver.copy_from_slice(&arr[23..27]); 
-    	let mut arr_bytes_firmware_ver: [u8; 8] = unsafe {::core::mem::transmute(arr_sub_firmware_ver)};
-		flip_bytes(&mut arr_bytes_firmware_ver);
-		
-		//takes subarray containing model number and flips each pair of bytes
-		let mut arr_sub_model: [u16;20] = Default::default();
-		arr_sub_model.copy_from_slice(&arr[27..47]);
-		let mut arr_bytes_model: [u8; 40] = unsafe{::core::mem::transmute(arr_sub_model)};
-		flip_bytes(&mut arr_bytes_model);
-
-		//transmutes the 
+		//transmutes the array of u16s from the ATA device into an ATAIdentifyData struct
 		let mut identify_data: AtaIdentifyData =unsafe {::core::mem::transmute(arr)};
-		identify_data.serial_number = arr_bytes_serial;
-		identify_data.firmware_ver = arr_bytes_firmware_ver;
-		identify_data.model_number = arr_bytes_model;
+		flip_bytes(&mut identify_data.serial_number);
+		flip_bytes(&mut identify_data.firmware_ver);
+		flip_bytes(&mut identify_data.model_number);
 
 
 		return identify_data
 
 	}
+	
 
 }
 
 
-
+//used to print ATAIdentifyData information to console
 impl ::core::fmt::Display for AtaIdentifyData {
 	fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result
 	{
@@ -252,7 +235,6 @@ impl ::core::fmt::Display for AtaIdentifyData {
 		write!(f, " sect_per_int: {}", self.sect_per_int & 0xFF);
 		write!(f, " capabilities: [{:#x},{:#x}]", self.capabilities[0], self.capabilities[1]);
 		write!(f, " valid_ext_data: {}", self.valid_ext_data);
-		//write!(f, " sector capacity: {}", self.sector_capacity);
 		write!(f, " size_of_rw_multiple: {}", self.size_of_rw_multiple);
 		write!(f, " sector_count_28: {:#x}", self.sector_count_28);
 		write!(f, " sector_count_48: {:#x}", self.sector_count_48);
@@ -263,13 +245,14 @@ impl ::core::fmt::Display for AtaIdentifyData {
 	}
 }
 
-
+//flips pairs of bytes, helpful for transfers between certain big-endian and little-endian interfaces 
 fn flip_bytes(bytes: &mut [u8]) {
 	for pair in bytes.chunks_mut(2) {
 		pair.swap(0, 1);
 	}
 }
 
+//prints basic ASCII characters to the console
 pub struct RawString<'a>(pub &'a [u8]);
 impl<'a> ::core::fmt::Debug for RawString<'a>
 {
