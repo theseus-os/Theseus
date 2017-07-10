@@ -1,11 +1,6 @@
 use x86_64;
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
-/// get the real, current value of cr3
-pub fn get_page_table_register() -> usize {
-    x86_64::registers::control_regs::cr3().0 as usize
-}
-
 
 pub struct ArchTaskState {
     registers: Registers,
@@ -17,17 +12,6 @@ impl ArchTaskState {
         ArchTaskState { 
             registers: Registers::new(),
         }
-    }
-
-
-    /// Set the page table address.
-    pub fn set_page_table(&mut self, address: usize) {
-        self.registers.set_page_table(address);
-    }
-
-    /// Get the page table address.
-    pub fn get_page_table(&self) -> usize {
-        self.registers.get_page_table()
     }
 
 
@@ -61,21 +45,9 @@ impl ArchTaskState {
 
         /*
          * NOTE: address spaces are changed in the general `context_switch()` function now, not here!
+         * as such, there is no need to modify cr3 here (it was changed just before calling this function)
          */
 
-        // swap the pdrp (aka P4, top-levl page tables) iff they're different
-        // threads within the same process will have the same cr3
-        // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space).
-        // currently our kernel shares one address space, so the cr3 should only change between user processes
-        // asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
-        // if next.registers.cr3 != self.registers.cr3 {
-        //     warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
-        //     asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
-        // }
-        // else {
-        //     // debug!("cr3 was the same as expected.");
-        // }
-        
 
         // save & restore rflags
         asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
@@ -109,8 +81,6 @@ impl ArchTaskState {
     }
 
 
-    /// # Prerequisites for calling this function
-    /// * self.rsp must be set to a new userspace stack before calling this. 
     pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         // Steps to jumping to userspace:
         // 1) push stack segment selector (ss), i.e., the user_data segment selector
@@ -235,24 +205,7 @@ impl Registers {
         }
     }
 
-    pub fn create(page_table: usize, stack: usize) -> Registers {
-        let mut regs = Registers::new();
-        regs.set_page_table(page_table);
-        regs.set_stack(stack);
-        regs
-    }
-
-    /// Set the page table address.
-    pub fn set_page_table(&mut self, address: usize) {
-        debug_assert!(self.cr3 == 0, "cr3 was already set!");
-        self.cr3 = address;
-    }
-
-    /// Get the page table address.
-    pub fn get_page_table(&self) -> usize {
-        self.cr3
-    }
-
+  
     /// Set the stack address.
     pub fn set_stack(&mut self, address: usize) {
         debug_assert!(self.rsp == 0, "stack pointer (rsp) was already set!");

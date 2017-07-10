@@ -5,7 +5,7 @@ use collections::{BTreeMap, Vec};
 use collections::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
-use arch::{pause, ArchTaskState, get_page_table_register};
+use arch::{pause, ArchTaskState};
 use alloc::boxed::Box;
 use core::mem;
 use core::fmt;
@@ -300,10 +300,6 @@ impl TaskList {
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
         task_zero.mmi = Some(Arc::new(Mutex::new(task_zero_mmi)));
 
-        // task_zero's page table and stack registers will be set on the first context switch by `switch_to()`,
-        // but we still have to initialize its page table to the current value
-        task_zero.arch_state.set_page_table(get_page_table_register());
-
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
 
         // insert the new context into the list
@@ -332,11 +328,9 @@ impl TaskList {
             -> Result<&Arc<RwLock<Task>>, &str> {
 
         // get the current tasks's memory info
-        let curr_pgtbl: usize;
         let curr_mmi_cloned: Option<Arc<Mutex<MemoryManagementInfo>>>;
         {
-            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_pgtbl").read();
-            curr_pgtbl = curr_task.arch_state.get_page_table();
+            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_mmi").read();
             curr_mmi_cloned = curr_task.mmi.clone();
         }
 
@@ -345,12 +339,8 @@ impl TaskList {
             let mut new_task = locked_new_task.write();
             new_task.set_name(String::from(thread_name));
 
-            // the new kernel thread uses the same address space as the current task
+            // the new kernel thread uses the same address space as the current task (Arc was cloned above)
             new_task.mmi = curr_mmi_cloned;
-
-            // for now, just use the same address space because we're creating a new kernel thread
-            new_task.arch_state.set_page_table(curr_pgtbl);
-
 
             // create and set up a new 16KB kstack
             let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kernel stack
@@ -404,6 +394,12 @@ impl TaskList {
 
         ::interrupts::disable_interrupts();
 
+        // get the current tasks's memory info
+        let curr_mmi_cloned: Option<Arc<Mutex<MemoryManagementInfo>>>;
+        {
+            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_mmi").read();
+            curr_mmi_cloned = curr_task.mmi.clone();
+        }
 
         // TODO: create a new InactivePageTable to represent the new process's address space. 
         //Then, an enum of either InactivePageTable/ActivePageTable will be added to the Task struct. 
@@ -411,14 +407,6 @@ impl TaskList {
         //     as such:     current_task_inactive_table = current_task_active_table.switch(next_task_inactive_table) 
 
 
-
-         // right now we only have one page table (memory area) shared between the kernel,
-        // so just get the current page table value and set the new task's value to the same thing
-        let mut curr_pgtbl: usize = 0;
-        {
-            curr_pgtbl = self.get_current().expect("spawn_userspace(): get_current failed in getting curr_pgtbl")
-                        .read().arch_state.get_page_table();
-        }
 
         let locked_new_task = self.new_task().expect("couldn't create task in spawn_userspace()!");
         {
@@ -437,7 +425,7 @@ impl TaskList {
             // this line would be useful if we wish to create an entirely new address space:
             // new_task.arch_state.set_page_table(unsafe { ::arch::memory::paging::ActivePageTable::new().address() });
             // for now, just use the same address space because we're creating a new kernel thread
-            new_task.arch_state.set_page_table(curr_pgtbl);
+            // new_task.arch_state.set_page_table(curr_pgtbl);
 
 
             // map the userspace module into our new address space
