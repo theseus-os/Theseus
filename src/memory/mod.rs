@@ -8,7 +8,7 @@
 // except according to those terms.
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
-pub use self::paging::{Page, PageIter, PageTable, PhysicalAddress, VirtualAddress, EntryFlags};
+pub use self::paging::{Page, PageIter, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
 pub use self::stack_allocator::Stack;
 
 mod area_frame_allocator;
@@ -64,6 +64,10 @@ impl MemoryManagementInfo {
 
     pub fn add_vmas(&mut self, vmas: &mut Vec<VirtualMemoryArea>) {
         self.vmas.append(vmas);
+    }
+
+    pub fn set_page_table(&mut self, pgtbl: PageTable) {
+        self.page_table = pgtbl;
     }
 
     /// Allocates a new stack in the currently-running Task's address space.
