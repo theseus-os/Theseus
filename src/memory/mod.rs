@@ -36,6 +36,68 @@ const MAX_MEMORY_AREAS: usize = 32;
 static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
 
 
+/// This holds all the information for a `Task`'s memory mappings and address space
+/// (this is basically the equivalent of Linux's mm_struct)
+pub struct MemoryManagementInfo {
+    /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
+    pub page_table: PageTable,
+    /// the list of virtual memory areas mapped currently in this Task's address space
+    pub vmas: Vec<VirtualMemoryArea>,
+    /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
+    /// could potentially merge the stack allocator into the frame allocator
+    stack_allocator: stack_allocator::StackAllocator,
+}
+
+impl MemoryManagementInfo {
+
+    // pub fn new(stack_allocator: stack_allocator::StackAllocator) -> Self {
+    //     MemoryManagementInfo {
+    //         page_table: PageTable::Uninitialized,
+    //         vmas: Vec::new(),
+    //         stack_allocator: stack_allocator,
+    //     }
+    // }
+
+    pub fn add_vma(&mut self, vma: VirtualMemoryArea) {
+        self.vmas.push(vma);
+    }
+
+    pub fn add_vmas(&mut self, vmas: &mut Vec<VirtualMemoryArea>) {
+        self.vmas.append(vmas);
+    }
+
+    /// Allocates a new stack in the currently-running Task's address space.
+    /// The task that called this must be currently running! 
+    /// This checks to make sure that this struct's page_table is an ActivePageTable.
+    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
+    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+        let &mut MemoryManagementInfo { ref mut page_table,
+                                        ref mut vmas,
+                                        ref mut stack_allocator } = self;
+    
+        match page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
+                    vmas.push(stack_vma);
+                    Some(stack)
+                }
+                else {
+                    error!("MemoryManagementInfo::alloc_stack: failed to allocate stack!");
+                    None
+                }
+            }
+            _ => {
+                // panic, because this should never happen
+                panic!("alloc_stack: page_table wasn't an ActivePageTable!");
+                None
+            }
+        }
+    }
+}
+
+
+
 
 /// An area of physical memory. 
 #[derive(Copy, Clone, Debug, Default)]
@@ -182,9 +244,11 @@ static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]
 static MODULE_AREAS: Once<[ModuleArea; MAX_MEMORY_AREAS]> = Once::new();
 
 
-/// initializes the virtual memory management system and returns the MemoryController singleton instance.
-/// Also returns a list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero)
-pub fn init(boot_info: &BootInformation) -> (MemoryController, Vec<VirtualMemoryArea>) {
+/// initializes the virtual memory management system and returns a MemoryManagementInfo instance,
+/// which represents Task zero's (the kernel's) address space. 
+/// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
+/// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
+pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     assert_has_not_been_called!("memory::init must be called only once");
 
     // copy the list of modules (currently used for userspace programs)
@@ -287,23 +351,21 @@ pub fn init(boot_info: &BootInformation) -> (MemoryController, Vec<VirtualMemory
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
     task_zero_vmas.push(heap_vma);
 
-    // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap and grow downwards towards it!
     let stack_allocator = {
+        // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap and grow downwards towards it!
         let stack_alloc_start = heap_end_page + 1; // extra stack pages start right after the heap ends
         let stack_alloc_end = stack_alloc_start + 100; // 100 pages in size
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
 
-    // return a tuple of the memory controller and the associated vmas that were created for what will be task zero
-    (
-        MemoryController {
-            active_table: active_table,
-            frame_allocator_mutex: FRAME_ALLOCATOR.try().expect("FRAME_ALLOCATOR wasn't yet initialized when passing to MemoryController"),
-            stack_allocator: stack_allocator,
-        },
-        task_zero_vmas
-    )
+    // return the kernel's (task_zero's) memory info 
+    MemoryManagementInfo {
+        page_table: PageTable::Active(active_table),
+        vmas: task_zero_vmas,
+        stack_allocator: stack_allocator, 
+    }
+
 }
 
 
@@ -318,26 +380,7 @@ pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
     }
 }
 
-/// A singleton container that holds all memory management information and interfaces 
-pub struct MemoryController {
-    /// the singleton owner of recursively mapped P4 page table, for the currently running Task
-    active_table: paging::ActivePageTable,
-    /// the singleton frame allocator
-    frame_allocator_mutex: &'static Mutex<AreaFrameAllocator>,
-    /// the singleton stack allocator, which was given a number of Pages from which to allocate.
-    /// could potentially merge the stack allocator into the frame allocator
-    stack_allocator: stack_allocator::StackAllocator,
-}
 
-impl MemoryController {
-
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<(Stack, VirtualMemoryArea)> {
-        let &mut MemoryController { ref mut active_table,
-                                    ref mut frame_allocator_mutex,
-                                    ref mut stack_allocator } = self;
-        stack_allocator.alloc_stack(active_table, frame_allocator_mutex.lock().deref_mut(), size_in_pages)
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {

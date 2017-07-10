@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::MemoryController;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
@@ -141,7 +140,9 @@ static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
 
 
-pub fn init(memory_controller: &mut MemoryController, double_fault_stack_top: usize) {
+/// initializes the interrupt subsystem and IRQ handlers with exceptions
+/// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
+pub fn init(double_fault_stack_top: usize) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
     

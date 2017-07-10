@@ -235,9 +235,9 @@ impl InactivePageTable {
 
 
 pub enum PageTable {
+    Uninitialized,
     Active(ActivePageTable),
     Inactive(InactivePageTable),
-    Uninitialized,
 }
 
 
