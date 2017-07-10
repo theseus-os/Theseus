@@ -58,18 +58,24 @@ impl ArchTaskState {
         // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
         // No, I don't think so. 
 
-        // swap the pdrp (page tables) iff they're different
+
+        /*
+         * NOTE: address spaces are changed in the general `context_switch()` function now, not here!
+         */
+
+        // swap the pdrp (aka P4, top-levl page tables) iff they're different
         // threads within the same process will have the same cr3
         // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space).
         // currently our kernel shares one address space, so the cr3 should only change between user processes
-        asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
-        if next.registers.cr3 != self.registers.cr3 {
-            warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
-            asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
-        }
-        else {
-            // debug!("cr3 was the same as expected.");
-        }
+        // asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
+        // if next.registers.cr3 != self.registers.cr3 {
+        //     warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
+        //     asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
+        // }
+        // else {
+        //     // debug!("cr3 was the same as expected.");
+        // }
+        
 
         // save & restore rflags
         asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");

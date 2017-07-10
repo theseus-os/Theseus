@@ -129,7 +129,7 @@ impl Task {
     }
     */
 
-    /// switches from the current (`self`)  to the `next` `Task`
+    /// switches from the current (`self`)  to the given `next` Task
     /// the lock on
     pub fn context_switch(&mut self, mut next: &mut Task) {
         // debug!("context_switch [0], getting lock.");
@@ -155,16 +155,50 @@ impl Task {
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
 
+        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
+        {
+            use memory::{PageTable, ActivePageTable};
+
+            let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
+            let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
+
+            if Arc::ptr_eq(prev_mmi, next_mmi) {
+                // do nothing because we're not changing address spaces
+                // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
+            }
+            else {
+
+                let mut prev_mmi_locked = prev_mmi.lock();
+                let mut next_mmi_locked = next_mmi.lock();
+
+                // time to change to a different address space and switch the page tables!
+                debug!("context_switch [3]: prev_mmi is different than next_mmi ... switching tables!");
+                let ref mut prev_table = prev_mmi.lock().page_table;
+                let ref mut next_table = next_mmi.lock().page_table;
+                    
+                // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
+                match (prev_table, next_table) {
+                    (&mut PageTable::Active(ref mut active_table), &mut PageTable::Inactive(ref inactive_table)) => {
+                        let (prev_table_now_inactive, new_active_table) = active_table.switch(inactive_table);
+                        prev_mmi_locked.set_page_table(PageTable::Inactive(prev_table_now_inactive));
+                        next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); // constructs an ActivePageTable from the newly-switched-to cr3 value
+                    }
+                    _ => {
+                        panic!("context_switch(): prev_table must be an ActivePageTable, next_table must be an InactivePageTable!");
+                    }
+                }
+
+            }
+        }
+
 
 
         // perform the actual context switch
-        // interrupts are automatically enabled at the end of switch_to
+        // NOTE:  interrupts are automatically enabled at the end of switch_to
         unsafe {
             self.arch_state.switch_to(&next.arch_state);
         }
 
-
-        // TODO: FIXME: perhaps this is where we should re-enable interrupts?
 
     }
 
@@ -298,8 +332,8 @@ impl TaskList {
             -> Result<&Arc<RwLock<Task>>, &str> {
 
         // get the current tasks's memory info
-        let mut curr_pgtbl: usize;
-        let mut curr_mmi_cloned: Option<Arc<Mutex<MemoryManagementInfo>>>;
+        let curr_pgtbl: usize;
+        let curr_mmi_cloned: Option<Arc<Mutex<MemoryManagementInfo>>>;
         {
             let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_pgtbl").read();
             curr_pgtbl = curr_task.arch_state.get_page_table();
@@ -570,19 +604,6 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 }
 
 
-
-pub fn userspace_function() -> ! {
-
-    unsafe {
-        asm!("mov r13, $0" : : "r"(0xDEADBEEF as usize) : "memory" : "intel", "volatile");
-        asm!("mov r14, $0" : : "r"(0xBEEFDEAD as usize) : "memory" : "intel", "volatile");
-    }
-
-    // println_unsafe!("HELLO FROM USERSPACE");
-
-    // panic!("in userspace baby!");
-    loop { }
-}
 
 
 fn kstack_placeholder(_: u64) -> Option<u64> {
