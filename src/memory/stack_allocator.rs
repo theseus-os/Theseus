@@ -2,7 +2,7 @@ use memory::paging::{self, Page, PageIter, ActivePageTable};
 use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
 
 pub struct StackAllocator {
-    range: PageIter,
+    pub range: PageIter,
 }
 
 impl StackAllocator {

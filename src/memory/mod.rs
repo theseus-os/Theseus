@@ -8,8 +8,8 @@
 // except according to those terms.
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
-pub use self::paging::{Page, PageIter, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
-pub use self::stack_allocator::Stack;
+pub use self::paging::*; //{Page, PageIter, PageTable, ActivePageTable, InactivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
+pub use self::stack_allocator::{StackAllocator, Stack};
 
 mod area_frame_allocator;
 mod paging;
@@ -23,6 +23,10 @@ use collections::Vec;
 
 pub const PAGE_SIZE: usize = 4096;
 
+pub fn address_is_page_aligned(addr: usize) -> bool {
+    addr % PAGE_SIZE == 0
+}
+
 /// the virtual address where the kernel is mapped to.
 /// i.e., the linear offset between physical memory and kernel memory
 /// so the VGA buffer will be moved from 0xb8000 to 0xFFFFFFFF800b8000.
@@ -33,7 +37,12 @@ const MAX_MEMORY_AREAS: usize = 32;
 
 
 /// The one and only frame allocator
-static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
+pub static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
+
+pub fn allocate_frame() -> Option<Frame> {
+    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
+    frame_allocator.allocate_frame()
+}
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -45,7 +54,8 @@ pub struct MemoryManagementInfo {
     pub vmas: Vec<VirtualMemoryArea>,
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
     /// could potentially merge the stack allocator into the frame allocator
-    stack_allocator: stack_allocator::StackAllocator,
+    pub stack_allocator: stack_allocator::StackAllocator,
+    // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 }
 
 impl MemoryManagementInfo {
@@ -393,7 +403,7 @@ pub struct Frame {
 
 impl Frame {
 	/// returns the Frame containing the given physical address
-    fn containing_address(address: usize) -> Frame {
+    pub fn containing_address(address: usize) -> Frame {
         Frame { number: address / PAGE_SIZE }
     }
 

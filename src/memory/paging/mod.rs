@@ -9,7 +9,7 @@
 
 pub use self::entry::*;
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
-use self::temporary_page::TemporaryPage;
+pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2::BootInformation;
@@ -327,7 +327,8 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas:
     });
 
 
-    let old_table = active_table.switch(&new_table);
+    // let (old_table, _) = active_table.switch(&new_table);
+    active_table.switch(&new_table);
 
 
     // unsafe {
