@@ -184,9 +184,19 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 	//interrupts::enable_interrupts(); //apparently this line is unecessary
 	println!("enabled interrupts!");
 
-    //println!("PCI configuration value: {}",pci::pciConfigRead(0,0,0,0));
+
+    
+    //testing pio read, write, and IDENTIFY functionality
+    /*
+    let test_arr: [u16; 256] = [1;256];
+    
     println!("Value from ATA identification function: {}", pci::ATADriveExists(0xA0));
-    println!("{} is value", pci::pio_read(0)[0]);
+    println!("Value from drive at sector 0 before write {}", pci::pio_read(0)[0]);
+    pci::pio_write(0,test_arr);
+    println!("Value from drive at sector 0 after write: {}", pci::pio_read(0)[0]);
+    */
+
+    //println!("{} is value", pci::pio_read(0)[1]);
     /*
     // create a second task to test context switching
     {

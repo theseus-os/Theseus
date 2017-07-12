@@ -4,6 +4,7 @@ pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use util;
 use CONFIG::*;
 use spin::Mutex;
+use drivers::pci;
 
 //standard port to write to on CMOS to select registers
 const CMOS_WRITE_PORT: u16 = 0x70;

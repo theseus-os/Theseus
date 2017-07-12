@@ -5,10 +5,13 @@ use interrupts::pit_clock;
 
 
 
-
+//"PRIMARY" here refers to primary drive, drive connected at bus 0
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
+
+const PRIMARY_DATA_PORT_ADDRESS: u16 = 0x1F0;
+const PRIMARY_ERROR_REGISTER_ADDRESS: u16 = 0x1F1;
 
 //drive select port for primary bus (bus 0)
 const BUS_SELECT_PRIMARY: u16 = 0x1F6;
@@ -29,12 +32,14 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 
 //ports used in IDENTIFY command 
 static PRIMARY_BUS_IO: Mutex<Port<u8>> = Mutex::new( Port::new(BUS_SELECT_PRIMARY));
+static PRIMARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(PRIMARY_DATA_PORT_ADDRESS));
+static PRIMARY_ERROR_REGISTER: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_ERROR_REGISTER_ADDRESS));
 static SECTORCOUNT: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F2));
 static LBALO: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F3));
 static LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F4));
 static LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F5));
 static COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F7));
-static PRIMARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(0x1F0));
+
 
 
 
@@ -51,17 +56,35 @@ pub fn pciConfigRead(bus: u32, slot: u32, func: u32, offset: u32)->u16{
 
 }
 
-//reads two bytes from the 
+//reads 256 2 byte words from primary ata data port
 pub fn read_primary_data_port()-> [u16; 256]{
     let mut arr: [u16; 256] = [0;256];
 	
 	for word in 0..256{
-    	while((COMMAND_IO.lock().read()>>3)%2 ==0){trace!("stuck in read_primary_data_port function")}
+    	while(!ata_data_transfer_ready()){trace!("data port not ready in read_primary_data_port function")}
 		arr[word] = PRIMARY_DATA_PORT.lock().read();
 
     }
 	
     arr
+
+}
+
+pub fn write_primary_data_port(arr: [u16;256]){
+	
+	for index in 0..256{
+		while(!ata_data_transfer_ready()){trace!("data port not ready in write_primary_data_port function")}
+		unsafe{PRIMARY_DATA_PORT.lock().write(arr[0])};
+	}
+	
+
+	trace!("end of write");
+
+}
+//basic abstraction: returns True if ata is ready to transfer data, False otherwise
+pub fn ata_data_transfer_ready() -> bool{
+
+	(COMMAND_IO.lock().read()>>3)%2 ==1
 
 }
 
@@ -113,6 +136,7 @@ pub fn ATADriveExists(drive:u8)-> AtaIdentifyData{
     }
 
 	if command_value%2 == 1{
+		trace!("Error bit is set");
 		let identify_data = AtaIdentifyData{..Default::default()};
 		return identify_data;
 
@@ -130,27 +154,44 @@ pub fn pio_read(lba:u32)->[u16; 256]{
 
     //selects master drive(using 0xE0 value) in primary bus (by writing to PRIMARY_BUS_IO-port 0x1F6)
     let master_select: u8 = 0xE0 | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
-    unsafe{PRIMARY_BUS_IO.lock().write(master_select);
+    unsafe{
+		
+	PRIMARY_BUS_IO.lock().write(master_select);
 
-    SECTORCOUNT.lock().write(0);
-
+	//number of consecutive sectors to read from, set at 1 
+	SECTORCOUNT.lock().write(1);
     //lba is written into disk 
-    LBALO.lock().write((lba&0xFF)as u8);
-    //trace!("{} here",lba>>8&0xFF);
-    LBAMID.lock().write((lba>>8 &0xFF)as u8);
-    LBAHI.lock().write((lba>>16 &0xFF)as u8);
+    LBALO.lock().write((lba)as u8);
+    LBAMID.lock().write((lba>>8)as u8);
+    LBAHI.lock().write((lba>>16)as u8);
 
     COMMAND_IO.lock().write(0x20);
     }
 
-
-    //just returning this during testing to make sure program compiles
-    //return COMMAND_IO.lock().read()>>3
-	trace!("got to end of pio_read function");
+	if COMMAND_IO.lock().read()%2 == 1{
+		trace!("error bit set");
+	}
 	
     read_primary_data_port()
 
+}
 
+pub fn pio_write(lba:u32, arr: [u16;256]){
+	let master_select: u8 = 0xE0 | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
+    unsafe{	
+	PRIMARY_BUS_IO.lock().write(master_select);
+
+	//number of consecutive sectors to write to: set at one currently
+	SECTORCOUNT.lock().write(1);
+    //lba(address) is written into disk 
+    LBALO.lock().write((lba&0xFF)as u8);
+    LBAMID.lock().write((lba>>8 &0xFF)as u8);
+    LBAHI.lock().write((lba>>16 &0xFF)as u8);
+
+    COMMAND_IO.lock().write(0x30);
+    }
+
+	write_primary_data_port(arr);
 
 }
 
