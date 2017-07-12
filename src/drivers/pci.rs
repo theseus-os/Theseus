@@ -10,36 +10,42 @@ use interrupts::pit_clock;
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
 
+//port data is read/write from
 const PRIMARY_DATA_PORT_ADDRESS: u16 = 0x1F0;
 const PRIMARY_ERROR_REGISTER_ADDRESS: u16 = 0x1F1;
+//port which number of consecutive sectors to be read/written is sent to 
+const PRIMARY_SECTORCOUNT_ADDRESS: u16 = 0x1F2;
+//specificy lower, middle, and upper bytes of lba address
+const PRIMARY_LBALO_ADDRESS: u16 = 0x1F3;
+const PRIMARY_LBAMID_ADDRESS: u16 = 0x1F4;
+const PRIMARY_LBAHI_ADDRESS: u16 = 0x1F5;
+//select port for primary bus (bus 0)
+const PRIMARY_BUS_SELECT_ADDRESS: u16 = 0x1F6;
+//commands which set ATA drive to read or write mode
+const PIO_WRITE_COMMAND: u8 = 0x30;
+const PIO_READ_COMMAND: u8 = 0x20;
+//port which commands are sent to for primary ATA
+const PRIMARY_COMMAND_IO: u16 = 0x1F7;
 
-//drive select port for primary bus (bus 0)
-const BUS_SELECT_PRIMARY: u16 = 0x1F6;
-//set "DRIVE_SELECT" port to choose master or slave drive
-const IDENTIFY_MASTER_DRIVE: u16 = 0xA0;
-const IDENTIFY_SLAVE_DRIVE: u16 = 0xB0;
-
-const IDENTIFY_COMMAND: u16 = 0xEC;
-
+const IDENTIFY_COMMAND: u8 = 0xEC;
 const READ_MASTER: u16 = 0xE0;
 
+
+//initializing addresses mentioned above
+static PRIMARY_BUS_SELECT: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_BUS_SELECT_ADDRESS));
+static PRIMARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(PRIMARY_DATA_PORT_ADDRESS));
+static PRIMARY_ERROR_REGISTER: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_ERROR_REGISTER_ADDRESS));
+static SECTORCOUNT: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_SECTORCOUNT_ADDRESS));
+static LBALO: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBALO_ADDRESS));
+static LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAMID_ADDRESS));
+static LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAHI_ADDRESS));
+static COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_COMMAND_IO));
 
 
 //access to CONFIG_ADDRESS 
 static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_ADDRESS));
 //acccess to CONFIG_DATA
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DATA));
-
-//ports used in IDENTIFY command 
-static PRIMARY_BUS_IO: Mutex<Port<u8>> = Mutex::new( Port::new(BUS_SELECT_PRIMARY));
-static PRIMARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(PRIMARY_DATA_PORT_ADDRESS));
-static PRIMARY_ERROR_REGISTER: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_ERROR_REGISTER_ADDRESS));
-static SECTORCOUNT: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F2));
-static LBALO: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F3));
-static LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F4));
-static LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F5));
-static COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(0x1F7));
-
 
 
 
@@ -56,7 +62,7 @@ pub fn pciConfigRead(bus: u32, slot: u32, func: u32, offset: u32)->u16{
 
 }
 
-//reads 256 2 byte words from primary ata data port
+//reads 256 u16s from primary ata data port
 pub fn read_primary_data_port()-> [u16; 256]{
     let mut arr: [u16; 256] = [0;256];
 	
@@ -70,15 +76,13 @@ pub fn read_primary_data_port()-> [u16; 256]{
 
 }
 
+//writes 256 u16s from an array to primary ata data port
 pub fn write_primary_data_port(arr: [u16;256]){
 	
 	for index in 0..256{
 		while(!ata_data_transfer_ready()){trace!("data port not ready in write_primary_data_port function")}
 		unsafe{PRIMARY_DATA_PORT.lock().write(arr[0])};
 	}
-	
-
-	trace!("end of write");
 
 }
 //basic abstraction: returns True if ata is ready to transfer data, False otherwise
@@ -94,14 +98,14 @@ pub fn ATADriveExists(drive:u8)-> AtaIdentifyData{
     let mut command_value: u8 = COMMAND_IO.lock().read();
     //let mut arr: [u16; 256] = [0; 256];
     //set port values for bus 0 to detect ATA device 
-    unsafe{PRIMARY_BUS_IO.lock().write(drive);
+    unsafe{PRIMARY_BUS_SELECT.lock().write(drive);
            
            SECTORCOUNT.lock().write(0);
            LBALO.lock().write(0);
            LBAMID.lock().write(0);
            LBAHI.lock().write(0);
 
-           COMMAND_IO.lock().write(0xEC);
+           COMMAND_IO.lock().write(IDENTIFY_COMMAND);
 
 
     }
@@ -152,20 +156,20 @@ pub fn ATADriveExists(drive:u8)-> AtaIdentifyData{
 //read from disk at address input 
 pub fn pio_read(lba:u32)->[u16; 256]{
 
-    //selects master drive(using 0xE0 value) in primary bus (by writing to PRIMARY_BUS_IO-port 0x1F6)
+    //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)
     let master_select: u8 = 0xE0 | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
     unsafe{
 		
-	PRIMARY_BUS_IO.lock().write(master_select);
+	PRIMARY_BUS_SELECT.lock().write(master_select);
 
 	//number of consecutive sectors to read from, set at 1 
 	SECTORCOUNT.lock().write(1);
-    //lba is written into disk 
+    //lba is written to disk ports 
     LBALO.lock().write((lba)as u8);
     LBAMID.lock().write((lba>>8)as u8);
     LBAHI.lock().write((lba>>16)as u8);
 
-    COMMAND_IO.lock().write(0x20);
+    COMMAND_IO.lock().write(PIO_READ_COMMAND);
     }
 
 	if COMMAND_IO.lock().read()%2 == 1{
@@ -179,16 +183,16 @@ pub fn pio_read(lba:u32)->[u16; 256]{
 pub fn pio_write(lba:u32, arr: [u16;256]){
 	let master_select: u8 = 0xE0 | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
     unsafe{	
-	PRIMARY_BUS_IO.lock().write(master_select);
+	PRIMARY_BUS_SELECT.lock().write(master_select);
 
 	//number of consecutive sectors to write to: set at one currently
 	SECTORCOUNT.lock().write(1);
-    //lba(address) is written into disk 
-    LBALO.lock().write((lba&0xFF)as u8);
-    LBAMID.lock().write((lba>>8 &0xFF)as u8);
-    LBAHI.lock().write((lba>>16 &0xFF)as u8);
+    //lba(address) is written to disk ports
+    LBALO.lock().write((lba)as u8);
+    LBAMID.lock().write((lba>>8)as u8);
+    LBAHI.lock().write((lba>>16)as u8);
 
-    COMMAND_IO.lock().write(0x30);
+    COMMAND_IO.lock().write(PIO_WRITE_COMMAND);
     }
 
 	write_primary_data_port(arr);
@@ -200,7 +204,6 @@ pub fn pio_write(lba:u32, arr: [u16;256]){
 pub fn handle_primary_interrupt(){
     trace!("Got IRQ 14!");
 }
-
 
 //AtaIdentifyData struct and implemenations from Tifflin Kernel
 #[repr(C,packed)]
