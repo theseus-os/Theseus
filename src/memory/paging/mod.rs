@@ -36,8 +36,7 @@ impl Page {
 	/// returns the first virtual address as the start of this Page
     pub fn containing_address(address: VirtualAddress) -> Page {
         assert!(address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000,
-                "invalid address: 0x{:x}",
-                address);
+                "Page::containing_address(): invalid address: 0x{:x}", address);
         Page { number: address / PAGE_SIZE }
     }
 
@@ -173,7 +172,10 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE);
+            
+            // THIS NEXT LINE CAUSES the self.mapper instance to be no longer mapped! 
+
+            self.p4_mut()[RECURSIVE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE); 
             tlb::flush_all();
 
             // execute f in the new context
@@ -188,6 +190,7 @@ impl ActivePageTable {
     }
 
     /// returns the old_table as an InactivePageTable, and the newly-created ActivePageTable.
+    // pub fn switch(&mut self, new_table: &InactivePageTable) -> InactivePageTable {
     pub fn switch(&mut self, new_table: &InactivePageTable) -> (InactivePageTable, ActivePageTable) {
         use x86_64::PhysicalAddress;
         use x86_64::registers::control_regs;
@@ -201,6 +204,7 @@ impl ActivePageTable {
         
         println_unsafe!("ActivePageTable::switch(): NEW TABLE!!!");
 
+        // old_table
         (old_table, unsafe { ActivePageTable::new() } )
     }
 
@@ -302,11 +306,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas:
                 start_virt_addr += super::KERNEL_OFFSET;
             }
 
-            vmas[index] = VirtualMemoryArea {
-                start: start_virt_addr,
-                size: section.size as usize,
-                flags: flags,
-            };
+            vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size as usize, flags, "Kernel ELF Section");
             index += 1;
 
             // map the whole range of pages to frames in this section
@@ -317,35 +317,27 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas:
         // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_virt_addr = 0xb8000 + super::KERNEL_OFFSET;
         let vga_buffer_flags = WRITABLE;
-        vmas[index] = VirtualMemoryArea {
-                start: vga_buffer_virt_addr,
-                size: PAGE_SIZE,
-                flags: vga_buffer_flags,
-        };
+        vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr,PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
     });
 
 
-    // let (old_table, _) = active_table.switch(&new_table);
-    active_table.switch(&new_table);
+    let (old_table, new_active_table) = active_table.switch(&new_table);
+    // let old_table = active_table.switch(&new_table);
 
-
-    // unsafe {
-    //      // print "OK" directly to the VGA buffer
-    //     *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
-    // }
-
-    // loop {}
 
     // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
     // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
     // active_table.unmap(old_p4_page, allocator);
     // println_unsafe!("guard page at {:#x}", old_p4_page.start_address());
 
-    // return the active_table, which represents the owner of the P4 pointer, 
-    // which *always* points to the current address space's top-level page table
-    active_table 
+
+
+    // active_table 
+    // previously we returned the active_table used to invoke the switch() method above, but I think that's wrong.
+    // I think we should return the new_active table because that's the one that should be used by task_zero in future mappings. 
+    new_active_table
 }
 
 

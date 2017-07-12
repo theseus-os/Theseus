@@ -19,6 +19,7 @@ use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
 use collections::Vec;
+use collections::string::String;
 
 
 pub const PAGE_SIZE: usize = 4096;
@@ -167,20 +168,22 @@ pub struct ModuleArea {
 
 
 /// A region of virtual memory that is mapped into a `Task`'s address space
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct VirtualMemoryArea {
     start: VirtualAddress,
     size: usize,
     flags: EntryFlags,
+    desc: &'static str,
 }
 
 
 impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags) -> Self {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
         VirtualMemoryArea {
             start: start,
             size: size,
             flags: flags,
+            desc: desc,
         }
     }
 
@@ -198,6 +201,13 @@ impl VirtualMemoryArea {
 
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
     pub fn pages(&self) -> PageIter {
+
+        // check that the end_page won't be invalid
+        if (self.start + self.size) < 1 {
+            // return an "empty" iterator (one that goes from 1 to 0, so no iterations happen)
+            return Page::range_inclusive( Page::containing_address(PAGE_SIZE), Page::containing_address(0) );
+        }
+        
         let start_page = Page::containing_address(self.start);
         let end_page = Page::containing_address((self.start as usize + self.size - 1) as VirtualAddress);
         Page::range_inclusive(start_page, end_page)
@@ -355,18 +365,20 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     let heap_start_page = Page::containing_address(HEAP_START);
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
     let heap_flags = paging::WRITABLE;
-    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(HEAP_START, HEAP_SIZE, heap_flags);
+    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(HEAP_START, HEAP_SIZE, heap_flags, "Kernel Heap");
     
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
     }
 
     // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
+
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
+    task_zero_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
     task_zero_vmas.push(heap_vma);
 
     let stack_allocator = {
-        // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap and grow downwards towards it!
+        // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap so the heap can expand!
         let stack_alloc_start = heap_end_page + 1; // extra stack pages start right after the heap ends
         let stack_alloc_end = stack_alloc_start + 100; // 100 pages in size
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
@@ -411,7 +423,7 @@ impl Frame {
         self.number * PAGE_SIZE
     }
 
-    fn clone(&self) -> Frame {
+    pub fn clone(&self) -> Frame {
         Frame { number: self.number }
     }
 
