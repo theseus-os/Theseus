@@ -3,6 +3,13 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use util;
 use CONFIG::*;
+use spin::Mutex;
+use drivers::pci;
+
+//standard port to write to on CMOS to select registers
+const CMOS_WRITE_PORT: u16 = 0x70;
+//standard port to read register values from on CMOS or write to to change settings
+const CMOS_READ_PORT: u16 = 0x71;
 
 pub static RTC_TICKS: AtomicUsize = AtomicUsize::new(0);
 //used to select register
