@@ -61,7 +61,8 @@ run: $(iso)
 	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
 
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int  -no-reboot -no-shutdown
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int  -no-reboot -no-shutdown 
+#-monitor stdio
 
 gdb:
 	@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
@@ -77,7 +78,7 @@ $(iso): $(kernel) userspace $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
 	@cp $(kernel) build/isofiles/boot/kernel.bin
 	@cp $(grub_cfg) build/isofiles/boot/grub
-	@grub-mkrescue -v -o $(iso) build/isofiles  # 2> /dev/null
+	@grub-mkrescue -o $(iso) build/isofiles  # 2> /dev/null
 	
 
 

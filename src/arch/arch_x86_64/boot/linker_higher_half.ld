@@ -31,7 +31,8 @@ SECTIONS
     }
 
     /* Read-only data. */
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - KERNEL_OFFSET)
+    .rodata ALIGN(4K) 
+    : AT(ADDR(.rodata) - KERNEL_OFFSET)
     {
         *(.rodata .rodata.*)
     }
@@ -52,24 +53,26 @@ SECTIONS
 
 
 
-    .got : ALIGN(4K) 
+    .got ALIGN(4K) : AT(ADDR(.got) - KERNEL_OFFSET)
     {
         *(.got)
         . = ALIGN(4K);
     }
 
-    .got.plt :
+    .got.plt ALIGN(4K) : AT(ADDR(.got.plt) - KERNEL_OFFSET)
     {
         *(.got.plt)
         . = ALIGN(4K);
     }
 
-    .data.rel.ro : ALIGN(4K) {
+    .data.rel.ro ALIGN(4K) : AT(ADDR(.data.rel.ro) - KERNEL_OFFSET)
+    {
         *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
         . = ALIGN(4K);
     }
 
-    .gcc_except_table : ALIGN(4K) {
+    .gcc_except_table ALIGN(4K) : AT(ADDR(.gcc_except_table) - KERNEL_OFFSET)
+    {
         *(.gcc_except_table)
         . = ALIGN(4K);
     }

@@ -49,11 +49,12 @@ impl StackAllocator {
                     active_table.map(page, flags, frame_allocator);
                 }
 
-                let stack_vma = VirtualMemoryArea {
-                    start: start.start_address(),
-                    size: end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
-                    flags: flags, 
-                };
+                let stack_vma = VirtualMemoryArea::new(
+                    start.start_address(),
+                    end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
+                    flags, 
+                    "Stack"
+                );
 
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
