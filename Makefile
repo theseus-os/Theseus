@@ -61,7 +61,7 @@ run: $(iso)
 	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown
 
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int  -no-reboot -no-shutdown 
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio   -no-reboot -no-shutdown 
 #-monitor stdio
 
 gdb:
