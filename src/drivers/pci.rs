@@ -21,11 +21,12 @@ const PRIMARY_LBAMID_ADDRESS: u16 = 0x1F4;
 const PRIMARY_LBAHI_ADDRESS: u16 = 0x1F5;
 //select port for primary bus (bus 0)
 const PRIMARY_BUS_SELECT_ADDRESS: u16 = 0x1F6;
+//port which commands are sent to for primary ATA
+const PRIMARY_COMMAND_IO: u16 = 0x1F7;
+
 //commands which set ATA drive to read or write mode
 const PIO_WRITE_COMMAND: u8 = 0x30;
 const PIO_READ_COMMAND: u8 = 0x20;
-//port which commands are sent to for primary ATA
-const PRIMARY_COMMAND_IO: u16 = 0x1F7;
 
 const IDENTIFY_COMMAND: u8 = 0xEC;
 const READ_MASTER: u16 = 0xE0;
@@ -83,7 +84,11 @@ pub fn write_primary_data_port(arr: [u16;256]){
 		while(!ata_data_transfer_ready()){trace!("data port not ready in write_primary_data_port function")}
 		unsafe{PRIMARY_DATA_PORT.lock().write(arr[0])};
 	}
-
+	
+	//pausing two pit ticks so that a read is never immediately after a write
+	let start = pit_clock::PIT_TICKS.load(Ordering::SeqCst);
+	while start+2 > pit_clock::PIT_TICKS.load(Ordering::SeqCst){}
+	
 }
 //basic abstraction: returns True if ata is ready to transfer data, False otherwise
 pub fn ata_data_transfer_ready() -> bool{
