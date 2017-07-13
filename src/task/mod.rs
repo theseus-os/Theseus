@@ -429,6 +429,15 @@ impl TaskList {
                         InactivePageTable::new(frame, active_table, &mut temporary_page)
                     };
 
+
+                    // testing mappings in active_table
+                    for vma in curr_vmas {
+                        println_unsafe!("{} {:#x} active_table->{:?}", 
+                            vma.desc(),
+                            vma.start_address(),
+                            active_table.translate(vma.start_address()));
+                    }
+
     
                     // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
                     let mut curr_page_to_frame_mappings = {
@@ -458,7 +467,7 @@ impl TaskList {
 
 
                     let phys_addr = active_table.translate(&mut curr_page_to_frame_mappings as *mut _ as usize);
-
+                    println_unsafe!("curr_page_to_frame_mappings {:#x} -> {:?}", &mut curr_page_to_frame_mappings as *mut _ as usize, phys_addr);
                     // !!! HERE THE PROBLEM IS THAT |mapper| below is invalid, accessing it causes a page fault...!!!
 
                     active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {

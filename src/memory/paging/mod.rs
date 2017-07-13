@@ -166,6 +166,13 @@ impl ActivePageTable {
         use x86_64::instructions::tlb;
 
         {
+
+            // test translate the active table itself
+            let virt_addr: usize = self as *mut _ as usize;
+            let phys_addr = self.translate(virt_addr);
+            println_unsafe!("self {:#x} -> {:?}", virt_addr, phys_addr); 
+    
+
             let backup = Frame::containing_address(control_regs::cr3().0 as usize);
 
             // map temporary_page to current p4 table
@@ -177,6 +184,13 @@ impl ActivePageTable {
 
             self.p4_mut()[RECURSIVE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE); 
             tlb::flush_all();
+
+            // test
+            let virt_addr: usize = self as *mut _ as usize;
+            let phys_addr = self.translate(virt_addr);
+            println_unsafe!("self {:#x} -> {:?}", virt_addr, phys_addr); 
+    
+
 
             // execute f in the new context
             f(self);
@@ -258,7 +272,10 @@ pub enum PageTable {
 
 
 
-pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) -> ActivePageTable
+pub fn remap_the_kernel<A>(allocator: &mut A, 
+    boot_info: &BootInformation, 
+    vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) 
+    -> ActivePageTable
     where A: FrameAllocator
 {
     //  let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
@@ -325,6 +342,15 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation, vmas:
 
     let (old_table, new_active_table) = active_table.switch(&new_table);
     // let old_table = active_table.switch(&new_table);
+
+
+    // testing mappings in active_table vs new_active_table
+    // for vma in vmas {
+    //     println_unsafe!("{:#x} active_table->{:?} new_active_table->{:?}", 
+    //         vma.start,
+    //         active_table.translate(vma.start),
+    //         new_active_table.translate(vma.start));
+    // }
 
 
     // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high

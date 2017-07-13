@@ -199,6 +199,10 @@ impl VirtualMemoryArea {
         self.flags
     }
 
+    pub fn desc(&self) -> &'static str {
+        self.desc
+    }
+
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
     pub fn pages(&self) -> PageIter {
 
@@ -384,6 +388,18 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
+
+
+
+    // testing mappings in active_table
+    for vma in &task_zero_vmas {
+        println_unsafe!("{} {:#x} active_table->{:?}", 
+            vma.desc,
+            vma.start,
+            active_table.translate(vma.start));
+    }
+
+
 
     // return the kernel's (task_zero's) memory info 
     MemoryManagementInfo {

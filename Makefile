@@ -68,7 +68,7 @@ run: $(iso)
 	-s  -serial stdio  -no-shutdown -cpu Haswell
 
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio -d int  -no-reboot -no-shutdown 
+	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio   -no-reboot -no-shutdown 
 #-monitor stdio
 
 gdb:
