@@ -81,11 +81,24 @@ impl MemoryManagementInfo {
         self.page_table = pgtbl;
     }
 
-    /// Allocates a new stack in the currently-running Task's address space.
+    /// Allocates a new userspace stack in the currently-running Task's address space.
     /// The task that called this must be currently running! 
     /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+    pub fn alloc_stack_user(&mut self, size_in_pages: usize) -> Option<Stack> {
+        self.alloc_stack(size_in_pages, WRITABLE | USER_ACCESSIBLE)
+    }
+
+    /// Allocates a new kernel stack in the currently-running Task's address space.
+    /// The task that called this must be currently running! 
+    /// This checks to make sure that this struct's page_table is an ActivePageTable.
+    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
+    pub fn alloc_stack_kernel(&mut self, size_in_pages: usize) -> Option<Stack> {
+        self.alloc_stack(size_in_pages, WRITABLE)  // not user accessible
+    }
+
+
+    fn alloc_stack(&mut self, size_in_pages: usize, flags: EntryFlags) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table,
                                         ref mut vmas,
                                         ref mut stack_allocator } = self;
@@ -93,7 +106,7 @@ impl MemoryManagementInfo {
         match page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
+                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages, flags) {
                     vmas.push(stack_vma);
                     Some(stack)
                 }
@@ -104,7 +117,7 @@ impl MemoryManagementInfo {
             }
             _ => {
                 // panic, because this should never happen
-                panic!("alloc_stack: page_table wasn't an ActivePageTable!");
+                panic!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable!");
                 None
             }
         }
@@ -388,17 +401,6 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
-
-
-
-    // testing mappings in active_table
-    for vma in &task_zero_vmas {
-        println_unsafe!("{} {:#x} active_table->{:?}", 
-            vma.desc,
-            vma.start,
-            active_table.translate(vma.start));
-    }
-
 
 
     // return the kernel's (task_zero's) memory info 

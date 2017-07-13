@@ -1,7 +1,6 @@
 BITS 64
 
-
-section .texttest
+section .text
 
 main:
     ; set eax to some distinguishable number, to read from the log afterwards

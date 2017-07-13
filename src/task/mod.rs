@@ -430,21 +430,12 @@ impl TaskList {
                     };
 
 
-                    // testing mappings in active_table
-                    for vma in curr_vmas {
-                        println_unsafe!("{} {:#x} active_table->{:?}", 
-                            vma.desc(),
-                            vma.start_address(),
-                            active_table.translate(vma.start_address()));
-                    }
-
-    
                     // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
                     let mut curr_page_to_frame_mappings = {
                         let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_vmas.len());
-                        println_unsafe!("curr_vmas: {:?}", curr_vmas);
+                        // println_unsafe!("curr_vmas: {:?}", curr_vmas);
                         for vma in curr_vmas {
-                            println_unsafe!("looking at vma: {:?}", vma);
+                            // println_unsafe!("looking at vma: {:?}", vma);
                             for page in vma.pages() { // THIS LINE CAUSES A PANIC because .pages() is wrong
                                 // println_unsafe!("   looking at page: {:?}", page);
                                 mappings.push( 
@@ -458,24 +449,13 @@ impl TaskList {
                         mappings
                     };
 
-                    // for (page, frame, flags) in curr_page_to_frame_mappings {
-                            // println_unsafe!(" translated page {:?} to frame {:?} with flags {:?}", page, frame, flags);
-                    // }
-
-                    // let test_mapping = &curr_page_to_frame_mappings[0];
-                    // let (page, frame, flags) = (test_mapping.0.clone(), test_mapping.1.clone(), test_mapping.2.clone());
-
-
-                    let phys_addr = active_table.translate(&mut curr_page_to_frame_mappings as *mut _ as usize);
-                    println_unsafe!("curr_page_to_frame_mappings {:#x} -> {:?}", &mut curr_page_to_frame_mappings as *mut _ as usize, phys_addr);
-                    // !!! HERE THE PROBLEM IS THAT |mapper| below is invalid, accessing it causes a page fault...!!!
 
                     active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
                         let virt_addr = &mut curr_page_to_frame_mappings as *mut _ as usize;
                         let phys_addr2 = mapper.translate(virt_addr);
                         // iterate over all of the VMAs from the current MMI and also map them to the new_table
                         for (page, frame, flags) in curr_page_to_frame_mappings {
-                            println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
+                            // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
                             mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
                         }
 
@@ -484,7 +464,6 @@ impl TaskList {
 
                     println_unsafe!("\nAfter active_table.with() in spawn_userspace");
 
-                    unreachable!();
 
                     // instead of waiting for the next context switch, we switch page tables now 
                     // such that the new userspace task can be setup (heap/stack) and started immediately
@@ -496,10 +475,12 @@ impl TaskList {
                     let mut new_vmas = curr_vmas.to_vec(); // deep copy the vma vec
 
                     // map the userspace module into the new address space
+                    println_unsafe!("!! mapping userspace module with name: {}", module.name);
                     assert!(address_is_page_aligned(module.mod_start as usize), "modules must be page aligned!");
                     let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
                     new_vmas.push(VirtualMemoryArea::new(module.mod_start as usize, module.mod_end as usize - module.mod_start as usize, module_flags, module.name));
                     active_table.identity_map(Frame::containing_address(module.mod_start as usize), module_flags, frame_allocator.deref_mut());
+
 
                     let mut returned_mmi = MemoryManagementInfo {
                         page_table: PageTable::Active(active_table),
@@ -531,8 +512,8 @@ impl TaskList {
                 }
             ));
 
-            let mut ustack: Stack = new_userspace_mmi.alloc_stack(4).expect("spawn_userspace: couldn't allocate new user stack!");
-            let ustack_top:usize  = ustack.top();
+            let ustack: Stack = new_userspace_mmi.alloc_stack_user(4).expect("spawn_userspace: couldn't allocate new user stack!");
+            let ustack_top: usize  = ustack.top() - mem::size_of::<usize>();
             new_task.ustack = Some(ustack);
 
 

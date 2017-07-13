@@ -11,6 +11,9 @@ use super::{Page, ActivePageTable, VirtualAddress};
 use super::table::{Table, Level1};
 use memory::{Frame, FrameAllocator, PAGE_SIZE};
 
+
+const TEMPORARY_PAGE_VIRT_ADDR: usize = 0xFFFF_FFFF_FFFF_FFFF;
+
 pub struct TemporaryPage {
     page: Page,
     allocator: TinyAllocator,
@@ -20,14 +23,8 @@ impl TemporaryPage {
     pub fn new<A>(allocator: &mut A) -> TemporaryPage
         where A: FrameAllocator
     {
-        static mut addr: usize = 0xFFFF_FFFF_FFFF_FFFF;
-        unsafe {addr -= PAGE_SIZE; }
-        let this_addr = unsafe {addr};
-        println_unsafe!("TemporaryPage::new() giving address {:#x}", this_addr);
-        
         TemporaryPage {
-            // NOTE: for some reason, the address 0xFFFF_FF0F_FFFF_FFFF does not work here!
-            page: Page::containing_address(this_addr), // the top of the address space
+            page: Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR), // the top of the address space
             allocator: TinyAllocator::new(allocator),
         }
     }

@@ -91,6 +91,11 @@ impl ArchTaskState {
         // 6) set all other segment registers (ds, es, fs, gs) to the user_data segment, same as (ss)
         // 7) issue iret to return to userspace
 
+        // println_unsafe!("Jumping to userspace with stack_ptr: {:#x} and function_ptr: {:#x}",
+        //                   stack_ptr, function_ptr);
+        // println_unsafe!("stack: {:#x} {:#x} func: {:#x}", *(stack_ptr as *const usize), *((stack_ptr - 8) as *const usize), 
+        //                 *(function_ptr as *const usize));
+
         let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData).0;
         let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
 

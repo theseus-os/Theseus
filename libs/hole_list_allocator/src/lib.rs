@@ -26,10 +26,10 @@ use linked_list_allocator::Heap;
 
 
 
-
-pub const HEAP_START: usize = 0xFFFF_FF0F_0000_0000; // higher-half heap 
-// pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
-pub const HEAP_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
+/// higher-half heap gets 512 GB address range starting at 509th P4 entry
+pub const HEAP_START: usize = 0o177777_775_000_000_000_0000;
+/// 1 MiB heap size right now
+pub const HEAP_SIZE: usize = 1 * 1024 * 1024; 
 
 
 lazy_static! {
