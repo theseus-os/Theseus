@@ -14,14 +14,13 @@ use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
 
-// Now that we're using the 511th entry of the P4 table for 
-// mapping the higher-half kernel, we need to use the 510th entry of P4 instead!
+// Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel, 
+// we need to use the 510th entry of P4 instead!
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
-// pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _; // for the 511th (last) entry 
-// this one is correct when just mapping pml4t[510] to pml4t[0]
 pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
-                                          // ^ 776 means that we're always looking at the 510 entry recursively
+                                         // ^p4 ^p3 ^p2 ^p1 ^offset  
+                                         // ^ 0o776 means that we're always looking at the 510th entry recursively
 
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRY_COUNT],
@@ -78,6 +77,7 @@ impl<L> Table<L>
 
     pub fn next_table_create<A>(&mut self,
                                 index: usize,
+                                flags: EntryFlags,
                                 allocator: &mut A)
                                 -> &mut Table<L::NextLevel>
         where A: FrameAllocator
@@ -86,7 +86,7 @@ impl<L> Table<L>
             assert!(!self.entries[index].flags().contains(HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, PRESENT | WRITABLE);
+            self.entries[index].set(frame, flags | PRESENT | WRITABLE); // must be PRESENT | WRITABLE
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

@@ -1,4 +1,4 @@
-use memory::paging::{self, Page, PageIter, ActivePageTable};
+use memory::paging::*;
 use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
 
 pub struct StackAllocator {
@@ -16,11 +16,15 @@ impl StackAllocator {
     pub fn alloc_stack<FA: FrameAllocator>(&mut self,
                                            active_table: &mut ActivePageTable,
                                            frame_allocator: &mut FA,
-                                           size_in_pages: usize)
+                                           size_in_pages: usize, 
+                                           flags: EntryFlags)
                                            -> Option<(Stack, VirtualMemoryArea)> {
         if size_in_pages == 0 {
             return None; /* a zero sized stack makes no sense */
         }
+
+        // minimum required flag is WRITABLE
+        let flags = flags | WRITABLE; // shadows the flags arg
 
         // clone the range, since we only want to change it on success
         let mut range = self.range.clone();
@@ -41,8 +45,6 @@ impl StackAllocator {
                 // success! write back updated range
                 self.range = range;
 
-                let flags = paging::WRITABLE;
-
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
                 for page in Page::range_inclusive(start, end) {
@@ -53,7 +55,7 @@ impl StackAllocator {
                     start.start_address(),
                     end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
                     flags, 
-                    "Stack"
+                    if flags.contains(USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
                 );
 
                 // create a new stack
