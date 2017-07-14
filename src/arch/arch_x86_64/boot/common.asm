@@ -17,52 +17,6 @@ extern KEXIT
 ; di as well) and the return value is passed in rax.
 ; All registers except RBP, RBX, and r12-r15 are caller preserved :)
 
-; Here we define the in and out functions we will use for interrupts
-global inb
-inb:
-	mov dx, di
-	in al, dx
-	ret
-
-global outb
-outb:
-	mov dx, di
-	mov ax, si
-	out dx, al
-	ret
-
-global inw
-inw:
-	mov dx, di
-	in ax, dx
-	ret
-
-global outw
-outw:
-	mov dx, di
-	mov ax, si
-	out dx, ax
-	ret
-
-global inl
-inl:
-	mov dx, di
-	in eax, dx
-	ret
-
-global outl
-outl:
-	mov dx, di
-	mov eax, esi
-	out dx, eax
-	ret
-
-; STI instruction that can
-; be linked from Rust
-global sti
-sti:
-	sti
-	ret
 
 ; Error puts function for long mode, if we
 ; ever need to extend the file to need it
