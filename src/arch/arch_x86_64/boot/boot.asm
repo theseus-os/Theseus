@@ -8,7 +8,7 @@
 ; except according to those terms.
 
 ; Kernel is linked to run at -2Gb
-KERNEL_BASE equ 0xFFFFFFFF80000000
+KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
 global start
 
@@ -30,9 +30,9 @@ start:
 	; stack (as it grows downwards on x86 systems). This is necessarily done
 	; in assembly as languages such as Rust cannot function without a stack.
 	;
-	; We subtract KERNEL_BASE from the stack address because we are not yet
+	; We subtract KERNEL_OFFSET from the stack address because we are not yet
 	; mapped to the higher half
-	mov esp, stack_top - KERNEL_BASE
+	mov esp, stack_top - KERNEL_OFFSET
 
 	; The multiboot2 specification requires the bootloader to load a pointer
 	; to the multiboot2 information structure in the `ebx` register. Here we
@@ -50,7 +50,7 @@ start:
 	call enable_paging
 
 	; Load the 64-bit GDT
-	lgdt [GDT.ptr_low - KERNEL_BASE]
+	lgdt [GDT.ptr_low - KERNEL_OFFSET]
 
 	; Load the code selector with a far jmp
 	; From now on instructions are 64 bits and this file is invalid
@@ -58,29 +58,29 @@ start:
 
 set_up_page_tables:
 	; Set up recursive paging at the second to last entry
-	mov eax, p4_table - KERNEL_BASE
+	mov eax, p4_table - KERNEL_OFFSET
 	or eax, 11b ; present + writable
-	mov [(p4_table - KERNEL_BASE) + (510 * 8)], eax
+	mov [(p4_table - KERNEL_OFFSET) + (510 * 8)], eax
 
 	; map the first P4 entry to the first p3 table
 	;
 	; This will be changed to the page containing
 	; only the first megabyte before rust starts
-	mov eax, low_p3_table - KERNEL_BASE
+	mov eax, low_p3_table - KERNEL_OFFSET
 	or eax, 11b ; present + writable
-	mov [p4_table - KERNEL_BASE], eax
+	mov [p4_table - KERNEL_OFFSET], eax
 
 	; map the last P4 entry to last P3 table
-	mov eax, high_p3_table - KERNEL_BASE
+	mov eax, high_p3_table - KERNEL_OFFSET
 	or eax, 11b ; present + writable
-	mov [p4_table - KERNEL_BASE + (511 * 8)], eax
+	mov [p4_table - KERNEL_OFFSET + (511 * 8)], eax
 
 	; map first entry of the low P3 table to the kernel table
-	mov eax, kernel_table - KERNEL_BASE
+	mov eax, kernel_table - KERNEL_OFFSET
 	or eax, 11b ; present + writable
-	mov [low_p3_table - KERNEL_BASE], eax
+	mov [low_p3_table - KERNEL_OFFSET], eax
 	; now to the second to highest entry of the high P3 table
-	mov [high_p3_table - KERNEL_BASE + (510 * 8)], eax
+	mov [high_p3_table - KERNEL_OFFSET + (510 * 8)], eax
 
 	; map each P2 entry to a huge 2MiB page
 	mov ecx, 0x0       ; counter variable
@@ -89,16 +89,16 @@ set_up_page_tables:
 	mov eax, 0x200000  ; 2MiB
 	mul ecx            ; start address of ecx-th page
 	or eax, 10000011b  ; present + writable + huge
-	mov [(kernel_table - KERNEL_BASE) + (ecx * 8)], eax ; map ecx-th entry
+	mov [(kernel_table - KERNEL_OFFSET) + (ecx * 8)], eax ; map ecx-th entry
 
 	inc ecx            ; increase counter
 	cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
 	jne .map_kernel_table  ; else map the next entry
 
 	; map the first p2 entry to the megabyte table
-	mov eax, megabyte_table - KERNEL_BASE
+	mov eax, megabyte_table - KERNEL_OFFSET
 	or eax, 11b
-	mov [low_p2_table - KERNEL_BASE], eax
+	mov [low_p2_table - KERNEL_OFFSET], eax
 
 	; identity map the first megabyte
 	mov ecx, 0x0
@@ -107,7 +107,7 @@ set_up_page_tables:
 	mov eax, 4096      ; 4Kb
 	mul ecx            ; start address of ecx-th page
 	or eax, 11b        ; present + writable
-	mov [(megabyte_table - KERNEL_BASE) + (ecx * 8)], eax ; map ecx-th entry
+	mov [(megabyte_table - KERNEL_OFFSET) + (ecx * 8)], eax ; map ecx-th entry
 
 	inc ecx            ; increase counter
 	cmp ecx, 256       ; if counter = 256, the whole megabyte is mapped
@@ -125,7 +125,7 @@ enable_paging:
 	mov cr4, eax
 
 	; load P4 to cr3 register (cpu uses this to access the P4 table)
-	mov eax, p4_table - KERNEL_BASE
+	mov eax, p4_table - KERNEL_OFFSET
 	mov cr3, eax
 
 	; set the no execute, long mode and system call extention
@@ -250,11 +250,11 @@ extern puts
 global start_high
 start_high:
 	; Set up high stack
-	add rsp, KERNEL_BASE
+	add rsp, KERNEL_OFFSET
 
 	; get rid of the old identity map, but
 	; continue to identity map the first Mb
-	mov rax, low_p2_table - KERNEL_BASE
+	mov rax, low_p2_table - KERNEL_OFFSET
 	or rax, 11b ; present + writable
 	mov [rel low_p3_table], rax
 
@@ -263,6 +263,9 @@ start_high:
 	mov ss, ax
 	mov ds, ax
 	mov es, ax
+	mov fs, ax
+	mov gs, ax
+
 
 	; Save the multiboot address
 	push rdi
@@ -272,10 +275,9 @@ start_high:
 	call puts
 	pop rdi
 
-	; Give rust the higher half address to the
-	; multiboot2 information structure
-	add rdi, KERNEL_BASE
-	; call Rust
+	; Give rust the higher half address to the multiboot2 information structure
+	add rdi, KERNEL_OFFSET
+	
 	call rust_main
 
 	; rust main returned, print `OS returned!`
@@ -310,7 +312,7 @@ GDT:
 .end equ $
 .ptr_low:
 	dw .end - GDT - 1
-	dd GDT - KERNEL_BASE
+	dd GDT - KERNEL_OFFSET
 .ptr:
 	dw .end - GDT - 1
 	dq GDT
