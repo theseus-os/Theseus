@@ -159,7 +159,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     
     // initialize our interrupts and IDT
-    let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
+    let double_fault_stack = task_zero_mm_info.alloc_stack(1).expect("could not allocate double fault stack");
     interrupts::init(double_fault_stack.top());
 
 

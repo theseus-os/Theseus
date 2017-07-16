@@ -73,24 +73,12 @@ impl MemoryManagementInfo {
         self.page_table = pgtbl;
     }
 
-    /// Allocates a new userspace stack in the currently-running Task's address space.
+
+    /// Allocates a new stack in the currently-running Task's address space.
     /// The task that called this must be currently running! 
     /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack_user(&mut self, size_in_pages: usize) -> Option<Stack> {
-        self.alloc_stack(size_in_pages, WRITABLE | USER_ACCESSIBLE)
-    }
-
-    /// Allocates a new kernel stack in the currently-running Task's address space.
-    /// The task that called this must be currently running! 
-    /// This checks to make sure that this struct's page_table is an ActivePageTable.
-    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack_kernel(&mut self, size_in_pages: usize) -> Option<Stack> {
-        self.alloc_stack(size_in_pages, WRITABLE)  // not user accessible
-    }
-
-
-    fn alloc_stack(&mut self, size_in_pages: usize, flags: EntryFlags) -> Option<Stack> {
+    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table,
                                         ref mut vmas,
                                         ref mut stack_allocator } = self;
@@ -98,7 +86,7 @@ impl MemoryManagementInfo {
         match page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages, flags) {
+                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
                     vmas.push(stack_vma);
                     Some(stack)
                 }
@@ -382,20 +370,17 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas);
 
 
-    // initialize the heap and map it to randomly chosen physical Frames
+    // The heap memory must be mapped before it can initialized! Map it and then init it here. 
     use self::paging::Page;
     use hole_list_allocator;
-
-    hole_list_allocator::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
-    println_unsafe!("after heap init!");
     let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
     let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
     let heap_flags = paging::WRITABLE;
     let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-    
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
     }
+    hole_list_allocator::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
 
     // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
@@ -410,7 +395,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let stack_alloc_start = Page::containing_address(KERNEL_STACK_BOTTOM); 
         let stack_alloc_end = Page::containing_address(KERNEL_STACK_TOP_ADDR);
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
-        stack_allocator::StackAllocator::new(stack_alloc_range)
+        stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
 

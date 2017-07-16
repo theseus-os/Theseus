@@ -5,13 +5,14 @@ use core::ops::DerefMut;
 
 pub struct StackAllocator {
     pub range: PageIter,
+    pub usermode: bool,
 }
 
 impl StackAllocator {
     /// Create a new `StackAllocator` that allocates random frames
     /// and maps them to the given range of `Page`s.
-    pub fn new(page_range: PageIter) -> StackAllocator {
-        StackAllocator { range: page_range }
+    pub fn new(page_range: PageIter, usermode: bool) -> StackAllocator {
+        StackAllocator { range: page_range, usermode: usermode }
     }
 }
 
@@ -21,12 +22,12 @@ impl StackAllocator {
     /// The given `active_table` can be an `ActivePageTable` or a `Mapper`, 
     /// because `ActivePageTable` automatically derefs into a `Mapper`.
     /// Reserves an unmapped guard page to catch stack overflows. 
+    /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
     pub fn alloc_stack<FA>(&mut self, 
                            active_table: &mut Mapper,
                            frame_allocator: &mut FA,
-                           size_in_pages: usize, 
-                           flags: EntryFlags)
+                           size_in_pages: usize)
                            -> Option<(Stack, VirtualMemoryArea)> 
                            where FA: FrameAllocator {
         if size_in_pages == 0 {
@@ -34,7 +35,7 @@ impl StackAllocator {
         }
 
         // minimum required flag is WRITABLE
-        let flags = flags | WRITABLE; // shadows the flags arg
+        let flags = if self.usermode { USER_ACCESSIBLE | WRITABLE} else { WRITABLE };
 
         // clone the range, since we only want to change it on success
         let mut range = self.range.clone();
