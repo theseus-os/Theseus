@@ -1,26 +1,36 @@
 use memory::paging::*;
 use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
+use memory::Mapper;
+use core::ops::DerefMut;
 
 pub struct StackAllocator {
     pub range: PageIter,
 }
 
 impl StackAllocator {
+    /// Create a new `StackAllocator` that allocates random frames
+    /// and maps them to the given range of `Page`s.
     pub fn new(page_range: PageIter) -> StackAllocator {
         StackAllocator { range: page_range }
     }
 }
 
 impl StackAllocator {
-    /// Returns the newly-allocated stack and a VMA to represent its mapping
-    pub fn alloc_stack<FA: FrameAllocator>(&mut self,
-                                           active_table: &mut ActivePageTable,
-                                           frame_allocator: &mut FA,
-                                           size_in_pages: usize, 
-                                           flags: EntryFlags)
-                                           -> Option<(Stack, VirtualMemoryArea)> {
+    
+    /// Allocates a new stack and maps it to the active page table. 
+    /// The given `active_table` can be an `ActivePageTable` or a `Mapper`, 
+    /// because `ActivePageTable` automatically derefs into a `Mapper`.
+    /// Reserves an unmapped guard page to catch stack overflows. 
+    /// Returns the newly-allocated stack and a VMA to represent its mapping.
+    pub fn alloc_stack<FA>(&mut self, 
+                           active_table: &mut Mapper,
+                           frame_allocator: &mut FA,
+                           size_in_pages: usize, 
+                           flags: EntryFlags)
+                           -> Option<(Stack, VirtualMemoryArea)> 
+                           where FA: FrameAllocator {
         if size_in_pages == 0 {
-            return None; /* a zero sized stack makes no sense */
+            return None; /* a zero sized stack maikes no sense */
         }
 
         // minimum required flag is WRITABLE

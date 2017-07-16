@@ -142,13 +142,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    // early initialization of things like vga console and logging
+    // early initialization of things like vga console and logging that don't require memory system.
     logger::init_logger().expect("WTF: couldn't init logger.");
     println_unsafe!("Logger initialized.");
     
     drivers::early_init();
     
-    println_unsafe!("multiboomultiboot_information_physical_address: {:#x}", multiboot_information_physical_address);
+    println_unsafe!("multiboot_information_physical_address: {:#x}", multiboot_information_physical_address);
     let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
     enable_nxe_bit();
     enable_write_protect_bit();

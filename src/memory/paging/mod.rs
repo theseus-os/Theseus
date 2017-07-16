@@ -13,19 +13,14 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2::BootInformation;
-use super::{MAX_MEMORY_AREAS, VirtualMemoryArea};
+use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
 
 mod entry;
 mod table;
 mod temporary_page;
 mod mapper;
 
-const ENTRY_COUNT: usize = 512;
-const RECURSIVE_INDEX: usize = 510;
-const MAX_PAGE_NUMBER: usize = 0xFFFF_FFFF_FFFF_FFFF / PAGE_SIZE;
 
-pub type PhysicalAddress = usize;
-pub type VirtualAddress = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
@@ -172,14 +167,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE); 
+            self.p4_mut()[RECURSIVE_PAGE_TABLE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE); 
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[RECURSIVE_INDEX].set(backup, PRESENT | WRITABLE);
+            p4_table[RECURSIVE_PAGE_TABLE_INDEX].set(backup, PRESENT | WRITABLE);
             tlb::flush_all();
         }
 
@@ -230,7 +225,8 @@ impl InactivePageTable {
         {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
-            table[RECURSIVE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
+
+            table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
         }
         temporary_page.unmap(active_table);
 
@@ -309,15 +305,15 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size as usize, flags, "Kernel ELF Section");
             index += 1;
 
-            // map the whole range of pages to frames in this section
-            mapper.map_contiguous_range(start_virt_addr, start_phys_addr, section.size as usize, flags, allocator);
+            // map the whole range of frames in this section
+            mapper.map_contiguous_frames(start_phys_addr, section.size as usize, start_virt_addr, flags, allocator);
         }
 
 
         // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_virt_addr = 0xb8000 + super::KERNEL_OFFSET;
         let vga_buffer_flags = WRITABLE;
-        vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr,PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
+        vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr, PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
     });

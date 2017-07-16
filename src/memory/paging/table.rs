@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use memory::paging::entry::*;
-use memory::paging::ENTRY_COUNT;
+use memory::paging::ENTRIES_PER_PAGE_TABLE;
 use memory::FrameAllocator;
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
@@ -23,7 +23,7 @@ pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
                                          // ^ 0o776 means that we're always looking at the 510th entry recursively
 
 pub struct Table<L: TableLevel> {
-    entries: [Entry; ENTRY_COUNT],
+    entries: [Entry; ENTRIES_PER_PAGE_TABLE],
     level: PhantomData<L>,
 }
 

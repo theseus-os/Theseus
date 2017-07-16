@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{VirtualAddress, PhysicalAddress, Page, ENTRY_COUNT};
+use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
 use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
@@ -52,9 +52,9 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().contains(HUGE_PAGE) {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRY_COUNT * ENTRY_COUNT) == 0);
+                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
-                                        number: start_frame.number + page.p2_index() * ENTRY_COUNT +
+                                        number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE +
                                                 page.p1_index(),
                                     });
                     }
@@ -65,7 +65,7 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().contains(HUGE_PAGE) {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRY_COUNT == 0);
+                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
                         }
                     }
@@ -102,18 +102,17 @@ impl Mapper {
 
     /// maps the given VirtualAddress to the contiguous range of Frames 
     /// corresponding to the given PhysicalAddress.
-    /// `size` specifies the length in bytes of the mapping. 
-    /// for example, a `size` of 4096 would map just a single frame.
-    pub fn map_contiguous_range<A>(&mut self, 
-                             virt_addr: VirtualAddress, 
+    /// `size_in_bytes` specifies the length in bytes of the mapping. 
+    pub fn map_contiguous_frames<A>(&mut self, 
                              phys_addr: PhysicalAddress,
-                             size: usize,
+                             size_in_bytes: usize,
+                             virt_addr: VirtualAddress, 
                              flags: EntryFlags, 
                              allocator: &mut A)
         where A: FrameAllocator
     {
         let start_frame = Frame::containing_address(phys_addr);
-        let end_frame = Frame::containing_address(phys_addr + size - 1);
+        let end_frame = Frame::containing_address(phys_addr + size_in_bytes - 1);
         let mut frame_counter = 0;
         for frame in Frame::range_inclusive(start_frame, end_frame) {
             self.map_virtual_address(virt_addr + frame_counter * PAGE_SIZE, frame, flags, allocator);

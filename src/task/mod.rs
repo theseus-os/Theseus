@@ -418,6 +418,7 @@ impl TaskList {
                 stack_allocator: ref curr_stack_allocator,
             } = *curr_mmi_locked;
 
+            
             match curr_page_table {
                 &mut PageTable::Active(ref mut active_table) => {
                     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
@@ -433,10 +434,9 @@ impl TaskList {
                     // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
                     let mut curr_page_to_frame_mappings = {
                         let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_vmas.len());
-                        // println_unsafe!("curr_vmas: {:?}", curr_vmas);
                         for vma in curr_vmas {
                             // println_unsafe!("looking at vma: {:?}", vma);
-                            for page in vma.pages() { // THIS LINE CAUSES A PANIC because .pages() is wrong
+                            for page in vma.pages() { 
                                 // println_unsafe!("   looking at page: {:?}", page);
                                 mappings.push( 
                                     (page, 
@@ -449,20 +449,48 @@ impl TaskList {
                         mappings
                     };
 
+                    // deep copy the vmas vec so we no longer use the current task's vmas
+                    let mut new_vmas = curr_vmas.to_vec(); 
+
+                    // create a new stack allocator for this userspace process
+                    let user_stack_allocator = {
+                        use memory::StackAllocator;
+                        let stack_alloc_start = Page::containing_address(USER_STACK_BOTTOM); 
+                        let stack_alloc_end = Page::containing_address(USER_STACK_TOP_ADDR);
+                        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+                        StackAllocator::new(stack_alloc_range)
+                    };
+                    
+
+                    // set up the userspace module flags/vma, the actual mapping happens in the with() closure below 
+                    assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+                    let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
+                    new_vmas.push(VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name()));
+                    
 
                     active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
-                        let virt_addr = &mut curr_page_to_frame_mappings as *mut _ as usize;
-                        let phys_addr2 = mapper.translate(virt_addr);
-                        // iterate over all of the VMAs from the current MMI and also map them to the new_table
+                        // iterate over all of the VMAs from the current MMI and also map them to the new_inactive_table
                         for (page, frame, flags) in curr_page_to_frame_mappings {
                             // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
                             mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
                         }
 
-                        // mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
-                    });
+                        // map the userspace module into the new address space
+                        // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+                        // println_unsafe!("!! mapping userspace module with name: {}", module.name());
+                        mapper.map_contiguous_frames(module.start_address(), module.size(), 
+                                                     module.start_address() as VirtualAddress, // identity mapping
+                                                     module_flags, frame_allocator.deref_mut());
 
-                    println_unsafe!("\nAfter active_table.with() in spawn_userspace");
+                        // allocate a new userspace stack
+                        
+
+                        // TOOD: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
+
+                    });
+                    
+
+                    // println_unsafe!("\nAfter active_table.with() in spawn_userspace");
 
 
                     // instead of waiting for the next context switch, we switch page tables now 
@@ -472,20 +500,13 @@ impl TaskList {
                     // NOTE: here we are operating in the new userspace Task's address space
 
                     let mut active_table = new_active_table; // make sure we cannot mistakenly access the old active table
-                    let mut new_vmas = curr_vmas.to_vec(); // deep copy the vma vec
 
-                    // map the userspace module into the new address space
-                    println_unsafe!("!! mapping userspace module with name: {}", module.name);
-                    assert!(address_is_page_aligned(module.mod_start as usize), "modules must be page aligned!");
-                    let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
-                    new_vmas.push(VirtualMemoryArea::new(module.mod_start as usize, module.mod_end as usize - module.mod_start as usize, module_flags, module.name));
-                    active_table.identity_map(Frame::containing_address(module.mod_start as usize), module_flags, frame_allocator.deref_mut());
 
 
                     let mut returned_mmi = MemoryManagementInfo {
                         page_table: PageTable::Active(active_table),
                         vmas: new_vmas,
-                        stack_allocator: StackAllocator::new(curr_stack_allocator.range.clone())
+                        stack_allocator: user_stack_allocator,
                     };
 
                     (returned_mmi, old_inactive_table)
@@ -508,7 +529,7 @@ impl TaskList {
             new_task.set_name(String::from(
                 match name {
                     Some(x) => x,
-                    None => module.name,
+                    None => module.name(),
                 }
             ));
 
@@ -545,7 +566,7 @@ impl TaskList {
             // for now, since we don't support ELF sections yet, 
             // we assume that the module's very first address is its main entry point
             unsafe {
-                new_task.arch_state.jump_to_userspace(ustack_top, module.mod_start as usize);
+                new_task.arch_state.jump_to_userspace(ustack_top, module.start_address() as VirtualAddress);
             }
 
             // not quite ready for this one to be scheduled in by our context_switch function

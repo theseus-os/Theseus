@@ -7,12 +7,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{Page, ActivePageTable, VirtualAddress};
+use super::*; //{Page, ActivePageTable, VirtualAddress};
 use super::table::{Table, Level1};
 use memory::{Frame, FrameAllocator, PAGE_SIZE};
 
-
-const TEMPORARY_PAGE_VIRT_ADDR: usize = 0xFFFF_FFFF_FFFF_FFFF;
 
 pub struct TemporaryPage {
     page: Page,
