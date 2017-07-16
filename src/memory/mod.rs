@@ -11,6 +11,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*; //{Page, PageIter, PageTable, ActivePageTable, InactivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
 pub use self::stack_allocator::{StackAllocator, Stack};
 
+mod config;
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
@@ -20,21 +21,12 @@ use spin::{Once, Mutex};
 use core::ops::DerefMut;
 use collections::Vec;
 use collections::string::String;
+pub use self::config::*;
 
 
-pub const PAGE_SIZE: usize = 4096;
+pub type PhysicalAddress = usize;
+pub type VirtualAddress = usize;
 
-pub fn address_is_page_aligned(addr: usize) -> bool {
-    addr % PAGE_SIZE == 0
-}
-
-/// the virtual address where the kernel is mapped to.
-/// i.e., the linear offset between physical memory and kernel memory
-/// so the VGA buffer will be moved from 0xb8000 to 0xFFFFFFFF800b8000.
-pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
-
-
-const MAX_MEMORY_AREAS: usize = 32;
 
 
 /// The one and only frame allocator
@@ -174,9 +166,23 @@ impl Iterator for PhysicalMemoryAreaIter {
 /// as provided by the multiboot2-compliant bootloader
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ModuleArea {
-    pub mod_start: u32,
-    pub mod_end: u32,
-    pub name: &'static str,
+    mod_start: u32,
+    mod_end: u32,
+    name: &'static str,
+}
+
+impl ModuleArea {
+    pub fn start_address(&self) -> PhysicalAddress {
+        self.mod_start as PhysicalAddress
+    }
+
+    pub fn size(&self) -> usize {
+        (self.mod_end - self.mod_start) as usize
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
 }
 
 
@@ -375,29 +381,34 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     let mut kernel_vmas: [VirtualMemoryArea; MAX_MEMORY_AREAS] = Default::default();
     let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas);
 
-    use self::paging::Page;
-    use hole_list_allocator::{HEAP_START, HEAP_SIZE};
 
-    // map the entire heap to randomly chosen physical Frames
-    let heap_start_page = Page::containing_address(HEAP_START);
-    let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1);
+    // initialize the heap and map it to randomly chosen physical Frames
+    use self::paging::Page;
+    use hole_list_allocator;
+
+    hole_list_allocator::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
+    println_unsafe!("after heap init!");
+    let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
+    let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
     let heap_flags = paging::WRITABLE;
-    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(HEAP_START, HEAP_SIZE, heap_flags, "Kernel Heap");
+    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
     
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
     }
 
+
     // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
+
 
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
     task_zero_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
     task_zero_vmas.push(heap_vma);
 
+    // init the kernel stack allocator
     let stack_allocator = {
-        // FIXME: this is not a great choice, the stack should start somewhere higher than the end of the heap so the heap can expand!
-        let stack_alloc_start = heap_end_page + 1; // extra stack pages start right after the heap ends
-        let stack_alloc_end = stack_alloc_start + 100; // 100 pages in size
+        let stack_alloc_start = Page::containing_address(KERNEL_STACK_BOTTOM); 
+        let stack_alloc_end = Page::containing_address(KERNEL_STACK_TOP_ADDR);
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range)
     };
