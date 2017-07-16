@@ -458,7 +458,7 @@ impl TaskList {
                         let stack_alloc_start = Page::containing_address(USER_STACK_BOTTOM); 
                         let stack_alloc_end = Page::containing_address(USER_STACK_TOP_ADDR);
                         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
-                        StackAllocator::new(stack_alloc_range)
+                        StackAllocator::new(stack_alloc_range, true)
                     };
                     
 
@@ -533,7 +533,7 @@ impl TaskList {
                 }
             ));
 
-            let ustack: Stack = new_userspace_mmi.alloc_stack_user(4).expect("spawn_userspace: couldn't allocate new user stack!");
+            let ustack: Stack = new_userspace_mmi.alloc_stack(4).expect("spawn_userspace: couldn't allocate new user stack!");
             let ustack_top: usize  = ustack.top() - mem::size_of::<usize>();
             new_task.ustack = Some(ustack);
 

@@ -27,34 +27,20 @@ use irq_safety::MutexIrqSafe;
 use linked_list_allocator::Heap;
 
 
-//static HEAP: Once<MutexIrqSafe<Heap>> = Once::new(); 
+static HEAP: Once<MutexIrqSafe<Heap>> = Once::new(); 
 
 
-/// higher-half heap gets 512 GB address range starting at 509th P4 entry
-pub const HEAP_START: usize = 0o177777_775_000_000_000_0000;
-/// 1 MiB heap size right now
-pub const HEAP_SIZE: usize = 1 * 1024 * 1024; 
- 
-
-lazy_static! {
-    static ref HEAP: MutexIrqSafe<Heap> = MutexIrqSafe::new(unsafe {
-        Heap::new(HEAP_START, HEAP_SIZE)
-    });
-}
-
-
+/// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
-    assert!(0o177777_775_000_000_000_0000 == start_virt_addr, "start_virt_addr was wrong!");
-    assert!(1*1024*1024 == size_in_bytes, "size_in_bytes was wrong!");
-    //HEAP.call_once(|| {
-    //    MutexIrqSafe::new(unsafe { Heap::new(start_virt_addr, size_in_bytes) })
-    //});
+    HEAP.call_once(|| {
+        MutexIrqSafe::new(unsafe { Heap::new(start_virt_addr, size_in_bytes) })
+    });
 }
 
 #[no_mangle]
 pub extern fn __rust_allocate(size: usize, align: usize) -> *mut u8 {
     HEAP
-        //.try().expect("heap wasn't yet initialized!")
+        .try().expect("heap wasn't yet initialized!")
         .lock().allocate_first_fit(size, align).expect("out of memory")
 }
 
@@ -71,7 +57,7 @@ pub extern fn __rust_allocate_zeroed(size: usize, align: usize) -> *mut u8 {
 pub extern fn __rust_deallocate(ptr: *mut u8, size: usize, align: usize) {
     unsafe { 
         HEAP
-            //.try().expect("heap wasn't yet initialized!")
+            .try().expect("heap wasn't yet initialized!")
             .lock().deallocate(ptr, size, align) 
     };
 }
