@@ -32,7 +32,17 @@ LINKFLAGS += -n ## from phil's blog_os
 
 CROSSDIR ?= prebuilt/x86_64-elf/bin
 
-QEMU_MEMORY ?= -m 10G
+QEMU_MEMORY ?= 10G
+QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio
+
+ifeq ($(int),yes)
+	QEMU_FLAGS += -d int
+endif
+ifeq ($(kvm),yes)
+	QEMU_FLAGS += -enable-kvm
+endif
+
+
 
 .PHONY: all clean run debug iso userspace cargo gdb
 
@@ -53,16 +63,16 @@ clean:
 	@rm -rf build
 
 orun:
-	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio
+	@qemu-system-x86_64 $(QEMU_FLAGS)
 
 odebug:
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio
+	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 run: $(iso) 
-	@qemu-system-x86_64 $(KVM_CMD) $(QEMU_MEMORY) -cdrom $(iso) -s  -serial stdio  -no-reboot -no-shutdown 
+	@qemu-system-x86_64 $(QEMU_FLAGS)
 
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_MEMORY) -cdrom $(iso) -s -S -serial stdio   -no-reboot -no-shutdown  
+	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 #-monitor stdio
 
 gdb:
