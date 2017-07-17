@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
 RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly
+RUSTC_CURRENT_SUPPORTED_DATE := 2017-05-15
 RUSTC_OUTPUT=$(shell rustc --version)
 
 
@@ -40,7 +41,7 @@ ifneq (, $(findstring ${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT}))
 	@echo '   Found proper rust compiler version, proceeding with build...'
 else
 	# @echo '   Error: must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)"!!\n\n'
-	$(error must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)")
+	$(error must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION) from $(RUSTC_CURRENT_SUPPORTED_DATE)")
 	# @exit 1
 endif
 
