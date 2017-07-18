@@ -64,7 +64,7 @@ use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
-use drivers::pci;
+use drivers::ata_pio;
 
 
 
@@ -188,18 +188,25 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
     
-    //testing pio read, write, and IDENTIFY functionality
-    
-    let test_arr: [u16; 256] = [1515;256];
-    
-    println!("Value from ATA identification function: {}", pci::ATADriveExists(0xA0));
-    println!("Value from drive at sector 0 before write:  {}", pci::pio_read(0)[0]);
-    pci::pio_write(1,test_arr);
-    println!("Value from drive at sector 0 after write: {}", pci::pio_read(1)[0]);
+    //testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
+    /*
+    let test_arr: [u16; 256] = [630;256];
+    println!("Value from ATA identification function: {}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
+    let begin = ata_pio::pio_read(0xE0,0);
+    //only use value if Result is ok
+    if begin.is_ok(){
+        println!("Value from drive at sector 0 before write:  {}", begin.unwrap()[0]);
+    }
+    ata_pio::pio_write(0xE0,0,test_arr);
+    let end = ata_pio::pio_read(0xE0,0);
+    if end.is_ok(){
+    println!("Value from drive at sector 0 after write: {}", end.unwrap()[0]);
+    }
+    */
     
 
-    //println!("{} is value", pci::pio_read(0)[1]);
-    /*
+    //println!("{} is value", ata_pio::pio_read(0)[1]);
+    
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
@@ -213,7 +220,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         { tasklist_mut.spawn_kthread(test_loop_2, None, "test_loop_2"); } 
         { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
-    */
+    
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
     schedule!();

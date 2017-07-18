@@ -1,6 +1,6 @@
 pub mod serial_port;
 pub mod input; 
-pub mod pci;
+pub mod ata_pio;
 #[macro_use] pub mod vga_buffer;
 
 /// This is for functions that DO NOT NEED dynamically allocated memory. 
@@ -13,4 +13,5 @@ pub fn early_init() {
 pub fn init() {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init();
+    ata_pio::init_ata_devices();
 }

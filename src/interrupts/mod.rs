@@ -12,7 +12,7 @@ use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
-use drivers::pci;
+use drivers::ata_pio;
 use arch;
 use CONFIG::*;
 use x86_64::structures::gdt::SegmentSelector;
@@ -324,7 +324,7 @@ extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
 
     //let placeholder = 2;
     
-    pci::handle_primary_interrupt();
+    ata_pio::handle_primary_interrupt();
 
     
 
