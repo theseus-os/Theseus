@@ -164,7 +164,7 @@ impl ArchTaskState {
         // Redox sets ths IOPL and interrupt enable flag using the following:  (3 << 12 | 1 << 9)
         // let mut flags: usize = 0;
         // asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
-        let rflags: usize = (3 << 12 | 1 << 9); // what Redox does
+        let rflags: usize = (3 << 12) | (1 << 9); // what Redox does
         
         // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
         // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace

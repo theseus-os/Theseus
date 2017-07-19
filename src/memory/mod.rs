@@ -19,6 +19,7 @@ mod stack_allocator;
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
+use alloc::arc::Arc;
 use collections::Vec;
 use collections::string::String;
 pub use self::config::*;
@@ -40,15 +41,19 @@ pub fn allocate_frame() -> Option<Frame> {
 
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
+/// A kernel stack allocator is required, but a userspace one is not (kernel threads don't have them).
 pub struct MemoryManagementInfo {
     /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
     pub page_table: PageTable,
+    
     /// the list of virtual memory areas mapped currently in this Task's address space
     pub vmas: Vec<VirtualMemoryArea>,
+    
+    /// there is a single kernel stack allocator instance, we just keep a cloned Arc reference to it here.
+    pub kernel_stack_allocator: Arc<Mutex<stack_allocator::StackAllocator>>, // TODO: this shouldn't be public, once we move spawn_userspace code into this module
+
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    /// could potentially merge the stack allocator into the frame allocator
-    pub stack_allocator: stack_allocator::StackAllocator,
-    // TODO: this shouldn't be public, once we move spawn_userspace code into this module
+    pub user_stack_allocator: Option<stack_allocator::StackAllocator>,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 }
 
 impl MemoryManagementInfo {
@@ -74,25 +79,56 @@ impl MemoryManagementInfo {
     }
 
 
-    /// Allocates a new stack in the currently-running Task's address space.
+    /// Allocates a new kernel stack in the currently-running Task's address space.
     /// The task that called this must be currently running! 
     /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+    pub fn alloc_stack_kernel(&mut self, size_in_pages: usize) -> Option<Stack> {
+        self.alloc_stack(size_in_pages, false)
+    }
+
+
+    /// Allocates a new user stack in the currently-running Task's address space.
+    /// The task that called this must be currently running! 
+    /// This checks to make sure that this struct's page_table is an ActivePageTable.
+    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
+    pub fn alloc_stack_user(&mut self, size_in_pages: usize) -> Option<Stack> {
+        self.alloc_stack(size_in_pages, true)
+    }
+
+
+    fn alloc_stack(&mut self, size_in_pages: usize, usermode: bool) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table,
                                         ref mut vmas,
-                                        ref mut stack_allocator } = self;
+                                        ref mut kernel_stack_allocator,
+                                        ref mut user_stack_allocator } = self;                                           
     
         match page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
-                    vmas.push(stack_vma);
-                    Some(stack)
-                }
-                else {
-                    error!("MemoryManagementInfo::alloc_stack: failed to allocate stack!");
-                    None
+
+                if usermode {
+                    if let Some( (ustack, stack_vma) ) = user_stack_allocator.as_mut().expect("MMI::alloc_stack: user_stack_allocator was None!")
+                                                                            .alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
+                        vmas.push(stack_vma);
+                        Some(ustack)
+                    }
+                    else {
+                        error!("MemoryManagementInfo::alloc_stack: failed to allocate user stack!");
+                        None
+                    }
+
+                } else {
+                    let mut ksa = kernel_stack_allocator.lock();
+                    if let Some( (kstack, stack_vma) ) = ksa.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
+                        vmas.push(stack_vma);
+                        Some(kstack)
+                    }
+                    else {
+                        error!("MemoryManagementInfo::alloc_stack: failed to allocate kernel stack!");
+                        None
+                    }
+                    
                 }
             }
             _ => {
@@ -390,10 +426,10 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     task_zero_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
     task_zero_vmas.push(heap_vma);
 
-    // init the kernel stack allocator
-    let stack_allocator = {
-        let stack_alloc_start = Page::containing_address(KERNEL_STACK_BOTTOM); 
-        let stack_alloc_end = Page::containing_address(KERNEL_STACK_TOP_ADDR);
+    // init the kernel stack allocator, a singleton
+    let kernel_stack_allocator = {
+        let stack_alloc_start = Page::containing_address(KERNEL_STACK_ALLOCATOR_BOTTOM); 
+        let stack_alloc_end = Page::containing_address(KERNEL_STACK_ALLOCATOR_TOP_ADDR);
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
@@ -403,7 +439,8 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
         vmas: task_zero_vmas,
-        stack_allocator: stack_allocator, 
+        kernel_stack_allocator: Arc::new(Mutex::new(kernel_stack_allocator)), 
+        user_stack_allocator: None,
     }
 
 }
