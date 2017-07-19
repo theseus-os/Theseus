@@ -59,14 +59,14 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
 
-/// the kernel stack gets the 508th P4 entry of addressability. 
-pub const KERNEL_STACK_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 2) << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in the kernel stack
-pub const KERNEL_STACK_TOP_ADDR: usize = KERNEL_STACK_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
+/// the kernel stack allocator gets the 508th P4 entry of addressability. 
+pub const KERNEL_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 2) << (P4_INDEX_SHIFT + PAGE_SHIFT));
+/// the highest actually usuable address in the kernel stack allocator
+pub const KERNEL_STACK_ALLOCATOR_TOP_ADDR: usize = KERNEL_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
 
 
-/// the userspace stack(s) gets the 507th P4 entry of addressability. 
-pub const USER_STACK_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 3) << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in the kernel stack
-pub const USER_STACK_TOP_ADDR: usize = USER_STACK_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
+/// the userspace stack allocators (one per userspace task) each get the 507th P4 entry of addressability. 
+pub const USER_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 3) << (P4_INDEX_SHIFT + PAGE_SHIFT));
+/// the highest actually usuable address in each userspace stack allocator
+pub const USER_STACK_ALLOCATOR_TOP_ADDR: usize = USER_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
 

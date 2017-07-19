@@ -97,6 +97,8 @@ impl Stack {
         }
     }
 
+    /// the top of this Stack. This address is not dereferenceable, the one right below it is. 
+    /// Highest usable address = top() - sizeof::<usize>()
     pub fn top(&self) -> usize {
         self.top
     }
