@@ -16,32 +16,32 @@
 #![no_std]
 
 
-extern crate irq_safety; // extern crate spin;
+extern crate irq_safety; 
 extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
+extern crate spin;
 
-use irq_safety::MutexIrqSafe; // use spin::Mutex;
+use spin::Once;
+use irq_safety::MutexIrqSafe; 
 use linked_list_allocator::Heap;
 
 
+static HEAP: Once<MutexIrqSafe<Heap>> = Once::new(); 
 
 
-pub const HEAP_START: usize = 0o_000_001_000_000_0000;
-// pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
-pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
-
-
-lazy_static! {
-    // static ref HEAP: Mutex<Heap> = Mutex::new(unsafe {
-    static ref HEAP: MutexIrqSafe<Heap> = MutexIrqSafe::new(unsafe {
-        Heap::new(HEAP_START, HEAP_SIZE)
+/// NOTE: the heap memory MUST BE MAPPED before calling this init function.
+pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
+    HEAP.call_once(|| {
+        MutexIrqSafe::new(unsafe { Heap::new(start_virt_addr, size_in_bytes) })
     });
 }
 
 #[no_mangle]
 pub extern fn __rust_allocate(size: usize, align: usize) -> *mut u8 {
-    HEAP.lock().allocate_first_fit(size, align).expect("out of memory")
+    HEAP
+        .try().expect("heap wasn't yet initialized!")
+        .lock().allocate_first_fit(size, align).expect("out of memory")
 }
 
 #[no_mangle]
@@ -55,7 +55,11 @@ pub extern fn __rust_allocate_zeroed(size: usize, align: usize) -> *mut u8 {
 
 #[no_mangle]
 pub extern fn __rust_deallocate(ptr: *mut u8, size: usize, align: usize) {
-    unsafe { HEAP.lock().deallocate(ptr, size, align) };
+    unsafe { 
+        HEAP
+            .try().expect("heap wasn't yet initialized!")
+            .lock().deallocate(ptr, size, align) 
+    };
 }
 
 #[no_mangle]

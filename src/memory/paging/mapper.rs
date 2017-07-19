@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{VirtualAddress, PhysicalAddress, Page, ENTRY_COUNT};
+use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
 use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
@@ -52,9 +52,9 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().contains(HUGE_PAGE) {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRY_COUNT * ENTRY_COUNT) == 0);
+                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
-                                        number: start_frame.number + page.p2_index() * ENTRY_COUNT +
+                                        number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE +
                                                 page.p1_index(),
                                     });
                     }
@@ -65,7 +65,7 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().contains(HUGE_PAGE) {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRY_COUNT == 0);
+                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
                         }
                     }
@@ -84,22 +84,52 @@ impl Mapper {
     pub fn map_to<A>(&mut self, page: Page, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let mut p3 = self.p4_mut().next_table_create(page.p4_index(), allocator);
-        let mut p2 = p3.next_table_create(page.p3_index(), allocator);
-        let mut p1 = p2.next_table_create(page.p2_index(), allocator);
+        let mut p3 = self.p4_mut().next_table_create(page.p4_index(), flags, allocator);
+        let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
+        let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
 
         assert!(p1[page.p1_index()].is_unused());
         p1[page.p1_index()].set(frame, flags | PRESENT);
     }
 
-    /// creates a mapping for a specific page -> random free frame
+    /// maps the given Page to a randomly selected (newly allocated) Frame
     pub fn map<A>(&mut self, page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let frame = allocator.allocate_frame().expect("out of memory");
+        let frame = allocator.allocate_frame().expect("Mapper::map() -- out of memory trying to alloc frame");
         self.map_to(page, frame, flags, allocator)
     }
 
+    /// maps the given VirtualAddress to the contiguous range of Frames 
+    /// corresponding to the given PhysicalAddress.
+    /// `size_in_bytes` specifies the length in bytes of the mapping. 
+    pub fn map_contiguous_frames<A>(&mut self, 
+                             phys_addr: PhysicalAddress,
+                             size_in_bytes: usize,
+                             virt_addr: VirtualAddress, 
+                             flags: EntryFlags, 
+                             allocator: &mut A)
+        where A: FrameAllocator
+    {
+        let start_frame = Frame::containing_address(phys_addr);
+        let end_frame = Frame::containing_address(phys_addr + size_in_bytes - 1);
+        let mut frame_counter = 0;
+        for frame in Frame::range_inclusive(start_frame, end_frame) {
+            self.map_virtual_address(virt_addr + frame_counter * PAGE_SIZE, frame, flags, allocator);
+            frame_counter += 1;
+        }
+    }
+
+
+    /// maps the Page containing the given virtual address to the given Frame
+    pub fn map_virtual_address<A>(&mut self, virt_addr: VirtualAddress, frame: Frame, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        let page: Page = Page::containing_address(virt_addr);
+        self.map_to(page, frame, flags, allocator)
+    }
+
+    /// maps the given frame's physical address to the same virtual address
     pub fn identity_map<A>(&mut self, frame: Frame, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {

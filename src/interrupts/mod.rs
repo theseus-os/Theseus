@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::MemoryController;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
@@ -16,6 +15,8 @@ use drivers::input::keyboard;
 use drivers::ata_pio;
 use arch;
 use CONFIG::*;
+use x86_64::structures::gdt::SegmentSelector;
+
 
 // expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
@@ -31,6 +32,14 @@ pub mod tsc;
 
 
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
+
+
+static KERNEL_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
+static KERNEL_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
+
 
 lazy_static! {
     static ref IDT: Idt = {
@@ -89,6 +98,40 @@ lazy_static! {
     };
 }
 
+pub enum AvailableSegmentSelector {
+    KernelCode,
+    KernelData,
+    UserCode,
+    UserData,
+    Tss,
+}
+
+
+/// Stupid hack because SegmentSelector is not Cloneable/Copyable
+pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
+    let seg: &SegmentSelector = match selector {
+        AvailableSegmentSelector::KernelCode => {
+            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::KernelData => {
+            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserCode => {
+            USER_CODE_SELECTOR.try().expect("USER_CODE_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserData => {
+            USER_DATA_SELECTOR.try().expect("USER_DATA_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::Tss => {
+            TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
+        }
+    };
+
+    SegmentSelector::new(seg.index(), seg.rpl())
+}
+
+
+
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
@@ -98,36 +141,60 @@ static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<gdt::Gdt> = Once::new();
 
 
-pub fn init(memory_controller: &mut MemoryController) {
+/// initializes the interrupt subsystem and IRQ handlers with exceptions
+/// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
+/// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
+pub fn init(double_fault_stack_top: usize, privilege_stack_top: usize) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
-    use x86_64::structures::gdt::SegmentSelector;
-    use x86_64::instructions::segmentation::set_cs;
+    
+    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
+    use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
 
-    let double_fault_stack =
-        memory_controller.alloc_stack(1).expect("could not allocate double fault stack");
+    
 
     let tss = TSS.call_once(|| {
                                 let mut tss = TaskStateSegment::new();
-                                tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack.top());
+                                tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top);
+                                // I believe that only a single privilege stack is necessary, 
+                                // and that it will be used automatically when going from RIng 3 to Ring 0
+                                // tss.privilege_stack_table[1] = VirtualAddress(privilege_stack_top);
+                                // tss.privilege_stack_table[2] = VirtualAddress(privilege_stack_top);
+                                tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top);
                                 tss
                             });
 
-    let mut code_selector = SegmentSelector(0);
-    let mut tss_selector = SegmentSelector(0);
+
+
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
-        code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment());
-        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(&tss));
+        KERNEL_CODE_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
+        });
+        KERNEL_DATA_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
+        });
+        USER_CODE_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_DATA_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_segment(), PrivilegeLevel::Ring3)
+        });
+        TSS_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0)
+        });
         gdt
     });
     gdt.load();
 
     unsafe {
-        set_cs(code_selector); // reload code segment register
-        load_tss(tss_selector); // load TSS
+        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
+        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
+        
+        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
 
         PIC.initialize();
     }

@@ -1,9 +1,5 @@
 use x86_64;
-
-/// get the real, current value of cr3
-pub fn get_page_table_register() -> usize {
-    x86_64::registers::control_regs::cr3().0 as usize
-}
+use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
 
 pub struct ArchTaskState {
@@ -16,17 +12,6 @@ impl ArchTaskState {
         ArchTaskState { 
             registers: Registers::new(),
         }
-    }
-
-
-    /// Set the page table address.
-    pub fn set_page_table(&mut self, address: usize) {
-        self.registers.set_page_table(address);
-    }
-
-    /// Get the page table address.
-    pub fn get_page_table(&self) -> usize {
-        self.registers.get_page_table()
     }
 
 
@@ -57,18 +42,14 @@ impl ArchTaskState {
         // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
         // No, I don't think so. 
 
-        // swap the pdrp (page tables) iff they're different
-        // threads within the same process will have the same cr3
-        // for example, in UNIX-like OSes, all kernel threads have the same cr3 (single kernel address space).
-        // currently our kernel shares one address space, so the cr3 should only change between user processes
-        asm!("mov $0, cr3" : "=r"(self.registers.cr3) : : "memory" : "intel", "volatile");
-        if next.registers.cr3 != self.registers.cr3 {
-            warn!("cr3 was different! curr={:#x} next={:#x}", self.registers.cr3, next.registers.cr3);
-            asm!("mov cr3, $0" : : "r"(next.registers.cr3) : "memory" : "intel", "volatile");
-        }
-        else {
-            // debug!("cr3 was the same as expected.");
-        }
+
+        /*
+         * NOTE: address spaces are changed in the general `context_switch()` function now, not here!
+         * as such, there is no need to modify cr3 here (it was changed just before calling this function)
+         */
+
+        // self.save_registers();
+        // next.restore_registers();
 
         // save & restore rflags
         asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
@@ -99,6 +80,119 @@ impl ArchTaskState {
 
         // enable interrupts again
         asm!("sti" : : : "memory" : "volatile");
+    }
+
+
+    /// saves current registers into this Task's arch state
+    #[inline(never)]
+    #[naked]
+    unsafe fn save_registers(&mut self) {
+        // save rflags
+        asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
+
+        // save rbx
+        asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
+        
+        // save r12 - r15
+        asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
+
+        // save the stack pointer
+        asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
+
+        // save the base pointer
+        asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
+
+    }
+
+
+    /// restores registers from this Task's arch state
+    #[inline(never)]
+    #[naked]
+    unsafe fn restore_registers(&self) {
+        // restore rflags
+        asm!("push $0 ; popfq" : : "r"(self.registers.rflags) : "memory" : "intel", "volatile");
+
+        // restore rbx
+        asm!("mov rbx, $0" : : "r"(self.registers.rbx) : "memory" : "intel", "volatile");
+        
+        // restore r12 - r15
+        asm!("mov r12, $0" : : "r"(self.registers.r12) : "memory" : "intel", "volatile");
+        asm!("mov r13, $0" : : "r"(self.registers.r13) : "memory" : "intel", "volatile");
+        asm!("mov r14, $0" : : "r"(self.registers.r14) : "memory" : "intel", "volatile");
+        asm!("mov r15, $0" : : "r"(self.registers.r15) : "memory" : "intel", "volatile");
+
+        // restore the stack pointer
+        asm!("mov rsp, $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
+
+        // restore the base pointer
+        asm!("mov rbp, $0" : : "r"(self.registers.rbp) : "memory" : "intel", "volatile");
+
+    }
+
+
+    pub unsafe fn jump_to_userspace(&mut self, stack_ptr: usize, function_ptr: usize) {
+        
+        // first, save the current task's registers
+        self.save_registers();
+        // no need to restore registers here from a next task, since we're using special args instead
+
+
+        // Steps to jumping to userspace:
+        // 1) push stack segment selector (ss), i.e., the user_data segment selector
+        // 2) push the userspace stack pointer
+        // 3) push rflags, the control flags we wish to use
+        // 4) push the code segment selector (cs), i.e., the user_code segment selector
+        // 5) push the instruction pointer (rip) for the start of userspace, e.g., the function pointer
+        // 6) set all other segment registers (ds, es, fs, gs) to the user_data segment, same as (ss)
+        // 7) issue iret to return to userspace
+
+        // println_unsafe!("Jumping to userspace with stack_ptr: {:#x} and function_ptr: {:#x}",
+        //                   stack_ptr, function_ptr);
+        // println_unsafe!("stack: {:#x} {:#x} func: {:#x}", *(stack_ptr as *const usize), *((stack_ptr - 8) as *const usize), 
+        //                 *(function_ptr as *const usize));
+
+
+
+        let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData).0;
+        let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
+
+        
+
+        // Redox sets ths IOPL and interrupt enable flag using the following:  (3 << 12 | 1 << 9)
+        // let mut flags: usize = 0;
+        // asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
+        let rflags: usize = (3 << 12 | 1 << 9); // what Redox does
+        
+        // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
+        // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace
+
+        println_unsafe!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
+
+
+        // for Step 6, save rax before using it below
+        // let mut rax_saved: usize = 0;
+        // asm!("mov $0, rax" : "=r"(rax_saved) : : "memory" : "intel", "volatile");
+        // asm!("mov ax, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov ds, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov es, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov fs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        asm!("mov gs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        // asm!("mov rax, $0" : : "r"(rax_saved) : "memory" : "intel", "volatile");
+
+
+        asm!("push $0" : : "r"(ss as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(stack_ptr) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(rflags) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(cs as usize) : "memory" : "intel", "volatile");
+        asm!("push $0" : : "r"(function_ptr) : "memory" : "intel", "volatile");
+        
+        // Redox pushes an argument here too.
+
+        // final step, use interrupt return to jump into Ring 3 userspace
+        asm!("iretq" : : : "memory" : "intel", "volatile");
     }
 }
 
@@ -183,24 +277,7 @@ impl Registers {
         }
     }
 
-    pub fn create(page_table: usize, stack: usize) -> Registers {
-        let mut regs = Registers::new();
-        regs.set_page_table(page_table);
-        regs.set_stack(stack);
-        regs
-    }
-
-    /// Set the page table address.
-    pub fn set_page_table(&mut self, address: usize) {
-        debug_assert!(self.cr3 == 0, "cr3 was already set!");
-        self.cr3 = address;
-    }
-
-    /// Get the page table address.
-    pub fn get_page_table(&self) -> usize {
-        self.cr3
-    }
-
+  
     /// Set the stack address.
     pub fn set_stack(&mut self, address: usize) {
         debug_assert!(self.rsp == 0, "stack pointer (rsp) was already set!");

@@ -22,7 +22,7 @@
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
-#![feature(drop_types_in_const)] // unsure about this, prompted to add by rust compiler for Once<>
+#![feature(drop_types_in_const)] 
 #![no_std]
 
 
@@ -65,8 +65,6 @@ use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
 use drivers::ata_pio;
-
-
 
 
 
@@ -141,33 +139,38 @@ fn fourth_thread_main(_: u64) -> Option<String> {
 
 
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    // early initialization of things like vga console and logging
+    // early initialization of things like vga console and logging that don't require memory system.
     logger::init_logger().expect("WTF: couldn't init logger.");
     println_unsafe!("Logger initialized.");
     
     drivers::early_init();
     
-
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    println_unsafe!("multiboot_information_physical_address: {:#x}", multiboot_information_physical_address);
+    let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    // set up stack guard page and map the heap pages
-    let mut memory_controller = memory::init(boot_info);
+    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
+    // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
+    let mut task_zero_mm_info: memory::MemoryManagementInfo = memory::init(boot_info);
 
+    
     // initialize our interrupts and IDT
-    interrupts::init(&mut memory_controller);
+    let double_fault_stack = task_zero_mm_info.alloc_stack(1).expect("could not allocate double fault stack");
+    let privilege_stack = task_zero_mm_info.alloc_stack(4).expect("could not allocate privilege stack");
+    interrupts::init(double_fault_stack.top(), privilege_stack.top());
+
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_first_task();
+        tasklist_mut.init_task_zero(task_zero_mm_info);
     }
 
     // initialize the kernel console
@@ -208,15 +211,15 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let second_task = tasklist_mut.spawn(first_thread_main, Some(6),  "first_thread"); }
-        { let second_task = tasklist_mut.spawn(second_thread_main, 6, "second_thread"); }
-        { let second_task = tasklist_mut.spawn(third_thread_main, String::from("hello"), "third_thread"); } 
-        { let second_task = tasklist_mut.spawn(fourth_thread_main, 12345u64, "fourth_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
+        { let second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
+        { let second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
-        { tasklist_mut.spawn(test_loop_1, None, "test_loop_1"); }
-        { tasklist_mut.spawn(test_loop_2, None, "test_loop_2"); } 
-        { tasklist_mut.spawn(test_loop_3, None, "test_loop_3"); } 
+        { tasklist_mut.spawn_kthread(test_loop_1, None, "test_loop_1"); }
+        { tasklist_mut.spawn_kthread(test_loop_2, None, "test_loop_2"); } 
+        { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
     
     // try to schedule in the second task
@@ -227,6 +230,19 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
 	
+
+    // // create and jump to the first userspace thread
+    if false
+    {
+        debug!("trying to jump to userspace");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(0).expect("Error: no userspace modules found!");
+        tasklist_mut.spawn_userspace(module, Some("userspace_module"));
+    }
+
+
+    debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
+
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
     }

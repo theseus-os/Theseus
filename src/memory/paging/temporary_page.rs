@@ -7,9 +7,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{Page, ActivePageTable, VirtualAddress};
+use super::*; //{Page, ActivePageTable, VirtualAddress};
 use super::table::{Table, Level1};
-use memory::{Frame, FrameAllocator};
+use memory::{Frame, FrameAllocator, PAGE_SIZE};
+
 
 pub struct TemporaryPage {
     page: Page,
@@ -17,11 +18,11 @@ pub struct TemporaryPage {
 }
 
 impl TemporaryPage {
-    pub fn new<A>(page: Page, allocator: &mut A) -> TemporaryPage
+    pub fn new<A>(allocator: &mut A) -> TemporaryPage
         where A: FrameAllocator
     {
         TemporaryPage {
-            page: page,
+            page: Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR), // the top of the address space
             allocator: TinyAllocator::new(allocator),
         }
     }
@@ -31,8 +32,11 @@ impl TemporaryPage {
     pub fn map(&mut self, frame: Frame, active_table: &mut ActivePageTable) -> VirtualAddress {
         use super::entry::WRITABLE;
 
-        assert!(active_table.translate_page(self.page).is_none(),
-                "temporary page is already mapped");
+        // find a free page that is not already mapped, starting from the top of the kernel heap region
+        while active_table.translate_page(self.page).is_some() {
+            println_unsafe!("temporary page (number {:#x}) is already mapped, trying the next lowest Page", self.page.number);
+            self.page -= 1;
+        }
         active_table.map_to(self.page, frame, WRITABLE, &mut self.allocator);
         self.page.start_address()
     }

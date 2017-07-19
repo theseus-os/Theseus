@@ -22,7 +22,7 @@ Because OS development requires many language features that Rust considers to be
 Since we're cross compiling for a custom target triple, we need to install the Rust source code:   
 `$ rustup component add rust-src`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   
+We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   cbs
 `$ cargo install xargo`
 
 
@@ -35,6 +35,16 @@ To build and run Theseus in QEMU, simply run:
 
 To run it without rebuilding the whole project:   
 `$ make orun`
+
+### Using the correct version of the Rust compiler
+Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use the latest version of `rustc` that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.
+
+So, if you see a build error about the improper version of `rustc`, follow these instructions to downgrade to the proper version.
+
+`$ rustup toolchain install`    
+`$ rustup default nightly-2017-05-15`  # insert the correct date here    
+`$ rustup component add rust-src`
+
 
 
 ## Using QEMU 

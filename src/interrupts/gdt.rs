@@ -11,11 +11,11 @@ impl Gdt {
     pub fn new() -> Gdt {
         Gdt {
             table: [0; 8],
-            next_free: 1,
+            next_free: 1, // skip the 0th entry because that must be null
         }
     }
 
-    pub fn add_entry(&mut self, entry: Descriptor) -> SegmentSelector {
+    pub fn add_entry(&mut self, entry: Descriptor, privilege: PrivilegeLevel) -> SegmentSelector {
         let index = match entry {
             Descriptor::UserSegment(value) => self.push(value),
             Descriptor::SystemSegment(value_low, value_high) => {
@@ -24,7 +24,7 @@ impl Gdt {
                 index
             }
         };
-        SegmentSelector::new(index as u16, PrivilegeLevel::Ring0)
+        SegmentSelector::new(index as u16, privilege)
     }
 
     fn push(&mut self, value: u64) -> usize {
@@ -51,16 +51,39 @@ impl Gdt {
     }
 }
 
+
+
+/// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/
+///                     and here: http://wiki.osdev.org/Global_Descriptor_Table
 pub enum Descriptor {
+    /// UserSegment is used for both code a data segments, 
+    /// in both the kernel and in user space
     UserSegment(u64),
+    /// SystemSegment is used only for TSS
     SystemSegment(u64, u64),
 }
 
 impl Descriptor {
     pub fn kernel_code_segment() -> Descriptor {
-        let flags = USER_SEGMENT | PRESENT | EXECUTABLE | LONG_MODE;
+        let flags = LONG_MODE | PRESENT | PRIVILEGE_RING0 | USER_SEGMENT | EXECUTABLE | READ_WRITE;
         Descriptor::UserSegment(flags.bits())
     }
+
+    pub fn kernel_data_segment() -> Descriptor {
+        let flags = PRESENT | PRIVILEGE_RING0 | USER_SEGMENT | READ_WRITE | ACCESSED;
+        Descriptor::UserSegment(flags.bits())
+    }
+
+    pub fn user_code_segment() -> Descriptor {
+        let flags = LONG_MODE | PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | EXECUTABLE;
+        Descriptor::UserSegment(flags.bits())
+    }
+
+    pub fn user_data_segment() -> Descriptor {
+        let flags = PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | READ_WRITE | ACCESSED;
+        Descriptor::UserSegment(flags.bits())
+    }
+    
 
     pub fn tss_segment(tss: &'static TaskStateSegment) -> Descriptor {
         use core::mem::size_of;
@@ -86,10 +109,17 @@ impl Descriptor {
 
 bitflags! {
     flags DescriptorFlags: u64 {
-        const CONFORMING        = 1 << 42,
-        const EXECUTABLE        = 1 << 43,
-        const USER_SEGMENT      = 1 << 44,
+        const ACCESSED         = 1 << 40, // should always be zero, don't use this
+        const READ_WRITE       = 1 << 41, // ignored by 64-bit CPU modes
+        // const _CONFORMING       = 1 << 42, // not used yet ??
+        const EXECUTABLE        = 1 << 43, // should be 1 for code segments, 0 for data segments
+        const USER_SEGMENT      = 1 << 44, 
+        const PRIVILEGE_RING0   = 0 << 45, // sets 45 and 46
+        const PRIVILEGE_RING1   = 1 << 45, // sets 45 and 46
+        const PRIVILEGE_RING2   = 2 << 45, // sets 45 and 46
+        const PRIVILEGE_RING3   = 3 << 45, // sets 45 and 46
+        // bit 46 is set above by PRIVILEGE_RING#
         const PRESENT           = 1 << 47,
-        const LONG_MODE         = 1 << 53,
+        const LONG_MODE         = 1 << 53, // data segments should set this bit to 0
     }
 }
