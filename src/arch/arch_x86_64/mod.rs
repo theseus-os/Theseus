@@ -48,6 +48,8 @@ impl ArchTaskState {
          * as such, there is no need to modify cr3 here (it was changed just before calling this function)
          */
 
+        // self.save_registers();
+        // next.restore_registers();
 
         // save & restore rflags
         asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
@@ -81,7 +83,63 @@ impl ArchTaskState {
     }
 
 
-    pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
+    /// saves current registers into this Task's arch state
+    #[inline(never)]
+    #[naked]
+    unsafe fn save_registers(&mut self) {
+        // save rflags
+        asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
+
+        // save rbx
+        asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
+        
+        // save r12 - r15
+        asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
+        asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
+
+        // save the stack pointer
+        asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
+
+        // save the base pointer
+        asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
+
+    }
+
+
+    /// restores registers from this Task's arch state
+    #[inline(never)]
+    #[naked]
+    unsafe fn restore_registers(&self) {
+        // restore rflags
+        asm!("push $0 ; popfq" : : "r"(self.registers.rflags) : "memory" : "intel", "volatile");
+
+        // restore rbx
+        asm!("mov rbx, $0" : : "r"(self.registers.rbx) : "memory" : "intel", "volatile");
+        
+        // restore r12 - r15
+        asm!("mov r12, $0" : : "r"(self.registers.r12) : "memory" : "intel", "volatile");
+        asm!("mov r13, $0" : : "r"(self.registers.r13) : "memory" : "intel", "volatile");
+        asm!("mov r14, $0" : : "r"(self.registers.r14) : "memory" : "intel", "volatile");
+        asm!("mov r15, $0" : : "r"(self.registers.r15) : "memory" : "intel", "volatile");
+
+        // restore the stack pointer
+        asm!("mov rsp, $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
+
+        // restore the base pointer
+        asm!("mov rbp, $0" : : "r"(self.registers.rbp) : "memory" : "intel", "volatile");
+
+    }
+
+
+    pub unsafe fn jump_to_userspace(&mut self, stack_ptr: usize, function_ptr: usize) {
+        
+        // first, save the current task's registers
+        self.save_registers();
+        // no need to restore registers here from a next task, since we're using special args instead
+
+
         // Steps to jumping to userspace:
         // 1) push stack segment selector (ss), i.e., the user_data segment selector
         // 2) push the userspace stack pointer
@@ -96,14 +154,22 @@ impl ArchTaskState {
         // println_unsafe!("stack: {:#x} {:#x} func: {:#x}", *(stack_ptr as *const usize), *((stack_ptr - 8) as *const usize), 
         //                 *(function_ptr as *const usize));
 
+
+
         let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData).0;
         let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
 
-        // for now, disable interrupts from userspace
+        
+
         // Redox sets ths IOPL and interrupt enable flag using the following:  (3 << 12 | 1 << 9)
-        let mut flags: usize = 0;
-        asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
-        let rflags = flags & !0x0200;
+        // let mut flags: usize = 0;
+        // asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
+        let rflags: usize = (3 << 12 | 1 << 9); // what Redox does
+        
+        // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
+        // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace
+
+        println_unsafe!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
 
 
         // for Step 6, save rax before using it below
@@ -123,6 +189,7 @@ impl ArchTaskState {
         asm!("push $0" : : "r"(cs as usize) : "memory" : "intel", "volatile");
         asm!("push $0" : : "r"(function_ptr) : "memory" : "intel", "volatile");
         
+        // Redox pushes an argument here too.
 
         // final step, use interrupt return to jump into Ring 3 userspace
         asm!("iretq" : : : "memory" : "intel", "volatile");

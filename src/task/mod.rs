@@ -79,6 +79,8 @@ pub struct Task {
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between other tasks in the same address space
     pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
+    /// for special behavior of new userspace task
+    pub new_userspace_entry_addr: Option<usize>, 
 }
 
 
@@ -95,6 +97,7 @@ impl Task {
             kstack: None,
             ustack: None,
             mmi: None,
+            new_userspace_entry_addr: None,
         }
     }
 
@@ -131,7 +134,7 @@ impl Task {
     */
 
     /// switches from the current (`self`)  to the given `next` Task
-    /// the lock on
+    /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, mut next: &mut Task) {
         // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
@@ -148,6 +151,53 @@ impl Task {
         next.running_on_cpu = 0; // only one CPU right now
 
 
+        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
+        {
+            use memory::{PageTable, ActivePageTable};
+
+            let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
+            let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
+
+
+            // TODO: we also don't need to switch page tables if we're just moving from any userspace task
+            //       to a kernel thread. We'll need some type of identifier in the Task struct
+            //       in order to identify a task as userspace or kernel thread only
+
+
+            if Arc::ptr_eq(prev_mmi, next_mmi) {
+                // do nothing because we're not changing address spaces
+                // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
+            }
+            else {
+
+                // time to change to a different address space and switch the page tables!
+                debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
+
+                let mut prev_mmi_locked = prev_mmi.lock();
+                let mut next_mmi_locked = next_mmi.lock();
+
+                // let MemoryManagementInfo { page_table: ref mut prev_table, .. } = *prev_mmi_locked;
+                // let MemoryManagementInfo { page_table: ref mut next_table, .. } = *next_mmi_locked;
+
+                let (prev_table_now_inactive, new_active_table) = {
+                    // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
+                    match (&mut prev_mmi_locked.page_table, &mut next_mmi_locked.page_table) {
+                        (&mut PageTable::Active(ref mut active_table), &mut PageTable::Inactive(ref inactive_table)) => {
+                            active_table.switch(inactive_table)
+                        }
+                        _ => {
+                            panic!("context_switch(): prev_table must be an ActivePageTable, next_table must be an InactivePageTable!");
+                        }
+                    }
+                };
+
+                prev_mmi_locked.set_page_table(PageTable::Inactive(prev_table_now_inactive));
+                next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); 
+
+            }
+        }
+       
+       
         // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
         CURRENT_TASK.store(next.id, Ordering::SeqCst);
@@ -156,48 +206,26 @@ impl Task {
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
 
-        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
-        {
-            use memory::{PageTable, ActivePageTable};
+        // perform the actual context switch, with a special case for new userspace tasks
+        match next.new_userspace_entry_addr {
+            Some(module_entry) => {
+                next.new_userspace_entry_addr = None;
+                let ustack_top: usize = next.ustack.as_ref().expect("context_switch(): ustack was None!").top() - mem::size_of::<usize>();
 
-            let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
-            let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
-
-            if Arc::ptr_eq(prev_mmi, next_mmi) {
-                // do nothing because we're not changing address spaces
-                // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
-            }
-            else {
-
-                let mut prev_mmi_locked = prev_mmi.lock();
-                let mut next_mmi_locked = next_mmi.lock();
-
-                // time to change to a different address space and switch the page tables!
-                debug!("context_switch [3]: prev_mmi is different than next_mmi ... switching tables!");
-                let ref mut prev_table = prev_mmi.lock().page_table;
-                let ref mut next_table = next_mmi.lock().page_table;
-                    
-                // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
-                match (prev_table, next_table) {
-                    (&mut PageTable::Active(ref mut active_table), &mut PageTable::Inactive(ref inactive_table)) => {
-                        let (prev_table_now_inactive, new_active_table) = active_table.switch(inactive_table);
-                        prev_mmi_locked.set_page_table(PageTable::Inactive(prev_table_now_inactive));
-                        next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); // constructs an ActivePageTable from the newly-switched-to cr3 value
-                    }
-                    _ => {
-                        panic!("context_switch(): prev_table must be an ActivePageTable, next_table must be an InactivePageTable!");
-                    }
+                // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
+                // for now, since we don't support ELF sections yet,  we assume that the module's very first address is its main entry point
+                unsafe {
+                    self.arch_state.jump_to_userspace(ustack_top, module_entry);
                 }
-
             }
-        }
 
-
-
-        // perform the actual context switch
-        // NOTE:  interrupts are automatically enabled at the end of switch_to
-        unsafe {
-            self.arch_state.switch_to(&next.arch_state);
+            _ => {
+                // just a regular context switch between tasks
+                // NOTE:  interrupts are automatically enabled at the end of switch_to
+                unsafe {
+                    self.arch_state.switch_to(&next.arch_state);
+                }
+            }
         }
 
 
@@ -335,9 +363,9 @@ impl TaskList {
             curr_mmi_cloned = curr_task.mmi.clone();
         }
 
-        let locked_new_task = self.new_task().expect("couldn't create task in spawn_kthread()!");
+        let new_task_locked = self.new_task().expect("couldn't create task in spawn_kthread()!");
         {
-            let mut new_task = locked_new_task.write();
+            let mut new_task = new_task_locked.write();
             new_task.set_name(String::from(thread_name));
 
             // the new kernel thread uses the same address space as the current task (Arc was cloned above)
@@ -383,9 +411,9 @@ impl TaskList {
 
         }
 
-        scheduler::add_task_to_runqueue(locked_new_task.clone());
+        scheduler::add_task_to_runqueue(new_task_locked.clone());
 
-        Ok(locked_new_task)
+        Ok(new_task_locked)
     }
 
 
@@ -396,136 +424,19 @@ impl TaskList {
         use memory::{address_is_page_aligned, StackAllocator, Page, Frame, EntryFlags, PageTable, VirtualMemoryArea, ActivePageTable, InactivePageTable, TemporaryPage, FRAME_ALLOCATOR, FrameAllocator};
         use memory::*;
         
-        ::interrupts::disable_interrupts();
+        debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
+
 
         // get the current tasks's memory info
-        let mut curr_mmi_ptr: Option<Arc<Mutex<MemoryManagementInfo>>>;
-        {
+        let mut curr_mmi_ptr: Option<Arc<Mutex<MemoryManagementInfo>>> = {
             let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_mmi").read();
-            curr_mmi_ptr = curr_task.mmi.clone();
-        }
-
-        // create a new InactivePageTable to represent the new process's address space. 
-        // currently, we manually copy all of the existing mappings into the new MMI struct (kernel mappings).
-        // there is probably a better way to do this by copying the page table frames themselves... or something else. 
-        let (mut new_userspace_mmi, old_inactive_table) =
-        {
-
-            let mut curr_mmi_locked = curr_mmi_ptr.as_mut().expect("spawn_userspace: couldn't get current task's MMI!").lock();
-            let MemoryManagementInfo { 
-                page_table: ref mut curr_page_table, 
-                vmas: ref curr_vmas, 
-                stack_allocator: ref curr_stack_allocator,
-            } = *curr_mmi_locked;
-
-            
-            match curr_page_table {
-                &mut PageTable::Active(ref mut active_table) => {
-                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                    let mut temporary_page = TemporaryPage::new(frame_allocator.deref_mut());
-
-                    // now that we have the current task's active table, we need a new inactive table for the userspace Task
-                    let mut new_inactive_table: InactivePageTable = {
-                        let frame = frame_allocator.allocate_frame().expect("no more frames");
-                        InactivePageTable::new(frame, active_table, &mut temporary_page)
-                    };
-
-
-                    // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
-                    let mut curr_page_to_frame_mappings = {
-                        let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_vmas.len());
-                        for vma in curr_vmas {
-                            // println_unsafe!("looking at vma: {:?}", vma);
-                            for page in vma.pages() { 
-                                // println_unsafe!("   looking at page: {:?}", page);
-                                mappings.push( 
-                                    (page, 
-                                     active_table.translate_page(page).expect("page in curr_vma was not mapped!?!"),
-                                     vma.flags(),
-                                    )
-                                );
-                            }
-                        }
-                        mappings
-                    };
-
-                    // deep copy the vmas vec so we no longer use the current task's vmas
-                    let mut new_vmas = curr_vmas.to_vec(); 
-
-                    // create a new stack allocator for this userspace process
-                    let user_stack_allocator = {
-                        use memory::StackAllocator;
-                        let stack_alloc_start = Page::containing_address(USER_STACK_BOTTOM); 
-                        let stack_alloc_end = Page::containing_address(USER_STACK_TOP_ADDR);
-                        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
-                        StackAllocator::new(stack_alloc_range, true)
-                    };
-                    
-
-                    // set up the userspace module flags/vma, the actual mapping happens in the with() closure below 
-                    assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
-                    let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
-                    new_vmas.push(VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name()));
-                    
-
-                    active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
-                        // iterate over all of the VMAs from the current MMI and also map them to the new_inactive_table
-                        for (page, frame, flags) in curr_page_to_frame_mappings {
-                            // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
-                            mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
-                        }
-
-                        // map the userspace module into the new address space
-                        // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-                        // println_unsafe!("!! mapping userspace module with name: {}", module.name());
-                        mapper.map_contiguous_frames(module.start_address(), module.size(), 
-                                                     module.start_address() as VirtualAddress, // identity mapping
-                                                     module_flags, frame_allocator.deref_mut());
-
-                        // allocate a new userspace stack
-                        
-
-                        // TOOD: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
-
-                    });
-                    
-
-                    // println_unsafe!("\nAfter active_table.with() in spawn_userspace");
-
-
-                    // instead of waiting for the next context switch, we switch page tables now 
-                    // such that the new userspace task can be setup (heap/stack) and started immediately
-                    let (old_inactive_table, mut new_active_table) = active_table.switch(&new_inactive_table);
-
-                    // NOTE: here we are operating in the new userspace Task's address space
-
-                    let mut active_table = new_active_table; // make sure we cannot mistakenly access the old active table
-
-
-
-                    let mut returned_mmi = MemoryManagementInfo {
-                        page_table: PageTable::Active(active_table),
-                        vmas: new_vmas,
-                        stack_allocator: user_stack_allocator,
-                    };
-
-                    (returned_mmi, old_inactive_table)
-
-                }
-                _ => {
-                    panic!("spawn_userspace(): current page_table must be an ActivePageTable!");
-                }
-            }
+            curr_task.mmi.clone()
         };
 
-        // NOTE: here we are operating in the new userspace Task's address space
-        curr_mmi_ptr.as_mut().expect("spawn_userspace: after switch, couldn't get current task's MMI!")
-            .lock().set_page_table(PageTable::Inactive(old_inactive_table));
 
-
-        let locked_new_task = self.new_task().expect("couldn't create task in spawn_userspace()!");
+        let new_task_locked = self.new_task().expect("couldn't create task in spawn_userspace()!");
         {
-            let mut new_task = locked_new_task.write();
+            let mut new_task = new_task_locked.write();
             new_task.set_name(String::from(
                 match name {
                     Some(x) => x,
@@ -533,18 +444,120 @@ impl TaskList {
                 }
             ));
 
-            let ustack: Stack = new_userspace_mmi.alloc_stack(4).expect("spawn_userspace: couldn't allocate new user stack!");
-            let ustack_top: usize  = ustack.top() - mem::size_of::<usize>();
-            new_task.ustack = Some(ustack);
 
+            let mut ustack: Option<Stack> = None;
+
+            // create a new InactivePageTable to represent the new process's address space. 
+            // currently, we manually copy all of the existing mappings into the new MMI struct (kernel mappings).
+            // there is probably a better way to do this by copying the page table frames themselves... or something else. 
+            let new_userspace_mmi = {
+
+                let mut curr_mmi_locked = curr_mmi_ptr.as_mut().expect("spawn_userspace: couldn't get current task's MMI!").lock();
+                let MemoryManagementInfo { 
+                    page_table: ref mut curr_page_table, 
+                    vmas: ref curr_vmas, 
+                    stack_allocator: ref curr_stack_allocator,
+                } = *curr_mmi_locked;
+
+                
+                match curr_page_table {
+                    &mut PageTable::Active(ref mut active_table) => {
+                        let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                        let mut temporary_page = TemporaryPage::new(frame_allocator.deref_mut());
+
+                        // now that we have the current task's active table, we need a new inactive table for the userspace Task
+                        let mut new_inactive_table: InactivePageTable = {
+                            let frame = frame_allocator.allocate_frame().expect("no more frames");
+                            InactivePageTable::new(frame, active_table, &mut temporary_page)
+                        };
+
+
+                        // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
+                        let mut curr_page_to_frame_mappings = {
+                            let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_vmas.len());
+                            for vma in curr_vmas {
+                                // println_unsafe!("looking at vma: {:?}", vma);
+                                for page in vma.pages() { 
+                                    // println_unsafe!("   looking at page: {:?}", page);
+                                    mappings.push( 
+                                        (page, 
+                                        active_table.translate_page(page).expect("page in curr_vma was not mapped!?!"),
+                                        vma.flags(),
+                                        )
+                                    );
+                                }
+                            }
+                            mappings
+                        };
+
+                        // deep copy the vmas vec so we no longer use the current task's vmas
+                        let mut new_vmas = curr_vmas.to_vec(); 
+
+                        // create a new stack allocator for this userspace process
+                        let mut user_stack_allocator = {
+                            use memory::StackAllocator;
+                            let stack_alloc_start = Page::containing_address(USER_STACK_BOTTOM); 
+                            let stack_alloc_end = Page::containing_address(USER_STACK_TOP_ADDR);
+                            let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+                            StackAllocator::new(stack_alloc_range, true)
+                        };
+                        
+
+                        // set up the userspace module flags/vma, the actual mapping happens in the with() closure below 
+                        assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+                        let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
+                        new_vmas.push(VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name()));
+                        
+
+                        active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
+                            // iterate over all of the VMAs from the current MMI and also map them to the new_inactive_table
+                            for (page, frame, flags) in curr_page_to_frame_mappings {
+                                // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
+                                mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
+                            }
+
+                            // map the userspace module into the new address space
+                            // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+                            // println_unsafe!("!! mapping userspace module with name: {}", module.name());
+                            mapper.map_contiguous_frames(module.start_address(), module.size(), 
+                                                        module.start_address() as VirtualAddress, // identity mapping
+                                                        module_flags, frame_allocator.deref_mut());
+
+                            // allocate a new userspace stack
+                            let (stack, stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
+                                                            .expect("spawn_userspace: couldn't allocate new user stack!");
+                            ustack = Some(stack); 
+                            new_vmas.push(stack_vma);
+
+                            // TOOD: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
+
+                        });
+                        
+
+                        println_unsafe!("\nAfter active_table.with() in spawn_userspace");
+
+                        // return a new mmi struct to the enclosing scope
+                        MemoryManagementInfo {
+                            page_table: PageTable::Inactive(new_inactive_table),
+                            vmas: new_vmas,
+                            stack_allocator: user_stack_allocator,
+                        }
+
+                    }
+                    _ => {
+                        panic!("spawn_userspace(): current page_table must be an ActivePageTable!");
+                    }
+                }
+            };
+
+            assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
+            new_task.ustack = ustack;
 
             new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
-            // map the userspace module into our new address space
-            // reminder that we are already in that address space
+
 
             // TODO: revamp this to use the stack_allocator api, which is safer with a guard page!
-            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kstackk
-
+            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kstack
             // we're just setting up this kstack as a backup, i don't think it will be used yet
             let kstack_offset = kstack.len() - mem::size_of::<usize>();
             unsafe {
@@ -554,31 +567,22 @@ impl TaskList {
             new_task.kstack = Some(kstack);
 
 
-            // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
-            // let ustack_offset = ustack.len() - mem::size_of::<usize>();
-            // unsafe {
-            //     let ustack_top = (ustack.as_ptr() as usize) + ustack_offset;
-            //     new_task.ustack = Some(ustack);
-            //     new_task.arch_state.jump_to_userspace(ustack_top, 0); //FIXME THIS IS DEF WRONG 
-            // }
-
-            // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
-            // for now, since we don't support ELF sections yet, 
-            // we assume that the module's very first address is its main entry point
-            unsafe {
-                new_task.arch_state.jump_to_userspace(ustack_top, module.start_address() as VirtualAddress);
-            }
-
-            // not quite ready for this one to be scheduled in by our context_switch function
-            // TODO: add this back in
-            // new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
+            // TODO: when we support ELF, the start address of the module won't just be its identity-mapped first address!
+            debug!("spawn_userspace [4]: module start addr: {:#x}", module.start_address());
+            new_task.new_userspace_entry_addr = Some(module.start_address());
+            new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
         }
 
-        // TODO: add this back in
-        // scheduler::add_task_to_runqueue(locked_new_task.clone());
 
-        Ok(locked_new_task)
+        scheduler::add_task_to_runqueue(new_task_locked.clone());
+
+
+        debug!("spawn_userspace [end]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
+
+        Ok(new_task_locked)
     }
+
+
 
 
 
