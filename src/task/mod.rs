@@ -206,27 +206,34 @@ impl Task {
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
 
-        // perform the actual context switch, with a special case for new userspace tasks
-        match next.new_userspace_entry_addr {
-            Some(module_entry) => {
-                next.new_userspace_entry_addr = None;
-                let ustack_top: usize = next.ustack.as_ref().expect("context_switch(): ustack was None!").top() - mem::size_of::<usize>();
-
-                // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
-                // for now, since we don't support ELF sections yet,  we assume that the module's very first address is its main entry point
-                unsafe {
-                    self.arch_state.jump_to_userspace(ustack_top, module_entry);
-                }
-            }
-
-            _ => {
-                // just a regular context switch between tasks
-                // NOTE:  interrupts are automatically enabled at the end of switch_to
-                unsafe {
-                    self.arch_state.switch_to(&next.arch_state);
-                }
-            }
+        // NOTE:  interrupts are automatically enabled at the end of switch_to
+        unsafe {
+            self.arch_state.switch_to(&next.arch_state);
         }
+
+
+
+        // // perform the actual context switch, with a special case for new userspace tasks
+        // match next.new_userspace_entry_addr {
+        //     Some(module_entry) => {
+        //         next.new_userspace_entry_addr = None;
+        //         let ustack_top: usize = next.ustack.as_ref().expect("context_switch(): ustack was None!").top() - mem::size_of::<usize>();
+
+        //         // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
+        //         // for now, since we don't support ELF sections yet,  we assume that the module's very first address is its main entry point
+        //         unsafe {
+        //             self.arch_state.jump_to_userspace(ustack_top, module_entry);
+        //         }
+        //     }
+
+        //     _ => {
+        //         // just a regular context switch between tasks
+        //         // NOTE:  interrupts are automatically enabled at the end of switch_to
+        //         unsafe {
+        //             self.arch_state.switch_to(&next.arch_state);
+        //         }
+        //     }
+        // }
 
 
     }
