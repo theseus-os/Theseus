@@ -142,7 +142,8 @@ static GDT: Once<gdt::Gdt> = Once::new();
 
 /// initializes the interrupt subsystem and IRQ handlers with exceptions
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
-pub fn init(double_fault_stack_top: usize) {
+/// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
+pub fn init(double_fault_stack_top: usize, privilege_stack_top: usize) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
 
     
@@ -155,6 +156,11 @@ pub fn init(double_fault_stack_top: usize) {
 
     let tss = TSS.call_once(|| {
                                 let mut tss = TaskStateSegment::new();
+                                tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top);
+                                // I believe that only a single privilege stack is necessary, 
+                                // and that it will be used automatically when going from RIng 3 to Ring 0
+                                // tss.privilege_stack_table[1] = VirtualAddress(privilege_stack_top);
+                                // tss.privilege_stack_table[2] = VirtualAddress(privilege_stack_top);
                                 tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top);
                                 tss
                             });
