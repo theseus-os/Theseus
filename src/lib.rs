@@ -212,7 +212,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 
     // // create and jump to the first userspace thread
-    if false
+    if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   

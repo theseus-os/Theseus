@@ -171,13 +171,11 @@ impl Task {
             else {
 
                 // time to change to a different address space and switch the page tables!
-                debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
+                // debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
 
                 let mut prev_mmi_locked = prev_mmi.lock();
                 let mut next_mmi_locked = next_mmi.lock();
 
-                // let MemoryManagementInfo { page_table: ref mut prev_table, .. } = *prev_mmi_locked;
-                // let MemoryManagementInfo { page_table: ref mut next_table, .. } = *next_mmi_locked;
 
                 let (prev_table_now_inactive, new_active_table) = {
                     // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
@@ -210,31 +208,6 @@ impl Task {
         unsafe {
             self.arch_state.switch_to(&next.arch_state);
         }
-
-
-
-        // // perform the actual context switch, with a special case for new userspace tasks
-        // match next.new_userspace_entry_addr {
-        //     Some(module_entry) => {
-        //         next.new_userspace_entry_addr = None;
-        //         let ustack_top: usize = next.ustack.as_ref().expect("context_switch(): ustack was None!").top() - mem::size_of::<usize>();
-
-        //         // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
-        //         // for now, since we don't support ELF sections yet,  we assume that the module's very first address is its main entry point
-        //         unsafe {
-        //             self.arch_state.jump_to_userspace(ustack_top, module_entry);
-        //         }
-        //     }
-
-        //     _ => {
-        //         // just a regular context switch between tasks
-        //         // NOTE:  interrupts are automatically enabled at the end of switch_to
-        //         unsafe {
-        //             self.arch_state.switch_to(&next.arch_state);
-        //         }
-        //     }
-        // }
-
 
     }
 
@@ -431,7 +404,7 @@ impl TaskList {
 
         // get the current tasks's memory info
         let mut curr_mmi_ptr: Option<Arc<Mutex<MemoryManagementInfo>>> = {
-            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_mmi").read();
+            let curr_task = self.get_current().expect("spawn_userspace(): get_current failed in getting curr_mmi").read();
             curr_task.mmi.clone()
         };
 
@@ -446,7 +419,6 @@ impl TaskList {
                 }
             ));
 
-
             let mut ustack: Option<Stack> = None;
 
             // create a new InactivePageTable to represent the new process's address space. 
@@ -457,8 +429,19 @@ impl TaskList {
                 let mut curr_mmi_locked = curr_mmi_ptr.as_mut().expect("spawn_userspace: couldn't get current task's MMI!").lock();
                 
                 // create a new kernel stack for this userspace task, and make sure it's also mapped in the current Task's (task_zero) address space too!
-                let kstack: Option<Stack> = curr_mmi_locked.alloc_stack_kernel(4);
-                
+                let kstack: Stack = curr_mmi_locked.alloc_stack_kernel(4).expect("spawn_userspace: couldn't alloc_stack_kernel!");
+                // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
+                let func_ptr: usize = kstack.top() - mem::size_of::<usize>(); // the top-most usable address on the kstack
+                unsafe { 
+                    *(func_ptr as *mut usize) = userspace_wrapper as usize;
+                    debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, userspace_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, userspace_wrapper as usize);
+                }
+                new_task.kstack = Some(kstack);
+                new_task.arch_state.set_stack(func_ptr); // the top of the kstack
+                // unlike kthread_spawn, we don't need any arguments at the bottom of the stack,
+                // because we can just utilize the task's userspace entry point member
+
+
                 // destructure the curr task's MMI so we can access its page table and vmas
                 let MemoryManagementInfo { 
                     page_table: ref mut curr_page_table, 
@@ -542,8 +525,6 @@ impl TaskList {
 
                         });
                         
-
-                        println_unsafe!("\nAfter active_table.with() in spawn_userspace");
 
                         // return a new mmi struct to the enclosing scope
                         MemoryManagementInfo {
@@ -724,9 +705,37 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
 
 /// this is invoked by the kernel component of a new userspace task 
-/// (using its kernel stack) and jumps to userspace using its userspace stack
+/// (using its kernel stack) and jumps to userspace using its userspace stack.
+/// It runs 
 fn userspace_wrapper() -> ! {
 
+    debug!("userspace_wrapper [0]");
+
+    // the three things we need to invoke jump_to_userspace
+    let mut current_task: *mut Task = 0 as *mut Task; 
+    let ustack_top: usize;
+    let entry_func: usize; 
+
+    { // scoped to release tasklist lock before calling jump_to_userspace
+        let tasklist = get_tasklist().read();
+        let mut currtask = tasklist.get_current().expect("userspace_wrapper(): get_current failed").write();
+        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top() - mem::size_of::<usize>();
+        entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
+        current_task = currtask.deref_mut() as *mut Task;
+    }
+
+    debug!("userspace_wrapper [1]: ustack_top: {:#x}, module_entry: {:#x}", ustack_top, entry_func);
+
+
+    assert!(current_task as usize != 0, "userspace_wrapper(): current_task was null!");
+    // SAFE: current_task is checked for null
+    unsafe {
+        let mut curr: &mut Task = &mut (*current_task);
+        curr.arch_state.jump_to_userspace(ustack_top, entry_func);
+    }
+
+
+    panic!("userspace_wrapper [end]: jump_to_userspace returned!!!");
 
     loop { }
 }

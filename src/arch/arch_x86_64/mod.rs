@@ -133,11 +133,11 @@ impl ArchTaskState {
     }
 
 
-    pub unsafe fn jump_to_userspace(&mut self, stack_ptr: usize, function_ptr: usize) {
+    pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         
-        // first, save the current task's registers
-        self.save_registers();
-        // no need to restore registers here from a next task, since we're using special args instead
+        // // first, save the current task's registers
+        // self.save_registers();
+        // // no need to restore registers here from a next task, since we're using special args instead
 
 
         // Steps to jumping to userspace:
@@ -169,7 +169,7 @@ impl ArchTaskState {
         // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
         // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace
 
-        println_unsafe!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
+        // println_unsafe!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
 
 
         // for Step 6, save rax before using it below
