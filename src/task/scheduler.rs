@@ -14,7 +14,7 @@ use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 /// Interrupts MUST be disabled before this function runs. 
 pub unsafe fn schedule() -> bool {
 
-    let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
+    // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("schedule [0]: current_taskid={}", current_taskid.into());
 
     let mut current_task = 0 as *mut Task; // a null Task ptr

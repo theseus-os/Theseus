@@ -284,6 +284,32 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
     loop {}
 }
 
+
+extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
+    use x86_64::registers::control_regs;
+    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
+                                  {:#b}\n{:#?}",
+             error_code,
+             stack_frame);
+
+
+    // TODO: kill the offending process
+    loop {}
+}
+
+
+extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
+    use x86_64::registers::control_regs;
+    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+                                  {:?}\n{:#?}",
+             control_regs::cr2(),
+             error_code,
+             stack_frame);
+    loop {}
+}
+
+
+
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
     // this is how to write something with literally ZERO locking
