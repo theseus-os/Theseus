@@ -64,7 +64,7 @@ use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use interrupts::tsc;
-use drivers::ata_pio;
+use drivers::{ata_pio, pci};
 
 
 
@@ -204,10 +204,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     println!("Value from drive at sector 0 after write: {}", end.unwrap()[0]);
     }
     */
-    
 
-    //println!("{} is value", ata_pio::pio_read(0)[1]);
-    
+    pci::init_pci_buses();
+    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
+    let bus_zero = bus_array[0];
+    let slot_zero = bus_zero.connected_devices[0]; 
+    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
+    println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     // create a second task to test context switching
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    

@@ -69,6 +69,7 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 run: $(iso) 
+<<<<<<< HEAD
 	#@qemu-system-x86_64  -cdrom $(iso) -s  -serial stdio  -no-shutdown  -d int
 	#drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 	#@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-shutdown -cpu Haswell -hda README.md
@@ -76,7 +77,10 @@ run: $(iso)
 	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) \
 	-drive format=raw,file=random_data2.img,if=none,id=mydisk \
 	-device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 \
-	-s  -serial stdio  -no-shutdown -cpu Haswell -net none
+	-s  -serial stdio  -no-shutdown -cpu Haswell
+=======
+	@qemu-system-x86_64 $(QEMU_FLAGS)
+>>>>>>> 216768cefa536343db54f892a618ae29e04f7b39
 
 debug: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S

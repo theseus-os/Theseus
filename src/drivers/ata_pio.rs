@@ -6,9 +6,6 @@ use interrupts::pit_clock;
 
 
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
-//data written here sets information at CONFIG_DATA
-const CONFIG_ADDRESS: u16 = 0xCF8;
-const CONFIG_DATA: u16 = 0xCFC;
 
 //port data is read/write from
 const PRIMARY_DATA_PORT_ADDRESS: u16 = 0x1F0;
@@ -46,10 +43,7 @@ static COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_COMMAND_IO_AD
 
 //holds AtaIdentifyData for primary and secondary bus
 pub static ATA_DEVICES: Once<AtaDevices> = Once::new();
-//access to CONFIG_ADDRESS 
-static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_ADDRESS));
-//acccess to CONFIG_DATA
-static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DATA));
+
 
 
 //port data is read/write from
@@ -68,29 +62,16 @@ const SECONDARY_COMMAND_IO_ADDRESS: u16 = 0x177;
 
 
 //initializing addresses mentioned above
-static SECONDARY_BUS_SELECT: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_BUS_SELECT_ADDRESS));
-static SECONDARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(PRIMARY_DATA_PORT_ADDRESS));
-static SECONDARY_ERROR_REGISTER: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_ERROR_REGISTER_ADDRESS));
-static SECONDARY: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_SECTORCOUNT_ADDRESS));
-static SECONDARY_LBALO: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBALO_ADDRESS));
-static SECONDARY_LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAMID_ADDRESS));
-static SECONDARY_LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAHI_ADDRESS));
+static SECONDARY_BUS_SELECT: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_BUS_SELECT_ADDRESS));
+static SECONDARY_DATA_PORT: Mutex<Port<u16>> = Mutex::new( Port::new(SECONDARY_DATA_PORT_ADDRESS));
+static SECONDARY_ERROR_REGISTER: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_ERROR_REGISTER_ADDRESS));
+static SECONDARY: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_SECTORCOUNT_ADDRESS));
+static SECONDARY_LBALO: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_LBALO_ADDRESS));
+static SECONDARY_LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_LBAMID_ADDRESS));
+static SECONDARY_LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_LBAHI_ADDRESS));
 static SECONDARY_COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_COMMAND_IO_ADDRESS));
 
 
-
-//used to read from PCI config, additionally initializes PCI buses to be used
-//might be better to set input paramters as u8 (method used in osdev)
-pub fn pciConfigRead(bus: u32, slot: u32, func: u32, offset: u32)->u16{
-    
-    //data to be written to CONFIG_ADDRESS
-    let address:u32 = ((bus<<16) | (slot<<11) |  (func << 8) | (offset&0xfc) | 0x80000000);
-
-    unsafe{PCI_CONFIG_ADDRESS_PORT.lock().write(address);}
-
-    ((PCI_CONFIG_DATA_PORT.lock().read() >> (offset&2) * 8) & 0xffff)as u16
-
-}
 
 
 pub fn init_ata_devices(){
