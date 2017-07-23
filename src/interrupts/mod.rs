@@ -64,7 +64,7 @@ lazy_static! {
         // missing: 0x0c stack segment exception
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
-        // reserved: 0x0f vector 15  
+        // reserved: 0x0f vector 15
         // missing: 0x10 floating point exception
         // missing: 0x11 alignment check exception
         // missing: 0x12 machine check exception
@@ -285,6 +285,32 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
     loop {}
 }
 
+
+extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
+    use x86_64::registers::control_regs;
+    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
+                                  {:#b}\n{:#?}",
+             error_code,
+             stack_frame);
+
+
+    // TODO: kill the offending process
+    loop {}
+}
+
+
+extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
+    use x86_64::registers::control_regs;
+    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+                                  {:?}\n{:#?}",
+             control_regs::cr2(),
+             error_code,
+             stack_frame);
+    loop {}
+}
+
+
+
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
     // this is how to write something with literally ZERO locking
@@ -319,7 +345,7 @@ extern "x86-interrupt" fn rtc_handler(stack_frame:&mut ExceptionStackFrame ) {
     unsafe { PIC.notify_end_of_interrupt(0x28); }
 
     //let placeholder = 2;
-    
+    //trace!("wow");
     rtc::handle_rtc_interrupt();
 
     

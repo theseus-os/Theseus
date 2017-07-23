@@ -73,7 +73,7 @@ pub struct Task {
     /// the simple name of this Task
     pub name: String,
     /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
-    pub kstack: Option<Box<[u8]>>,
+    pub kstack: Option<Stack>,
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Stack>,
     /// memory management details: page tables, mappings, allocators, etc.
@@ -171,13 +171,11 @@ impl Task {
             else {
 
                 // time to change to a different address space and switch the page tables!
-                debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
+                // debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
 
                 let mut prev_mmi_locked = prev_mmi.lock();
                 let mut next_mmi_locked = next_mmi.lock();
 
-                // let MemoryManagementInfo { page_table: ref mut prev_table, .. } = *prev_mmi_locked;
-                // let MemoryManagementInfo { page_table: ref mut next_table, .. } = *next_mmi_locked;
 
                 let (prev_table_now_inactive, new_active_table) = {
                     // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
@@ -211,36 +209,11 @@ impl Task {
             self.arch_state.switch_to(&next.arch_state);
         }
 
-
-
-        // // perform the actual context switch, with a special case for new userspace tasks
-        // match next.new_userspace_entry_addr {
-        //     Some(module_entry) => {
-        //         next.new_userspace_entry_addr = None;
-        //         let ustack_top: usize = next.ustack.as_ref().expect("context_switch(): ustack was None!").top() - mem::size_of::<usize>();
-
-        //         // to jump to userspace, we need to set the new task's rsp (stack pointer) to the top of our newly-allocated ustack
-        //         // for now, since we don't support ELF sections yet,  we assume that the module's very first address is its main entry point
-        //         unsafe {
-        //             self.arch_state.jump_to_userspace(ustack_top, module_entry);
-        //         }
-        //     }
-
-        //     _ => {
-        //         // just a regular context switch between tasks
-        //         // NOTE:  interrupts are automatically enabled at the end of switch_to
-        //         unsafe {
-        //             self.arch_state.switch_to(&next.arch_state);
-        //         }
-        //     }
-        // }
-
-
     }
 
 
 
-    pub fn get_kstack(&self) -> Option<&Box<[u8]>> {
+    pub fn get_kstack(&self) -> Option<&Stack> {
         self.kstack.as_ref()
     }
 }
@@ -378,20 +351,19 @@ impl TaskList {
             // the new kernel thread uses the same address space as the current task (Arc was cloned above)
             new_task.mmi = curr_mmi_cloned;
 
-            // create and set up a new 16KB kstack
-            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kernel stack
+            // create and set up a new kstack
+            let kstack: Stack = {
+                let mut new_mmi = new_task.mmi.as_mut().expect("spawn_kthread: new_task.mmi was None!").lock();
+                new_mmi.alloc_stack_kernel(4).expect("spawn_kthread: couldn't allocate kstack!")
+            };
 
             // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
             // as such, putting a function pointer on the top of the kstack will cause it to be invoked.
-            let offset = kstack.len() - mem::size_of::<usize>();
-            unsafe {
-                // put it on the top of the kstack
-                let func_ptr = kstack.as_mut_ptr().offset(offset as isize);
+            let func_ptr: usize = kstack.top() - mem::size_of::<usize>(); // the top-most usable address on the kstack
+            unsafe { 
                 *(func_ptr as *mut usize) = kthread_wrapper::<A, R> as usize;
-
-                // debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
+                debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
             }
-
 
             // set up the kthread stuff
             let kthread_call = Box::new( KthreadCall::new(arg, func) );
@@ -399,19 +371,15 @@ impl TaskList {
 
 
             // currently we're using the very bottom of the kstack for kthread arguments
-            let offset2: isize = 0;
+            let arg_ptr = kstack.bottom();
+            let kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
             unsafe {
-                let arg_ptr = kstack.as_mut_ptr().offset(offset2);
-                let kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);
-                *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize; // consumes the kthread_call Box!
-
+                *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
                 debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, *kthread_ptr);
-                // let recovered_kthread = Box::from_raw(kthread_ptr);
-                // debug!("recovered_kthread: {:?}", recovered_kthread);
             }
 
 
-            new_task.arch_state.set_stack((kstack.as_ptr() as usize) + offset); // the top of the kstack
+            new_task.arch_state.set_stack(func_ptr); // the top of the kstack
             new_task.kstack = Some(kstack);
 
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
@@ -436,7 +404,7 @@ impl TaskList {
 
         // get the current tasks's memory info
         let mut curr_mmi_ptr: Option<Arc<Mutex<MemoryManagementInfo>>> = {
-            let curr_task = self.get_current().expect("spawn_kthread(): get_current failed in getting curr_mmi").read();
+            let curr_task = self.get_current().expect("spawn_userspace(): get_current failed in getting curr_mmi").read();
             curr_task.mmi.clone()
         };
 
@@ -451,7 +419,6 @@ impl TaskList {
                 }
             ));
 
-
             let mut ustack: Option<Stack> = None;
 
             // create a new InactivePageTable to represent the new process's address space. 
@@ -460,10 +427,27 @@ impl TaskList {
             let new_userspace_mmi = {
 
                 let mut curr_mmi_locked = curr_mmi_ptr.as_mut().expect("spawn_userspace: couldn't get current task's MMI!").lock();
+                
+                // create a new kernel stack for this userspace task, and make sure it's also mapped in the current Task's (task_zero) address space too!
+                let kstack: Stack = curr_mmi_locked.alloc_stack_kernel(4).expect("spawn_userspace: couldn't alloc_stack_kernel!");
+                // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
+                let func_ptr: usize = kstack.top() - mem::size_of::<usize>(); // the top-most usable address on the kstack
+                unsafe { 
+                    *(func_ptr as *mut usize) = userspace_wrapper as usize;
+                    debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, userspace_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, userspace_wrapper as usize);
+                }
+                new_task.kstack = Some(kstack);
+                new_task.arch_state.set_stack(func_ptr); // the top of the kstack
+                // unlike kthread_spawn, we don't need any arguments at the bottom of the stack,
+                // because we can just utilize the task's userspace entry point member
+
+
+                // destructure the curr task's MMI so we can access its page table and vmas
                 let MemoryManagementInfo { 
                     page_table: ref mut curr_page_table, 
                     vmas: ref curr_vmas, 
-                    stack_allocator: ref curr_stack_allocator,
+                    kernel_stack_allocator: ref curr_kernel_stack_allocator,
+                    ..  // don't need to access the user stack allocator
                 } = *curr_mmi_locked;
 
                 
@@ -477,6 +461,7 @@ impl TaskList {
                             let frame = frame_allocator.allocate_frame().expect("no more frames");
                             InactivePageTable::new(frame, active_table, &mut temporary_page)
                         };
+
 
 
                         // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
@@ -503,8 +488,8 @@ impl TaskList {
                         // create a new stack allocator for this userspace process
                         let mut user_stack_allocator = {
                             use memory::StackAllocator;
-                            let stack_alloc_start = Page::containing_address(USER_STACK_BOTTOM); 
-                            let stack_alloc_end = Page::containing_address(USER_STACK_TOP_ADDR);
+                            let stack_alloc_start = Page::containing_address(USER_STACK_ALLOCATOR_BOTTOM); 
+                            let stack_alloc_end = Page::containing_address(USER_STACK_ALLOCATOR_TOP_ADDR);
                             let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
                             StackAllocator::new(stack_alloc_range, true)
                         };
@@ -541,16 +526,15 @@ impl TaskList {
                         });
                         
 
-                        println_unsafe!("\nAfter active_table.with() in spawn_userspace");
-
                         // return a new mmi struct to the enclosing scope
                         MemoryManagementInfo {
                             page_table: PageTable::Inactive(new_inactive_table),
                             vmas: new_vmas,
-                            stack_allocator: user_stack_allocator,
+                            kernel_stack_allocator: curr_kernel_stack_allocator.clone(),
+                            user_stack_allocator: Some(user_stack_allocator),
                         }
-
                     }
+
                     _ => {
                         panic!("spawn_userspace(): current page_table must be an ActivePageTable!");
                     }
@@ -562,17 +546,17 @@ impl TaskList {
 
             new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
 
-
+            /*
             // TODO: revamp this to use the stack_allocator api, which is safer with a guard page!
             let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kstack
             // we're just setting up this kstack as a backup, i don't think it will be used yet
             let kstack_offset = kstack.len() - mem::size_of::<usize>();
             unsafe {
                 let kstack_func_ptr = kstack.as_mut_ptr().offset(kstack_offset as isize);
-                *(kstack_func_ptr as *mut usize) = kstack_placeholder as usize;
+                *(kstack_func_ptr as *mut usize) = userspace_wrapper as usize;
             }
             new_task.kstack = Some(kstack);
-
+            */
 
             // TODO: when we support ELF, the start address of the module won't just be its identity-mapped first address!
             debug!("spawn_userspace [4]: module start addr: {:#x}", module.start_address());
@@ -665,13 +649,13 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
         let tasklist = get_tasklist().read();
+        let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
+        let kstack = currtask.get_kstack().expect("kthread_wrapper(): get_kstack failed.");
+        // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
+        // let off: isize = 0;
         unsafe {
-            let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
-            let kstack = currtask.get_kstack().expect("kthread_wrapper(): get_kstack failed.");
-            // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
-            let off: isize = 0;
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            kthread_call_stack_ptr = *(kstack.as_ptr().offset(off) as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>;
+            kthread_call_stack_ptr = *(kstack.bottom() as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>;
         }
     }
 
@@ -720,10 +704,38 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 }
 
 
+/// this is invoked by the kernel component of a new userspace task 
+/// (using its kernel stack) and jumps to userspace using its userspace stack.
+/// It runs 
+fn userspace_wrapper() -> ! {
+
+    debug!("userspace_wrapper [0]");
+
+    // the three things we need to invoke jump_to_userspace
+    let mut current_task: *mut Task = 0 as *mut Task; 
+    let ustack_top: usize;
+    let entry_func: usize; 
+
+    { // scoped to release tasklist lock before calling jump_to_userspace
+        let tasklist = get_tasklist().read();
+        let mut currtask = tasklist.get_current().expect("userspace_wrapper(): get_current failed").write();
+        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top() - mem::size_of::<usize>();
+        entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
+        current_task = currtask.deref_mut() as *mut Task;
+    }
+
+    debug!("userspace_wrapper [1]: ustack_top: {:#x}, module_entry: {:#x}", ustack_top, entry_func);
 
 
-fn kstack_placeholder(_: u64) -> Option<u64> {
-    println_unsafe!("!!! kstack_placeholder !!!");
+    assert!(current_task as usize != 0, "userspace_wrapper(): current_task was null!");
+    // SAFE: current_task is checked for null
+    unsafe {
+        let mut curr: &mut Task = &mut (*current_task);
+        curr.arch_state.jump_to_userspace(ustack_top, entry_func);
+    }
+
+
+    panic!("userspace_wrapper [end]: jump_to_userspace returned!!!");
+
     loop { }
-    None
 }

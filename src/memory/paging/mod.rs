@@ -194,7 +194,7 @@ impl ActivePageTable {
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
         
-        println_unsafe!("ActivePageTable::switch(): NEW TABLE!!!");
+        // println_unsafe!("ActivePageTable::switch(): NEW TABLE!!!");
 
         // old_table
         (old_table, unsafe { ActivePageTable::new() } )

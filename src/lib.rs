@@ -114,24 +114,24 @@ fn second_thr(a: u64) -> u64 {
 
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
-    println!("Hello from first thread!!");
+    println!("Hello from first thread, arg: {:?}!!", arg);
     1
 }
 
 fn second_thread_main(arg: u64) -> u64  {
-    println!("Hello from second thread!!");
+    println!("Hello from second thread, arg: {}!!", arg);
     2
 }
 
 
 fn third_thread_main(arg: String) -> String {
-    println!("Hello from third thread!!");
+    println!("Hello from third thread, arg: {}!!", arg);
     String::from("3")
 }
 
 
-fn fourth_thread_main(_: u64) -> Option<String> {
-    println!("Hello from fourth thread!!");
+fn fourth_thread_main(arg: u64) -> Option<String> {
+    println!("Hello from fourth thread, arg: {:?}!!", arg);
     // String::from("returned None")
     None
 }
@@ -161,8 +161,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     
     // initialize our interrupts and IDT
-    let double_fault_stack = task_zero_mm_info.alloc_stack(1).expect("could not allocate double fault stack");
-    let privilege_stack = task_zero_mm_info.alloc_stack(4).expect("could not allocate privilege stack");
+    let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
+    let privilege_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate privilege stack");
     interrupts::init(double_fault_stack.top(), privilege_stack.top());
 
 
@@ -238,7 +238,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 
     // // create and jump to the first userspace thread
-    if false
+    if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
