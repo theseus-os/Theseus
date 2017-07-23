@@ -249,12 +249,6 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
 
 
 
-extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT\n{:#?}", stack_frame);
-    loop {}
-}
-
-
 extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
@@ -299,15 +293,6 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 }
 
 
-extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
-                                  {:?}\n{:#?}",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
-    loop {}
-}
 
 
 
