@@ -26,6 +26,7 @@ pub fn pci_config_read(bus: u32, slot: u32, func: u32, offset: u32)->u16{
 }
 
 //struct representing PCI Bus, contains array of PCI Devices
+#[derive(Debug)]
 pub struct PciBus{
     pub bus_number: u16,
     //total number of devices connected to the bus
@@ -51,6 +52,7 @@ impl Clone for PciBus {
 }
 
 //
+#[derive(Debug)]
 pub struct PciDev{
     //slot number
     pub slot: u8,
