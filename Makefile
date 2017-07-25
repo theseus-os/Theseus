@@ -32,8 +32,12 @@ LINKFLAGS += -n ## from phil's blog_os
 
 CROSSDIR ?= prebuilt/x86_64-elf/bin
 
-QEMU_MEMORY ?= 10G
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio
+QEMU_MEMORY ?= 1G
+QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio -cpu Haswell -net none
+
+#drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk \
+              -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
@@ -69,14 +73,10 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 run: $(iso) 
-	#@qemu-system-x86_64  -cdrom $(iso) -s  -serial stdio  -no-shutdown  -d int
-	#drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-	#@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) -s  -serial stdio  -no-shutdown -cpu Haswell -hda README.md
 	@qemu-img resize random_data2.img 100K
-	@qemu-system-x86_64 $(KVM_CMD) -cdrom $(iso) \
-	-drive format=raw,file=random_data2.img,if=none,id=mydisk \
-	-device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 \
-	-s  -serial stdio  -no-shutdown -cpu Haswell -net none
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
+	
 
 debug: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
