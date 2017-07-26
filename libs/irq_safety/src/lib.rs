@@ -1,7 +1,9 @@
 //! Irq-safe locking and 
 //! a high level Rust wrapper.
 
-#![feature(asm, const_fn)]
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
+
+#![feature(asm)]
 #![feature(manually_drop)]
 #![no_std]
 
