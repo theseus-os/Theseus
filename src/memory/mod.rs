@@ -408,7 +408,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
     // The heap memory must be mapped before it can initialized! Map it and then init it here. 
     use self::paging::Page;
-    use hole_list_allocator;
+    use heap_irq_safe;
     let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
     let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
     let heap_flags = paging::WRITABLE;
@@ -416,7 +416,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
     }
-    hole_list_allocator::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
+    heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
 
     // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
