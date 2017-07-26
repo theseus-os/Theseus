@@ -1,6 +1,6 @@
 [package]
 authors = ["Philipp Oppermann <dev@phil-opp.com>", "Kevin Boos <kevinaboos@gmail.com>"]
-name = "hole_list_allocator"
+name = "heap_irq_safe"
 version = "0.1.0"
 
 [dependencies]

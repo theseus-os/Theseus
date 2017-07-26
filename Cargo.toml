@@ -22,8 +22,8 @@ atomic = "0.3"
 default-features = false
 version = "0.3.7"
 
-[dependencies.hole_list_allocator]
-path = "libs/hole_list_allocator"
+[dependencies.heap_irq_safe]
+path = "libs/heap_irq_safe"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

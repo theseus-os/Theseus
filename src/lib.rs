@@ -36,7 +36,7 @@ extern crate x86;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
-extern crate hole_list_allocator; // our own allocator
+extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate alloc;
 #[macro_use] extern crate collections;
 extern crate port_io; // our own crate for port_io, replaces exising "cpu_io"
