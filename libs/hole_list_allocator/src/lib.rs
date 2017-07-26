@@ -9,82 +9,62 @@
 
 // modified by Kevin Boos
 
-#![feature(allocator)]
 #![feature(const_fn)]
+#![feature(global_allocator)]
 
-#![allocator]
+#![feature(alloc, allocator_api)]
+
 #![no_std]
 
-
-extern crate irq_safety; 
+extern crate alloc;
 extern crate linked_list_allocator;
-#[macro_use]
-extern crate lazy_static;
+extern crate irq_safety; 
 extern crate spin;
 
-use spin::Once;
-use irq_safety::MutexIrqSafe; 
+use spin::{Once, Mutex};
+use core::ops::Deref;
+use alloc::allocator::{Alloc, Layout, AllocErr};
 use linked_list_allocator::Heap;
+use irq_safety::MutexIrqSafe; 
 
 
-static HEAP: Once<MutexIrqSafe<Heap>> = Once::new(); 
-
+#[global_allocator]
+static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
-    HEAP.call_once(|| {
-        MutexIrqSafe::new(unsafe { Heap::new(start_virt_addr, size_in_bytes) })
-    });
-}
-
-#[no_mangle]
-pub extern fn __rust_allocate(size: usize, align: usize) -> *mut u8 {
-    HEAP
-        .try().expect("heap wasn't yet initialized!")
-        .lock().allocate_first_fit(size, align).expect("out of memory")
-}
-
-#[no_mangle]
-pub extern fn __rust_allocate_zeroed(size: usize, align: usize) -> *mut u8 {
     unsafe {
-        let result = __rust_allocate(size, align);
-        core::intrinsics::write_bytes(result, 0, size);
-        result
+        ALLOCATOR.lock().init(start_virt_addr, size_in_bytes);
     }
 }
 
-#[no_mangle]
-pub extern fn __rust_deallocate(ptr: *mut u8, size: usize, align: usize) {
-    unsafe { 
-        HEAP
-            .try().expect("heap wasn't yet initialized!")
-            .lock().deallocate(ptr, size, align) 
-    };
+
+
+
+/// This is mostly copied from LockedHeap, just to use IrqSafe versions instead of spin::Mutex.
+pub struct IrqSafeHeap(MutexIrqSafe<Heap>);
+
+impl IrqSafeHeap {
+    /// Creates an empty heap. All allocate calls will return `None`.
+    pub const fn empty() -> IrqSafeHeap {
+        IrqSafeHeap(MutexIrqSafe::new(Heap::empty()))
+    }
 }
 
-#[no_mangle]
-pub extern fn __rust_usable_size(size: usize, _align: usize) -> usize {
-    size
+impl Deref for IrqSafeHeap {
+    type Target = MutexIrqSafe<Heap>;
+
+    fn deref(&self) -> &MutexIrqSafe<Heap> {
+        &self.0
+    }
 }
 
-#[no_mangle]
-pub extern fn __rust_reallocate_inplace(_ptr: *mut u8, size: usize,
-    _new_size: usize, _align: usize) -> usize
-{
-    size
-}
+unsafe impl<'a> Alloc for &'a IrqSafeHeap {
+    unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
+        self.0.lock().allocate_first_fit(layout)
+    }
 
-#[no_mangle]
-pub extern fn __rust_reallocate(ptr: *mut u8, size: usize, new_size: usize,
-                                align: usize) -> *mut u8 {
-    use core::{ptr, cmp};
-
-    // from: https://github.com/rust-lang/rust/blob/
-    //     c66d2380a810c9a2b3dbb4f93a830b101ee49cc2/
-    //     src/liballoc_system/lib.rs#L98-L101
-
-    let new_ptr = __rust_allocate(new_size, align);
-    unsafe { ptr::copy(ptr, new_ptr, cmp::min(size, new_size)) };
-    __rust_deallocate(ptr, size, align);
-    new_ptr
+    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
+        self.0.lock().deallocate(ptr, layout)
+    }
 }

@@ -37,7 +37,8 @@ version = "0.2.1"
 
 [dependencies.irq_safety]
 path = "libs/irq_safety"
-version = "0.1.0"
+version = "0.1.1"
+# features = ["const_fn"]  #if we need them later
 
 [lib]
 crate-type = ["staticlib"]
