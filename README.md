@@ -42,19 +42,14 @@ To run it without rebuilding the whole project:
 ### Using the correct version of the Rust compiler
 Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use the latest version of `rustc` that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.
 
-So, if you see a build error about the improper version of `rustc`, follow these instructions to downgrade to the proper version.
-
-`$ rustup toolchain install`    
-`$ rustup default nightly-2017-05-15`  # insert the correct date here    
-`$ rustup component add rust-src`
-
+So, if you see a build error about the improper version of `rustc`, follow the instructions printed out at the end of the error message.     
 
 
 ## Using QEMU 
 QEMU allows us to run Theseus quickly and easily in its own virtual machine, completely segregated from the host machine and OS. 
 To exit Theseus in QEMU, press `Ctrl+Alt`, which releases your keyboard focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU. 
 
-To investigate the state of the running QEMU entry, you can switch to the QEMU console by pressing `Ctrl+Alt+Shift+2`. 
+To investigate the state of the running QEMU entry, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`.    
 
 #### KVM Support
 While not strictly required, KVM will *significantly* speed up the execution of Theseus in QEMU.  
