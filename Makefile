@@ -1,13 +1,11 @@
 SHELL := /bin/bash
 
-#RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.19.0-nightly
-#RUSTC_CURRENT_SUPPORTED_DATE := 2017-05-15
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.21.0-nightly
-RUSTC_CURRENT_SUPPORTED_DATE := 2017-07-25
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.21.0-nightly (c417ee9ae 2017-07-25)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-07-26
 RUSTC_OUTPUT=$(shell rustc --version)
 
 
-#### We're disabling KVM for the time being because it breaks some features, like RDMSR
+#### We're disabling KVM for the time being because it breaks some features, like RDMSR used for TSC
 KVM_CMD=
 #KVM_CMD=$(shell kvm-ok 2>&1 > /dev/null; if [ $$? == 0 ]; then echo "-enable-kvm"; fi)
 
@@ -38,8 +36,7 @@ QEMU_MEMORY ?= 1G
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio -cpu Haswell -net none
 
 #drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk \
-              -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
@@ -53,12 +50,17 @@ endif
 .PHONY: all clean run debug iso userspace cargo gdb
 
 test_rustc: 	
-ifneq (, $(findstring ${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT}))
-	@echo '   Found proper rust compiler version, proceeding with build...'
+ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
+	@echo -e "\nError: your rustc version does not match our supported compiler version."
+	@echo -e "To install the proper version of rustc, run the following commands:\n"
+	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
+	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
+	@echo -e "   rustup component add rust-src"
+	@echo -e "   make clean\n"
+	@echo -e "Then you can retry building!\n"
+	@exit 1
 else
-	# @echo '   Error: must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION)"!!\n\n'
-	$(error must use rustc version: "$(RUSTC_CURRENT_SUPPORTED_VERSION) from $(RUSTC_CURRENT_SUPPORTED_DATE)")
-	# @exit 1
+	@echo '\nFound proper rust compiler version, proceeding with build...\n'
 endif
 
 
