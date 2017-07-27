@@ -2,24 +2,29 @@ extern crate keycodes_ascii; // our own crate in "libs/" dir
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
-use collections::VecDeque;
 use core::default::Default;
-
+use spin::Once;
+use dfqueue::DFQueueProducer;
+use console::{ConsoleEvent, ConsoleInputEvent};
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
 
 
-// TODO: use a lock-free queue (a la Michael Scott): https://aturon.github.io/blog/2015/08/27/epoch/
-//                                                   https://blog.rust-lang.org/2015/04/10/Fearless-Concurrency.html
-
 
 static mut KBD_MODIFIERS: Option<KeyboardModifiers> = None;
 
 
-pub fn init() { 
+static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
+
+
+pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
     assert_has_not_been_called!("keyboard init was called more than once!");
     
+    CONSOLE_PRODUCER.call_once(|| {
+        console_queue_producer
+    });
+
     unsafe {
         KBD_MODIFIERS = Some(KeyboardModifiers::default());
     }
@@ -101,13 +106,8 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    use console;
-                    use console::{ConsoleEvent, ConsoleInputEvent};
-                    console::queue_event(
-                        ConsoleEvent::InputEvent(
-                            ConsoleInputEvent::new(KeyEvent::new(keycode, action, modifiers.clone()))
-                        )
-                    );
+                    let producer = CONSOLE_PRODUCER.try().expect("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized!");
+                    producer.enqueue(ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone())));
                     return Ok(());  // successfully queued up KeyEvent 
                 }
 

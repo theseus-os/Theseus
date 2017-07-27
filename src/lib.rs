@@ -44,6 +44,7 @@ extern crate irq_safety; // our own crate for irq-safe locking and interrupt uti
 #[macro_use] extern crate log;
 extern crate keycodes_ascii; // our own crate for keyboard 
 //extern crate atomic;
+extern crate dfqueue; // our own crate for dfqueue
 
 
 
@@ -174,10 +175,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // initialize the kernel console
-    console::console_init(task::get_tasklist().write());
+    let console_queue_producer = console::console_init(task::get_tasklist().write());
 
     // initialize the rest of our drivers
-    drivers::init();
+    drivers::init(console_queue_producer);
 
 
 

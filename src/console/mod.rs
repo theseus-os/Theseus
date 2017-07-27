@@ -4,10 +4,9 @@ use drivers::vga_buffer;
 use collections::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
 use task::TaskList;
-
-
-// TODO: transform this into a generic producer and consumer template, 
-//       and this file will be the single consumer of data that pushes it to the vga buffer
+use core::sync::atomic::Ordering;
+use spin::Once;
+use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
 
 
@@ -38,20 +37,17 @@ macro_rules! print {
             use core::fmt::Write;
             let mut s: String = String::new();
             write!(&mut s, $($arg)*);
-            let output_event = $crate::console::ConsoleEvent::OutputEvent(
-                $crate::console::ConsoleOutputEvent::new(s));
-            $crate::console::queue_event(output_event);
+            $crate::console::print_to_console(s).unwrap();
     });
 }
 
 
-static mut CONSOLE_QUEUE: Option<VecDeque<ConsoleEvent>> = None;
+static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 
-pub fn queue_event(e: ConsoleEvent) -> Result<(), &'static str> {
-    /// SAFE: just appending an event to the back of the queue
-    let mut cq = unsafe { CONSOLE_QUEUE.as_mut().expect("CONSOLE_QUEUE uninintialized") }; 
-    cq.push_back(e);
+pub fn print_to_console<S>(s: S) -> Result<(), &'static str> where S: Into<String> {
+    let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()));
+    PRINT_PRODUCER.try().expect("Console print producer isn't yet initialized!").enqueue(output_event);
     Ok(())
 }
 
@@ -62,6 +58,16 @@ pub enum ConsoleEvent {
     ExitEvent,
 }
 
+impl ConsoleEvent {
+    pub fn new_input_event(kev: KeyEvent) -> ConsoleEvent {
+        ConsoleEvent::InputEvent(ConsoleInputEvent::new(kev))
+    }
+
+    pub fn new_output_event<S>(s: S) -> ConsoleEvent where S: Into<String> {
+        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()))
+    }
+}
+
 /// use this to deliver input events (such as keyboard input) to the console.
 #[derive(Debug)]
 pub struct ConsoleInputEvent {
@@ -69,9 +75,9 @@ pub struct ConsoleInputEvent {
 }
 
 impl ConsoleInputEvent {
-    pub fn new(ke: KeyEvent) -> ConsoleInputEvent {
+    pub fn new(kev: KeyEvent) -> ConsoleInputEvent {
         ConsoleInputEvent {
-            key_event: ke,
+            key_event: kev,
         }
     }
 }
@@ -96,14 +102,20 @@ impl ConsoleOutputEvent {
 /// the console does not own the event queue, it merely receives a reference to it. 
 /// BUT WHO SHOULD OWN THE EVENT QUEUE? TODO: answer this question
 // pub fn console_init(event_queue: &VecDeque<ConsoleEvent>, tasklist_mut: mut RwLockIrqSafeWriteGuard<TaskList>) -> bool {
-pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> bool {
+pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQueueProducer<ConsoleEvent> {
     assert_has_not_been_called!("console_init was called more than once!");
 
-    unsafe { 
-        CONSOLE_QUEUE = Some(VecDeque::with_capacity(256));
-    }
-    tasklist_mut.spawn_kthread(main_loop, unsafe { CONSOLE_QUEUE.as_mut().expect("CONSOLE_QUEUE failed to initialize") }, "console_loop");
-    true
+    let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
+    let console_consumer = console_dfq.into_consumer();
+    let returned_producer = console_consumer.obtain_producer();
+    PRINT_PRODUCER.call_once(|| {
+        console_consumer.obtain_producer()
+    });
+
+    print_to_console("Console says hello!");
+    
+    tasklist_mut.spawn_kthread(main_loop, console_consumer, "console_loop");
+    returned_producer
 }
 
 
@@ -111,28 +123,33 @@ pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> bool
 /// This is the only thread that is allowed to touch the vga buffer!
 /// ## Returns
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
-fn main_loop(event_queue: &mut VecDeque<ConsoleEvent>) -> bool {
+fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> bool { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
+    use core::ops::Deref;
+    use dfqueue::PeekedData;
 
     loop { 
-        // pop_front() is a non-blocking call right now that returns None if the queue is empty
-        // we should probably make it a blocking (non-spinlock) call once we have wait events working
-        let event: Option<ConsoleEvent> = event_queue.pop_front();
+        let event = consumer.peek();
         if event.is_none() {
             continue; 
         }
 
-        match event.unwrap() {
-            ConsoleEvent::ExitEvent => {
+        let event = event.unwrap();
+        let event_data = event.deref(); // event.deref() is the equivalent of   &*event
+
+        match event_data {
+            &ConsoleEvent::ExitEvent => {
                 vga_buffer::print_str("\nSmoothly exiting console main loop.\n");
                 return true; 
             }
-            ConsoleEvent::InputEvent(input_event) => {
+            &ConsoleEvent::InputEvent(ref input_event) => {
                 handle_key_event(input_event.key_event);
             }
-            ConsoleEvent::OutputEvent(output_event) => {
-                vga_buffer::print_string(output_event.text);
+            &ConsoleEvent::OutputEvent(ref output_event) => {
+                vga_buffer::print_string(&output_event.text);
             }
         }
+        event.mark_completed();
+
     }
 
 }

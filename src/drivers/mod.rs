@@ -4,6 +4,10 @@ pub mod ata_pio;
 pub mod pci;
 #[macro_use] pub mod vga_buffer;
 
+use dfqueue::DFQueueProducer;
+use console::ConsoleEvent;
+
+
 /// This is for functions that DO NOT NEED dynamically allocated memory. 
 pub fn early_init() {
     assert_has_not_been_called!("drivers::early_init was called more than once!");
@@ -11,9 +15,9 @@ pub fn early_init() {
 }
 
 /// This is for functions that require the memory subsystem to be initialized. 
-pub fn init() {
+pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
-    input::keyboard::init();
+    input::keyboard::init(console_producer);
     ata_pio::init_ata_devices();
     pci::init_pci_buses();
 
