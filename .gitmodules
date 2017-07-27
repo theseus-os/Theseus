@@ -1,0 +1,3 @@
+[submodule "libs/dfqueue"]
+	path = libs/dfqueue
+	url = https://github.com/kevinaboos/dfqueue

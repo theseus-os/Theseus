@@ -46,7 +46,7 @@ macro_rules! println_unsafe {
 
 
 
-pub fn print_string(s: String) -> fmt::Result {
+pub fn print_string(s: &String) -> fmt::Result {
     print_str(s.as_str())
 }
 
