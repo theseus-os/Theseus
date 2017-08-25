@@ -359,7 +359,7 @@ impl TaskList {
 
             // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
             // as such, putting a function pointer on the top of the kstack will cause it to be invoked.
-            let func_ptr: usize = kstack.top() - mem::size_of::<usize>(); // the top-most usable address on the kstack
+            let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
             unsafe { 
                 *(func_ptr as *mut usize) = kthread_wrapper::<A, R> as usize;
                 debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
@@ -431,7 +431,7 @@ impl TaskList {
                 // create a new kernel stack for this userspace task, and make sure it's also mapped in the current Task's (task_zero) address space too!
                 let kstack: Stack = curr_mmi_locked.alloc_stack_kernel(4).expect("spawn_userspace: couldn't alloc_stack_kernel!");
                 // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
-                let func_ptr: usize = kstack.top() - mem::size_of::<usize>(); // the top-most usable address on the kstack
+                let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
                 unsafe { 
                     *(func_ptr as *mut usize) = userspace_wrapper as usize;
                     debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, userspace_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, userspace_wrapper as usize);
@@ -445,9 +445,9 @@ impl TaskList {
                 // destructure the curr task's MMI so we can access its page table and vmas
                 let MemoryManagementInfo { 
                     page_table: ref mut curr_page_table, 
-                    vmas: ref curr_vmas, 
+                    kernel_vmas: ref curr_kernel_vmas, 
                     kernel_stack_allocator: ref curr_kernel_stack_allocator,
-                    ..  // don't need to access the user stack allocator
+                    ..  // don't need to access the user stack allocator or user vmas
                 } = *curr_mmi_locked;
 
                 
@@ -465,10 +465,11 @@ impl TaskList {
 
 
                         // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
+                        // we are only interested in kernel vmas, not userspace because the user ones do not carry over to a new process! DUH!
                         let mut curr_page_to_frame_mappings = {
-                            let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_vmas.len());
-                            for vma in curr_vmas {
-                                // println_unsafe!("looking at vma: {:?}", vma);
+                            let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_kernel_vmas.len());
+                            for vma in curr_kernel_vmas {
+                                println_unsafe!("looking at vma: {:?}", vma);
                                 for page in vma.pages() { 
                                     // println_unsafe!("   looking at page: {:?}", page);
                                     mappings.push( 
@@ -483,7 +484,7 @@ impl TaskList {
                         };
 
                         // deep copy the vmas vec so we no longer use the current task's vmas
-                        let mut new_vmas = curr_vmas.to_vec(); 
+                        let mut new_kernel_vmas = curr_kernel_vmas.to_vec(); 
 
                         // create a new stack allocator for this userspace process
                         let mut user_stack_allocator = {
@@ -498,7 +499,9 @@ impl TaskList {
                         // set up the userspace module flags/vma, the actual mapping happens in the with() closure below 
                         assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
                         let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
-                        new_vmas.push(VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name()));
+                        let mut new_user_vmas = vec![
+                            VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name())
+                        ];
                         
 
                         active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
@@ -516,12 +519,12 @@ impl TaskList {
                                                         module_flags, frame_allocator.deref_mut());
 
                             // allocate a new userspace stack
-                            let (stack, stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
+                            let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
                                                             .expect("spawn_userspace: couldn't allocate new user stack!");
-                            ustack = Some(stack); 
-                            new_vmas.push(stack_vma);
+                            ustack = Some(user_stack); 
+                            new_user_vmas.push(user_stack_vma);
 
-                            // TOOD: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
+                            // TODO: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
 
                         });
                         
@@ -529,7 +532,8 @@ impl TaskList {
                         // return a new mmi struct to the enclosing scope
                         MemoryManagementInfo {
                             page_table: PageTable::Inactive(new_inactive_table),
-                            vmas: new_vmas,
+                            kernel_vmas: new_kernel_vmas,
+                            user_vmas: new_user_vmas,
                             kernel_stack_allocator: curr_kernel_stack_allocator.clone(),
                             user_stack_allocator: Some(user_stack_allocator),
                         }
@@ -546,18 +550,7 @@ impl TaskList {
 
             new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
 
-            /*
-            // TODO: revamp this to use the stack_allocator api, which is safer with a guard page!
-            let mut kstack = vec![0; 16384].into_boxed_slice(); // `kstack` is the bottom of the kstack
-            // we're just setting up this kstack as a backup, i don't think it will be used yet
-            let kstack_offset = kstack.len() - mem::size_of::<usize>();
-            unsafe {
-                let kstack_func_ptr = kstack.as_mut_ptr().offset(kstack_offset as isize);
-                *(kstack_func_ptr as *mut usize) = userspace_wrapper as usize;
-            }
-            new_task.kstack = Some(kstack);
-            */
-
+            
             // TODO: when we support ELF, the start address of the module won't just be its identity-mapped first address!
             debug!("spawn_userspace [4]: module start addr: {:#x}", module.start_address());
             new_task.new_userspace_entry_addr = Some(module.start_address());
@@ -719,7 +712,7 @@ fn userspace_wrapper() -> ! {
     { // scoped to release tasklist lock before calling jump_to_userspace
         let tasklist = get_tasklist().read();
         let mut currtask = tasklist.get_current().expect("userspace_wrapper(): get_current failed").write();
-        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top() - mem::size_of::<usize>();
+        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
         current_task = currtask.deref_mut() as *mut Task;
     }

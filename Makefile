@@ -107,7 +107,7 @@ $(iso): $(kernel) userspace $(grub_cfg)
 ### this builds all userspace programs
 userspace: 
 	@echo "======== BUILDING USERSPACE ========"
-	@$(MAKE) -C userspace
+	@$(MAKE) -C userspace all
 
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)

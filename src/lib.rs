@@ -47,7 +47,6 @@ extern crate keycodes_ascii; // our own crate for keyboard
 extern crate dfqueue; // our own crate for dfqueue
 
 
-
 pub mod CONFIG; // TODO: need a better way to separate this out
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod drivers;  
@@ -57,6 +56,7 @@ mod logger;
 #[macro_use] mod task;
 mod memory;
 mod interrupts;
+mod syscall;
 
 
 use spin::RwLockWriteGuard;
@@ -164,8 +164,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // initialize our interrupts and IDT
     let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
     let privilege_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate privilege stack");
-    interrupts::init(double_fault_stack.top(), privilege_stack.top());
+    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
+    syscall::init(privilege_stack.top_unusable());
+            
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
@@ -212,8 +214,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     trace!("Entering Task0's idle loop");
 	
 
-    // // create and jump to the first userspace thread
-    if true
+    // create and jump to the first userspace thread
+    if false
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -221,6 +223,14 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         tasklist_mut.spawn_userspace(module, Some("userspace_module"));
     }
 
+    // create and jump to the first userspace thread
+    if true
+    {
+        debug!("trying out a system call module");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(1).expect("Error: no module 2 found!");
+        tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+    }
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
