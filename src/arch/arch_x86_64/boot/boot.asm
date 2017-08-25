@@ -128,7 +128,7 @@ enable_paging:
 	mov eax, p4_table - KERNEL_OFFSET
 	mov cr3, eax
 
-	; set the no execute, long mode and system call extention
+	; set the no execute (bit 11), long mode (bit 8), and SYSCALL Enable (bit 0)
 	; bits in the EFER MSR (model specific register)
 	mov ecx, 0xC0000080
 	rdmsr

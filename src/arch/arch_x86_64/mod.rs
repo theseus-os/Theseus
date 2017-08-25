@@ -178,8 +178,6 @@ impl ArchTaskState {
         // asm!("mov ax, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         asm!("mov ds, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         asm!("mov es, $0" : : "r"(ss) : "memory" : "intel", "volatile");
-        asm!("mov fs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
-        asm!("mov gs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         // asm!("mov rax, $0" : : "r"(rax_saved) : "memory" : "intel", "volatile");
 
 

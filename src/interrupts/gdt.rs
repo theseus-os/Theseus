@@ -56,7 +56,7 @@ impl Gdt {
 /// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/
 ///                     and here: http://wiki.osdev.org/Global_Descriptor_Table
 pub enum Descriptor {
-    /// UserSegment is used for both code a data segments, 
+    /// UserSegment is used for both code and data segments, 
     /// in both the kernel and in user space
     UserSegment(u64),
     /// SystemSegment is used only for TSS
