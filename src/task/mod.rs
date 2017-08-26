@@ -21,7 +21,9 @@ int_like!(TaskId, AtomicTaskId, usize, AtomicUsize);
 
 // #[thread_local] // not sure thread_local is a valid attribute
 static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
-
+pub fn get_current_task_id() -> TaskId {
+    CURRENT_TASK.load(Ordering::Acquire)
+}
 
 /// Used to ensure that context switches are done atomically
 static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
