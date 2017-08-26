@@ -47,8 +47,11 @@ pub fn init(privilege_stack_top_usable: usize) {
 
 
 #[no_mangle]
+#[naked]
 pub unsafe extern "C" fn syscall_handler() {
     
+    // here, rcx = userland IP, r11 = userland EFLAGS
+
     asm!("movq r12, 0x1234567890ABCDEF" : : : : "intel");
 
     // switch to the kernel's privilege stack (TSS.RSP0)
@@ -56,20 +59,17 @@ pub unsafe extern "C" fn syscall_handler() {
     asm!("swapgs");
     // FIXME: TODO: use proper TLS to save user's rsp
     
-    // use the below line later when we're actually storing a TLS struct in KERNEL_GS_BASE
-    // asm!("mov rsp, gs:[0x0]" : : : "memory" : "intel", "volatile"); // swap to the current kernel rsp. Right now I'm placing the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
-    asm!("mov rbx, gs:[0x0]" : : : "memory" : "intel", "volatile");
+    asm!("mov rbx, gs:[0x0]" : : : "memory" : "intel", "volatile");  // swap to the current kernel rsp. Right now I'm placing a pointer to the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
     asm!("sub rbx, 0x8" : : : : "intel");
     asm!("mov rsp, rbx" : : : : "intel");
 
-    let x = 5;
-    let val = x + 3 * x;
-    // here we are using the privilege stack 0 as our stack
+    // debugging
+    let (rax, rdi, rsi, rdx, r10, r9, r8): (u64, u64, u64, u64, u64, u64, u64); 
+    asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : : "intel");
+    trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
+            ::task::get_current_task_id().into(), rax, rdi, rsi, rdx, r10, r9, r8);
 
-    debug!("IN SYSCALL HANDLER! {} ", val);
     
-
-
     
     loop { }
 
