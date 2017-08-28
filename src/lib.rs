@@ -164,10 +164,17 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // initialize our interrupts and IDT
     let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
     let privilege_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate privilege stack");
+    let syscall_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate syscall stack");
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
-    syscall::init(privilege_stack.top_unusable());
-            
+    syscall::init(syscall_stack.top_usable());
+
+
+    println_unsafe!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
+    println_unsafe!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
+    println_unsafe!("UserCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode).0); 
+    println_unsafe!("UserData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData).0); 
+    println_unsafe!("TSS: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe

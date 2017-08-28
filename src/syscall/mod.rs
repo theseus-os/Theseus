@@ -41,6 +41,13 @@
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
 
+
+fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64, arg6: u64) {
+    trace!("syscall_dispatcher: num={} arg1={} arg2={} arg3={} arg4={} arg5={} arg6={}",
+            syscall_number, arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+
 pub fn init(privilege_stack_top_usable: usize) {
     unsafe { enable_syscall_sysret(privilege_stack_top_usable); }
 }
@@ -49,73 +56,80 @@ pub fn init(privilege_stack_top_usable: usize) {
 #[no_mangle]
 #[naked]
 pub unsafe extern "C" fn syscall_handler() {
-    
-    // here, rcx = userland IP, r11 = userland EFLAGS
 
-    asm!("movq r12, 0x1234567890ABCDEF" : : : : "intel");
+    // here, rcx = userland IP, r11 = userland EFLAGS
 
     // switch to the kernel's privilege stack (TSS.RSP0)
     // link to tifflin: https://github.com/thepowersgang/rust_os/blob/deb156d263e0a0af9195955cccfc150ea12f466f/Kernel/Core/arch/amd64/start.asm#L335
     asm!("swapgs");
-    // FIXME: TODO: use proper TLS to save user's rsp
+    // FIXME: TODO: use proper TLS to save user's rsp, temporarily using r14
+    asm!("mov r13, rsp" : : : : "intel"); // copy userspace RSP to r13 for now
     
-    asm!("mov rbx, gs:[0x0]" : : : "memory" : "intel", "volatile");  // swap to the current kernel rsp. Right now I'm placing a pointer to the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
-    asm!("sub rbx, 0x8" : : : : "intel");
-    asm!("mov rsp, rbx" : : : : "intel");
+    // swap to the current kernel rsp. Right now I'm placing a pointer to the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
+    asm!("mov rsp, gs:[0x0]" : : : "memory" : "intel", "volatile");  
 
-    // debugging
+    asm!("push r13" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
+    asm!("push rcx; push r11" : : : : "intel"); // RCX = userland IP, R11 = userland EFLAGS
+
     let (rax, rdi, rsi, rdx, r10, r9, r8): (u64, u64, u64, u64, u64, u64, u64); 
     asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : : "intel");
+    
+    // here: once the registers are remapped to local rust vars, then we can do anything we want
+    
+    
     trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
             ::task::get_current_task_id().into(), rax, rdi, rsi, rdx, r10, r9, r8);
 
-    
-    
-    loop { }
+    asm!("sti");
 
-    // FIXME: TODO: restore user's rsp
+
+    // because we use the same calling convention for syscalls that Rust uses for functions, 
+    // the syscall arguments are already in the proper registers and order that Rust functions expect
+    let result = syscall_dispatcher(rax, rdi, rsi, rdx, r10, r9, r8); 
+    
+    //trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
+    //trace!("syscall_handler: entering infinite loop!");
+    
+    // loop { }
+
+    //trace!("syscall_handler: SHOULDN'T BE HERE!...");
+
+    asm!("pop r11; pop rcx" : : : : "intel"); // recover userland registers
+    //asm!("or r11, 0x200" : : : : "intel"); // TRYING this: force enable interrupts in userspace: causes a GPF
+    // TODO: restore user's rsp properly using TLS data from gs
+    // asm!("mov rsp, gs:[0x10]" : : : : "intel");
+    asm!("pop rsp" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
 
     // restore current GS back into GSBASE
     asm!("swapgs");
-    asm!("sysret");
+    asm!("sysretq");
+    //asm!("db 0x48; sysret" : : : : "intel"); // "db 0x48" tells sysret that we are jumping back to 64-bit code
 
 }
 
-
-const STAR:  u32 = 0xC000_0081;
-const LSTAR: u32 = 0xC000_0082;
-const FMASK: u32 = 0xC000_0084;
 
 unsafe fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
 
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
     // in the future, this will be a separate value per-thread, using thread-local storage
-    use x86_64::registers::msr::{IA32_KERNEL_GS_BASE, wrmsr};
+    use x86_64::registers::msr::{IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     use alloc::boxed::Box;
     let top_ptr = Box::new(privilege_stack_top_usable);
     wrmsr(IA32_KERNEL_GS_BASE, Box::into_raw(top_ptr) as u64); 
     println_unsafe!("Set KERNEL_GS_BASE to privilege_stack_top_usable={:#x}", privilege_stack_top_usable);
     
-    asm!("mov rax, $0" : : "r"(syscall_handler as u64) : "memory" : "intel");
-	asm!("mov rdx, rax" : : : "memory" : "intel");
-	asm!("shr rdx, 32" : : : "memory" : "intel");
-	asm!("mov ecx, $0" : : "r"(LSTAR) : "memory" : "intel");
-	asm!("wrmsr" : : : "memory" : "intel");
+    // set a kernelspace entry point for the syscall instruction from userspace
+    wrmsr(IA32_LSTAR, syscall_handler as u64);
 
-	// get user code segment and kernel code segment
+	// set up user code segment and kernel code segment
     let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode);
     let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode);
-    let star_val: u32 = ((user_cs.0 as u32) << 16) | (kernel_cs.0 as u32);
+    let star_val: u32 = ((user_cs.0 as u32) << 16) | (kernel_cs.0 as u32); // this is what's recommended
+    wrmsr(IA32_STAR, (star_val as u64) << 32);   //  [63:48] User CS, [47:32] Kernel CS
 
-	asm!("mov eax, 0x0" : : : "memory" : "intel");
-	asm!("mov edx, $0" : : "r"(star_val) : "memory" : "intel");	//  [63:48] User CS, [47:32] Kernel CS
-	asm!("mov ecx, $0" : : "r"(STAR) : "memory" : "intel");
-	asm!("wrmsr" : : : "memory" : "intel");
-
-	asm!("mov eax, 0x200" : : : "memory" : "intel"); // clear interrupts during syscalls (if the bit is set here, it will be cleared upon a syscall)
-	asm!("mov edx, 0x0" : : : "memory" : "intel");
-	asm!("mov ecx, $0" : : "r"(FMASK) : "memory" : "intel");
-	asm!("wrmsr" : : : "memory" : "intel");
+    // set up flags upon kernelspace entry into syscall_handler
+    let rflags_interrupt_bitmask = 0x200;
+    wrmsr(IA32_FMASK, rflags_interrupt_bitmask);  // clear interrupts during syscalls (if the bit is set here, it will be cleared upon a syscall)
 }
 
