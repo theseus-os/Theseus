@@ -4,9 +4,12 @@ const SERIAL_PORT_COM1: u16 = 0x3F8;
 const SERIAL_PORT_COM1_READY: u16 = SERIAL_PORT_COM1 + 5;
 const SERIAL_PORT_READY_MASK: u8 = 0x20;
 
+const PORT_E9: u16 = 0xE9; // for use with bochs
+
+
 static COM1: Port<u8> = Port::new(SERIAL_PORT_COM1);
 static COM1_READY: Port<u8> = Port::new(SERIAL_PORT_COM1_READY);
-
+static E9: Port<u8> = Port::new(PORT_E9);
 
 pub fn serial_out(s: &str) {
 	for b in s.bytes() {
@@ -14,7 +17,10 @@ pub fn serial_out(s: &str) {
 
 		// SAFE because we're just writing to the serial port. 
 		// worst-case effects here are simple out-of-order characters in the serial log.
-		unsafe { COM1.write(b); }
+		unsafe { 
+			COM1.write(b); 
+			E9.write(b);
+		}
 	}
 }
 
