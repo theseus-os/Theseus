@@ -36,8 +36,10 @@ const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 static KERNEL_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
 static KERNEL_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
-static USER_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
-static USER_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
 
 
@@ -85,9 +87,10 @@ lazy_static! {
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
         idt[0x20].set_handler_fn(timer_handler); // int 32
         idt[0x21].set_handler_fn(keyboard_handler); // int 33
-        
+        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
+
         //if interrupt is correct, will send to rtc_handler function rtc-test
-        idt[0x28].set_handler_fn(rtc_handler);//int 112?
+        idt[0x28].set_handler_fn(rtc_handler);
         idt[0x2e].set_handler_fn(primary_ata);
 
 
@@ -101,8 +104,10 @@ lazy_static! {
 pub enum AvailableSegmentSelector {
     KernelCode,
     KernelData,
-    UserCode,
-    UserData,
+    UserCode32,
+    UserData32,
+    UserCode64,
+    UserData64,
     Tss,
 }
 
@@ -116,11 +121,17 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
         AvailableSegmentSelector::KernelData => {
             KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!")
         }
-        AvailableSegmentSelector::UserCode => {
-            USER_CODE_SELECTOR.try().expect("USER_CODE_SELECTOR failed to init!")
+        AvailableSegmentSelector::UserCode32 => {
+            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
         }
-        AvailableSegmentSelector::UserData => {
-            USER_DATA_SELECTOR.try().expect("USER_DATA_SELECTOR failed to init!")
+        AvailableSegmentSelector::UserData32 => {
+            USER_DATA_32_SELECTOR.try().expect("USER_DATA__32SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserCode64 => {
+            USER_CODE_64_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
+        }
+        AvailableSegmentSelector::UserData64 => {
+            USER_DATA_64_SELECTOR.try().expect("USER_DATA__32SELECTOR failed to init!")
         }
         AvailableSegmentSelector::Tss => {
             TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
@@ -157,11 +168,8 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
     let tss = TSS.call_once(|| {
                                 let mut tss = TaskStateSegment::new();
+                                // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
                                 tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
-                                // I believe that only a single privilege stack is necessary, 
-                                // and that it will be used automatically when going from RIng 3 to Ring 0
-                                // tss.privilege_stack_table[1] = VirtualAddress(privilege_stack_top_unusable);
-                                // tss.privilege_stack_table[2] = VirtualAddress(privilege_stack_top_unusable);
                                 tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
                                 tss
                             });
@@ -171,7 +179,7 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
 
-        // this order of code segments must be preserved: kernel cs, kernel ds, user cs, user ds, tss
+        // this order of code segments must be preserved: kernel cs, kernel ds, user cs 32, user ds 32, user cs 64, user ds 64, tss
 
         KERNEL_CODE_SELECTOR.call_once(|| {
             gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
@@ -179,11 +187,17 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         KERNEL_DATA_SELECTOR.call_once(|| {
             gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
         });
-        USER_CODE_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_segment(), PrivilegeLevel::Ring3)
+        USER_CODE_32_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3)
         });
-        USER_DATA_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_segment(), PrivilegeLevel::Ring3)
+        USER_DATA_32_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_CODE_64_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_DATA_64_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
         });
         TSS_SELECTOR.call_once(|| {
             gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0)
@@ -191,6 +205,8 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         gdt
     });
     gdt.load();
+
+    println_unsafe!("Loaded GDT: {}", gdt);
 
     unsafe {
         set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
@@ -241,13 +257,6 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
              stack_frame.instruction_pointer,
              stack_frame);
 
-	// TODO: handle this
-	/* When any IRQ7 is received, simply read the In-Service Register
-		 outb(0x20, 0x0B); unsigned char irr = inb(0x20);
-		and check if bit 7
-		irr & 0x80
-		is set. If it isn't, then return from the interrupt without sending an EOI.
-	*/
 }
 
 
@@ -284,7 +293,6 @@ extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exceptio
 
 
 extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
                                   {:#b}\n{:#?}",
              error_code,
@@ -328,8 +336,42 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
     
 }
 
+
+static MASTER_PIC_CMD_REG: Port<u8>  = Port::new(0x20);
+//0x27
+extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
+    // println_unsafe!("\nSPURIOUS IRQ");
+
+    unsafe {
+        MASTER_PIC_CMD_REG.write(0x0B);
+        let isr = MASTER_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(0x0A);
+        let irr = MASTER_PIC_CMD_REG.read();
+
+
+        println_unsafe!("\nSpurious interrupt handler:  isr={:#b} irr={:#b}\n", isr, irr);
+        if isr & 0x80 == 0x80 {
+            PIC.notify_end_of_interrupt(0x27);
+        }
+        else {
+            // do nothing
+        }
+    }
+
+	// TODO: handle this
+	/* When any IRQ7 is received, simply read the In-Service Register
+		 outb(0x20, 0x0B); unsigned char irr = inb(0x20);
+		and check if bit 7
+		irr & 0x80
+		is set. If it isn't, then return from the interrupt without sending an EOI.
+	*/
+}
+
+
+
 //0x28
-extern "x86-interrupt" fn rtc_handler(stack_frame:&mut ExceptionStackFrame ) {
+extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
     unsafe { PIC.notify_end_of_interrupt(0x28); }
 
     //let placeholder = 2;
@@ -353,6 +395,7 @@ extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-	error!("caught unhandled interrupt: {:#?}", stack_frame);
+	println_unsafe!("caught unhandled interrupt: {:#?}", stack_frame);
 
+    loop { }
 }

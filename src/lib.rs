@@ -172,8 +172,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     println_unsafe!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
     println_unsafe!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
-    println_unsafe!("UserCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode).0); 
-    println_unsafe!("UserData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData).0); 
+    println_unsafe!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
+    println_unsafe!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
+    println_unsafe!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
+    println_unsafe!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
     println_unsafe!("TSS: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, called task_zero
@@ -230,7 +232,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         tasklist_mut.spawn_userspace(module, Some("userspace_module"));
     }
 
-    // create and jump to the first userspace thread
+    // create and jump to a userspace thread that tests syscalls
     if true
     {
         debug!("trying out a system call module");
