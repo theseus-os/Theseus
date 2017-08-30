@@ -471,7 +471,7 @@ impl TaskList {
                         let mut curr_page_to_frame_mappings = {
                             let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(curr_kernel_vmas.len());
                             for vma in curr_kernel_vmas {
-                                println_unsafe!("looking at vma: {:?}", vma);
+                                // println_unsafe!("looking at vma: {:?}", vma);
                                 for page in vma.pages() { 
                                     // println_unsafe!("   looking at page: {:?}", page);
                                     mappings.push( 

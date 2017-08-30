@@ -264,7 +264,7 @@ start_high:
 	mov ds, ax
 	mov es, ax
 	mov fs, ax
-	mov gs, ax
+	; mov gs, ax
 
 
 	; Save the multiboot address

@@ -133,6 +133,11 @@ impl ArchTaskState {
     }
 
 
+    pub unsafe fn jump_to_userspace_sysret(&self, stack_ptr: usize, function_ptr: usize) {
+
+
+    }
+
     pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         
         // // first, save the current task's registers
@@ -156,8 +161,8 @@ impl ArchTaskState {
 
 
 
-        let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData).0;
-        let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode).0;
+        let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData64).0;
+        let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode64).0;
 
         
 
@@ -178,6 +183,8 @@ impl ArchTaskState {
         // asm!("mov ax, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         asm!("mov ds, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         asm!("mov es, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        //asm!("mov fs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
+        //asm!("mov gs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
         // asm!("mov rax, $0" : : "r"(rax_saved) : "memory" : "intel", "volatile");
 
 

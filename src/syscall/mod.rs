@@ -53,9 +53,10 @@ pub fn init(privilege_stack_top_usable: usize) {
 }
 
 
+#[allow(private_no_mangle_fns)]
 #[no_mangle]
 #[naked]
-pub unsafe extern "C" fn syscall_handler() {
+unsafe extern "C" fn syscall_handler() {
 
     // here, rcx = userland IP, r11 = userland EFLAGS
 
@@ -68,42 +69,63 @@ pub unsafe extern "C" fn syscall_handler() {
     // swap to the current kernel rsp. Right now I'm placing a pointer to the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
     asm!("mov rsp, gs:[0x0]" : : : "memory" : "intel", "volatile");  
 
+    // save the old stack frame (unsure if necessary)
+
     asm!("push r13" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
+    // asm!("push rbp" : : : : "intel");
     asm!("push rcx; push r11" : : : : "intel"); // RCX = userland IP, R11 = userland EFLAGS
+    // asm!("push r11" : : : : "intel"); // stack must be 16-byte aligned, so just pushing another random item so we push an even number of things
+
+
+    ::drivers::serial_port::serial_out("IN SYSCALL HANDLER!\n");
+
 
     let (rax, rdi, rsi, rdx, r10, r9, r8): (u64, u64, u64, u64, u64, u64, u64); 
     asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : : "intel");
     
     // here: once the registers are remapped to local rust vars, then we can do anything we want
     
-    
-    trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
-            ::task::get_current_task_id().into(), rax, rdi, rsi, rdx, r10, r9, r8);
+    let curr_id = ::task::get_current_task_id().into();
 
-    asm!("sti");
+    // FIXME:  macros like trace!() below cause the stack contents to be clobbered, which ruins the popping of r11 below. 
+    // Since R11's pushed val on the stack is ruined, when sysretq returns to ring 3, interrupts are no longer properly enabled. 
+    // FIXME: TODO: fix this to either remove macros like this or to do something else here to avoid stack contents being ruined.
+
+    trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
+           curr_id, rax, rdi, rsi, rdx, r10, r9, r8);
+    /*
+
+    // asm!("sti");
 
 
     // because we use the same calling convention for syscalls that Rust uses for functions, 
     // the syscall arguments are already in the proper registers and order that Rust functions expect
     let result = syscall_dispatcher(rax, rdi, rsi, rdx, r10, r9, r8); 
     
-    //trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
-    //trace!("syscall_handler: entering infinite loop!");
+    trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
     
+
+    // trace!("syscall_handler: entering infinite loop!");
     // loop { }
+    // trace!("syscall_handler: SHOULDN'T BE HERE!...");
 
-    //trace!("syscall_handler: SHOULDN'T BE HERE!...");
 
+
+    // asm!("cli");
+
+    */
+
+    // asm!("pop r11" : : : : "intel"); // pop random thing off because of the 16-byte stack alignment (above)
     asm!("pop r11; pop rcx" : : : : "intel"); // recover userland registers
     //asm!("or r11, 0x200" : : : : "intel"); // TRYING this: force enable interrupts in userspace: causes a GPF
     // TODO: restore user's rsp properly using TLS data from gs
     // asm!("mov rsp, gs:[0x10]" : : : : "intel");
+    // asm!("pop rbp" : : : : "intel");
     asm!("pop rsp" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
 
     // restore current GS back into GSBASE
     asm!("swapgs");
     asm!("sysretq");
-    //asm!("db 0x48; sysret" : : : : "intel"); // "db 0x48" tells sysret that we are jumping back to 64-bit code
 
 }
 
@@ -113,20 +135,24 @@ unsafe fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
     // in the future, this will be a separate value per-thread, using thread-local storage
-    use x86_64::registers::msr::{IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
+    use x86_64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     use alloc::boxed::Box;
     let top_ptr = Box::new(privilege_stack_top_usable);
-    wrmsr(IA32_KERNEL_GS_BASE, Box::into_raw(top_ptr) as u64); 
-    println_unsafe!("Set KERNEL_GS_BASE to privilege_stack_top_usable={:#x}", privilege_stack_top_usable);
+    let raw_ptr = Box::into_raw(top_ptr) as u64;
+    wrmsr(IA32_KERNEL_GS_BASE, raw_ptr);
+    wrmsr(IA32_GS_BASE, raw_ptr); 
+    println_unsafe!("Set KERNEL_GS_BASE and GS_BASE to privilege_stack_top_usable={:#x}", privilege_stack_top_usable);
     
     // set a kernelspace entry point for the syscall instruction from userspace
     wrmsr(IA32_LSTAR, syscall_handler as u64);
 
 	// set up user code segment and kernel code segment
-    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode);
-    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode);
-    let star_val: u32 = ((user_cs.0 as u32) << 16) | (kernel_cs.0 as u32); // this is what's recommended
+    // not sure if user cs segment should be 0x1B or 0x18. Beelzebub (vercas) sets it as 0x18 because it should be an offset (?)
+    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3; 
+    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
+    let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
     wrmsr(IA32_STAR, (star_val as u64) << 32);   //  [63:48] User CS, [47:32] Kernel CS
+    println_unsafe!("Set IA32_STAR to {:#x}", star_val);
 
     // set up flags upon kernelspace entry into syscall_handler
     let rflags_interrupt_bitmask = 0x200;

@@ -2,15 +2,16 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::PrivilegeLevel;
 
+
 pub struct Gdt {
-    table: [u64; 8],
+    table: [u64; 10],  // max size is 8192 entries, but we don't need that many.
     next_free: usize,
 }
 
 impl Gdt {
     pub fn new() -> Gdt {
         Gdt {
-            table: [0; 8],
+            table: [0; 10], 
             next_free: 1, // skip the 0th entry because that must be null
         }
     }
@@ -51,6 +52,17 @@ impl Gdt {
     }
 }
 
+use core::fmt;
+impl fmt::Display for Gdt {
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmtr.write_fmt(format_args!("\nGdt: [\n"));
+        for (index, entry) in self.table.iter().enumerate() {
+            try!( fmtr.write_fmt(format_args!("  {}:  {:#016x}\n", index, entry)));
+        }
+        fmtr.write_fmt(format_args!("]"));
+        Ok(())
+    }
+}
 
 
 /// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/
@@ -70,17 +82,28 @@ impl Descriptor {
     }
 
     pub fn kernel_data_segment() -> Descriptor {
-        let flags = PRESENT | PRIVILEGE_RING0 | USER_SEGMENT | READ_WRITE | ACCESSED;
+        let flags = PRESENT | PRIVILEGE_RING0 | USER_SEGMENT | READ_WRITE; // | ACCESSED;
         Descriptor::UserSegment(flags.bits())
     }
 
-    pub fn user_code_segment() -> Descriptor {
+
+    pub fn user_code_32_segment() -> Descriptor {
+        let flags = SIZE | PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | EXECUTABLE;
+        Descriptor::UserSegment(flags.bits())
+    }
+
+    pub fn user_data_32_segment() -> Descriptor {
+        let flags = SIZE | PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | READ_WRITE; // | ACCESSED;
+        Descriptor::UserSegment(flags.bits())
+    }
+
+    pub fn user_code_64_segment() -> Descriptor {
         let flags = LONG_MODE | PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | EXECUTABLE;
         Descriptor::UserSegment(flags.bits())
     }
 
-    pub fn user_data_segment() -> Descriptor {
-        let flags = PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | READ_WRITE | ACCESSED;
+    pub fn user_data_64_segment() -> Descriptor {
+        let flags = PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | READ_WRITE; // | ACCESSED;
         Descriptor::UserSegment(flags.bits())
     }
     
@@ -109,8 +132,8 @@ impl Descriptor {
 
 bitflags! {
     flags DescriptorFlags: u64 {
-        const ACCESSED         = 1 << 40, // should always be zero, don't use this
-        const READ_WRITE       = 1 << 41, // ignored by 64-bit CPU modes
+        const ACCESSED          = 1 << 40, // should always be zero, don't use this
+        const READ_WRITE        = 1 << 41, // ignored by 64-bit CPU modes
         // const _CONFORMING       = 1 << 42, // not used yet ??
         const EXECUTABLE        = 1 << 43, // should be 1 for code segments, 0 for data segments
         const USER_SEGMENT      = 1 << 44, 
@@ -121,5 +144,6 @@ bitflags! {
         // bit 46 is set above by PRIVILEGE_RING#
         const PRESENT           = 1 << 47,
         const LONG_MODE         = 1 << 53, // data segments should set this bit to 0
+        const SIZE              = 1 << 54, // set to 1 for 32-bit segments, otherwise 0.
     }
 }

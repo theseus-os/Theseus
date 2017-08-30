@@ -26,8 +26,8 @@ main:
 
     pop rbx
     add rbx, 1 ; syscall num increments each time for easy tracking
-    ; mov rcx, 0x40000000
-    mov rcx, 0x400000
+    mov rcx, 0x40000000
+    ; mov rcx, 0x400000
 
 loopstart:
     
