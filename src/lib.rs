@@ -23,6 +23,7 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 #![feature(drop_types_in_const)] 
+#![feature(compiler_fences)]
 #![no_std]
 
 
@@ -232,6 +233,14 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         tasklist_mut.spawn_userspace(module, Some("userspace_module"));
     }
 
+    if false
+    {
+        debug!("trying to jump to userspace 2nd time");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(0).expect("Error: no userspace modules found!");
+        tasklist_mut.spawn_userspace(module, Some("userspace_module_2"));
+    }
+
     // create and jump to a userspace thread that tests syscalls
     if true
     {
@@ -239,6 +248,15 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module(1).expect("Error: no module 2 found!");
         tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+    }
+
+    // a second duplicate syscall test user task
+    if false
+    {
+        debug!("trying out a second system call module");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(1).expect("Error: no module 2 found!");
+        tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
     }
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
