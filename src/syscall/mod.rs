@@ -38,19 +38,46 @@
 // Moreover, SYSRET will return to compatibility mode if the operand size is set to 32 bits, which is, for instance, nasm's default. To explicitly request a return into long mode, set the operand size to 64 bits (e.g. "o64 sysret" with nasm).
 
 
+use core::sync::atomic::{Ordering, compiler_fence};
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
 
-
-fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64, arg6: u64) {
+// #[no_mangle]
+fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64, arg6: u64) -> u64{
     trace!("syscall_dispatcher: num={} arg1={} arg2={} arg3={} arg4={} arg5={} arg6={}",
             syscall_number, arg1, arg2, arg3, arg4, arg5, arg6);
+
+    return 0x1234BEEF0123FEED;
 }
 
 
 pub fn init(privilege_stack_top_usable: usize) {
-    unsafe { enable_syscall_sysret(privilege_stack_top_usable); }
+    enable_syscall_sysret(privilege_stack_top_usable);
+
+    let result = syscall_dispatcher(0, 1, 2, 3, 4, 5, 6);
+    trace!("fake result = {:#x}", result);
 }
+
+
+
+/// The structure that holds data related to syscall/sysret handling.
+/// NOTE: DO NOT CHANGE THE ORDER OF THESE ELEMENTS, THE syscall_handler() REQUIRES THEM TO BE IN A CERTAIN ORDER.
+#[repr(C)]
+struct UserTaskGsData {
+    // TODO: change this to a proper TLS data structure later, and then swap the current GS to it in the task switcher
+
+    /// the kernel's rsp
+    kernel_stack: u64, // offset 0x0 (0)
+    /// the user task's rsp, which is found in rsp upon syscall entry and should be placed back into rsp upon sysret
+    user_stack: u64, // offset 0x8 (8)
+    /// the user task's instruction pointer, which is found in rcx upon syscall entry and should be placed back into rcx upon sysret
+    user_ip: u64, // offset 0x10 (16)
+    /// the user task's rflags, which is found in r11 upon syscall entry and should be placed back into r11 upon sysret
+    user_flags: u64, // offset 0x18 (24)
+}
+
+
+
 
 
 #[allow(private_no_mangle_fns)]
@@ -58,52 +85,48 @@ pub fn init(privilege_stack_top_usable: usize) {
 #[naked]
 unsafe extern "C" fn syscall_handler() {
 
-    // here, rcx = userland IP, r11 = userland EFLAGS
 
-    // switch to the kernel's privilege stack (TSS.RSP0)
-    // link to tifflin: https://github.com/thepowersgang/rust_os/blob/deb156d263e0a0af9195955cccfc150ea12f466f/Kernel/Core/arch/amd64/start.asm#L335
-    asm!("swapgs");
-    // FIXME: TODO: use proper TLS to save user's rsp, temporarily using r14
-    asm!("mov r13, rsp" : : : : "intel"); // copy userspace RSP to r13 for now
-    
-    // swap to the current kernel rsp. Right now I'm placing a pointer to the TSS.RSP0 directly into the hidden GSBASE, hence the offset of 0x0
-    asm!("mov rsp, gs:[0x0]" : : : "memory" : "intel", "volatile");  
-
-    // save the old stack frame (unsure if necessary)
-
-    asm!("push r13" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
-    // asm!("push rbp" : : : : "intel");
-    asm!("push rcx; push r11" : : : : "intel"); // RCX = userland IP, R11 = userland EFLAGS
+    // switch to the kernel stack dedicated for syscall handling, and save the user task's details
+    // link to similar features in tifflin: https://github.com/thepowersgang/rust_os/blob/deb156d263e0a0af9195955cccfc150ea12f466f/Kernel/Core/arch/amd64/start.asm#L335
+    // here, rcx = user task's IP, r11 = user task's EFLAGS
+    // The gs offsets used below must match the order of elements in the UserTaskGsData struct above!!!
+    asm!("swapgs; \
+          mov gs:[0x8],  rsp; \
+          mov gs:[0x10], rcx; \
+          mov gs:[0x18], r11; \
+          mov rsp, gs:[0x0];"
+          : : : "memory" : "intel", "volatile");
     // asm!("push r11" : : : : "intel"); // stack must be 16-byte aligned, so just pushing another random item so we push an even number of things
-
-
-    ::drivers::serial_port::serial_out("IN SYSCALL HANDLER!\n");
-
-
     let (rax, rdi, rsi, rdx, r10, r9, r8): (u64, u64, u64, u64, u64, u64, u64); 
-    asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : : "intel");
-    
-    // here: once the registers are remapped to local rust vars, then we can do anything we want
+    asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : "memory" : "intel", "volatile");
+    compiler_fence(Ordering::SeqCst);
+
+   
+    // here: once the stack is set up and registers are saved and remapped to local rust vars, then we can do anything we want
     
     let curr_id = ::task::get_current_task_id().into();
-
-    // FIXME:  macros like trace!() below cause the stack contents to be clobbered, which ruins the popping of r11 below. 
-    // Since R11's pushed val on the stack is ruined, when sysretq returns to ring 3, interrupts are no longer properly enabled. 
-    // FIXME: TODO: fix this to either remove macros like this or to do something else here to avoid stack contents being ruined.
-
     trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
            curr_id, rax, rdi, rsi, rdx, r10, r9, r8);
-    /*
 
     // asm!("sti");
 
 
-    // because we use the same calling convention for syscalls that Rust uses for functions, 
-    // the syscall arguments are already in the proper registers and order that Rust functions expect
-    let result = syscall_dispatcher(rax, rdi, rsi, rdx, r10, r9, r8); 
+    // FIX THIS FIXME TODO
+    // OKAY SO the real reason things don't work is because Rust's calling convention stipulates that 6 arguments can be passed via registers,
+    // and any more must be passed on the stack. Since "syscall_dispatcher()" takes SEVEN arguments, the last one is placed on the stack,
+    // which overwrites the thing we most recently pushed onto the stack, which is R11 (userspace eflags).
+    // So, to fix this, we'll need to push a 8-byte placeholder (one element) onto the stack for every argument more than 6 args in the syscall_dispatcher invocation. 
+    // That method kind of sucks, because if we change syscall_dispatcher we'll need to remember to change the push behavior too.
+    // Thus, the real solution is to store everything that comes from userspace in the GS-based TLS data structure, including R11, RCX, and user RSP
+
+
+    // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack
+    let result: u64 = syscall_dispatcher(rax, rdi, rsi, rdx, r10, r9, r8); 
+
+
+    // trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
     
-    trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
-    
+    // ::drivers::serial_port::serial_out("IN SYSCALL HANDLER!\n");
 
     // trace!("syscall_handler: entering infinite loop!");
     // loop { }
@@ -111,17 +134,21 @@ unsafe extern "C" fn syscall_handler() {
 
 
 
+
+    // below here, we cannot do anything we want, we must restore userspace registers in an atomic fashion
     // asm!("cli");
+    compiler_fence(Ordering::SeqCst);
+    asm!("mov rax, $0" : : "r"(result) : : "intel", "volatile"); //  put result in rax for returning to userspace
 
-    */
+    // TODO: FIXME: we probably do not need to save the current rsp back into the UserTaskGsData struct (first asm line below), 
+    //              since we can just use the same rsp that was originally placed into it in the syscall init routines
+    // asm!("mov gs:[0x0], rsp;  \
+    asm!("
+          mov rsp, gs:[0x8];  \
+          mov rcx, gs:[0x10]; \
+          mov r11, gs:[0x18];"
+          : : : "memory" : "intel", "volatile");
 
-    // asm!("pop r11" : : : : "intel"); // pop random thing off because of the 16-byte stack alignment (above)
-    asm!("pop r11; pop rcx" : : : : "intel"); // recover userland registers
-    //asm!("or r11, 0x200" : : : : "intel"); // TRYING this: force enable interrupts in userspace: causes a GPF
-    // TODO: restore user's rsp properly using TLS data from gs
-    // asm!("mov rsp, gs:[0x10]" : : : : "intel");
-    // asm!("pop rbp" : : : : "intel");
-    asm!("pop rsp" : : : : "intel"); // cuz we're temporarily using r13 to save userspace rsp
 
     // restore current GS back into GSBASE
     asm!("swapgs");
@@ -130,32 +157,42 @@ unsafe extern "C" fn syscall_handler() {
 }
 
 
-unsafe fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
+
+
+
+
+fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
 
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
     // in the future, this will be a separate value per-thread, using thread-local storage
     use x86_64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     use alloc::boxed::Box;
-    let top_ptr = Box::new(privilege_stack_top_usable);
-    let raw_ptr = Box::into_raw(top_ptr) as u64;
-    wrmsr(IA32_KERNEL_GS_BASE, raw_ptr);
-    wrmsr(IA32_GS_BASE, raw_ptr); 
-    println_unsafe!("Set KERNEL_GS_BASE and GS_BASE to privilege_stack_top_usable={:#x}", privilege_stack_top_usable);
+    let gs_data: UserTaskGsData = UserTaskGsData {
+        kernel_stack: privilege_stack_top_usable as u64,
+        // the other 3 elements below are 0, but will be init'd at the entry of every syscall_handler invocation
+        user_stack: 0,
+        user_ip: 0,
+        user_flags: 0, 
+    };
+    let gs_data_ptr = Box::into_raw(Box::new(gs_data)) as u64; // puts it on the kernel heap, and prevents it from being dropped
+    unsafe { wrmsr(IA32_KERNEL_GS_BASE, gs_data_ptr); }
+    unsafe { wrmsr(IA32_GS_BASE, gs_data_ptr); }
+    println_unsafe!("Set KERNEL_GS_BASE and GS_BASE to include a kernel stack at {:#x}", privilege_stack_top_usable);
     
     // set a kernelspace entry point for the syscall instruction from userspace
-    wrmsr(IA32_LSTAR, syscall_handler as u64);
+    unsafe { wrmsr(IA32_LSTAR, syscall_handler as u64); }
 
 	// set up user code segment and kernel code segment
     // not sure if user cs segment should be 0x1B or 0x18. Beelzebub (vercas) sets it as 0x18 because it should be an offset (?)
     let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3; 
     let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
     let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
-    wrmsr(IA32_STAR, (star_val as u64) << 32);   //  [63:48] User CS, [47:32] Kernel CS
+    unsafe { wrmsr(IA32_STAR, (star_val as u64) << 32); }   //  [63:48] User CS, [47:32] Kernel CS
     println_unsafe!("Set IA32_STAR to {:#x}", star_val);
 
     // set up flags upon kernelspace entry into syscall_handler
     let rflags_interrupt_bitmask = 0x200;
-    wrmsr(IA32_FMASK, rflags_interrupt_bitmask);  // clear interrupts during syscalls (if the bit is set here, it will be cleared upon a syscall)
+    unsafe { wrmsr(IA32_FMASK, rflags_interrupt_bitmask); }  // clear interrupts during syscalls (if the bit is set here, it will be cleared upon a syscall)
 }
 

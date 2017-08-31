@@ -64,7 +64,7 @@ impl fmt::Display for Gdt {
     }
 }
 
-
+/// We need 6 GDT segments even for 64-bit: http://tunes.org/~qz/search/?view=1&c=osdev&y=17&m=1&d=2
 /// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/
 ///                     and here: http://wiki.osdev.org/Global_Descriptor_Table
 pub enum Descriptor {
@@ -85,7 +85,6 @@ impl Descriptor {
         let flags = PRESENT | PRIVILEGE_RING0 | USER_SEGMENT | READ_WRITE; // | ACCESSED;
         Descriptor::UserSegment(flags.bits())
     }
-
 
     pub fn user_code_32_segment() -> Descriptor {
         let flags = SIZE | PRESENT | PRIVILEGE_RING3 | USER_SEGMENT | EXECUTABLE;

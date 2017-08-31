@@ -14,12 +14,12 @@ section .text
 
 main:
     mov rax, rbx ; rbx is holding ground/accumulator for syscall num
-    mov rdi, 20
-    mov rsi, 30
-    mov rdx, 40
-    mov r10, 50
-    mov r9 , 60
-    mov r8 , 70
+    mov rdi, 10
+    mov rsi, 20
+    mov rdx, 30
+    mov r10, 40
+    mov r9 , 50
+    mov r8 , 60
 
     push rbx
     syscall
