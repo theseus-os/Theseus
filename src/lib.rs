@@ -299,6 +299,9 @@ extern "C" fn eh_personality() {}
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
     println_unsafe!("\n\nPANIC in {} at line {}:", file, line);
     println_unsafe!("    {}", fmt);
+
+    // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9
+
     loop {}
 }
 

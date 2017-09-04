@@ -46,6 +46,10 @@ pub unsafe fn schedule() -> bool {
                         .write().deref_mut() as *mut Task; 
     }
 
+    if current_task == next_task {
+        // no need to switch if the chosen task is the same as the current task
+        return false; // tasklist is automatically unlocked here
+    }
 
     // we want mutable references to mutable tasks
     let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
