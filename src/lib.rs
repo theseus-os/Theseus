@@ -55,6 +55,7 @@ pub mod CONFIG; // TODO: need a better way to separate this out
 mod arch;
 mod logger;
 #[macro_use] mod task;
+#[macro_use] mod dbus;
 mod memory;
 mod interrupts;
 mod syscall;
@@ -65,9 +66,10 @@ use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard}
 use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci};
-
+use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -117,11 +119,30 @@ fn second_thr(a: u64) -> u64 {
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
+    
+    unsafe{
+        let mut table = get_connection_table().write();
+        let mut connection = table.get_connection(String::from("bus.connection.first"))
+            .expect("Fail to create the first bus connection").write();
+        println!("Create the first connection.");
+        
+        
+    }
     1
 }
 
 fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread, arg: {}!!", arg);
+    unsafe {
+        let mut table = get_connection_table().write();
+        {let mut connection = table.get_connection(String::from("bus.connection.second"))
+            .expect("Fail to create the first bus connection").write();
+        println!("Create the second connection.");
+        let message = BusMessage::new(String::from("bus.connection.second"), String::from("This is a message from 1 to 2."));       
+        connection.send(&message);}
+
+        table.match_msg(&String::from("bus.connection.first"));
+    }
     2
 }
 
@@ -134,9 +155,9 @@ fn third_thread_main(arg: String) -> String {
 
 fn fourth_thread_main(arg: u64) -> Option<String> {
     println!("Hello from fourth thread, arg: {:?}!!", arg);
-    // String::from("returned None")
     None
 }
+
 
 
 

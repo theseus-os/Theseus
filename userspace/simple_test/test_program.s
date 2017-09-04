@@ -11,8 +11,11 @@ main:
 
 loopstart:
     
-    add rax,  1
+    add rax,  2
 
+    dec rcx
+    dec rcx
+    dec rcx
     dec rcx
     jnz loopstart
 
