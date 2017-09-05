@@ -89,7 +89,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    fn new(top: usize, bottom: usize) -> Stack {
+    pub fn new(top: usize, bottom: usize) -> Stack {
         assert!(top > bottom);
         Stack {
             top: top,
@@ -114,5 +114,9 @@ impl Stack {
     #[allow(dead_code)]
     pub fn bottom(&self) -> usize {
         self.bottom
+    }
+
+    pub fn size(&self) -> usize {
+        self.top_unusable() - self.bottom
     }
 }

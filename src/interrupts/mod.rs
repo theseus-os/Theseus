@@ -152,13 +152,17 @@ static TSS: Mutex<Option<TaskStateSegment>> = Mutex::new(None);
 static GDT: Once<gdt::Gdt> = Once::new();
 
 
+/// Sets the TSS's privilege stack 0 (RSP0) entry, which points to the stack that 
+/// the x86_64 hardware automatically switches to when transitioning from Ring 3 -> Ring 0.
+/// Should be set to an address within the current userspace task's kernel stack.
+/// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_value: usize) {
     use x86_64::VirtualAddress;
     if let Some(mut tss) = TSS.try_lock() {
         tss.as_mut().expect("TSS was None in tss_set_rsp0!").privilege_stack_table[0] = VirtualAddress(new_value);
     }
     else {
-        error!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
+        panic!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
     }
 }
 
