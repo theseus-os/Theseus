@@ -107,11 +107,12 @@ impl Descriptor {
     }
     
 
-    pub fn tss_segment(tss: &'static TaskStateSegment) -> Descriptor {
+    // pub fn tss_segment(tss: &'static TaskStateSegment) -> Descriptor {
+    pub fn tss_segment(ptr: u64) -> Descriptor {
         use core::mem::size_of;
         use bit_field::BitField;
 
-        let ptr = tss as *const _ as u64;
+        // let ptr = tss as *const _ as u64;
 
         let mut low = PRESENT.bits();
         // base

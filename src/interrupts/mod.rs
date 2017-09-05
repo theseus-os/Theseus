@@ -148,8 +148,19 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
-static TSS: Once<TaskStateSegment> = Once::new();
+static TSS: Mutex<Option<TaskStateSegment>> = Mutex::new(None);
 static GDT: Once<gdt::Gdt> = Once::new();
+
+
+pub fn tss_set_rsp0(new_value: usize) {
+    use x86_64::VirtualAddress;
+    if let Some(mut tss) = TSS.try_lock() {
+        tss.as_mut().expect("TSS was None in tss_set_rsp0!").privilege_stack_table[0] = VirtualAddress(new_value);
+    }
+    else {
+        error!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
+    }
+}
 
 
 /// initializes the interrupt subsystem and IRQ handlers with exceptions
@@ -165,16 +176,17 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
     use x86_64::VirtualAddress;
 
     
-
-    let tss = TSS.call_once(|| {
-                                let mut tss = TaskStateSegment::new();
-                                // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-                                tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
-                                tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
-                                tss
-                            });
-
-
+    let mut tss = TSS.lock();
+    *tss = {
+        let mut tss = TaskStateSegment::new();
+        // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
+        tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
+        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
+        Some(tss)
+    };
+    // get the pointer to the raw TSS structure inside the TSS mutex, required for x86's load tss instruction
+    let tss_ptr: u64 = tss.as_ref().unwrap() as *const _ as u64; 
+    
 
     let gdt = GDT.call_once(|| {
         let mut gdt = gdt::Gdt::new();
@@ -200,11 +212,12 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
             gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
         });
         TSS_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::tss_segment(&tss), PrivilegeLevel::Ring0)
+            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
         });
         gdt
     });
     gdt.load();
+
 
     println_unsafe!("Loaded GDT: {}", gdt);
 
