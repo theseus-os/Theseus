@@ -150,17 +150,30 @@ impl Task {
         let curr_id: usize = self.id.into();
         let next_id: usize = next.id.into();
         
-        // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id.into(), next.name, next.id.into());
-        ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-        ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
-        ::drivers::serial_port::serial_out(" to ");
-        ::drivers::serial_port::serial_outb((next_id + 48) as u8);
-        ::drivers::serial_port::serial_out(" \x1b[0m\n");
+        if true {
+            // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id.into(), next.name, next.id.into());
+            ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
+            ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
+            ::drivers::serial_port::serial_out(" to ");
+            ::drivers::serial_port::serial_outb((next_id + 48) as u8);
+            ::drivers::serial_port::serial_out(" \x1b[0m\n");
+        }
 
         // update runstates
         self.running_on_cpu = -1; // no longer running
         next.running_on_cpu = 0; // only one CPU right now
 
+
+        // change the privilege stack (RSP0) in the TSS
+        // TODO: skip this when switching to kernel threads, i.e., when next is not a userspace task
+        {
+            use interrupts::tss_set_rsp0;
+            let next_kstack = next.get_kstack().expect("context_switch(): error: next task's kstack was None!");
+            let top = next_kstack.top_unusable();
+            let bottom = next_kstack.bottom(); 
+            let size = next_kstack.size();
+            tss_set_rsp0(next_kstack.bottom() + (next_kstack.size() / 2)); // the middle half of the stack
+        }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
@@ -307,6 +320,7 @@ impl TaskList {
     }
 
 
+
     /// initialize the first `Task` with special id = 0.
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
     /// the one that enters `rust_main()`.
@@ -319,6 +333,23 @@ impl TaskList {
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
         task_zero.mmi = Some(Arc::new(Mutex::new(task_zero_mmi)));
+
+        task_zero.kstack = {
+            extern "C" {
+                // these are exposed by the assembly linker, found in arch/arch_x86_64/boot.asm
+                static initial_stack_top: usize;
+                static initial_stack_bottom: usize;
+            }
+
+            use memory::Stack;
+            // SAFE because we're just accessing linker defines
+            unsafe {
+                let task_zero_stack_top = &initial_stack_top as *const _ as usize;
+                let task_zero_stack_bottom = &initial_stack_bottom as *const _ as usize;
+                println_unsafe!("CREATING TASK ZERO STACK at top={:#x} bottom={:#x}", task_zero_stack_top, task_zero_stack_bottom);
+                Some(Stack::new(task_zero_stack_top, task_zero_stack_bottom))
+            }
+        };
 
         CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
 
