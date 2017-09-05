@@ -225,7 +225,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 
     // create and jump to the first userspace thread
-    if false
+    if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -242,7 +242,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -258,6 +258,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         let module = memory::get_module(1).expect("Error: no module 2 found!");
         tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
     }
+
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 

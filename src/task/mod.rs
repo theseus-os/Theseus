@@ -147,6 +147,15 @@ impl Task {
         // debug!("context_switch [1], testing runstates.");
         assert!(next.runstate == RunState::RUNNABLE, "scheduler bug: chosen 'next' Task was not RUNNABLE!");
 
+        let curr_id: usize = self.id.into();
+        let next_id: usize = next.id.into();
+        
+        // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id.into(), next.name, next.id.into());
+        ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
+        ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
+        ::drivers::serial_port::serial_out(" to ");
+        ::drivers::serial_port::serial_outb((next_id + 48) as u8);
+        ::drivers::serial_port::serial_out(" \x1b[0m\n");
 
         // update runstates
         self.running_on_cpu = -1; // no longer running
