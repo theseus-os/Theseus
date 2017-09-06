@@ -3,6 +3,13 @@
 //! Currently, that would be any address that starts with 0xFFFF_FF0*_****_****,
 //! so do not use that virtual address range for anything!!
 
+//! Current P4 (top-level page table) mappings:
+//! * 511: kernel text sections
+//! * 510: recursive mapping to top of P4
+//! * 509: kernel heap
+//! * 508: kernel stacks
+//! * 507: userspace stacks
+//! * 506 down to 0:  available for user processes
 
 
 /// 64-bit architecture results in 8 bytes per address.
