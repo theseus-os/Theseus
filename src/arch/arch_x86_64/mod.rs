@@ -69,6 +69,26 @@ impl ArchTaskState {
         asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
         asm!("mov r15, $0" : : "r"(next.registers.r15) : "memory" : "intel", "volatile");
 
+        if true {
+            // TESTING extra regs
+            // save & restore rax, rcx, rdx, rdi, rsi
+            asm!("mov $0, rax" : "=r"(self.registers.rax) : : "memory" : "intel", "volatile");
+            asm!("mov rax, $0" : : "r"(next.registers.rax) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rcx" : "=r"(self.registers.rcx) : : "memory" : "intel", "volatile");
+            asm!("mov rcx, $0" : : "r"(next.registers.rcx) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rdx" : "=r"(self.registers.rdx) : : "memory" : "intel", "volatile");
+            asm!("mov rdx, $0" : : "r"(next.registers.rdx) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rdi" : "=r"(self.registers.rdi) : : "memory" : "intel", "volatile");
+            asm!("mov rdi, $0" : : "r"(next.registers.rdi) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rsi" : "=r"(self.registers.rsi) : : "memory" : "intel", "volatile");
+            asm!("mov rsi, $0" : : "r"(next.registers.rsi) : "memory" : "intel", "volatile");
+
+        }
+
         // save & restore the stack pointer
         asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
         asm!("mov rsp, $0" : : "r"(next.registers.rsp) : "memory" : "intel", "volatile");
