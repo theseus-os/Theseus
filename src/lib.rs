@@ -180,13 +180,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
-    let mut task_zero_mm_info: memory::MemoryManagementInfo = memory::init(boot_info);
+    let mut kernel_mmi: memory::MemoryManagementInfo = memory::init(boot_info);
 
     
     // initialize our interrupts and IDT
-    let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
-    let privilege_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate privilege stack");
-    let syscall_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate syscall stack");
+    let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
+    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
+    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
     syscall::init(syscall_stack.top_usable());
@@ -198,13 +198,14 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     println_unsafe!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
     println_unsafe!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
     println_unsafe!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
-    println_unsafe!("TSS: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
+    println_unsafe!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
+    // TODO: transform this into something more like "task::init(initial_mmi)"
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(task_zero_mm_info);
+        tasklist_mut.init_task_zero(kernel_mmi);
     }
 
     // initialize the kernel console
@@ -223,7 +224,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
     // create a second task to test context switching
-    {
+    if true {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
         { let second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
@@ -249,7 +250,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -266,7 +267,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if false
+    if true
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
