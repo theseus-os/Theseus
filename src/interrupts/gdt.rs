@@ -112,8 +112,6 @@ impl Descriptor {
         use core::mem::size_of;
         use bit_field::BitField;
 
-        // let ptr = tss as *const _ as u64;
-
         let mut low = PRESENT.bits();
         // base
         low.set_bits(16..40, ptr.get_bits(0..24));

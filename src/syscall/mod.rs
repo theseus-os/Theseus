@@ -103,46 +103,25 @@ unsafe extern "C" fn syscall_handler() {
 
    
     // here: once the stack is set up and registers are saved and remapped to local rust vars, then we can do anything we want
+    // asm!("sti"); // TODO: we could consider letting interrupts occur while in a system call. Probably should do that. 
     
     let curr_id = ::task::get_current_task_id().into();
     trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r9={:#x} r8={:#x}",
            curr_id, rax, rdi, rsi, rdx, r10, r9, r8);
-
-    // asm!("sti");
-
-
-    // FIX THIS FIXME TODO
-    // OKAY SO the real reason things don't work is because Rust's calling convention stipulates that 6 arguments can be passed via registers,
-    // and any more must be passed on the stack. Since "syscall_dispatcher()" takes SEVEN arguments, the last one is placed on the stack,
-    // which overwrites the thing we most recently pushed onto the stack, which is R11 (userspace eflags).
-    // So, to fix this, we'll need to push a 8-byte placeholder (one element) onto the stack for every argument more than 6 args in the syscall_dispatcher invocation. 
-    // That method kind of sucks, because if we change syscall_dispatcher we'll need to remember to change the push behavior too.
-    // Thus, the real solution is to store everything that comes from userspace in the GS-based TLS data structure, including R11, RCX, and user RSP
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack
     let result: u64 = syscall_dispatcher(rax, rdi, rsi, rdx, r10, r9, r8); 
 
 
-    // trace!("syscall_handler: interrupts enabled={}", ::interrupts::interrupts_enabled());
-    
-    // ::drivers::serial_port::serial_out("IN SYSCALL HANDLER!\n");
-
-    // trace!("syscall_handler: entering infinite loop!");
-    // loop { }
-    // trace!("syscall_handler: SHOULDN'T BE HERE!...");
-
-
-
 
     // below here, we cannot do anything we want, we must restore userspace registers in an atomic fashion
-    // asm!("cli");
     compiler_fence(Ordering::SeqCst);
+    // asm!("cli");
     asm!("mov rax, $0" : : "r"(result) : : "intel", "volatile"); //  put result in rax for returning to userspace
 
-    // TODO: FIXME: we probably do not need to save the current rsp back into the UserTaskGsData struct (first asm line below), 
-    //              since we can just use the same rsp that was originally placed into it in the syscall init routines
-    // asm!("mov gs:[0x0], rsp;  \
+    // we don't need to save the current kernel rsp back into the UserTaskGsData struct's kernel_stack member (gs:[0x0]), 
+    // because we can just re-use the same rsp that was originally placed into TSS RSP0 (which is set on a context switch)
     asm!("
           mov rsp, gs:[0x8];  \
           mov rcx, gs:[0x10]; \
@@ -157,10 +136,7 @@ unsafe extern "C" fn syscall_handler() {
 }
 
 
-
-
-
-
+/// Configures and enables the usage and behavior of `syscall` and `sysret` instructions. 
 fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
 
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
@@ -184,9 +160,10 @@ fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
     unsafe { wrmsr(IA32_LSTAR, syscall_handler as u64); }
 
 	// set up user code segment and kernel code segment
-    // not sure if user cs segment should be 0x1B or 0x18. Beelzebub (vercas) sets it as 0x18 because it should be an offset (?)
-    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3; 
-    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
+    // I believe the cs segment below should be 0x18, not 0x1B, because it's an offset, not a true descriptor with privilege level masks. 
+    //      Beelzebub (vercas) sets it as 0x18.
+    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
+    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
     let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
     unsafe { wrmsr(IA32_STAR, (star_val as u64) << 32); }   //  [63:48] User CS, [47:32] Kernel CS
     println_unsafe!("Set IA32_STAR to {:#x}", star_val);

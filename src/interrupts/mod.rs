@@ -124,13 +124,13 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
             USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
         }
         AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.try().expect("USER_DATA__32SELECTOR failed to init!")
+            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
         }
         AvailableSegmentSelector::UserCode64 => {
             USER_CODE_64_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
         }
         AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.try().expect("USER_DATA__32SELECTOR failed to init!")
+            USER_DATA_64_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
         }
         AvailableSegmentSelector::Tss => {
             TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
