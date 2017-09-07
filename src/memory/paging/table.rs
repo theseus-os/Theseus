@@ -18,6 +18,7 @@ use core::marker::PhantomData;
 // we need to use the 510th entry of P4 instead!
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
+// NOTE: keep this in sync with the recursive index in memory/config.rs, and the one in arch/*/boot.asm.
 pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
                                          // ^p4 ^p3 ^p2 ^p1 ^offset  
                                          // ^ 0o776 means that we're always looking at the 510th entry recursively
@@ -34,6 +35,19 @@ impl<L> Table<L>
         for entry in self.entries.iter_mut() {
             entry.set_unused();
         }
+    }
+
+    pub fn copy_entry_from_table(&mut self, from_table: &Table<Level4>, index: usize) {
+        // bounds check
+        assert!(index < ENTRIES_PER_PAGE_TABLE, "copy_entry_from_table: index of was out of bounds!");
+        // simply copy the table entry, which is just a u64
+        self.entries[index] = from_table[index].copy();
+    }
+
+    pub fn clear_entry(&mut self, index: usize) {
+        // bounds check
+        assert!(index < ENTRIES_PER_PAGE_TABLE, "clear_entry: index of was out of bounds!");
+        self.entries[index].set_unused();
     }
 }
 

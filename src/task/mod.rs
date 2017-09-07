@@ -153,7 +153,7 @@ impl Task {
         let curr_id: usize = self.id.into();
         let next_id: usize = next.id.into();
         
-        if true {
+        if false {
             // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id.into(), next.name, next.id.into());
             ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
             ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
@@ -488,7 +488,7 @@ impl TaskList {
                         let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
                         let mut temporary_page = TemporaryPage::new(frame_allocator.deref_mut());
 
-                        // now that we have the current task's active table, we need a new inactive table for the userspace Task
+                        // now that we have the kernel's active table, we need a new inactive table for the userspace Task
                         let mut new_inactive_table: InactivePageTable = {
                             let frame = frame_allocator.allocate_frame().expect("no more frames");
                             InactivePageTable::new(frame, active_table, &mut temporary_page)
@@ -496,22 +496,22 @@ impl TaskList {
 
                         // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
                         // we are only interested in kernel vmas, not userspace because the user ones do not carry over to a new process! DUH!
-                        let mut curr_page_to_frame_mappings = {
-                            let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(kernel_vmas.len());
-                            for vma in kernel_vmas {
-                                println_unsafe!("looking at vma: {:?}", vma);
-                                for page in vma.pages() { 
-                                    // println_unsafe!("   looking at page: {:?}", page);
-                                    mappings.push( 
-                                        (page, 
-                                        active_table.translate_page(page).expect("page in curr_vma was not mapped!?!"),
-                                        vma.flags(),
-                                        )
-                                    );
-                                }
-                            }
-                            mappings
-                        };
+                        // let mut curr_page_to_frame_mappings = {
+                        //     let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(kernel_vmas.len());
+                        //     for vma in kernel_vmas {
+                        //         println_unsafe!("looking at vma: {:?}", vma);
+                        //         for page in vma.pages() { 
+                        //             // println_unsafe!("   looking at page: {:?}", page);
+                        //             mappings.push( 
+                        //                 (page, 
+                        //                 active_table.translate_page(page).expect("page in curr_vma was not mapped!?!"),
+                        //                 vma.flags(),
+                        //                 )
+                        //             );
+                        //         }
+                        //     }
+                        //     mappings
+                        // };
 
                         // create a new stack allocator for this userspace process
                         let mut user_stack_allocator = {
@@ -522,7 +522,7 @@ impl TaskList {
                             StackAllocator::new(stack_alloc_range, true) // true means it's for userspace
                         };
 
-                        // set up the userspace module flags/vma, the actual mapping happens in the with() closure below 
+                        // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
                         assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
                         let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
                         let mut new_user_vmas = vec![
@@ -531,10 +531,20 @@ impl TaskList {
 
                         active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
                             // iterate over all of the VMAs from the current MMI and also map them to the new_inactive_table
-                            for (page, frame, flags) in curr_page_to_frame_mappings {
-                                // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
-                                mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
-                            }
+                            // for (page, frame, flags) in curr_page_to_frame_mappings {
+                            //     // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
+                            //     mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
+                            // }
+
+                            // first, we need to set the kernel-related entries of our new inactive_table's P4 to the same values used in the kernel's P4
+                            // based on memory/config.rs, we see that these entries are as follows: 
+                            // * 511: kernel text sections
+                            // * 509: kernel heap
+                            // * 508: kernel stacks
+                            
+                            // Actually, we now do this in InactivePageTable::new(), just to make sure a new page table can never be created without including the shared kernel mappings
+
+
 
                             // map the userspace module into the new address space
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
