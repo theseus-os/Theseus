@@ -1,4 +1,3 @@
-use x86_64;
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 
 
@@ -103,60 +102,58 @@ impl ArchTaskState {
     }
 
 
-    /// saves current registers into this Task's arch state
-    #[inline(never)]
-    #[naked]
-    unsafe fn save_registers(&mut self) {
-        // save rflags
-        asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
+    // /// saves current registers into this Task's arch state
+    // #[inline(never)]
+    // #[naked]
+    // unsafe fn save_registers(&mut self) {
+    //     // save rflags
+    //     asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
 
-        // save rbx
-        asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
+    //     // save rbx
+    //     asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
         
-        // save r12 - r15
-        asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
-        asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
-        asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
-        asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
+    //     // save r12 - r15
+    //     asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
+    //     asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
+    //     asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
+    //     asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
 
-        // save the stack pointer
-        asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
+    //     // save the stack pointer
+    //     asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
 
-        // save the base pointer
-        asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
+    //     // save the base pointer
+    //     asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
 
-    }
+    // }
 
 
-    /// restores registers from this Task's arch state
-    #[inline(never)]
-    #[naked]
-    unsafe fn restore_registers(&self) {
-        // restore rflags
-        asm!("push $0 ; popfq" : : "r"(self.registers.rflags) : "memory" : "intel", "volatile");
+    // /// restores registers from this Task's arch state
+    // #[inline(never)]
+    // #[naked]
+    // unsafe fn restore_registers(&self) {
+    //     // restore rflags
+    //     asm!("push $0 ; popfq" : : "r"(self.registers.rflags) : "memory" : "intel", "volatile");
 
-        // restore rbx
-        asm!("mov rbx, $0" : : "r"(self.registers.rbx) : "memory" : "intel", "volatile");
+    //     // restore rbx
+    //     asm!("mov rbx, $0" : : "r"(self.registers.rbx) : "memory" : "intel", "volatile");
         
-        // restore r12 - r15
-        asm!("mov r12, $0" : : "r"(self.registers.r12) : "memory" : "intel", "volatile");
-        asm!("mov r13, $0" : : "r"(self.registers.r13) : "memory" : "intel", "volatile");
-        asm!("mov r14, $0" : : "r"(self.registers.r14) : "memory" : "intel", "volatile");
-        asm!("mov r15, $0" : : "r"(self.registers.r15) : "memory" : "intel", "volatile");
+    //     // restore r12 - r15
+    //     asm!("mov r12, $0" : : "r"(self.registers.r12) : "memory" : "intel", "volatile");
+    //     asm!("mov r13, $0" : : "r"(self.registers.r13) : "memory" : "intel", "volatile");
+    //     asm!("mov r14, $0" : : "r"(self.registers.r14) : "memory" : "intel", "volatile");
+    //     asm!("mov r15, $0" : : "r"(self.registers.r15) : "memory" : "intel", "volatile");
 
-        // restore the stack pointer
-        asm!("mov rsp, $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
+    //     // restore the stack pointer
+    //     asm!("mov rsp, $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
 
-        // restore the base pointer
-        asm!("mov rbp, $0" : : "r"(self.registers.rbp) : "memory" : "intel", "volatile");
+    //     // restore the base pointer
+    //     asm!("mov rbp, $0" : : "r"(self.registers.rbp) : "memory" : "intel", "volatile");
 
-    }
-
-
-    pub unsafe fn jump_to_userspace_sysret(&self, stack_ptr: usize, function_ptr: usize) {
+    // }
 
 
-    }
+    // pub unsafe fn jump_to_userspace_sysret(&self, stack_ptr: usize, function_ptr: usize) {
+    //  }
 
     pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         
@@ -319,23 +316,23 @@ pub fn pause() {
     unsafe { asm!("pause" : : : : "intel", "volatile"); }
 }
 
-#[inline(always)]
-pub fn enable_interrupts() {
-    unsafe { x86_64::instructions::interrupts::enable(); }
-}
+// #[inline(always)]
+// pub fn enable_interrupts() {
+//     unsafe { x86_64::instructions::interrupts::enable(); }
+// }
 
 
-#[inline(always)]
-pub fn disable_interrupts() {
-    unsafe { x86_64::instructions::interrupts::disable(); }
-}
+// #[inline(always)]
+// pub fn disable_interrupts() {
+//     unsafe { x86_64::instructions::interrupts::disable(); }
+// }
 
 
-#[inline(always)]
-pub fn interrupts_enabled() -> bool {
-    unsafe { 
-        let flags: u64;
-		asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
-		(flags & 0x200) != 0
-     }
-}
+// #[inline(always)]
+// pub fn interrupts_enabled() -> bool {
+//     unsafe { 
+//         let flags: u64;
+// 		asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
+// 		(flags & 0x200) != 0
+//      }
+// }

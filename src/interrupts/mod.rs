@@ -13,7 +13,6 @@ use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
 use drivers::ata_pio;
-use arch;
 use CONFIG::*;
 use x86_64::structures::gdt::SegmentSelector;
 
@@ -298,7 +297,7 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackF
 /// this shouldn't really ever happen, but I added the handler anyway
 /// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
 extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    use x86_64::registers::control_regs;
+    // use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",
 //             control_regs::cr2(),

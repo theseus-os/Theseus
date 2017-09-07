@@ -1,13 +1,12 @@
 
-use spin::{Once, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
-use collections::{BTreeMap, Vec};
+use spin::{Once, Mutex, RwLock};
+use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard};
+use collections::{BTreeMap};
 use collections::string::String;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
 use arch::{pause, ArchTaskState};
 use alloc::boxed::Box;
-use core::mem;
 use core::fmt;
 use core::ops::DerefMut;
 use memory::{Stack, ModuleArea, MemoryManagementInfo};
@@ -15,15 +14,15 @@ use memory::{Stack, ModuleArea, MemoryManagementInfo};
 #[macro_use] pub mod scheduler;
 
 
-// declare types "TaskId" as a usize and AtomicTaskId as an Atomic usize
-int_like!(TaskId, AtomicTaskId, usize, AtomicUsize);
+type TaskId = usize;
+type AtomicTaskId = AtomicUsize;
 
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
 
-
-static CURRENT_TASK: AtomicTaskId = AtomicTaskId::default();
+/// The `TaskId` of the currently executing `Task`
+static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
 pub fn get_current_task_id() -> TaskId {
     CURRENT_TASK.load(Ordering::Acquire)
 }
@@ -98,7 +97,7 @@ impl Task {
             runstate: RunState::INITING,
             running_on_cpu: -1, // not running on any cpu
             arch_state: ArchTaskState::new(),
-            name: format!("task{}", task_id.into()),
+            name: format!("task{}", task_id),
             kstack: None,
             ustack: None,
             mmi: None,
@@ -132,7 +131,7 @@ impl Task {
             id: task_id,
             runstate: RunState::INITING,
             arch_state: self.arch_state.clone(),
-            name: format!("task{}", task_id.into()),
+            name: format!("task{}", task_id),
             kstack: None,
         }
     }
@@ -150,11 +149,11 @@ impl Task {
         // debug!("context_switch [1], testing runstates.");
         assert!(next.runstate == RunState::RUNNABLE, "scheduler bug: chosen 'next' Task was not RUNNABLE!");
 
-        let curr_id: usize = self.id.into();
-        let next_id: usize = next.id.into();
+        let curr_id: usize = self.id;
+        let next_id: usize = next.id;
         
         if false {
-            // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id.into(), next.name, next.id.into());
+            // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id, next.name, next.id;
             ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
             ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
             ::drivers::serial_port::serial_out(" to ");
@@ -172,15 +171,12 @@ impl Task {
         {
             use interrupts::tss_set_rsp0;
             let next_kstack = next.get_kstack().expect("context_switch(): error: next task's kstack was None!");
-            let top = next_kstack.top_unusable();
-            let bottom = next_kstack.bottom(); 
-            let size = next_kstack.size();
             tss_set_rsp0(next_kstack.bottom() + (next_kstack.size() / 2)); // the middle half of the stack
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
-            use memory::{PageTable, ActivePageTable};
+            use memory::{PageTable};
 
             let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
             let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
@@ -248,7 +244,7 @@ impl Task {
 
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{{{}}}", self.name, self.id.into())
+        write!(f, "{}{{{}}}", self.name, self.id)
     }
 }
 
@@ -268,6 +264,7 @@ impl TaskList {
 
         TaskList {
             list: BTreeMap::new(),
+            // start at 1, task_zero is reserved for intial kernel thread
             taskid_counter: 1,
         }
     }
@@ -311,11 +308,11 @@ impl TaskList {
         // insert the new context into the list
         match self.list.insert(new_id, Arc::new(RwLock::new(Task::new(new_id)))) {
             None => { // None indicates that the insertion didn't overwrite anything, which is what we want
-                debug!("Successfully created task {}", new_id.into());
+                debug!("Successfully created task {}", new_id);
                 Ok(self.list.get(&new_id).expect("new_task(): couldn't find new task in tasklist"))
             }
             _ => {
-                error!("failed to create task {}", new_id.into());
+                error!("failed to create task {}", new_id);
                 Err("Error: overwrote task id!")
             }
         }
@@ -335,7 +332,7 @@ impl TaskList {
             Arc::new(Mutex::new(task_zero_mmi))
         });
 
-        let id_zero = TaskId::from(0);
+        let id_zero: TaskId = 0;
         let mut task_zero = Task::new(id_zero);
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
@@ -438,7 +435,6 @@ impl TaskList {
     /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
     pub fn spawn_userspace(&mut self, module: &ModuleArea, name: Option<&str>) -> Result<&Arc<RwLock<Task>>, &str> {
 
-        use memory::{address_is_page_aligned, StackAllocator, Page, Frame, EntryFlags, PageTable, VirtualMemoryArea, ActivePageTable, InactivePageTable, TemporaryPage, FRAME_ALLOCATOR, FrameAllocator};
         use memory::*;
         debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
 
@@ -478,8 +474,7 @@ impl TaskList {
                 // destructure the kernel's MMI so we can access its page table and vmas
                 let MemoryManagementInfo { 
                     page_table: ref mut kernel_page_table, 
-                    vmas: ref kernel_vmas, 
-                    ..  // don't need to access the kernel's stack allocator, we already allocated a kstack above
+                    ..  // don't need to access the kernel's VMA list or stack allocator, we already allocated a kstack above
                 } = *kernel_mmi_locked;
 
                 
@@ -493,25 +488,6 @@ impl TaskList {
                             let frame = frame_allocator.allocate_frame().expect("no more frames");
                             InactivePageTable::new(frame, active_table, &mut temporary_page)
                         };
-
-                        // we need to use the current active_table to obtain each vma's Page -> Frame mappings/translations
-                        // we are only interested in kernel vmas, not userspace because the user ones do not carry over to a new process! DUH!
-                        // let mut curr_page_to_frame_mappings = {
-                        //     let mut mappings: Vec<(Page, Frame, EntryFlags)> = Vec::with_capacity(kernel_vmas.len());
-                        //     for vma in kernel_vmas {
-                        //         println_unsafe!("looking at vma: {:?}", vma);
-                        //         for page in vma.pages() { 
-                        //             // println_unsafe!("   looking at page: {:?}", page);
-                        //             mappings.push( 
-                        //                 (page, 
-                        //                 active_table.translate_page(page).expect("page in curr_vma was not mapped!?!"),
-                        //                 vma.flags(),
-                        //                 )
-                        //             );
-                        //         }
-                        //     }
-                        //     mappings
-                        // };
 
                         // create a new stack allocator for this userspace process
                         let mut user_stack_allocator = {
@@ -530,23 +506,14 @@ impl TaskList {
                         ];
 
                         active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
-                            // iterate over all of the VMAs from the current MMI and also map them to the new_inactive_table
-                            // for (page, frame, flags) in curr_page_to_frame_mappings {
-                            //     // println_unsafe!("     mapping page {:?} to frame {:?} with flags {:?}", page, frame, flags);
-                            //     mapper.map_to(page, frame, flags, frame_allocator.deref_mut());
-                            // }
-
-                            // first, we need to set the kernel-related entries of our new inactive_table's P4 to the same values used in the kernel's P4
-                            // based on memory/config.rs, we see that these entries are as follows: 
-                            // * 511: kernel text sections
-                            // * 509: kernel heap
-                            // * 508: kernel stacks
-                            
-                            // Actually, we now do this in InactivePageTable::new(), just to make sure a new page table can never be created without including the shared kernel mappings
+                            /*
+                             * We need to set the kernel-related entries of our new inactive_table's P4 to the same values used in the kernel's P4.
+                             * However, this is done in InactivePageTable::new(), just to make sure a new page table can never be created without including the shared kernel mappings.
+                             * Thus, we do not need to handle that here.
+                             */
 
 
-
-                            // map the userspace module into the new address space
+                            // map the userspace module into the new address space.
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
                             // println_unsafe!("!! mapping userspace module with name: {}", module.name());
                             mapper.map_contiguous_frames(module.start_address(), module.size(), 
@@ -672,7 +639,7 @@ pub fn get_tasklist() -> &'static RwLockIrqSafe<TaskList> {
 /// this does not return
 fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
-    let mut kthread_call_stack_ptr: *mut KthreadCall<A, R>;
+    let kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
         let tasklist = get_tasklist().read();
         let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
@@ -738,7 +705,7 @@ fn userspace_wrapper() -> ! {
     debug!("userspace_wrapper [0]");
 
     // the three things we need to invoke jump_to_userspace
-    let mut current_task: *mut Task = 0 as *mut Task; 
+    let current_task: *mut Task; 
     let ustack_top: usize;
     let entry_func: usize; 
 
@@ -756,12 +723,10 @@ fn userspace_wrapper() -> ! {
     assert!(current_task as usize != 0, "userspace_wrapper(): current_task was null!");
     // SAFE: current_task is checked for null
     unsafe {
-        let mut curr: &mut Task = &mut (*current_task);
+        let curr: &mut Task = &mut (*current_task); // dereference current_task and get a ref to it
         curr.arch_state.jump_to_userspace(ustack_top, entry_func);
     }
 
 
     panic!("userspace_wrapper [end]: jump_to_userspace returned!!!");
-
-    loop { }
 }
