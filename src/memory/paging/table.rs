@@ -61,7 +61,7 @@ impl<L> Table<L>
         let entry_flags = self[index].flags();
         if entry_flags.contains(PRESENT) && !entry_flags.contains(HUGE_PAGE) {
             let table_address = self as *const _ as usize;
-            let mut retval: usize = (table_address << 9) | (index << 12);
+            let retval: usize = (table_address << 9) | (index << 12);
             
             // if bit 47 is zero, then we must sign extend the top 16 bits as zeroes.
             if retval & 0x800000000000 == 0 {

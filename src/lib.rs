@@ -109,13 +109,6 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 
 
-fn second_thr(a: u64) -> u64 {
-    return a * 2;
-}
-
-
-
-
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
@@ -225,10 +218,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // create a second task to test context switching
     if true {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
-        { let second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
-        { let second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
-        { let second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
+        { let _second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
         { tasklist_mut.spawn_kthread(test_loop_1, None, "test_loop_1"); }

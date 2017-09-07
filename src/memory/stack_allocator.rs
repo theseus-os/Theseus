@@ -1,7 +1,6 @@
 use memory::paging::*;
 use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
 use memory::Mapper;
-use core::ops::DerefMut;
 
 pub struct StackAllocator {
     pub range: PageIter,
