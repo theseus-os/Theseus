@@ -227,6 +227,11 @@ impl InactivePageTable {
             table.zero();
 
             table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
+
+            // start out by copying all the kernel sections into the new inactive table
+            table.copy_entry_from_table(active_table.p4(), KERNEL_TEXT_P4_INDEX);
+            table.copy_entry_from_table(active_table.p4(), KERNEL_HEAP_P4_INDEX);
+            table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
         }
         temporary_page.unmap(active_table);
 
@@ -269,6 +274,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
+
+        // clear out the initially-mapped kernel entries of P4
+        // (they are initialized in InactivePageTable::new())
+        mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
         // map the allocated kernel text sections
         let mut index = 0;

@@ -36,10 +36,8 @@ impl Mapper {
         // get the frame number of the page containing the given virtual address,
         // and then the corresponding physical address is that PFN*sizeof(Page) + offset
         self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
-                                                                               frame.number *
-                                                                               PAGE_SIZE +
-                                                                               offset
-                                                                           })
+            frame.number * PAGE_SIZE + offset
+        })
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
