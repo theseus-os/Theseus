@@ -23,6 +23,7 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 #![feature(drop_types_in_const)] 
+#![feature(compiler_fences)]
 #![no_std]
 
 
@@ -47,7 +48,6 @@ extern crate keycodes_ascii; // our own crate for keyboard
 extern crate dfqueue; // our own crate for dfqueue
 
 
-
 pub mod CONFIG; // TODO: need a better way to separate this out
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod drivers;  
@@ -57,6 +57,7 @@ mod logger;
 #[macro_use] mod task;
 mod memory;
 mod interrupts;
+mod syscall;
 
 
 use spin::RwLockWriteGuard;
@@ -106,13 +107,6 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 
 
-fn second_thr(a: u64) -> u64 {
-    return a * 2;
-}
-
-
-
-
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
@@ -158,20 +152,31 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
-    let mut task_zero_mm_info: memory::MemoryManagementInfo = memory::init(boot_info);
+    let mut kernel_mmi: memory::MemoryManagementInfo = memory::init(boot_info);
 
     
     // initialize our interrupts and IDT
-    let double_fault_stack = task_zero_mm_info.alloc_stack_kernel(1).expect("could not allocate double fault stack");
-    let privilege_stack = task_zero_mm_info.alloc_stack_kernel(4).expect("could not allocate privilege stack");
-    interrupts::init(double_fault_stack.top(), privilege_stack.top());
+    let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
+    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
+    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
+    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
+    syscall::init(syscall_stack.top_usable());
+
+    // println_unsafe!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
+    // println_unsafe!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
+    // println_unsafe!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
+    // println_unsafe!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
+    // println_unsafe!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
+    // println_unsafe!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
+    // println_unsafe!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
+    // TODO: transform this into something more like "task::init(initial_mmi)"
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(task_zero_mm_info);
+        tasklist_mut.init_task_zero(kernel_mmi);
     }
 
     // initialize the kernel console
@@ -196,12 +201,12 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     println!("{:?}", bus_array);
 
     // create a second task to test context switching
-    {
+    if true {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
-        { let second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
-        { let second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
-        { let second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
+        { let _second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
+        { let _second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
 
         // must be lexically scoped like this to avoid the "multiple mutable borrows" error
         { tasklist_mut.spawn_kthread(test_loop_1, None, "test_loop_1"); }
@@ -218,13 +223,39 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     trace!("Entering Task0's idle loop");
 	
 
-    // // create and jump to the first userspace thread
+    // create and jump to the first userspace thread
     if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module(0).expect("Error: no userspace modules found!");
         tasklist_mut.spawn_userspace(module, Some("userspace_module"));
+    }
+
+    if true
+    {
+        debug!("trying to jump to userspace 2nd time");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(0).expect("Error: no userspace modules found!");
+        tasklist_mut.spawn_userspace(module, Some("userspace_module_2"));
+    }
+
+    // create and jump to a userspace thread that tests syscalls
+    if true
+    {
+        debug!("trying out a system call module");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(1).expect("Error: no module 2 found!");
+        tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+    }
+
+    // a second duplicate syscall test user task
+    if true
+    {
+        debug!("trying out a second system call module");
+        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
+        let module = memory::get_module(1).expect("Error: no module 2 found!");
+        tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
     }
 
 
@@ -268,6 +299,9 @@ extern "C" fn eh_personality() {}
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
     println_unsafe!("\n\nPANIC in {} at line {}:", file, line);
     println_unsafe!("    {}", fmt);
+
+    // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9
+
     loop {}
 }
 

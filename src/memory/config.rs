@@ -3,6 +3,13 @@
 //! Currently, that would be any address that starts with 0xFFFF_FF0*_****_****,
 //! so do not use that virtual address range for anything!!
 
+//! Current P4 (top-level page table) mappings:
+//! * 511: kernel text sections
+//! * 510: recursive mapping to top of P4
+//! * 509: kernel heap
+//! * 508: kernel stacks
+//! * 507: userspace stacks
+//! * 506 down to 0:  available for user processes
 
 
 /// 64-bit architecture results in 8 bytes per address.
@@ -39,8 +46,17 @@ pub const MAX_MEMORY_AREAS: usize = 32;
 
 /// Value: 512. 
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
+/// Value: 511. The 511th entry is used for kernel text sections
+pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
 /// Value: 510. The 510th entry is used for the recursive P4 mapping.
 pub const RECURSIVE_PAGE_TABLE_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
+/// Value: 509. The 509th entry is used for the kernel heap
+pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
+/// Value: 508. The 508th entry is used for all kernel stacks
+pub const KERNEL_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
+/// Value: 507. The 507th entry is used for all userspace stacks
+pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
+
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
@@ -53,20 +69,20 @@ pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
 /// higher-half heap gets 512 GB address range starting at the 509th P4 entry,
 /// which is the slot right below the recursive P4 entry (510)
 /// actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
-pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 1) << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 pub const KERNEL_HEAP_INITIAL_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
 
 /// the kernel stack allocator gets the 508th P4 entry of addressability. 
-pub const KERNEL_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 2) << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const KERNEL_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (KERNEL_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 /// the highest actually usuable address in the kernel stack allocator
 pub const KERNEL_STACK_ALLOCATOR_TOP_ADDR: usize = KERNEL_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
 
 
 /// the userspace stack allocators (one per userspace task) each get the 507th P4 entry of addressability. 
-pub const USER_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | ((RECURSIVE_PAGE_TABLE_INDEX - 3) << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const USER_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (USER_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 /// the highest actually usuable address in each userspace stack allocator
 pub const USER_STACK_ALLOCATOR_TOP_ADDR: usize = USER_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
 

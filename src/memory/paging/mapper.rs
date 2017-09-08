@@ -36,10 +36,8 @@ impl Mapper {
         // get the frame number of the page containing the given virtual address,
         // and then the corresponding physical address is that PFN*sizeof(Page) + offset
         self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
-                                                                               frame.number *
-                                                                               PAGE_SIZE +
-                                                                               offset
-                                                                           })
+            frame.number * PAGE_SIZE + offset
+        })
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
@@ -54,9 +52,8 @@ impl Mapper {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
-                                        number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE +
-                                                page.p1_index(),
-                                    });
+                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
+                        });
                     }
                 }
                 if let Some(p2) = p3.next_table(page.p3_index()) {

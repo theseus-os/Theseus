@@ -227,6 +227,11 @@ impl InactivePageTable {
             table.zero();
 
             table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
+
+            // start out by copying all the kernel sections into the new inactive table
+            table.copy_entry_from_table(active_table.p4(), KERNEL_TEXT_P4_INDEX);
+            table.copy_entry_from_table(active_table.p4(), KERNEL_HEAP_P4_INDEX);
+            table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
         }
         temporary_page.unmap(active_table);
 
@@ -269,6 +274,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
+
+        // clear out the initially-mapped kernel entries of P4
+        // (they are initialized in InactivePageTable::new())
+        mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
         // map the allocated kernel text sections
         let mut index = 0;
@@ -319,21 +330,16 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     });
 
 
-    let (old_table, new_active_table) = active_table.switch(&new_table);
-    // let old_table = active_table.switch(&new_table);
+    let (_old_table, new_active_table) = active_table.switch(&new_table);
 
-
-
+    
     // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
     // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
     // active_table.unmap(old_p4_page, allocator);
     // println_unsafe!("guard page at {:#x}", old_p4_page.start_address());
 
 
-
-    // active_table 
-    // previously we returned the active_table used to invoke the switch() method above, but I think that's wrong.
-    // I think we should return the new_active table because that's the one that should be used by task_zero in future mappings. 
+    // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     new_active_table
 }
 

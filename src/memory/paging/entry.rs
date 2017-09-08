@@ -37,6 +37,11 @@ impl Entry {
         assert!(frame.start_address() & !0x000fffff_fffff000 == 0);
         self.0 = (frame.start_address() as u64) | flags.bits();
     }
+
+    // we use this to force explicit copying rather than deriving Copy/Clone
+    pub fn copy(&self) -> Entry {
+        Entry(self.0)
+    }
 }
 
 bitflags! {

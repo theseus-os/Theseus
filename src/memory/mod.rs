@@ -41,19 +41,15 @@ pub fn allocate_frame() -> Option<Frame> {
 
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
-/// A kernel stack allocator is required, but a userspace one is not (kernel threads don't have them).
 pub struct MemoryManagementInfo {
     /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
     pub page_table: PageTable,
     
     /// the list of virtual memory areas mapped currently in this Task's address space
     pub vmas: Vec<VirtualMemoryArea>,
-    
-    /// there is a single kernel stack allocator instance, we just keep a cloned Arc reference to it here.
-    pub kernel_stack_allocator: Arc<Mutex<stack_allocator::StackAllocator>>, // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    pub user_stack_allocator: Option<stack_allocator::StackAllocator>,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
+    pub stack_allocator: stack_allocator::StackAllocator,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 }
 
 impl MemoryManagementInfo {
@@ -66,69 +62,30 @@ impl MemoryManagementInfo {
     //     }
     // }
 
-    pub fn add_vma(&mut self, vma: VirtualMemoryArea) {
-        self.vmas.push(vma);
-    }
-
-    pub fn add_vmas(&mut self, vmas: &mut Vec<VirtualMemoryArea>) {
-        self.vmas.append(vmas);
-    }
-
     pub fn set_page_table(&mut self, pgtbl: PageTable) {
         self.page_table = pgtbl;
     }
 
 
-    /// Allocates a new kernel stack in the currently-running Task's address space.
+    /// Allocates a new stack in the currently-running Task's address space.
     /// The task that called this must be currently running! 
     /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack_kernel(&mut self, size_in_pages: usize) -> Option<Stack> {
-        self.alloc_stack(size_in_pages, false)
-    }
-
-
-    /// Allocates a new user stack in the currently-running Task's address space.
-    /// The task that called this must be currently running! 
-    /// This checks to make sure that this struct's page_table is an ActivePageTable.
-    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    pub fn alloc_stack_user(&mut self, size_in_pages: usize) -> Option<Stack> {
-        self.alloc_stack(size_in_pages, true)
-    }
-
-
-    fn alloc_stack(&mut self, size_in_pages: usize, usermode: bool) -> Option<Stack> {
-        let &mut MemoryManagementInfo { ref mut page_table,
-                                        ref mut vmas,
-                                        ref mut kernel_stack_allocator,
-                                        ref mut user_stack_allocator } = self;                                           
+    /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
+    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator } = self;
     
         match page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
 
-                if usermode {
-                    if let Some( (ustack, stack_vma) ) = user_stack_allocator.as_mut().expect("MMI::alloc_stack: user_stack_allocator was None!")
-                                                                            .alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
-                        vmas.push(stack_vma);
-                        Some(ustack)
-                    }
-                    else {
-                        error!("MemoryManagementInfo::alloc_stack: failed to allocate user stack!");
-                        None
-                    }
-
-                } else {
-                    let mut ksa = kernel_stack_allocator.lock();
-                    if let Some( (kstack, stack_vma) ) = ksa.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
-                        vmas.push(stack_vma);
-                        Some(kstack)
-                    }
-                    else {
-                        error!("MemoryManagementInfo::alloc_stack: failed to allocate kernel stack!");
-                        None
-                    }
-                    
+                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
+                    vmas.push(stack_vma);
+                    Some(stack)
+                }
+                else {
+                    error!("MemoryManagementInfo::alloc_stack: failed to allocate stack!");
+                    None
                 }
             }
             _ => {
@@ -312,7 +269,7 @@ static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]
 
 /// The set of modules loaded by the bootloader
 /// we use a max size of 32 because that's the limit of Rust's default array initializers
-static MODULE_AREAS: Once<[ModuleArea; MAX_MEMORY_AREAS]> = Once::new();
+static MODULE_AREAS: Once<([ModuleArea; MAX_MEMORY_AREAS], usize)> = Once::new();
 
 
 /// initializes the virtual memory management system and returns a MemoryManagementInfo instance,
@@ -325,6 +282,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
+        let mut count = 0;
         for (i, m) in boot_info.module_tags().enumerate() {
             println_unsafe!("Module: {:?}", m);
             modules[i] = ModuleArea {
@@ -332,8 +290,9 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
                 mod_end:   m.end_address(), 
                 name:      m.name(),
             };
+            count += 1;
         }
-        modules
+        (modules, count)
     });
 
 
@@ -439,8 +398,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
         vmas: task_zero_vmas,
-        kernel_stack_allocator: Arc::new(Mutex::new(kernel_stack_allocator)), 
-        user_stack_allocator: None,
+        stack_allocator: kernel_stack_allocator, 
     }
 
 }
@@ -448,9 +406,9 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
 /// returns the `ModuleArea` corresponding to the given `index`
 pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
-    let modules = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
-    if index < modules.len() {
-        Some(&modules[index])
+    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+    if index < ma_pair.1 {
+        Some(&ma_pair.0[index])
     }
     else {
         None

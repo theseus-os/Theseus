@@ -22,13 +22,13 @@ Because OS development requires many language features that Rust considers to be
 Since we're cross compiling for a custom target triple, we need to install the Rust source code:   
 `$ rustup component add rust-src`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:   cbs
+We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
 `$ cargo install xargo`
 
 
 ## Additional Build Environment Setup
 Currently we only support building on 64-bit Debian-like Linux distributions (e.g., Ubuntu 16.04). You will need to install the following packages:  
-`$ sudo apt-get install nasm grub-mkrescue grub-pc-bin mtools xorriso qemu`   
+`$ sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
 
 When you first check out the project, don't forget to checkout all the submodule repositories too:
 `$ git submodule update --init --recursive`
@@ -75,6 +75,10 @@ Try setting a breakpoint at the kernel's entry function using `b rust_main` or a
 
 ## IDE Setup  
 The developer's personal preference is to use Visual Studio Code (VS Code), which is officially supported on Rust's [Are We IDE Yet](https://areweideyet.com/) website. Other good options include Atom, Sublime, Eclipse, and Intellij, but we have had the most success developing with VS Code. You'll need to install several plugins, like racer and rust-fmt, to allow whichever IDE you choose to properly understand Rust source code.
+
+For VS Code, recommended plugins are:
+ * Rust (by kalitaalexey)
+ * Better TOML (by bungcip)
 
 
 ## License

@@ -8,6 +8,7 @@ static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 
 /// See ANSI terminal formatting schemes
+#[allow(dead_code)]
 pub enum LogColor {
     Reset,
     Black,
