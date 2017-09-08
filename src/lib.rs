@@ -210,14 +210,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     println!("initialization done!");
 
-    for num in range(16){
-        
-        for num in range(32){
-            
-
-        }
-
-    }
 	//interrupts::enable_interrupts(); //apparently this line is unecessary
 	println!("enabled interrupts!");
     
