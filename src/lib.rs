@@ -194,11 +194,11 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
     let ref bus_zero = bus_array[0];
-    let slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
+    let ref slot_zero = bus_zero.connected_devices[0]; 
+    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
     println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
-    println!("{:?}", bus_array);
+    // println!("{:?}", bus_array);
 
     // create a second task to test context switching
     if true {
