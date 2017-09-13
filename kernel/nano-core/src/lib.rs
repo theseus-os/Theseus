@@ -118,8 +118,17 @@ fn first_thread_main(arg: Option<u64>) -> u64  {
         let mut connection = table.get_connection(String::from("bus.connection.first"))
             .expect("Fail to create the first bus connection").write();
         println!("Create the first connection.");
-        
-        
+
+  //      loop {
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+ //
+  //      }
+        print!("3");
     }
     1
 }
@@ -128,13 +137,28 @@ fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread, arg: {}!!", arg);
     unsafe {
         let mut table = get_connection_table().write();
-        {let mut connection = table.get_connection(String::from("bus.connection.second"))
-            .expect("Fail to create the first bus connection").write();
-        println!("Create the second connection.");
-        let message = BusMessage::new(String::from("bus.connection.second"), String::from("This is a message from 1 to 2."));       
-        connection.send(&message);}
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.second"))
+            .expect("Fail to create the second bus connection").write();
+            println!("Create the second connection.");
+            let message = BusMessage::new(String::from("bus.connection.first"), String::from("This is a message from 2 to 1."));       
+            connection.send(&message);
+        }
 
-        table.match_msg(&String::from("bus.connection.first"));
+        table.match_msg(&String::from("bus.connection.second"));
+
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.first"))
+                .expect("Fail to create the first bus connection").write();
+            println!("Get the first connection.");
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+
+        }
     }
     2
 }

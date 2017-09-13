@@ -61,6 +61,10 @@ impl BusConnection {
         self.outnum+=1;
     }
 
+    pub fn receive(&mut self) -> Option<BusMessage> {
+        self.incoming.write().pop_back()
+    }
+
     
 }
 
@@ -89,7 +93,7 @@ impl BusConnectionTable {
     }
 
     pub fn match_msg(&self, name:&String){
-        
+       
         let mut source = self.table.get(name).expect("Fail to get the source connection").write();
         let msg_obj = source.outgoing.write().pop_back();
         
@@ -103,6 +107,7 @@ impl BusConnectionTable {
                 println!("Send the message successfully!");
             } else {
                 source.outgoing.write().push_front(msg);
+                println!("Destination connection does not exist!");
             }
             source.outnum -= 1;
         }
