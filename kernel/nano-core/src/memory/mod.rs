@@ -11,7 +11,6 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*; //{Page, PageIter, PageTable, ActivePageTable, InactivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-mod config;
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
@@ -22,7 +21,8 @@ use core::ops::DerefMut;
 use alloc::arc::Arc;
 use collections::Vec;
 use collections::string::String;
-pub use self::config::*;
+use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, MAX_MEMORY_AREAS};
+use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 
 
 pub type PhysicalAddress = usize;

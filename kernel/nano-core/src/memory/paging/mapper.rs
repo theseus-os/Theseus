@@ -10,8 +10,9 @@
 use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
 use super::entry::*;
 use super::table::{self, Table, Level4};
-use memory::{PAGE_SIZE, Frame, FrameAllocator};
+use memory::{Frame, FrameAllocator};
 use core::ptr::Unique;
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, MAX_PAGE_NUMBER, PAGE_SIZE};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,

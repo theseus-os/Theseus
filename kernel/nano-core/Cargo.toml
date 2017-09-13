@@ -44,6 +44,15 @@ version = "0.1.1"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.serial_port]
+path = "../serial_port"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
 
 [lib]
 crate-type = ["staticlib"]

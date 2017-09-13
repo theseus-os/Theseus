@@ -1,15 +1,5 @@
-// Copyright 2016 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-
 // Copyright 2017 Kevin Boos. 
-// Licensed under the  MIT license
+// Licensed under the MIT license
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>,
 // This file may not be copied, modified, or distributed
 // except according to those terms.
@@ -27,6 +17,9 @@
 #![no_std]
 
 
+// ------------------------------------
+// ----- EXTERNAL CRATES BELOW --------
+// ------------------------------------
 extern crate rlibc;
 extern crate volatile;
 extern crate spin; // core spinlocks 
@@ -37,18 +30,25 @@ extern crate x86;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
-extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate alloc;
 #[macro_use] extern crate collections;
-extern crate port_io; // our own crate for port_io, replaces exising "cpu_io"
-extern crate irq_safety; // our own crate for irq-safe locking and interrupt utilities
 #[macro_use] extern crate log;
-extern crate keycodes_ascii; // our own crate for keyboard 
 //extern crate atomic;
-extern crate dfqueue; // our own crate for dfqueue
 
 
-pub mod CONFIG; // TODO: need a better way to separate this out
+// ------------------------------------
+// ------ OUR OWN CRATES BELOW --------
+// ------------------------------------
+extern crate kernel_config; // our configuration options, just a set of const definitions.
+extern crate irq_safety; // for irq-safe locking and interrupt utilities
+extern crate keycodes_ascii; // for keyboard 
+extern crate port_io; // for port_io, replaces external crate "cpu_io"
+extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
+extern crate serial_port;
+#[macro_use] extern crate vga_buffer; 
+extern crate dfqueue; // decoupled, fault-tolerant queue
+
+
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod drivers;  
 #[macro_use] mod util;

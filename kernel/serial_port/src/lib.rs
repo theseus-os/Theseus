@@ -1,3 +1,8 @@
+#![no_std]
+#![feature(const_fn)]
+
+extern crate port_io;
+
 use port_io::Port;
 
 const SERIAL_PORT_COM1: u16 = 0x3F8;

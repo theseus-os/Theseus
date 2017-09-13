@@ -1,22 +1,41 @@
-// Adapted from Phillip Opperman's blog os. 
+//! The vga buffer that implements basic printing,
+//! including the println_unsafe macro. 
+//! Adapted from Phillip Opperman's blog os. 
+
+#![no_std]
+#![feature(collections)]
+#![feature(const_fn)]
+#![feature(unique)]
+
+extern crate spin;
+extern crate volatile;
+extern crate collections;
+extern crate serial_port;
 
 use core::ptr::Unique;
 use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
 use collections::string::String;
+use serial_port::serial_out;
 
+
+const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
+
+
+/// defined by x86's physical memory maps
+const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
+/// default height of the VGA window
 const BUFFER_HEIGHT: usize = 25;
+/// default width of the VGA window
 const BUFFER_WIDTH: usize = 80;
 
-const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
 
 static WRITER: Mutex<Writer> = Mutex::new(Writer {
-                    column_position: 0,
-                    color_code: ColorCode::new(Color::LightGreen,
-                                                Color::Black),
-                    buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + ::memory::KERNEL_OFFSET) as *mut _) },
-                });
+    column_position: 0,
+    color_code: ColorCode::new(Color::LightGreen, Color::Black),
+    buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+});
 
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use print!() instead. 
@@ -25,7 +44,7 @@ static WRITER: Mutex<Writer> = Mutex::new(Writer {
 #[macro_export]
 macro_rules! print_unsafe {
     ($($arg:tt)*) => ({
-            $crate::drivers::vga_buffer::print_args_unsafe(format_args!($($arg)*)).unwrap();
+            $crate::print_args_unsafe(format_args!($($arg)*)).unwrap();
     });
 }
 
@@ -113,9 +132,9 @@ impl Writer {
                 let color_code = self.color_code;
 
                 self.buffer().chars[row][col].write(ScreenChar {
-                                                        ascii_character: byte,
-                                                        color_code: color_code,
-                                                    });
+                    ascii_character: byte,
+                    color_code: color_code,
+                });
                 self.column_position += 1;
             }
         }
@@ -151,7 +170,7 @@ impl Writer {
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         
-        ::drivers::serial_port::serial_out(s); // mirror to serial port
+        serial_out(s); // mirror to serial port
         
         for byte in s.bytes() {
             self.write_byte(byte)

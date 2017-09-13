@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use memory::paging::entry::*;
-use memory::paging::ENTRIES_PER_PAGE_TABLE;
+use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 use memory::FrameAllocator;
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
@@ -18,7 +18,7 @@ use core::marker::PhantomData;
 // we need to use the 510th entry of P4 instead!
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
-// NOTE: keep this in sync with the recursive index in memory/config.rs, and the one in arch/*/boot.asm.
+// NOTE: keep this in sync with the recursive index in kernel_config/memory.rs, and the one in arch/*/boot.asm.
 pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
                                          // ^p4 ^p3 ^p2 ^p1 ^offset  
                                          // ^ 0o776 means that we're always looking at the 510th entry recursively

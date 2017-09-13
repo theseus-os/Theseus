@@ -8,12 +8,15 @@
 // except according to those terms.
 
 pub use self::entry::*;
-use memory::{PAGE_SIZE, Frame, FrameAllocator};
+use memory::{Frame, FrameAllocator};
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2::BootInformation;
 use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
+
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_PAGE_TABLE_INDEX};
+use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 mod entry;
 mod table;
