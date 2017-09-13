@@ -1,0 +1,4 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "kernel_config"
+version = "0.1.0"

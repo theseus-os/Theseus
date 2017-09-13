@@ -1,11 +1,10 @@
-pub mod serial_port;
 pub mod input; 
 pub mod ata_pio;
 pub mod pci;
-#[macro_use] pub mod vga_buffer;
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
+use vga_buffer;
 
 
 /// This is for functions that DO NOT NEED dynamically allocated memory. 

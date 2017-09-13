@@ -1,5 +1,5 @@
 use drivers::input::keyboard::KeyEvent;
-use drivers::vga_buffer;
+use vga_buffer;
 use collections::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
 use task::TaskList;
@@ -13,7 +13,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 // #[macro_export]
 // macro_rules! print {
 //     ($($arg:tt)*) => ({
-//             $crate::drivers::vga_buffer::print_args(format_args!($($arg)*));
+//             $crate::vga_buffer::print_args(format_args!($($arg)*));
 //     });
 // }
 

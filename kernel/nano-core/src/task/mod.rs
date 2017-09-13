@@ -10,6 +10,7 @@ use alloc::boxed::Box;
 use core::fmt;
 use core::ops::DerefMut;
 use memory::{Stack, ModuleArea, MemoryManagementInfo};
+use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 
 #[macro_use] pub mod scheduler;
 
@@ -154,11 +155,12 @@ impl Task {
         
         if false {
             // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id, next.name, next.id;
-            ::drivers::serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-            ::drivers::serial_port::serial_outb((curr_id + 48) as u8);
-            ::drivers::serial_port::serial_out(" to ");
-            ::drivers::serial_port::serial_outb((next_id + 48) as u8);
-            ::drivers::serial_port::serial_out(" \x1b[0m\n");
+            use serial_port;
+            serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
+            serial_port::serial_outb((curr_id + 48) as u8);
+            serial_port::serial_out(" to ");
+            serial_port::serial_outb((next_id + 48) as u8);
+            serial_port::serial_out(" \x1b[0m\n");
         }
 
         // update runstates

@@ -10,6 +10,7 @@
 use super::*; //{Page, ActivePageTable, VirtualAddress};
 use super::table::{Table, Level1};
 use memory::{Frame, FrameAllocator};
+use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 
 pub struct TemporaryPage {

@@ -1,4 +1,4 @@
-### This Makefile builds all of the subdirectories within this kernel directory.
+### This Makefile builds the specified subdirectories within this kernel directory.
 ### It offers the "all" and "clean" targets only
 
 KERNEL_BUILD_DIR = build
@@ -12,12 +12,18 @@ SUBDIRS := $(wildcard */.)
 SUBDIRS := $(filter-out $(KERNEL_BUILD_DIR)/., $(SUBDIRS))
 
 
+.PHONY: $(TOPTARGETS) $(SUBDIRS)
 
-## TODO: change this, because most directories will jsut be built with cargo directly, 
-##       they won't all have their own individual makefile
 
 $(TOPTARGETS): $(SUBDIRS)
 $(SUBDIRS):
-	$(MAKE) -C $@ $(MAKECMDGOALS)
+## If a directory has a Makefile, then we call it. Otherwise, we invoke cargo build. 
+	@if [ -f $@/Makefile ]; then \
+		$(MAKE) -C $@ $(MAKECMDGOALS);  \
+	# else \
+		# cd $@; cargo build; \
+	fi;
+	# @cd serial_port; cargo build;
+	# @cd vga_buffer; cargo build;
 
-.PHONY: $(TOPTARGETS) $(SUBDIRS)
+

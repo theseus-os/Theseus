@@ -2,7 +2,7 @@ use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 use util;
-use CONFIG::*;
+use kernel_config::time::{CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
 use spin::Mutex;
 use drivers::ata_pio;
 

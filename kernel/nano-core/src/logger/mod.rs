@@ -55,7 +55,8 @@ impl ::log::Log for Logger {
                 LogLevel::Trace => ("T", LogColor::Purple.as_terminal_string()),
             };
 
-            ::drivers::serial_port::serial_out( format!("{}[{}] {}{}\n", 
+            use serial_port;
+            serial_port::serial_out( format!("{}[{}] {}{}\n", 
                     color_str, prefix, record.args(), LogColor::Reset.as_terminal_string()).as_str());
         }
     }
