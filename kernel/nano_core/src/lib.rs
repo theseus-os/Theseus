@@ -17,6 +17,10 @@
 #![no_std]
 
 
+// #![feature(compiler_builtins_lib)]  // this is needed for our odd approach of including the nano_core as a library for other kernel crates
+// extern crate compiler_builtins; // this is needed for our odd approach of including the nano_core as a library for other kernel crates
+
+
 // ------------------------------------
 // ----- EXTERNAL CRATES BELOW --------
 // ------------------------------------
@@ -47,6 +51,7 @@ extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crat
 extern crate serial_port;
 #[macro_use] extern crate vga_buffer; 
 extern crate dfqueue; // decoupled, fault-tolerant queue
+extern crate test_lib;
 
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
@@ -308,6 +313,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
+
+    use test_lib;
+    println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
+
 
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
