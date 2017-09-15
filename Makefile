@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 arch ?= x86_64
 target ?= $(arch)-theseus
-nano-core := kernel/nano-core/build/nano-core-$(arch).bin
+nano_core := kernel/nano_core/build/nano_core-$(arch).bin
 iso := build/theseus-$(arch).iso
 grub_cfg := cfg/grub.cfg
 
@@ -90,8 +90,8 @@ debug: $(iso)
 ### Runs a gdb instance on the host machine. 
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
-	@rust-os-gdb/bin/rust-gdb "$(nano-core)" -ex "target remote :1234"
-### TODO: add more symbol files besides nano-core once they're split from nano-core
+	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
+### TODO: add more symbol files besides nano_core once they're split from nano_core
 
 
 
@@ -110,7 +110,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@cp userspace/build/* $(grub-isofiles)/modules/
 ### copy kernel build files
 	@mkdir -p $(grub-isofiles)/boot/grub
-	@cp $(nano-core) $(grub-isofiles)/boot/kernel.bin
+	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
 	@grub-mkrescue -o $(iso) $(grub-isofiles)  # 2> /dev/null
 	
@@ -118,13 +118,13 @@ $(iso): kernel userspace $(grub_cfg)
 
 ### this builds all userspace programs
 userspace: 
-	@echo "======== BUILDING USERSPACE ========"
+	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
 
 
 ### this builds all kernel components
 kernel: test_rustc
-	@echo "======== BUILDING KERNEL ========"
+	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
 
 
