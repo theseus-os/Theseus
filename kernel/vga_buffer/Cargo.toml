@@ -11,6 +11,10 @@ volatile = "0.1.0"
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 
