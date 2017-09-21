@@ -11,6 +11,7 @@ extern crate spin;
 extern crate volatile;
 extern crate collections;
 extern crate serial_port;
+extern crate kernel_config;
 
 use core::ptr::Unique;
 use core::fmt;
@@ -18,9 +19,7 @@ use spin::Mutex;
 use volatile::Volatile;
 use collections::string::String;
 use serial_port::serial_out;
-
-
-const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
+use kernel_config::memory::KERNEL_OFFSET;
 
 
 /// defined by x86's physical memory maps
@@ -31,9 +30,8 @@ const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
 
-static WRITER: Mutex<Writer> = Mutex::new(Writer {
+static VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
     column_position: 0,
-    color_code: ColorCode::new(Color::LightGreen, Color::Black),
     buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
 });
 
@@ -50,7 +48,7 @@ macro_rules! print_unsafe {
 
 #[doc(hidden)]
 pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
-    unsafe { WRITER.force_unlock(); }
+    unsafe { VGA_WRITER.force_unlock(); }
     print_args(args)
 }
 
@@ -71,23 +69,93 @@ pub fn print_string(s: &String) -> fmt::Result {
 
 pub fn print_str(s: &str) -> fmt::Result {
     use core::fmt::Write;
-    WRITER.lock().write_str(s)
+    VGA_WRITER.lock().write_str(s)
 }
 
 pub fn print_args(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
-    WRITER.lock().write_fmt(args)
+    VGA_WRITER.lock().write_fmt(args)
 }
 
 pub fn clear_screen() {
-    let mut locked_writer = WRITER.lock(); 
+    let mut locked_Vgawriter = VGA_WRITER.lock(); 
     for _ in 0..BUFFER_HEIGHT {
-        locked_writer.new_line();
+        locked_Vgawriter.new_line();
     }
 }
 
 pub fn show_splash_screen() {
     print_str(WELCOME_STRING);
+}
+
+pub struct VgaWriter {
+    column_position: usize,
+    buffer: Unique<Buffer>,
+}
+
+impl VgaWriter {
+    pub fn write_byte_with_color(&mut self, byte: u8, color_code: ColorCode) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                self.buffer().chars[row][col].write(ScreenChar {
+                    ascii_character: byte,
+                    color_code: color_code,
+                });
+                self.column_position += 1;
+            }
+        }
+    }
+
+    
+    pub fn write_byte(&mut self, byte: u8) {
+        self.write_byte_with_color(byte, ColorCode::default())
+    }
+
+
+    fn buffer(&mut self) -> &mut Buffer {
+        unsafe { self.buffer.as_mut() }
+    }
+
+    fn new_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let buffer = self.buffer();
+                let character = buffer.chars[row][col].read();
+                buffer.chars[row - 1][col].write(character);
+            }
+        }
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: ColorCode::default()
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer().chars[row][col].write(blank);
+        }
+    }
+}
+
+impl fmt::Write for VgaWriter {
+    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+        
+        serial_out(s); // mirror to serial port
+        
+        for byte in s.bytes() {
+            self.write_byte(byte)
+        }
+        Ok(())
+    }
 }
 
 #[allow(dead_code)]
@@ -112,80 +180,20 @@ pub enum Color {
     White = 15,
 }
 
-pub struct Writer {
-    column_position: usize,
-    color_code: ColorCode,
-    buffer: Unique<Buffer>,
-}
-
-impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
-
-                let color_code = self.color_code;
-
-                self.buffer().chars[row][col].write(ScreenChar {
-                    ascii_character: byte,
-                    color_code: color_code,
-                });
-                self.column_position += 1;
-            }
-        }
-    }
-
-    fn buffer(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
-    }
-
-    fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let buffer = self.buffer();
-                let character = buffer.chars[row][col].read();
-                buffer.chars[row - 1][col].write(character);
-            }
-        }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer().chars[row][col].write(blank);
-        }
-    }
-}
-
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        
-        serial_out(s); // mirror to serial port
-        
-        for byte in s.bytes() {
-            self.write_byte(byte)
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
-struct ColorCode(u8);
+pub struct ColorCode(u8);
 
 impl ColorCode {
-    const fn new(foreground: Color, background: Color) -> ColorCode {
+    pub const fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
+}
+
+impl Default for ColorCode {
+	fn default() -> ColorCode {
+		ColorCode::new(Color::LightGreen, Color::Black)
+	}
+
 }
 
 #[derive(Debug, Clone, Copy)]
