@@ -2,6 +2,7 @@ pub mod serial_port;
 pub mod input; 
 pub mod ata_pio;
 pub mod pci;
+pub mod isa_dma;
 #[macro_use] pub mod vga_buffer;
 
 use dfqueue::DFQueueProducer;
