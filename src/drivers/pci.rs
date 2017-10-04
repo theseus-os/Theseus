@@ -3,6 +3,7 @@ use spin::{Once, Mutex};
 use alloc::rc::Rc;
 use collections::Vec;
 use core::fmt;
+use memory;
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -14,6 +15,16 @@ static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DATA));
 
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
+pub static BAR4_BASE: Once<u16> = Once::new();
+
+///the ports to the DMA primary and secondary command and status bytes
+pub static DMA_PRIM_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
+pub static DMA_PRIM_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
+pub static DMA_SEC_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
+pub static DMA_SEC_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
+///ports to write prdt address to
+pub static DMA_PRIM_PRDT_ADD: Once<Mutex<Port<u32>>> = Once::new();
+pub static DMA_SEC_PRDT_ADD: Once<Mutex<Port<u32>>> = Once::new();
 
 /// used to read from PCI config, additionally initializes PCI buses to be used
 pub fn pci_config_read(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
@@ -69,12 +80,13 @@ pub struct PciDev{
     pub class: u8,
     /// subclass can also be used to determine device type http://wiki.osdev.org/PCI#Class_Codes 
     pub subclass: u8,
+    pub bar4: u16,
 }
 
 impl fmt::Display for PciDev { 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "slot: {}, exists: {}, device_id: {:#x}, vendor_id: {:#x}, func: {}, class: {:#x}, subclass: {:#x}", 
-            self.slot, self.exists, self.device_id, self.vendor_id, self.func, self.class, self.subclass)
+        write!(f, "slot: {}, exists: {}, device_id: {:#x}, vendor_id: {:#x}, func: {}, class: {:#x}, subclass: {:#x}, bar4_address: {:#x}", 
+            self.slot, self.exists, self.device_id, self.vendor_id, self.func, self.class, self.subclass, self.bar4)
     }
 }
 
@@ -104,7 +116,7 @@ impl fmt::Display for PciDev {
 const GET_VENDOR_ID: u16 = 0;
 const GET_DEVICE_ID: u16 = 2;
 const GET_CLASS_ID:  u16 = 0xA;
-
+const GET_BAR4: u16 = 0x20;
 
 //initializes structure containing PCI buses and their attached devices
 pub fn init_pci_buses(){
@@ -138,6 +150,7 @@ pub fn init_pci_buses(){
                         num_connected += 1;
                         let device_id = pci_config_read(bus, slot, f, GET_DEVICE_ID);
                         let class_word = pci_config_read(bus, slot, f, GET_CLASS_ID);
+                        let bar4 = pci_config_read(bus, slot, f, GET_BAR4);
                         let class: u8 = (class_word >> 8) as u8;
                         let subclass: u8 = (class_word & 0xFF) as u8;
 
@@ -149,6 +162,7 @@ pub fn init_pci_buses(){
                             func: f,
                             class: class,
                             subclass: subclass, 
+                            bar4: bar4,
                         };
 
                         debug!("found pci device: {}", device);
@@ -166,4 +180,59 @@ pub fn init_pci_buses(){
 	    buses
     });
 	
+}
+
+///PCI DMA, currently set for primary bus
+
+///sets the ports for PCI DMA configuration access using BAR4 information
+pub fn set_dma_ports(){
+    BAR4_BASE.call_once(||pci_config_read(0, 1, 1, GET_BAR4));
+    //offsets for DMA configuration ports found in http://wiki.osdev.org/ATA/ATAPI_using_DMA under "The Bus Master Register"
+    DMA_PRIM_COMMAND_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0)));
+    DMA_PRIM_STATUS_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0x2)));
+    DMA_SEC_COMMAND_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0x8)));
+    DMA_SEC_STATUS_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0xA))); 
+
+    DMA_PRIM_PRDT_ADD.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0x4)));
+    DMA_SEC_PRDT_ADD.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0xC)));
+    
+    
+
+}
+
+///uses the memory allocator to allocate a frame and writes the address to the DMA address port
+pub fn allocate_mem()->u32{
+
+    let frame = memory::allocate_frame().expect("pci::allocate_mem() - out of memory trying to allocate frame");
+    let prdt: u32 = frame.start_address() as u32;
+    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt);}
+    prdt
+}
+
+
+///functions which configure the DMA controller for read and write mode
+pub fn start_read(){
+    //sets bit 0 in the command byte to put the dma controller in start mode, clears bit 3 to put in read mode
+    unsafe{DMA_PRIM_COMMAND_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(1)}; 
+    //sets bit 0 in the status byte to clear error and interrupt bits and set dma mode bit
+    unsafe{DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(1)};
+}
+
+pub fn start_write(){
+    //sets bit 0 in the command byte to put the dma controller in start mode, set bit 3 to put in write mode
+    unsafe{DMA_PRIM_COMMAND_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(0b101)};
+    //sets bit 0 in the status byte to clear error and interrupt bits and set dma mode bit
+    unsafe{DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(1)};
+}
+
+///immediately ends the transfer, dma controller clears any set prdt address 
+pub fn end_transfer(){
+    unsafe{DMA_PRIM_COMMAND_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(0)};
+
+}
+
+///the status byte must be read after each IRQ (I believe IRQ 14 which is handled in ata_pio)
+///IRQ number still needs to be confirmed, was 14 according to http://www.pchell.com/hardware/irqs.shtml
+pub fn acknowledge_disk_irq(){
+    DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_STATUS_BYTE not configured").lock().read();
 }
