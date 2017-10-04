@@ -2,6 +2,7 @@ use port_io::Port;
 use spin::{Once, Mutex}; 
 use core::sync::atomic::{Ordering};
 use interrupts::pit_clock;
+use drivers::pci;
 
 #[allow(dead_code)]
 
@@ -300,6 +301,8 @@ pub fn pio_write(drive:u8, lba:u32, arr: [u16;256])->Result<u16, u16>{
 //could be used later to replace polling system with interrupt system for reading and writing
 pub fn handle_primary_interrupt(){
     trace!("Got IRQ 14!");
+	pci::acknowledge_disk_irq();
+
 }
 
 //AtaIdentifyData struct and implemenations from Tifflin Kernel

@@ -233,6 +233,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     let console_queue_producer = console::console_init(task::get_tasklist().write());
 
     // initialize the rest of our drivers
+    pci::set_dma_ports();
     drivers::init(console_queue_producer);
 
 
@@ -243,12 +244,15 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	println!("enabled interrupts!");
     
     let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
+    
     let ref bus_zero = bus_array[0];
     let ref slot_zero = bus_zero.connected_devices[0]; 
     println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
     println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
-    // println!("{:?}", bus_array);
+    pci::allocate_mem();
+    
+
 
     // create a second task to test context switching
     if true {
