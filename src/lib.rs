@@ -202,6 +202,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     println!("{:?}", bus_zero);
     pci::allocate_mem();
     println!("Data at location 0 of drive: {:?}",ata_pio::pio_read(0xE0,0).unwrap()[0]);
+    pci::read_from_disk(0xE0,0);
     
 
 

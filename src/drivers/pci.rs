@@ -250,8 +250,3 @@ pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32,u16>{
     }
     return Err(0);
 }
-
-pub fn write_to_disk(drive: u8, lba: u32) -> Result<u32, u16>{
-    let 
-
-}
