@@ -4,6 +4,7 @@ use core::sync::atomic::{Ordering};
 use interrupts::pit_clock;
 use drivers::pci;
 
+
 #[allow(dead_code)]
 
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
@@ -22,9 +23,13 @@ const PRIMARY_BUS_SELECT_ADDRESS: u16 = 0x1F6;
 //port which commands are sent to for primary ATA
 const PRIMARY_COMMAND_IO_ADDRESS: u16 = 0x1F7;
 
-//commands which set ATA drive to read or write mode
+//commands which set ATA drive to read or write mode in PIO
 const PIO_WRITE_COMMAND: u8 = 0x30;
 const PIO_READ_COMMAND: u8 = 0x20;
+
+//commands which set ATA drive to read or write mode in DMA
+const DMA_WRITE_COMMAND: u8 = 0xCA;
+const DMA_READ_COMMAND: u8 = 0xC8;
 
 const IDENTIFY_COMMAND: u8 = 0xEC;
 const READ_MASTER: u16 = 0xE0;
@@ -437,4 +442,56 @@ impl<'a> ::core::fmt::Debug for RawString<'a>
 		try!(write!(f, "\""));
 		::core::result::Result::Ok( () )
 	}
+}
+
+///read from disk at address input, drive = 0xE0 for master drive, 0xF0 for slave drive, should only be accessed by dma_read in pci.rs
+pub fn ata_read(drive:u8, lba:u32)->Result<u16,u16>{
+	let mut chosen_drive = &AtaIdentifyData{..Default::default()};
+
+	if drive == 0xE0 {
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master;
+	}
+
+	if drive == 0xF0{
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_slave;
+	}
+	trace!("{} number of sectors", chosen_drive.sector_count_28);
+	if drive != 0xE0 && drive != 0xF0 {
+		trace!("input drive value is unacceptable");
+		return Err(0);
+	}
+	if lba+1> chosen_drive.sector_count_28{
+		trace!("lba out of range of sectors");
+		trace!("{} number of sectors", chosen_drive.sector_count_28);
+		return Err(0);
+	}
+    //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)
+    let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
+    unsafe{
+		
+	PRIMARY_BUS_SELECT.lock().write(master_select);
+
+	//number of consecutive sectors to read from, set at 1 
+	SECTORCOUNT.lock().write(1);
+    //lba is written to disk ports 
+    LBALO.lock().write((lba)as u8);
+    LBAMID.lock().write((lba>>8)as u8);
+    LBAHI.lock().write((lba>>16)as u8);
+
+    COMMAND_IO.lock().write(DMA_READ_COMMAND);
+    }
+
+	if COMMAND_IO.lock().read()%2 == 1{
+		trace!("error bit set");
+		return Err(0);
+	}
+
+	//pausing 100 pit ticks to ensure data has time to be transferred (temporary measure)
+	let start = pit_clock::PIT_TICKS.load(Ordering::SeqCst);
+	while start+100 > pit_clock::PIT_TICKS.load(Ordering::SeqCst){}
+
+	//data is ready to read from memory
+	Ok(1)
+
+
 }
