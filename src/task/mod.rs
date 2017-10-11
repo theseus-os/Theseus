@@ -270,7 +270,7 @@ impl TaskList {
     }
 
     /// returns a shared reference to the current `Task`
-    fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
+    pub fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(&CURRENT_TASK.load(Ordering::SeqCst))
     }
 

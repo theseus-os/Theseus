@@ -34,6 +34,7 @@ macro_rules! println {
 macro_rules! print {
     ($($arg:tt)*) => ({
             use core::fmt::Write;
+            use collections::String;
             let mut s: String = String::new();
             write!(&mut s, $($arg)*);
             $crate::console::print_to_console(s).unwrap();

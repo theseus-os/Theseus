@@ -136,7 +136,7 @@ fn write_primary_data_port(arr: [u16;256])-> Result<u16, u16>{
 			//end of while
 			}
 
-		unsafe{PRIMARY_DATA_PORT.lock().write(arr[0])};
+		unsafe{PRIMARY_DATA_PORT.lock().write(arr[index as usize])};
 	}
 	
 	//pausing two pit ticks so that a read is never immediately after a write
@@ -358,7 +358,7 @@ impl AtaIdentifyData{
 	fn new(arr: [u16; 256])-> AtaIdentifyData{
 
 		//transmutes the array of u16s from the ATA device into an ATAIdentifyData struct
-		let mut identify_data: AtaIdentifyData =unsafe {::core::mem::transmute(arr)};
+		let mut identify_data: AtaIdentifyData = unsafe {::core::mem::transmute(arr)};
 		flip_bytes(&mut identify_data.serial_number);
 		flip_bytes(&mut identify_data.firmware_ver);
 		flip_bytes(&mut identify_data.model_number);
@@ -472,7 +472,7 @@ pub fn ata_read(drive:u8, lba:u32)->Result<u16,u16>{
 	PRIMARY_BUS_SELECT.lock().write(master_select);
 
 	//number of consecutive sectors to read from, set at 1 
-	SECTORCOUNT.lock().write(1);
+	SECTORCOUNT.lock().write(512);
     //lba is written to disk ports 
     LBALO.lock().write((lba)as u8);
     LBAMID.lock().write((lba>>8)as u8);
