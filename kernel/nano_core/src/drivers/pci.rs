@@ -205,7 +205,10 @@ pub fn set_dma_ports(){
 pub fn allocate_mem()->u32{
 
     let frame = memory::allocate_frame().expect("pci::allocate_mem() - out of memory trying to allocate frame");
-    let prdt: u32 = frame.start_address() as u32;
+    // FIXME TODO: double check that the frame.start_address() is within 32-bit size before just casting it as u32
+    let frame_start = frame.start_address();
+    println!("frame_start = {:#x}", frame_start);
+    let prdt: u32 = frame_start as u32;
     unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt);}
     prdt
 }
@@ -240,13 +243,13 @@ pub fn acknowledge_disk_irq(){
 
 ///allocates memory, sets the DMA controller to read mode, sends transfer commands to the ATA drive, and then ends the transfer
 ///returns start address of prdt if successful or Err(0) if unsuccessful
-pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32,u16>{
+pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32, ()>{
     let prdt_start: u32 = allocate_mem();
     start_read();
-    let ata_result = ata_pio::pio_read(drive,lba);
+    let ata_result = ata_pio::ata_read(drive,lba);
     end_transfer();
     if ata_result.is_ok(){
         return Ok(prdt_start);
     }
-    return Err(0);
+    return Err(());
 }
