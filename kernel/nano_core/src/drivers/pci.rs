@@ -4,6 +4,7 @@ use alloc::rc::Rc;
 use collections::Vec;
 use core::fmt;
 use memory;
+use drivers::ata_pio;
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -235,4 +236,22 @@ pub fn end_transfer(){
 ///IRQ number still needs to be confirmed, was 14 according to http://www.pchell.com/hardware/irqs.shtml
 pub fn acknowledge_disk_irq(){
     DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_STATUS_BYTE not configured").lock().read();
+}
+
+///allocates memory, sets the DMA controller to read mode, sends transfer commands to the ATA drive, and then ends the transfer
+///returns start address of prdt if successful or Err(0) if unsuccessful
+pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32,u16>{
+    let prdt_start: u32 = allocate_mem();
+    start_read();
+    let ata_result = ata_pio::pio_read(drive,lba);
+    end_transfer();
+    if ata_result.is_ok(){
+        return Ok(prdt_start);
+    }
+    return Err(0);
+}
+
+pub fn write_to_disk(drive: u8, lba: u32) -> Result<u32, u16>{
+    let 
+
 }
