@@ -1,4 +1,3 @@
-use collections::VecDeque;
 use drivers::input::keyboard::KeyEvent;
 use drivers::vga_buffer;
 use collections::string::String;
@@ -125,7 +124,6 @@ pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQu
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
 fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> bool { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
     use core::ops::Deref;
-    use dfqueue::PeekedData;
 
     loop { 
         let event = consumer.peek();

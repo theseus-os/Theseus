@@ -32,7 +32,7 @@ start:
 	;
 	; We subtract KERNEL_OFFSET from the stack address because we are not yet
 	; mapped to the higher half
-	mov esp, stack_top - KERNEL_OFFSET
+	mov esp, initial_stack_top - KERNEL_OFFSET
 
 	; The multiboot2 specification requires the bootloader to load a pointer
 	; to the multiboot2 information structure in the `ebx` register. Here we
@@ -128,7 +128,7 @@ enable_paging:
 	mov eax, p4_table - KERNEL_OFFSET
 	mov cr3, eax
 
-	; set the no execute, long mode and system call extention
+	; set the no execute (bit 11), long mode (bit 8), and SYSCALL Enable (bit 0)
 	; bits in the EFER MSR (model specific register)
 	mov ecx, 0xC0000080
 	rdmsr
@@ -264,7 +264,7 @@ start_high:
 	mov ds, ax
 	mov es, ax
 	mov fs, ax
-	mov gs, ax
+	; mov gs, ax
 
 
 	; Save the multiboot address
@@ -341,6 +341,8 @@ megabyte_table:
 kernel_table:
 	resb 4096
 
+
+
 ; The multiboot standard does not define the value of the stack pointer register
 ; (esp) and it is up to the kernel to provide a stack. This allocates room for a
 ; small stack by creating a symbol at the bottom of it, then allocating 64
@@ -352,6 +354,8 @@ kernel_table:
 ; stack is properly aligned and failure to align the stack will result in
 ; undefined behavior.
 align 16
-stack_bottom:
+global initial_stack_bottom
+initial_stack_bottom:
 	resb 4096 * 5
-stack_top:
+global initial_stack_top
+initial_stack_top:

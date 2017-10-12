@@ -1,11 +1,10 @@
 use core::ops::DerefMut;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_BOOL_INIT};
 use collections::VecDeque;
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
+use irq_safety::{RwLockIrqSafe, RwLockIrqSafeWriteGuard};
 use spin::RwLock;
 
-use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
+use super::{get_tasklist, Task};
 
 /// This function performs a context switch.
 /// This is unsafe because we have to maintain references to the current and next tasks
@@ -15,11 +14,10 @@ use super::{RunState, get_tasklist, CURRENT_TASK, TaskId, AtomicTaskId, Task};
 pub unsafe fn schedule() -> bool {
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("schedule [0]: current_taskid={}", current_taskid.into());
+    // trace!("schedule [0]: current_taskid={}", current_taskid);
 
-    let mut current_task = 0 as *mut Task; // a null Task ptr
-    let mut next_task = 0 as *mut Task; // a null Task ptr
-    
+    let current_task: *mut Task;
+    let next_task: *mut Task; 
 
     // this is scoped to ensure that the tasklist's RwLockIrqSafe is released at the end.
     // we only request a read lock cuz we're not modifying the list here, 
@@ -46,17 +44,21 @@ pub unsafe fn schedule() -> bool {
                         .write().deref_mut() as *mut Task; 
     }
 
+    if current_task == next_task {
+        // no need to switch if the chosen task is the same as the current task
+        return false; // tasklist is automatically unlocked here
+    }
 
     // we want mutable references to mutable tasks
     let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
     let mut next: &mut Task = &mut (*next_task); // as &mut Task; 
 
-    // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid.into(), ::interrupts::interrupts_enabled());
+    // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 
     curr.context_switch(next); 
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current.into(), ::interrupts::interrupts_enabled());
+    // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
 
     true
 }

@@ -1,6 +1,16 @@
-BUILD_DIR = build
+USERSPACE_BUILD_DIR = build
+export  # export this to Makefiles in subdirectories
 
-all: 
-	@mkdir -p $(BUILD_DIR)
-	@nasm -f bin test_program.s -o $(BUILD_DIR)/test_program
-	
+TOPTARGETS := all clean
+
+# get all the subdirectories for making
+SUBDIRS := $(wildcard */.)
+# except for the build directory
+SUBDIRS := $(filter-out $(USERSPACE_BUILD_DIR)/., $(SUBDIRS))
+
+
+$(TOPTARGETS): $(SUBDIRS)
+$(SUBDIRS):
+	$(MAKE) -C $@ $(MAKECMDGOALS)
+
+.PHONY: $(TOPTARGETS) $(SUBDIRS)

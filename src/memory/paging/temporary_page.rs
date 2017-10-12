@@ -9,7 +9,7 @@
 
 use super::*; //{Page, ActivePageTable, VirtualAddress};
 use super::table::{Table, Level1};
-use memory::{Frame, FrameAllocator, PAGE_SIZE};
+use memory::{Frame, FrameAllocator};
 
 
 pub struct TemporaryPage {

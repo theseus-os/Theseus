@@ -1,7 +1,6 @@
 use memory::paging::*;
 use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
 use memory::Mapper;
-use core::ops::DerefMut;
 
 pub struct StackAllocator {
     pub range: PageIter,
@@ -89,7 +88,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    fn new(top: usize, bottom: usize) -> Stack {
+    pub fn new(top: usize, bottom: usize) -> Stack {
         assert!(top > bottom);
         Stack {
             top: top,
@@ -98,13 +97,25 @@ impl Stack {
     }
 
     /// the top of this Stack. This address is not dereferenceable, the one right below it is. 
-    /// Highest usable address = top() - sizeof::<usize>()
-    pub fn top(&self) -> usize {
+    /// to get the highest usable address in this Stack, call `top_usable()`
+    pub fn top_unusable(&self) -> usize {
         self.top
     }
+
+    /// Returns the highest usable address of this Stack, 
+    /// which is top_unusable() - sizeof(usize)
+    pub fn top_usable(&self) -> usize {
+        use core::mem;
+        self.top - mem::size_of::<usize>()
+    }
+
 
     #[allow(dead_code)]
     pub fn bottom(&self) -> usize {
         self.bottom
+    }
+
+    pub fn size(&self) -> usize {
+        self.top_unusable() - self.bottom
     }
 }
