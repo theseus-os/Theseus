@@ -4,14 +4,18 @@
 
 #![no_std]
 #![feature(collections)]
+#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
 
 extern crate spin;
 extern crate volatile;
+extern crate alloc;
 extern crate collections;
 extern crate serial_port;
 extern crate kernel_config;
+extern crate state_store;
+#[macro_use] extern crate lazy_static;
 
 use core::ptr::Unique;
 use core::fmt;
@@ -20,7 +24,7 @@ use volatile::Volatile;
 use collections::string::String;
 use serial_port::serial_out;
 use kernel_config::memory::KERNEL_OFFSET;
-
+use state_store::{SSCached, get_state, insert_state};
 
 /// defined by x86's physical memory maps
 const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
@@ -30,10 +34,17 @@ const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
 
-static VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
-    column_position: 0,
-    buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-});
+lazy_static! {
+    static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
+        let vga_writer = VgaWriter {
+            column_position: 0,
+            buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+        };
+        insert_state(Mutex::new(vga_writer));
+        get_state::<Mutex<VgaWriter>>()
+    };
+}
+
 
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use print!() instead. 
@@ -48,8 +59,13 @@ macro_rules! print_unsafe {
 
 #[doc(hidden)]
 pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
-    unsafe { VGA_WRITER.force_unlock(); }
-    print_args(args)
+    if let Some(writer) = VGA_WRITER.get() {
+        unsafe{ writer.force_unlock() };
+        print_args(args)
+    }
+    else {
+        Err(fmt::Error)
+    }
 }
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use println!() instead. 
@@ -69,30 +85,45 @@ pub fn print_string(s: &String) -> fmt::Result {
 
 pub fn print_str(s: &str) -> fmt::Result {
     use core::fmt::Write;
-    VGA_WRITER.lock().write_str(s)
+    if let Some(writer) = VGA_WRITER.get() {
+        writer.lock().write_str(s)
+    }
+    else {
+        Err(fmt::Error)
+    }
 }
 
 pub fn print_args(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
-    VGA_WRITER.lock().write_fmt(args)
+    if let Some(writer) = VGA_WRITER.get() {
+        writer.lock().write_fmt(args)
+    }
+    else {
+        Err(fmt::Error)
+    }
 }
 
-pub fn clear_screen() {
-    let mut locked_Vgawriter = VGA_WRITER.lock(); 
-    for _ in 0..BUFFER_HEIGHT {
-        locked_Vgawriter.new_line();
+pub fn clear_screen() -> Result<(), ()> {
+    if let Some(writer) = VGA_WRITER.get() {
+        let mut locked_vgawriter = writer.lock(); 
+        for _ in 0..BUFFER_HEIGHT {
+            locked_vgawriter.new_line();
+        }
+        Ok(())
+    }
+    else {
+        Err(())
     }
 }
 
 pub fn show_splash_screen() {
-    print_str(WELCOME_STRING);
+    let _ = print_str(WELCOME_STRING);
 }
 
 pub struct VgaWriter {
     column_position: usize,
     buffer: Unique<Buffer>,
 }
-
 impl VgaWriter {
     pub fn write_byte_with_color(&mut self, byte: u8, color_code: ColorCode) {
         match byte {
