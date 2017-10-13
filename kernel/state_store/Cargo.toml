@@ -4,9 +4,8 @@ name = "state_store"
 version = "0.1.0"
 
 [dependencies]
-typemap = "0.3.3"
+# typemap = "0.3.3"
 spin = "0.4.5"
-debugit = "0.1.2"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

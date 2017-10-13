@@ -3,70 +3,41 @@
 #![feature(collections)]
 #![feature(alloc)]
 #![feature(drop_types_in_const)]
-#![feature(core_intrinsics)]
+
+#[cfg(test)] 
+#[macro_use] extern crate std;
 
 
 extern crate collections;
 extern crate alloc;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 extern crate spin;
-extern crate typemap;
 extern crate atomic_linked_list; 
+// #[macro_use] extern crate mopa;
 
-
-#[macro_use] mod downcast_rs_no_std;
-use downcast_rs_no_std::Downcast;
-
+// #[macro_use] mod downcast_rs_no_std;
+// use downcast_rs_no_std::Downcast;
 
 // Any trait allows dynamic type checks
 use core::any::{Any, TypeId};
-use collections::BTreeMap;
+use core::sync::atomic::{AtomicPtr, Ordering};
 use alloc::boxed::Box;
 use spin::{RwLock, Mutex, Once};
-use typemap::{TypeMap, Key};
 use alloc::arc::{Arc, Weak};
-use core::sync::atomic::{Ordering, AtomicPtr};
-use atomic_linked_list::{AtomicLinkedList, AtomicLinkedListIter};
+use atomic_linked_list::atomic_map::AtomicMap;
 
 
 
-/// The trait that all types must implement if they want to be
-/// eligible for inclusion in the system-wide data store.
-///
-/// To wrap this in a Mutex, it has to be Send.
-/// To wrap this in a RwLock, it has to be Sync.
-pub trait SystemState : Downcast + Send { }
-impl_downcast!(SystemState);
-
-
-
-// type SSData = RwLock<Box<SystemState>>;
-type SSData = Box<SystemState>;
-type SSResult<S: SystemState> = Option<Weak<Box<S>>>;  // the thing inside Weak<> should match SSData
-
-
-struct SystemStateNode {
-	data: Arc<SSData>,
-	typ: &'static str,
-}
-impl SystemStateNode {
-	fn new<S: SystemState>(s: S) -> SystemStateNode {
-		SystemStateNode {
-			data: Arc::new(Box::new(s)),
-			// SAFE: just using a rust internal type function
-            typ: unsafe { core::intrinsics::type_name::<S>() },
-		}
-	}
-
-}
-
-
-
-struct SystemStateList( pub AtomicLinkedList<SystemStateNode> ); 
+/// Thanks to Rust's lack of a base type like Java's Object,
+/// we have to use this dumbass List structure of Box<Any>,
+/// in which what we actually add to the List is not the type T itself, 
+/// but rather an Arc<T> that itself is wrapped in the Box.
+/// In summary, Any = Arc<T>, and Box<Any> = Box<Arc<T>>
+/// in order for us to obtain weak references to that specific type T.
+struct SystemStateList( pub AtomicMap<TypeId, Box<Any>> ); 
 impl SystemStateList {
 	fn new() -> SystemStateList {
-		let list: AtomicLinkedList<SystemStateNode> = AtomicLinkedList::new();
-		SystemStateList( list )
+		SystemStateList( AtomicMap::new() )
 	}
 }
 
@@ -107,114 +78,143 @@ lazy_static! {
 
 
 /// Inserts a new SystemState-implementing type into the map. 
-/// If the map did not previously have a SystemState of this type, `None` is returned.
-/// If the map did previously have one, the value is updated, and the old value is returned.
-pub fn insert_state<S: SystemState>(state: S) -> Option<Arc<SSData>> {
-	// before adding the new state, first check if another one of the same type exists
-	for elem in SYSTEM_STATE.0.iter_mut() {
-		// SAFE, just getting core intrinsic type string
-		if elem.typ == unsafe { core::intrinsics::type_name::<S>() } {
-			
-			// use mem::replace to swap our new node into the old node's place
-			let old_data = core::mem::replace(&mut elem.data, Arc::new(Box::new(state)));
-			return Some(old_data);
-		}
-	}
-	
-	// here: an element with the type S did not yet exist, so just add it
-	SYSTEM_STATE.0.push_front(SystemStateNode::new(state));
-	None
+// /// If the map did not previously have a SystemState of this type, `None` is returned.
+// /// If the map did previously have one, the value is updated, and the old value is returned.
+pub fn insert_state<S: Any>(state: S) -> Option<S>{
+	let old_val: Option<Box<Any>> = SYSTEM_STATE.0.insert(TypeId::of::<S>(), 
+		Box::new(
+			// this is the type that is represented by Any
+			Arc::new(state)
+		)
+	);
+
+	// now we have the old value, we need to downcast it from Any to S, 
+	// and then obtain a single-count Arc<S> from that &Arc<S>,
+	// while we achieve by cloning the &Arc<S> and then letting it drop out of scope.
+	let solo_arc = match old_val {
+		Some(g) => g.downcast_ref::<Arc<S>>().map( |a| Arc::clone(a)),
+		_ => None,
+	};
+
+	// now that this Arc is a single reference, unwrap it to take ownership of its inner S
+	solo_arc.and_then( |s_arc| Arc::try_unwrap(s_arc).ok())
 }
+
+
+/// A thread-safe cached reference to a system-wide state.
+/// Internally, this contains a Weak pointer to `S`,
+/// which is upgraded / updated whenenver the caller invokes `get()`.
+pub struct SSCached<S: Any> ( AtomicPtr<Option<Weak<S>>> );
+impl<S: Any> SSCached<S> {
+
+	/// Tries to upgrade the internal Weak pointer to a Strong (Arc) pointer.
+	/// If successful, the weak pointer is still valid, so we return the Arc<S>. 
+	/// If not, the current internal Weak reference is None, so we try to reaquire it.
+	/// If it cannot be reacquired, there is currently not a system-wide state of type `S`,
+	/// so we return None.  
+	pub fn get(&self) -> Option<Arc<S>> {
+		// this is the VERY common case, simply loading the cached weak pointer and upgrading it
+		// SAFE: because we're the only ones able to access this AtomicPtr
+		let val: &Option<Weak<S>> = unsafe{ &*self.0.load(Ordering::Acquire) };
+		if let &Some(ref v) = val {
+			if let Some(arc) = v.upgrade() {
+				// weird structure, because we only want to return if upgrade works!
+				return Some(arc);
+			}
+		}
+
+		// remove this when we support real fault tolerance
+		panic!("In state_store SSCached::get():  reached a fault tolerance condition; cached SystemState was None!");
+
+		// here: cached value was none, so try to get it again
+		let new_state = get_state_internal::<S>(); 
+		let (new_cached_val, return_val) = match new_state {
+			Some(ns_weak) => ( Some(Weak::clone(&ns_weak)), ns_weak.upgrade() ), // NOTE: I haven't been able to fully test this yet
+			_ => (None, None)
+		};
+		
+		// update the cached pointer to the new value
+		let old_ptr = self.0.swap(Box::into_raw(Box::new(new_cached_val)), Ordering::Release);
+
+		// clean up the old cached value to allow it to be dropped
+        // SAFE: we are the only ones touching this AtomicPtr
+        unsafe {
+            let _ = Box::from_raw(old_ptr);
+        }
+
+		return_val
+	}
+}
+
 
 /// Returns a Weak reference to the SystemState of the requested type `S`,
 /// which the caller can downcast into the specific type `S`
 /// by invoking downcast_ref() on the data inside the Weak<> wrapper.
 /// It's safe for the caller to save/cache the returned value. 
-pub fn get_state<S: SystemState>() -> Option<Weak<SSData>> {
-	for elem in SYSTEM_STATE.0.iter() {
-		// SAFE, just getting core intrinsic type string
-		if elem.typ == unsafe { core::intrinsics::type_name::<S>() } {
-			return Some(Arc::downgrade(&elem.data));
-		}
-	}
-	
-	None
+pub fn get_state<S: Any>() -> SSCached<S> {
+	SSCached( AtomicPtr::new(Box::into_raw(Box::new(get_state_internal::<S>()))) )
+}
+
+
+
+fn get_state_internal<S: Any>() -> Option<Weak<S>> {
+	SYSTEM_STATE.0.get(TypeId::of::<S>())        // get the Option<Arc<Any>> value
+	.and_then( |g| g.downcast_ref::<Arc<S>>())   // if it's Some(g), then downcast g to S
+	.map( |dcast_arc| Arc::downgrade(dcast_arc)) // transform result of downcast to weak ptr
 }
 
 
 
 
-
-
-
-#[cfg(test)] 
-#[macro_use] extern crate std;
+// --------------- TESTING BELOW  ----------------------
 
 #[cfg(test)] 
-#[macro_use] extern crate debugit;
-
-
 #[derive(Debug)]
 struct TestStruct {
 	data: u32,
 	extra: u64,
 }
-impl SystemState for TestStruct { }
 
+#[cfg(test)] 
 #[derive(Debug)]
 struct Red (u64);
-impl SystemState for Red { }
 
+#[cfg(test)] 
 #[derive(Debug)]
 struct Green (u64);
-impl SystemState for Green { }
 
 
+// To run this:  cargo test statetest -- --nocapture
 #[test]
 fn statetest() {
 
 	// add some things to SYSTEM_STATE
 	println!("here1 ");
-	insert_state(Red(32));
-	println!("here2 ");
-	insert_state(Green(42));
-	println!("here3 ");
+	let res = insert_state(Red(32));
+	println!("here2, res = {:?} ", res);
+	let res = insert_state(Green(42));
+	println!("here3, res = {:?} ", res);
 	let oldred = insert_state(Red(55));
-	let rref = oldred.unwrap();
-	let red: Option<&Red> = rref.downcast_ref();
-	println!("oldred = {:?}", red);
-	insert_state(TestStruct{
+	println!("oldred = {:?}", oldred);
+	let res = insert_state(TestStruct{
 		data: 45,
 		extra: 239874,
 	});
-	println!("here4 ");
+	println!("here4, res = {:?} ", res);
 
-	let rw: Weak<SSData>;
 
 	// try to retrieve those things from the SYSTEM_STATE
 	{
-		let r = get_state::<Red>().expect("r not found"); 
+		let red = get_state::<Red>().get();
 		println!("here5 ");
-		let g = get_state::<Green>().expect("g not found");;
+		let green = get_state::<Green>().get();
 		println!("here6 ");
-		let t = get_state::<TestStruct>().expect("t not found");;
+		let test = get_state::<TestStruct>().get();
 		println!("here7 ");
+
+		let rr: Option<Arc<Red>> = get_state().get();
 	
-		let rr: Weak<SSData> = get_state::<Red>().expect("rr not found");
-		rw = r.clone();
-
-		// let r: Red = r.upgrade().unwrap().downcast_ref();
-		let rref = r.upgrade().unwrap();
-		let red: Option<&Red> = rref.downcast_ref();
-
-		let gref = g.upgrade().unwrap();
-		let green: Option<&Green> = gref.downcast_ref();
-
-		let tref = t.upgrade().unwrap();
-		let test: Option<&TestStruct> = tref.downcast_ref();
-		
-	
-		println!("r: {:?} g: {:?} t: {:?}", red, green, test);
+		println!("r: {:?} g: {:?} t: {:?}, rr: {:?}", red, green, test, rr);
 
 		// let redred: &Red = red.downcast_ref().expect();
 		// let greengreen: &Green = green.downcast_ref().expect();
@@ -223,7 +223,4 @@ fn statetest() {
 
 	println!("DONE!");
 
-	let val = rw.upgrade().unwrap();		
-	println!("rw = {:?}", val.downcast_ref::<Red>());
-	
 }
