@@ -352,7 +352,7 @@ impl TaskList {
             unsafe {
                 let task_zero_stack_top = &initial_stack_top as *const _ as usize;
                 let task_zero_stack_bottom = &initial_stack_bottom as *const _ as usize;
-                println_unsafe!("CREATING TASK ZERO STACK at top={:#x} bottom={:#x}", task_zero_stack_top, task_zero_stack_bottom);
+                debug!("CREATING TASK ZERO STACK at top={:#x} bottom={:#x}", task_zero_stack_top, task_zero_stack_bottom);
                 Some(Stack::new(task_zero_stack_top, task_zero_stack_bottom))
             }
         };
@@ -363,7 +363,7 @@ impl TaskList {
         match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
             None => {
                 // None indicates that the insertion didn't overwrite anything, which is what we want
-                println_unsafe!("Successfully created initial task0");
+                debug!("Successfully created initial task0");
                 let tz = self.list.get(&id_zero).expect("init_task_zero(): couldn't find task_zero in tasklist");
                 scheduler::add_task_to_runqueue(tz.clone());
                 Ok(tz)
@@ -517,7 +517,7 @@ impl TaskList {
 
                             // map the userspace module into the new address space.
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-                            // println_unsafe!("!! mapping userspace module with name: {}", module.name());
+                            // debug!("!! mapping userspace module with name: {}", module.name());
                             mapper.map_contiguous_frames(module.start_address(), module.size(), 
                                                         module.start_address() as VirtualAddress, // identity mapping
                                                         module_flags, frame_allocator.deref_mut());

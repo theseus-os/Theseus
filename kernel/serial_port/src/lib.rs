@@ -41,3 +41,38 @@ fn wait_for_ready() {
 		// do nothing
 	}
 }
+
+
+// a hack wrapper for using the serial port with fmt::Write
+static mut SERIAL_PORT: SerialPort = SerialPort { };
+struct SerialPort; 
+
+use core::fmt;
+use core::fmt::Write;
+pub fn write_fmt(args: fmt::Arguments) -> ::core::fmt::Result {
+	// SAFE: as above, worst-case effect is just out-of-order characters in the serial log.
+	unsafe {
+		SERIAL_PORT.write_fmt(args)
+	}
+}
+
+/// convenience function for use with the Logger
+pub fn write_fmt_log(prefix1: &str, prefix2: &str, args: fmt::Arguments, suffix: &str) -> ::core::fmt::Result {
+	serial_out(prefix1);
+	serial_out(prefix2);
+
+	// SAFE: as above, worst-case effect is just out-of-order characters in the serial log.
+	let ret = unsafe {
+		SERIAL_PORT.write_fmt(args)
+	};
+
+	serial_out(suffix);
+	ret
+}
+
+impl fmt::Write for SerialPort {
+    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+        serial_out(s); 
+        Ok(())
+    }
+}

@@ -1,0 +1,21 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "logger"
+version = "0.1.0"
+
+[dependencies]
+
+
+[dependencies.serial_port]
+path = "../serial_port"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

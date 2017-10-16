@@ -35,7 +35,7 @@ impl TemporaryPage {
 
         // find a free page that is not already mapped, starting from the top of the kernel heap region
         while active_table.translate_page(self.page).is_some() {
-            println_unsafe!("temporary page (number {:#x}) is already mapped, trying the next lowest Page", self.page.number);
+            debug!("temporary page (number {:#x}) is already mapped, trying the next lowest Page", self.page.number);
             self.page -= 1;
         }
         active_table.map_to(self.page, frame, WRITABLE, &mut self.allocator);

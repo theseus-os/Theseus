@@ -63,29 +63,32 @@ impl SystemStateList {
 // 	// strong.downcast_ref::<S>()
 // }
 
+/// A key-value store containing all of the system-wide states,
+/// of which there is only one instance of each (underlying storage is an AtomicMap, backed by an AtomicLinkedList).
+/// Instead of wrapping the entire SYSTEM_STATE map in a coarse-grained global lock (RwLock or Mutex),
+/// the caller can use fine-grained locking to protect each element individually.
+///
+/// This design permits individual modules to retain Weak Arc references to their individual data elements
+/// without having to constantly ask the data store module to get and re-insert a module's state.
+static SYSTEM_STATE: Once<SystemStateList> = Once::new();
 
-lazy_static! {
-	/// A key-value store containing all of the system-wide states,
-	/// of which there is only one instance of each (underlying storage is a BTreeMap). 
-	/// Instead of wrapping the entire SYSTEM_STATE map in a coarse-grained global lock (RwLock or Mutex),
-	/// we use fine-grained locking to protect each element individually. 
-	///
-	/// This design permits individual modules to retain Arc references to their individual data elements
-	/// without having to constantly ask the data store module to get and re-insert a module's state.
-	static ref SYSTEM_STATE: SystemStateList = SystemStateList::new();
+pub fn init() {
+	SYSTEM_STATE.call_once( || {
+		SystemStateList::new()
+	});
 }
+
+
 
 
 
 /// Inserts a new SystemState-implementing type into the map. 
 // /// If the map did not previously have a SystemState of this type, `None` is returned.
 // /// If the map did previously have one, the value is updated, and the old value is returned.
-pub fn insert_state<S: Any>(state: S) -> Option<S>{
-	let old_val: Option<Box<Any>> = SYSTEM_STATE.0.insert(TypeId::of::<S>(), 
-		Box::new(
-			// this is the type that is represented by Any
-			Arc::new(state)
-		)
+pub fn insert_state<S: Any>(state: S) -> Option<S> {
+	let old_val: Option<Box<Any>> = SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0.insert(
+		TypeId::of::<S>(), 
+		Box::new( Arc::new(state) ) // Arc<S> is the type that is represented by Any
 	);
 
 	// now we have the old value, we need to downcast it from Any to S, 
@@ -158,9 +161,10 @@ pub fn get_state<S: Any>() -> SSCached<S> {
 
 
 fn get_state_internal<S: Any>() -> Option<Weak<S>> {
-	SYSTEM_STATE.0.get(TypeId::of::<S>())        // get the Option<Arc<Any>> value
-	.and_then( |g| g.downcast_ref::<Arc<S>>())   // if it's Some(g), then downcast g to S
-	.map( |dcast_arc| Arc::downgrade(dcast_arc)) // transform result of downcast to weak ptr
+	SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0
+		.get(TypeId::of::<S>())                       // get the Option<Arc<Any>> value
+		.and_then( |g| g.downcast_ref::<Arc<S>>())    // if it's Some(g), then downcast g to S
+		.map( |dcast_arc| Arc::downgrade(dcast_arc))  // transform result of downcast to weak ptr
 }
 
 

@@ -50,8 +50,14 @@ version = "0.1.0"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[dependencies.state_store]
+path = "../state_store"
+
 [dependencies.serial_port]
 path = "../serial_port"
+
+[dependencies.logger]
+path = "../logger"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"

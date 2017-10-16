@@ -222,7 +222,7 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
     gdt.load();
 
 
-    println_unsafe!("Loaded GDT: {}", gdt);
+    debug!("Loaded GDT: {}", gdt);
 
     unsafe {
         set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
@@ -235,7 +235,7 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
     }
 
     IDT.load();
-    println_unsafe!("loaded interrupt descriptor table.");
+    info!("loaded interrupt descriptor table.");
 
     // init PIT and RTC interrupts
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
