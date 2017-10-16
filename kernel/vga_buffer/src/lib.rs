@@ -35,12 +35,6 @@ const BUFFER_WIDTH: usize = 80;
 
 
 
-// static VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
-//     column_position: 0,
-//     buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-// });
-
-
 lazy_static! {
     static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
         let vga_writer = VgaWriter {
@@ -101,9 +95,6 @@ pub fn print_str(s: &str) -> fmt::Result {
     else {
         Err(fmt::Error)
     }
-
-
-    // VGA_WRITER.lock().write_str(s)
 }
 
 pub fn print_args(args: fmt::Arguments) -> fmt::Result {
@@ -114,8 +105,6 @@ pub fn print_args(args: fmt::Arguments) -> fmt::Result {
     else {
         Err(fmt::Error)
     }
-
-    // VGA_WRITER.lock().write_fmt(args)
 }
 
 pub fn clear_screen() -> Result<(), ()> {
@@ -129,14 +118,6 @@ pub fn clear_screen() -> Result<(), ()> {
     else {
         Err(())
     }
-
-    /*
-    let mut locked_Vgawriter = VGA_WRITER.lock();
-    for _ in 0..BUFFER_HEIGHT {
-        locked_Vgawriter.new_line();
-    }
-    Ok(())
-    */
 }
 
 pub fn show_splash_screen() {

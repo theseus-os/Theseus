@@ -10,9 +10,6 @@ use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLeve
 static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 
-// TODO: could use this crate: https://github.com/ogham/rust-ansi-term
-
-
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
 pub enum LogColor {
