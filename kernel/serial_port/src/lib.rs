@@ -49,11 +49,9 @@ struct SerialPort;
 
 use core::fmt;
 use core::fmt::Write;
+
 pub fn write_fmt(args: fmt::Arguments) -> ::core::fmt::Result {
-	// SAFE: as above, worst-case effect is just out-of-order characters in the serial log.
-	unsafe {
-		SERIAL_PORT.write_fmt(args)
-	}
+	write_fmt_log("", "", args, "")
 }
 
 /// convenience function for use with the Logger
