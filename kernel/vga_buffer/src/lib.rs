@@ -35,22 +35,22 @@ const BUFFER_WIDTH: usize = 80;
 
 
 
-static VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
-    column_position: 0,
-    buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-});
+// static VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
+//     column_position: 0,
+//     buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+// });
 
 
-// lazy_static! {
-//     static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
-//         let vga_writer = VgaWriter {
-//             column_position: 0,
-//             buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-//         };
-//         insert_state(Mutex::new(vga_writer));
-//         get_state::<Mutex<VgaWriter>>()
-//     };
-// }
+lazy_static! {
+    static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
+        let vga_writer = VgaWriter {
+            column_position: 0,
+            buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+        };
+        insert_state(Mutex::new(vga_writer));
+        get_state::<Mutex<VgaWriter>>()
+    };
+}
 
 
 
@@ -66,7 +66,6 @@ macro_rules! print_unsafe {
 
 #[doc(hidden)]
 pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
-    /**
     if let Some(writer) = VGA_WRITER.get() {
         unsafe{ writer.force_unlock() };
         print_args(args)
@@ -74,10 +73,9 @@ pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
     else {
         Err(fmt::Error)
     }
-    **/
 
-    unsafe { VGA_WRITER.force_unlock(); }
-    print_args(args)
+    // unsafe { VGA_WRITER.force_unlock(); }
+    // print_args(args)
 }
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use println!() instead. 
@@ -97,35 +95,30 @@ pub fn print_string(s: &String) -> fmt::Result {
 
 pub fn print_str(s: &str) -> fmt::Result {
     use core::fmt::Write;
-    /**
     if let Some(writer) = VGA_WRITER.get() {
         writer.lock().write_str(s)
     }
     else {
         Err(fmt::Error)
     }
-    **/
 
 
-    VGA_WRITER.lock().write_str(s)
+    // VGA_WRITER.lock().write_str(s)
 }
 
 pub fn print_args(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
-    /**
     if let Some(writer) = VGA_WRITER.get() {
         writer.lock().write_fmt(args)
     }
     else {
         Err(fmt::Error)
     }
-    **/
 
-    VGA_WRITER.lock().write_fmt(args)
+    // VGA_WRITER.lock().write_fmt(args)
 }
 
 pub fn clear_screen() -> Result<(), ()> {
-    /**
     if let Some(writer) = VGA_WRITER.get() {
         let mut locked_vgawriter = writer.lock(); 
         for _ in 0..BUFFER_HEIGHT {
@@ -136,14 +129,14 @@ pub fn clear_screen() -> Result<(), ()> {
     else {
         Err(())
     }
-    **/
 
-
+    /*
     let mut locked_Vgawriter = VGA_WRITER.lock();
     for _ in 0..BUFFER_HEIGHT {
         locked_Vgawriter.new_line();
     }
     Ok(())
+    */
 }
 
 pub fn show_splash_screen() {
