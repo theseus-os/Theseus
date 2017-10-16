@@ -53,7 +53,7 @@ impl AreaFrameAllocator {
                     })
             .min_by_key(|area| area.base_addr);
 
-        println_unsafe!("chose next area {:?}", self.current_area);
+        debug!("chose next area {:?}", self.current_area);
 
         if let Some(area) = self.current_area {
             let start_frame = Frame::containing_address(area.base_addr as usize);

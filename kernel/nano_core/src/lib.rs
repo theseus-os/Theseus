@@ -42,15 +42,22 @@ extern crate alloc;
 
 // ------------------------------------
 // ------ OUR OWN CRATES BELOW --------
+// ----------  LIBRARIES   ------------
 // ------------------------------------
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate keycodes_ascii; // for keyboard 
 extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
-extern crate serial_port;
-#[macro_use] extern crate vga_buffer; 
 extern crate dfqueue; // decoupled, fault-tolerant queue
+
+// ------------------------------------
+// -------  THESEUS MODULES   ---------
+// ------------------------------------
+extern crate serial_port;
+#[macro_use] extern crate logger;
+extern crate state_store;
+#[macro_use] extern crate vga_buffer; 
 extern crate test_lib;
 
 
@@ -58,7 +65,6 @@ extern crate test_lib;
 #[macro_use] mod drivers;  
 #[macro_use] mod util;
 mod arch;
-mod logger;
 #[macro_use] mod task;
 #[macro_use] mod dbus;
 mod memory;
@@ -189,22 +195,26 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    // early initialization of things like vga console and logging that don't require memory system.
-    logger::init_logger().expect("WTF: couldn't init logger.");
-    println_unsafe!("Logger initialized.");
+    // first, bring up the logger so we can debug
+    logger::init().expect("WTF: couldn't init logger.");
+    trace!("Logger initialized.");
     
-    drivers::early_init();
-    
-    println_unsafe!("multiboot_information_physical_address: {:#x}", multiboot_information_physical_address);
+    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
     enable_nxe_bit();
     enable_write_protect_bit();
-
-    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
     let mut kernel_mmi: memory::MemoryManagementInfo = memory::init(boot_info);
-
     
+    
+    // now that we have a heap, we can create basic things like state_store
+    state_store::init();
+    trace!("state_store initialized.");
+    drivers::early_init();
+
+
+
+
     // initialize our interrupts and IDT
     let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
     let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
@@ -213,13 +223,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     syscall::init(syscall_stack.top_usable());
 
-    // println_unsafe!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
-    // println_unsafe!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
-    // println_unsafe!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
-    // println_unsafe!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
-    // println_unsafe!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
-    // println_unsafe!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
-    // println_unsafe!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
+    // debug!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
+    // debug!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
+    // debug!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
+    // debug!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
+    // debug!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
+    // debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
+    // debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, called task_zero
     // this is scoped in order to automatically release the tasklist RwLockIrqSafe
@@ -398,6 +408,9 @@ extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
+    error!("\n\nPANIC in {} at line {}:", file, line);
+    error!("    {}", fmt);
+
     println_unsafe!("\n\nPANIC in {} at line {}:", file, line);
     println_unsafe!("    {}", fmt);
 
@@ -409,6 +422,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn _Unwind_Resume() -> ! {
+    error!("\n\nin _Unwind_Resume, unimplemented!");
     println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }

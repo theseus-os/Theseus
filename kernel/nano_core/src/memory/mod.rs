@@ -306,7 +306,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
         let mut count = 0;
         for (i, m) in boot_info.module_tags().enumerate() {
-            println_unsafe!("Module: {:?}", m);
+            debug!("Module: {:?}", m);
             modules[i] = ModuleArea {
                 mod_start: m.start_address(), 
                 mod_end:   m.end_address(), 
@@ -337,11 +337,11 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     let kernel_phys_end = kernel_virt_end - (KERNEL_OFFSET as u64);
 
 
-    println_unsafe!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
+    debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
              kernel_phys_start,
              kernel_phys_end,
              kernel_virt_end);
-    println_unsafe!("multiboot start: {:#x}, multiboot end: {:#x}",
+    debug!("multiboot start: {:#x}, multiboot end: {:#x}",
              boot_info.start_address(),
              boot_info.end_address());
     
@@ -350,11 +350,11 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
         let mut areas: [PhysicalMemoryArea; MAX_MEMORY_AREAS] = Default::default();
         for (index, area) in memory_map_tag.memory_areas().enumerate() {
-            println_unsafe!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+            debug!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
             
             // we cannot allocate memory from sections below the end of the kernel's physical address!!
             if area.base_addr + area.length < kernel_phys_end {
-                println_unsafe!("  skipping region before kernel_phys_end");
+                debug!("  skipping region before kernel_phys_end");
                 continue;
             }
 
@@ -366,7 +366,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
                 acpi: 0, // TODO: what does this mean??
             };
 
-            println_unsafe!("  region established: start={:#x}, length={:#x}", areas[index].base_addr, areas[index].length);
+            info!("  region established: start={:#x}, length={:#x}", areas[index].base_addr, areas[index].length);
         }
         areas
     });

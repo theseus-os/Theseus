@@ -197,7 +197,7 @@ impl ActivePageTable {
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
         
-        // println_unsafe!("ActivePageTable::switch(): NEW TABLE!!!");
+        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
 
         // old_table
         (old_table, unsafe { ActivePageTable::new() } )
@@ -294,7 +294,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
             assert!(section.addr as usize % PAGE_SIZE == 0,
                     "sections need to be page aligned");
-            println_unsafe!("mapping section at addr: {:#x}, size: {:#x}",
+            debug!("mapping section at addr: {:#x}, size: {:#x}",
                      section.addr,
                      section.size);
 
@@ -339,7 +339,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
     // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
     // active_table.unmap(old_p4_page, allocator);
-    // println_unsafe!("guard page at {:#x}", old_p4_page.start_address());
+    // debug!("guard page at {:#x}", old_p4_page.start_address());
 
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 

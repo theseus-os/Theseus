@@ -171,9 +171,9 @@ impl ArchTaskState {
         // 6) set all other segment registers (ds, es, fs, gs) to the user_data segment, same as (ss)
         // 7) issue iret to return to userspace
 
-        // println_unsafe!("Jumping to userspace with stack_ptr: {:#x} and function_ptr: {:#x}",
+        // debug!("Jumping to userspace with stack_ptr: {:#x} and function_ptr: {:#x}",
         //                   stack_ptr, function_ptr);
-        // println_unsafe!("stack: {:#x} {:#x} func: {:#x}", *(stack_ptr as *const usize), *((stack_ptr - 8) as *const usize), 
+        // debug!("stack: {:#x} {:#x} func: {:#x}", *(stack_ptr as *const usize), *((stack_ptr - 8) as *const usize), 
         //                 *(function_ptr as *const usize));
 
 
@@ -191,7 +191,7 @@ impl ArchTaskState {
         // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
         // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace
 
-        // println_unsafe!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
+        // debug!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
 
 
         // for Step 6, save rax before using it below
