@@ -125,7 +125,7 @@ userspace:
 ### this builds all kernel components
 kernel: test_rustc
 	@echo -e "\n======== BUILDING KERNEL ========"
-	@$(MAKE) -C kernel all
+	@$(MAKE) -C kernel build
 
 
 
