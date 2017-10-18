@@ -1,0 +1,19 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "serial_port"
+version = "0.1.0"
+
+[dependencies]
+# rlibc = "1.0.0"
+
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

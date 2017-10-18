@@ -1,0 +1,20 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "panic_unwind"
+version = "0.1.0"
+
+[dependencies]
+rlibc = "1.0.0"
+spin = "0.4.5"
+
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+
+[lib]
+crate-type = ["lib"]
+# # rlib? 
