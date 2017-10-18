@@ -1,5 +1,5 @@
 {
-  "llvm-target": "x86_64-unknown-linux-gnu",
+  "llvm-target": "x86_64-unknown-none-gnu",
   "data-layout": "e-m:e-i64:64-f80:128-n8:16:32:64-S128",
   "linker-flavor": "gcc",
   "target-endian": "little",
@@ -9,5 +9,7 @@
   "os": "none",
   "features": "-mmx,-sse,+soft-float",
   "disable-redzone": true,
-  "panic": "abort"
+  "panic": "abort",
+
+  "executables": true
 }

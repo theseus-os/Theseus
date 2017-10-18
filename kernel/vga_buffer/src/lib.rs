@@ -39,7 +39,7 @@ lazy_static! {
     static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
         let vga_writer = VgaWriter {
             column_position: 0,
-            buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+            buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
         };
         insert_state(Mutex::new(vga_writer));
         get_state::<Mutex<VgaWriter>>()
