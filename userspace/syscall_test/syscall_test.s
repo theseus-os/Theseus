@@ -7,8 +7,8 @@ section .text
     ; rsi -- second argument
     ; rdx -- third argument
     ; r10 -- fourth argument
-    ; r9  -- fifth argument 
-    ; r8  -- sixth argument
+    ; r8  -- fifth argument 
+    ; r9  -- sixth argument
     
     mov rbx, 0
 
@@ -18,8 +18,8 @@ main:
     mov rsi, 20
     mov rdx, 30
     mov r10, 40
-    mov r9 , 50
-    mov r8 , 60
+    mov r8 , 50
+    mov r9 , 60
 
     push rbx
     syscall
