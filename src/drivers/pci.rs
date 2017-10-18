@@ -5,6 +5,7 @@ use collections::Vec;
 use core::fmt;
 use memory;
 use drivers::ata_pio;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -18,6 +19,7 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
 pub static BAR4_BASE: Once<u16> = Once::new();
 
+pub static DMA_FINISHED: AtomicBool = AtomicBool::new(true);
 ///the ports to the DMA primary and secondary command and status bytes
 pub static DMA_PRIM_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
 pub static DMA_PRIM_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
@@ -205,11 +207,18 @@ pub fn set_dma_ports(){
 pub fn allocate_mem()->u32{
 
     let frame = memory::allocate_frame().expect("pci::allocate_mem() - out of memory trying to allocate frame");
-    let prdt: u32 = frame.start_address() as u32;
-    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt);}
-    prdt
+    let prdt_start: u32 = frame.start_address() as u32;
+    let prdt: [u64;1] = [prdt_start as u64 | 2 <<32 | 1 << 63];
+    let prdt_ref = &prdt as *const u64;
+    let prdt_pointer: u32 = unsafe{*prdt_ref as u32};
+    set_prdt_start_add(prdt_pointer);
+    
+    prdt_pointer
 }
 
+pub fn set_prdt_start_add(start_address: u32) {
+    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(start_address);}
+}
 
 ///functions which configure the DMA controller for read and write mode
 pub fn start_read(){
@@ -235,18 +244,32 @@ pub fn end_transfer(){
 ///the status byte must be read after each IRQ (I believe IRQ 14 which is handled in ata_pio)
 ///IRQ number still needs to be confirmed, was 14 according to http://www.pchell.com/hardware/irqs.shtml
 pub fn acknowledge_disk_irq(){
+    
     DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_STATUS_BYTE not configured").lock().read();
+    
 }
 
 ///allocates memory, sets the DMA controller to read mode, sends transfer commands to the ATA drive, and then ends the transfer
-///returns start address of prdt if successful or Err(0) if unsuccessful
+///returns start address of prdt if successful or Err(0) if unsuccessful, disk parameter should be 0xE0 for primary disk
 pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32,u16>{
     let prdt_start: u32 = allocate_mem();
     start_read();
-    let ata_result = ata_pio::pio_read(drive,lba);
+    let ata_result = ata_pio::dma_read(drive,lba);
     end_transfer();
     if ata_result.is_ok(){
         return Ok(prdt_start);
     }
-    return Err(0);
+    Err(0)
+}
+
+///uses DMA to write to ATA disk
+pub fn write_to_disk(drive: u8, lba: u32, mem_start_address: u32) -> Result<u16, u16> {
+    set_prdt_start_add(mem_start_address);
+    start_write();
+    let ata_result = ata_pio::dma_write(drive, lba);
+    end_transfer();
+    if ata_result.is_ok(){
+        return Ok(1);
+    }
+    Err(0)
 }

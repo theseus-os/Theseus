@@ -200,11 +200,19 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
     println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
-    pci::allocate_mem();
-    println!("Data at location 0 of drive: {:?}",ata_pio::pio_read(0xE0,0).unwrap()[0]);
-    pci::read_from_disk(0xE0,0);
-    
-
+    println!("Data at location 0 of drive: {:?}",ata_pio::pio_read(0xE0,0).unwrap()[250]);
+    let mem_add: u32 = pci::read_from_disk(0xE0,0).unwrap();
+    /*
+    {
+        let mut task_list = task::get_tasklist().write();
+        let mut curtask = task_list.get_current().write();
+        match curtask.mmi.unwrap().page_table {
+            PageTable::ActivePageTable(apt) => {
+                
+            }
+            _ => { }
+        }
+    */
 
     // create a second task to test context switching
     if true {
