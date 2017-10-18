@@ -189,6 +189,7 @@ pub fn init_pci_buses(){
 
 ///sets the ports for PCI DMA configuration access using BAR4 information
 pub fn set_dma_ports(){
+
     BAR4_BASE.call_once(||pci_config_read(0, 1, 1, GET_BAR4));
     //offsets for DMA configuration ports found in http://wiki.osdev.org/ATA/ATAPI_using_DMA under "The Bus Master Register"
     DMA_PRIM_COMMAND_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0)));
@@ -204,21 +205,25 @@ pub fn set_dma_ports(){
 }
 
 ///uses the memory allocator to allocate a frame and writes the address to the DMA address port
-pub fn allocate_mem()->u32{
+pub fn allocate_mem() -> u32{
 
     let frame = memory::allocate_frame().expect("pci::allocate_mem() - out of memory trying to allocate frame");
-    let prdt_start: u32 = frame.start_address() as u32;
-    let prdt: [u64;1] = [prdt_start as u64 | 2 <<32 | 1 << 63];
-    let prdt_ref = &prdt as *const u64;
-    let prdt_pointer: u32 = unsafe{*prdt_ref as u32};
-    set_prdt_start_add(prdt_pointer);
-    
-    prdt_pointer
+    frame.start_address() as u32
+
 }
 
-pub fn set_prdt_start_add(start_address: u32) {
-    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(start_address);}
+///creates a prdt table and send its pointer to the DMA PRDT address port
+pub fn set_prdt(start_add: u32) -> u32{
+
+    
+    let prdt: [u64;1] = [start_add as u64 | 2 <<32 | 1 << 63];
+    let prdt_ref = &prdt as *const u64;
+    let prdt_pointer: u32 = unsafe{*prdt_ref as u32};
+    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt_pointer);}
+    prdt_pointer
+
 }
+
 
 ///functions which configure the DMA controller for read and write mode
 pub fn start_read(){
@@ -244,32 +249,19 @@ pub fn end_transfer(){
 ///the status byte must be read after each IRQ (I believe IRQ 14 which is handled in ata_pio)
 ///IRQ number still needs to be confirmed, was 14 according to http://www.pchell.com/hardware/irqs.shtml
 pub fn acknowledge_disk_irq(){
-    
     DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_STATUS_BYTE not configured").lock().read();
-    
 }
 
 ///allocates memory, sets the DMA controller to read mode, sends transfer commands to the ATA drive, and then ends the transfer
-///returns start address of prdt if successful or Err(0) if unsuccessful, disk parameter should be 0xE0 for primary disk
-pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32,u16>{
-    let prdt_start: u32 = allocate_mem();
+///returns start address of prdt if successful or Err(0) if unsuccessful
+pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32, ()>{
+    let start_add: u32 = allocate_mem();
+    set_prdt(start_add);
     start_read();
     let ata_result = ata_pio::dma_read(drive,lba);
     end_transfer();
     if ata_result.is_ok(){
-        return Ok(prdt_start);
+        return Ok(start_add);
     }
-    Err(0)
-}
-
-///uses DMA to write to ATA disk
-pub fn write_to_disk(drive: u8, lba: u32, mem_start_address: u32) -> Result<u16, u16> {
-    set_prdt_start_add(mem_start_address);
-    start_write();
-    let ata_result = ata_pio::dma_write(drive, lba);
-    end_transfer();
-    if ata_result.is_ok(){
-        return Ok(1);
-    }
-    Err(0)
+    return Err(());
 }
