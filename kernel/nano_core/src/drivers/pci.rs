@@ -5,6 +5,7 @@ use collections::Vec;
 use core::fmt;
 use memory;
 use drivers::ata_pio;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -18,6 +19,7 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
 pub static BAR4_BASE: Once<u16> = Once::new();
 
+pub static DMA_FINISHED: AtomicBool = AtomicBool::new(true);
 ///the ports to the DMA primary and secondary command and status bytes
 pub static DMA_PRIM_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
 pub static DMA_PRIM_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
@@ -213,6 +215,9 @@ pub fn allocate_mem()->u32{
     prdt
 }
 
+pub fn set_prdt_start_add(start_address: u32) {
+    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(start_address);}
+}
 
 ///functions which configure the DMA controller for read and write mode
 pub fn start_read(){
@@ -238,7 +243,9 @@ pub fn end_transfer(){
 ///the status byte must be read after each IRQ (I believe IRQ 14 which is handled in ata_pio)
 ///IRQ number still needs to be confirmed, was 14 according to http://www.pchell.com/hardware/irqs.shtml
 pub fn acknowledge_disk_irq(){
+    
     DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_STATUS_BYTE not configured").lock().read();
+    
 }
 
 ///allocates memory, sets the DMA controller to read mode, sends transfer commands to the ATA drive, and then ends the transfer
