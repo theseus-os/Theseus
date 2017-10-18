@@ -23,12 +23,11 @@ $(TOPTARGETS): $(SUBDIRS)
 $(SUBDIRS): 
 	@echo "\nBUILDING $@\n"
 ## If a directory has a Makefile, then we call it. Otherwise, we invoke cargo build. 
-	if [ -f $@/Makefile ]; then \
+	@if [ -f $@/Makefile ]; then \
 		$(MAKE) -C $@ $(MAKECMDGOALS);  \
-	else \
-		cd $@; RUST_TARGET_PATH="../../cfg" xargo $(MAKECMDGOALS) --target x86_64-theseus; \
+	## For now, since everything is included as a regular library in the nano_core,    \
+	## we don't need to individually build each crate yet as a standalone module.      \
+	## When we need to do that, just uncomment the 'else' and 'xargo' lines.           \
+	#else \
+	#	cd $@; RUST_TARGET_PATH="../../cfg" xargo $(MAKECMDGOALS) --target x86_64-theseus; \
 	fi;
-# @cd serial_port; cargo build;
-# @cd vga_buffer; cargo build;
-
-
