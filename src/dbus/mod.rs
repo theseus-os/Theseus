@@ -128,3 +128,70 @@ pub fn get_connection_table() -> &'static RwLockIrqSafe<BusConnectionTable> {
         RwLockIrqSafe::new(BusConnectionTable::new())
     })
 }
+
+pub fn syssend(src:String, dest:String, msg:String) {
+    let mut table = get_connection_table().write();
+    let mut ssrc = String::from("bus.connection.");
+    ssrc = ssrc + &src;
+
+    let mut sdest = String::from("bus.connection.");
+    sdest = sdest + &dest;
+    println!("Create the connection {}", &ssrc);
+    println!("Send msg to connection {}", &sdest);
+    {
+
+            let mut connection = table.get_connection(String::clone(&ssrc))
+                .expect("Fail to create the destination bus connection").write();
+            let message = BusMessage::new(sdest, msg);
+            connection.send(&message);           
+    }
+    
+
+
+    table.match_msg(&ssrc);
+
+
+
+}
+
+pub fn sysrecv(name:String) -> u64{
+    let mut sname = String::from("bus.connection.");
+    sname = sname + &name;
+    unsafe{
+        println!("Get the connection {}", &sname);
+        let mut table = get_connection_table().write();
+        let mut connection = table.get_connection(sname)
+            .expect("Fail to create the first bus connection").write();
+        
+
+  
+        let obj = connection.receive();
+        if(obj.is_some()){
+            println!("Get the result!");
+            return obj.unwrap().data.parse().unwrap();
+        } else {
+            println!("No message!");
+            return 0;
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! syssend {
+    ($src:expr, $dest:expr, $msg:expr) => (
+        {
+            $crate::dbus::syssend($src, $dest, $msg);
+        }
+    )
+}
+
+#[macro_export]
+macro_rules! sysrecv {
+    ($name:expr) => (
+        {
+            $crate::dbus::sysrecv($name)
+        }
+    )
+}
+
+

@@ -139,7 +139,7 @@ fn second_thread_main(arg: u64) -> u64  {
         let mut table = get_connection_table().write();
         {
             let mut connection = table.get_connection(String::from("bus.connection.second"))
-            .expect("Fail to create the second bus connection").write();
+                .expect("Fail to create the second bus connection").write();
             println!("Create the second connection.");
             let message = BusMessage::new(String::from("bus.connection.first"), String::from("This is a message from 2 to 1."));       
             connection.send(&message);
@@ -291,10 +291,10 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // a second duplicate syscall test user task
     if true
     {
-        debug!("trying out a second system call module");
+        debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
+        let module = memory::get_module(2).expect("Error: no module 2 found!");
+        tasklist_mut.spawn_userspace(module, Some("syscall_receive"));
     }
 
 
