@@ -49,16 +49,25 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
     trace!("syscall_dispatcher: num={} arg1={} arg2={} arg3={} arg4={} arg5={} arg6={}",
             syscall_number, arg1, arg2, arg3, arg4, arg5, arg6);
     let mut result = 0xDEADBEEF01234567;
+
     match syscall_number{
         1 => syssend!(format!("{}", arg1), format!("{}",arg2), format!("{}", arg3)),
         2 => result = sysrecv!(format!("{}", arg1)),           
         _ => trace!("Invalid syscall {}", syscall_number),
     }
                 
-    match syscall_number{
-        2 => trace!("Get message {}", result),           
-        _ => trace!("Invalid syscall {}", syscall_number),
-    }
+ /*   unsafe{
+        match syscall_number{
+            1 => {
+                   asm!("
+          mov rax, [rdx];"
+          
+          : : : "memory" : "intel", "volatile");
+
+            },
+            _ => trace!("Invalid syscall {}", syscall_number),
+        }
+    }*/
     return result;    
 }
 
@@ -108,6 +117,13 @@ unsafe extern "C" fn syscall_handler() {
           mov gs:[0x18], r11; \
           mov rsp, gs:[0x0];"
           : : : "memory" : "intel", "volatile");
+
+ /*unsafe{
+    let rdi:u64;
+    asm!("mov rax, rdi": : : "memory" : "intel", "volatile");
+    asm!("" : "={rax}"(rdi): : "memory" : "intel", "volatile");
+    trace!("The sender is {}", rdi);
+}*/
     // asm!("push r11" : : : : "intel"); // stack must be 16-byte aligned, so just pushing another random item so we push an even number of things
     let (rax, rdi, rsi, rdx, r10, r9, r8): (u64, u64, u64, u64, u64, u64, u64); 
     asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r9}"(r9), "={r8}"(r8)  : : "memory" : "intel", "volatile");

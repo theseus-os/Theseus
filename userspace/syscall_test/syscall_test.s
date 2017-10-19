@@ -1,5 +1,11 @@
 BITS 64
 
+section .data
+
+src: db 'sender', 0
+message db "sss", 0
+test: dw  0abcdh
+
 section .text
 
     ; rax -- syscall number
@@ -11,11 +17,23 @@ section .text
     ; r8  -- sixth argument
     
     mov rbx, 1; 1 is the syscall send
+
 main:
+
     mov rax, rbx ; rbx is holding ground/accumulator for syscall num
-    mov rdi, 2;src
-    mov rsi, 3;dest
-    mov rdx, 2017;msg increases every time
+
+    mov rdi, src    
+    mov rdi, 2
+    
+    mov rsi,  src
+    ;mov rsi, 3
+
+
+    mov ax, [test]
+    mov rdx, "1234567890";
+
+
+
     mov r10, 8
     mov r9 , 13
     mov r8 , 21
@@ -36,3 +54,5 @@ loopstart:
 
     ;  infinite loop
     jmp main
+
+
