@@ -2,9 +2,10 @@ BITS 64
 
 section .data
 
-src: db 'sender', 0
-message db "sss", 0
-test: dw  0abcdh
+    src: db 'sender', 0
+    dest: db 'receiver', 0
+    msg db "sss", 0
+    test: dw  2
 
 section .text
 
@@ -25,11 +26,11 @@ main:
     mov rdi, src    
     mov rdi, 2
     
-    mov rsi,  src
-    ;mov rsi, 3
+    mov rsi,  dest
+    mov rsi, 3
 
-
-    mov ax, [test]
+    ;mov rdx, [msg]
+    mov rdx, msg
     mov rdx, "1234567890";
 
 

@@ -1,0 +1,24 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "state_store"
+version = "0.1.0"
+
+[dependencies]
+# typemap = "0.3.3"
+spin = "0.4.5"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+# [bin]
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think
