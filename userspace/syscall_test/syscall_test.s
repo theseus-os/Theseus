@@ -10,8 +10,7 @@ section .text
     ; r8  -- fifth argument 
     ; r9  -- sixth argument
     
-    mov rbx, 0
-
+    mov rbx, 1; 1 is the syscall send
 main:
     mov rax, rbx ; rbx is holding ground/accumulator for syscall num
     mov rdi, 10
@@ -25,14 +24,12 @@ main:
     syscall
 
     pop rbx
-    add rbx, 1 ; syscall num increments each time for easy tracking
-    mov rcx, 0x40000000
-    ; mov rcx, 0x400000
+    
+    mov rcx, 0x4000000
+    
 
 loopstart:
     
-    add rax,  1
-
     dec rcx
     jnz loopstart
 

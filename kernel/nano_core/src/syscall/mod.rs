@@ -12,14 +12,26 @@
 
 use core::sync::atomic::{Ordering, compiler_fence};
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
+use collections::string::String;
+
 
 
 // #[no_mangle]
 fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64, arg6: u64) -> u64{
     trace!("syscall_dispatcher: num={} arg1={} arg2={} arg3={} arg4={} arg5={} arg6={}",
             syscall_number, arg1, arg2, arg3, arg4, arg5, arg6);
-
-    return 0x1234BEEF0123FEED;
+    let mut result = 0xDEADBEEF01234567;
+    match syscall_number{
+        1 => syssend!(format!("{}", arg1), format!("{}",arg2), format!("{}", arg3)),
+        2 => result = sysrecv!(format!("{}", arg1)),           
+        _ => trace!("Invalid syscall {}", syscall_number),
+    }
+                
+    match syscall_number{
+        2 => trace!("Get message {}", result),           
+        _ => trace!("Invalid syscall {}", syscall_number),
+    }
+    return result;    
 }
 
 
