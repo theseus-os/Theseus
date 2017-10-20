@@ -132,6 +132,7 @@ pub fn get_connection_table() -> &'static RwLockIrqSafe<BusConnectionTable> {
 pub fn syssend(src:String, dest:String, msg:String) {
     let mut table = get_connection_table().write();
     let mut ssrc = String::from("bus.connection.");
+
     ssrc = ssrc + &src;
 
     let mut sdest = String::from("bus.connection.");
@@ -154,7 +155,7 @@ pub fn syssend(src:String, dest:String, msg:String) {
 
 }
 
-pub fn sysrecv(name:String) -> u64{
+pub fn sysrecv(name:String) -> String{
     let mut sname = String::from("bus.connection.");
     sname = sname + &name;
     unsafe{
@@ -168,10 +169,10 @@ pub fn sysrecv(name:String) -> u64{
         let obj = connection.receive();
         if(obj.is_some()){
             println!("Get the result!");
-            return obj.unwrap().data.parse().unwrap();
+            return obj.unwrap().data;
         } else {
             println!("No message!");
-            return 0;
+            return String::from("");
         }
     }
 }

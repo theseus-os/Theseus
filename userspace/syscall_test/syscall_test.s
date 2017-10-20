@@ -22,9 +22,11 @@ main:
 
     mov rax, rbx ; rbx is holding ground/accumulator for syscall num
 
-    mov rdi, src    
-    mov rdi, 2
+    mov rdi, "sender"    
+        
+    mov rsi,  "receiver"
     
+<<<<<<< HEAD
     mov rsi,  src
     ;mov rsi, 3
 
@@ -33,6 +35,10 @@ main:
     mov rdx, "1234567890";
 
 
+=======
+    ;mov rdx, [msg]
+    mov rdx, "Hello!"
+>>>>>>> send message be by string
 
     mov r10, 8
     mov r9 , 13
