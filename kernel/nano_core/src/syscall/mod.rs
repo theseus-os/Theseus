@@ -23,23 +23,47 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
     let mut result = 0xDEADBEEF01234567;
 
     match syscall_number{
-        1 => syssend!(format!("{}", arg1), format!("{}",arg2), format!("{}", arg3)),
-        2 => result = sysrecv!(format!("{}", arg1)),           
+        1 =>{
+            let mut src:String = String::from("");
+            let mut dest:String = String::from("");
+            let mut msg:String = String::from("");
+            let mut temp = arg1;
+            while(temp!=0){
+                src.push(((temp % 0x100) as u8) as char);
+                temp = temp/0x100;
+            }
+            temp = arg2;
+            while(temp!=0){
+                dest.push(((temp % 0x100) as u8) as char);
+                temp = temp/0x100;
+            }
+            temp = arg3;
+            while(temp!=0){
+                msg.push(((temp % 0x100) as u8) as char);
+                temp = temp/0x100;
+            }
+            trace!("Send message {} from {} to {}", msg, src, dest);
+            syssend!(src, dest,msg);
+        },
+        2 =>{
+            let mut conn:String = String::from("");
+            let mut temp = arg1;
+            while(temp!=0){
+                conn.push(((temp % 0x100) as u8) as char);
+                temp = temp/0x100;
+            }
+            let msg = sysrecv!(format!("{}", conn));
+            let mut i = 1;
+            result = 0;
+            for b in msg.as_bytes(){
+                result = result + i*(b.clone() as u64);
+                i = i* 0x100;
+            }
+            trace!("Receive message {}:{}", msg, result);
+        },   
         _ => trace!("Invalid syscall {}", syscall_number),
     }
                 
- /*   unsafe{
-        match syscall_number{
-            1 => {
-                   asm!("
-          mov rax, [rdx];"
-          
-          : : : "memory" : "intel", "volatile");
-
-            },
-            _ => trace!("Invalid syscall {}", syscall_number),
-        }
-    }*/
     return result;    
 }
 

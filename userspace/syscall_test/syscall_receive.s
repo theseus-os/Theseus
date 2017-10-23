@@ -16,8 +16,8 @@ section .text
 
 main:
     mov rax, rbx ; rbx is holding ground/accumulator for syscall num
-    mov rdi, 3
-    mov rsi, 3
+    mov rdi, "receiver"
+    mov rsi, "default"; rsi is the pointer to the received msg
     mov rdx, 5
     mov r10, 8
     mov r9 , 13
