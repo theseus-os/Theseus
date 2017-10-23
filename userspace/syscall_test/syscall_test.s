@@ -14,8 +14,8 @@ section .text
     ; rsi -- second argument
     ; rdx -- third argument
     ; r10 -- fourth argument
-    ; r9  -- fifth argument 
-    ; r8  -- sixth argument
+    ; r8  -- fifth argument 
+    ; r9  -- sixth argument
     
     mov rbx, 1; 1 is the syscall send
 
