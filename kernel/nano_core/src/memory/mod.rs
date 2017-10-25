@@ -117,6 +117,22 @@ impl MemoryManagementInfo {
             }
         }
     }
+
+
+
+    /// Translates a virtual address into a PhysicalAddress using this MMI's active page table.
+    pub fn translate(&mut self, virt_addr: VirtualAddress) -> Option<PhysicalAddress> {
+        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, .. } = self;
+        match page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                active_table.translate(virt_addr)
+            }
+            _ => {
+                // panic, because this should never happen
+                panic!("trying to translate virt_addr: page_table wasn't an ActivePageTable!");
+            }
+        }
+    }
 }
 
 

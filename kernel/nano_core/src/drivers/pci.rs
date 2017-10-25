@@ -6,6 +6,7 @@ use core::fmt;
 use memory;
 use drivers::ata_pio;
 use core::sync::atomic::{AtomicBool, Ordering};
+use task;
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -213,14 +214,29 @@ pub fn allocate_mem() -> u32{
 }
 
 ///creates a prdt table and send its pointer to the DMA PRDT address port
-pub fn set_prdt(start_add: u32) -> u32{
+pub fn set_prdt(start_add: u32) -> Result<u32, ()>{
 
     
     let prdt: [u64;1] = [start_add as u64 | 2 <<32 | 1 << 63];
     let prdt_ref = &prdt as *const u64;
-    let prdt_pointer: u32 = unsafe{*prdt_ref as u32};
-    unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt_pointer);}
-    prdt_pointer
+    // TODO: first, translate prdt_ref to physicaladdress
+    let prdt_paddr = {
+        let tasklist = task::get_tasklist().read();
+        let curr_task = tasklist.get_current().unwrap().write();
+        let curr_mmi = curr_task.mmi.as_ref().unwrap();
+        let mut curr_mmi_locked = curr_mmi.lock();
+        curr_mmi_locked.translate(prdt_ref as usize)
+    };
+
+    // TODO: then, check that the pdrt phys_addr is Some and that it fits within u32
+    if prdt_paddr.is_some() & (prdt_paddr.expect("prdt_paddr has none as value") < 0xFFFFFFFF) {
+        unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt_paddr
+            .expect("this statement should be unreachable: prdt_paddr already checked") as u32 );}
+        return Ok(prdt_paddr.expect("this statement should be unreachable: prdt_paddr already checked") as u32);  
+    }
+
+    Err(())
+ 
 
 }
 
