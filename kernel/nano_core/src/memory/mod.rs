@@ -322,12 +322,14 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
         let mut count = 0;
         for (i, m) in boot_info.module_tags().enumerate() {
-            debug!("Module: {:?}", m);
-            modules[i] = ModuleArea {
+            // debug!("Module: {:?}", m);
+            let mod_area = ModuleArea {
                 mod_start: m.start_address(), 
                 mod_end:   m.end_address(), 
                 name:      m.name(),
             };
+            debug!("Module: {:?}", mod_area);
+            modules[i] = mod_area;
             count += 1;
         }
         (modules, count)

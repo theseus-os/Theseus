@@ -2,6 +2,8 @@ BITS 64
 
 section .text
 
+global  _start
+_start:
 main:
     mov rax, 1
     mov r12, 0xDEADBEEF01234567

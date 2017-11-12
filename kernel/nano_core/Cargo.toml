@@ -14,7 +14,8 @@ volatile = "0.1.0"
 x86 = "0.8.1"
 x86_64 = "0.1.2"
 atomic = "0.3.4"
- 
+xmas-elf = "0.6.0"
+
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
