@@ -37,6 +37,7 @@ extern crate bit_field;
 extern crate alloc;
 #[macro_use] extern crate collections;
 #[macro_use] extern crate log;
+extern crate xmas_elf;
 //extern crate atomic;
 
 
@@ -70,6 +71,7 @@ mod arch;
 mod memory;
 mod interrupts;
 mod syscall;
+mod mod_mgmt;
 
 
 use spin::RwLockWriteGuard;
@@ -283,28 +285,28 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module"));
+        tasklist_mut.spawn_userspace(module, Some("userspace_test_1"));
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module_2"));
+        tasklist_mut.spawn_userspace(module, Some("userspace_test_2"));
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+        tasklist_mut.spawn_userspace(module, None);
     }
 
     // a second duplicate syscall test user task
-    if true
+    if false
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -315,8 +317,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-    use test_lib;
-    println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
+    // use test_lib;
+    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
 
 
     loop { 

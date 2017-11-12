@@ -1,5 +1,6 @@
 #[macro_use] pub mod int_like;
 
+pub mod c_str;
 
 /// the log base 2 of an integer value
 pub fn log2(value: usize) -> usize {

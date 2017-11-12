@@ -20,8 +20,8 @@ main:
     mov rsi, "default"; rsi is the pointer to the received msg
     mov rdx, 5
     mov r10, 8
-    mov r9 , 13
-    mov r8 , 21
+    mov r8 , 13
+    mov r9 , 21
     
     push rbx
     syscall    

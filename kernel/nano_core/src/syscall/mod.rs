@@ -13,6 +13,7 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 use collections::string::String;
+use util::c_str::{c_char, CStr};
 
 
 
@@ -23,27 +24,43 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
     let mut result = 0xDEADBEEF01234567;
 
     match syscall_number{
-        1 =>{
+        1 => {
+
+            // uhhh... wtf is this nonsense? encoding strings within integers? no no no. bad. 
+
+            // let mut src:String = String::from("");
+            // let mut dest:String = String::from("");
+            // let mut msg:String = String::from("");
+            // let mut temp = arg1;
+            // while(temp!=0){
+            //     src.push(((temp % 0x100) as u8) as char);
+            //     temp = temp/0x100;
+            // }
+            // temp = arg2;
+            // while(temp!=0){
+            //     dest.push(((temp % 0x100) as u8) as char);
+            //     temp = temp/0x100;
+            // }
+            // temp = arg3;
+            // while(temp!=0){
+            //     msg.push(((temp % 0x100) as u8) as char);
+            //     temp = temp/0x100;
+            // }
+            
+
+            // we use CStr instead of CString to indicate a borrowed &str that we do not own
+            // (userspace owns it)
+            let src_cstr:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
+            let dest_cstr: &CStr = unsafe { CStr::from_ptr(arg2 as *const c_char) };
+            let msg_cstr:  &CStr = unsafe { CStr::from_ptr(arg3 as *const c_char) };
+            
+
             let mut src:String = String::from("");
             let mut dest:String = String::from("");
             let mut msg:String = String::from("");
-            let mut temp = arg1;
-            while(temp!=0){
-                src.push(((temp % 0x100) as u8) as char);
-                temp = temp/0x100;
-            }
-            temp = arg2;
-            while(temp!=0){
-                dest.push(((temp % 0x100) as u8) as char);
-                temp = temp/0x100;
-            }
-            temp = arg3;
-            while(temp!=0){
-                msg.push(((temp % 0x100) as u8) as char);
-                temp = temp/0x100;
-            }
-            trace!("Send message {} from {} to {}", msg, src, dest);
-            syssend!(src, dest,msg);
+
+            trace!("Send message {} from {} to {}", msg_cstr, src_cstr, dest_cstr);
+            // syssend!(src, dest, msg); // FIXME: don't use macros here, they serve no purpose
         },
         2 =>{
             let mut conn:String = String::from("");

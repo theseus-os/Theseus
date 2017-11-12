@@ -2,12 +2,15 @@ BITS 64
 
 section .data
 
-    src: db 'sender', 0
-    dest: db 'receiver', 0
-    msg db "sss", 0
-    test: dw  2
+src:    db "sender", 0
+dest:   db "receiver", 0
+msg:    db "sss", 0
+; test:   dw  2
 
 section .text
+global  _start
+
+_start:
 
     ; rax -- syscall number
     ; rdi -- first argument
@@ -17,38 +20,29 @@ section .text
     ; r8  -- fifth argument 
     ; r9  -- sixth argument
     
-    mov rbx, 1; 1 is the syscall send
-
 main:
 
-    mov rax, rbx ; rbx is holding ground/accumulator for syscall num
+    mov rax, 1
 
-    mov rdi, "sender"    
+    ; mov rdi, "sender"    
+    mov rdi, src
         
-    mov rsi,  "receiver"
+    ;mov rsi,  "receiver"
+    mov rsi, dest
     
-    ;mov rdx, [msg]
-    mov rdx, "Hello!"
+    ; mov rdx, "Hello!"
+    mov rdx, msg
 
     mov r10, 8
-    mov r9 , 13
-    mov r8 , 21
+    mov r8 , 13
+    mov r9 , 21
 
-    push rbx
     syscall
 
-    pop rbx
-    
-    mov rcx, 0x4000000
-    
 
 loopstart:
-    
-    dec rcx
-    jnz loopstart
-
 
     ;  infinite loop
-    jmp main
+    jmp loopstart
 
 

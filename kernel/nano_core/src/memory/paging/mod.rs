@@ -298,7 +298,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
                      section.addr,
                      section.size);
 
-            let flags = EntryFlags::from_elf_section_flags(section);
+            let flags = EntryFlags::from_multiboot2_section_flags(section);
 
             // even though the linker stipulates that the kernel sections have a higher-half virtual address,
             // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
