@@ -33,11 +33,11 @@ pub fn parse_elf_executable(start_addr: *const u8, size: usize) -> Result<(Vec<E
     // SAFE: safe enough, checked for null 
     let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
     let elf_file = ElfFile::new(byte_slice).unwrap();
-    debug!("Elf File: {:?}", elf_file);
+    // debug!("Elf File: {:?}", elf_file);
 
     let mut prog_sects: Vec<ElfProgramSection> = Vec::new();
     for prog in elf_file.program_iter() {
-        debug!("   prog: {}", prog);
+        // debug!("   prog: {}", prog);
         let typ = prog.get_type();
         if typ != Ok(Type::Load) {
             warn!("Program type in ELF file wasn't LOAD, {}", prog);

@@ -177,22 +177,25 @@ pub fn sysrecv(name:String) -> String{
     }
 }
 
-#[macro_export]
-macro_rules! syssend {
-    ($src:expr, $dest:expr, $msg:expr) => (
-        {
-            $crate::dbus::syssend($src, $dest, $msg);
-        }
-    )
-}
 
-#[macro_export]
-macro_rules! sysrecv {
-    ($name:expr) => (
-        {
-            $crate::dbus::sysrecv($name)
-        }
-    )
-}
+// NOTE from Kevin:  don't use macros for this. There's no benefit.
+
+// #[macro_export]
+// macro_rules! syssend {
+//     ($src:expr, $dest:expr, $msg:expr) => (
+//         {
+//             $crate::dbus::syssend($src, $dest, $msg);
+//         }
+//     )
+// }
+
+// #[macro_export]
+// macro_rules! sysrecv {
+//     ($name:expr) => (
+//         {
+//             $crate::dbus::sysrecv($name)
+//         }
+//     )
+// }
 
 

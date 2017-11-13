@@ -53,23 +53,29 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
             let src_cstr:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             let dest_cstr: &CStr = unsafe { CStr::from_ptr(arg2 as *const c_char) };
             let msg_cstr:  &CStr = unsafe { CStr::from_ptr(arg3 as *const c_char) };
-            
-
-            let mut src:String = String::from("");
-            let mut dest:String = String::from("");
-            let mut msg:String = String::from("");
-
             trace!("Send message {} from {} to {}", msg_cstr, src_cstr, dest_cstr);
-            // syssend!(src, dest, msg); // FIXME: don't use macros here, they serve no purpose
+
+            // NOTE from Kevin: Wenqiu, do you need to create so many Strings? They are slow and require allocation.
+            // For example, in syssend, do you need an owned String (CString), or does a &str work (CStr)?
+            let src  =  src_cstr.to_string_lossy().into_owned();
+            let dest = dest_cstr.to_string_lossy().into_owned();
+            let msg  =  msg_cstr.to_string_lossy().into_owned();
+
+            use dbus::syssend;
+            syssend(src, dest, msg); // Kevin note: don't use macros here, they serve no purpose
         },
         2 =>{
+
+            // FIXME: Hey wenqiu, please fix this now that you can use real strings (CStr/CString)
+
             let mut conn:String = String::from("");
             let mut temp = arg1;
             while(temp!=0){
                 conn.push(((temp % 0x100) as u8) as char);
                 temp = temp/0x100;
             }
-            let msg = sysrecv!(format!("{}", conn));
+            use dbus::sysrecv;
+            let msg = sysrecv(format!("{}", conn));
             let mut i = 1;
             result = 0;
             for b in msg.as_bytes(){
@@ -77,8 +83,9 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
                 i = i* 0x100;
             }
             trace!("Receive message {}:{}", msg, result);
-        },   
-        _ => trace!("Invalid syscall {}", syscall_number),
+        }, 
+          
+        _ => error!("Invalid syscall {}", syscall_number),
     }
                 
     return result;    

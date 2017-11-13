@@ -12,10 +12,9 @@ section .text
     ; r9  -- fifth argument 
     ; r8  -- sixth argument
     
-    mov rbx, 2; 1 is the syscall recv
-
 main:
-    mov rax, rbx ; rbx is holding ground/accumulator for syscall num
+    mov rax, 2 ; syscall #2 is sysrecv
+    
     mov rdi, "receiver"
     mov rsi, "default"; rsi is the pointer to the received msg
     mov rdx, 5
