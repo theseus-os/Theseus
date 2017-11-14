@@ -39,7 +39,7 @@ lazy_static! {
     static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
         let vga_writer = VgaWriter {
             column_position: 0,
-            buffer: unsafe { Unique::new((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+            buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
         };
         insert_state(Mutex::new(vga_writer));
         get_state::<Mutex<VgaWriter>>()
@@ -245,10 +245,9 @@ struct Buffer {
 
 // this doesn't line up as shown here because of the escaped backslashes,
 // but it lines up properly when printed :)
-static WELCOME_STRING: &'static str = "\n
-    ____           _    __       _        ___  ____  
-   |  _ \\ ___  ___| |_ / _|_   _| |      / _ \\/ ___| 
-   | |_) / _ \\/ __| __| |_| | | | |     | | | \\___ \\ 
-   |  _ <  __/\\__ \\ |_|  _| |_| | |     | |_| |___) |
-   |_| \\_\\___||___/\\__|_|  \\__,_|_|      \\___/|____/ \n";
-                                               
+const WELCOME_STRING: &'static str = "\n\n
+ _____ _                              
+|_   _| |__   ___  ___  ___ _   _ ___ 
+  | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
+  | | | | | |  __/\\__ \\  __/ |_| \\__ \\
+  |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";

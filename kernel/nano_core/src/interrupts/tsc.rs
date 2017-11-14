@@ -1,6 +1,85 @@
-#![feature(asm)]
-use interrupts::pit_clock;
 use core::sync::atomic::{AtomicUsize, Ordering};
+
+static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Debug)]
+pub struct TscTicks(u64);
+
+impl TscTicks {
+    /// Converts ticks to nanoseconds. 
+    /// Returns None if the TSC tick frequency is unavailable.
+    pub fn to_ns(&self) -> Option<u64> {
+         let freq = get_tsc_frequency();
+         if freq == 0 {
+             None
+         }
+         else {
+            Some( (self.0 * 1000000000) / freq )
+         }
+    }
+
+    /// Checked subtraction. Computes `self - other`, 
+    /// returning `None` if underflow occurred.
+    pub fn sub(&self, other: &TscTicks) -> Option<TscTicks> {
+        let checked_sub = self.0.checked_sub(other.0);
+        checked_sub.map( |tt| TscTicks(tt) )
+    }
+    
+    /// Checked addition. Computes `self + other`, 
+    /// returning `None` if overflow occurred.
+    pub fn add(&self, other: &TscTicks) -> Option<TscTicks> {
+        let checked_add = self.0.checked_add(other.0);
+        checked_add.map( |tt| TscTicks(tt) )
+    }
+
+    /// Get the inner value, the number of ticks.
+    pub fn into(self) -> u64 {
+        self.0
+    }
+
+    pub const fn default() -> TscTicks {
+        TscTicks(0)
+    }
+}
+
+
+/// Returns the current number of ticks from the TSC, i.e., `rdtsc`. 
+pub fn tsc_ticks() -> TscTicks {
+    let mask: u64 = 0xFFFF_FFFF;
+    let high: u64;
+    let low: u64;
+    // SAFE: just using rdtsc asm instructions
+    unsafe {
+        // lfence is a cheaper fence instruction than cpuid
+        asm!("lfence; rdtsc"
+            : "={edx}"(high), "={eax}"(low)
+            :
+            : "rdx", "rax"
+            : "volatile"
+        );
+    }
+    
+    TscTicks( ((mask&high)<<32) | (mask&low) )
+}
+
+/// Returns the frequency of the TSC for the system, 
+/// currently measured using the PIT clock for calibration.
+/// A frequency of 0 means it hasn't yet been calibrated.
+pub fn get_tsc_frequency() -> u64 {
+    TSC_FREQUENCY.load(Ordering::SeqCst) as u64
+}
+
+#[doc(hidden)]
+pub fn set_tsc_frequency(new_tsc_freq: u64) {
+    TSC_FREQUENCY.store(new_tsc_freq as usize, Ordering::Release);
+}
+
+
+
+////////////////////////////////////////////////////////////////
+/////////////////////// OLD CODE BELOW /////////////////////////
+////////////////////////////////////////////////////////////////
+
 
 //const INVARIANT_TSC_AVAILABILITY_REGISTER: u32 = 0x80000007;
 //const TSC_CALIBRATION_LOOPS: u64 = 10;
@@ -28,73 +107,56 @@ pub fn invariant_tsc()->bool{
 
 }
 */
+// /*two tsc functions, one for starting count and one for end:
+// cpuid forces in order instruction. In start function, cpuid is placed 
+// before RDTSC and after RDTSCP in end function so cpuid instruction not added inside of counted cycles    
+// (Page 16 Intel "How to Benchmark Code Execution" manual) */
+// #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+// pub fn get_start_tsc()->u64{
 
+//     //RDTSC opcode puts lower half of 64 bit value in register eax and upper half in edx
+//     let low_order: u64;
+//     let high_order: u64;
 
-
-//returns the frequency of the tsc for the system
-pub fn get_tsc_frequency()->u64{
-
-    pit_clock::TSC_FREQUENCY.load(Ordering::SeqCst) as u64
-}
-
-//takes a tsc cycle value and returns the number of nanoseconds it represents
-pub fn tsc_cycles_to_nanoseconds(cycles: u64)-> u64{
+//     //clearing eax and calling cpuid ensures out of order instruction does not happen because of cpuid's use of registers
+//     unsafe {
+//         asm!("cpuid
+//             RDTSC" 
+//             :"={eax}"(low_order), "={edx}"(high_order) 
+//             ://no input 
+//             : "rax","rbx","rcx", "rdx"
+//             :"intel", "volatile")
+//     }
     
-    cycles*1000000000/get_tsc_frequency()
+//     high_order<<32 | low_order
+
+// }
+
+// #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+// pub fn get_end_tsc()->u64{
+
+//     //RDTSC opcode puts lower half of 64 bit value in register eax and upper half in edx
+//     let low_order: u32;
+//     let high_order: u32;
+
+//     //clearing eax and calling cpuid ensures out of order instruction does not happen because of cpuid's use of registers
+//     unsafe {
+//         asm!("RDTSCP
+//             mov $0, eax
+//             mov $1, edx
+//             cpuid"
+//             :"=r"(low_order), "=r"(high_order) 
+//             ://no input
+//             : "rax","rcx", "rdx"
+//             :"intel", "volatile")
+//     }
     
-
-}
-
-/*two tsc functions, one for starting count and one for end:
-cpuid forces in order instruction. In start function, cpuid is placed 
-before RDTSC and after RDTSCP in end function so cpuid instruction not added inside of counted cycles    
-(Page 16 Intel "How to Benchmark Code Execution" manual) */
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn get_start_tsc()->u64{
-
-    //RDTSC opcode puts lower half of 64 bit value in register eax and upper half in edx
-    let low_order: u64;
-    let high_order: u64;
-
-    //clearing eax and calling cpuid ensures out of order instruction does not happen because of cpuid's use of registers
-    unsafe {
-        asm!("cpuid
-            RDTSC" 
-            :"={eax}"(low_order), "={edx}"(high_order) 
-            ://no input 
-            : "rax","rbx","rcx", "rdx"
-            :"intel", "volatile")
-    }
-    
-    high_order<<32 | low_order
-
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn get_end_tsc()->u64{
-
-    //RDTSC opcode puts lower half of 64 bit value in register eax and upper half in edx
-    let low_order: u32;
-    let high_order: u32;
-
-    //clearing eax and calling cpuid ensures out of order instruction does not happen because of cpuid's use of registers
-    unsafe {
-        asm!("RDTSCP
-            mov $0, eax
-            mov $1, edx
-            cpuid"
-            :"=r"(low_order), "=r"(high_order) 
-            ://no input
-            : "rax","rcx", "rdx"
-            :"intel", "volatile")
-    }
-    
-    //it seems like if if not reading from a register, output of inline assembly must be u32(match the size of memory being read from)
-    (high_order as u64)<<32 | (low_order as u64)
+//     //it seems like if if not reading from a register, output of inline assembly must be u32(match the size of memory being read from)
+//     (high_order as u64)<<32 | (low_order as u64)
     
     
 
-} 
+// } 
 
 /*
 //uses PIT timer to count number of TSC cycles in 1 second to determine frequency

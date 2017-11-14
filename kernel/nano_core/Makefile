@@ -22,10 +22,11 @@ assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.asm, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
 
 
-.PHONY: all clean cargo
+.PHONY: all build clean cargo
 
+all: build
 
-all: $(nano_core-obj)
+build: $(nano_core-obj)
 
 clean:
 	@cargo clean
@@ -33,7 +34,7 @@ clean:
 
 
 cargo: 
-	@xargo build --target $(target)  ## target arg must be a target name, not the file path.
+	@RUST_TARGET_PATH="../../cfg" xargo build --target $(target)  ## target arg must be a target name, not the file path.
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)

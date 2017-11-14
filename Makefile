@@ -22,8 +22,8 @@ all: kernel userspace
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.21.0-nightly (c417ee9ae 2017-07-25)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-07-26
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.22.0-nightly (fd4bef54a 2017-09-15)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-09-16
 RUSTC_OUTPUT=$(shell rustc --version)
 
 test_rustc: 	
@@ -125,7 +125,7 @@ userspace:
 ### this builds all kernel components
 kernel: test_rustc
 	@echo -e "\n======== BUILDING KERNEL ========"
-	@$(MAKE) -C kernel all
+	@$(MAKE) -C kernel build
 
 
 
