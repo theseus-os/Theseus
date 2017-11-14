@@ -12,7 +12,6 @@
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
-#![feature(drop_types_in_const)] 
 #![feature(compiler_fences)]
 #![no_std]
 
@@ -79,8 +78,6 @@ use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard}
 use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use core::ops::DerefMut;
-use interrupts::tsc;
 use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 
@@ -404,7 +401,8 @@ fn enable_write_protect_bit() {
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
+#[no_mangle]
+pub extern "C" fn eh_personality() {}
 
 #[cfg(not(test))]
 #[lang = "panic_fmt"]

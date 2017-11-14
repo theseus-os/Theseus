@@ -11,7 +11,6 @@
 extern crate spin;
 extern crate volatile;
 extern crate alloc;
-extern crate collections;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate state_store;
@@ -21,7 +20,7 @@ use core::ptr::Unique;
 use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
-use collections::string::String;
+use alloc::string::String;
 use serial_port::serial_out;
 use kernel_config::memory::KERNEL_OFFSET;
 use state_store::{SSCached, get_state, insert_state};

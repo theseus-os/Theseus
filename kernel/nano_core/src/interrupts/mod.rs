@@ -23,7 +23,6 @@ pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
 mod pic;
-mod time_tools; //testing whether including a module makes any difference
 pub mod rtc; // TODO: shouldn't be pub
 pub mod tsc;
 
@@ -238,8 +237,7 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
     // init PIT and RTC interrupts
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
-    rtc::enable_rtc_interrupt();
-    rtc::change_rtc_frequency(CONFIG_RTC_FREQUENCY_HZ);
+    rtc::init(CONFIG_RTC_FREQUENCY_HZ);
 }
 
 
