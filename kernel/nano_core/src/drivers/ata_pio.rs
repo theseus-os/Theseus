@@ -81,8 +81,16 @@ static SECONDARY_COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_C
 
 
 pub fn init_ata_devices(){
+
+
+	trace!("ATAPI test: {:#x} {:#x} {:#x} {:#x}", SECTORCOUNT.lock().read(),
+										LBALO.lock().read(),
+										LBAMID.lock().read(),
+										LBAHI.lock().read());
 	let mut identify_drives: AtaDevices = AtaDevices{..Default::default()};
-	
+
+
+
 	ATA_DEVICES.call_once( || {
 		identify_drives.primary_master = get_ata_identify_data(0xA0);
 		identify_drives.primary_slave = get_ata_identify_data(0xB0);
@@ -91,6 +99,8 @@ pub fn init_ata_devices(){
 
 
 	identify_drives});
+	
+
 	
 	
 	
@@ -168,6 +178,10 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
 
            COMMAND_IO.lock().write(IDENTIFY_COMMAND);
 
+			trace!("ATAPI test after identify command: {:#x} {:#x} {:#x} {:#x}", SECTORCOUNT.lock().read(),
+												LBALO.lock().read(),
+												LBAMID.lock().read(),
+												LBAHI.lock().read());
 
     }
 
@@ -468,18 +482,22 @@ pub fn dma_read(drive:u8, lba:u32)->Result<u16,u16>{
     //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)
     let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
     unsafe{
-		
-	PRIMARY_BUS_SELECT.lock().write(master_select);
+			
+		PRIMARY_BUS_SELECT.lock().write(master_select);
 
-	//number of consecutive sectors to read from, set at 1 
-	SECTORCOUNT.lock().write(512);
-    //lba is written to disk ports 
-    LBALO.lock().write((lba)as u8);
-    LBAMID.lock().write((lba>>8)as u8);
-    LBAHI.lock().write((lba>>16)as u8);
+		//number of consecutive sectors to read from, set at 1 
+		SECTORCOUNT.lock().write(1);
+		//lba is written to disk ports 
+		LBALO.lock().write((lba)as u8);
+		LBAMID.lock().write((lba>>8)as u8);
+		LBAHI.lock().write((lba>>16)as u8);
 
-    COMMAND_IO.lock().write(DMA_READ_COMMAND);
+		COMMAND_IO.lock().write(DMA_READ_COMMAND);
     }
+
+	return Ok(1); // TODO: fix return value
+
+	// old code below
 
 	if COMMAND_IO.lock().read()%2 == 1{
 		trace!("error bit set");

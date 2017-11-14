@@ -22,6 +22,7 @@ pub static BAR4_BASE: Once<u16> = Once::new();
 
 pub static DMA_FINISHED: AtomicBool = AtomicBool::new(true);
 ///the ports to the DMA primary and secondary command and status bytes
+pub static PCI_COMMAND_PORT: Once<Mutex<Port<u16>>> = Once::new();
 pub static DMA_PRIM_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
 pub static DMA_PRIM_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
 pub static DMA_SEC_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
@@ -192,7 +193,9 @@ pub fn init_pci_buses(){
 pub fn set_dma_ports(){
 
     BAR4_BASE.call_once(||pci_config_read(0, 1, 1, GET_BAR4));
+    debug!("set_dma_ports: BAR4_BASE: {:#x}", BAR4_BASE.try().unwrap());
     //offsets for DMA configuration ports found in http://wiki.osdev.org/ATA/ATAPI_using_DMA under "The Bus Master Register"
+    PCI_COMMAND_PORT.call_once(||Mutex::new(Port::new(BAR4_BASE.try().unwrap()-0x16)));
     DMA_PRIM_COMMAND_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0)));
     DMA_PRIM_STATUS_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0x2)));
     DMA_SEC_COMMAND_BYTE.call_once(||Mutex::new( Port::new(BAR4_BASE.try().expect("BAR4 address not configured")+0x8)));
@@ -217,7 +220,7 @@ pub fn allocate_mem() -> u32{
 pub fn set_prdt(start_add: u32) -> Result<u32, ()>{
 
     
-    let prdt: [u64;1] = [start_add as u64 | 2 <<32 | 1 << 63];
+    let prdt: [u64;1] = [start_add as u64 | 512 << 32 | 1 << 63];
     let prdt_ref = &prdt as *const u64;
     // TODO: first, translate prdt_ref to physicaladdress
     let prdt_paddr = {
@@ -229,10 +232,13 @@ pub fn set_prdt(start_add: u32) -> Result<u32, ()>{
     };
 
     // TODO: then, check that the pdrt phys_addr is Some and that it fits within u32
-    if prdt_paddr.is_some() & (prdt_paddr.expect("prdt_paddr has none as value") < 0xFFFFFFFF) {
-        unsafe{DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(prdt_paddr
-            .expect("this statement should be unreachable: prdt_paddr already checked") as u32 );}
-        return Ok(prdt_paddr.expect("this statement should be unreachable: prdt_paddr already checked") as u32);  
+    if let Some(paddr) = prdt_paddr {
+        if paddr < 0xFFFFFFFF {
+            unsafe{
+                DMA_PRIM_PRDT_ADD.try().expect("DMA_PRDT_ADD_LOW not configured").lock().write(paddr as u32 );
+            }
+            return Ok(paddr as u32);  
+        }
     }
 
     Err(())
@@ -245,8 +251,26 @@ pub fn set_prdt(start_add: u32) -> Result<u32, ()>{
 pub fn start_read(){
     //sets bit 0 in the command byte to put the dma controller in start mode, clears bit 3 to put in read mode
     unsafe{DMA_PRIM_COMMAND_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(1)}; 
+    unsafe{PCI_COMMAND_PORT.try().unwrap().lock().write(0b01)};
+    
+    // temp: reading this bit for debug info
     //sets bit 0 in the status byte to clear error and interrupt bits and set dma mode bit
-    unsafe{DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(1)};
+    unsafe{
+        trace!("start_read()1 : DMA status byte = {:#x}", 
+                DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().read()
+        );
+    }
+    
+    //sets bit 0 in the status byte to clear error and interrupt bits and set dma mode bit
+    unsafe{DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().write(0)};
+
+    // temp: reading this bit for debug info
+    //sets bit 0 in the status byte to clear error and interrupt bits and set dma mode bit
+    unsafe{
+        trace!("start_read() 2: DMA status byte = {:#x}", 
+                DMA_PRIM_STATUS_BYTE.try().expect("DMA_PRIM_COMMAND_BYTE not configured").lock().read()
+        );
+    }
 }
 
 pub fn start_write(){
@@ -273,9 +297,10 @@ pub fn acknowledge_disk_irq(){
 pub fn read_from_disk(drive: u8, lba: u32) -> Result<u32, ()>{
     let start_add: u32 = allocate_mem();
     set_prdt(start_add);
-    start_read();
     let ata_result = ata_pio::dma_read(drive,lba);
-    end_transfer();
+    trace!("read_from_disk: set up dma_read stuff.");
+    start_read();
+    // end_transfer(); // TODO: only do when needing to switch from Read/Write mode
     if ata_result.is_ok(){
         return Ok(start_add);
     }
