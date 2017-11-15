@@ -48,7 +48,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     let ref bus_zero = bus_array[0];
     let slot_zero = bus_zero.connected_devices[0]; 
     println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
-    println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
+    println!("pci config data {:#x}",pci::pci_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
     */
 }
