@@ -63,8 +63,13 @@ path = "../logger"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.rtc]
+path = "../rtc"
+
 [dependencies.test_lib]
 path = "../test_lib"
+
+
 
 [build]
 rustflags = ["-C", "link-args=-fPIC", "-C", "relocation-model=pic", "-C", "code-model=large"]

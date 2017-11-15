@@ -1,17 +1,26 @@
+#![no_std]
+#![feature(unboxed_closures)]
+#![feature(const_fn)]
+
+#[macro_use] extern crate lazy_static;
+extern crate port_io;
+extern crate irq_safety;
+extern crate spin;
+extern crate state_store;
+#[macro_use] extern crate log;
+
 use port_io::Port;
+use irq_safety::hold_interrupts;
 use core::sync::atomic::{AtomicUsize, Ordering};
-pub use irq_safety::hold_interrupts;
-use util;
-use kernel_config::time::{CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
-use spin::Mutex;
-use drivers::ata_pio;
+use spin::{Mutex, Once};
+use state_store::{get_state, insert_state, SSCached};
+
 
 //standard port to write to on CMOS to select registers
 const CMOS_WRITE_PORT: u16 = 0x70;
 //standard port to read register values from on CMOS or write to to change settings
 const CMOS_READ_PORT: u16 = 0x71;
 
-pub static RTC_TICKS: AtomicUsize = AtomicUsize::new(0);
 //used to select register
 static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_WRITE_PORT));
 //used to change cmos settings
@@ -20,8 +29,24 @@ static CMOS_WRITE_SETTINGS: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_POR
 static CMOS_READ: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_READ_PORT));
 
 
-/// Initialize the RTC interrupt with the given frequency.
-pub fn init(rtc_freq: usize) -> Result<(), ()> {
+type RtcTicks = AtomicUsize;
+lazy_static! {
+    static ref RTC_TICKS: SSCached<RtcTicks> = {
+        insert_state(RtcTicks::new(0));
+        get_state::<RtcTicks>()
+    };
+}
+
+pub type RtcInterruptFunction = fn(Option<usize>);
+
+static RTC_INTERRUPT_FUNC: Once<RtcInterruptFunction> = Once::new();
+
+/// Initialize the RTC interrupt with the given frequency
+/// and the given closure that will run on each RTC interrupt.
+/// The closure is provided with the current number of RTC ticks since boot,
+/// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
+pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(), ()> {
+    RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
     enable_rtc_interrupt();
     set_rtc_frequency(rtc_freq)
 }
@@ -64,13 +89,14 @@ fn read_register(register: u8) -> u8{
     (bcd/16)*10 + (bcd & 0xf)
 }
 
+/// A timestamp obtained from the real-time clock.
 pub struct RtcTime {
-    seconds: u8,
-    minutes: u8,
-    hours: u8,
-    days: u8,
-    months: u8,
-    years: u8,
+    pub seconds: u8,
+    pub minutes: u8,
+    pub hours: u8,
+    pub days: u8,
+    pub months: u8,
+    pub years: u8,
 }
 
 //call this function to print RTC's date and time
@@ -94,7 +120,15 @@ pub fn read_rtc() -> RtcTime {
         months: month, 
         years: year
     }
+}
 
+pub fn get_rtc_ticks() -> Result<usize, ()> {
+     if let Some(ticks) = RTC_TICKS.get() {
+         Ok(ticks.load(Ordering::Acquire))
+     }
+     else {
+        Err(())
+     }
 }
 
 
@@ -126,9 +160,22 @@ fn enable_rtc_interrupt()
 }
 
 
+/// the log base 2 of an integer value
+fn log2(value: usize) -> usize {
+    let mut v = value;
+    let mut result = 0;
+    v >>= 1;
+    while v > 0 {
+        result += 1;
+        v >>= 1;
+    }
+
+    result
+}
+
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
+fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
 
     if (!rate.is_power_of_two()) || rate < 2 || rate > 8192 {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
@@ -139,7 +186,7 @@ pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     let _held_interrupts = hold_interrupts();
 
     // formula is "rate = 32768 Hz >> (dividor - 1)"
-    let dividor: u8 = util::log2(rate) as u8 + 2; 
+    let dividor: u8 = log2(rate) as u8 + 2; 
 
     //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
@@ -163,9 +210,11 @@ pub fn handle_rtc_interrupt() {
     write_cmos(0x0C);
     read_cmos();
 
-    let ticks = RTC_TICKS.fetch_add(1, Ordering::SeqCst) + 1; // +1 because fetch_add returns previous value
-    
-    if (ticks % (CONFIG_TIMESLICE_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
-        schedule!();
+    if let Some(rtc_interrupt_func) = RTC_INTERRUPT_FUNC.try() {
+        let arg: Option<usize> = RTC_TICKS.get().map(|atomic_ticks| atomic_ticks.fetch_add(1, Ordering::SeqCst) + 1); // +1 because fetch_add returns previous value
+        rtc_interrupt_func(arg);
+    }
+    else {
+        warn!("RTC_INTERRUPT_FUNC was None, doing nothing this interrupt.");
     }
 }

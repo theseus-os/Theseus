@@ -59,6 +59,7 @@ extern crate serial_port;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
 extern crate test_lib;
+extern crate rtc;
 
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
