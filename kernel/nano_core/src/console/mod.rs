@@ -6,6 +6,7 @@ use task::TaskList;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use rtc;
 
 
 
@@ -169,9 +170,9 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        debug!("PIT_TICKS={}, RTC_TICKS={}", 
+        debug!("PIT_TICKS={:?}, RTC_TICKS={:?}", 
                 ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-                ::interrupts::rtc::RTC_TICKS.load(Ordering::Relaxed));
+                rtc::get_rtc_ticks().ok());
         return; 
     }
 
