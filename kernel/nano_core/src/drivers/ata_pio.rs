@@ -46,6 +46,7 @@ static LBAMID: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAMID_ADDRESS));
 static LBAHI: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_LBAHI_ADDRESS));
 static COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(PRIMARY_COMMAND_IO_ADDRESS));
 
+static PRIMARY_ALT_STATUS_PORT: Mutex<Port<u8>> = Mutex::new( Port::new(0x3f6));
 
 //holds AtaIdentifyData for primary and secondary bus
 pub static ATA_DEVICES: Once<AtaDevices> = Once::new();
@@ -111,16 +112,16 @@ pub fn init_ata_devices(){
 fn read_primary_data_port()-> Result<[u16; 256], u16>{
     let mut arr: [u16; 256] = [0;256];
 	
-	for word in 0..256{
+	for word in 0..256 {
 		let mut loop_count = 0;
 
-    	while(!ata_data_transfer_ready()){
+    	while !ata_data_transfer_ready() {
 			loop_count +=1;
 			trace!("data port not ready in read_primary_data_port function");
 			if loop_count > 1000{
 				return Err(loop_count)
 			}
-			}
+		}
 		arr[word] = PRIMARY_DATA_PORT.lock().read();
 
     }
@@ -189,7 +190,7 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     command_value = COMMAND_IO.lock().read();
     //if value is 0, no drive exists
     if command_value == 0{
-        trace!("No Drive Exists");
+        trace!("Drive {:#x} does not exist.", drive);
 		return identify_data;
 
     }
@@ -232,7 +233,7 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
 }
 
 //read from disk at address input, drive = 0xE0 for master drive, 0xF0 for slave drive
-pub fn pio_read(drive:u8, lba:u32)->Result<[u16; 256],u16>{
+pub fn pio_read(drive:u8, lba:u32) -> Result<[u16; 256], u16>{
 	let mut chosen_drive = &AtaIdentifyData{..Default::default()};
 
 	if drive == 0xE0 {
@@ -471,12 +472,11 @@ pub fn dma_read(drive:u8, lba:u32)->Result<u16,u16>{
 	}
 	trace!("{} number of sectors", chosen_drive.sector_count_28);
 	if drive != 0xE0 && drive != 0xF0 {
-		trace!("input drive value is unacceptable");
+		error!("input drive value {:#x} is unacceptable", drive);
 		return Err(0);
 	}
 	if lba+1> chosen_drive.sector_count_28{
-		trace!("lba out of range of sectors");
-		trace!("{} number of sectors", chosen_drive.sector_count_28);
+		error!("lba {} out of range of sectors, sector count: {}", lba, chosen_drive.sector_count_28);
 		return Err(0);
 	}
     //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)

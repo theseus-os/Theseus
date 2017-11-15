@@ -390,8 +390,6 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
 extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
     unsafe { PIC.notify_end_of_interrupt(0x28); }
 
-    //let placeholder = 2;
-    //trace!("wow");
     rtc::handle_rtc_interrupt();
 
     
@@ -402,7 +400,6 @@ extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
 extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
     unsafe { PIC.notify_end_of_interrupt(0x2e); }
 
-    //let placeholder = 2;
     
     ata_pio::handle_primary_interrupt();
 
