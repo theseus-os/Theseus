@@ -12,7 +12,7 @@ use console::{ConsoleEvent, ConsoleInputEvent};
 
 
 
-static mut KBD_MODIFIERS: Option<KeyboardModifiers> = None;
+static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 
 
 static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
@@ -24,11 +24,6 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });
-
-    unsafe {
-        KBD_MODIFIERS = Some(KeyboardModifiers::default());
-    }
-
 }
 
 
@@ -60,6 +55,7 @@ impl KeyEvent {
 #[derive(Debug)]
 pub enum KeyboardInputError {
     UnknownScancode,
+    EventQueueNotReady,
 }
 
 
@@ -68,14 +64,11 @@ pub enum KeyboardInputError {
 /// returns Ok(()) if everything was handled properly.
 /// returns KeyboardInputError 
 pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
-    // let kbd_state = KBD_STATE.try_read();
-    // if kbd_state.is_none() {
-    //     println!("Error: KBD_STATE.try_read() failed, discarding {}!", scan_code);
-    //     return Err(KeyboardInputError::TryAcquireFailed);
-    // }
-    // let kbd_state = kbd_state.unwrap(); // safe, cuz we already checked for is_none()
-    let mut modifiers = unsafe { KBD_MODIFIERS.as_mut().expect("Error: KBD_MODIFIERS was uninitialized") };
+    // SAFE: no real race conditions with keyboard presses
+    let modifiers = unsafe { &mut KBD_MODIFIERS };
    
+    // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
+
     // first, update the modifier keys
     match scan_code {
         x if x == Keycode::Control as u8 => { modifiers.control = true }
@@ -92,6 +85,7 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
         _ => { } // do nothing
     }
 
+    // debug!("KBD_MODIFIERS after {}: {:?}", scan_code, modifiers);
 
     // second,  put the keycode and it's action (pressed or released) in the keyboard queue
     match scan_code {
@@ -106,14 +100,19 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    let producer = CONSOLE_PRODUCER.try().expect("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized!");
-                    producer.enqueue(ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone())));
-                    return Ok(());  // successfully queued up KeyEvent 
+                    if let Some(producer) = CONSOLE_PRODUCER.try() {
+                        producer.enqueue(ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone())));
+                        Ok(()) // successfully queued up KeyEvent 
+                    }
+                    else {
+                        warn!("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized, dropping keyboard event.");
+                        Err(KeyboardInputError::EventQueueNotReady)
+                    }
                 }
 
                 _ => { 
-                    warn!("Unknown keycode: {:?}", keycode);
-                    return Err(KeyboardInputError::UnknownScancode); 
+                    warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
+                    Err(KeyboardInputError::UnknownScancode) 
                 }
             }
         }
