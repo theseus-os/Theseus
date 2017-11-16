@@ -13,7 +13,7 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
 use collections::string::String;
-use util::c_str::{c_char, CStr};
+use util::c_str::{c_char, CStr, CString};
 
 
 
@@ -57,32 +57,30 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
 
             // NOTE from Kevin: Wenqiu, do you need to create so many Strings? They are slow and require allocation.
             // For example, in syssend, do you need an owned String (CString), or does a &str work (CStr)?
-            let src  =  src_cstr.to_string_lossy().into_owned();
-            let dest = dest_cstr.to_string_lossy().into_owned();
-            let msg  =  msg_cstr.to_string_lossy().into_owned();
+            //let src  =  src_cstr.to_string_lossy().into_owned();
+            //let dest = dest_cstr.to_string_lossy().into_owned();
+            //let msg  =  msg_cstr.to_string_lossy().into_owned();
 
             use dbus::syssend;
-            syssend(src, dest, msg); // Kevin note: don't use macros here, they serve no purpose
+            syssend(src_cstr, dest_cstr, msg_cstr); // Kevin note: don't use macros here, they serve no purpose
         },
         2 =>{
 
             // FIXME: Hey wenqiu, please fix this now that you can use real strings (CStr/CString)
 
-            let mut conn:String = String::from("");
-            let mut temp = arg1;
-            while(temp!=0){
-                conn.push(((temp % 0x100) as u8) as char);
-                temp = temp/0x100;
-            }
+            let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             use dbus::sysrecv;
-            let msg = sysrecv(format!("{}", conn));
-            let mut i = 1;
-            result = 0;
+
+            let msg:&str = &(sysrecv(conn_name));
+            result = CString::new(msg).unwrap().as_ptr() as u64;
+            //let mut i = 1;
+            /*result = 0;
             for b in msg.as_bytes(){
                 result = result + i*(b.clone() as u64);
                 i = i* 0x100;
-            }
-            trace!("Receive message {}:{}", msg, result);
+            }*/
+
+            trace!("Receive message {}", msg);
         }, 
           
         _ => error!("Invalid syscall {}", syscall_number),
