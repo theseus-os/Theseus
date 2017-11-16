@@ -136,8 +136,8 @@ pub fn syssend(src:&CStr, dest:&CStr, msg:&CStr) {
     let ssrc = src.to_string_lossy().into_owned();
 
     let sdest = dest.to_string_lossy().into_owned();
-    println!("Create the connection {}", &ssrc);
-    println!("Send msg to connection {}", &sdest);
+    trace!("Create the connection {}", &ssrc);
+    trace!("Send msg to connection {}", &sdest);
     {
 
             let mut connection = table.get_connection(String::clone(&ssrc))
@@ -147,27 +147,24 @@ pub fn syssend(src:&CStr, dest:&CStr, msg:&CStr) {
     }
     
 
-
     table.match_msg(&ssrc);
-
-
 
 }
 
 pub fn sysrecv(name:&CStr) -> String{
     let sname = name.to_string_lossy().into_owned();;;
     unsafe{
-        println!("Get the connection {}", &sname);
+        trace!("Get the connection {}", &sname);
         let mut table = get_connection_table().write();
         let mut connection = table.get_connection(sname)
-            .expect("Fail to create the first bus connection").write();
+            .expect("Fail to create the bus connection").write();
   
         let obj = connection.receive();
         if(obj.is_some()){
-            println!("Get the result!");
+            trace!("Get the result!");
             return obj.unwrap().data;
         } else {
-            println!("No message!");
+            trace!("No message!");
             return String::from("");
         }
     }
