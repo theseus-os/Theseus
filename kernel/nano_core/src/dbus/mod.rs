@@ -5,6 +5,8 @@ use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard}
 use core::ops::DerefMut;
 use spin::{Once, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use alloc::arc::Arc;
+use util::c_str::{c_char, CStr};
+
 
 
 
@@ -129,21 +131,18 @@ pub fn get_connection_table() -> &'static RwLockIrqSafe<BusConnectionTable> {
     })
 }
 
-pub fn syssend(src:String, dest:String, msg:String) {
+pub fn syssend(src:&CStr, dest:&CStr, msg:&CStr) {
     let mut table = get_connection_table().write();
-    let mut ssrc = String::from("bus.connection.");
+    let ssrc = src.to_string_lossy().into_owned();
 
-    ssrc = ssrc + &src;
-
-    let mut sdest = String::from("bus.connection.");
-    sdest = sdest + &dest;
+    let sdest = dest.to_string_lossy().into_owned();
     println!("Create the connection {}", &ssrc);
     println!("Send msg to connection {}", &sdest);
     {
 
             let mut connection = table.get_connection(String::clone(&ssrc))
                 .expect("Fail to create the destination bus connection").write();
-            let message = BusMessage::new(sdest, msg);
+            let message =  BusMessage::new(sdest, msg.to_string_lossy().into_owned());
             connection.send(&message);           
     }
     
@@ -155,16 +154,13 @@ pub fn syssend(src:String, dest:String, msg:String) {
 
 }
 
-pub fn sysrecv(name:String) -> String{
-    let mut sname = String::from("bus.connection.");
-    sname = sname + &name;
+pub fn sysrecv(name:&CStr) -> String{
+    let sname = name.to_string_lossy().into_owned();;;
     unsafe{
         println!("Get the connection {}", &sname);
         let mut table = get_connection_table().write();
         let mut connection = table.get_connection(sname)
             .expect("Fail to create the first bus connection").write();
-        
-
   
         let obj = connection.receive();
         if(obj.is_some()){

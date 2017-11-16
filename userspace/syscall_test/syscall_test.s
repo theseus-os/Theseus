@@ -38,11 +38,22 @@ main:
     mov r9 , 21
 
     syscall
+   
+    mov rcx, 0x4000000
 
 
 loopstart:
 
+     ;add rax,  1
+
+    dec rcx
+    jnz loopstart
+    
+    mov rax, rbx
+
+    
+
     ;  infinite loop
-    jmp loopstart
+    jmp main
 
 

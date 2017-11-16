@@ -15,7 +15,7 @@ section .text
 main:
     mov rax, 2 ; syscall #2 is sysrecv
     
-    mov rdi, "receiver"
+    mov rdi, dest
     mov rsi, "default"; rsi is the pointer to the received msg
     mov rdx, 5
     mov r10, 8
