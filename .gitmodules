@@ -1,3 +1,11 @@
 [submodule "libs/dfqueue"]
 	path = libs/dfqueue
 	url = https://github.com/kevinaboos/dfqueue
+[submodule "libs/x86_64"]
+	path = libs/x86_64
+	url = https://github.com/kevinaboos/x86_64
+	branch = master
+[submodule "libs/irq_safety"]
+	path = libs/irq_safety
+	url = https://github.com/kevinaboos/irq_safety
+	branch = master

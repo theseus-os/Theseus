@@ -8,8 +8,9 @@
 // except according to those terms.
 
 use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::idt::{Idt, ExceptionStackFrame, PageFaultErrorCode};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
+use irq_safety::MutexIrqSafe;
 use port_io::Port;
 use drivers::input::keyboard;
 use drivers::ata_pio;
@@ -17,7 +18,7 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, C
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
 
-// expose these functions from within this interrupt module
+// re-expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
 mod gdt;
@@ -39,63 +40,8 @@ static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
 
 
-lazy_static! {
-    static ref IDT: Idt = {
-        let mut idt = ::x86_64::structures::idt::Idt::new();
+static IDT: LockedIdt = LockedIdt::new();
 
-		// SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        // missing: 0x02 non-maskable interrupt exception
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(device_not_available_handler);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
-        }
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
-        // reserved: 0x0f vector 15  
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
-
-
-        // fill all IDT entries with an unimplemented IRQ handler
-        for i in 32..255 {
-	        idt[i].set_handler_fn(unimplemented_interrupt_handler);
-        }
-
-
-		// SET UP CUSTOM INTERRUPT HANDLERS
-		// we can directly index the "idt" object because it implements the Index/IndexMut traits
-        idt[0x20].set_handler_fn(timer_handler); // int 32
-        idt[0x21].set_handler_fn(keyboard_handler); // int 33
-        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
-
-        //if interrupt is correct, will send to rtc_handler function rtc-test
-        idt[0x28].set_handler_fn(rtc_handler);
-        idt[0x2e].set_handler_fn(primary_ata);
-
-
-        // TODO: add more 
-
-
-        idt // return idt so it's set to the static ref IDT above
-    };
-}
 
 pub enum AvailableSegmentSelector {
     KernelCode,
@@ -231,6 +177,61 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         PIC.initialize();
     }
 
+
+    {
+        let mut idt = IDT.lock();
+
+		// SET UP FIXED EXCEPTION HANDLERS
+        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
+        // missing: 0x01 debug exception
+        // missing: 0x02 non-maskable interrupt exception
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        // missing: 0x04 overflow exception
+        // missing: 0x05 bound range exceeded exception
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
+        idt.device_not_available.set_handler_fn(device_not_available_handler);
+        unsafe {
+            idt.double_fault.set_handler_fn(double_fault_handler)
+                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
+        }
+        // reserved: 0x09 coprocessor segment overrun exception
+        // missing: 0x0a invalid TSS exception
+        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
+        // missing: 0x0c stack segment exception
+        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);
+        // reserved: 0x0f vector 15
+        // missing: 0x10 floating point exception
+        // missing: 0x11 alignment check exception
+        // missing: 0x12 machine check exception
+        // missing: 0x13 SIMD floating point exception
+        // missing: 0x14 virtualization vector 20
+        // missing: 0x15 - 0x1d SIMD floating point exception
+        // missing: 0x1e security exception
+        // reserved: 0x1f
+
+
+        // fill all IDT entries with an unimplemented IRQ handler
+        for i in 32..255 {
+	        idt[i].set_handler_fn(unimplemented_interrupt_handler);
+        }
+
+
+		// SET UP CUSTOM INTERRUPT HANDLERS
+		// we can directly index the "idt" object because it implements the Index/IndexMut traits
+        idt[0x20].set_handler_fn(timer_handler); // int 32
+        idt[0x21].set_handler_fn(keyboard_handler); // int 33
+        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
+
+        //if interrupt is correct, will send to rtc_handler function rtc-test
+        idt[0x28].set_handler_fn(rtc_handler);
+        idt[0x2e].set_handler_fn(primary_ata);
+
+
+        // TODO: add more 
+
+    }
+    
     IDT.load();
     info!("loaded interrupt descriptor table.");
 
@@ -332,16 +333,9 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    // this is how to write something with literally ZERO locking
-    // TODO: FIXME: establish non-locking debug messages, with compile-time string literals only!
-    // we still do not know how to print runtime values without locking, due to the format!() macro needing allocation.
-    // ::drivers::serial_port::serial_out("\n\x1b[33m[W] TIMER! \x1b[0m\n");
-
-    // we must acknowledge the interrupt first before handling it, which will cause a context switch
-	unsafe { PIC.notify_end_of_interrupt(0x20); }
-
-
     pit_clock::handle_timer_interrupt();
+
+	unsafe { PIC.notify_end_of_interrupt(0x20); }
 }
 
 
@@ -395,6 +389,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
 
 //0x28
 extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
+    // we must acknowledge the interrupt first before handling it, because the handler will cause a context switch
     unsafe { PIC.notify_end_of_interrupt(0x28); }
 
     rtc::handle_rtc_interrupt();
@@ -405,17 +400,16 @@ extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
 
 //0x2e
 extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
-    unsafe { PIC.notify_end_of_interrupt(0x2e); }
 
     
     ata_pio::handle_primary_interrupt();
 
     
-
+    unsafe { PIC.notify_end_of_interrupt(0x2e); }
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("caught unhandled interrupt: {:#?}", stack_frame);
+	warn!("caught unhandled interrupt: {:#?}", stack_frame);
 
     loop { }
 }
