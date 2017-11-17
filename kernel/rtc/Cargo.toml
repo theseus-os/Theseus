@@ -5,6 +5,8 @@ version = "0.1.0"
 
 [dependencies]
 spin = "0.4.5"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" }
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
