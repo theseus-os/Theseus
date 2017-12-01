@@ -55,9 +55,8 @@ main:
 
     syscall
    
+    ;; busy wait here for a few seconds
     mov rcx, 0x4000000
-
-
 loopstart:
 
      ;add rax,  1
