@@ -284,34 +284,34 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_test_1"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_1"));
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_test_2"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_2"));
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
+        let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
         tasklist_mut.spawn_userspace(module, None);
     }
 
     // a second duplicate syscall test user task
-    if true
+    if false
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(2).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_receive"));
+        let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
 
 
