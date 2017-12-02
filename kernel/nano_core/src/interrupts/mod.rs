@@ -443,11 +443,17 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
         let slave_irr = SLAVE_PIC_CMD_REG.read();
 
 
-        println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}\n", 
-                                    master_isr, master_irr, slave_isr, slave_irr);
+        // println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+        //                             master_isr, master_irr, slave_isr, slave_irr);
         
-        // PIC.notify_end_of_interrupt(0x27);
+        // println_unsafe!("    acking spurious irq 0x20 (PIT timer)\n");
+        PIC.notify_end_of_interrupt(0x20);
+        // TODO FIXME: NOTE: so right now this fixes it on real hardware.
+        // i think it's because the irr is 0x1, which means that the PIC is trying to say that IRQ 0 (bit position 0 is set)
+        // has been raised, and we need to ack it. So when I ack it here, it works. 
+        // Need to try it with PIT unmasked and enabled.
 
+        return;
 
         loop {
             unimplemented!();

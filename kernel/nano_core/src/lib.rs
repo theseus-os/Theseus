@@ -321,7 +321,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
-    schedule!();
+    schedule!(); // this automatically enables interrupts right now
 
 
 

@@ -25,7 +25,7 @@ cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU        "
 
 print_timestamps: enabled=0
 debugger_log: -
-magic_break: enabled=0
+magic_break: enabled=1
 private_colormap: enabled=0
 clock: sync=none, time0=local, rtc_sync=0
 # no cmosimage
@@ -36,8 +36,9 @@ logprefix: %t%e%d
 
 panic: action=ask
 error: action=report
-info: action=report, pic=report
+info: action=report
 debug: action=ignore
+debug: action=ignore, cpu0=report
 #debug: action=ignore, pic=report
 
 
