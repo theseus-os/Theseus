@@ -19,7 +19,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     input::keyboard::init(console_producer);
     
     // ata_pio::init_ata_devices();
-    pci::init_pci_buses();
+    // pci::init_pci_buses();
 
 
 

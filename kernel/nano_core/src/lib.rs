@@ -250,11 +250,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
 
-    println!("initialization done!");
-
+    println_unsafe!("initialization done! (interrupts enabled?: {})", interrupts::interrupts_enabled());
 	
-	//interrupts::enable_interrupts(); //apparently this line is unecessary
-	println!("enabled interrupts!");
 
 
     // create a second task to test context switching
@@ -273,7 +270,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
-    schedule!();
+    schedule!(); // this automatically enables interrupts right now
 
 
     // the idle thread's (Task 0) busy loop
