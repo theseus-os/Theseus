@@ -101,15 +101,30 @@ impl ChainedPics {
         // worked around this by writing garbage data to port 0x80, which
         // allegedly takes long enough to make everything work on most
         // hardware.  Here, `io_wait` is a closure.
-        let mut wait_port: port_io::Port<u8> = port_io::Port::new(0x80);
-        let mut io_wait = || { wait_port.write(0) };
+        let wait_port: port_io::Port<u8> = port_io::Port::new(0x80);
+        let io_wait = || { wait_port.write(0) };
 
         // Save our original interrupt masks, because I'm too lazy to
         // figure out reasonable values.  We'll restore these when we're
         // done.
         let saved_mask1 = self.pics[0].data.read();
         let saved_mask2 = self.pics[1].data.read();
-        info!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
+        // info!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
+        println_unsafe!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
+
+        // testing: masking all interrupts during init
+        self.pics[0].data.write(0xFF);
+        io_wait();
+        self.pics[1].data.write(0xFF);
+        io_wait();
+
+
+        // testing: pre-emptively acknowledge both PICs in case they have pending unhandled irqs
+        self.pics[0].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
+        self.pics[1].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
+
 
         // Tell each PIC that we're going to send it a three-byte
         // initialization sequence on its data port.
@@ -136,9 +151,15 @@ impl ChainedPics {
         self.pics[1].data.write(MODE_8086);
         io_wait();
 
-        // Restore our saved masks.
-        self.pics[0].data.write(saved_mask1);
-        self.pics[1].data.write(saved_mask2);
+        
+        // TODO: FIX ME replace interrupt masks
+        // 0 means enabled, 1 means disabled (masked)
+        self.pics[0].data.write(0b1111_1001); // PIT timer and kbd
+        io_wait();
+        // self.pics[1].data.write(saved_mask2);
+        self.pics[1].data.write(0b1111_1110); // just RTC timer
+        io_wait();
+
     }
 
     /// Do we handle this interrupt?

@@ -230,18 +230,56 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         
         load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
         load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-
-        PIC.initialize();
     }
+
 
     IDT.load();
     info!("loaded interrupt descriptor table.");
 
-    // init PIT and RTC interrupts
+    // init PIC, PIT and RTC interrupts
+    unsafe{ 
+        PIC.initialize(); 
+    }
+
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     rtc::enable_rtc_interrupt();
     rtc::change_rtc_frequency(CONFIG_RTC_FREQUENCY_HZ);
 }
+
+
+
+// use x86_64::instructions::port::outb;
+
+// const PIC1: u16 = 	0x20;		/* IO base address for master PIC */
+// const PIC2: u16 = 	0xA0;		/* IO base address for slave PIC */
+// const PIC1_COMMAND: u16 = 		PIC1;
+// const PIC1_DATA: u16 = 		(PIC1+1);
+// const PIC2_COMMAND: u16 = 		PIC2;
+// const PIC2_DATA: u16 = 		(PIC2+1);
+// const PIC_EOI: u8 = 0x20;       /* End of interrupt cmd */
+
+// const ICW1_ICW4: u8	= 0x01;		/* ICW4 (not) needed */
+// const ICW1_SINGLE: u8	= 	0x02;		/* Single (cascade) mode */
+// const ICW1_INTERVAL4: u8	= 	0x04;		/* Call address interval 4 (8) */
+// const ICW1_LEVEL: u8	= 	0x08;		/* Level triggered (edge) mode */
+// const ICW1_INIT: u8	= 	0x10;		/* Initialization - required! */
+
+// const ICW4_8086: u8	= 	0x01;		/* 8086/88 (MCS-80/85) mode */
+// const ICW4_AUTO: u8	= 	0x02;		/* Auto (normal) EOI */
+// const ICW4_BUF_SLAVE: u8	= 	0x08;		/* Buffered mode/slave */
+// const ICW4_BUF_MASTER: u8	= 	0x0C;		/* Buffered mode/master */
+// const ICW4_SFNM: u8	= 	0x10;		/* Special fully nested (not) */
+
+// fn set_up_pic() {
+
+// }
+
+// fn pic_send_eoi(irq_num: u8) {
+//     if irq_num > 8 {
+//         outb(PIC)
+//     }
+// }
+
 
 
 
@@ -354,20 +392,37 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 
 
 static MASTER_PIC_CMD_REG: Port<u8>  = Port::new(0x20);
+static SLAVE_PIC_CMD_REG: Port<u8>  = Port::new(0xA0);
 //0x27
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     // println_unsafe!("\nSPURIOUS IRQ");
 
     unsafe {
-        MASTER_PIC_CMD_REG.write(0x0B);
-        let isr = MASTER_PIC_CMD_REG.read();
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
 
-        MASTER_PIC_CMD_REG.write(0x0A);
-        let irr = MASTER_PIC_CMD_REG.read();
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
 
 
-        println_unsafe!("\nSpurious interrupt handler:  isr={:#b} irr={:#b}\n", isr, irr);
-        if isr & 0x80 == 0x80 {
+        println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}\n", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+        
+        // PIC.notify_end_of_interrupt(0x27);
+
+
+        loop {
+            unimplemented!();
+        }
+
+        if master_isr & 0x80 == 0x80 {
             PIC.notify_end_of_interrupt(0x27);
         }
         else {

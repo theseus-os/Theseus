@@ -113,7 +113,7 @@ pub fn enable_rtc_interrupt()
     unsafe{CMOS_WRITE_SETTINGS.lock().write(prev | 0x40)};
 
     
-    enable_interrupts();
+    // enable_interrupts();
 
     trace!("RTC Enabled!");
 
@@ -145,7 +145,7 @@ pub fn change_rtc_frequency(rate: usize){
 
     unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|dividor))};
 
-    enable_interrupts();
+    // enable_interrupts();
     trace!("rtc rate frequency changed!");
 }
 
