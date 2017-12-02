@@ -21,6 +21,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
     
+    // ata_pio::init_ata_devices();
     pci::init_pci_buses();
 
 

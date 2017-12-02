@@ -237,8 +237,6 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         
         load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
         load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-
-        PIC.initialize();
     }
 
 
@@ -299,7 +297,11 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         info!("loaded interrupt descriptor table.");
     }
 
-    // init PIT and RTC interrupts
+    // init PIC, PIT and RTC interrupts
+    unsafe{ 
+        PIC.initialize(); 
+    }
+
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
     IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
@@ -421,20 +423,37 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 
 
 static MASTER_PIC_CMD_REG: Port<u8>  = Port::new(0x20);
+static SLAVE_PIC_CMD_REG: Port<u8>  = Port::new(0xA0);
 //0x27
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     // println_unsafe!("\nSPURIOUS IRQ");
 
     unsafe {
-        MASTER_PIC_CMD_REG.write(0x0B);
-        let isr = MASTER_PIC_CMD_REG.read();
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
 
-        MASTER_PIC_CMD_REG.write(0x0A);
-        let irr = MASTER_PIC_CMD_REG.read();
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
 
 
-        println_unsafe!("\nSpurious interrupt handler:  isr={:#b} irr={:#b}\n", isr, irr);
-        if isr & 0x80 == 0x80 {
+        println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}\n", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+        
+        // PIC.notify_end_of_interrupt(0x27);
+
+
+        loop {
+            unimplemented!();
+        }
+
+        if master_isr & 0x80 == 0x80 {
             PIC.notify_end_of_interrupt(0x27);
         }
         else {

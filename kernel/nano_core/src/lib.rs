@@ -213,6 +213,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     drivers::early_init();
 
 
+    unsafe{  logger::enable_vga(); }
 
 
     // initialize our interrupts and IDT
