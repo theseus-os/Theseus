@@ -150,11 +150,16 @@ pub fn change_rtc_frequency(rate: usize){
 }
 
 
-/// counts interrupts from RTC
-pub fn handle_rtc_interrupt() {
+pub fn rtc_ack_irq() {
     // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
     write_cmos(0x0C);
     read_cmos();
+}
+
+/// counts interrupts from RTC
+pub fn handle_rtc_interrupt() {
+    // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
+    // rtc_ack_irq();  // FIXME: currently doing this in interrupts/mod.rs instead as a test
 
     let ticks = RTC_TICKS.fetch_add(1, Ordering::SeqCst) + 1; // +1 because fetch_add returns previous value
 

@@ -171,9 +171,10 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        debug!("PIT_TICKS={:?}, RTC_TICKS={:?}", 
+        debug!("PIT_TICKS={}, RTC_TICKS={}, SPURIOUS={}", 
                 ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-                rtc::get_rtc_ticks().ok());
+                ::interrupts::rtc::RTC_TICKS.load(Ordering::Relaxed),
+                unsafe{::interrupts::SPURIOUS_COUNT});
         return; 
     }
 

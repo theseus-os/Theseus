@@ -107,10 +107,10 @@ impl ChainedPics {
         // Save our original interrupt masks, because I'm too lazy to
         // figure out reasonable values.  We'll restore these when we're
         // done.
-        let saved_mask1 = self.pics[0].data.read();
-        let saved_mask2 = self.pics[1].data.read();
+        // let saved_mask1 = self.pics[0].data.read();
+        // let saved_mask2 = self.pics[1].data.read();
         // info!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
-        println_unsafe!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
+        // println_unsafe!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
 
         // testing: masking all interrupts during init
         self.pics[0].data.write(0xFF);
@@ -152,12 +152,20 @@ impl ChainedPics {
         io_wait();
 
         
-        // TODO: FIX ME replace interrupt masks
         // 0 means enabled, 1 means disabled (masked)
-        self.pics[0].data.write(0b1111_1001); // PIT timer and kbd
+        self.pics[0].data.write(0x80); // everything is allowed except IRQ7 (but this seems to not actually mask it... it still fires.)
         io_wait();
         // self.pics[1].data.write(saved_mask2);
-        self.pics[1].data.write(0b1111_1110); // just RTC timer
+        // self.pics[1].data.write(0b1111_1110); // just RTC timer
+        self.pics[1].data.write(0b0000_1000); // everything is allowed except 0x2B 
+        io_wait();
+
+
+        // pre-emptively acknowledge both PICs in case they have pending unhandled irqs
+        // this is generally unnecessary but doesn't hurt if the interrupt hardware is misbehaving
+        self.pics[0].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
+        self.pics[1].command.write(CMD_END_OF_INTERRUPT);
         io_wait();
 
     }

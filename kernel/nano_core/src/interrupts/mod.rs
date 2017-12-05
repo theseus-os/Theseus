@@ -349,6 +349,7 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
              stack_frame.instruction_pointer,
              stack_frame);
 
+    loop {}
 }
 
 
@@ -401,6 +402,10 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> real hardware works, there is an option to duplicate all log messages to the vga_buffer/console (see logger::enable_vga() in rust_main()).
     pit_clock::handle_timer_interrupt();
 
 	unsafe { PIC.notify_end_of_interrupt(0x20); }
@@ -410,25 +415,35 @@ extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
 // 0x21
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
-    let mut scan_code: u8 = { 
+    let scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
 	// trace!("KBD: {:?}", scan_code);
 
-
     keyboard::handle_keyboard_input(scan_code);	
+
     unsafe { PIC.notify_end_of_interrupt(0x21); }
-    
 }
 
 
 static MASTER_PIC_CMD_REG: Port<u8>  = Port::new(0x20);
 static SLAVE_PIC_CMD_REG: Port<u8>  = Port::new(0xA0);
-//0x27
+pub static mut SPURIOUS_COUNT: u64 = 0;
+
+/// The Spurious interrupt handler. 
+/// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
+/// I believe the problem is something to do with still using the antiquated PIC (instead of APIC)
+/// on an SMP system with only one CPU core.
+/// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html
+/// Thus, for now, we will basically just ignore/ack it, but ideally this will no longer happen
+/// when we transition from PIC to APIC, and disable the PIC altogether. 
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     // println_unsafe!("\nSPURIOUS IRQ");
+    unsafe { SPURIOUS_COUNT += 1; }
 
     unsafe {
+        // The ISR register indicates which interrupts are currently being serviced
+        // The IRR register indicates which interrupts have currently been raised (and are pending)
         const IRR_CMD: u8 = 0x0A;
         const ISR_CMD: u8 = 0x0B;
 
@@ -444,36 +459,26 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
 
 
         // println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
-        //                             master_isr, master_irr, slave_isr, slave_irr);
+                                    // master_isr, master_irr, slave_isr, slave_irr);
         
-        // println_unsafe!("    acking spurious irq 0x20 (PIT timer)\n");
-        PIC.notify_end_of_interrupt(0x20);
+
         // TODO FIXME: NOTE: so right now this fixes it on real hardware.
         // i think it's because the irr is 0x1, which means that the PIC is trying to say that IRQ 0 (bit position 0 is set)
         // has been raised, and we need to ack it. So when I ack it here, it works. 
         // Need to try it with PIT unmasked and enabled.
 
-        return;
-
-        loop {
-            unimplemented!();
-        }
-
+        // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
+        // (pretty sure this will never happen)
+        // if it was a real IRQ7, we do need to ack it by sending an EOI
         if master_isr & 0x80 == 0x80 {
+            println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
             PIC.notify_end_of_interrupt(0x27);
         }
         else {
-            // do nothing
+            // do nothing. Do not send an EOI.
         }
     }
-
-	// TODO: handle this
-	/* When any IRQ7 is received, simply read the In-Service Register
-		 outb(0x20, 0x0B); unsigned char irr = inb(0x20);
-		and check if bit 7
-		irr & 0x80
-		is set. If it isn't, then return from the interrupt without sending an EOI.
-	*/
 }
 
 
@@ -487,6 +492,7 @@ extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
     
     unsafe { PIC.notify_end_of_interrupt(0x2e); }
 }
+
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
 
