@@ -84,13 +84,31 @@ lazy_static! {
 
 		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
+
+        // MASTER PIC starts here (0x20 - 0x27)
         idt[0x20].set_handler_fn(timer_handler); // int 32
         idt[0x21].set_handler_fn(keyboard_handler); // int 33
+        
+        idt[0x22].set_handler_fn(irq_0x22_handler); 
+        idt[0x23].set_handler_fn(irq_0x23_handler); 
+        idt[0x24].set_handler_fn(irq_0x24_handler); 
+        idt[0x25].set_handler_fn(irq_0x25_handler); 
+        idt[0x26].set_handler_fn(irq_0x26_handler); 
+
         idt[0x27].set_handler_fn(spurious_interrupt_handler); 
 
-        //if interrupt is correct, will send to rtc_handler function rtc-test
+
+        // SLAVE PIC starts here (0x28 - 0x2E)        
         idt[0x28].set_handler_fn(rtc_handler);
-        idt[0x2e].set_handler_fn(primary_ata);
+
+        idt[0x29].set_handler_fn(irq_0x29_handler); 
+        idt[0x2A].set_handler_fn(irq_0x2A_handler); 
+        idt[0x2B].set_handler_fn(irq_0x2B_handler); 
+        idt[0x2C].set_handler_fn(irq_0x2C_handler); 
+        idt[0x2D].set_handler_fn(irq_0x2D_handler); 
+
+
+        idt[0x2E].set_handler_fn(primary_ata);
 
 
         // TODO: add more 
@@ -311,6 +329,7 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
              stack_frame.instruction_pointer,
              stack_frame);
 
+    loop {}
 }
 
 
@@ -363,39 +382,108 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 
 // 0x20
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    // this is how to write something with literally ZERO locking
-    // TODO: FIXME: establish non-locking debug messages, with compile-time string literals only!
-    // we still do not know how to print runtime values without locking, due to the format!() macro needing allocation.
-    // ::drivers::serial_port::serial_out("\n\x1b[33m[W] TIMER! \x1b[0m\n");
-
-    // we must acknowledge the interrupt first before handling it, which will cause a context switch
-	unsafe { PIC.notify_end_of_interrupt(0x20); }
-    //time_tools::return_ticks();
 
     pit_clock::handle_timer_interrupt();
+
+	unsafe { PIC.notify_end_of_interrupt(0x20); }
 }
 
 
 // 0x21
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
-    let mut scan_code: u8 = { 
+    let scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
 	// trace!("KBD: {:?}", scan_code);
 
-
     keyboard::handle_keyboard_input(scan_code);	
+
     unsafe { PIC.notify_end_of_interrupt(0x21); }
-    
 }
 
 
 static MASTER_PIC_CMD_REG: Port<u8>  = Port::new(0x20);
 static SLAVE_PIC_CMD_REG: Port<u8>  = Port::new(0xA0);
-//0x27
+pub static mut SPURIOUS_COUNT: u64 = 0;
+
+/// The Spurious interrupt handler. 
+/// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
+/// I believe the problem is something to do with still using the antiquated PIC (instead of APIC)
+/// on an SMP system with only one CPU core.
+/// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html
+/// Thus, for now, we will basically just ignore/ack it, but ideally this will no longer happen
+/// when we transition from PIC to APIC, and disable the PIC altogether. 
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     // println_unsafe!("\nSPURIOUS IRQ");
+    unsafe { SPURIOUS_COUNT += 1; }
+
+    unsafe {
+        // The ISR register indicates which interrupts are currently being serviced
+        // The IRR register indicates which interrupts have currently been raised (and are pending)
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        // println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    // master_isr, master_irr, slave_isr, slave_irr);
+        
+
+        // TODO FIXME: NOTE: so right now this fixes it on real hardware.
+        // i think it's because the irr is 0x1, which means that the PIC is trying to say that IRQ 0 (bit position 0 is set)
+        // has been raised, and we need to ack it. So when I ack it here, it works. 
+        // Need to try it with PIT unmasked and enabled.
+
+        // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
+        // (pretty sure this will never happen)
+        // if it was a real IRQ7, we do need to ack it by sending an EOI
+        if master_isr & 0x80 == 0x80 {
+            println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
+            PIC.notify_end_of_interrupt(0x27);
+        }
+        else {
+            // do nothing. Do not send an EOI.
+        }
+    }
+}
+
+
+
+//0x28
+extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
+    // because we use the RTC interrupt handler for context switching,
+    // we must ack the interrupt before calling the handler, because the handler will not return.
+
+    rtc::rtc_ack_irq();
+    unsafe { PIC.notify_end_of_interrupt(0x28); }
+    
+    rtc::handle_rtc_interrupt();
+}
+
+
+//0x2e
+extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
+    unsafe { PIC.notify_end_of_interrupt(0x2e); }
+
+    //let placeholder = 2;
+    
+    ata_pio::handle_primary_interrupt();
+}
+
+
+extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("caught unhandled interrupt: {:#?}", stack_frame);
 
     unsafe {
         const IRR_CMD: u8 = 0x0A;
@@ -412,67 +500,272 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
         let slave_irr = SLAVE_PIC_CMD_REG.read();
 
 
-        // println_unsafe!("\nSpurious interrupt handler:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
-        //                             master_isr, master_irr, slave_isr, slave_irr);
-        
-        // println_unsafe!("    acking spurious irq 0x20 (PIT timer)\n");
-        PIC.notify_end_of_interrupt(0x20);
-        // TODO FIXME: NOTE: so right now this fixes it on real hardware.
-        // i think it's because the irr is 0x1, which means that the PIC is trying to say that IRQ 0 (bit position 0 is set)
-        // has been raised, and we need to ack it. So when I ack it here, it works. 
-        // Need to try it with PIT unmasked and enabled.
-
-        return;
-
-        loop {
-            unimplemented!();
-        }
-
-        if master_isr & 0x80 == 0x80 {
-            PIC.notify_end_of_interrupt(0x27);
-        }
-        else {
-            // do nothing
-        }
+        println_unsafe!("\nUnimplemented irq:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
     }
-
-	// TODO: handle this
-	/* When any IRQ7 is received, simply read the In-Service Register
-		 outb(0x20, 0x0B); unsigned char irr = inb(0x20);
-		and check if bit 7
-		irr & 0x80
-		is set. If it isn't, then return from the interrupt without sending an EOI.
-	*/
-}
-
-
-
-//0x28
-extern "x86-interrupt" fn rtc_handler(stack_frame: &mut ExceptionStackFrame ) {
-    unsafe { PIC.notify_end_of_interrupt(0x28); }
-
-    //let placeholder = 2;
-    //trace!("wow");
-    rtc::handle_rtc_interrupt();
-
-    
-
-}
-
-//0x2e
-extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
-    unsafe { PIC.notify_end_of_interrupt(0x2e); }
-
-    //let placeholder = 2;
-    
-    ata_pio::handle_primary_interrupt();
-
-    
-
-}
-
-extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("caught unhandled interrupt: {:#?}", stack_frame);
 
     loop { }
 }
+
+
+
+
+
+
+
+extern "x86-interrupt" fn irq_0x22_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x22 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+extern "x86-interrupt" fn irq_0x23_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x23 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+extern "x86-interrupt" fn irq_0x24_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x24 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+extern "x86-interrupt" fn irq_0x25_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x25 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+
+extern "x86-interrupt" fn irq_0x26_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x26 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+extern "x86-interrupt" fn irq_0x29_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x29 interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+
+
+extern "x86-interrupt" fn irq_0x2A_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x2A interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+
+extern "x86-interrupt" fn irq_0x2B_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x2B interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+
+extern "x86-interrupt" fn irq_0x2C_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x2C interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+
+
+extern "x86-interrupt" fn irq_0x2D_handler(stack_frame: &mut ExceptionStackFrame) {
+	println_unsafe!("\nCaught 0x2D interrupt: {:#?}", stack_frame);
+
+    unsafe {
+        const IRR_CMD: u8 = 0x0A;
+        const ISR_CMD: u8 = 0x0B;
+
+        MASTER_PIC_CMD_REG.write(ISR_CMD);
+        SLAVE_PIC_CMD_REG.write(ISR_CMD);
+        let master_isr = MASTER_PIC_CMD_REG.read();
+        let slave_isr = SLAVE_PIC_CMD_REG.read();
+
+        MASTER_PIC_CMD_REG.write(IRR_CMD);
+        SLAVE_PIC_CMD_REG.write(IRR_CMD);
+        let master_irr = MASTER_PIC_CMD_REG.read();
+        let slave_irr = SLAVE_PIC_CMD_REG.read();
+
+
+        println_unsafe!("Details:  master isr={:#b} irr={:#b}, slave isr={:#b}, irr={:#b}", 
+                                    master_isr, master_irr, slave_isr, slave_irr);
+    }
+
+    loop { }
+}
+

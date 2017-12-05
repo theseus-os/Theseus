@@ -215,7 +215,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     drivers::early_init();
 
 
-    unsafe{  logger::enable_vga(); }
+    // unsafe{  logger::enable_vga(); }
 
 
     // initialize our interrupts and IDT
@@ -295,7 +295,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if false
+    if true
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -304,7 +304,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // a second duplicate syscall test user task
-    if false
+    if true
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
