@@ -59,7 +59,7 @@ impl<L> Table<L>
     /// returns the address of the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1) as a raw u64 pointer
     fn next_table_address(&self, index: usize) -> Option<usize> {
         let entry_flags = self[index].flags();
-        if entry_flags.contains(PRESENT) && !entry_flags.contains(HUGE_PAGE) {
+        if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE) {
             let table_address = self as *const _ as usize;
             let retval: usize = (table_address << 9) | (index << 12);
             
@@ -97,10 +97,10 @@ impl<L> Table<L>
         where A: FrameAllocator
     {
         if self.next_table(index).is_none() {
-            assert!(!self.entries[index].flags().contains(HUGE_PAGE),
+            assert!(!self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, flags | PRESENT | WRITABLE); // must be PRESENT | WRITABLE
+            self.entries[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

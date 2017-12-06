@@ -31,14 +31,15 @@ impl TemporaryPage {
     /// Maps the temporary page to the given frame in the active table.
     /// Returns the start address of the temporary page.
     pub fn map(&mut self, frame: Frame, active_table: &mut ActivePageTable) -> VirtualAddress {
-        use super::entry::WRITABLE;
+        use super::entry::EntryFlags;
+        // use super::entry::WRITABLE;
 
         // find a free page that is not already mapped, starting from the top of the kernel heap region
         while active_table.translate_page(self.page).is_some() {
             debug!("temporary page (number {:#x}) is already mapped, trying the next lowest Page", self.page.number);
             self.page -= 1;
         }
-        active_table.map_to(self.page, frame, WRITABLE, &mut self.allocator);
+        active_table.map_to(self.page, frame, EntryFlags::WRITABLE, &mut self.allocator);
         self.page.start_address()
     }
 

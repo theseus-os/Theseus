@@ -410,7 +410,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     use heap_irq_safe;
     let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
     let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
-    let heap_flags = paging::WRITABLE;
+    let heap_flags = paging::EntryFlags::WRITABLE;
     let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());

@@ -49,7 +49,7 @@ impl Mapper {
                 let p3_entry = &p3[page.p3_index()];
                 // 1GiB page?
                 if let Some(start_frame) = p3_entry.pointed_frame() {
-                    if p3_entry.flags().contains(HUGE_PAGE) {
+                    if p3_entry.flags().contains(EntryFlags::HUGE_PAGE) {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
@@ -61,7 +61,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if p2_entry.flags().contains(HUGE_PAGE) {
+                        if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -87,7 +87,7 @@ impl Mapper {
         let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
 
         assert!(p1[page.p1_index()].is_unused());
-        p1[page.p1_index()].set(frame, flags | PRESENT);
+        p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
     }
 
     /// maps the given Page to a randomly selected (newly allocated) Frame

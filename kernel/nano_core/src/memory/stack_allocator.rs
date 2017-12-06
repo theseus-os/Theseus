@@ -34,7 +34,7 @@ impl StackAllocator {
         }
 
         // minimum required flag is WRITABLE
-        let flags = if self.usermode { USER_ACCESSIBLE | WRITABLE} else { WRITABLE };
+        let flags = if self.usermode { EntryFlags::USER_ACCESSIBLE | EntryFlags::WRITABLE} else { EntryFlags::WRITABLE };
 
         // clone the range, since we only want to change it on success
         let mut range = self.range.clone();
@@ -65,7 +65,7 @@ impl StackAllocator {
                     start.start_address(),
                     end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
                     flags, 
-                    if flags.contains(USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
+                    if flags.contains(EntryFlags::USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
                 );
 
                 // create a new stack

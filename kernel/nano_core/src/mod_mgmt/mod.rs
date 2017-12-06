@@ -45,7 +45,7 @@ pub fn parse_elf_executable(start_addr: *const u8, size: usize) -> Result<(Vec<E
         }
         let flags = EntryFlags::from_elf_program_flags(prog.flags());
         use memory::*;
-        if !flags.contains(PRESENT) {
+        if !flags.contains(EntryFlags::PRESENT) {
             warn!("Program flags in ELF file wasn't Read, so EntryFlags wasn't PRESENT!!\n{}", prog);
             return Err(());
         }

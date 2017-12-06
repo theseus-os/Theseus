@@ -170,14 +170,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_PAGE_TABLE_INDEX].set(table.p4_frame.clone(), PRESENT | WRITABLE); 
+            self.p4_mut()[RECURSIVE_PAGE_TABLE_INDEX].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[RECURSIVE_PAGE_TABLE_INDEX].set(backup, PRESENT | WRITABLE);
+            p4_table[RECURSIVE_PAGE_TABLE_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
             tlb::flush_all();
         }
 
@@ -229,7 +229,7 @@ impl InactivePageTable {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
 
-            table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), PRESENT | WRITABLE);
+            table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
 
             // start out by copying all the kernel sections into the new inactive table
             table.copy_entry_from_table(active_table.p4(), KERNEL_TEXT_P4_INDEX);
@@ -326,7 +326,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
         // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
         let vga_buffer_virt_addr = 0xb8000 + super::KERNEL_OFFSET;
-        let vga_buffer_flags = WRITABLE;
+        let vga_buffer_flags = EntryFlags::WRITABLE;
         vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr, PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
