@@ -6,6 +6,9 @@ version = "0.1.0"
 [dependencies]
 
 
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
 [dependencies.serial_port]
 path = "../serial_port"
 

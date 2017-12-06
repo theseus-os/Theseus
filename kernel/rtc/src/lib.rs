@@ -260,14 +260,17 @@ use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
 
 
 
-
-
-pub extern "x86-interrupt" fn rtc_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+pub fn rtc_ack_irq() {
     // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
     write_cmos(0x0C);
     read_cmos();
+}
+
+
+pub extern "x86-interrupt" fn rtc_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     // we must acknowledge the interrupt first before handling it, in case the custom func does something like context switch
+    rtc_ack_irq();
     unsafe { outb(0x20, 0x20); outb(0xA0, 0x20); } // equivalent to:  unsafe { PIC.notify_end_of_interrupt(0x28); } 
 
     if let Some(rtc_interrupt_func) = RTC_INTERRUPT_FUNC.try() {

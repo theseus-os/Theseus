@@ -36,6 +36,7 @@ extern crate bit_field;
 extern crate alloc;
 #[macro_use] extern crate collections;
 #[macro_use] extern crate log;
+extern crate xmas_elf;
 //extern crate atomic;
 
 
@@ -66,9 +67,11 @@ extern crate rtc;
 #[macro_use] mod util;
 mod arch;
 #[macro_use] mod task;
+#[macro_use] mod dbus;
 mod memory;
 mod interrupts;
 mod syscall;
+mod mod_mgmt;
 
 
 use spin::RwLockWriteGuard;
@@ -76,8 +79,10 @@ use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard}
 use task::TaskList;
 use collections::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use core::ops::DerefMut;
+use interrupts::tsc;
 use drivers::{ata_pio, pci};
-
+use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -120,11 +125,54 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
+    
+    unsafe{
+        let mut table = get_connection_table().write();
+        let mut connection = table.get_connection(String::from("bus.connection.first"))
+            .expect("Fail to create the first bus connection").write();
+        println!("Create the first connection.");
+
+  //      loop {
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+ //
+  //      }
+        print!("3");
+    }
     1
 }
 
 fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread, arg: {}!!", arg);
+    unsafe {
+        let mut table = get_connection_table().write();
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.second"))
+                .expect("Fail to create the second bus connection").write();
+            println!("Create the second connection.");
+            let message = BusMessage::new(String::from("bus.connection.first"), String::from("This is a message from 2 to 1."));       
+            connection.send(&message);
+        }
+
+        table.match_msg(&String::from("bus.connection.second"));
+
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.first"))
+                .expect("Fail to create the first bus connection").write();
+            println!("Get the first connection.");
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+
+        }
+    }
     2
 }
 
@@ -137,9 +185,9 @@ fn third_thread_main(arg: String) -> String {
 
 fn fourth_thread_main(arg: u64) -> Option<String> {
     println!("Hello from fourth thread, arg: {:?}!!", arg);
-    // String::from("returned None")
     None
 }
+
 
 
 
@@ -167,6 +215,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     drivers::early_init();
 
 
+    // unsafe{  logger::enable_vga(); }
 
 
     // initialize our interrupts and IDT
@@ -201,11 +250,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
 
-    println!("initialization done!");
-
+    println_unsafe!("initialization done! (interrupts enabled?: {})", interrupts::interrupts_enabled());
 	
-	//interrupts::enable_interrupts(); //apparently this line is unecessary
-	println!("enabled interrupts!");
 
 
     // create a second task to test context switching
@@ -224,7 +270,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
-    schedule!();
+    schedule!(); // this automatically enables interrupts right now
 
 
     // the idle thread's (Task 0) busy loop
@@ -236,16 +282,16 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_1"));
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module_2"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_2"));
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -253,24 +299,24 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+        let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
 
     // a second duplicate syscall test user task
     if true
     {
-        debug!("trying out a second system call module");
+        debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
+        let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
 
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-    use test_lib;
-    println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
+    // use test_lib;
+    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
 
 
     loop { 

@@ -8,7 +8,8 @@
 // except according to those terms.
 
 use memory::Frame;
-use multiboot2::ElfSection;
+use multiboot2;
+use xmas_elf;
 
 pub struct Entry(u64);
 
@@ -61,7 +62,7 @@ bitflags! {
 }
 
 impl EntryFlags {
-    pub fn from_elf_section_flags(section: &ElfSection) -> EntryFlags {
+    pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE, ELF_SECTION_EXECUTABLE};
 
         let mut flags = EntryFlags::empty();
@@ -74,6 +75,51 @@ impl EntryFlags {
             flags = flags | WRITABLE;
         }
         if !section.flags().contains(ELF_SECTION_EXECUTABLE) {
+            flags = flags | NO_EXECUTE;
+        }
+
+        flags
+    }
+
+    // pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
+    //     use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+        
+    //     let mut flags = EntryFlags::empty();
+
+    //     if elf_flags & SHF_ALLOC == SHF_ALLOC {
+    //         // section is loaded to memory
+    //         flags = flags | PRESENT;
+    //     }
+    //     if elf_flags & SHF_WRITE == SHF_WRITE {
+    //         flags = flags | WRITABLE;
+    //     }
+    //     if elf_flags & SHF_EXECINSTR == 0 {
+    //         // only mark no execute if the execute flag isn't 1
+    //         flags = flags | NO_EXECUTE;
+    //     }
+
+    //     flags
+    // }
+
+     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+        use xmas_elf::program::{FLAG_R, FLAG_W, FLAG_X};
+        
+        let mut flags = EntryFlags::empty();
+
+        // stupid ass hack because Flags is a private struct
+        // debug!("CHECKING PROG_FLAGS: flags: {:#x} {:?}", prog_flags, prog_flags);
+        let prog_flags: u32 = unsafe { ::core::mem::transmute(prog_flags) };
+        // debug!("CHECKING PROG_FLAGS: flags: {:#x} {:?}", prog_flags, prog_flags);
+
+        if prog_flags & FLAG_R == FLAG_R {
+            // section is loaded to memory
+            flags = flags | PRESENT;
+        }
+        if prog_flags & FLAG_W == FLAG_W {
+            flags = flags | WRITABLE;
+        }
+        if prog_flags & FLAG_X == 0 {
+            // only mark no execute if the execute flag isn't 1
             flags = flags | NO_EXECUTE;
         }
 

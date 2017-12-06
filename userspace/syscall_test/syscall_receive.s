@@ -1,4 +1,6 @@
 BITS 64
+section .data
+    dest db 'receiver'
 
 section .text
 
@@ -10,32 +12,33 @@ section .text
     ; r9  -- fifth argument 
     ; r8  -- sixth argument
     
-    mov rbx, 0
-
 main:
-    mov rax, rbx ; rbx is holding ground/accumulator for syscall num
-    mov rdi, 10
-    mov rsi, 20
-    mov rdx, 30
-    mov r10, 40
-    mov r9 , 50
-    mov r8 , 60
-
+    mov rax, 2 ; syscall #2 is sysrecv
+    
+    mov rdi, dest
+    mov rsi, "default"; rsi is the pointer to the received msg
+    mov rdx, 5
+    mov r10, 8
+    mov r8 , 13
+    mov r9 , 21
+    
     push rbx
-    syscall
-
+    syscall    
     pop rbx
-    add rbx, 1 ; syscall num increments each time for easy tracking
-    mov rcx, 0x40000000
-    ; mov rcx, 0x400000
+  
+    mov rcx, 0x4000000
+    
 
 loopstart:
     
-    add rax,  1
+    ;add rax,  1
 
     dec rcx
     jnz loopstart
+    
+    mov rax, rbx
 
+    
 
     ;  infinite loop
     jmp main

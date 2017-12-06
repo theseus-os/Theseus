@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![no_std] // use core instead of std
 
+#![feature(const_fn)]
+
 
 // use core::cell::RefCell;
 
@@ -22,7 +24,7 @@ static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
 // which is to use complicated data structures to permit simpler logic. 
 
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct KeyboardModifiers {
     pub control: bool,
     pub alt: bool, 
@@ -30,9 +32,20 @@ pub struct KeyboardModifiers {
     pub caps_lock: bool,
     pub num_lock: bool,
 }
+impl KeyboardModifiers {
+    /// Returns a new `KeyboardModifiers` struct with no keys pressed (all false).
+    pub const fn default() -> KeyboardModifiers {
+        KeyboardModifiers {
+            control: false,
+            alt: false,
+            shift: false,
+            caps_lock: false,
+            num_lock: false,
+        }
+    }
+}
 
-
-unsafe impl Sync for KeyboardModifiers {}
+// unsafe impl Sync for KeyboardModifiers {}
 
 
 pub static KEY_RELEASED_OFFSET: u8 = 128;

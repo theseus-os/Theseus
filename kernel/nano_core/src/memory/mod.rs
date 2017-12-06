@@ -284,12 +284,14 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
         let mut count = 0;
         for (i, m) in boot_info.module_tags().enumerate() {
-            debug!("Module: {:?}", m);
-            modules[i] = ModuleArea {
+            // debug!("Module: {:?}", m);
+            let mod_area = ModuleArea {
                 mod_start: m.start_address(), 
                 mod_end:   m.end_address(), 
                 name:      m.name(),
             };
+            debug!("Module: {:?}", mod_area);
+            modules[i] = mod_area;
             count += 1;
         }
         (modules, count)
@@ -405,7 +407,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
 
 /// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
+pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
     let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
     if index < ma_pair.1 {
         Some(&ma_pair.0[index])
@@ -413,6 +415,20 @@ pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
     else {
         None
     }
+}
+
+
+/// returns the `ModuleArea` corresponding to the given module name.
+pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
+    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+    for i in 0..ma_pair.1 {
+        if name == ma_pair.0[i].name() {
+            return Some(&ma_pair.0[i]);
+        }
+    }
+
+    // not found    
+    None
 }
 
 
