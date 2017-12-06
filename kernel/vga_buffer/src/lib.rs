@@ -3,7 +3,6 @@
 //! Adapted from Phillip Opperman's blog os. 
 
 #![no_std]
-#![feature(collections)]
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]

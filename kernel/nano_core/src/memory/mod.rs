@@ -19,8 +19,8 @@ use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
 use alloc::arc::Arc;
-use collections::Vec;
-use collections::string::String;
+use alloc::Vec;
+use alloc::string::String;
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, MAX_MEMORY_AREAS};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 
@@ -380,7 +380,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
 
-    // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
+    // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
 
 
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();

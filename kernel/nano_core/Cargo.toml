@@ -79,7 +79,7 @@ rustflags = ["-C", "link-args=-fPIC", "-C", "relocation-model=pic", "-C", "code-
 [lib]
 # this builds both libtheseus.a and libtheseus.rlib
 # staticlib is required to build a self-contained .a file that we can boot into
-# rlib is for my hopeful attempt to satisfy the collections and other dependencies when building other crates as dylibs
+# rlib is for my hopeful attempt to satisfy the alloc crate and other dependencies when building other crates as dylibs
 
 # we choose rlib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
 # meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it

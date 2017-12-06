@@ -12,7 +12,7 @@
 
 use core::sync::atomic::{Ordering, compiler_fence};
 use interrupts::{AvailableSegmentSelector, get_segment_selector};
-use collections::string::String;
+use alloc::string::String;
 use util::c_str::{c_char, CStr, CString};
 
 

@@ -8,17 +8,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use collections::borrow::{Cow, Borrow, ToOwned};
+use alloc::borrow::{Cow, Borrow, ToOwned};
 use core::cmp::Ordering;
 use core::ptr;
 use core::slice;
-use collections::fmt::{self, Write};
+use alloc::fmt::{self, Write};
 use core::mem;
 use core::ops;
 use core::str::{self, Utf8Error};
 use alloc::boxed::Box;
-use collections::vec::Vec;
-use collections::String;
+use alloc::vec::Vec;
+use alloc::String;
 
 // use error::Error;
 
@@ -1312,7 +1312,7 @@ mod tests {
     use os::raw::c_char;
     use borrow::Cow::{Borrowed, Owned};
     use hash::{Hash, Hasher};
-    use collections::hash_map::DefaultHasher;
+    use alloc::hash_map::DefaultHasher;
 
     #[test]
     fn c_to_rust() {

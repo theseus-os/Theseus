@@ -1,6 +1,6 @@
 use core::ops::DerefMut;
 use alloc::arc::Arc;
-use collections::VecDeque;
+use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeWriteGuard};
 use spin::RwLock;
 

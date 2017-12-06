@@ -8,7 +8,7 @@
 
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
-#![feature(alloc, collections)]
+#![feature(alloc)]
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
@@ -33,8 +33,7 @@ extern crate x86;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
-extern crate alloc;
-#[macro_use] extern crate collections;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 extern crate xmas_elf;
 //extern crate atomic;
@@ -77,7 +76,7 @@ mod mod_mgmt;
 use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
-use collections::string::String;
+use alloc::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ops::DerefMut;
 use interrupts::tsc;
