@@ -1,8 +1,8 @@
 
 use spin::{Once, Mutex, RwLock};
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard};
-use collections::{BTreeMap, Vec};
-use collections::string::String;
+use alloc::{BTreeMap, Vec};
+use alloc::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
 use arch::{pause, ArchTaskState};
@@ -282,7 +282,7 @@ impl TaskList {
     }
 
     /// Get a iterator for the list of contexts.
-    pub fn iter(&self) -> ::collections::btree_map::Iter<TaskId, Arc<RwLock<Task>>> {
+    pub fn iter(&self) -> ::alloc::btree_map::Iter<TaskId, Arc<RwLock<Task>>> {
         self.list.iter()
     }
 

@@ -1,11 +1,11 @@
 #![no_std]
-#![feature(collections)]
+#![feature(alloc)]
 
 #[macro_use] extern crate vga_buffer; // for temp testing on real hardware
 
 extern crate serial_port;
 extern crate log;
-#[macro_use] extern crate collections;
+#[macro_use] extern crate alloc;
 
 use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 

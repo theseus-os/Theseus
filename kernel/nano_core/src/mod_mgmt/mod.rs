@@ -2,7 +2,7 @@ use xmas_elf::ElfFile;
 use xmas_elf::program::Type;
 use core::slice;
 use core::ptr;
-use collections::Vec;
+use alloc::Vec;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags};
 
 

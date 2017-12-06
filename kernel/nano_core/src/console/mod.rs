@@ -1,6 +1,6 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
-use collections::string::String;
+use alloc::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
 use task::TaskList;
 use core::sync::atomic::Ordering;

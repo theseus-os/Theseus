@@ -1,6 +1,6 @@
 
-use collections::string::String;
-use collections::{BTreeMap, VecDeque};
+use alloc::string::String;
+use alloc::{BTreeMap, VecDeque};
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use core::ops::DerefMut;
 use spin::{Once, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
