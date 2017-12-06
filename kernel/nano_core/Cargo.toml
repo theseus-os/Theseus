@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 bit_field = "0.7.0"
-bitflags = "0.7.0"
+bitflags = "1.0"
 multiboot2 = "0.3.2"
 once = "0.3.2"
 rlibc = "1.0.0"
@@ -15,7 +15,7 @@ x86 = "0.8.1"
 atomic = "0.3.4"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-xmas-elf = "0.6.0"
+xmas-elf = { git = "https://github.com/nrc/xmas-elf" } # the crates.io version is out of date right now
 
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed

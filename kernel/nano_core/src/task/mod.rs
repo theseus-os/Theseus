@@ -505,7 +505,7 @@ impl TaskList {
                         // first we need to map the module memory region into our address space, 
                         // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
                         // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-                        let module_flags: EntryFlags = PRESENT;
+                        let module_flags: EntryFlags = EntryFlags::PRESENT;
                         active_table.map_contiguous_frames(module.start_address(), module.size(), 
                                                     module.start_address() as VirtualAddress, // identity mapping
                                                     module_flags, frame_allocator.deref_mut());     
@@ -534,7 +534,7 @@ impl TaskList {
                             for prog in elf_progs.iter() {
                                 // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
                                 debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
-                                let new_flags = prog.vma.flags() | USER_ACCESSIBLE;
+                                let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
                                 mapper.map_contiguous_frames(module.start_address() + prog.offset, prog.vma.size(), 
                                                              prog.vma.start_address(),
                                                              new_flags, frame_allocator.deref_mut());
