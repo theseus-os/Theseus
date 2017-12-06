@@ -31,13 +31,13 @@ pub mod tsc;
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 
-static KERNEL_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
-static KERNEL_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
+static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
+static KERNEL_DATA_SELECTOR:  Once<SegmentSelector> = Once::new();
 static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
-static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
+static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
 
@@ -154,7 +154,7 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 static mut PIC: pic::ChainedPics = unsafe { pic::ChainedPics::new(0x20, 0x28) };
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
-static TSS: Mutex<Option<TaskStateSegment>> = Mutex::new(None);
+static TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
 static GDT: Once<gdt::Gdt> = Once::new();
 
 
@@ -165,7 +165,7 @@ static GDT: Once<gdt::Gdt> = Once::new();
 pub fn tss_set_rsp0(new_value: usize) {
     use x86_64::VirtualAddress;
     if let Some(mut tss) = TSS.try_lock() {
-        tss.as_mut().expect("TSS was None in tss_set_rsp0!").privilege_stack_table[0] = VirtualAddress(new_value);
+        tss.privilege_stack_table[0] = VirtualAddress(new_value);
     }
     else {
         panic!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
@@ -185,17 +185,17 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
     use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
 
-    
-    let mut tss = TSS.lock();
-    *tss = {
-        let mut tss = TaskStateSegment::new();
+
+    // set up TSS and get pointer to it    
+    let tss_ptr: u64 = {
+        let mut tss = TSS.lock();
         // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
         tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
-        Some(tss)
+
+        // get the pointer to the raw TSS structure inside the TSS mutex, required for x86's load tss instruction
+        &*tss as *const _ as u64
     };
-    // get the pointer to the raw TSS structure inside the TSS mutex, required for x86's load tss instruction
-    let tss_ptr: u64 = tss.as_ref().unwrap() as *const _ as u64; 
     
 
     let gdt = GDT.call_once(|| {
