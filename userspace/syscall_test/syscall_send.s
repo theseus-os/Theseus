@@ -9,7 +9,6 @@ msg:    db "sss", 0
 
 section .text
 global  _start
-
 _start:
 
     ; rax -- syscall number

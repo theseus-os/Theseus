@@ -3,6 +3,8 @@ section .data
     dest db 'receiver'
 
 section .text
+global  _start
+_start:
 
     ; rax -- syscall number
     ; rdi -- first argument

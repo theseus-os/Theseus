@@ -1,3 +1,9 @@
+USERSPACE_BUILD_DIR ?= build
+
+.PHONY: all clean
+.DEFAULT_GOAL := all
+
+
 all: test_program.s
 	@mkdir -p ../$(USERSPACE_BUILD_DIR)
 
@@ -6,4 +12,4 @@ all: test_program.s
 	@strip ../$(USERSPACE_BUILD_DIR)/test_program
 
 clean:
-	@rm -rf build
+	@rm -rf ../$(USERSPACE_BUILD_DIR)/test_program*

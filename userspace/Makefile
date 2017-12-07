@@ -1,7 +1,9 @@
-USERSPACE_BUILD_DIR = build
+USERSPACE_BUILD_DIR ?= build
 export  # export this to Makefiles in subdirectories
 
-TOPTARGETS := all clean
+.PHONY: all clean $(SUBDIRS)
+.DEFAULT_GOAL := all
+
 
 # get all the subdirectories for making
 SUBDIRS := $(wildcard */.)
@@ -9,8 +11,9 @@ SUBDIRS := $(wildcard */.)
 SUBDIRS := $(filter-out $(USERSPACE_BUILD_DIR)/., $(SUBDIRS))
 
 
-$(TOPTARGETS): $(SUBDIRS)
+all: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
 
-.PHONY: $(TOPTARGETS) $(SUBDIRS)
+clean:
+	@rm -rf $(USERSPACE_BUILD_DIR)
