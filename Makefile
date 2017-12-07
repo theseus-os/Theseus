@@ -45,7 +45,7 @@ endif
 ### This section has QEMU arguments and configuration
 ###################################################################################################
 
-QEMU_MEMORY ?= 1G
+QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio -cpu Haswell -net none
 
 #drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation

@@ -275,6 +275,46 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
 	
+    // attempt to parse a test kernel module
+    if true {
+        debug!("trying to load the test_lib kernel module");
+        let module = memory::get_module("__k_test_lib").expect("Error: no userspace modules named '__k_test_lib' found!");
+        use kernel_config::memory::address_is_page_aligned;
+        assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+
+
+        // first we need to map the module memory region into our address space, 
+        // so we can then parse the module as an ELF file in the kernel.
+        // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+        {
+            let mmi_ref = task::get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+            let mut kernel_mmi_locked = mmi_ref.lock();
+            // destructure the kernel's MMI so we can access its page table and vmas
+            let memory::MemoryManagementInfo { 
+                page_table: ref mut kernel_page_table, 
+                ..  // don't need to access the kernel's VMA list or stack allocator, we already allocated a kstack above
+            } = *kernel_mmi_locked;
+            let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
+                
+            match kernel_page_table {
+                &mut memory::PageTable::Active(ref mut active_table) => {
+                    let module_flags = memory::EntryFlags::PRESENT;
+                    active_table.map_contiguous_frames(module.start_address(), module.size(), 
+                                        module.start_address() as memory::VirtualAddress, // identity mapping
+                                        module_flags, frame_allocator.deref_mut());  
+            
+                    for i in 0..module.size() {
+                        mod_mgmt::parse_elf_kernel_module(module.start_address() + i, module.size() - i);
+                    }
+                    // now we can unmap the module because we're done reading from it in the ELF parser
+                    active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                }
+                _ => {
+                    panic!("Error getting kernel's active page table to map module.")
+                }
+            }
+        }
+    }
 
     // create and jump to the first userspace thread
     if true
@@ -313,9 +353,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
-
-    // use test_lib;
-    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
 
 
     loop { 
