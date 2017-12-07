@@ -1,5 +1,9 @@
 USERSPACE_BUILD_DIR ?= build
 
+.PHONY: all clean
+.DEFAULT_GOAL := all
+
+
 all: syscall_send.s syscall_receive.s
 	@mkdir -p ../$(USERSPACE_BUILD_DIR)
 
@@ -10,4 +14,5 @@ all: syscall_send.s syscall_receive.s
 	@ld -o ../$(USERSPACE_BUILD_DIR)/syscall_send ../$(USERSPACE_BUILD_DIR)/syscall_send.o
 
 clean:
-	@rm -rf build
+	@rm -rf ../$(USERSPACE_BUILD_DIR)/syscall_send* \
+		../$(USERSPACE_BUILD_DIR)/syscall_receive*

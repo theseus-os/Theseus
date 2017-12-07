@@ -125,14 +125,16 @@ grub-isofiles := build/grub-isofiles
 ### This target builds an .iso OS image from the userspace and kernel.
 $(iso): kernel userspace $(grub_cfg)
 	@rm -rf $(grub-isofiles) 
-### copy userspace build files
+### copy userspace module build files
 	@mkdir -p $(grub-isofiles)/modules
 	@cp userspace/build/* $(grub-isofiles)/modules/
-### copy kernel build files
+### copy kernel module build files
+	@cp kernel/build/* $(grub-isofiles)/modules/
+### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
-	@grub-mkrescue -o $(iso) $(grub-isofiles)  # 2> /dev/null
+	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 	
 
 

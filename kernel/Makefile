@@ -2,9 +2,9 @@
 ### It offers the "all" and "clean" targets only
 
 
-export RUST_TARGET_PATH:="/home/kevin/Dropbox/theseus_os/cfg"
+export RUST_TARGET_PATH:="$(pwd)/../cfg"
 
-KERNEL_BUILD_DIR = build
+KERNEL_BUILD_DIR ?= build
 export  # export this to Makefiles in subdirectories
 
 TOPTARGETS := build clean
@@ -21,7 +21,7 @@ default: build ;
 
 $(TOPTARGETS): $(SUBDIRS)
 $(SUBDIRS): 
-	@echo "\nBUILDING $@\n"
+	@echo "\nBUILDING $@"
 ## If a directory has a Makefile, then we call it. Otherwise, we invoke cargo build. 
 	@if [ -f $@/Makefile ]; then \
 		$(MAKE) -C $@ $(MAKECMDGOALS);  \
