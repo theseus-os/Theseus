@@ -155,3 +155,23 @@ clean:
 	@$(MAKE) -C userspace clean
 	
 
+
+help: 
+	@echo -e "\nThe following make targets are available:"
+	@echo -e "  run:"
+	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
+	@echo -e "  debug:"
+	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+	@echo -e "  gdb:"
+	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
+	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+	@echo -e "  boot:"
+	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
+	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
+	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "\nThe following options are available for QEMU:"
+	@echo -e "  int=yes:"
+	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+	@echo -e "\t Only relevant for QEMU targets like 'run' and 'debug'."
+	@echo ""
