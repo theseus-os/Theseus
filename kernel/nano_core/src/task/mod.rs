@@ -22,6 +22,12 @@ type AtomicTaskId = AtomicUsize;
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
 
+/// returns the kernel's `MemoryManagementInfo`, if initialized.
+/// If not, it returns None.
+pub fn get_kernel_mmi_ref() -> Option<Arc<Mutex<MemoryManagementInfo>>> {
+    KERNEL_MMI.try().map( |r| r.clone())
+}
+
 /// The `TaskId` of the currently executing `Task`
 static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
 pub fn get_current_task_id() -> TaskId {
@@ -510,7 +516,7 @@ impl TaskList {
                                                     module.start_address() as VirtualAddress, // identity mapping
                                                     module_flags, frame_allocator.deref_mut());     
                         use mod_mgmt;
-                        let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as *const u8, module.size()).unwrap();
+                        let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as VirtualAddress, module.size()).unwrap();
                         // now we can unmap the module because we're done reading from it in the ELF parser
                         active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
                         

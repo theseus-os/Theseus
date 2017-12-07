@@ -368,9 +368,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-    // use test_lib;
-    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
-
 
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal

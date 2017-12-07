@@ -1,5 +1,6 @@
 use xmas_elf::ElfFile;
 use xmas_elf::program::Type;
+use xmas_elf::sections::ShType;
 use core::slice;
 use core::ptr;
 use alloc::Vec;
@@ -23,9 +24,11 @@ pub struct ElfProgramSection {
 }
 
 
-/// parses an elf executable file as a slice of bytes starting at the given `start_addr`.
-pub fn parse_elf_executable(start_addr: *const u8, size: usize) -> Result<(Vec<ElfProgramSection>, VirtualAddress), ()> {
-    debug!("Parsing Elf: start_addr {:#x}, size {:#x}({})", start_addr as usize, size, size);
+/// parses an elf executable file as a slice of bytes starting at the given `start_addr`, 
+/// which must be a VirtualAddress currently mapped into the kernel's address space.
+pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(Vec<ElfProgramSection>, VirtualAddress), ()> {
+    debug!("Parsing Elf executable: start_addr {:#x}, size {:#x}({})", start_addr, size, size);
+    let start_addr = start_addr as *const u8;
     if start_addr.is_null() || size < ELF_HEADER_SIZE { 
         return Err(()); 
     }
@@ -63,23 +66,48 @@ pub fn parse_elf_executable(start_addr: *const u8, size: usize) -> Result<(Vec<E
 }
 
 
+pub fn parse_elf_kernel_module(start_addr: VirtualAddress, size: usize) {
+    debug!("Parsing Elf kernel module: start_addr {:#x}, size {:#x}({})", start_addr as usize, size, size);
+    let start_addr = start_addr as *const u8;
+    if start_addr.is_null() || size < ELF_HEADER_SIZE { 
+        // return Err(()); 
+        return;
+    }
 
-// code snippets for analyzing sections in ELF, not programs
-// {
-//     for sec in elf_file.section_iter() {
-//         debug!("Elf Section: {:?}", sec);
-//         debug!("             name {:?} type {:?}", sec.get_name(&elf_file), sec.get_type());
-//         if sec.get_type().unwrap() == ShType::ProgBits {
-//             // map all of the PROGBITS sections
-//             trace!("Found ProgBits section: {:?}", sec.get_name(&elf_file));
-//             let entry_flags = EntryFlags::from_elf_section_flags(sec.flags()); 
-//             sections.push(VirtualMemoryArea::new(sec.address() as usize, sec.size() as usize, entry_flags, sec.get_name(&elf_file).unwrap()));
-//         }
-//     }
+    // SAFE: safe enough, checked for null 
+    let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
+    // debug!("BYTE SLICE: {:?}", byte_slice);
+    let elf_file_result = ElfFile::new(byte_slice);
+    match elf_file_result {
+        Err(msg) => {
+            error!("vaddr {:#x} wasn't the start of an ELF file.", start_addr as usize);
+            return;
+        }
+        Ok(elf_file) => {
+            debug!("Elf File: {:?}\n\n", elf_file);
+            // code snippets for analyzing sections in ELF, not programs
+            {
+                let mut sections: Vec<VirtualMemoryArea> = Vec::new();
+                for sec in elf_file.section_iter() {
+                    debug!("Elf Section: {:?}", sec);
+                    debug!("             name {:?} type {:?}", sec.get_name(&elf_file), sec.get_type());
+                    if sec.get_type().unwrap() == ShType::ProgBits {
+                        // map all of the PROGBITS sections
+                        trace!("Found ProgBits section: {:?}", sec.get_name(&elf_file));
+                        let entry_flags = EntryFlags::from_elf_section_flags(sec.flags()); 
+                        sections.push(VirtualMemoryArea::new(sec.address() as usize, sec.size() as usize, entry_flags, sec.get_name(&elf_file).unwrap()));
+                    }
+                }
 
-//     let entry_point: usize = elf_file.header.pt2.entry_point() as usize;
+                let entry_point: usize = elf_file.header.pt2.entry_point() as usize;
 
 
-//     debug!("Entry_point: {:#x}, new VMAs: {:?}", entry_point, sections);
-//     Ok((entry_point, sections))
-// }
+                debug!("Entry_point: {:#x}, new VMAs: {:?}", entry_point, sections);
+                // Ok((entry_point, sections))
+            }
+        }
+    }
+
+    loop { }
+}
+

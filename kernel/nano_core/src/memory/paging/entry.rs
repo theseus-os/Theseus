@@ -81,25 +81,25 @@ impl EntryFlags {
         flags
     }
 
-    // pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
-    //     use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+    pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
+        use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
         
-    //     let mut flags = EntryFlags::empty();
+        let mut flags = EntryFlags::empty();
 
-    //     if elf_flags & SHF_ALLOC == SHF_ALLOC {
-    //         // section is loaded to memory
-    //         flags = flags | PRESENT;
-    //     }
-    //     if elf_flags & SHF_WRITE == SHF_WRITE {
-    //         flags = flags | WRITABLE;
-    //     }
-    //     if elf_flags & SHF_EXECINSTR == 0 {
-    //         // only mark no execute if the execute flag isn't 1
-    //         flags = flags | NO_EXECUTE;
-    //     }
+        if elf_flags & SHF_ALLOC == SHF_ALLOC {
+            // section is loaded to memory
+            flags = flags | EntryFlags::PRESENT;
+        }
+        if elf_flags & SHF_WRITE == SHF_WRITE {
+            flags = flags | EntryFlags::WRITABLE;
+        }
+        if elf_flags & SHF_EXECINSTR == 0 {
+            // only mark no execute if the execute flag isn't 1
+            flags = flags | EntryFlags::NO_EXECUTE;
+        }
 
-    //     flags
-    // }
+        flags
+    }
 
      pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         use xmas_elf::program::{FLAG_R, FLAG_W, FLAG_X};
