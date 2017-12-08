@@ -22,5 +22,4 @@ rustflags = ["-C", "prefer-dynamic", "-C", "link-args=-fPIC"]
 # , "-C", "panic=abort"
 
 [lib]
-# crate-type = ["rlib"] # "lib" does the same thing I think
-crate-type = ["lib"] # "lib" does the same thing I think
+crate-type = ["rlib"] # "lib" does the same thing I think

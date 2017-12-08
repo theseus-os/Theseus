@@ -29,8 +29,8 @@ all: build
 build: $(nano_core-obj)
 
 clean:
-	@cargo clean
-	@rm -rf build
+	cargo clean
+	rm -rf ./build
 
 
 cargo: 

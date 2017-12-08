@@ -13,6 +13,9 @@ nano_core := kernel/nano_core/build/nano_core-$(arch).bin
 iso := build/theseus-$(arch).iso
 grub_cfg := cfg/grub.cfg
 
+ifeq ($(bypass),yes)
+	BYPASS_RUSTC_CHECK := yes
+endif
 
 
 all: kernel userspace
@@ -27,6 +30,7 @@ RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-09-16
 RUSTC_OUTPUT=$(shell rustc --version)
 
 test_rustc: 	
+ifneq (${BYPASS_RUSTC_CHECK}, yes)
 ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
 	@echo -e "\nError: your rustc version does not match our supported compiler version."
 	@echo -e "To install the proper version of rustc, run the following commands:\n"
@@ -38,7 +42,8 @@ ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
 	@exit 1
 else
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif
+endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
+endif ## BYPASS_RUSTC_CHECK
 
 
 ###################################################################################################
