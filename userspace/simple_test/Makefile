@@ -9,6 +9,7 @@ all: test_program.s
 
 	@nasm -f elf64 test_program.s -o $(USERSPACE_BUILD_DIR)/test_program.o
 	@ld -o $(USERSPACE_BUILD_DIR)/test_program $(USERSPACE_BUILD_DIR)/test_program.o
+	@rm $(USERSPACE_BUILD_DIR)/test_program.o
 	@strip $(USERSPACE_BUILD_DIR)/test_program
 
 clean:
