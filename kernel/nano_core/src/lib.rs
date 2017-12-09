@@ -36,6 +36,7 @@ extern crate bit_field;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 extern crate xmas_elf;
+extern crate rustc_demangle;
 //extern crate atomic;
 
 
@@ -303,9 +304,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
                                         module.start_address() as memory::VirtualAddress, // identity mapping
                                         module_flags, frame_allocator.deref_mut());  
             
-                    for i in 0..module.size() {
-                        mod_mgmt::parse_elf_kernel_module(module.start_address() + i, module.size() - i);
-                    }
+                    mod_mgmt::parse_elf_kernel_crate(module.start_address(), module.size());
                     // now we can unmap the module because we're done reading from it in the ELF parser
                     active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
                 }
