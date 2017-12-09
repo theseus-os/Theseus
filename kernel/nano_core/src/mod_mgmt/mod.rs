@@ -5,13 +5,15 @@ use core::slice;
 use core::ptr;
 use alloc::Vec;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags};
+use rustc_demangle::try_demangle;
 
-
+mod metadata;
+use self::metadata::*;
 
 // Can also try this crate: https://crates.io/crates/goblin
 
-/// the minimum size that an Elf file must be, 52 bytes.
-const ELF_HEADER_SIZE: usize = 52;
+// /// the minimum size that an Elf file must be, 52 bytes.
+// const ELF_HEADER_SIZE: usize = 52;
 
 
 pub struct ElfProgramSection {
@@ -29,7 +31,7 @@ pub struct ElfProgramSection {
 pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(Vec<ElfProgramSection>, VirtualAddress), ()> {
     debug!("Parsing Elf executable: start_addr {:#x}, size {:#x}({})", start_addr, size, size);
     let start_addr = start_addr as *const u8;
-    if start_addr.is_null() || size < ELF_HEADER_SIZE { 
+    if start_addr.is_null() {
         return Err(()); 
     }
 
@@ -66,48 +68,65 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
 }
 
 
-pub fn parse_elf_kernel_module(start_addr: VirtualAddress, size: usize) {
-    debug!("Parsing Elf kernel module: start_addr {:#x}, size {:#x}({})", start_addr as usize, size, size);
+pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize) -> Result<(), &'static str> {
+    debug!("Parsing Elf kernel crate: start_addr {:#x}, size {:#x}({})", start_addr as usize, size, size);
     let start_addr = start_addr as *const u8;
-    if start_addr.is_null() || size < ELF_HEADER_SIZE { 
-        // return Err(()); 
-        return;
+    if start_addr.is_null() {
+        return Err("start_addr for parse_elf_kernel_crate is null!");
     }
 
     // SAFE: safe enough, checked for null 
     let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
     // debug!("BYTE SLICE: {:?}", byte_slice);
-    let elf_file_result = ElfFile::new(byte_slice);
-    match elf_file_result {
-        Err(msg) => {
-            error!("vaddr {:#x} wasn't the start of an ELF file.", start_addr as usize);
-            return;
-        }
-        Ok(elf_file) => {
-            debug!("Elf File: {:?}\n\n", elf_file);
-            // code snippets for analyzing sections in ELF, not programs
-            {
-                let mut sections: Vec<VirtualMemoryArea> = Vec::new();
-                for sec in elf_file.section_iter() {
-                    debug!("Elf Section: {:?}", sec);
-                    debug!("             name {:?} type {:?}", sec.get_name(&elf_file), sec.get_type());
-                    if sec.get_type().unwrap() == ShType::ProgBits {
-                        // map all of the PROGBITS sections
-                        trace!("Found ProgBits section: {:?}", sec.get_name(&elf_file));
-                        let entry_flags = EntryFlags::from_elf_section_flags(sec.flags()); 
-                        sections.push(VirtualMemoryArea::new(sec.address() as usize, sec.size() as usize, entry_flags, sec.get_name(&elf_file).unwrap()));
+    let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
+    // debug!("Elf File: {:?}\n\n", elf_file);
+    {
+        for sec in elf_file.section_iter() {
+            let sec_type = sec.get_type(); 
+            if sec_type.is_err() { continue; }
+
+            match sec_type.unwrap() {
+                ShType::ProgBits => {
+                    // the PROGBITS sections (including .text sections) are what we care about
+                    let size = sec.size(); 
+                    if size == 0 { continue; }
+
+                    const text_prefix: &'static str = ".text.";
+                    let text_prefix_end: usize = text_prefix.len();
+                    if let Ok(name) = sec.get_name(&elf_file) {
+                        if name.starts_with(text_prefix) {
+                            if let Some(name) = name.get(text_prefix_end..) {
+                                let demangled = try_demangle(name);
+                                trace!("Found .text section: {}", sec);
+                                trace!("Found .text section: {:?} {:?}, size={:#x}, start_addr={:#x}", 
+                                        name, demangled, sec.size(), sec.address());
+                                let entry_flags = EntryFlags::from_elf_section_flags(sec.flags()); 
+                            }
+
+                        }
+                    }
+                    else {
+                        warn!("parse_elf_kernel_crate: couldn't get section name!");
+                        continue;
                     }
                 }
-
-                let entry_point: usize = elf_file.header.pt2.entry_point() as usize;
-
-
-                debug!("Entry_point: {:#x}, new VMAs: {:?}", entry_point, sections);
-                // Ok((entry_point, sections))
+                ShType::Rel => {
+                    trace!("Found Rel section: {:?}", sec);
+                    trace!("      Relf data: {:?}", sec.get_data(&elf_file));
+                }
+                ShType::Rela => {
+                    trace!("Found Rela section: {:?}", sec);
+                    trace!("      Rela data: {:?}", sec.get_data(&elf_file));
+                }
+                _ => { 
+                    debug!("Skipping unneeded Elf Section: {:?}", sec);
+                    debug!("         name {:?} type {:?}", sec.get_name(&elf_file), sec.get_type());
+                    continue; 
+                }
             }
         }
     }
 
-    loop { }
+    Err("not doing anything yet!")
 }
 
