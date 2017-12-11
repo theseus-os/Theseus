@@ -15,7 +15,7 @@ x86 = "0.8.1"
 atomic = "0.3.4"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-xmas-elf = { git = "https://github.com/nrc/xmas-elf" } # the crates.io version is out of date right now
+xmas-elf = "0.6.1"
 rustc-demangle = "0.1.5" 
 
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
