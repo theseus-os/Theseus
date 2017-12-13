@@ -135,6 +135,22 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
+
+    pub fn remap(&mut self, page: Page, new_flags: EntryFlags) {
+        use x86_64::instructions::tlb;
+        use x86_64::VirtualAddress;
+
+        let p1 = self.p4_mut()
+            .next_table_mut(page.p4_index())
+            .and_then(|p3| p3.next_table_mut(page.p3_index()))
+            .and_then(|p2| p2.next_table_mut(page.p2_index()))
+            .expect("mapping code does not support huge pages");
+        let frame = p1[page.p1_index()].pointed_frame().expect("remap(): page frame not mapped");
+        p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+
+        tlb::flush(VirtualAddress(page.start_address()));
+    }
+
     pub fn unmap<A>(&mut self, page: Page, _allocator: &mut A)
         where A: FrameAllocator
     {

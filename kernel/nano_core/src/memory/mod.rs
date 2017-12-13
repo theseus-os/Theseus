@@ -14,6 +14,8 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
+pub mod virtual_address_allocator;
+
 
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
@@ -174,6 +176,14 @@ pub struct VirtualMemoryArea {
     size: usize,
     flags: EntryFlags,
     desc: &'static str,
+}
+use core::fmt;
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
+                  self.start, self.size, self.flags, self.desc
+        )
+    }
 }
 
 

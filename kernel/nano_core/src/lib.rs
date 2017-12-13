@@ -23,7 +23,7 @@
 // ------------------------------------
 // ----- EXTERNAL CRATES BELOW --------
 // ------------------------------------
-extern crate rlibc;
+extern crate rlibc; // basic memset/memcpy libc functions
 extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
@@ -293,20 +293,42 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
             // destructure the kernel's MMI so we can access its page table and vmas
             let memory::MemoryManagementInfo { 
                 page_table: ref mut kernel_page_table, 
-                ..  // don't need to access the kernel's VMA list or stack allocator, we already allocated a kstack above
+                vmas: ref kernel_vmas, 
+                ..  // don't need to access the kernel's stack allocator, we already allocated a kstack above
             } = *kernel_mmi_locked;
-            let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
                 
+
+            // // temporarily dumping kernel VMAs
+            // {
+            //     info!("================ KERNEL VMAS ================");
+            //     for vma in kernel_vmas {
+            //         info!("   {}", vma);
+            //     }
+            // }
+
             match kernel_page_table {
                 &mut memory::PageTable::Active(ref mut active_table) => {
                     let module_flags = memory::EntryFlags::PRESENT;
-                    active_table.map_contiguous_frames(module.start_address(), module.size(), 
+                    {
+                        let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
+                        active_table.map_contiguous_frames(module.start_address(), module.size(), 
                                         module.start_address() as memory::VirtualAddress, // identity mapping
                                         module_flags, frame_allocator.deref_mut());  
-            
-                    mod_mgmt::parse_elf_kernel_crate(module.start_address(), module.size());
+                    }
+
+                    let new_crate = mod_mgmt::parse_elf_kernel_crate(module.start_address(), module.size(), module.name(), active_table).unwrap();
+
                     // now we can unmap the module because we're done reading from it in the ELF parser
-                    active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                    {
+                        let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
+                        active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                    }
+
+                    // now let's try to invoke the test_lib function we just loaded
+                    let test_lib_fn_addr = new_crate.text_sections[0].virt_addr;
+                    debug!("test_lib_fn_addr: {:#x}", test_lib_fn_addr);
+                    let test_lib_public: fn(u8) -> u8 = unsafe { core::mem::transmute(test_lib_fn_addr) };
+                    debug!("Called test_lib_fn(25) = {}", test_lib_public(25));
                 }
                 _ => {
                     panic!("Error getting kernel's active page table to map module.")

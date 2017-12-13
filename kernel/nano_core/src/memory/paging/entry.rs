@@ -101,7 +101,7 @@ impl EntryFlags {
         flags
     }
 
-     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+    pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         use xmas_elf::program::{FLAG_R, FLAG_W, FLAG_X};
         
         let mut flags = EntryFlags::empty();

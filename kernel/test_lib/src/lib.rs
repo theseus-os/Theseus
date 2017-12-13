@@ -4,10 +4,17 @@
 // #[macro_use] extern crate vga_buffer; // for println_unsafe!
 // #[macro_use] extern crate log;
 
-pub fn test_lib_func(arg: u8) -> u8 { 
+pub fn test_lib_public(arg: u8) -> u8 { 
 	// warn!("yo in pub func!");
+	// test_lib_private(arg)
 	arg * 10
 }
+
+// #[inline(never)]
+// fn test_lib_private(arg: u8) -> u8 {
+// 	arg * 10
+// }
+
 
 pub struct DeezNuts {
 	item1: u32,

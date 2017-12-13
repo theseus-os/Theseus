@@ -1,6 +1,6 @@
 
-use spin::{Once, Mutex, RwLock};
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard};
+use spin::{Once, RwLock};
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe, RwLockIrqSafeReadGuard};
 use alloc::{BTreeMap, Vec};
 use alloc::string::String;
 use alloc::arc::Arc;
@@ -20,11 +20,11 @@ type AtomicTaskId = AtomicUsize;
 
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
 /// returns the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<Arc<Mutex<MemoryManagementInfo>>> {
+pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
     KERNEL_MMI.try().map( |r| r.clone())
 }
 
@@ -88,8 +88,8 @@ pub struct Task {
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Stack>,
     /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & Mutex because it's shared between other tasks in the same address space
-    pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
+    /// Wrapped in an Arc & MutexIrqSafe because it's shared between other tasks in the same address space
+    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
 }
@@ -337,7 +337,7 @@ impl TaskList {
         assert_has_not_been_called!("init_task_zero was already called once!");
 
         let mmi_ref = KERNEL_MMI.call_once( || {
-            Arc::new(Mutex::new(task_zero_mmi))
+            Arc::new(MutexIrqSafe::new(task_zero_mmi))
         });
 
         let id_zero: TaskId = 0;
@@ -574,7 +574,7 @@ impl TaskList {
 
             assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
             new_task.ustack = ustack;
-            new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
+            new_task.mmi = Some(Arc::new(MutexIrqSafe::new(new_userspace_mmi)));
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
         }
 

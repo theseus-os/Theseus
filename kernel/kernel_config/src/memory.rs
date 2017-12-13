@@ -74,6 +74,7 @@ pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 /// which is where the nano_core itself starts. 
 /// actual value: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
 pub const KERNEL_TEXT_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_TEXT_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+/// The size in bytes, not in pages.
 pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 * 1024 * 1024); // because the KERNEL_OFFSET starts at -2GiB
 
 /// higher-half heap gets 512 GB address range starting at the 509th P4 entry,
