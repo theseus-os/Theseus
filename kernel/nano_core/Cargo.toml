@@ -22,7 +22,6 @@ rustc-demangle = "0.1.5"
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
 
-
 [dependencies.log]
 default-features = false
 version = "0.3.7"

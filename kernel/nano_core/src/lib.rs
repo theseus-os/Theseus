@@ -278,63 +278,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
     // attempt to parse a test kernel module
     if true {
-        debug!("trying to load the test_lib kernel module");
-        let module = memory::get_module("__k_test_lib").expect("Error: no userspace modules named '__k_test_lib' found!");
-        use kernel_config::memory::address_is_page_aligned;
-        assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
-
-
-        // first we need to map the module memory region into our address space, 
-        // so we can then parse the module as an ELF file in the kernel.
-        // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-        {
-            let mmi_ref = task::get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-            let mut kernel_mmi_locked = mmi_ref.lock();
-            // destructure the kernel's MMI so we can access its page table and vmas
-            let memory::MemoryManagementInfo { 
-                page_table: ref mut kernel_page_table, 
-                vmas: ref kernel_vmas, 
-                ..  // don't need to access the kernel's stack allocator, we already allocated a kstack above
-            } = *kernel_mmi_locked;
-                
-
-            // // temporarily dumping kernel VMAs
-            // {
-            //     info!("================ KERNEL VMAS ================");
-            //     for vma in kernel_vmas {
-            //         info!("   {}", vma);
-            //     }
-            // }
-
-            match kernel_page_table {
-                &mut memory::PageTable::Active(ref mut active_table) => {
-                    let module_flags = memory::EntryFlags::PRESENT;
-                    {
-                        let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
-                        active_table.map_contiguous_frames(module.start_address(), module.size(), 
-                                        module.start_address() as memory::VirtualAddress, // identity mapping
-                                        module_flags, frame_allocator.deref_mut());  
-                    }
-
-                    let new_crate = mod_mgmt::parse_elf_kernel_crate(module.start_address(), module.size(), module.name(), active_table).unwrap();
-
-                    // now we can unmap the module because we're done reading from it in the ELF parser
-                    {
-                        let mut frame_allocator = memory::FRAME_ALLOCATOR.try().unwrap().lock();
-                        active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
-                    }
-
-                    // now let's try to invoke the test_lib function we just loaded
-                    let test_lib_fn_addr = new_crate.text_sections[0].virt_addr;
-                    debug!("test_lib_fn_addr: {:#x}", test_lib_fn_addr);
-                    let test_lib_public: fn(u8) -> u8 = unsafe { core::mem::transmute(test_lib_fn_addr) };
-                    debug!("Called test_lib_fn(25) = {}", test_lib_public(25));
-                }
-                _ => {
-                    panic!("Error getting kernel's active page table to map module.")
-                }
-            }
-        }
+        memory::load_kernel_crate("__k_test_lib");
     }
 
     // create and jump to the first userspace thread

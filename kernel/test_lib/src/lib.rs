@@ -4,16 +4,28 @@
 // #[macro_use] extern crate vga_buffer; // for println_unsafe!
 // #[macro_use] extern crate log;
 
-pub fn test_lib_public(arg: u8) -> u8 { 
-	// warn!("yo in pub func!");
-	// test_lib_private(arg)
-	arg * 10
-}
+extern crate kernel_config;
 
 // #[inline(never)]
-// fn test_lib_private(arg: u8) -> u8 {
-// 	arg * 10
+// pub fn test_generic<T>(arg: T) -> T {
+// 	arg
 // }
+
+#[inline(never)]
+pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64, usize) {// , bool) { 
+	// warn!("yo in pub func!");
+	// test_lib_private(arg)
+	// arg * 10
+	let test_u8: u8 = arg;
+	let test_str: &str = "hello";
+	let test_u64: u64 = 5u64;
+	(test_u8, test_str, test_u64, kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
+}
+
+#[inline(never)]
+fn test_lib_private(arg: u8) -> u8 {
+	arg * 10
+}
 
 
 pub struct DeezNuts {
@@ -21,6 +33,7 @@ pub struct DeezNuts {
 	item2: u64,
 }
 impl DeezNuts {
+	#[inline(never)]
 	pub fn new(i1: u32, i2: u64) -> DeezNuts {
 		DeezNuts {
 			item1: i1,

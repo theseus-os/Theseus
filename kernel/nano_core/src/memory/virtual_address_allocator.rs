@@ -7,7 +7,7 @@ use memory::{VirtualAddress, Page, PageIter};
 use spin::Mutex;
 use alloc::LinkedList;
 
-/// A group of pages, much like a hole in other allocators. 
+/// A group of contiguous pages, much like a hole in other allocators. 
 struct Chunk {
 	/// Whether or not this Chunk is currently allocated. If false, it is free.
 	allocated: bool,
@@ -17,8 +17,8 @@ struct Chunk {
 	size_in_pages: usize,
 }
 impl Chunk {
-	fn as_owned_page(&self) -> OwnedPages {
-		OwnedPages {
+	fn as_owned_pages(&self) -> OwnedContiguousPages {
+		OwnedContiguousPages {
 			start: self.start_page,
 			num_pages: self.size_in_pages,
 		}
@@ -26,14 +26,14 @@ impl Chunk {
 }
 
 
-pub struct OwnedPages {
+pub struct OwnedContiguousPages {
 	pub start: Page,
 	pub num_pages: usize,
 }
-impl Drop for OwnedPages {
+impl Drop for OwnedContiguousPages {
     #[inline]
     fn drop(&mut self) {
-        deallocate_pages(self.start.start_address());
+        deallocate_pages(self);
     }
 }
 
@@ -58,7 +58,7 @@ lazy_static!{
 /// Convenience function for allocating pages by giving the number of bytes
 /// rather than the number of pages. It will still allocated whole pages
 /// by rounding up the number of bytes. 
-pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedPages, &'static str> {
+pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedContiguousPages, &'static str> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
 }
@@ -69,7 +69,12 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedPages, &'static 
 /// Allocation is quick, technically O(n) but generally will allocate immediately
 /// because the largest free chunks are stored at the front of the list.
 /// Fragmentation isn't cleaned up until we're out of address space, but not really a big deal.
-pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
+pub fn allocate_pages(num_pages: usize) -> Result<OwnedContiguousPages, &'static str> {
+
+	if num_pages == 0 {
+		return Err("requested to allocate 0 pages...");
+	}
+
 	// the Page where the newly-allocated Chunk starts, which we'll return if successfully allocated.
 	let mut new_start_page: Option<Page> = None;
 
@@ -87,7 +92,7 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 			if remaining_size == 0 {
 				// if the chunk is exactly the right size, just update it in-place as 'allocated'
 				c.allocated = true;
-				return Ok(c.as_owned_page())
+				return Ok(c.as_owned_pages())
 			}
 
 			// here: we have the chunk and we need to split it up into two chunks
@@ -109,7 +114,7 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 			start_page: p,
 			size_in_pages: num_pages,
 		};
-		let ret = new_chunk.as_owned_page();
+		let ret = new_chunk.as_owned_pages();
 		locked_list.push_back(new_chunk);
 		Ok(ret)
 	}
@@ -119,6 +124,6 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 }
 
 
-pub fn deallocate_pages(vaddr: VirtualAddress) -> Result<(), ()> {
+fn deallocate_pages(_pages: &mut OwnedContiguousPages) -> Result<(), ()> {
 	unimplemented!();
 }
