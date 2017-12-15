@@ -1,4 +1,5 @@
 #[macro_use] pub mod int_like;
+#[macro_use] pub mod try_opt;
 
 pub mod c_str;
 

@@ -25,7 +25,6 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
 
-
 [dependencies.log]
 default-features = false
 version = "0.3.7"

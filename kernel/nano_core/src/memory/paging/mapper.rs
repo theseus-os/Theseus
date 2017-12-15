@@ -149,7 +149,7 @@ impl Mapper {
         p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
         tlb::flush(VirtualAddress(page.start_address()));
-    }
+    }   
 
     pub fn unmap<A>(&mut self, page: Page, _allocator: &mut A)
         where A: FrameAllocator

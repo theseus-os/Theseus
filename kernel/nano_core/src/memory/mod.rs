@@ -20,12 +20,12 @@ pub mod virtual_address_allocator;
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
-use alloc::arc::Arc;
 use alloc::Vec;
 use alloc::string::String;
-use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, MAX_MEMORY_AREAS};
+use kernel_config::memory::{PAGE_SIZE, MAX_MEMORY_AREAS};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-
+use task;
+use mod_mgmt::parse_elf_kernel_crate;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
@@ -454,29 +454,98 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 }
 
 
+/// Loads the specified kernel crate into memory, allowing it to be invoked.  
+pub fn load_kernel_crate<S>(module_name: S) -> Result<(), &'static str> where S: Into<String> {
+    let module_name: String = module_name.into();
+    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module_name);
+
+    let module = try!(get_module(module_name.as_ref()));
+    use kernel_config::memory::address_is_page_aligned;
+    assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+
+
+    // first we need to map the module memory region into our address space, 
+    // so we can then parse the module as an ELF file in the kernel.
+    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+    {
+        let mmi_ref = task::get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+        let mut kernel_mmi_locked = mmi_ref.lock();
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            vmas: ref kernel_vmas, 
+            ..  // don't need to access the kernel's stack allocator, we already allocated a kstack above
+        } = *kernel_mmi_locked;
+            
+
+        // // temporarily dumping kernel VMAs
+        // {
+        //     info!("================ KERNEL VMAS ================");
+        //     for vma in kernel_vmas {
+        //         info!("   {}", vma);
+        //     }
+        // }
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let module_flags = EntryFlags::PRESENT;
+                {
+                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                    active_table.map_contiguous_frames(module.start_address(), module.size(), 
+                                    module.start_address() as VirtualAddress, // identity mapping
+                                    module_flags, frame_allocator.deref_mut());  
+                }
+
+                let new_crate = parse_elf_kernel_crate(module.start_address(), module.size(), module.name(), active_table).unwrap();
+
+                // now we can unmap the module because we're done reading from it in the ELF parser
+                {
+                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                    active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                }
+
+                // now let's try to invoke the test_lib function we just loaded
+                use mod_mgmt::metadata::LoadedSection;
+                if let LoadedSection::Text(ref test_lib_fn_sec) = new_crate.sections[0] {
+                    let test_lib_fn_addr = test_lib_fn_sec.virt_addr;
+                    debug!("test_lib_fn_addr: {:#x}", test_lib_fn_addr);
+                    let test_lib_public: fn(u8) -> (u8, &'static str, u64, usize) = unsafe { ::core::mem::transmute(test_lib_fn_addr) };
+                    debug!("Called test_lib_fn(25) = {:?}", test_lib_public(25));
+                }
+            }
+            _ => {
+                panic!("Error getting kernel's active page table to map module.")
+            }
+        }
+    }
+
+    Err("doing nothing yet")
+}
+
+
 /// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
-    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+pub fn get_module_index(index: usize) -> Result<&'static ModuleArea, &'static str> {
+    let ma_pair = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
     if index < ma_pair.1 {
-        Some(&ma_pair.0[index])
+        Ok(&ma_pair.0[index])
     }
     else {
-        None
+        error!("get_module_index(): module index {} out of range {}.", index, ma_pair.1); 
+        Err("module index our of range")
     }
 }
 
 
 /// returns the `ModuleArea` corresponding to the given module name.
-pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+pub fn get_module(name: &str) -> Result<&'static ModuleArea, &'static str> {
+    let ma_pair = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
     for i in 0..ma_pair.1 {
         if name == ma_pair.0[i].name() {
-            return Some(&ma_pair.0[i]);
+            return Ok(&ma_pair.0[i]);
         }
     }
-
-    // not found    
-    None
+    error!("get_module(): module \"{}\" not found!", name);
+    Err("module not found")
 }
 
 
