@@ -4,22 +4,33 @@
 // #[macro_use] extern crate vga_buffer; // for println_unsafe!
 // #[macro_use] extern crate log;
 
-extern crate kernel_config;
+// extern crate kernel_config;
+
+// pub static HELLO_STRING: &'static str = "hello";
+pub const HELLO_STRING: &'static str = "hello";
 
 // #[inline(never)]
 // pub fn test_generic<T>(arg: T) -> T {
 // 	arg
 // }
 
+
+//#[no_mangle]
+//#[inline(never)]
+//pub fn unmangled_fn(arg: u8) -> u8 {
+//	123
+//}
+
+
 #[inline(never)]
-pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64, usize) {// , bool) { 
+pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64) {// , bool) { 
 	// warn!("yo in pub func!");
 	// test_lib_private(arg)
 	// arg * 10
 	let test_u8: u8 = arg;
-	let test_str: &str = "hello";
+	let test_str: &str = HELLO_STRING;
 	let test_u64: u64 = 5u64;
-	(test_u8, test_str, test_u64, kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
+	(test_u8, test_str, test_u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
 }
 
 #[inline(never)]

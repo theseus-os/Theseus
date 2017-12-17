@@ -6,7 +6,7 @@ use core::slice;
 use core::ptr;
 use core::ops::DerefMut;
 use spin::Mutex;
-use alloc::{Vec, String};
+use alloc::{Vec, BTreeMap, String};
 use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
 use memory::virtual_address_allocator::OwnedContiguousPages;
@@ -111,11 +111,17 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
 
     // For us to properly load the ELF file, it must NOT have been stripped,
-    // meaning that it must still have its symbol table section. Otherwise, relocations will not work.  
-    if find_first_section_by_type(&elf_file, ShType::SymTab).is_none() {
-        error!("parse_elf_kernel_crate(): couldn't find symbol table -- is file \"{}\" stripped?", module_name);
-        return Err("no symbol table found -- cannot load!");
-    }
+    // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
+    use xmas_elf::sections::SectionData::SymbolTable64;
+    let symtab_data = match find_first_section_by_type(&elf_file, ShType::SymTab).ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) {
+        Ok(SymbolTable64(symtab)) => Ok(symtab),
+        _ => {
+            error!("parse_elf_kernel_crate(): can't load file: no symbol table found. Was file stripped?");
+            Err("cannot load: no symbol table found. Was file stripped?")
+        }
+    };
+    let symtab = try!(symtab_data);
+    debug!("symtab: {:?}", symtab);
 
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
     // which are text (present | exec), rodata (present | noexec), data (present | writable)
@@ -174,12 +180,12 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
 
     // First, we need to parse all the sections and load the text and data sections
-    let mut sections: Vec<LoadedSection> = Vec::new();
+    let mut loaded_sections: BTreeMap<usize, LoadedSection> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
     let mut text_offset: Option<usize> = None;
     let mut rodata_offset: Option<usize> = None;
     let mut data_offset: Option<usize> = None;
     {
-        for sec in elf_file.section_iter() {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
             // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
             if let Ok(ShType::ProgBits) = sec.get_type() {
                 // skip null section and any empty sections
@@ -197,9 +203,18 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
                     if name.starts_with(TEXT_PREFIX) {
                         if let Some(name) = name.get(text_prefix_end..) {
-                            let demangled: String = demangle(name).to_string();
-                            trace!("Found .text section: {:?} {:?}, size={:#x}",
-                                    name, demangled, sec_size);
+                            let demangled = demangle(name);
+                            let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
+                            let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
+                            let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
+                            let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
+                                .and_then(|index| {
+                                    let hash_start = index + 2 + without_hash.len();
+                                    with_hash.get(hash_start..).map(|s| s.to_string())
+                                }); // + 2 to skip the "::" separator
+                        
+                            trace!("Found .text section: name {:?}, with_hash {:?}, without_hash {:?}, symbol_only {:?}, hash_only {:?}, size={:#x}",
+                                    name, with_hash, without_hash, symbol_only, hash_only, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
                             // let entry_flags = EntryFlags::from_elf_section_flags(sec.flags());
 
@@ -218,15 +233,15 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                     };
                                     dest.copy_from_slice(sec_data);
 
-                                    sections.push( LoadedSection::Text(
-                                        TextSection{
-                                            symbol: demangled.clone(), // FIXME
-                                            abs_symbol: demangled.clone(), // FIXME
-                                            hash: None, // FIXME
+                                    loaded_sections.insert(shndx, 
+                                        LoadedSection::Text(TextSection{
+                                            symbol: symbol_only.unwrap_or(without_hash.clone()),
+                                            abs_symbol: without_hash,
+                                            hash: hash_only,
                                             virt_addr: dest_addr,
                                             size: sec_size,
-                                        }
-                                    ));
+                                        })
+                                    );
                                 }
                                 else {
                                     error!("expected \"Undefined\" data in .text section {}: {:?}", name, sec.get_data(&elf_file));
@@ -239,9 +254,35 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
                         }
                     }
+
                     else if name.starts_with(RODATA_PREFIX) {
-                        warn!("skipping unhandled RODATA section {:?}", sec);
-                        continue; // TODO handle this
+                        if rodata_offset.is_none() {
+                            rodata_offset = Some(sec.offset() as usize);
+                        }
+
+                        if let Ok(ref rp) = rodata_pages {
+                            let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
+
+                            // here: we're ready to copy the data/text section to the proper address
+                            if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
+                                // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                                let dest: &mut [u8] = unsafe {
+                                    slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                                };
+                                dest.copy_from_slice(sec_data);
+
+                                loaded_sections.insert(shndx, 
+                                    LoadedSection::Rodata(RodataSection{
+                                        virt_addr: dest_addr,
+                                        size: sec_size,
+                                    })
+                                );
+                            }
+                            else {
+                                error!("expected \"Undefined\" data in .rodata section {}: {:?}", name, sec.get_data(&elf_file));
+                                return Err("unexpected data in .rodata section");
+                            }
+                        }
                     }
 
                     else if name.starts_with(DATA_PREFIX) {
@@ -266,22 +307,59 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
     // Second, we need to fix up the sections we just loaded with proper relocation info
     for sec in elf_file.section_iter() {
+
         if let Ok(ShType::Rela) = sec.get_type() {
             // skip null section and any empty sections
             let sec_size = sec.size() as usize;
             if sec_size == 0 { continue; }
 
             // offset is the destination 
-            use xmas_elf::sections::SectionData::Rela64;
-            trace!("Found Rela section: {:?}", sec);
-            if let Ok(Rela64(rela_arr)) = sec.get_data(&elf_file) {
-                trace!("      Rela64 data: {:?}", rela_arr);
-                for r in rela_arr {
-                    trace!("      offset: {:#X}, addend: {:#X}, symtab_index: {:#X}, type: {:#X}",
-                                r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type());
-                }
-                    
+            use xmas_elf::sections::SectionData::{Rela32, Rela64};
+            use xmas_elf::symbol_table::Entry;
+            trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info());
 
+            // the target section is where we write the relocation data to.
+            // the source section is where we get the data from. 
+            // There is one target section per rela section, and one source section per entry in this rela section.
+            // The "info" field in the Rela section specifies which section is the target of the relocation.
+            
+            // check if this Rela sections has a valid target section (one that we've already loaded)
+            if let Some(target_sec) = loaded_sections.get(&(sec.info() as usize)) {
+                if let Ok(Rela64(rela_arr)) = sec.get_data(&elf_file) {
+                    for r in rela_arr {
+                        trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {:#X}, type: {:#X}",
+                                r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type());
+
+                        match r.get_type() {
+                            // currently only handling R_X86_64_PC32 relocations
+                            0x2 => {
+                                let dest_offset = r.get_offset() as usize;
+                                let dest_ptr: *mut u32 = (target_sec.virt_addr() + dest_offset) as *mut u32; // this Rela type says we're writing to a 32-bit data chunk
+                                let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
+                                let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
+                                trace!("             relevant section {:?}", source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
+                                let source_sec = try!(loaded_sections.get(&source_sec_shndx).ok_or("Couldn't find source_sec_shndx in loaded_sections"));
+                                let source_val = source_sec.virt_addr().wrapping_add((r.get_addend() as usize)) - (dest_ptr as usize);
+                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr as usize, source_val, source_sec);
+                                unsafe {
+                                    *dest_ptr = source_val as u32;
+                                }
+                            }
+                            _ => {
+                                error!("found unsupported relocation {:?}", r);
+                                return Err("found unsupported relocation type");
+                            }
+                        }   
+                    }
+                }
+                else {
+                    error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                    return Err("Found Rela section that wasn't able to be parsed as Rela64");
+                }
+            }
+            else {
+                warn!("Skipping Rela section {:?} for target section that wasn't loaded!", sec.get_name(&elf_file));
+                continue;
             }
         }
     }
@@ -313,14 +391,34 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
         all_pages
     };
     
+    // extract just the sections from the section map
+    let (_keys, values): (Vec<usize>, Vec<LoadedSection>) = loaded_sections.into_iter().unzip();
 
     Ok(LoadedCrate {
         crate_name: String::from(module_name.get(3..).unwrap()),
-        sections: sections,
+        sections: values,
         owned_pages: all_pages,
     })
 
 }
+
+
+// // check that we  have a valid target section, for now we only care about applying relocations to actual loaded sections, i.e., PROGBITS
+            // {
+            //     let target_sec_symtab_entry: &Entry = &symtab[sec.info() as usize];
+            //     let target_sec_hdr = target_sec_symtab_entry.get_section_header(&elf_file, sec.info() as usize); 
+            //     if let Ok(tsh) = target_sec_hdr {
+            //         if tsh.get_type() != ShType::ProgBits {
+            //             info!("Skipping relocation for non-PROGBITS section {:?}", target_sec_hdr.and_then(|s| s.get_name(&elf_file))))
+            //             continue;
+            //         }
+            //     }
+            //     else {
+            //         warn!("Rela section specified a target section index {} that didn't correspond to a real section!", sec.info());
+            //         continue;
+            //     }
+            // }
+
 
 
 

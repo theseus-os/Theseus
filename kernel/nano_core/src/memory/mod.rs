@@ -504,12 +504,14 @@ pub fn load_kernel_crate<S>(module_name: S) -> Result<(), &'static str> where S:
                     active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
                 }
 
+                println!("NEW CRATE: {:?}", new_crate);
+
                 // now let's try to invoke the test_lib function we just loaded
                 use mod_mgmt::metadata::LoadedSection;
                 if let LoadedSection::Text(ref test_lib_fn_sec) = new_crate.sections[0] {
                     let test_lib_fn_addr = test_lib_fn_sec.virt_addr;
                     debug!("test_lib_fn_addr: {:#x}", test_lib_fn_addr);
-                    let test_lib_public: fn(u8) -> (u8, &'static str, u64, usize) = unsafe { ::core::mem::transmute(test_lib_fn_addr) };
+                    let test_lib_public: fn(u8) -> (u8, &'static str, u64) = unsafe { ::core::mem::transmute(test_lib_fn_addr) };
                     debug!("Called test_lib_fn(25) = {:?}", test_lib_public(25));
                 }
             }

@@ -7,8 +7,8 @@ version = "0.1.0"
 # rlibc = "1.0.0"
 # spin = "0.4.5"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
+#3[dependencies.kernel_config]
+#3path = "../kernel_config"
 
 # [dependencies.log]
 # default-features = false
@@ -23,6 +23,7 @@ path = "../kernel_config"
 [build]
 rustflags = ["-C", "prefer-dynamic", "-C", "link-args=-fPIC"]
 # , "-C", "panic=abort"
+# "-C", "code-model=large"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

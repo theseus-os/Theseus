@@ -26,6 +26,7 @@ impl Chunk {
 }
 
 
+#[derive(Debug)]
 pub struct OwnedContiguousPages {
 	pub start: Page,
 	pub num_pages: usize,
@@ -125,5 +126,7 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedContiguousPages, &'static
 
 
 fn deallocate_pages(_pages: &mut OwnedContiguousPages) -> Result<(), ()> {
-	unimplemented!();
+	warn!("deallocated_pages: trying to dealloc: {:?}", _pages);
+	Err(())
+	// unimplemented!();
 }
