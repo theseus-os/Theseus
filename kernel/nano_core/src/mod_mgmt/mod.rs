@@ -2,6 +2,7 @@ use xmas_elf::ElfFile;
 use xmas_elf::program::Type;
 use xmas_elf::sections::{SectionHeader, SectionData, ShType};
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+use core::mem;
 use core::slice;
 use core::ptr;
 use core::ops::DerefMut;
@@ -11,6 +12,9 @@ use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
 use memory::virtual_address_allocator::OwnedContiguousPages;
 use rustc_demangle::{demangle, try_demangle};
+use kernel_config::memory::{PAGE_SIZE, BYTES_PER_ADDR};
+use goblin::elf::reloc::*;
+
 
 pub mod metadata;
 use self::metadata::*;
@@ -121,7 +125,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
         }
     };
     let symtab = try!(symtab_data);
-    debug!("symtab: {:?}", symtab);
+    // debug!("symtab: {:?}", symtab);
 
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
     // which are text (present | exec), rodata (present | noexec), data (present | writable)
@@ -192,16 +196,15 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                 let sec_size = sec.size() as usize;
                 if sec_size == 0 { continue; }
 
-                const TEXT_PREFIX:   &'static str = ".text.";
-                const RODATA_PREFIX: &'static str = ".rodata.";
-                const DATA_PREFIX:   &'static str = ".data.";
-                let text_prefix_end:   usize = TEXT_PREFIX.len();
-                let rodata_prefix_len: usize = RODATA_PREFIX.len();
-                let data_prefix_len:   usize = DATA_PREFIX.len();
 
                 if let Ok(name) = sec.get_name(&elf_file) {
+               
+                    const TEXT_PREFIX:   &'static str = ".text.";
+                    const RODATA_PREFIX: &'static str = ".rodata.";
+                    const DATA_PREFIX:   &'static str = ".data.";
 
                     if name.starts_with(TEXT_PREFIX) {
+                        let text_prefix_end:   usize = TEXT_PREFIX.len();
                         if let Some(name) = name.get(text_prefix_end..) {
                             let demangled = demangle(name);
                             let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
@@ -215,7 +218,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                         
                             trace!("Found .text section: name {:?}, with_hash {:?}, without_hash {:?}, symbol_only {:?}, hash_only {:?}, size={:#x}",
                                     name, with_hash, without_hash, symbol_only, hash_only, sec_size);
-                            assert!(sec.flags() & (SHF_ALLOC | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
+                            assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
                             // let entry_flags = EntryFlags::from_elf_section_flags(sec.flags());
 
                             if text_offset.is_none() {
@@ -253,12 +256,21 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                 return Err("no text_pages were allocated");
                             }
                         }
+                        else {
+                            error!("Failed to get the .text section's name after \".text.\": {:?}", name);
+                            return Err("Failed to get the .text section's name after \".text.\"!");
+                        }
                     }
 
                     else if name.starts_with(RODATA_PREFIX) {
+                        trace!("Found .rodata section: {:?}", name);
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+                        
                         if rodata_offset.is_none() {
                             rodata_offset = Some(sec.offset() as usize);
                         }
+
+                        // let rodata_prefix_len: usize = RODATA_PREFIX.len();
 
                         if let Ok(ref rp) = rodata_pages {
                             let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
@@ -286,8 +298,53 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                     }
 
                     else if name.starts_with(DATA_PREFIX) {
-                        warn!("skipping unhandled DATA section {:?}", sec);
-                        continue; // TODO handle this
+                        let data_prefix_len:   usize = DATA_PREFIX.len();
+                        if let Some(name) = name.get(data_prefix_len..) {
+                            let demangled = demangle(name);
+                            let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
+                            let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
+                            let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
+                            let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
+                                .and_then(|index| {
+                                    let hash_start = index + 2 + without_hash.len();
+                                    with_hash.get(hash_start..).map(|s| s.to_string())
+                                }); // + 2 to skip the "::" separator
+                        
+                            trace!("Found .data section: name {:?}, with_hash {:?}, without_hash {:?}, symbol_only {:?}, hash_only {:?}, size={:#x}",
+                                    name, with_hash, without_hash, symbol_only, hash_only, sec_size);
+                            assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
+                            
+                            if data_offset.is_none() {
+                                data_offset = Some(sec.offset() as usize);
+                            }
+
+                            if let Ok(ref dp) = data_pages {
+                                let dest_addr = dp.start.start_address() + (sec.offset() as usize) - data_offset.unwrap();
+
+                                // here: we're ready to copy the data/text section to the proper address
+                                if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
+                                    // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                                    let dest: &mut [u8] = unsafe {
+                                        slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                                    };
+                                    dest.copy_from_slice(sec_data);
+
+                                    loaded_sections.insert(shndx, 
+                                        LoadedSection::Data(DataSection{
+                                            symbol: symbol_only.unwrap_or(without_hash.clone()),
+                                            abs_symbol: without_hash,
+                                            hash: hash_only,
+                                            virt_addr: dest_addr,
+                                            size: sec_size,
+                                        })
+                                    );
+                                }
+                                else {
+                                    error!("expected \"Undefined\" data in .data section {}: {:?}", name, sec.get_data(&elf_file));
+                                    return Err("unexpected data in .data section");
+                                }
+                            }
+                        }
                     }
 
                     else {
@@ -330,23 +387,51 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                         trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {:#X}, type: {:#X}",
                                 r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type());
 
+                        // common to all relocations: calculate the relocation destination and get the source section
+                        let dest_offset = r.get_offset() as usize;
+                        let dest_ptr: usize = target_sec.virt_addr() + dest_offset;
+                        let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
+                        let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
+                        trace!("             relevant section {:?}", source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
+                        let source_sec = try!(loaded_sections.get(&source_sec_shndx).ok_or("Couldn't find source_sec_shndx in loaded_sections"));
+                       
+                       
+                       // There is a great, succint table of relocation types here
+                        // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
                         match r.get_type() {
-                            // currently only handling R_X86_64_PC32 relocations
-                            0x2 => {
-                                let dest_offset = r.get_offset() as usize;
-                                let dest_ptr: *mut u32 = (target_sec.virt_addr() + dest_offset) as *mut u32; // this Rela type says we're writing to a 32-bit data chunk
-                                let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
-                                let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
-                                trace!("             relevant section {:?}", source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
-                                let source_sec = try!(loaded_sections.get(&source_sec_shndx).ok_or("Couldn't find source_sec_shndx in loaded_sections"));
-                                let source_val = source_sec.virt_addr().wrapping_add((r.get_addend() as usize)) - (dest_ptr as usize);
-                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr as usize, source_val, source_sec);
+                            R_X86_64_32 => {
+                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
+                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
                                 unsafe {
-                                    *dest_ptr = source_val as u32;
+                                    *(dest_ptr as *mut u32) = source_val as u32;
                                 }
                             }
+                            R_X86_64_64 => {
+                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
+                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                unsafe {
+                                    *(dest_ptr as *mut u64) = source_val as u64;
+                                }
+                            }
+                            R_X86_64_PC32 => {
+                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize) - dest_ptr;
+                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                unsafe {
+                                    *(dest_ptr as *mut u32) = source_val as u32;
+                                }
+                            }
+                            R_X86_64_PC64 => {
+                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize) - dest_ptr;
+                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                unsafe {
+                                    *(dest_ptr as *mut u64) = source_val as u64;
+                                }
+                            }
+                            R_X86_64_GOTPCREL => { 
+                                unimplemented!(); // TODO FIXME we need to create a Global Offset Table
+                            }
                             _ => {
-                                error!("found unsupported relocation {:?}", r);
+                                error!("found unsupported relocation {:?}\n  --> Are you building kernel modules with code-model=large?", r);
                                 return Err("found unsupported relocation type");
                             }
                         }   

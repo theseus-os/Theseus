@@ -7,6 +7,10 @@
 // extern crate kernel_config;
 
 // pub static HELLO_STRING: &'static str = "hello";
+
+pub static mut INT_VALUE: usize = 98765;
+pub static mut OTHER_VAL: u32 = 123;
+
 pub const HELLO_STRING: &'static str = "hello";
 
 // #[inline(never)]
@@ -30,7 +34,9 @@ pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64) {// , bool) {
 	let test_u8: u8 = arg;
 	let test_str: &str = HELLO_STRING;
 	let test_u64: u64 = 5u64;
-	(test_u8, test_str, test_u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
+	unsafe { 
+		(OTHER_VAL as u8, test_str, INT_VALUE as u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
+	}
 }
 
 #[inline(never)]
