@@ -24,6 +24,10 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
+[dependencies.goblin]
+version = "0.0.13"
+default-features = false
+features = ["elf64", "goblin"]
 
 [dependencies.log]
 default-features = false

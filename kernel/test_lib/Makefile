@@ -12,7 +12,7 @@ target ?= $(arch)-theseus
 
 
 MODULE_NAME := $(strip $(shell basename ${PWD}))
-
+RUSTFLAGS += "-C code-model=large"
 
 .PHONY: all build clean cargo
 
@@ -28,7 +28,7 @@ clean:
 cargo: 
 	@echo -e "pwd: \"$(PWD)\", module_name: \"${MODULE_NAME}\""
 	@mkdir -p $(KERNEL_BUILD_DIR)
-	@RUST_TARGET_PATH="${CFG_DIR}" xargo build --release --target $(target)  ## target arg must be a target name, not the file path.
+	@RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS=${RUSTFLAGS} xargo build --release --target $(target)  ## target arg must be a target name, not the file path.
 	@cd target/$(target)/release/ && ar x "lib${MODULE_NAME}.rlib" ## extract object file from .rlib file
 	@cp -v `find ./target/${target}/release/ -name "${MODULE_NAME}*.o"` $(KERNEL_BUILD_DIR)/__k_${MODULE_NAME}.o
 

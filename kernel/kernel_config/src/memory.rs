@@ -78,6 +78,7 @@ pub const KERNEL_TEXT_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_TEXT_P4_IND
 /// The size in bytes, not in pages.
 pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 * 1024 * 1024); // because the KERNEL_OFFSET starts at -2GiB
 
+
 /// higher-half heap gets 512 GB address range starting at the 509th P4 entry,
 /// which is the slot right below the recursive P4 entry (510)
 /// actual value: 0o177777_776_000_000_000_0000, or 0xFFFF_FF00_0000_0000

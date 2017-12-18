@@ -37,7 +37,7 @@ extern crate bit_field;
 #[macro_use] extern crate log;
 extern crate xmas_elf;
 extern crate rustc_demangle;
-//extern crate atomic;
+extern crate goblin;
 
 
 // ------------------------------------
