@@ -98,6 +98,9 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
 pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_name: &str, active_table: &mut ActivePageTable)
     -> Result<LoadedCrate, &'static str>
 {
+    // all kernel module crate names must start with "__k_"
+    const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
+
     debug!("Parsing Elf kernel crate: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
     let start_addr = start_addr as *const u8;
     if start_addr.is_null() {
@@ -105,7 +108,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
         return Err("start_addr for parse_elf_kernel_crate is null!");
     }
     if !module_name.starts_with("__k_") {
-        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with __k_.", module_name);
+        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {}.", module_name, KERNEL_MODULE_NAME_PREFIX);
         return Err("module_name didn't start with __k_");
     }
 
@@ -478,9 +481,10 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     
     // extract just the sections from the section map
     let (_keys, values): (Vec<usize>, Vec<LoadedSection>) = loaded_sections.into_iter().unzip();
+    let kernel_module_name_prefix_end = KERNEL_MODULE_NAME_PREFIX.len();
 
     Ok(LoadedCrate {
-        crate_name: String::from(module_name.get(3..).unwrap()),
+        crate_name: String::from(module_name.get(kernel_module_name_prefix_end..).unwrap()), 
         sections: values,
         owned_pages: all_pages,
     })
