@@ -113,7 +113,7 @@ pub fn enable_rtc_interrupt()
     unsafe{CMOS_WRITE_SETTINGS.lock().write(prev | 0x40)};
 
     
-    enable_interrupts();
+    // enable_interrupts();
 
     trace!("RTC Enabled!");
 
@@ -145,16 +145,21 @@ pub fn change_rtc_frequency(rate: usize){
 
     unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|dividor))};
 
-    enable_interrupts();
+    // enable_interrupts();
     trace!("rtc rate frequency changed!");
 }
 
 
-/// counts interrupts from RTC
-pub fn handle_rtc_interrupt() {
+pub fn rtc_ack_irq() {
     // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
     write_cmos(0x0C);
     read_cmos();
+}
+
+/// counts interrupts from RTC
+pub fn handle_rtc_interrupt() {
+    // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
+    // rtc_ack_irq();  // FIXME: currently doing this in interrupts/mod.rs instead as a test
 
     let ticks = RTC_TICKS.fetch_add(1, Ordering::SeqCst) + 1; // +1 because fetch_add returns previous value
 

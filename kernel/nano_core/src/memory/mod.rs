@@ -19,8 +19,8 @@ use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
 use alloc::arc::Arc;
-use collections::Vec;
-use collections::string::String;
+use alloc::Vec;
+use alloc::string::String;
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, MAX_MEMORY_AREAS};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 
@@ -92,44 +92,6 @@ impl MemoryManagementInfo {
                 // panic, because this should never happen
                 panic!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable!");
                 None
-            }
-        }
-    }
-
-    /// Maps a physical region of memory starting at the given `phys_addr` with the given size 
-    /// into virtual memory at the same identity-mapped VirtualAddress. 
-    /// TODO: support any arbitrary virtual address, not just identity mapping.
-    /// Returns the VirtualAddress that it mapped the given PhysicalAddress to.
-    pub fn map_dma_memory(&mut self, phys_addr: PhysicalAddress, 
-                          size_in_bytes: usize, flags: EntryFlags ) -> VirtualAddress {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, .. } = self;
-        match page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                active_table.identity_map(Frame::containing_address(phys_addr), EntryFlags::default(), &mut *frame_allocator);
-                let virt_addr = phys_addr;
-                vmas.push(VirtualMemoryArea::new(virt_addr, size_in_bytes, flags, "DMA region"));
-                virt_addr
-            }
-            _ => {
-                // panic, because this should never happen
-                panic!("trying to map DMA frame: page_table wasn't an ActivePageTable!");
-            }
-        }
-    }
-
-
-
-    /// Translates a virtual address into a PhysicalAddress using this MMI's active page table.
-    pub fn translate(&mut self, virt_addr: VirtualAddress) -> Option<PhysicalAddress> {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, .. } = self;
-        match page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                active_table.translate(virt_addr)
-            }
-            _ => {
-                // panic, because this should never happen
-                panic!("trying to translate virt_addr: page_table wasn't an ActivePageTable!");
             }
         }
     }
@@ -322,12 +284,14 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
         let mut count = 0;
         for (i, m) in boot_info.module_tags().enumerate() {
-            debug!("Module: {:?}", m);
-            modules[i] = ModuleArea {
+            // debug!("Module: {:?}", m);
+            let mod_area = ModuleArea {
                 mod_start: m.start_address(), 
                 mod_end:   m.end_address(), 
                 name:      m.name(),
             };
+            debug!("Module: {:?}", mod_area);
+            modules[i] = mod_area;
             count += 1;
         }
         (modules, count)
@@ -408,7 +372,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     use heap_irq_safe;
     let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
     let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
-    let heap_flags = paging::WRITABLE;
+    let heap_flags = paging::EntryFlags::WRITABLE;
     let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
@@ -416,7 +380,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
 
-    // HERE: now the heap is set up, we can use dynamically-allocated collections types like Vecs
+    // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
 
 
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
@@ -443,7 +407,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
 
 /// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
+pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
     let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
     if index < ma_pair.1 {
         Some(&ma_pair.0[index])
@@ -451,6 +415,20 @@ pub fn get_module(index: usize) -> Option<&'static ModuleArea> {
     else {
         None
     }
+}
+
+
+/// returns the `ModuleArea` corresponding to the given module name.
+pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
+    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+    for i in 0..ma_pair.1 {
+        if name == ma_pair.0[i].name() {
+            return Some(&ma_pair.0[i]);
+        }
+    }
+
+    // not found    
+    None
 }
 
 
@@ -466,7 +444,7 @@ impl Frame {
         Frame { number: address / PAGE_SIZE }
     }
 
-    pub fn start_address(&self) -> PhysicalAddress {
+    fn start_address(&self) -> PhysicalAddress {
         self.number * PAGE_SIZE
     }
 

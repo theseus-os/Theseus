@@ -8,11 +8,10 @@
 
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
-#![feature(alloc, collections)]
+#![feature(alloc)]
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
-#![feature(drop_types_in_const)] 
 #![feature(compiler_fences)]
 #![no_std]
 
@@ -34,9 +33,9 @@ extern crate x86;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
-extern crate alloc;
-#[macro_use] extern crate collections;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+extern crate xmas_elf;
 //extern crate atomic;
 
 
@@ -59,6 +58,7 @@ extern crate serial_port;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
 extern crate test_lib;
+extern crate rtc;
 
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
@@ -66,19 +66,22 @@ extern crate test_lib;
 #[macro_use] mod util;
 mod arch;
 #[macro_use] mod task;
+#[macro_use] mod dbus;
 mod memory;
 mod interrupts;
 mod syscall;
+mod mod_mgmt;
 
 
 use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
-use collections::string::String;
+use alloc::string::String;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci};
-
+use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -121,11 +124,54 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
+    
+    unsafe{
+        let mut table = get_connection_table().write();
+        let mut connection = table.get_connection(String::from("bus.connection.first"))
+            .expect("Fail to create the first bus connection").write();
+        println!("Create the first connection.");
+
+  //      loop {
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+ //
+  //      }
+        print!("3");
+    }
     1
 }
 
 fn second_thread_main(arg: u64) -> u64  {
     println!("Hello from second thread, arg: {}!!", arg);
+    unsafe {
+        let mut table = get_connection_table().write();
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.second"))
+                .expect("Fail to create the second bus connection").write();
+            println!("Create the second connection.");
+            let message = BusMessage::new(String::from("bus.connection.first"), String::from("This is a message from 2 to 1."));       
+            connection.send(&message);
+        }
+
+        table.match_msg(&String::from("bus.connection.second"));
+
+        {
+            let mut connection = table.get_connection(String::from("bus.connection.first"))
+                .expect("Fail to create the first bus connection").write();
+            println!("Get the first connection.");
+            let obj = connection.receive();
+            if(obj.is_some()){
+                println!("{}", obj.unwrap().data);
+            } else {
+                println!("No message!");
+            }
+
+        }
+    }
     2
 }
 
@@ -138,9 +184,9 @@ fn third_thread_main(arg: String) -> String {
 
 fn fourth_thread_main(arg: u64) -> Option<String> {
     println!("Hello from fourth thread, arg: {:?}!!", arg);
-    // String::from("returned None")
     None
 }
+
 
 
 
@@ -168,6 +214,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     drivers::early_init();
 
 
+    // unsafe{  logger::enable_vga(); }
 
 
     // initialize our interrupts and IDT
@@ -198,69 +245,16 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     let console_queue_producer = console::console_init(task::get_tasklist().write());
 
     // initialize the rest of our drivers
-    pci::set_dma_ports();
     drivers::init(console_queue_producer);
 
 
 
-    println!("initialization done!");
-
-	//interrupts::enable_interrupts(); //apparently this line is unecessary
-	println!("enabled interrupts!");
-    
-    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
-    
-    let ref bus_zero = bus_array[0];
-    let ref slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
-    println!("pci config data {:#x}", pci::pci_read(0,0,0,0x0c));
-    println!("{:?}", bus_zero);
-    // pci::allocate_mem();
-    let data = ata_pio::pio_read(0xE0,0).unwrap();
-    
-    println!("ATA PIO read data: ==========================");
-    for sh in data.iter() {
-        print!("{:#x} ", sh);
-    }
-    println!("=============================================");
-    
-    let paddr = pci::read_from_disk(0xE0,0).unwrap() as usize;
-
-    // TO CHECK PHYSICAL MEMORY:
-    //  In QEMU, press Ctrl + Alt + 2
-    //  xp/x 0x2b5000   
-    //        ^^ substitute the frame_start value
-    // xp means "print physical memory",   /x means format as hex
-
-
-
-    let vaddr: usize = {
-        let tasklist = task::get_tasklist().read();
-        let mut curr_task = tasklist.get_current().unwrap().write();
-        let curr_mmi = curr_task.mmi.as_ref().unwrap();
-        let mut curr_mmi_locked = curr_mmi.lock();
-        use memory::*;
-        let vaddr = curr_mmi_locked.map_dma_memory(paddr, 512, PRESENT | WRITABLE);
-        println!("\n========== VMAs after DMA ============");
-        for vma in curr_mmi_locked.vmas.iter() {
-            println!("    vma: {:?}", vma);
-        }
-        println!("=====================================");
-        vaddr
-    };
-    let dataptr = vaddr as *const u16;
-    let dma_data = unsafe { collections::slice::from_raw_parts(dataptr, 256) };
-    println!("======================DMA read data phys_addr: {:#x}: ==========================", paddr);
-    for i in 0..256 {
-        print!("{:#x} ", dma_data[i]);
-    }
-    println!("\n========================================================");
-    
-    // println!("DMA TEST paddr={:#x}", paddr);
+    println_unsafe!("initialization done! (interrupts enabled?: {})", interrupts::interrupts_enabled());
+	
 
 
     // create a second task to test context switching
-    if false {
+    if true {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let _second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
         { let _second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
@@ -275,28 +269,28 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
-    schedule!();
+    schedule!(); // this automatically enables interrupts right now
 
 
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
 	
-    /*
+
     // create and jump to the first userspace thread
     if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_1"));
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(0).expect("Error: no userspace modules found!");
-        tasklist_mut.spawn_userspace(module, Some("userspace_module_2"));
+        let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
+        tasklist_mut.spawn_userspace(module, Some("test_program_2"));
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -304,24 +298,24 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test"));
+        let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
 
     // a second duplicate syscall test user task
     if true
     {
-        debug!("trying out a second system call module");
+        debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
-        let module = memory::get_module(1).expect("Error: no module 2 found!");
-        tasklist_mut.spawn_userspace(module, Some("syscall_test_2"));
+        let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
+        tasklist_mut.spawn_userspace(module, None);
     }
-    */
+
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-    use test_lib;
-    println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
+    // use test_lib;
+    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
 
 
     loop { 
@@ -354,7 +348,8 @@ fn enable_write_protect_bit() {
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
+#[no_mangle]
+pub extern "C" fn eh_personality() {}
 
 #[cfg(not(test))]
 #[lang = "panic_fmt"]

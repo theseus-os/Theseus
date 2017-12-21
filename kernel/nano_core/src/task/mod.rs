@@ -1,15 +1,15 @@
 
 use spin::{Once, Mutex, RwLock};
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard};
-use collections::{BTreeMap};
-use collections::string::String;
+use alloc::{BTreeMap, Vec};
+use alloc::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
 use arch::{pause, ArchTaskState};
 use alloc::boxed::Box;
 use core::fmt;
 use core::ops::DerefMut;
-use memory::{Stack, ModuleArea, MemoryManagementInfo};
+use memory::{Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 
 #[macro_use] pub mod scheduler;
@@ -85,7 +85,7 @@ pub struct Task {
     /// Wrapped in an Arc & Mutex because it's shared between other tasks in the same address space
     pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
-    pub new_userspace_entry_addr: Option<usize>, 
+    pub new_userspace_entry_addr: Option<VirtualAddress>, 
 }
 
 
@@ -272,7 +272,7 @@ impl TaskList {
     }
 
     /// returns a shared reference to the current `Task`
-    pub fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
+    fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(&CURRENT_TASK.load(Ordering::SeqCst))
     }
 
@@ -282,7 +282,7 @@ impl TaskList {
     }
 
     /// Get a iterator for the list of contexts.
-    pub fn iter(&self) -> ::collections::btree_map::Iter<TaskId, Arc<RwLock<Task>>> {
+    pub fn iter(&self) -> ::alloc::btree_map::Iter<TaskId, Arc<RwLock<Task>>> {
         self.list.iter()
     }
 
@@ -502,10 +502,22 @@ impl TaskList {
 
                         // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
                         assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
-                        let module_flags: EntryFlags = PRESENT | USER_ACCESSIBLE;
-                        let mut new_user_vmas = vec![
-                            VirtualMemoryArea::new(module.start_address(), module.size(), module_flags, module.name())
-                        ];
+                        // first we need to map the module memory region into our address space, 
+                        // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
+                        // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+                        let module_flags: EntryFlags = EntryFlags::PRESENT;
+                        active_table.map_contiguous_frames(module.start_address(), module.size(), 
+                                                    module.start_address() as VirtualAddress, // identity mapping
+                                                    module_flags, frame_allocator.deref_mut());     
+                        use mod_mgmt;
+                        let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as *const u8, module.size()).unwrap();
+                        // now we can unmap the module because we're done reading from it in the ELF parser
+                        active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                        
+                        let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
+
+                        debug!("spawn_userspace [4]: ELF entry point: {:#x}", entry_point);
+                        new_task.new_userspace_entry_addr = Some(entry_point);
 
                         active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
                             /*
@@ -518,9 +530,16 @@ impl TaskList {
                             // map the userspace module into the new address space.
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
                             // debug!("!! mapping userspace module with name: {}", module.name());
-                            mapper.map_contiguous_frames(module.start_address(), module.size(), 
-                                                        module.start_address() as VirtualAddress, // identity mapping
-                                                        module_flags, frame_allocator.deref_mut());
+                            // TODO: FIXME: map the actual elf regions to their proper address, no longer a linear dumb mapping
+                            for prog in elf_progs.iter() {
+                                // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
+                                debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
+                                let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
+                                mapper.map_contiguous_frames(module.start_address() + prog.offset, prog.vma.size(), 
+                                                             prog.vma.start_address(),
+                                                             new_flags, frame_allocator.deref_mut());
+                                new_user_vmas.push(VirtualMemoryArea::new(prog.vma.start_address(), prog.vma.size(), new_flags, prog.vma.desc()));
+                            }
 
                             // allocate a new userspace stack
                             let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
@@ -549,13 +568,7 @@ impl TaskList {
 
             assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
             new_task.ustack = ustack;
-
             new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
-
-            
-            // TODO: when we support ELF, the start address of the module won't just be its identity-mapped first address!
-            debug!("spawn_userspace [4]: module start addr: {:#x}", module.start_address());
-            new_task.new_userspace_entry_addr = Some(module.start_address());
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
         }
 

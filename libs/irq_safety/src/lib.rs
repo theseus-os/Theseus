@@ -1,5 +1,7 @@
-//! Irq-safe locking and 
-//! a high level Rust wrapper.
+//! Irq-safe locking via Mutex and RwLock. 
+//! Identical behavior to the regular `spin` crate's 
+//! Mutex and RwLock, with the added behavior of holding interrupts
+//! for the duration of the Mutex guard. 
 
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 

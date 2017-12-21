@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(const_fn)]
-#![feature(collections)]
 #![feature(alloc)]
 #![feature(drop_types_in_const)]
 
@@ -8,7 +7,6 @@
 #[macro_use] extern crate std;
 
 
-extern crate collections;
 extern crate alloc;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 extern crate spin;

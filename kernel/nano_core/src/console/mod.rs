@@ -1,11 +1,12 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
-use collections::string::String;
+use alloc::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
 use task::TaskList;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use rtc;
 
 
 
@@ -34,7 +35,6 @@ macro_rules! println {
 macro_rules! print {
     ($($arg:tt)*) => ({
             use core::fmt::Write;
-            use collections::String;
             let mut s: String = String::new();
             write!(&mut s, $($arg)*);
             $crate::console::print_to_console(s).unwrap();
@@ -170,9 +170,10 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        debug!("PIT_TICKS={}, RTC_TICKS={}", 
+        debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}", 
                 ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-                ::interrupts::rtc::RTC_TICKS.load(Ordering::Relaxed));
+                rtc::get_rtc_ticks().ok(),
+                unsafe{::interrupts::SPURIOUS_COUNT});
         return; 
     }
 

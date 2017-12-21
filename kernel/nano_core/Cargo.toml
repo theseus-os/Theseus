@@ -5,16 +5,18 @@ version = "0.1.0"
 
 [dependencies]
 bit_field = "0.7.0"
-bitflags = "0.7.0"
+bitflags = "1.0"
 multiboot2 = "0.3.2"
 once = "0.3.2"
 rlibc = "1.0.0"
 spin = "0.4.5"
 volatile = "0.1.0"
 x86 = "0.8.1"
-x86_64 = "0.1.2"
 atomic = "0.3.4"
- 
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+xmas-elf = { git = "https://github.com/nrc/xmas-elf" } # the crates.io version is out of date right now
+
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
@@ -62,8 +64,13 @@ path = "../logger"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.rtc]
+path = "../rtc"
+
 [dependencies.test_lib]
 path = "../test_lib"
+
+
 
 [build]
 rustflags = ["-C", "link-args=-fPIC", "-C", "relocation-model=pic", "-C", "code-model=large"]
@@ -72,7 +79,7 @@ rustflags = ["-C", "link-args=-fPIC", "-C", "relocation-model=pic", "-C", "code-
 [lib]
 # this builds both libtheseus.a and libtheseus.rlib
 # staticlib is required to build a self-contained .a file that we can boot into
-# rlib is for my hopeful attempt to satisfy the collections and other dependencies when building other crates as dylibs
+# rlib is for my hopeful attempt to satisfy the alloc crate and other dependencies when building other crates as dylibs
 
 # we choose rlib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
 # meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it

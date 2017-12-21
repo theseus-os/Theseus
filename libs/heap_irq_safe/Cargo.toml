@@ -10,4 +10,3 @@ spin = "0.4.5"
 [dependencies.irq_safety]
 version = "0.1.1"
 path = "../irq_safety"
-features = ["const_fn"]

@@ -1,14 +1,17 @@
 #![no_std]
-#![feature(collections)]
+#![feature(alloc)]
+
+#[macro_use] extern crate vga_buffer; // for temp testing on real hardware
 
 extern crate serial_port;
 extern crate log;
-#[macro_use] extern crate collections;
+#[macro_use] extern crate alloc;
 
 use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 
 static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
+static mut print_to_vga: bool = false;
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
@@ -40,6 +43,10 @@ impl LogColor {
     }
 }
 
+/// quick dirty hack to trigger printing to vga once it's set up
+pub unsafe fn enable_vga() {
+    print_to_vga = true;
+}
 
 struct Logger;
 
@@ -61,6 +68,11 @@ impl ::log::Log for Logger {
             use serial_port;
             let _ = serial_port::write_fmt_log(color_str, prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
 
+            unsafe {
+                if print_to_vga {
+                    println_unsafe!("{} {}", prefix, record.args().clone());
+                }
+            }
 
             // the old way of doing it, which required an allocation unfortunately, 
             // meaning it couldn't be used before the heap was established. Sad!

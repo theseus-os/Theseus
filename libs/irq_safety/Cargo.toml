@@ -13,3 +13,4 @@ spin = "0.4.5"
 
 [features]
 const_fn = []
+default = ["const_fn"]
