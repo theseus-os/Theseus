@@ -109,44 +109,6 @@ impl MemoryManagementInfo {
             }
         }
     }
-
-    /// Maps a physical region of memory starting at the given `phys_addr` with the given size 
-    /// into virtual memory at the same identity-mapped VirtualAddress. 
-    /// TODO: support any arbitrary virtual address, not just identity mapping.
-    /// Returns the VirtualAddress that it mapped the given PhysicalAddress to.
-    pub fn map_dma_memory(&mut self, phys_addr: PhysicalAddress, 
-                          size_in_bytes: usize, flags: EntryFlags ) -> VirtualAddress {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, .. } = self;
-        match page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                active_table.identity_map(Frame::containing_address(phys_addr), EntryFlags::default(), &mut *frame_allocator);
-                let virt_addr = phys_addr;
-                vmas.push(VirtualMemoryArea::new(virt_addr, size_in_bytes, flags, "DMA region"));
-                virt_addr
-            }
-            _ => {
-                // panic, because this should never happen
-                panic!("trying to map DMA frame: page_table wasn't an ActivePageTable!");
-            }
-        }
-    }
-
-
-
-    /// Translates a virtual address into a PhysicalAddress using this MMI's active page table.
-    pub fn translate(&mut self, virt_addr: VirtualAddress) -> Option<PhysicalAddress> {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, .. } = self;
-        match page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                active_table.translate(virt_addr)
-            }
-            _ => {
-                // panic, because this should never happen
-                panic!("trying to translate virt_addr: page_table wasn't an ActivePageTable!");
-            }
-        }
-    }
 }
 
 
@@ -551,6 +513,20 @@ pub fn get_module(name: &str) -> Result<&'static ModuleArea, &'static str> {
 }
 
 
+/// returns the `ModuleArea` corresponding to the given module name.
+pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
+    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+    for i in 0..ma_pair.1 {
+        if name == ma_pair.0[i].name() {
+            return Some(&ma_pair.0[i]);
+        }
+    }
+
+    // not found    
+    None
+}
+
+
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
@@ -563,7 +539,7 @@ impl Frame {
         Frame { number: address / PAGE_SIZE }
     }
 
-    pub fn start_address(&self) -> PhysicalAddress {
+    fn start_address(&self) -> PhysicalAddress {
         self.number * PAGE_SIZE
     }
 

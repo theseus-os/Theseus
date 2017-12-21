@@ -244,7 +244,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     let console_queue_producer = console::console_init(task::get_tasklist().write());
 
     // initialize the rest of our drivers
-    pci::set_dma_ports();
     drivers::init(console_queue_producer);
 
 
@@ -306,7 +305,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 
     // create a second task to test context switching
-    if false {
+    if true {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
         { let _second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
         { let _second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
@@ -345,7 +344,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
 	
-    /*
+
     // create and jump to the first userspace thread
     if true
     {
@@ -380,7 +379,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
         tasklist_mut.spawn_userspace(module, None);
     }
-    */
+
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
