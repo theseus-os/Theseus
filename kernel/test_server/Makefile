@@ -12,7 +12,7 @@ target ?= $(arch)-theseus
 
 
 MODULE_NAME := $(strip $(shell basename ${PWD}))
-#RUSTFLAGS += "-C code-model=large"
+RUSTFLAGS += "-C code-model=large"
 
 .PHONY: all build clean cargo
 

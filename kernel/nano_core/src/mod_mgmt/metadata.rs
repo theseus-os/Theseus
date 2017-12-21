@@ -1,33 +1,78 @@
 use spin::Mutex;
 use alloc::{Vec, String, BTreeMap};
-use alloc::arc::Arc;
+use alloc::arc::{Arc, Weak};
 use memory::VirtualAddress;
 use memory::virtual_address_allocator::OwnedContiguousPages;
-// use concurrent_hashmap::ConcHashMap;
+
+
+lazy_static! {
+    /// The main metadata structure that contains a tree of all loaded crates.
+    /// Maps a String crate_name to its crate instance.
+    static ref CRATE_TREE: Mutex<BTreeMap<String, LoadedCrate>> = Mutex::new(BTreeMap::new());
+}
+
 
 lazy_static! {
     /// A flat map of all symbols currently loaded into the kernel. 
-    /// Maps a fully-qualified kernel symbol name (String) to its VirtualAddress. 
-    // static ref KERNEL_SYMBOL_TABLE: Arc<ConcHashMap<String, VirtualAddress>> = 
-    //            Arc::new(ConcHashMap::new());
-    static ref KERNEL_SYMBOL_TABLE: Mutex<BTreeMap<String, VirtualAddress>> = 
-            Mutex::new(BTreeMap::new());
+    /// Maps a fully-qualified kernel symbol name (String) to the corresponding `LoadedSection`. 
+    /// Symbols declared as "no_mangle" will appear in the root namespace with no crate prefixex, as expected.
+    static ref SYSTEM_MAP: Mutex<BTreeMap<String, Weak<LoadedSection>>> = Mutex::new(BTreeMap::new());
 }
+
+
+/// simple debugging function
+pub fn dump_symbol_map() -> String {
+    use core::fmt::Write;
+    let mut output: String = String::new();
+    match write!(&mut output, "{:?}", *SYSTEM_MAP.lock()) {
+        Ok(_) => output,
+        _ => String::from("error"),
+    }
+}
+
+
+/// Adds a new crate to the module tree, and adds its symbols to the system map. 
+pub fn add_crate(new_crate: LoadedCrate) {
+    
+    // add all the symbols to the system map
+    {
+        let mut locked_kmap = SYSTEM_MAP.lock();
+        for sec in new_crate.sections.iter() {
+            if let Some(key) = sec.key() {
+                locked_kmap.insert(key, Arc::downgrade(sec));
+            }
+        }
+    }
+    CRATE_TREE.lock().insert(new_crate.crate_name.clone(), new_crate);
+}
+
+
+/// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol String.
+pub fn get_symbol<S: Into<String>>(symbol: S) -> Weak<LoadedSection> {
+    match SYSTEM_MAP.lock().get(&symbol.into()) {
+        Some(sec) => sec.clone(),
+        _ => Weak::default(),
+    }
+}
+
+
+
 
 #[derive(Debug)]
 pub struct LoadedCrate {
     pub crate_name: String,
-    pub sections: Vec<LoadedSection>,
+    pub sections: Vec<Arc<LoadedSection>>,
     pub owned_pages: Vec<OwnedContiguousPages>,
     // crate_dependencies: Vec<LoadedCrate>,
 }
 
 
+
 #[derive(Debug)]
 pub enum LoadedSection{
     Text(TextSection),
-    Rodata(RodataSection), // TODO: add type
-    Data(DataSection),  // TODO: add type
+    Rodata(RodataSection),
+    Data(DataSection),
 }
 impl LoadedSection {
     pub fn virt_addr(&self) -> VirtualAddress {
@@ -42,6 +87,13 @@ impl LoadedSection {
             &LoadedSection::Text(ref text) => text.size,
             &LoadedSection::Rodata(ref rodata) => rodata.size,
             &LoadedSection::Data(ref data) => data.size,
+        }
+    }
+    pub fn key(&self) -> Option<String> {
+        match self {
+            &LoadedSection::Text(ref text) => Some(text.abs_symbol.clone()),
+            &LoadedSection::Rodata(ref rodata) => None,
+            &LoadedSection::Data(ref data) => Some(data.abs_symbol.clone()),
         }
     }
 }
