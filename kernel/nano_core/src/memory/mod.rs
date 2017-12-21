@@ -32,13 +32,25 @@ pub type VirtualAddress = usize;
 
 
 
-/// The one and only frame allocator
+/// The one and only frame allocator, a singleton. 
 pub static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
 
+/// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
     frame_allocator.allocate_frame()
 }
+
+/// The set of physical memory areas as provided by the bootloader.
+/// It cannot be a Vec or other collection because those allocators aren't available yet
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]> = Once::new();
+
+/// The set of modules loaded by the bootloader
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static MODULE_AREAS: Once<([ModuleArea; MAX_MEMORY_AREAS], usize)> = Once::new();
+
+
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -272,14 +284,7 @@ impl VirtualMemoryArea {
 
 
 
-/// The set of physical memory areas as provided by the bootloader.
-/// It cannot be a Vec or other collection because those allocators aren't available yet
-/// we use a max size of 32 because that's the limit of Rust's default array initializers
-static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]> = Once::new();
 
-/// The set of modules loaded by the bootloader
-/// we use a max size of 32 because that's the limit of Rust's default array initializers
-static MODULE_AREAS: Once<([ModuleArea; MAX_MEMORY_AREAS], usize)> = Once::new();
 
 
 /// initializes the virtual memory management system and returns a MemoryManagementInfo instance,
@@ -364,12 +369,14 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
     // init the frame allocator
     let frame_allocator_mutex: &Mutex<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        Mutex::new( AreaFrameAllocator::new(kernel_phys_start as usize,
-                                kernel_phys_end as usize,
-                                boot_info.start_address(),
-                                boot_info.end_address(),
-                                PhysicalMemoryAreaIter::new()
-                    )
+        Mutex::new( 
+            AreaFrameAllocator::new(
+                kernel_phys_start as usize,
+                kernel_phys_end as usize,
+                boot_info.start_address(),
+                boot_info.end_address(),
+                PhysicalMemoryAreaIter::new()
+            )
         )
     });
 
@@ -417,13 +424,13 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
 
 /// Loads the specified kernel crate into memory, allowing it to be invoked.  
-pub fn load_kernel_crate<S>(module_name: S) -> Result<(), &'static str> where S: Into<String> {
-    let module_name: String = module_name.into();
-    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module_name);
-
-    let module = try!(get_module(module_name.as_ref()));
+pub fn load_kernel_crate(module: &ModuleArea) -> Result<(), &'static str> {
+    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
     use kernel_config::memory::address_is_page_aligned;
-    assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+    if !address_is_page_aligned(module.start_address()) {
+        error!("module {} is not page aligned!", module.name());
+        return Err("module was not page aligned");
+    } 
 
 
     // first we need to map the module memory region into our address space, 
@@ -466,16 +473,9 @@ pub fn load_kernel_crate<S>(module_name: S) -> Result<(), &'static str> where S:
                     active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
                 }
 
-                println!("NEW CRATE: {:?}", new_crate);
+                info!("loaded new crate: {:?}", new_crate);
+                ::mod_mgmt::metadata::add_crate(new_crate);
 
-                // now let's try to invoke the test_lib function we just loaded
-                use mod_mgmt::metadata::LoadedSection;
-                if let LoadedSection::Text(ref test_lib_fn_sec) = new_crate.sections[0] {
-                    let test_lib_fn_addr = test_lib_fn_sec.virt_addr;
-                    debug!("test_lib_fn_addr: {:#x}", test_lib_fn_addr);
-                    let test_lib_public: fn(u8) -> (u8, &'static str, u64) = unsafe { ::core::mem::transmute(test_lib_fn_addr) };
-                    debug!("Called test_lib_fn(25) = {:?}", test_lib_public(25));
-                }
             }
             _ => {
                 panic!("Error getting kernel's active page table to map module.")

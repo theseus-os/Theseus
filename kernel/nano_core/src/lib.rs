@@ -278,7 +278,17 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
     // attempt to parse a test kernel module
     if true {
-        memory::load_kernel_crate("__k_test_lib");
+        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap());
+        debug!("{}", mod_mgmt::metadata::dump_symbol_map());
+        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap());
+        debug!("{}", mod_mgmt::metadata::dump_symbol_map());
+
+        // now let's try to invoke the test_server function we just loaded
+        let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func").upgrade().unwrap();
+        debug!("server_func_vaddr: {:#x}", func_sec.virt_addr());
+        let server_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
+        debug!("Called server_func() = {:?}", server_func());
+
     }
 
     // create and jump to the first userspace thread

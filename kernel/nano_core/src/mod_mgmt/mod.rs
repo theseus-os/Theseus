@@ -8,10 +8,10 @@ use core::ptr;
 use core::ops::DerefMut;
 use spin::Mutex;
 use alloc::{Vec, BTreeMap, String};
+use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
 use memory::virtual_address_allocator::OwnedContiguousPages;
-use rustc_demangle::{demangle, try_demangle};
 use kernel_config::memory::{PAGE_SIZE, BYTES_PER_ADDR};
 use goblin::elf::reloc::*;
 
@@ -21,11 +21,6 @@ use self::metadata::*;
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
-
-
-lazy_static! {
-    static ref MODULE_TREE: Mutex<Vec<LoadedCrate>> = Mutex::new(Vec::new());
-}
 
 
 pub struct ElfProgramSegment {
@@ -51,6 +46,8 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
     let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
     let elf_file = try!(ElfFile::new(byte_slice));
     // debug!("Elf File: {:?}", elf_file);
+
+    // TODO FIXME: check elf_file is an executable type 
 
     let mut prog_sects: Vec<ElfProgramSegment> = Vec::new();
     for prog in elf_file.program_iter() {
@@ -94,6 +91,34 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
 //     pub flags: EntryFlags,
 // }
 
+/// A representation of a demangled symbol, e.g., my_crate::module::func_name.
+/// If the symbol wasn't originally mangled, `symbol` == `full`. 
+struct DemangledSymbol {
+    symbol: String,
+    full: String, 
+    hash: Option<String>,
+}
+
+fn demangle_symbol(s: &str) -> DemangledSymbol {
+    use rustc_demangle::demangle;
+    let demangled = demangle(s);
+    let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
+    let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
+    let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
+    let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
+        .and_then(|index| {
+            let hash_start = index + 2 + without_hash.len();
+            with_hash.get(hash_start..).map(|s| s.to_string())
+        }); // + 2 to skip the "::" separator
+    
+    DemangledSymbol {
+        symbol: symbol_only.unwrap_or(without_hash.clone()),
+        full: without_hash,
+        hash: hash_only,
+    }
+}
+
+
 
 pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_name: &str, active_table: &mut ActivePageTable)
     -> Result<LoadedCrate, &'static str>
@@ -116,6 +141,8 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
+
+    // TODO FIXME: check elf_file is a relocatable type 
 
     // For us to properly load the ELF file, it must NOT have been stripped,
     // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
@@ -187,7 +214,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
 
     // First, we need to parse all the sections and load the text and data sections
-    let mut loaded_sections: BTreeMap<usize, LoadedSection> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
+    let mut loaded_sections: BTreeMap<usize, Arc<LoadedSection>> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
     let mut text_offset: Option<usize> = None;
     let mut rodata_offset: Option<usize> = None;
     let mut data_offset: Option<usize> = None;
@@ -209,18 +236,8 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                     if name.starts_with(TEXT_PREFIX) {
                         let text_prefix_end:   usize = TEXT_PREFIX.len();
                         if let Some(name) = name.get(text_prefix_end..) {
-                            let demangled = demangle(name);
-                            let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
-                            let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
-                            let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
-                            let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
-                                .and_then(|index| {
-                                    let hash_start = index + 2 + without_hash.len();
-                                    with_hash.get(hash_start..).map(|s| s.to_string())
-                                }); // + 2 to skip the "::" separator
-                        
-                            trace!("Found .text section: name {:?}, with_hash {:?}, without_hash {:?}, symbol_only {:?}, hash_only {:?}, size={:#x}",
-                                    name, with_hash, without_hash, symbol_only, hash_only, sec_size);
+                            let demangled = demangle_symbol(name);
+                            trace!("Found .text section: name {:?}, with_hash {:?}, size={:#x}", name, demangled.full, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
                             // let entry_flags = EntryFlags::from_elf_section_flags(sec.flags());
 
@@ -240,13 +257,13 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                     dest.copy_from_slice(sec_data);
 
                                     loaded_sections.insert(shndx, 
-                                        LoadedSection::Text(TextSection{
-                                            symbol: symbol_only.unwrap_or(without_hash.clone()),
-                                            abs_symbol: without_hash,
-                                            hash: hash_only,
+                                        Arc::new( LoadedSection::Text(TextSection{
+                                            symbol: demangled.symbol,
+                                            abs_symbol: demangled.full,
+                                            hash: demangled.hash,
                                             virt_addr: dest_addr,
                                             size: sec_size,
-                                        })
+                                        }))
                                     );
                                 }
                                 else {
@@ -287,10 +304,10 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                 dest.copy_from_slice(sec_data);
 
                                 loaded_sections.insert(shndx, 
-                                    LoadedSection::Rodata(RodataSection{
+                                    Arc::new( LoadedSection::Rodata(RodataSection{
                                         virt_addr: dest_addr,
                                         size: sec_size,
-                                    })
+                                    }))
                                 );
                             }
                             else {
@@ -303,18 +320,8 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                     else if name.starts_with(DATA_PREFIX) {
                         let data_prefix_len:   usize = DATA_PREFIX.len();
                         if let Some(name) = name.get(data_prefix_len..) {
-                            let demangled = demangle(name);
-                            let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
-                            let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
-                            let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
-                            let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
-                                .and_then(|index| {
-                                    let hash_start = index + 2 + without_hash.len();
-                                    with_hash.get(hash_start..).map(|s| s.to_string())
-                                }); // + 2 to skip the "::" separator
-                        
-                            trace!("Found .data section: name {:?}, with_hash {:?}, without_hash {:?}, symbol_only {:?}, hash_only {:?}, size={:#x}",
-                                    name, with_hash, without_hash, symbol_only, hash_only, sec_size);
+                            let demangled = demangle_symbol(name);
+                            trace!("Found .data section: name {:?}, with_hash {:?}, size={:#x}", name, demangled.full, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
                             
                             if data_offset.is_none() {
@@ -333,13 +340,13 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                     dest.copy_from_slice(sec_data);
 
                                     loaded_sections.insert(shndx, 
-                                        LoadedSection::Data(DataSection{
-                                            symbol: symbol_only.unwrap_or(without_hash.clone()),
-                                            abs_symbol: without_hash,
-                                            hash: hash_only,
+                                        Arc::new( LoadedSection::Data(DataSection{
+                                            symbol: demangled.symbol,
+                                            abs_symbol: demangled.full,
+                                            hash: demangled.hash,
                                             virt_addr: dest_addr,
                                             size: sec_size,
-                                        })
+                                        }))
                                     );
                                 }
                                 else {
@@ -395,11 +402,24 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                         let dest_ptr: usize = target_sec.virt_addr() + dest_offset;
                         let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
                         let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
-                        trace!("             relevant section {:?}", source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
-                        let source_sec = try!(loaded_sections.get(&source_sec_shndx).ok_or("Couldn't find source_sec_shndx in loaded_sections"));
-                       
-                       
-                       // There is a great, succint table of relocation types here
+                        let source_sec_name = try!(source_sec_entry.get_name(&elf_file));
+                        trace!("             relevant section {:?} -- {:?}", source_sec_name, source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
+                        let source_sec: Arc<LoadedSection> = try!(
+                            loaded_sections.get(&source_sec_shndx).cloned().or_else(|| { 
+                                // the source section was not in this object file, so check our list of loaded external crates 
+                                // do a quick search for the symbol's demangled name in the kernel's symbol map
+                                let demangled = demangle_symbol(source_sec_name);
+                                metadata::get_symbol(demangled.full).upgrade()
+                            })
+                            .ok_or_else(|| {
+                                error!("Could not resolve source section for symbol relocation for symtab[{}] {:?}", source_sec_shndx, source_sec_name);
+                                "Could not resolve source section for symbol relocation"
+                            })
+                        );
+                        
+                        
+
+                        // There is a great, succint table of relocation types here
                         // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
                         match r.get_type() {
                             R_X86_64_32 => {
@@ -480,7 +500,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     };
     
     // extract just the sections from the section map
-    let (_keys, values): (Vec<usize>, Vec<LoadedSection>) = loaded_sections.into_iter().unzip();
+    let (_keys, values): (Vec<usize>, Vec<Arc<LoadedSection>>) = loaded_sections.into_iter().unzip();
     let kernel_module_name_prefix_end = KERNEL_MODULE_NAME_PREFIX.len();
 
     Ok(LoadedCrate {

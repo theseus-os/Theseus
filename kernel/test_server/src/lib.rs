@@ -1,22 +1,12 @@
 #![no_std]
-// #![feature(lang_items)]
 
-// #[macro_use] extern crate vga_buffer; // for println_unsafe!
-// #[macro_use] extern crate log;
 
-// extern crate kernel_config;
+pub mod test;
 
-// pub static HELLO_STRING: &'static str = "hello";
-
-pub static mut INT_VALUE: usize = 98765;
-pub static mut OTHER_VAL: u32 = 123;
-
-pub const HELLO_STRING: &'static str = "hello";
-
-// #[inline(never)]
-// pub fn test_generic<T>(arg: T) -> T {
-// 	arg
-// }
+#[inline(never)]
+pub fn generic_fn<T: Clone>(arg: T) -> T {
+	arg.clone()
+}
 
 
 //#[no_mangle]
@@ -26,23 +16,11 @@ pub const HELLO_STRING: &'static str = "hello";
 //}
 
 
+// pub fn server_func<'a>(arg1: u8, arg2: &'a str) -> (u8, &'a str) {
 #[inline(never)]
-pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64) {// , bool) { 
-	// warn!("yo in pub func!");
-	// test_lib_private(arg)
-	// arg * 10
-	let test_str: &str = HELLO_STRING;
-	let test_u64: u64 = 5u64;
-	unsafe { 
-		(arg as u8, test_str, INT_VALUE as u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
-	}
+pub fn server_func(arg1: u8, arg2: u64) -> (u8, u64) {
+	(test::another_file_fn(arg1), arg2 * 2)
 }
-
-#[inline(never)]
-fn test_lib_private(arg: u8) -> u8 {
-	arg * 10
-}
-
 
 pub struct MyStruct {
 	item1: u32,
