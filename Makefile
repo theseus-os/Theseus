@@ -25,8 +25,8 @@ all: kernel userspace
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.22.0-nightly (fd4bef54a 2017-09-15)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-09-16
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.24.0-nightly (5a2465e2b 2017-12-06)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-12-07
 RUSTC_OUTPUT=$(shell rustc --version)
 
 test_rustc: 	
