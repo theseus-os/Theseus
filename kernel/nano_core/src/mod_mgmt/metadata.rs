@@ -34,12 +34,16 @@ pub fn dump_symbol_map() -> String {
 /// Adds a new crate to the module tree, and adds its symbols to the system map. 
 pub fn add_crate(new_crate: LoadedCrate) {
     
-    // add all the symbols to the system map
+    // add all the global symbols to the system map
     {
         let mut locked_kmap = SYSTEM_MAP.lock();
-        for sec in new_crate.sections.iter() {
+        for sec in new_crate.sections.iter().filter(|s| s.is_global()) {
             if let Some(key) = sec.key() {
-                locked_kmap.insert(key, Arc::downgrade(sec));
+                let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
+                // as of now we don't expect/support replacing a symbol (section) in the system map
+                if old_val.is_some() {
+                    warn!("Unexpected: replacing existing entry in system map: {} -> {:?}", key, old_val);
+                }
             }
         }
     }
@@ -96,6 +100,20 @@ impl LoadedSection {
             &LoadedSection::Data(ref data) => Some(data.abs_symbol.clone()),
         }
     }
+    pub fn is_global(&self) -> bool {
+        match self {
+            &LoadedSection::Text(ref text) => text.global,
+            &LoadedSection::Rodata(ref rodata) => rodata.global,
+            &LoadedSection::Data(ref data) => data.global,
+        }
+    }
+    pub fn set_global(&mut self, is_global: bool) {
+        match self {
+            &mut LoadedSection::Text(ref mut text) => text.global = is_global,
+            &mut LoadedSection::Rodata(ref mut rodata) => rodata.global = is_global,
+            &mut LoadedSection::Data(ref mut data) => data.global = is_global,
+        }
+    }
 }
 
 
@@ -118,6 +136,8 @@ pub struct TextSection {
     pub virt_addr: VirtualAddress,
     /// The size in bytes of this section
     pub size: usize,
+    /// Whether or not this section's symbol was exported globally (is public)
+    pub global: bool,
 }
 
 
@@ -128,6 +148,8 @@ pub struct RodataSection {
     pub virt_addr: VirtualAddress,
     /// The size in bytes of this section
     pub size: usize,
+    /// Whether or not this section's symbol was exported globally (is public)
+    pub global: bool,
 }
 
 
@@ -149,4 +171,6 @@ pub struct DataSection {
     pub virt_addr: VirtualAddress,
     /// The size in bytes of this section
     pub size: usize,
+    /// Whether or not this section's symbol was exported globally (is public)
+    pub global: bool,
 }

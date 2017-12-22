@@ -1,5 +1,5 @@
+use xmas_elf;
 use xmas_elf::ElfFile;
-use xmas_elf::program::Type;
 use xmas_elf::sections::{SectionHeader, SectionData, ShType};
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use core::mem;
@@ -7,7 +7,7 @@ use core::slice;
 use core::ptr;
 use core::ops::DerefMut;
 use spin::Mutex;
-use alloc::{Vec, BTreeMap, String};
+use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
@@ -47,11 +47,20 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
     let elf_file = try!(ElfFile::new(byte_slice));
     // debug!("Elf File: {:?}", elf_file);
 
-    // TODO FIXME: check elf_file is an executable type 
+    // check that elf_file is an executable type 
+    {
+        use xmas_elf::header::Type;
+        let typ = elf_file.header.pt2.type_().as_type();
+        if typ != Type::Executable {
+            error!("parse_elf_executable(): ELF file has wrong type {:?}, must be an Executable Elf File!", typ);
+            return Err("not a relocatable elf file");
+        }
+    } 
 
     let mut prog_sects: Vec<ElfProgramSegment> = Vec::new();
     for prog in elf_file.program_iter() {
         // debug!("   prog: {}", prog);
+        use xmas_elf::program::Type;
         let typ = prog.get_type();
         if typ != Ok(Type::Load) {
             warn!("Program type in ELF file wasn't LOAD, {}", prog);
@@ -142,7 +151,16 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
 
-    // TODO FIXME: check elf_file is a relocatable type 
+    // check that elf_file is a relocatable type 
+    {
+        use xmas_elf::header::Type;
+        let typ = elf_file.header.pt2.type_().as_type();
+        if typ != Type::Relocatable {
+            error!("parse_elf_kernel_crate(): module {} was of type {:?}, must be a Relocatable Elf File!", module_name, typ);
+            return Err("not a relocatable elf file");
+        }
+    } 
+
 
     // For us to properly load the ELF file, it must NOT have been stripped,
     // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
@@ -156,6 +174,25 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     };
     let symtab = try!(symtab_data);
     // debug!("symtab: {:?}", symtab);
+
+    // iterate through the symbol table so we can find which sections are global (publicly visible)
+    // we keep track of them here in a list
+    let global_sections: BTreeSet<usize> = {
+        let mut globals: BTreeSet<usize> = BTreeSet::new();
+        use xmas_elf::symbol_table::Entry;
+        for entry in symtab.iter() {
+            if let Ok(typ) = entry.get_type() {
+                if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                    if let Ok(bind) = entry.get_binding() {
+                        if bind == xmas_elf::symbol_table::Binding::Global {
+                            globals.insert(entry.shndx() as usize);
+                        }
+                    }
+                }
+            }
+        }   
+        globals 
+    };
 
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
     // which are text (present | exec), rodata (present | noexec), data (present | writable)
@@ -263,6 +300,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                             hash: demangled.hash,
                                             virt_addr: dest_addr,
                                             size: sec_size,
+                                            global: global_sections.contains(&shndx),
                                         }))
                                     );
                                 }
@@ -307,6 +345,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                     Arc::new( LoadedSection::Rodata(RodataSection{
                                         virt_addr: dest_addr,
                                         size: sec_size,
+                                        global: global_sections.contains(&shndx),
                                     }))
                                 );
                             }
@@ -346,6 +385,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                             hash: demangled.hash,
                                             virt_addr: dest_addr,
                                             size: sec_size,
+                                            global: global_sections.contains(&shndx),
                                         }))
                                     );
                                 }
@@ -499,6 +539,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
         all_pages
     };
     
+
     // extract just the sections from the section map
     let (_keys, values): (Vec<usize>, Vec<Arc<LoadedSection>>) = loaded_sections.into_iter().unzip();
     let kernel_module_name_prefix_end = KERNEL_MODULE_NAME_PREFIX.len();

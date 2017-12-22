@@ -279,16 +279,21 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // attempt to parse a test kernel module
     if true {
         memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap());
-        debug!("{}", mod_mgmt::metadata::dump_symbol_map());
+        debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
         memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap());
-        debug!("{}", mod_mgmt::metadata::dump_symbol_map());
+        debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
 
         // now let's try to invoke the test_server function we just loaded
         let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func").upgrade().unwrap();
         debug!("server_func_vaddr: {:#x}", func_sec.virt_addr());
-        let server_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
-        debug!("Called server_func() = {:?}", server_func());
+        let server_func: fn(u8, u64) -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
+        debug!("Called server_func(10, 20) = {:?}", server_func(10, 20));
 
+        // now let's try to invoke the test_client function we just loaded
+        let client_func_sec = ::mod_mgmt::metadata::get_symbol("test_client::client_func").upgrade().unwrap();
+        debug!("client_func_vaddr: {:#x}", client_func_sec.virt_addr());
+        let client_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(client_func_sec.virt_addr()) };
+        debug!("Called client_func() = {:?}", client_func());
     }
 
     // create and jump to the first userspace thread
