@@ -1,7 +1,7 @@
 ### This makefile is the top-level build script that builds all the crates in subdirectories 
 ### and combines them into the final OS .iso image.
 ### It also provides convenient targets for running and debugging Theseus and using GDB on your host computer.
-.DEFAULT_GOAL := run
+.DEFAULT_GOAL := all
 SHELL := /bin/bash
 
 .PHONY: all clean run debug iso userspace cargo gdb
@@ -18,7 +18,7 @@ ifeq ($(bypass),yes)
 endif
 
 
-all: kernel userspace
+all: iso
 
 
 ###################################################################################################
@@ -152,7 +152,7 @@ userspace:
 ### this builds all kernel components
 kernel: test_rustc
 	@echo -e "\n======== BUILDING KERNEL ========"
-	@$(MAKE) -C kernel build
+	@$(MAKE) -C kernel all
 
 
 
