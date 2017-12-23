@@ -16,9 +16,7 @@ RUSTFLAGS += "-C code-model=large"
 
 .PHONY: all build clean cargo
 
-all: build
-
-build: cargo
+all: cargo
 
 clean:
 	cargo clean

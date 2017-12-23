@@ -10,10 +10,12 @@ export  # export this to Makefiles in subdirectories
 SUBDIRS := $(wildcard */.)
 # except for the build directory
 SUBDIRS := $(filter-out build/., $(SUBDIRS))
+# build the nano_core separately
+SUBDIRS := $(filter-out nano_core/., $(SUBDIRS))
 
 
-.PHONY: build clean $(SUBDIRS)
-.DEFAULT_GOAL := build 
+.PHONY: all clean $(SUBDIRS) nano_core
+.DEFAULT_GOAL := all 
 
 ## Loops over all subdirectories (except the build dir) and runs make <cmd> in it
 ## Note that while this does build the nano_core, the nano_core's build file does not
@@ -23,14 +25,19 @@ $(SUBDIRS):
 	@if [ -f $@/Makefile ]; then \
 		$(MAKE) -C $@ $(MAKECMDGOALS);  \
 	fi;
-## Otherwise, we're ignoring it for now. 
 
 
-## simply runs make build in all subdirs
-build: $(SUBDIRS) 
+## Build the nano_core separately, which is faster if done either at the beginning or end
+## because of how xargo works: https://github.com/japaric/xargo/issues/86
+nano_core:
+	$(MAKE) -C nano_core $(MAKECMDGOALS)
+
+
+## simply runs make all in all subdirs
+all: $(SUBDIRS) nano_core
 
 
 ## simply runs make clean in all subdirs, then removes the kernel build dir
-clean: $(SUBDIRS)
+clean: $(SUBDIRS) nano_core
 	rm -rf $(KERNEL_BUILD_DIR)
 
