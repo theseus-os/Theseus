@@ -3,12 +3,16 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "test_lib"
 version = "0.1.0"
 
-[dependencies]
+# [dependencies]
 # rlibc = "1.0.0"
 # spin = "0.4.5"
 
-#3[dependencies.kernel_config]
-#3path = "../kernel_config"
+
+[dependencies]
+test_server = { path = "../test_server" }
+
+#[dependencies.kernel_config]
+#path = "../kernel_config"
 
 # [dependencies.log]
 # default-features = false

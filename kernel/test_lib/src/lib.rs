@@ -1,4 +1,9 @@
 #![no_std]
+
+extern crate test_server;
+
+use test_server::*;
+
 // #![feature(lang_items)]
 
 // #[macro_use] extern crate vga_buffer; // for println_unsafe!
@@ -32,9 +37,9 @@ pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64) {// , bool) {
 	// test_lib_private(arg)
 	// arg * 10
 	let test_str: &str = HELLO_STRING;
-	let test_u64: u64 = 5u64;
+	let (test_u8, test_u64) = server_func2(arg, unsafe {INT_VALUE as u64});
 	unsafe { 
-		(arg as u8, test_str, INT_VALUE as u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
+		(test_u8, test_str, test_u64) // , kernel_config::memory::KERNEL_TEXT_START) //, kernel_config::memory::address_is_page_aligned(0x1000))
 	}
 }
 
