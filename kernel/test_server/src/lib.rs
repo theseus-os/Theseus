@@ -18,8 +18,13 @@ pub fn generic_fn<T: Clone>(arg: T) -> T {
 
 // pub fn server_func<'a>(arg1: u8, arg2: &'a str) -> (u8, &'a str) {
 #[inline(never)]
-pub fn server_func(arg1: u8, arg2: u64) -> (u8, u64) {
+pub fn server_func1(arg1: u8, arg2: u64) -> (u8, u64) {
 	(test::another_file_fn(arg1), arg2 * 2)
+}
+
+#[inline(never)]
+pub fn server_func2(arg1: u8, arg2: u64) -> (u8, u64) {
+	(test::another_file_fn(arg1 * 2), arg2 * 4)
 }
 
 pub struct MyStruct {
