@@ -435,3 +435,101 @@ impl<'a> ::core::fmt::Debug for RawString<'a>
 		::core::result::Result::Ok( () )
 	}
 }
+
+
+/*
+
+
+///read from disk at address input, drive = 0xE0 for master drive, 0xF0 for slave drive, should only be accessed by dma_read in pci.rs
+pub fn dma_read(drive:u8, lba:u32)->Result<u16,u16>{
+	let mut chosen_drive = &AtaIdentifyData{..Default::default()};
+
+	if drive == 0xE0 {
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master;
+	}
+
+	if drive == 0xF0{
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_slave;
+	}
+	trace!("{} number of sectors", chosen_drive.sector_count_28);
+	if drive != 0xE0 && drive != 0xF0 {
+		error!("input drive value {:#x} is unacceptable", drive);
+		return Err(0);
+	}
+	if lba+1> chosen_drive.sector_count_28{
+		error!("lba {} out of range of sectors, sector count: {}", lba, chosen_drive.sector_count_28);
+		return Err(0);
+	}
+    //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)
+    let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
+    unsafe{
+			
+		PRIMARY_BUS_SELECT.lock().write(master_select);
+
+		//number of consecutive sectors to read from, set at 1 
+		SECTORCOUNT.lock().write(1);
+		//lba is written to disk ports 
+		LBALO.lock().write((lba)as u8);
+		LBAMID.lock().write((lba>>8)as u8);
+		LBAHI.lock().write((lba>>16)as u8);
+
+		COMMAND_IO.lock().write(DMA_READ_COMMAND);
+    }
+
+	return Ok(1); // TODO: fix return value
+
+	// old code below
+
+	if COMMAND_IO.lock().read()%2 == 1{
+		trace!("error bit set");
+		return Err(0);
+	}
+
+	//pausing 100 pit ticks to ensure data has time to be transferred (temporary measure)
+	let start = pit_clock::PIT_TICKS.load(Ordering::SeqCst);
+	while start+100 > pit_clock::PIT_TICKS.load(Ordering::SeqCst){}
+
+	//data is ready to read from memory
+	Ok(1)
+
+
+}
+
+
+//returns number of shorts written to disk or error, drive = 0xE0 for master drive, 0xF0 for slave drive
+pub fn dma_write(drive:u8, lba:u32)->Result<u16, u16>{
+	let mut chosen_drive = &AtaIdentifyData{..Default::default()};
+
+	if drive == 0xE0 {
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master;
+	}
+
+	if drive == 0xF0{
+		chosen_drive = &ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_slave;
+	}
+	trace!("{} number of sectors", chosen_drive.sector_count_28);
+	if drive != 0xE0 && drive != 0xF0 {
+		return Err(0);
+	}
+	if lba+1> chosen_drive.sector_count_28{
+		trace!("{} number of sectors", chosen_drive.sector_count_28);
+		return Err(0);
+	}
+	let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
+    unsafe{	
+	PRIMARY_BUS_SELECT.lock().write(master_select);
+
+	//number of consecutive sectors to write to: set at one currently
+	SECTORCOUNT.lock().write(1);
+    //lba(address) is written to disk ports
+    LBALO.lock().write((lba)as u8);
+    LBAMID.lock().write((lba>>8)as u8);
+    LBAHI.lock().write((lba>>16)as u8);
+
+    COMMAND_IO.lock().write(DMA_WRITE_COMMAND);
+    }
+
+
+	Ok(1)
+}
+*/
