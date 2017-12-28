@@ -396,7 +396,6 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     }
     heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
-
     // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
 
 

@@ -294,9 +294,6 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
             assert!(section.addr as usize % PAGE_SIZE == 0,
                     "sections need to be page aligned");
-            debug!("mapping section at addr: {:#x}, size: {:#x}",
-                     section.addr,
-                     section.size);
 
             let flags = EntryFlags::from_multiboot2_section_flags(section);
 
@@ -317,10 +314,12 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             }
 
             vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size as usize, flags, "Kernel ELF Section");
-            index += 1;
-
+            debug!("mapping kernel section: at addr: {:?}", vmas[index]);
+            
             // map the whole range of frames in this section
             mapper.map_contiguous_frames(start_phys_addr, section.size as usize, start_virt_addr, flags, allocator);
+
+            index += 1;
         }
 
 

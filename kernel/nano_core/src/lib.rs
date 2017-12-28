@@ -443,7 +443,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-
+    assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
     }
