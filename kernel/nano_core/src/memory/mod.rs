@@ -381,7 +381,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     });
 
     let mut kernel_vmas: [VirtualMemoryArea; MAX_MEMORY_AREAS] = Default::default();
-    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas);
+    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas).unwrap();
 
 
     // The heap memory must be mapped before it can initialized! Map it and then init it here. 

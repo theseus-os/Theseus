@@ -252,11 +252,16 @@ start_high:
 	; Set up high stack
 	add rsp, KERNEL_OFFSET
 
-	; get rid of the old identity map, but
-	; continue to identity map the first Mb
-	mov rax, low_p2_table - KERNEL_OFFSET
-	or rax, 11b ; present + writable
-	mov [rel low_p3_table], rax
+	
+	; for easy use of multiboot2 data structures,
+	; we preserve an identity mapping that's the same as the higher-half mapping.
+	; The rust code in remap_the_kernel() will erase the kernel's identity mapping later.
+	;;; ; get rid of the old identity map, but
+	;;; ; continue to identity map the first Mb
+	;;; mov rax, low_p2_table - KERNEL_OFFSET
+	;;; or rax, 11b ; present + writable
+	;;; mov [rel low_p3_table], rax
+
 
 	; set up the segment registers
 	mov ax, GDT.data ; data offset

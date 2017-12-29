@@ -206,14 +206,6 @@ impl ActivePageTable {
 }
 
 
-// pub fn higher_half_entry() {
-
-//     unsafe {
-//         *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
-//     }
-//     loop { }
-// }
-
 
 
 pub struct InactivePageTable {
@@ -251,18 +243,10 @@ pub enum PageTable {
 
 
 
-// pub fn new_address_space<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
-//     where A: FrameAllocator
-// {
-    
-// }
-
-
-
 pub fn remap_the_kernel<A>(allocator: &mut A, 
     boot_info: &BootInformation, 
     vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) 
-    -> ActivePageTable
+    -> Result<ActivePageTable, &'static str>
     where A: FrameAllocator
 {
     //  let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
@@ -271,13 +255,26 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
     let mut active_table: ActivePageTable = unsafe { ActivePageTable::new() };
     let mut new_table: InactivePageTable = {
-        let frame = allocator.allocate_frame().expect("no more frames");
+        let frame = try!(allocator.allocate_frame().ok_or("couldn't allocate frame"));
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
 
-    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
-        let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
+    let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
+    // use multiboot2::StringTable;
+    // let strtab: &StringTable = {
+    //     let first_sec = try!(elf_sections_tag.sections().next().ok_or("First Elf section was None!"));
+    //     let string_table_ptr = (&first_sec as *const ElfSection).offset(self.shndx as isize);
+    //         &*((*string_table_ptr).addr as *const StringTable)
+    //     }
+    // };
+    // let strtab = ((elf_sections_tag.string_table() as *const StringTable as usize) + KERNEL_OFFSET) as *const StringTable;
+    let strtab = elf_sections_tag.string_table();
+    info!("Found {} kernel sections, strtab: {:#X}.", elf_sections_tag.number_of_sections, strtab as *const _ as usize);
+    for section in elf_sections_tag.sections() {
+            info!("kernel section: {}: {:?}", strtab.section_name(section), section);
+    }
 
+    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         // clear out the initially-mapped kernel entries of P4
         // (they are initialized in InactivePageTable::new())
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
@@ -287,6 +284,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // map the allocated kernel text sections
         let mut index = 0;
         for section in elf_sections_tag.sections() {
+            // info!("kernel section: {}", strtab.section_name(section));
             if section.size == 0 || !section.is_allocated() {
                 // skip sections that aren't loaded to memory
                 continue;
@@ -342,7 +340,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
-    new_active_table
+    Ok(new_active_table)
 }
 
 

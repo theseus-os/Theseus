@@ -19,7 +19,7 @@ SECTIONS {
 	}
 
 	. += KERNEL_OFFSET;
-
+	
 	.text ALIGN(4K) : AT(ADDR(.text) - KERNEL_OFFSET)
 	{
 		*(.text .text.*)
