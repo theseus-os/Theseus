@@ -11,7 +11,7 @@ CFG_DIR ?= ${PWD}/../../cfg
 RUSTFLAGS += "-C code-model=large"
 
 BUILD_MODE := debug
-#BUILD_MODE := release
+# BUILD_MODE := release
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which is "debug" by default
