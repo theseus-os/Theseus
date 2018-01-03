@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 bit_field = "0.7.0"
 bitflags = "1.0"
-multiboot2 = "0.3.2"
+multiboot2 = { git = "https://github.com/phil-opp/multiboot2-elf64", rev = "aeeb28249eb94e9a8da4002b5ead518200258ab8" }
 once = "0.3.2"
 rlibc = "1.0.0"
 spin = "0.4.5"

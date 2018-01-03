@@ -128,7 +128,7 @@ pub struct TextSection {
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
     pub abs_symbol: String,
-    /// the unique hash generated for this function by the Rust compiler,
+    /// the unique hash generated for this section by the Rust compiler,
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,
@@ -144,6 +144,17 @@ pub struct TextSection {
 /// Represents a .rodata section in a crate.
 #[derive(Debug)]
 pub struct RodataSection {
+    /// The String representation of just this symbol,
+    /// without any preceding crate namespaces or anything.
+    pub symbol: String,
+    /// The full String representation of this symbol. 
+    /// Format <crate>::<module>::<struct>::<fn_name>
+    /// For example, test_lib::MyStruct::new
+    pub abs_symbol: String,
+    /// the unique hash generated for this section by the Rust compiler,
+    /// which can be used as a version identifier. 
+    /// Not all symbols will have a hash, like those that are not mangled.
+    pub hash: Option<String>,
     /// The virtual address of where this section is loaded
     pub virt_addr: VirtualAddress,
     /// The size in bytes of this section
@@ -163,7 +174,7 @@ pub struct DataSection {
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
     pub abs_symbol: String,
-    /// the unique hash generated for this function by the Rust compiler,
+    /// the unique hash generated for this section by the Rust compiler,
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,

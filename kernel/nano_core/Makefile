@@ -7,11 +7,12 @@ SHELL := /bin/bash
 
 PWD := $(shell pwd)
 
+KERNEL_BUILD_DIR ?= ${PWD}/../build
 CFG_DIR ?= ${PWD}/../../cfg
 RUSTFLAGS += "-C code-model=large"
 
 BUILD_MODE := debug
-# BUILD_MODE := release
+# BUILD_MODE := release  ## release mode currently does NOT work! See issue #14
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which is "debug" by default
@@ -49,6 +50,8 @@ cargo:
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)	
+	@mkdir -p $(KERNEL_BUILD_DIR)
+	@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/__k_nano_core.bin
 
 
 # compile assembly files
