@@ -74,6 +74,11 @@ mod syscall;
 mod mod_mgmt;
 
 
+// TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
+// and make visible/accessible to other modules that depend on nano_core functions
+
+
+
 use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
@@ -251,8 +256,14 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     enable_nxe_bit();
     enable_write_protect_bit();
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
-    let mut kernel_mmi: memory::MemoryManagementInfo = memory::init(boot_info);
+    let mut kernel_mmi = memory::init(boot_info); // consumes boot_info
     
+    // parse the nano_core ELF object to load its symbols into our metadata
+    {
+        memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
+    }
+        
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -284,7 +295,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // TODO: transform this into something more like "task::init(initial_mmi)"
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(kernel_mmi);
+        tasklist_mut.init_task_zero(kernel_mmi).unwrap();
     }
 
     // initialize the kernel console
@@ -375,11 +386,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 	
     // attempt to parse a test kernel module
     if true {
-        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap());
+        let kernel_mmi_ref = task::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
+        let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
         debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap());
+        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
         debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap());
+        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
         debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
 
         // now let's try to invoke the test_server function we just loaded

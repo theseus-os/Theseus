@@ -183,9 +183,17 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
         for entry in symtab.iter() {
             if let Ok(typ) = entry.get_type() {
                 if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
-                    if let Ok(bind) = entry.get_binding() {
-                        if bind == xmas_elf::symbol_table::Binding::Global {
-                            globals.insert(entry.shndx() as usize);
+                    use xmas_elf::symbol_table::Visibility;
+                    match entry.get_other() {
+                        Visibility::Default => {
+                            if let Ok(bind) = entry.get_binding() {
+                                if bind == xmas_elf::symbol_table::Binding::Global {
+                                    globals.insert(entry.shndx() as usize);
+                                }
+                            }
+                        }
+                        _ => {
+                            continue;
                         }
                     }
                 }
@@ -321,37 +329,42 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                     }
 
                     else if name.starts_with(RODATA_PREFIX) {
-                        trace!("Found .rodata section: {:?}", name);
-                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
-                        
-                        if rodata_offset.is_none() {
-                            rodata_offset = Some(sec.offset() as usize);
-                        }
-
-                        // let rodata_prefix_len: usize = RODATA_PREFIX.len();
-
-                        if let Ok(ref rp) = rodata_pages {
-                            let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
-
-                            // here: we're ready to copy the data/text section to the proper address
-                            if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
-                                // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                                let dest: &mut [u8] = unsafe {
-                                    slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                                };
-                                dest.copy_from_slice(sec_data);
-
-                                loaded_sections.insert(shndx, 
-                                    Arc::new( LoadedSection::Rodata(RodataSection{
-                                        virt_addr: dest_addr,
-                                        size: sec_size,
-                                        global: global_sections.contains(&shndx),
-                                    }))
-                                );
+                        let rodata_prefix_end:   usize = RODATA_PREFIX.len();
+                        if let Some(name) = name.get(rodata_prefix_end..) {
+                            let demangled = demangle_symbol(name);
+                            trace!("Found .rodata section: name {:?}, with_hash {:?}, size={:#x}", name, demangled.full, sec_size);
+                            assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+                            
+                            if rodata_offset.is_none() {
+                                rodata_offset = Some(sec.offset() as usize);
                             }
-                            else {
-                                error!("expected \"Undefined\" data in .rodata section {}: {:?}", name, sec.get_data(&elf_file));
-                                return Err("unexpected data in .rodata section");
+
+                            if let Ok(ref rp) = rodata_pages {
+                                let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
+
+                                // here: we're ready to copy the data/text section to the proper address
+                                if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
+                                    // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                                    let dest: &mut [u8] = unsafe {
+                                        slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                                    };
+                                    dest.copy_from_slice(sec_data);
+
+                                    loaded_sections.insert(shndx, 
+                                        Arc::new( LoadedSection::Rodata(RodataSection{
+                                            symbol: demangled.symbol,
+                                            abs_symbol: demangled.full,
+                                            hash: demangled.hash,
+                                            virt_addr: dest_addr,
+                                            size: sec_size,
+                                            global: global_sections.contains(&shndx),
+                                        }))
+                                    );
+                                }
+                                else {
+                                    error!("expected \"Undefined\" data in .rodata section {}: {:?}", name, sec.get_data(&elf_file));
+                                    return Err("unexpected data in .rodata section");
+                                }
                             }
                         }
                     }
@@ -553,21 +566,153 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 }
 
 
-// // check that we  have a valid target section, for now we only care about applying relocations to actual loaded sections, i.e., PROGBITS
-            // {
-            //     let target_sec_symtab_entry: &Entry = &symtab[sec.info() as usize];
-            //     let target_sec_hdr = target_sec_symtab_entry.get_section_header(&elf_file, sec.info() as usize); 
-            //     if let Ok(tsh) = target_sec_hdr {
-            //         if tsh.get_type() != ShType::ProgBits {
-            //             info!("Skipping relocation for non-PROGBITS section {:?}", target_sec_hdr.and_then(|s| s.get_name(&elf_file))))
-            //             continue;
-            //         }
-            //     }
-            //     else {
-            //         warn!("Rela section specified a target section index {} that didn't correspond to a real section!", sec.info());
-            //         continue;
-            //     }
-            // }
+
+// parses the nano_core ELF file, which is not loaded (because it is already loaded and running right out of the gate) 
+// but rather searched for global symbols, which are added to the system map and the crate metadata
+pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<LoadedCrate, &'static str> {
+    const module_name: &'static str = "nano_core";
+    debug!("Parsing nano_core: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
+    let start_addr = start_addr as *const u8;
+    if start_addr.is_null() {
+        error!("parse_nano_core(): start_addr is null!");
+        return Err("start_addr for parse_nano_core is null!");
+    }
+
+    // SAFE: checked for null
+    let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
+    // debug!("BYTE SLICE: {:?}", byte_slice);
+    let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
+
+
+    // For us to properly load the ELF file, it must NOT have been stripped,
+    // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
+    use xmas_elf::sections::SectionData::SymbolTable64;
+    let sssec = find_first_section_by_type(&elf_file, ShType::SymTab);
+    let symtab_data = match sssec.ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) {
+        Ok(SymbolTable64(symtab)) => Ok(symtab),
+        _ => {
+            error!("parse_nano_core(): can't load file: no symbol table found. Was file stripped?");
+            Err("cannot load nano_core: no symbol table found. Was file stripped?")
+        }
+    };
+    let symtab = try!(symtab_data);
+    // debug!("symtab: {:?}", symtab);
+
+    
+    // find the .text, .data, and .rodata sections
+    let mut text_shndx:   Option<usize> = None;
+    let mut rodata_shndx: Option<usize> = None;
+    let mut data_shndx:   Option<usize> = None;
+
+    for (shndx, sec) in elf_file.section_iter().enumerate() {
+        // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
+        if let Ok(ShType::ProgBits) = sec.get_type() {
+            // skip null section and any empty sections
+            let sec_size = sec.size() as usize;
+            if sec_size == 0 { continue; }
+
+            if let Ok(name) = sec.get_name(&elf_file) {
+                match name {
+                    ".text" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
+                        text_shndx = Some(shndx);
+                    }
+                    ".data" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
+                        data_shndx = Some(shndx);
+                    }
+                    ".rodata" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+                        rodata_shndx = Some(shndx);
+                    }
+                    _ => {
+                        continue;
+                    }
+                };
+            }
+        }
+    }
+
+    let text_shndx = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
+    let rodata_shndx = try!(rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF"));
+    let data_shndx = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
+
+    // iterate through the symbol table so we can find which sections are global (publicly visible)
+
+    let loaded_sections = {
+        let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+        let mut globals: BTreeSet<(VirtualAddress, &str)> = BTreeSet::new();
+        use xmas_elf::symbol_table::Entry;
+        for entry in symtab.iter() {
+            use xmas_elf::symbol_table::Visibility;
+            match entry.get_other() {
+                Visibility::Default => {
+                    // do nothing, fall through to proceed
+                }
+                _ => {
+                    continue; // skip this
+                }
+            };
+            
+            if let Ok(typ) = entry.get_type() {
+                if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                    if let Ok(bind) = entry.get_binding() {
+                        if bind == xmas_elf::symbol_table::Binding::Global {
+                            let sec_vaddr = entry.value() as VirtualAddress;
+                            let name = entry.get_name(&elf_file).unwrap();
+                            // debug!("parse_nano_core(): name: {}, vaddr: {:#X}", name, sec_vaddr);
+
+                            let demangled = demangle_symbol(name);
+                            let new_section = match entry.shndx() {
+                                text_shndx => {
+                                    LoadedSection::Text(TextSection{
+                                        symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        virt_addr: sec_vaddr,
+                                        size: 0, // TODO FIXME: is it necessary to calculate the size?
+                                        global: true,
+                                    })
+                                }
+                                rodata_shndx => {
+                                    LoadedSection::Rodata(RodataSection{
+                                        symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        virt_addr: sec_vaddr,
+                                        size: 0, // TODO FIXME: is it necessary to calculate the size?
+                                        global: true,
+                                    })
+                                }
+                                data_shndx => {
+                                    LoadedSection::Data(DataSection{
+                                        symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        virt_addr: sec_vaddr,
+                                        size: 0, // TODO FIXME: is it necessary to calculate the size?
+                                        global: true,
+                                    })
+                                }
+                            };
+
+                            sections.push(Arc::new(new_section));
+                        }
+                    }
+                }
+            }
+        }   
+        sections 
+    };
+
+    debug!("nano_core parsing: {} loaded sections: {:?}", loaded_sections.len(), loaded_sections);
+
+    Ok(LoadedCrate {
+        crate_name: String::from("nano_core"), 
+        sections: loaded_sections,
+        owned_pages: Vec::default(),
+    })
+}
 
 
 

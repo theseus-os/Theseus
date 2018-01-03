@@ -7,12 +7,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use alloc::BTreeSet;
+use mod_mgmt::find_first_section_by_type;
 pub use self::entry::*;
 use memory::{Frame, FrameAllocator};
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
-use multiboot2::BootInformation;
+use multiboot2;
 use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_PAGE_TABLE_INDEX};
@@ -244,7 +246,7 @@ pub enum PageTable {
 
 
 pub fn remap_the_kernel<A>(allocator: &mut A, 
-    boot_info: &BootInformation, 
+    boot_info: multiboot2::BootInformation, 
     vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) 
     -> Result<ActivePageTable, &'static str>
     where A: FrameAllocator
@@ -260,19 +262,22 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     };
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
-    // use multiboot2::StringTable;
-    // let strtab: &StringTable = {
-    //     let first_sec = try!(elf_sections_tag.sections().next().ok_or("First Elf section was None!"));
-    //     let string_table_ptr = (&first_sec as *const ElfSection).offset(self.shndx as isize);
-    //         &*((*string_table_ptr).addr as *const StringTable)
-    //     }
-    // };
-    // let strtab = ((elf_sections_tag.string_table() as *const StringTable as usize) + KERNEL_OFFSET) as *const StringTable;
-    let strtab = elf_sections_tag.string_table();
-    info!("Found {} kernel sections, strtab: {:#X}.", elf_sections_tag.number_of_sections, strtab as *const _ as usize);
-    for section in elf_sections_tag.sections() {
-            info!("kernel section: {}: {:?}", strtab.section_name(section), section);
-    }
+    let symtab_vaddr = {
+        let mut addr = None;
+        let mut count = 0;
+        for section in elf_sections_tag.sections() {
+            count += 1;
+            info!("kernel section: {} {:?}", section.name(), section.section_type());
+            info!("       addr {:#X}, size {:#X}", section.start_address(), section.size());
+            if section.section_type() == multiboot2::ElfSectionType::LinkerSymbolTable {
+                addr = Some(section.start_address());
+                info!("        found SYMTAB at addr {:#X}", section.start_address());
+            }
+        }
+        debug!("Found {} kernel sections", count);
+        try!(addr.ok_or("Couldn't find symbol table in kernel ELF file from bootloader"))
+    };
+
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         // clear out the initially-mapped kernel entries of P4
@@ -284,38 +289,37 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // map the allocated kernel text sections
         let mut index = 0;
         for section in elf_sections_tag.sections() {
-            // info!("kernel section: {}", strtab.section_name(section));
-            if section.size == 0 || !section.is_allocated() {
+            if section.size() == 0 || !section.is_allocated() {
                 // skip sections that aren't loaded to memory
                 continue;
             }
 
-            assert!(section.addr as usize % PAGE_SIZE == 0,
+            assert!(section.start_address() as usize % PAGE_SIZE == 0,
                     "sections need to be page aligned");
 
-            let flags = EntryFlags::from_multiboot2_section_flags(section);
+            let flags = EntryFlags::from_multiboot2_section_flags(&section);
 
             // even though the linker stipulates that the kernel sections have a higher-half virtual address,
             // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
             // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
             // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-            let mut start_phys_addr = section.start_address();
+            let mut start_phys_addr = section.start_address() as PhysicalAddress;
             if start_phys_addr >= super::KERNEL_OFFSET { 
                 // true for all sections but the first section (inittext)
                 start_phys_addr -= super::KERNEL_OFFSET;
             }
             
-            let mut start_virt_addr = section.start_address();
+            let mut start_virt_addr = section.start_address() as VirtualAddress;
             if start_virt_addr < super::KERNEL_OFFSET { 
                 // special case to handle the first section only
                 start_virt_addr += super::KERNEL_OFFSET;
             }
 
-            vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size as usize, flags, "Kernel ELF Section");
-            debug!("mapping kernel section: at addr: {:?}", vmas[index]);
+            vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, "KERNEL ELF SECTION TODO FIXME");
+            debug!("mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
             
             // map the whole range of frames in this section
-            mapper.map_contiguous_frames(start_phys_addr, section.size as usize, start_virt_addr, flags, allocator);
+            mapper.map_contiguous_frames(start_phys_addr, section.size() as usize, start_virt_addr, flags, allocator);
 
             index += 1;
         }
@@ -327,20 +331,15 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr, PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
+
+
+        // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
+        mapper.p4_mut().clear_entry(0);
     });
 
 
     let (_old_table, new_active_table) = active_table.switch(&new_table);
 
-    
-    // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
-    // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
-    // active_table.unmap(old_p4_page, allocator);
-    // debug!("guard page at {:#x}", old_p4_page.start_address());
-
-
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok(new_active_table)
 }
-
-

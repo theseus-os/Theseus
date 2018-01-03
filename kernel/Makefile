@@ -34,10 +34,10 @@ nano_core:
 
 
 ## simply runs make all in all subdirs
-all: $(SUBDIRS) nano_core
+all: nano_core $(SUBDIRS)
 
 
 ## simply runs make clean in all subdirs, then removes the kernel build dir
-clean: $(SUBDIRS) nano_core
+clean: nano_core $(SUBDIRS)
 	rm -rf $(KERNEL_BUILD_DIR)
 
