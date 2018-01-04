@@ -26,6 +26,7 @@ use kernel_config::memory::{PAGE_SIZE, MAX_MEMORY_AREAS};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 use task;
 use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
+use mod_mgmt::metadata;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
@@ -426,14 +427,15 @@ pub fn init(boot_info: BootInformation) -> MemoryManagementInfo {
 
 
 /// Loads the specified kernel crate into memory, allowing it to be invoked.  
-pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+/// Returns a Result containing the number of symbols that were added to the system map
+/// as a result of loading this crate.
+pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
     debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
         error!("module {} is not page aligned!", module.name());
         return Err("module was not page aligned");
     } 
-
 
     // first we need to map the module memory region into our address space, 
     // so we can then parse the module as an ELF file in the kernel.
@@ -481,18 +483,17 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                     active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
                 }
 
-                info!("loaded new crate: {:?}", new_crate);
-                ::mod_mgmt::metadata::add_crate(new_crate);
+                info!("loaded new crate: {}", new_crate.crate_name);
+                Ok(metadata::add_crate(new_crate))
 
             }
             _ => {
                 error!("load_kernel_crate(): error getting kernel's active page table to map module.");
-                return Err("couldn't get kernel's active page table");
+                Err("couldn't get kernel's active page table")
             }
         }
     }
 
-    Ok(())
 }
 
 

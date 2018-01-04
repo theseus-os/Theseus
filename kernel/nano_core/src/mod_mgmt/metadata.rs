@@ -4,7 +4,6 @@ use alloc::arc::{Arc, Weak};
 use memory::VirtualAddress;
 use memory::virtual_address_allocator::OwnedContiguousPages;
 
-
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
     /// Maps a String crate_name to its crate instance.
@@ -20,20 +19,23 @@ lazy_static! {
 }
 
 
-/// simple debugging function
+
+/// Simple debugging function for outputting the system map.
 pub fn dump_symbol_map() -> String {
     use core::fmt::Write;
     let mut output: String = String::new();
-    match write!(&mut output, "{:?}", *SYSTEM_MAP.lock()) {
+    let sysmap = SYSTEM_MAP.lock();
+    match write!(&mut output, "{:?}", sysmap.keys().collect::<Vec<&String>>()) {
         Ok(_) => output,
         _ => String::from("error"),
     }
 }
 
 
-/// Adds a new crate to the module tree, and adds its symbols to the system map. 
-pub fn add_crate(new_crate: LoadedCrate) {
-    
+/// Adds a new crate to the module tree, and adds its symbols to the system map.
+/// Returns the number of global symbols added to the system map. 
+pub fn add_crate(new_crate: LoadedCrate) -> usize {
+    let mut count = 0;
     // add all the global symbols to the system map
     {
         let mut locked_kmap = SYSTEM_MAP.lock();
@@ -42,12 +44,15 @@ pub fn add_crate(new_crate: LoadedCrate) {
                 let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
                 // as of now we don't expect/support replacing a symbol (section) in the system map
                 if old_val.is_some() {
-                    warn!("Unexpected: replacing existing entry in system map: {} -> {:?}", key, old_val);
+                    warn!("Unexpected: replacing existing entry in system map: {}", key);
                 }
+                count += 1;
+                debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);
             }
         }
     }
     CRATE_TREE.lock().insert(new_crate.crate_name.clone(), new_crate);
+    count
 }
 
 
@@ -107,13 +112,13 @@ impl LoadedSection {
             &LoadedSection::Data(ref data) => data.global,
         }
     }
-    pub fn set_global(&mut self, is_global: bool) {
-        match self {
-            &mut LoadedSection::Text(ref mut text) => text.global = is_global,
-            &mut LoadedSection::Rodata(ref mut rodata) => rodata.global = is_global,
-            &mut LoadedSection::Data(ref mut data) => data.global = is_global,
-        }
-    }
+    // pub fn set_global(&mut self, is_global: bool) {
+    //     match self {
+    //         &mut LoadedSection::Text(ref mut text) => text.global = is_global,
+    //         &mut LoadedSection::Rodata(ref mut rodata) => rodata.global = is_global,
+    //         &mut LoadedSection::Data(ref mut data) => data.global = is_global,
+    //     }
+    // }
 }
 
 

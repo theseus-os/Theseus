@@ -438,6 +438,13 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
             use xmas_elf::symbol_table::Entry;
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info());
 
+            // currently not using eh_frame sections
+            if let Ok(name) = sec.get_name(&elf_file) {
+                if name.contains("eh_frame") {
+                    continue;
+                }
+            }
+
             // the target section is where we write the relocation data to.
             // the source section is where we get the data from. 
             // There is one target section per rela section, and one source section per entry in this rela section.
@@ -504,7 +511,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                 }
                             }
                             R_X86_64_GOTPCREL => { 
-                                unimplemented!(); // TODO FIXME we need to create a Global Offset Table
+                                unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
                             }
                             _ => {
                                 error!("found unsupported relocation {:?}\n  --> Are you building kernel modules with code-model=large?", r);
@@ -705,7 +712,6 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
         sections 
     };
 
-    debug!("nano_core parsing: {} loaded sections: {:?}", loaded_sections.len(), loaded_sections);
 
     Ok(LoadedCrate {
         crate_name: String::from("nano_core"), 
