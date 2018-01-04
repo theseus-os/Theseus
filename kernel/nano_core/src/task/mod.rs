@@ -190,11 +190,6 @@ impl Task {
             let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
 
 
-            // TODO: we also don't need to switch page tables if we're just moving from any userspace task
-            //       to a kernel thread. We'll need some type of identifier in the Task struct
-            //       in order to identify a task as userspace or kernel thread only
-
-
             if Arc::ptr_eq(prev_mmi, next_mmi) {
                 // do nothing because we're not changing address spaces
                 // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
@@ -536,7 +531,6 @@ impl TaskList {
                             // map the userspace module into the new address space.
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
                             // debug!("!! mapping userspace module with name: {}", module.name());
-                            // TODO: FIXME: map the actual elf regions to their proper address, no longer a linear dumb mapping
                             for prog in elf_progs.iter() {
                                 // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
                                 debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());

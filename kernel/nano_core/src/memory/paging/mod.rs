@@ -262,22 +262,6 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     };
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
-    let symtab_vaddr = {
-        let mut addr = None;
-        let mut count = 0;
-        for section in elf_sections_tag.sections() {
-            count += 1;
-            info!("kernel section: {} {:?}", section.name(), section.section_type());
-            info!("       addr {:#X}, size {:#X}", section.start_address(), section.size());
-            if section.section_type() == multiboot2::ElfSectionType::LinkerSymbolTable {
-                addr = Some(section.start_address());
-                info!("        found SYMTAB at addr {:#X}", section.start_address());
-            }
-        }
-        debug!("Found {} kernel sections", count);
-        try!(addr.ok_or("Couldn't find symbol table in kernel ELF file from bootloader"))
-    };
-
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         // clear out the initially-mapped kernel entries of P4

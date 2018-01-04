@@ -73,9 +73,9 @@ mod interrupts;
 mod syscall;
 mod mod_mgmt;
 
-
 // TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
-// and make visible/accessible to other modules that depend on nano_core functions
+// and make visible/accessible to other modules that depend on nano_core functions.
+// Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 
 
 
@@ -260,8 +260,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // parse the nano_core ELF object to load its symbols into our metadata
     {
-        memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
-        debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
+        let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
     }
         
     
@@ -389,11 +389,11 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
         let kernel_mmi_ref = task::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
         memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
+        // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
         memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
+        // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
         memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
+        // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
 
         // now let's try to invoke the test_server function we just loaded
         let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func1").upgrade().unwrap();
@@ -436,7 +436,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -445,7 +445,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // a second duplicate syscall test user task
-    if true
+    if false
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
