@@ -61,7 +61,6 @@ extern crate state_store;
 extern crate test_lib;
 extern crate rtc;
 
-
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod drivers;  
 #[macro_use] mod util;
@@ -206,10 +205,9 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
-    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
+    // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
-    enable_nxe_bit();
-    enable_write_protect_bit();
+    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
     let mut kernel_mmi = memory::init(boot_info); // consumes boot_info
     
@@ -368,21 +366,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 }
 
-fn enable_nxe_bit() {
-    use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
-
-    let nxe_bit = 1 << 11;
-    unsafe {
-        let efer = rdmsr(IA32_EFER);
-        wrmsr(IA32_EFER, efer | nxe_bit);
-    }
-}
-
-fn enable_write_protect_bit() {
-    use x86_64::registers::control_regs::{cr0, cr0_write, Cr0};
-
-    unsafe { cr0_write(cr0() | Cr0::WRITE_PROTECT) };
-}
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
