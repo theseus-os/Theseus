@@ -20,7 +20,7 @@ pub const PAGE_SHIFT: usize = 12;
 /// page size is 4096, 4KiB pages.
 pub const PAGE_SIZE: usize = (1 << PAGE_SHIFT);
 /// returns true if an address is page-aligned
-#[inline(never)]
+#[inline(always)]
 pub fn address_is_page_aligned(addr: usize) -> bool {
     addr % PAGE_SIZE == 0
 }
