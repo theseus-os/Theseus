@@ -513,7 +513,7 @@ impl TaskList {
                         use mod_mgmt;
                         let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as VirtualAddress, module.size()).unwrap();
                         // now we can unmap the module because we're done reading from it in the ELF parser
-                        active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                        active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
                         
                         let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
 

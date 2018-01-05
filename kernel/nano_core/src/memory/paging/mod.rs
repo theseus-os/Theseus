@@ -72,6 +72,15 @@ impl Page {
             end: end,
         }
     }
+
+    pub fn range_inclusive_addr(virt_addr: VirtualAddress, size_in_bytes: usize) -> PageIter {
+        let start_page = Page::containing_address(virt_addr);
+        let end_page = Page::containing_address(virt_addr + size_in_bytes - 1);
+        PageIter {
+            start: start_page,
+            end: end_page,
+        }
+    }
 }
 
 impl Add<usize> for Page {
@@ -308,13 +317,21 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             index += 1;
         }
 
+        // let's just go ahead and try mapping the entire first megabyte of physical memory,
+        // which happens to include ACPI tables, VGA memory, etc
+        // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
+        mapper.map_contiguous_frames(0x0, 0x10_0000, KERNEL_OFFSET, EntryFlags::PRESENT, allocator);
 
-        // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
-        let vga_buffer_virt_addr = 0xb8000 + super::KERNEL_OFFSET;
-        let vga_buffer_flags = EntryFlags::WRITABLE;
-        vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr, PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
-        let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
+        // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
+        // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
+        const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+        const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
+        let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
+        let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
+        let vga_display_flags = EntryFlags::WRITABLE;
+        vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
+        // use remap because we already mapped it above
+        mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr, size_in_bytes), vga_display_flags);
 
 
         // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
