@@ -480,7 +480,7 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                 // now we can unmap the module because we're done reading from it in the ELF parser
                 {
                     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                    active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
                 }
 
                 info!("loaded new crate: {}", new_crate.crate_name);

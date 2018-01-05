@@ -47,7 +47,7 @@ pub fn add_crate(new_crate: LoadedCrate) -> usize {
                     warn!("Unexpected: replacing existing entry in system map: {}", key);
                 }
                 count += 1;
-                debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);
+                // debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);
             }
         }
     }

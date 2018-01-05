@@ -151,6 +151,15 @@ impl Mapper {
         tlb::flush(VirtualAddress(page.start_address()));
     }   
 
+
+    /// remaps the range of pages specified by the given `PageIter`.
+    pub fn remap_pages(&mut self, page_range: PageIter, new_flags: EntryFlags) {
+        for page in page_range {
+            self.remap(page, new_flags);
+        }
+    }
+
+
     pub fn unmap<A>(&mut self, page: Page, _allocator: &mut A)
         where A: FrameAllocator
     {
@@ -171,12 +180,10 @@ impl Mapper {
         // allocator.deallocate_frame(frame);
     }
 
-    pub fn unmap_contiguous_pages<A>(&mut self, virt_addr: VirtualAddress, size_in_bytes: usize, allocator: &mut A)
+    pub fn unmap_pages<A>(&mut self, page_range: PageIter, allocator: &mut A)
         where A: FrameAllocator
     {
-        let start_page = Page::containing_address(virt_addr);
-        let end_page = Page::containing_address(virt_addr + size_in_bytes - 1);
-        for page in Page::range_inclusive(start_page, end_page) {
+        for page in page_range {
             self.unmap(page, allocator);
         }
     }
