@@ -133,8 +133,10 @@ $(iso): kernel userspace $(grub_cfg)
 ### copy userspace module build files
 	@mkdir -p $(grub-isofiles)/modules
 	@cp userspace/build/* $(grub-isofiles)/modules/
-### copy kernel module build files
-	@cp kernel/build/* $(grub-isofiles)/modules/
+### copy kernel module build files and add the __k_ prefix
+	@for f in kernel/build/* kernel/build/*/* ; do \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
+	done
 ### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin

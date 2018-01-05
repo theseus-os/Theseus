@@ -51,7 +51,7 @@ cargo:
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)	
 	@mkdir -p $(KERNEL_BUILD_DIR)
-	@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/__k_nano_core.bin
+	@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/nano_core.bin
 
 
 # compile assembly files
