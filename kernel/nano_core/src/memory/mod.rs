@@ -297,6 +297,20 @@ impl VirtualMemoryArea {
 pub fn init(boot_info: BootInformation) -> MemoryManagementInfo {
     assert_has_not_been_called!("memory::init must be called only once");
 
+    for t in boot_info.tags() {
+        trace!("Multiboot2 Tag: {:?}", t);
+        if t.typ == 14 {
+            let mut addr = (&*t) as *const _ as *const u32; // tags are 64-bits anyway
+            let addr1 = unsafe { addr.offset(0) };
+            let addr2 = unsafe { addr.offset(1) };
+            use drivers::acpi::RSDP;
+            let addr_rsdp = unsafe { addr.offset(2) } as *const RSDP;
+            unsafe {
+                trace!("    typ {}, size {}, RSDP: {:?}", *addr1, *addr2, *addr_rsdp);
+            }
+        }
+    }
+
     // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
         let mut modules: [ModuleArea; MAX_MEMORY_AREAS] = Default::default();
@@ -351,7 +365,7 @@ pub fn init(boot_info: BootInformation) -> MemoryManagementInfo {
     USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
         let mut areas: [PhysicalMemoryArea; MAX_MEMORY_AREAS] = Default::default();
         for (index, area) in memory_map_tag.memory_areas().enumerate() {
-            debug!("memory area base_addr={:#x} length={:#x}", area.start_address(), area.size());
+            debug!("memory area base_addr={:#x} length={:#x} ({:?})", area.start_address(), area.size(), area);
             
             // we cannot allocate memory from sections below the end of the kernel's physical address!!
             if area.end_address() < kernel_phys_end {

@@ -1,7 +1,7 @@
 pub mod input; 
 pub mod ata_pio;
 pub mod pci;
-mod acpi;
+pub mod acpi;
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;

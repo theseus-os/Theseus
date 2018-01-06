@@ -14,15 +14,15 @@ use spin::RwLock;
 use memory::{ActivePageTable, Page, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use core::ops::DerefMut;
 
-// use self::dmar::Dmar;
-use self::fadt::Fadt;
-use self::madt::Madt;
-use self::rsdt::Rsdt;
-use self::sdt::Sdt;
-use self::xsdt::Xsdt;
-// use self::hpet::Hpet;
-use self::rxsdt::Rxsdt;
-use self::rsdp::RSDP;
+// pub use self::dmar::Dmar;
+pub use self::fadt::Fadt;
+pub use self::madt::Madt;
+pub use self::rsdt::Rsdt;
+pub use self::sdt::Sdt;
+pub use self::xsdt::Xsdt;
+// pub use self::hpet::Hpet;
+pub use self::rxsdt::Rxsdt;
+pub use self::rsdp::RSDP;
 
 // use self::aml::{parse_aml_table, AmlError, AmlValue};
 
