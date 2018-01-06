@@ -1,8 +1,7 @@
 pub mod input; 
 pub mod ata_pio;
 pub mod pci;
-pub mod isa_dma;
-#[macro_use] pub mod vga_buffer;
+mod acpi_old;
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
@@ -19,7 +18,8 @@ pub fn early_init() {
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
-    
+    acpi_old::init();
+
     // ata_pio::init_ata_devices();
     // pci::init_pci_buses();
 

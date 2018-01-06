@@ -507,9 +507,9 @@ impl TaskList {
                         // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
                         // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
                         let module_flags: EntryFlags = EntryFlags::PRESENT;
-                        active_table.map_contiguous_frames(module.start_address(), module.size(), 
-                                                    module.start_address() as VirtualAddress, // identity mapping
-                                                    module_flags, frame_allocator.deref_mut());     
+                        active_table.map_frames(Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                                                Page::containing_address(module.start_address() as VirtualAddress), // identity mapping
+                                                module_flags, frame_allocator.deref_mut());
                         use mod_mgmt;
                         let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as VirtualAddress, module.size()).unwrap();
                         // now we can unmap the module because we're done reading from it in the ELF parser
@@ -535,9 +535,9 @@ impl TaskList {
                                 // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
                                 debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
                                 let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
-                                mapper.map_contiguous_frames(module.start_address() + prog.offset, prog.vma.size(), 
-                                                             prog.vma.start_address(),
-                                                             new_flags, frame_allocator.deref_mut());
+                                mapper.map_frames(Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
+                                                  Page::containing_address(prog.vma.start_address()),
+                                                  new_flags, frame_allocator.deref_mut());
                                 new_user_vmas.push(VirtualMemoryArea::new(prog.vma.start_address(), prog.vma.size(), new_flags, prog.vma.desc()));
                             }
 

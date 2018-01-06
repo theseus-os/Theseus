@@ -17,6 +17,7 @@ atomic = "0.3.4"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 xmas-elf = "0.6.1"
 rustc-demangle = "0.1.5" 
+zero = "0.1.2"
 
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate

@@ -13,6 +13,7 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 #![feature(compiler_fences)]
+#![feature(iterator_step_by)]
 #![no_std]
 
 
@@ -38,6 +39,7 @@ extern crate bit_field;
 extern crate xmas_elf;
 extern crate rustc_demangle;
 extern crate goblin;
+extern crate zero;
 
 
 // ------------------------------------

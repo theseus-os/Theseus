@@ -99,22 +99,12 @@ impl Mapper {
     }
 
     /// maps the given VirtualAddress to the contiguous range of Frames 
-    /// corresponding to the given PhysicalAddress.
     /// `size_in_bytes` specifies the length in bytes of the mapping. 
-    pub fn map_contiguous_frames<A>(&mut self, 
-                             phys_addr: PhysicalAddress,
-                             size_in_bytes: usize,
-                             virt_addr: VirtualAddress, 
-                             flags: EntryFlags, 
-                             allocator: &mut A)
+    pub fn map_frames<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let start_frame = Frame::containing_address(phys_addr);
-        let end_frame = Frame::containing_address(phys_addr + size_in_bytes - 1);
-        let mut frame_counter = 0;
-        for frame in Frame::range_inclusive(start_frame, end_frame) {
-            self.map_virtual_address(virt_addr + frame_counter * PAGE_SIZE, frame, flags, allocator);
-            frame_counter += 1;
+        for (ctr, frame) in frame_range.enumerate() {
+            self.map_to(start_page + ctr, frame, flags, allocator);
         }
     }
 
