@@ -312,15 +312,19 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             debug!("mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
             
             // map the whole range of frames in this section
-            mapper.map_contiguous_frames(start_phys_addr, section.size() as usize, start_virt_addr, flags, allocator);
+            mapper.map_frames(Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
+                              Page::containing_address(start_virt_addr), 
+                              flags, allocator);
 
             index += 1;
         }
 
-        // let's just go ahead and try mapping the entire first megabyte of physical memory,
+        // let's just go ahead and map the entire first megabyte of physical memory,
         // which happens to include ACPI tables, VGA memory, etc
         // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
-        mapper.map_contiguous_frames(0x0, 0x10_0000, KERNEL_OFFSET, EntryFlags::PRESENT, allocator);
+        mapper.map_frames(Frame::range_inclusive_addr(0x0, 0x10_0000), 
+                          Page::containing_address(KERNEL_OFFSET as VirtualAddress), 
+                          EntryFlags::PRESENT, allocator);
 
         // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
         // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000

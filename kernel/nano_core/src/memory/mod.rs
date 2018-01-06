@@ -461,9 +461,9 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                 let module_flags = EntryFlags::PRESENT;
                 {
                     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.map_contiguous_frames(module.start_address(), module.size(), 
-                                    module.start_address() as VirtualAddress, // identity mapping
-                                    module_flags, frame_allocator.deref_mut());  
+                    active_table.map_frames(Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                                            Page::containing_address(module.start_address() as VirtualAddress), // identity mapping
+                                            module_flags, frame_allocator.deref_mut());  
                 }
 
                 let new_crate = try!( {
@@ -531,8 +531,8 @@ pub struct Frame {
 
 impl Frame {
 	/// returns the Frame containing the given physical address
-    pub fn containing_address(address: usize) -> Frame {
-        Frame { number: address / PAGE_SIZE }
+    pub fn containing_address(phys_addr: usize) -> Frame {
+        Frame { number: phys_addr / PAGE_SIZE }
     }
 
     fn start_address(&self) -> PhysicalAddress {
@@ -549,9 +549,16 @@ impl Frame {
             end: end,
         }
     }
+
+    pub fn range_inclusive_addr(phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameIter {
+        FrameIter {
+            start: Frame::containing_address(phys_addr),
+            end: Frame::containing_address(phys_addr + size_in_bytes - 1),
+        }
+    }
 }
 
-struct FrameIter {
+pub struct FrameIter {
     start: Frame,
     end: Frame,
 }
