@@ -535,7 +535,7 @@ impl Frame {
         Frame { number: phys_addr / PAGE_SIZE }
     }
 
-    fn start_address(&self) -> PhysicalAddress {
+    pub fn start_address(&self) -> PhysicalAddress {
         self.number * PAGE_SIZE
     }
 

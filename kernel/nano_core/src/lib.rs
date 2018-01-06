@@ -79,7 +79,6 @@ mod mod_mgmt;
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 
 
-
 use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
@@ -198,7 +197,7 @@ fn fourth_thread_main(arg: u64) -> Option<String> {
 
 
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
@@ -208,7 +207,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     trace!("Logger initialized.");
     
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
-    let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
+    let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
     let mut kernel_mmi = memory::init(boot_info); // consumes boot_info
@@ -223,7 +222,13 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
-    drivers::early_init();
+
+
+    // HERE: this is the beginning of things that should be moved out of the nano_core into separate crates, called by a driver
+
+    {
+        drivers::early_init(&mut kernel_mmi);
+    }
 
 
     // unsafe{  logger::enable_vga(); }
