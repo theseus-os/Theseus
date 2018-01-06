@@ -21,21 +21,11 @@ impl RSDP {
     pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<RSDP> {
         let start_addr = 0xE_0000 + KERNEL_OFFSET;
         let end_addr = 0xF_FFFF + KERNEL_OFFSET;
-
         // The whole area from 0x0 to 0x10_0000 has already been mapped to the higher half in remap_the_kernel()
-        // Map all of the ACPI RSDP space
-        // {
-        //     let start_frame = Frame::containing_address(PhysicalAddress::new(start_addr));
-        //     let end_frame = Frame::containing_address(PhysicalAddress::new(end_addr));
-        //     for frame in Frame::range_inclusive(start_frame, end_frame) {
-        //         let page = Page::containing_address(VirtualAddress::new(frame.start_address().get()));
-        //         let result = active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE);
-        //         result.flush(active_table);
-        //     }
-        // }
 
-
-        RSDP::search(start_addr, end_addr)
+        let rsdp = RSDP::search(start_addr, end_addr);
+        debug!("Found RSDP at addr {:#X}: {:?}", &rsdp as *const _ as usize, rsdp);
+        rsdp
     }
 
     fn search(start_addr: usize, end_addr: usize) -> Option<RSDP> {
