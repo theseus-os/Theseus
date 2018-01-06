@@ -1,24 +1,50 @@
 pub mod input; 
 pub mod ata_pio;
 pub mod pci;
-mod acpi_old;
+mod acpi;
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
-
+use memory::{MemoryManagementInfo, PageTable};
 
 /// This is for functions that DO NOT NEED dynamically allocated memory. 
-pub fn early_init() {
+pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) {
     assert_has_not_been_called!("drivers::early_init was called more than once!");
     vga_buffer::show_splash_screen();
+    
+    {
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+        } = kernel_mmi;
+            
+
+        // // temporarily dumping kernel VMAs
+        // {
+        //     info!("================ KERNEL VMAS ================");
+        //     for vma in kernel_vmas {
+        //         info!("   {}", vma);
+        //     }
+        // }
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                acpi::init(active_table);
+            }
+            _ => {
+                error!("drivers::early_init(): couldn't get kernel's active_table!");
+                return;
+            }
+        }
+    }
 }
 
 /// This is for functions that require the memory subsystem to be initialized. 
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
-    acpi_old::init();
 
     // ata_pio::init_ata_devices();
     // pci::init_pci_buses();
