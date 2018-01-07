@@ -3,16 +3,28 @@
 ### It does not build an OS .iso image or anything runnable in a simulator like QEMU.
 
 .DEFAULT_GOAL := all
+SHELL := /bin/bash
 
+PWD := $(shell pwd)
+
+KERNEL_BUILD_DIR ?= ${PWD}/../build
+CFG_DIR ?= ${PWD}/../../cfg
+RUSTFLAGS += "-C code-model=large"
+
+BUILD_MODE := debug
+# BUILD_MODE := release  ## release mode currently does NOT work! See issue #14
+ifeq ($(BUILD_MODE), release)
+	XARGO_RELEASE_ARG := --release
+endif  ## otherwise, nothing, which is "debug" by default
 
 arch ?= x86_64
 
 ## this should not point directly to the .json target spec file, but it should have the same name.
-target ?= $(arch)-theseus
+TARGET ?= $(arch)-theseus
 
 ## this is the output path of the xargo command, not our choice.
 ## The name of the lib (lib_____.a) is defined by the target above.
-cargo-obj := target/$(target)/debug/libnano_core.a
+cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 
 nano_core-obj := build/nano_core-$(arch).bin
 
@@ -22,23 +34,24 @@ assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.asm, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
 
 
-.PHONY: all build clean cargo
+.PHONY: all clean cargo
 
-all: build
-
-build: $(nano_core-obj)
+all: $(nano_core-obj)
 
 clean:
-	@cargo clean
-	@rm -rf build
+	cargo clean
+	rm -rf ./build
 
 
 cargo: 
-	@RUST_TARGET_PATH="../../cfg" xargo build --target $(target)  ## target arg must be a target name, not the file path.
+	##cargo clean   ## temporarily calling cargo clean to fix nano_core makefile
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS=${RUSTFLAGS} xargo build $(XARGO_RELEASE_ARG) --verbose --target $(TARGET)  ## target arg must be a target name, not the file path.
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)	
+	@mkdir -p $(KERNEL_BUILD_DIR)
+	@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/nano_core.bin
 
 
 # compile assembly files

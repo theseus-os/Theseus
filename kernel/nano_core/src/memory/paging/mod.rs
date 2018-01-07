@@ -7,12 +7,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use alloc::BTreeSet;
+use mod_mgmt::find_first_section_by_type;
 pub use self::entry::*;
 use memory::{Frame, FrameAllocator};
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
-use multiboot2::BootInformation;
+use multiboot2;
 use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_PAGE_TABLE_INDEX};
@@ -68,6 +70,15 @@ impl Page {
         PageIter {
             start: start,
             end: end,
+        }
+    }
+
+    pub fn range_inclusive_addr(virt_addr: VirtualAddress, size_in_bytes: usize) -> PageIter {
+        let start_page = Page::containing_address(virt_addr);
+        let end_page = Page::containing_address(virt_addr + size_in_bytes - 1);
+        PageIter {
+            start: start_page,
+            end: end_page,
         }
     }
 }
@@ -206,14 +217,6 @@ impl ActivePageTable {
 }
 
 
-// pub fn higher_half_entry() {
-
-//     unsafe {
-//         *((0xb8000 + super::KERNEL_OFFSET) as *mut u64) = 0x2f592f412f4b2f4f;
-//     }
-//     loop { }
-// }
-
 
 
 pub struct InactivePageTable {
@@ -251,18 +254,10 @@ pub enum PageTable {
 
 
 
-// pub fn new_address_space<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
-//     where A: FrameAllocator
-// {
-    
-// }
-
-
-
 pub fn remap_the_kernel<A>(allocator: &mut A, 
-    boot_info: &BootInformation, 
+    boot_info: multiboot2::BootInformation, 
     vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) 
-    -> ActivePageTable
+    -> Result<ActivePageTable, &'static str>
     where A: FrameAllocator
 {
     //  let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
@@ -271,13 +266,13 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
     let mut active_table: ActivePageTable = unsafe { ActivePageTable::new() };
     let mut new_table: InactivePageTable = {
-        let frame = allocator.allocate_frame().expect("no more frames");
+        let frame = try!(allocator.allocate_frame().ok_or("couldn't allocate frame"));
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
 
-    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
-        let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
+    let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
 
+    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         // clear out the initially-mapped kernel entries of P4
         // (they are initialized in InactivePageTable::new())
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
@@ -287,63 +282,65 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // map the allocated kernel text sections
         let mut index = 0;
         for section in elf_sections_tag.sections() {
-            if section.size == 0 || !section.is_allocated() {
+            if section.size() == 0 || !section.is_allocated() {
                 // skip sections that aren't loaded to memory
                 continue;
             }
 
-            assert!(section.addr as usize % PAGE_SIZE == 0,
+            assert!(section.start_address() as usize % PAGE_SIZE == 0,
                     "sections need to be page aligned");
-            debug!("mapping section at addr: {:#x}, size: {:#x}",
-                     section.addr,
-                     section.size);
 
-            let flags = EntryFlags::from_multiboot2_section_flags(section);
+            let flags = EntryFlags::from_multiboot2_section_flags(&section);
 
             // even though the linker stipulates that the kernel sections have a higher-half virtual address,
             // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
             // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
             // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-            let mut start_phys_addr = section.start_address();
+            let mut start_phys_addr = section.start_address() as PhysicalAddress;
             if start_phys_addr >= super::KERNEL_OFFSET { 
                 // true for all sections but the first section (inittext)
                 start_phys_addr -= super::KERNEL_OFFSET;
             }
             
-            let mut start_virt_addr = section.start_address();
+            let mut start_virt_addr = section.start_address() as VirtualAddress;
             if start_virt_addr < super::KERNEL_OFFSET { 
                 // special case to handle the first section only
                 start_virt_addr += super::KERNEL_OFFSET;
             }
 
-            vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size as usize, flags, "Kernel ELF Section");
-            index += 1;
-
+            vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, "KERNEL ELF SECTION TODO FIXME");
+            debug!("mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
+            
             // map the whole range of frames in this section
-            mapper.map_contiguous_frames(start_phys_addr, section.size as usize, start_virt_addr, flags, allocator);
+            mapper.map_contiguous_frames(start_phys_addr, section.size() as usize, start_virt_addr, flags, allocator);
+
+            index += 1;
         }
 
+        // let's just go ahead and try mapping the entire first megabyte of physical memory,
+        // which happens to include ACPI tables, VGA memory, etc
+        // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
+        mapper.map_contiguous_frames(0x0, 0x10_0000, KERNEL_OFFSET, EntryFlags::PRESENT, allocator);
 
-        // map the VGA text buffer to 0xb8000 + KERNEL_OFFSET
-        let vga_buffer_virt_addr = 0xb8000 + super::KERNEL_OFFSET;
-        let vga_buffer_flags = EntryFlags::WRITABLE;
-        vmas[index] = VirtualMemoryArea::new(vga_buffer_virt_addr, PAGE_SIZE, vga_buffer_flags, "Kernel VGA Buffer");
-        let vga_buffer_frame = Frame::containing_address(0xb8000);
-        mapper.map_virtual_address(vga_buffer_virt_addr, vga_buffer_frame, vga_buffer_flags, allocator);
+        // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
+        // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
+        const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+        const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
+        let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
+        let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
+        let vga_display_flags = EntryFlags::WRITABLE;
+        vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
+        // use remap because we already mapped it above
+        mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr, size_in_bytes), vga_display_flags);
+
+
+        // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
+        mapper.p4_mut().clear_entry(0);
     });
 
 
     let (_old_table, new_active_table) = active_table.switch(&new_table);
 
-    
-    // DEPRECATED:  the boot.S file sets up the guard page by zero-ing pml4t and pmdp in start64_high
-    // let old_p4_page = Page::containing_address(old_table.p4_frame.start_address());
-    // active_table.unmap(old_p4_page, allocator);
-    // debug!("guard page at {:#x}", old_p4_page.start_address());
-
-
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
-    new_active_table
+    Ok(new_active_table)
 }
-
-

@@ -1,7 +1,8 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "kernel_config"
+name = "test_server"
 version = "0.1.0"
 
+
 [lib]
-crate-type = ["lib"]
+crate-type = ["rlib"] # "lib" does the same thing I think

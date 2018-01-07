@@ -14,29 +14,44 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
+pub mod virtual_address_allocator;
+
 
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
 use core::ops::DerefMut;
-use alloc::arc::Arc;
 use alloc::Vec;
 use alloc::string::String;
-use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, MAX_MEMORY_AREAS};
+use kernel_config::memory::{PAGE_SIZE, MAX_MEMORY_AREAS};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-
+use task;
+use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
+use mod_mgmt::metadata;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
 
 
 
-/// The one and only frame allocator
+/// The one and only frame allocator, a singleton. 
 pub static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
 
+/// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
     frame_allocator.allocate_frame()
 }
+
+/// The set of physical memory areas as provided by the bootloader.
+/// It cannot be a Vec or other collection because those allocators aren't available yet
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]> = Once::new();
+
+/// The set of modules loaded by the bootloader
+/// we use a max size of 32 because that's the limit of Rust's default array initializers
+static MODULE_AREAS: Once<([ModuleArea; MAX_MEMORY_AREAS], usize)> = Once::new();
+
+
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -104,8 +119,8 @@ impl MemoryManagementInfo {
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct PhysicalMemoryArea {
-    pub base_addr: u64,
-    pub length: u64,
+    pub base_addr: usize,
+    pub length: usize,
     pub typ: u32,
     pub acpi: u32
 }
@@ -174,6 +189,14 @@ pub struct VirtualMemoryArea {
     size: usize,
     flags: EntryFlags,
     desc: &'static str,
+}
+use core::fmt;
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
+                  self.start, self.size, self.flags, self.desc
+        )
+    }
 }
 
 
@@ -262,21 +285,16 @@ impl VirtualMemoryArea {
 
 
 
-/// The set of physical memory areas as provided by the bootloader.
-/// It cannot be a Vec or other collection because those allocators aren't available yet
-/// we use a max size of 32 because that's the limit of Rust's default array initializers
-static USABLE_PHYSICAL_MEMORY_AREAS: Once<[PhysicalMemoryArea; MAX_MEMORY_AREAS]> = Once::new();
 
-/// The set of modules loaded by the bootloader
-/// we use a max size of 32 because that's the limit of Rust's default array initializers
-static MODULE_AREAS: Once<([ModuleArea; MAX_MEMORY_AREAS], usize)> = Once::new();
 
 
 /// initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents Task zero's (the kernel's) address space. 
+/// Consumes the given BootInformation, because after the memory system is initialized,
+/// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
+pub fn init(boot_info: BootInformation) -> MemoryManagementInfo {
     assert_has_not_been_called!("memory::init must be called only once");
 
     // copy the list of modules (currently used for userspace programs)
@@ -301,20 +319,23 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
     let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
 
-    // our linker script specifies that the kernel will start at 1MB, and end at 1MB + length + KERNEL_OFFSET
-    // so the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
-    // thus, kernel_phys_start is the same as kernel_virt_start
-    let kernel_phys_start = elf_sections_tag.sections()
+    // Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
+    // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
+    // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
+    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in remap_the_kernel.
+    let kernel_phys_start: PhysicalAddress = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
-        .map(|s| s.addr)
+        .map(|s| s.start_address())
         .min()
-        .unwrap();
-    let kernel_virt_end = elf_sections_tag.sections()
+        .unwrap()
+        as PhysicalAddress;
+    let kernel_virt_end: VirtualAddress = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
-        .map(|s| s.addr + s.size)
+        .map(|s| s.end_address())
         .max()
-        .unwrap();
-    let kernel_phys_end = kernel_virt_end - (KERNEL_OFFSET as u64);
+        .unwrap()
+        as PhysicalAddress;
+    let kernel_phys_end: PhysicalAddress = kernel_virt_end - KERNEL_OFFSET;
 
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
@@ -330,18 +351,18 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     USABLE_PHYSICAL_MEMORY_AREAS.call_once( || {
         let mut areas: [PhysicalMemoryArea; MAX_MEMORY_AREAS] = Default::default();
         for (index, area) in memory_map_tag.memory_areas().enumerate() {
-            debug!("memory area base_addr={:#x} length={:#x}", area.base_addr, area.length);
+            debug!("memory area base_addr={:#x} length={:#x}", area.start_address(), area.size());
             
             // we cannot allocate memory from sections below the end of the kernel's physical address!!
-            if area.base_addr + area.length < kernel_phys_end {
+            if area.end_address() < kernel_phys_end {
                 debug!("  skipping region before kernel_phys_end");
                 continue;
             }
 
-            let start_addr = if area.base_addr >= kernel_phys_end { area.base_addr } else { kernel_phys_end };
+            let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
             areas[index] = PhysicalMemoryArea {
-                base_addr: start_addr,
-                length: (area.base_addr + area.length) - start_addr,
+                base_addr: start_paddr,
+                length: area.end_address() - start_paddr,
                 typ: 1, // TODO: what does this mean??
                 acpi: 0, // TODO: what does this mean??
             };
@@ -354,17 +375,19 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 
     // init the frame allocator
     let frame_allocator_mutex: &Mutex<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        Mutex::new( AreaFrameAllocator::new(kernel_phys_start as usize,
-                                kernel_phys_end as usize,
-                                boot_info.start_address(),
-                                boot_info.end_address(),
-                                PhysicalMemoryAreaIter::new()
-                    )
+        Mutex::new( 
+            AreaFrameAllocator::new(
+                kernel_phys_start as usize,
+                kernel_phys_end as usize,
+                boot_info.start_address(),
+                boot_info.end_address(),
+                PhysicalMemoryAreaIter::new()
+            )
         )
     });
 
     let mut kernel_vmas: [VirtualMemoryArea; MAX_MEMORY_AREAS] = Default::default();
-    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas);
+    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), boot_info, &mut kernel_vmas).unwrap();
 
 
     // The heap memory must be mapped before it can initialized! Map it and then init it here. 
@@ -379,9 +402,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
     }
     heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
 
-
     // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
-
 
     let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
     task_zero_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
@@ -395,7 +416,6 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
-
     // return the kernel's (task_zero's) memory info 
     MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
@@ -406,29 +426,100 @@ pub fn init(boot_info: &BootInformation) -> MemoryManagementInfo {
 }
 
 
+/// Loads the specified kernel crate into memory, allowing it to be invoked.  
+/// Returns a Result containing the number of symbols that were added to the system map
+/// as a result of loading this crate.
+pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
+    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
+    use kernel_config::memory::address_is_page_aligned;
+    if !address_is_page_aligned(module.start_address()) {
+        error!("module {} is not page aligned!", module.name());
+        return Err("module was not page aligned");
+    } 
+
+    // first we need to map the module memory region into our address space, 
+    // so we can then parse the module as an ELF file in the kernel.
+    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+    {
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+        } = kernel_mmi;
+            
+
+        // // temporarily dumping kernel VMAs
+        // {
+        //     info!("================ KERNEL VMAS ================");
+        //     for vma in kernel_vmas {
+        //         info!("   {}", vma);
+        //     }
+        // }
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let module_flags = EntryFlags::PRESENT;
+                {
+                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                    active_table.map_contiguous_frames(module.start_address(), module.size(), 
+                                    module.start_address() as VirtualAddress, // identity mapping
+                                    module_flags, frame_allocator.deref_mut());  
+                }
+
+                let new_crate = try!( {
+                    // the nano_core requires special handling because it has already been loaded,
+                    // we just need to parse its symbols and add them to the symbol table & crate metadata lists
+                    if module.name() == "__k_nano_core" {
+                        parse_nano_core(module.start_address(), module.size())
+                    }
+                    else {
+                        parse_elf_kernel_crate(module.start_address(), module.size(), module.name(), active_table)
+                    }
+                });
+
+                // now we can unmap the module because we're done reading from it in the ELF parser
+                {
+                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                    active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
+                }
+
+                info!("loaded new crate: {}", new_crate.crate_name);
+                Ok(metadata::add_crate(new_crate))
+
+            }
+            _ => {
+                error!("load_kernel_crate(): error getting kernel's active page table to map module.");
+                Err("couldn't get kernel's active page table")
+            }
+        }
+    }
+
+}
+
+
 /// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
-    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+pub fn get_module_index(index: usize) -> Result<&'static ModuleArea, &'static str> {
+    let ma_pair = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
     if index < ma_pair.1 {
-        Some(&ma_pair.0[index])
+        Ok(&ma_pair.0[index])
     }
     else {
-        None
+        error!("get_module_index(): module index {} out of range {}.", index, ma_pair.1); 
+        Err("module index our of range")
     }
 }
 
 
 /// returns the `ModuleArea` corresponding to the given module name.
-pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
+pub fn get_module(name: &str) -> Result<&'static ModuleArea, &'static str> {
+    let ma_pair = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
     for i in 0..ma_pair.1 {
         if name == ma_pair.0[i].name() {
-            return Some(&ma_pair.0[i]);
+            return Ok(&ma_pair.0[i]);
         }
     }
-
-    // not found    
-    None
+    error!("get_module(): module \"{}\" not found!", name);
+    Err("module not found")
 }
 
 

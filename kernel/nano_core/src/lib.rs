@@ -23,7 +23,7 @@
 // ------------------------------------
 // ----- EXTERNAL CRATES BELOW --------
 // ------------------------------------
-extern crate rlibc;
+extern crate rlibc; // basic memset/memcpy libc functions
 extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
@@ -36,7 +36,8 @@ extern crate bit_field;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 extern crate xmas_elf;
-//extern crate atomic;
+extern crate rustc_demangle;
+extern crate goblin;
 
 
 // ------------------------------------
@@ -60,7 +61,6 @@ extern crate state_store;
 extern crate test_lib;
 extern crate rtc;
 
-
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 #[macro_use] mod drivers;  
 #[macro_use] mod util;
@@ -71,6 +71,11 @@ mod memory;
 mod interrupts;
 mod syscall;
 mod mod_mgmt;
+
+// TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
+// and make visible/accessible to other modules that depend on nano_core functions.
+// Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
+
 
 
 use spin::RwLockWriteGuard;
@@ -247,13 +252,18 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
-    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
+    // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_physical_address) };
-    enable_nxe_bit();
-    enable_write_protect_bit();
+    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
-    let mut kernel_mmi: memory::MemoryManagementInfo = memory::init(boot_info);
+    let mut kernel_mmi = memory::init(boot_info); // consumes boot_info
     
+    // parse the nano_core ELF object to load its symbols into our metadata
+    {
+        let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
+    }
+        
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -285,7 +295,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // TODO: transform this into something more like "task::init(initial_mmi)"
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(kernel_mmi);
+        tasklist_mut.init_task_zero(kernel_mmi).unwrap();
     }
 
     // initialize the kernel console
@@ -322,6 +332,35 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     // the idle thread's (Task 0) busy loop
     trace!("Entering Task0's idle loop");
 	
+    // attempt to parse a test kernel module
+    if true {
+        let kernel_mmi_ref = task::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
+        let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
+        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
+        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
+
+        // now let's try to invoke the test_server function we just loaded
+        let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func1").upgrade().unwrap();
+        debug!("server_func_vaddr: {:#x}", func_sec.virt_addr());
+        let server_func: fn(u8, u64) -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
+        debug!("Called server_func(10, 20) = {:?}", server_func(10, 20));
+
+        // now let's try to invoke the test_client function we just loaded
+        let client_func_sec = ::mod_mgmt::metadata::get_symbol("test_client::client_func").upgrade().unwrap();
+        debug!("client_func_vaddr: {:#x}", client_func_sec.virt_addr());
+        let client_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(client_func_sec.virt_addr()) };
+        debug!("Called client_func() = {:?}", client_func());
+
+        // now let's try to invoke the test_lib function we just loaded
+        let test_lib_public_sec = ::mod_mgmt::metadata::get_symbol("test_lib::test_lib_public").upgrade().unwrap();
+        debug!("test_lib_public_vaddr: {:#x}", client_func_sec.virt_addr());
+        let test_lib_public_func: fn(u8) -> (u8, &'static str, u64) = unsafe { ::core::mem::transmute(test_lib_public_sec.virt_addr()) };
+        debug!("Called test_lib_public() = {:?}", test_lib_public_func(10));
+    }
 
     // create and jump to the first userspace thread
     if true
@@ -341,7 +380,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -350,7 +389,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     }
 
     // a second duplicate syscall test user task
-    if true
+    if false
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -361,10 +400,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
-    // use test_lib;
-    // println!("test_lib::test_lib_func(10) = {}", test_lib::test_lib_func(10));
-
-
+    assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
     }
@@ -377,21 +413,6 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
 }
 
-fn enable_nxe_bit() {
-    use x86_64::registers::msr::{IA32_EFER, rdmsr, wrmsr};
-
-    let nxe_bit = 1 << 11;
-    unsafe {
-        let efer = rdmsr(IA32_EFER);
-        wrmsr(IA32_EFER, efer | nxe_bit);
-    }
-}
-
-fn enable_write_protect_bit() {
-    use x86_64::registers::control_regs::{cr0, cr0_write, Cr0};
-
-    unsafe { cr0_write(cr0() | Cr0::WRITE_PROTECT) };
-}
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]

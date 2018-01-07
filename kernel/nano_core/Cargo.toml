@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 bit_field = "0.7.0"
 bitflags = "1.0"
-multiboot2 = "0.3.2"
+multiboot2 = { git = "https://github.com/phil-opp/multiboot2-elf64", rev = "aeeb28249eb94e9a8da4002b5ead518200258ab8" }
 once = "0.3.2"
 rlibc = "1.0.0"
 spin = "0.4.5"
@@ -15,12 +15,16 @@ x86 = "0.8.1"
 atomic = "0.3.4"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-xmas-elf = { git = "https://github.com/nrc/xmas-elf" } # the crates.io version is out of date right now
+xmas-elf = "0.6.1"
+rustc-demangle = "0.1.5" 
 
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
 # compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
 
-
+[dependencies.goblin]  ## for linker relocation typedefs
+version = "0.0.13"
+default-features = false
+features = ["elf64", "goblin"]
 
 [dependencies.log]
 default-features = false
@@ -77,11 +81,10 @@ rustflags = ["-C", "link-args=-fPIC", "-C", "relocation-model=pic", "-C", "code-
 
 
 [lib]
-# this builds both libtheseus.a and libtheseus.rlib
-# staticlib is required to build a self-contained .a file that we can boot into
-# rlib is for my hopeful attempt to satisfy the alloc crate and other dependencies when building other crates as dylibs
-
-# we choose rlib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
+# This builds the nano_core as two types of libraries:
+# 1) staticlib: required to build a self-contained, fully-linked .a file that we can boot into.
+# 2) rlib: to build a partial object file that other crates can include and use without including the full nano_core code in their object file.
+# we choose rlib instead of dylib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
 # meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it
 # Furthermore we cannot build it as a dylib instead of rlib because he custom x86_64-theseus target triple doesn't support it (really, Xargo doesn't support it)
 crate-type = ["staticlib", "rlib"]  

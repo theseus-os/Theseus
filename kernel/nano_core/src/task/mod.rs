@@ -1,6 +1,6 @@
 
-use spin::{Once, Mutex, RwLock};
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard};
+use spin::{Once, RwLock};
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe, RwLockIrqSafeReadGuard};
 use alloc::{BTreeMap, Vec};
 use alloc::string::String;
 use alloc::arc::Arc;
@@ -20,7 +20,13 @@ type AtomicTaskId = AtomicUsize;
 
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+
+/// returns the kernel's `MemoryManagementInfo`, if initialized.
+/// If not, it returns None.
+pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
+    KERNEL_MMI.try().map( |r| r.clone())
+}
 
 /// The `TaskId` of the currently executing `Task`
 static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
@@ -82,8 +88,8 @@ pub struct Task {
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Stack>,
     /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & Mutex because it's shared between other tasks in the same address space
-    pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
+    /// Wrapped in an Arc & MutexIrqSafe because it's shared between other tasks in the same address space
+    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
 }
@@ -182,11 +188,6 @@ impl Task {
 
             let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
             let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
-
-
-            // TODO: we also don't need to switch page tables if we're just moving from any userspace task
-            //       to a kernel thread. We'll need some type of identifier in the Task struct
-            //       in order to identify a task as userspace or kernel thread only
 
 
             if Arc::ptr_eq(prev_mmi, next_mmi) {
@@ -331,7 +332,7 @@ impl TaskList {
         assert_has_not_been_called!("init_task_zero was already called once!");
 
         let mmi_ref = KERNEL_MMI.call_once( || {
-            Arc::new(Mutex::new(task_zero_mmi))
+            Arc::new(MutexIrqSafe::new(task_zero_mmi))
         });
 
         let id_zero: TaskId = 0;
@@ -510,9 +511,9 @@ impl TaskList {
                                                     module.start_address() as VirtualAddress, // identity mapping
                                                     module_flags, frame_allocator.deref_mut());     
                         use mod_mgmt;
-                        let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as *const u8, module.size()).unwrap();
+                        let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as VirtualAddress, module.size()).unwrap();
                         // now we can unmap the module because we're done reading from it in the ELF parser
-                        active_table.unmap_contiguous_pages(module.start_address(), module.size(), frame_allocator.deref_mut());
+                        active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
                         
                         let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
 
@@ -530,7 +531,6 @@ impl TaskList {
                             // map the userspace module into the new address space.
                             // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
                             // debug!("!! mapping userspace module with name: {}", module.name());
-                            // TODO: FIXME: map the actual elf regions to their proper address, no longer a linear dumb mapping
                             for prog in elf_progs.iter() {
                                 // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
                                 debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
@@ -568,7 +568,7 @@ impl TaskList {
 
             assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
             new_task.ustack = ustack;
-            new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
+            new_task.mmi = Some(Arc::new(MutexIrqSafe::new(new_userspace_mmi)));
             new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
         }
 

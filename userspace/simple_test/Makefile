@@ -1,9 +1,16 @@
-all: test_program.s
-	@mkdir -p ../$(USERSPACE_BUILD_DIR)
+USERSPACE_BUILD_DIR ?= ../build
 
-	@nasm -f elf64 test_program.s -o ../$(USERSPACE_BUILD_DIR)/test_program.o
-	@ld -o ../$(USERSPACE_BUILD_DIR)/test_program ../$(USERSPACE_BUILD_DIR)/test_program.o
-	@strip ../$(USERSPACE_BUILD_DIR)/test_program
+.PHONY: all clean
+.DEFAULT_GOAL := all
+
+
+all: test_program.s
+	@mkdir -p $(USERSPACE_BUILD_DIR)
+
+	@nasm -f elf64 test_program.s -o $(USERSPACE_BUILD_DIR)/test_program.o
+	@ld -o $(USERSPACE_BUILD_DIR)/test_program $(USERSPACE_BUILD_DIR)/test_program.o
+	@rm $(USERSPACE_BUILD_DIR)/test_program.o
+	@strip $(USERSPACE_BUILD_DIR)/test_program
 
 clean:
-	@rm -rf build
+	@rm -rf $(USERSPACE_BUILD_DIR)/test_program*

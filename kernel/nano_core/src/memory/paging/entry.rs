@@ -63,45 +63,46 @@ bitflags! {
 
 impl EntryFlags {
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
-        use multiboot2::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE, ELF_SECTION_EXECUTABLE};
+        use multiboot2::ElfSectionFlags;
+        // ::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE, ELF_SECTION_EXECUTABLE};
 
         let mut flags = EntryFlags::empty();
 
-        if section.flags().contains(ELF_SECTION_ALLOCATED) {
+        if section.flags().contains(ElfSectionFlags::ALLOCATED) {
             // section is loaded to memory
             flags = flags | EntryFlags::PRESENT;
         }
-        if section.flags().contains(ELF_SECTION_WRITABLE) {
+        if section.flags().contains(ElfSectionFlags::WRITABLE) {
             flags = flags | EntryFlags::WRITABLE;
         }
-        if !section.flags().contains(ELF_SECTION_EXECUTABLE) {
+        if !section.flags().contains(ElfSectionFlags::EXECUTABLE) {
             flags = flags | EntryFlags::NO_EXECUTE;
         }
 
         flags
     }
 
-    // pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
-    //     use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+    pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
+        use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
         
-    //     let mut flags = EntryFlags::empty();
+        let mut flags = EntryFlags::empty();
 
-    //     if elf_flags & SHF_ALLOC == SHF_ALLOC {
-    //         // section is loaded to memory
-    //         flags = flags | PRESENT;
-    //     }
-    //     if elf_flags & SHF_WRITE == SHF_WRITE {
-    //         flags = flags | WRITABLE;
-    //     }
-    //     if elf_flags & SHF_EXECINSTR == 0 {
-    //         // only mark no execute if the execute flag isn't 1
-    //         flags = flags | NO_EXECUTE;
-    //     }
+        if elf_flags & SHF_ALLOC == SHF_ALLOC {
+            // section is loaded to memory
+            flags = flags | EntryFlags::PRESENT;
+        }
+        if elf_flags & SHF_WRITE == SHF_WRITE {
+            flags = flags | EntryFlags::WRITABLE;
+        }
+        if elf_flags & SHF_EXECINSTR == 0 {
+            // only mark no execute if the execute flag isn't 1
+            flags = flags | EntryFlags::NO_EXECUTE;
+        }
 
-    //     flags
-    // }
+        flags
+    }
 
-     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+    pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         use xmas_elf::program::{FLAG_R, FLAG_W, FLAG_X};
         
         let mut flags = EntryFlags::empty();

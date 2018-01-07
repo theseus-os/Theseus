@@ -17,9 +17,10 @@ pub const BYTES_PER_ADDR: usize = 8;
 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
 pub const PAGE_SHIFT: usize = 12;
-/// page size is 4096, 4KiB pages.
+/// page size is 4096 bytes, 4KiB pages.
 pub const PAGE_SIZE: usize = (1 << PAGE_SHIFT);
 /// returns true if an address is page-aligned
+#[inline(always)]
 pub fn address_is_page_aligned(addr: usize) -> bool {
     addr % PAGE_SIZE == 0
 }
@@ -61,14 +62,26 @@ pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
 
-/// the virtual address where the kernel is mapped to: 0xFFFFFFFF80000000.
+/// The virtual address where the initial kernel (the nano_core) is mapped to.
+/// Actual value: 0xFFFFFFFF80000000.
 /// i.e., the linear offset between physical memory and kernel memory
 /// so the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
-pub const KERNEL_OFFSET: usize = 0xFFFFFFFF80000000;
+/// This is -2GiB from the end of the 64-bit address space.
+pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
+
+
+/// The kernel text region is where we load kernel modules. 
+/// It starts at the 511th P4 entry and goes up until the KERNEL_OFFSET,
+/// which is where the nano_core itself starts. 
+/// actual value: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
+pub const KERNEL_TEXT_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_TEXT_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+/// The size in bytes, not in pages.
+pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 * 1024 * 1024); // because the KERNEL_OFFSET starts at -2GiB
+
 
 /// higher-half heap gets 512 GB address range starting at the 509th P4 entry,
 /// which is the slot right below the recursive P4 entry (510)
-/// actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
+/// actual value: 0o177777_776_000_000_000_0000, or 0xFFFF_FF00_0000_0000
 pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 pub const KERNEL_HEAP_INITIAL_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
 /// the kernel heap gets the whole 509th P4 entry.

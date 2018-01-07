@@ -99,9 +99,7 @@ impl ConsoleOutputEvent {
 }
 
 
-/// the console does not own the event queue, it merely receives a reference to it. 
-/// BUT WHO SHOULD OWN THE EVENT QUEUE? TODO: answer this question
-// pub fn console_init(event_queue: &VecDeque<ConsoleEvent>, tasklist_mut: mut RwLockIrqSafeWriteGuard<TaskList>) -> bool {
+/// the console owns and creates the event queue, and returns a producer reference to the queue.
 pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQueueProducer<ConsoleEvent> {
     assert_has_not_been_called!("console_init was called more than once!");
 
