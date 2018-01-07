@@ -255,8 +255,8 @@ pub enum PageTable {
 
 
 pub fn remap_the_kernel<A>(allocator: &mut A, 
-    boot_info: multiboot2::BootInformation, 
-    vmas: &mut [VirtualMemoryArea; MAX_MEMORY_AREAS]) 
+    boot_info: &multiboot2::BootInformation, 
+    vmas: &mut [VirtualMemoryArea; 32]) 
     -> Result<ActivePageTable, &'static str>
     where A: FrameAllocator
 {

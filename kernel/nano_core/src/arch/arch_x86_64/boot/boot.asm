@@ -361,6 +361,6 @@ kernel_table:
 align 16
 global initial_stack_bottom
 initial_stack_bottom:
-	resb 4096 * 5
+	resb 4096 * 16
 global initial_stack_top
 initial_stack_top:

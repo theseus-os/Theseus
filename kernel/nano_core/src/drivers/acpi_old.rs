@@ -44,7 +44,7 @@ pub enum Rsdp<'a> {
 }
 
 #[derive(Debug)]
-#[repr(C,packed)]
+#[repr(packed)]
 pub struct Rsdp1 {
 	signature: [u8; 8],
 	checksum: u8,
