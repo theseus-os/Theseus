@@ -9,3 +9,7 @@
 	path = libs/irq_safety
 	url = https://github.com/kevinaboos/irq_safety
 	branch = master
+[submodule "libs/multiboot2-elf64"]
+	path = libs/multiboot2-elf64
+	url = https://github.com/kevinaboos/multiboot2-elf64.git
+	branch = master

@@ -7,7 +7,41 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::{Frame, FrameAllocator, PhysicalMemoryAreaIter, PhysicalMemoryArea};
+use memory::{Frame, FrameAllocator, PhysicalMemoryArea};
+use alloc::Vec;
+
+/// A stand-in for a Union
+pub enum VectorArray<T: Clone> {
+    Array((usize, [T; 32])),
+    Vector(Vec<T>),
+}
+impl<T: Clone> VectorArray<T> {
+    pub fn upgrade_to_vector(&mut self) {
+        let new_val = { 
+            match *self {
+                VectorArray::Array((_, ref arr)) => { 
+                    Some(VectorArray::Vector(arr.to_vec()))
+                }
+                _ => { 
+                    None // no-op, it's already a Vector
+                }
+            }
+        };
+        if let Some(nv) = new_val {
+            *self = nv;
+        }
+    }
+
+    // pub fn iter(&self) -> ::core::slice::Iter<T> {
+    //     match self {
+    //         &VectorArray::Array((_count, arr)) => arr.iter(),
+    //         &VectorArray::Vector(v) => v[0..v.len()].iter(),
+    //     }
+    // }
+}
+
+
+
 
 /// A frame allocator that uses the memory areas from the multiboot information structure as
 /// source. The {kernel, multiboot}_{start, end} fields are used to avoid returning memory that is
@@ -16,44 +50,76 @@ use memory::{Frame, FrameAllocator, PhysicalMemoryAreaIter, PhysicalMemoryArea};
 /// `kernel_end` and `multiboot_end` are _inclusive_ bounds.
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
-    current_area: Option<&'static PhysicalMemoryArea>,
-    areas: PhysicalMemoryAreaIter,
-    kernel_start: Frame,
-    kernel_end: Frame,
-    multiboot_start: Frame,
-    multiboot_end: Frame,
+    current_area: Option<PhysicalMemoryArea>,
+    available: VectorArray<PhysicalMemoryArea>,
+    occupied: VectorArray<PhysicalMemoryArea>,
 }
 
 impl AreaFrameAllocator {
-    pub fn new(kernel_start: usize,
-               kernel_end: usize,
-               multiboot_start: usize,
-               multiboot_end: usize,
-               memory_areas: PhysicalMemoryAreaIter)
-               -> AreaFrameAllocator {
+    pub fn new(available: [PhysicalMemoryArea; 32], avail_len: usize, occupied: [PhysicalMemoryArea; 32], occ_len: usize) 
+               -> Result<AreaFrameAllocator, &'static str> {
+        // if available.len() > 32 || occupied.len() > 32 {
+        //     error!("length of slice must be <= 32, available[{}] occupied[{}]", available.len(), occupied.len());
+        //     return Err("initial available or occupied slice is too long");
+        // }
+        // let mut avail: [PhysicalMemoryArea; 32] = Default::default();
+        // avail[0 .. available.len()].copy_from_slice(available);
+        // let mut occ: [PhysicalMemoryArea; 32] = Default::default();
+        // occ[0 .. occupied.len()].copy_from_slice(occupied);
+
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::containing_address(0),
             current_area: None,
-            areas: memory_areas,
-            kernel_start: Frame::containing_address(kernel_start),
-            kernel_end: Frame::containing_address(kernel_end),
-            multiboot_start: Frame::containing_address(multiboot_start),
-            multiboot_end: Frame::containing_address(multiboot_end),
+            available: VectorArray::Array((avail_len, available)),
+            occupied: VectorArray::Array((occ_len, occupied)),
         };
-        allocator.choose_next_area();
-        allocator
+        allocator.select_next_area();
+        Ok(allocator)
     }
 
-    fn choose_next_area(&mut self) {
-        self.current_area = self.areas
-            .clone()
-            .filter(|area| {
-                        let address = area.base_addr + area.length - 1;
-                        Frame::containing_address(address as usize) >= self.next_free_frame
-                    })
-            .min_by_key(|area| area.base_addr);
+    /// `available`: specifies whether the given `area` is an available or occupied memory area.
+    pub fn add_area(&mut self, area: PhysicalMemoryArea, available: bool) -> Result<(), &'static str> {
+        // match if available { self.available } else { self.occupied } {
+        match self.available {
+            VectorArray::Array((ref mut count, ref mut arr)) => {
+                if *count < arr.len() {
+                    arr[*count] = area;
+                    *count += 1;
+                }
+                else {
+                    error!("AreaFrameAllocator::add_area(): {} array is already full!", if available { "available" } else { "occupied" } );
+                    return Err("array is already full");
+                }
+            }
+            VectorArray::Vector(ref mut v) => {
+                v.push(area)
+            }
+        }
+        Ok(())
+    }
 
-        debug!("chose next area {:?}", self.current_area);
+    fn select_next_area(&mut self) {
+        self.current_area = match self.available {
+            VectorArray::Array((len, ref arr)) => {
+                arr.iter().take(len)
+                    .filter(|area| {
+                        let address = area.base_addr + area.length - 1;
+                        area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
+                    })
+                    .min_by_key(|area| area.base_addr).cloned()
+            }
+            VectorArray::Vector(ref v) => {
+                v.iter()
+                    .filter(|area| {
+                        let address = area.base_addr + area.length - 1;
+                        area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
+                    })
+                    .min_by_key(|area| area.base_addr).cloned()
+            }
+        };
+        
+            
+        trace!("AreaFrameAllocator: selected next area {:?}", self.current_area);
 
         if let Some(area) = self.current_area {
             let start_frame = Frame::containing_address(area.base_addr as usize);
@@ -62,6 +128,42 @@ impl AreaFrameAllocator {
             }
         }
     }
+
+    /// Whether or not the given Frame is within any occupied memory area.
+    fn skip_occupied_frames(&mut self) {
+        let orig_frame: usize = self.next_free_frame.number;
+        match self.occupied {
+            VectorArray::Array((len, ref arr)) => {
+                for area in arr.iter().take(len) {
+                    let start = Frame::containing_address(area.base_addr);
+                    let end = Frame::containing_address(area.base_addr + area.length);
+                    if self.next_free_frame >= start && self.next_free_frame <= end {
+                        self.next_free_frame = end + 1; 
+                        trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
+                        return;
+                    }
+                }
+            }
+            VectorArray::Vector(ref v) => {
+                for area in v.iter() {
+                    let start = Frame::containing_address(area.base_addr);
+                    let end = Frame::containing_address(area.base_addr + area.length);
+                    if self.next_free_frame >= start && self.next_free_frame <= end {
+                        self.next_free_frame = end + 1; 
+                        trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
+                        return;
+                    }
+                }
+            }
+        };
+    }
+
+
+    pub fn alloc_ready(&mut self) {
+        self.available.upgrade_to_vector();
+        self.occupied.upgrade_to_vector();
+    }
+
 }
 
 impl FrameAllocator for AreaFrameAllocator {
@@ -77,23 +179,20 @@ impl FrameAllocator for AreaFrameAllocator {
                 Frame::containing_address(address as usize)
             };
 
+            self.skip_occupied_frames();
+
             if frame > current_area_last_frame {
                 // all frames of current area are used, switch to next area
-                self.choose_next_area();
-            } else if frame >= self.kernel_start && frame <= self.kernel_end {
-                // `frame` is used by the kernel
-                self.next_free_frame = Frame { number: self.kernel_end.number + 1 };
-            } else if frame >= self.multiboot_start && frame <= self.multiboot_end {
-                // `frame` is used by the multiboot information structure
-                self.next_free_frame = Frame { number: self.multiboot_end.number + 1 };
+                self.select_next_area();
             } else {
                 // frame is unused, increment `next_free_frame` and return it
-                self.next_free_frame.number += 1;
+                self.next_free_frame += 1;
                 return Some(frame);
             }
             // `frame` was not valid, try it again with the updated `next_free_frame`
             self.allocate_frame()
         } else {
+            error!("FATAL ERROR: AreaFrameAllocator: out of physical memory!!!");
             None // no free frames left
         }
     }
