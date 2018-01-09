@@ -25,4 +25,6 @@ pub trait Rxsdt {
 
         None
     }
+
+    fn length(&self) -> usize;
 }

@@ -256,8 +256,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    debug!("multiboot2 boot_info: {:?}", boot_info);
-    debug!("end of multiboot2 info");
+    // debug!("multiboot2 boot_info: {:?}", boot_info);
+    // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
     let mut kernel_mmi = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info

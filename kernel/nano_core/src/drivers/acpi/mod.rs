@@ -4,14 +4,13 @@ use alloc::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-
 // use syscall::io::{Io, Pio};
 
 use spin::RwLock;
 
 // use stop::kstop;
 
-use memory::{ActivePageTable, Page, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{ActivePageTable, Page, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
@@ -20,13 +19,13 @@ pub use self::madt::Madt;
 pub use self::rsdt::Rsdt;
 pub use self::sdt::Sdt;
 pub use self::xsdt::Xsdt;
-// pub use self::hpet::Hpet;
+pub use self::hpet::Hpet;
 pub use self::rxsdt::Rxsdt;
 pub use self::rsdp::RSDP;
 
 // use self::aml::{parse_aml_table, AmlError, AmlValue};
 
-// pub mod hpet;
+pub mod hpet;
 // mod dmar;
 mod fadt;
 mod madt;
@@ -119,7 +118,7 @@ fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static S
 // }
 
 /// Parse the ACPI tables to gather CPU, interrupt, and timer information
-pub fn init(active_table: &mut ActivePageTable) {
+pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     {
         let mut sdt_ptrs = SDT_POINTERS.write();
         *sdt_ptrs = Some(BTreeMap::new());
@@ -135,17 +134,24 @@ pub fn init(active_table: &mut ActivePageTable) {
         let rxsdt = get_sdt(rsdp.sdt_address(), active_table);
         debug!("rxsdt: {:?}", rxsdt);
 
-        let rxsdt: Box<Rxsdt + Send + Sync> = if let Some(rsdt) = Rsdt::new(rxsdt) {
-            Box::new(rsdt)
-        } else if let Some(xsdt) = Xsdt::new(rxsdt) {
-            Box::new(xsdt)
-        } else {
-            error!("UNKNOWN RSDT OR XSDT SIGNATURE");
-            return;
+        let rxsdt: Box<Rxsdt + Send + Sync> = {
+            if let Some(rsdt) = Rsdt::new(rxsdt) {
+                Box::new(rsdt)
+            } else if let Some(xsdt) = Xsdt::new(rxsdt) {
+                Box::new(xsdt)
+            } else {
+                error!("UNKNOWN RSDT OR XSDT SIGNATURE");
+                return Err("unknown rsdt/xsdt signature!");
+            }
         };
 
+        // inform the frame allocator that the physical frames where the top-level RSDT/XSDT table exists
+        // is now off-limits and should not be touched
+        let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address() as usize, rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
+        try!(FRAME_ALLOCATOR.try().unwrap().lock().add_area(rxsdt_area, false));
 
-        rxsdt.map_all(active_table);
+        rxsdt.map_all(active_table); // TODO: FIXME: change this to not be an identity mapping, but rather to use our VirtualAddressAllocator
+
 
         for sdt_address in rxsdt.iter() {
             let sdt = unsafe { &*(sdt_address as *const Sdt) };
@@ -156,13 +162,18 @@ pub fn init(active_table: &mut ActivePageTable) {
             }
         }
 
-        // Fadt::init(active_table);
+        Fadt::init(active_table);
         Madt::init(active_table);
         // Dmar::init(active_table);
-        // Hpet::init(active_table);
+        Hpet::init(active_table);
         // init_namespace();
-    } else {
+
+        Ok(())
+
+    } 
+    else {
         error!("NO RSDP FOUND");
+        Err("could not find RSDP")
     }
 }
 
@@ -255,13 +266,13 @@ pub fn get_index_from_signature(signature: SdtSignature) -> Option<usize> {
 pub struct Acpi {
     pub fadt: RwLock<Option<Fadt>>,
     // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
-    // pub hpet: RwLock<Option<Hpet>>,
+    pub hpet: RwLock<Option<Hpet>>,
     pub next_ctx: RwLock<u64>,
 }
 
 pub static ACPI_TABLE: Acpi = Acpi {
     fadt: RwLock::new(None),
     // namespace: RwLock::new(None),
-    // hpet: RwLock::new(None),
+    hpet: RwLock::new(None),
     next_ctx: RwLock::new(0),
 };

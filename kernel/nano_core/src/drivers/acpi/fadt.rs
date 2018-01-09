@@ -108,7 +108,7 @@ impl Fadt {
         };
 
         if let Some(fadt) = fadt {
-            info!("  FACP: {:X}", fadt.dsdt);
+            debug!("  FACP: {:X}  {:?}", fadt.dsdt, fadt);
 
             let dsdt_sdt = get_sdt(fadt.dsdt as usize, active_table);
 
