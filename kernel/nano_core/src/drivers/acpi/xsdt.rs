@@ -24,6 +24,9 @@ impl Rxsdt for Xsdt {
             i: 0
         })
     }
+    fn length(&self) -> usize {
+        self.0.length as usize
+    }
 }
 
 pub struct XsdtIter {

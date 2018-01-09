@@ -17,7 +17,7 @@ use core::sync::atomic::Ordering;
 pub struct Madt {
     sdt: &'static Sdt,
     pub local_address: u32,
-    pub flags: u32
+    pub flags: u32,
 }
 
 impl Madt {
@@ -192,8 +192,6 @@ impl Madt {
     }
 }
 
-///
-
 /// MADT Local APIC
 #[derive(Debug)]
 #[repr(packed)]
@@ -234,6 +232,20 @@ pub struct MadtIntSrcOverride {
     pub flags: u16
 }
 
+/// MADT Non-maskable Interrupt.
+/// Configure these with the LINT0 and LINT1 entries in the Local vector table
+///  of the relevant processor's (or processors') local APIC.
+#[derive(Debug)]
+#[repr(packed)]
+pub struct MadtNonMaskableInterrupt {
+    /// which processor this is for, 0xFF means all processors
+    pub processor: u8,
+    /// Flags
+    pub flags: u16,
+    /// LINT (either 0 or 1)
+    pub lint: u8,
+}
+
 /// MADT Entries
 #[derive(Debug)]
 pub enum MadtEntry {
@@ -243,6 +255,8 @@ pub enum MadtEntry {
     InvalidIoApic(usize),
     IntSrcOverride(&'static MadtIntSrcOverride),
     InvalidIntSrcOverride(usize),
+    NonMaskableInterrupt(&'static MadtNonMaskableInterrupt),
+    InvalidNonMaskableInterrupt(usize),
     Unknown(u8)
 }
 
@@ -265,16 +279,27 @@ impl Iterator for MadtIter {
                     } else {
                         MadtEntry::InvalidLocalApic(entry_len)
                     },
+
                     1 => if entry_len == mem::size_of::<MadtIoApic>() + 2 {
                         MadtEntry::IoApic(unsafe { &*((self.sdt.data_address() + self.i + 2) as *const MadtIoApic) })
                     } else {
                         MadtEntry::InvalidIoApic(entry_len)
                     },
+
                     2 => if entry_len == mem::size_of::<MadtIntSrcOverride>() + 2 {
                         MadtEntry::IntSrcOverride(unsafe { &*((self.sdt.data_address() + self.i + 2) as *const MadtIntSrcOverride) })
                     } else {
                         MadtEntry::InvalidIntSrcOverride(entry_len)
                     },
+
+                    // Entry Type 3 doesn't exist
+
+                    4 => if entry_len == mem::size_of::<MadtNonMaskableInterrupt>() + 2 {
+                        MadtEntry::NonMaskableInterrupt(unsafe { &*((self.sdt.data_address() + self.i + 2) as *const MadtNonMaskableInterrupt) })
+                    } else {
+                        MadtEntry::InvalidNonMaskableInterrupt(entry_len)
+                    },
+
                     _ => MadtEntry::Unknown(entry_type)
                 };
 

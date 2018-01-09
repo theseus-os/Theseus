@@ -1,10 +1,8 @@
 use core::{mem, ptr};
+use core::ops::DerefMut;
+use core::ptr::{read_volatile, write_volatile};
 
-use core::intrinsics::{volatile_load, volatile_store};
-
-use memory::Frame;
-use paging::{ActivePageTable, PhysicalAddress, Page, VirtualAddress};
-use paging::entry::EntryFlags;
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 
 use super::sdt::Sdt;
 use super::{ACPI_TABLE, find_sdt, load_table, get_sdt_signature};
@@ -42,12 +40,12 @@ impl Hpet {
             load_table(get_sdt_signature(hpet_sdt[0]));
             Hpet::new(hpet_sdt[0], active_table)
         } else {
-            println!("Unable to find HPET");
+            error!("Unable to find HPET");
             return;
         };
 
         if let Some(hpet) = hpet {
-            println!("  HPET: {:X}", hpet.hpet_number);
+            debug!("  HPET: {:X} {:?}", hpet.hpet_number, hpet);
 
             let mut hpet_t = ACPI_TABLE.hpet.write();
             *hpet_t = Some(hpet);
@@ -67,17 +65,17 @@ impl Hpet {
 
 impl GenericAddressStructure {
     pub unsafe fn init(&self, active_table: &mut ActivePageTable) {
-        let page = Page::containing_address(VirtualAddress::new(self.address as usize));
-        let frame = Frame::containing_address(PhysicalAddress::new(self.address as usize));
-        let result = active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE);
-        result.flush(active_table);
+        let page = Page::containing_address(self.address as VirtualAddress);
+        let frame = Frame::containing_address(self.address as PhysicalAddress);
+        let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+        active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut());
     }
 
     pub unsafe fn read_u64(&self, offset: usize) -> u64{
-        volatile_load((self.address as usize + offset) as *const u64)
+        read_volatile((self.address as usize + offset) as *const u64)
     }
 
     pub unsafe fn write_u64(&mut self, offset: usize, value: u64) {
-        volatile_store((self.address as usize + offset) as *mut u64, value);
+        write_volatile((self.address as usize + offset) as *mut u64, value);
     }
 }

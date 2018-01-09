@@ -117,7 +117,7 @@ pub struct PhysicalMemoryArea {
     pub acpi: u32
 }
 impl PhysicalMemoryArea {
-    fn new(addr: usize, len: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
+    pub fn new(addr: usize, len: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
         PhysicalMemoryArea {
             base_addr: addr,
             length: len,
@@ -337,13 +337,13 @@ pub fn init(boot_info: BootInformation) -> Result<MemoryManagementInfo, &'static
     for area in memory_map_tag.memory_areas() {
         debug!("memory area base_addr={:#x} length={:#x} ({:?})", area.start_address(), area.size(), area);
         
-        // we cannot allocate memory from sections below the end of the kernel's physical address!!
-        // if area.end_address() < kernel_phys_end {
-        //     debug!("  skipping region before kernel_phys_end");
-        //     continue;
-        // }
-        // let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
-        let start_paddr = 0;
+        // optimization: we reserve memory from areas below the end of the kernel's physical address,
+        // which includes addresses beneath 1 MB
+        if area.end_address() < kernel_phys_end {
+            debug!("  skipping region before kernel_phys_end");
+            continue;
+        }
+        let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
 
         available[avail_index] = PhysicalMemoryArea {
             base_addr: start_paddr,

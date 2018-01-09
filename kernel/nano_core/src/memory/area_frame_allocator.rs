@@ -19,8 +19,8 @@ impl<T: Clone> VectorArray<T> {
     pub fn upgrade_to_vector(&mut self) {
         let new_val = { 
             match *self {
-                VectorArray::Array((_, ref arr)) => { 
-                    Some(VectorArray::Vector(arr.to_vec()))
+                VectorArray::Array((count, ref arr)) => { 
+                    Some(VectorArray::Vector(arr[0..count].to_vec()))
                 }
                 _ => { 
                     None // no-op, it's already a Vector
@@ -38,6 +38,7 @@ impl<T: Clone> VectorArray<T> {
     //         &VectorArray::Vector(v) => v[0..v.len()].iter(),
     //     }
     // }
+
 }
 
 
@@ -79,9 +80,9 @@ impl AreaFrameAllocator {
 
     /// `available`: specifies whether the given `area` is an available or occupied memory area.
     pub fn add_area(&mut self, area: PhysicalMemoryArea, available: bool) -> Result<(), &'static str> {
-        // match if available { self.available } else { self.occupied } {
-        match self.available {
-            VectorArray::Array((ref mut count, ref mut arr)) => {
+        // match self.available {
+        match if available { &mut self.available } else { &mut self.occupied } {
+            &mut VectorArray::Array((ref mut count, ref mut arr)) => {
                 if *count < arr.len() {
                     arr[*count] = area;
                     *count += 1;
@@ -91,10 +92,23 @@ impl AreaFrameAllocator {
                     return Err("array is already full");
                 }
             }
-            VectorArray::Vector(ref mut v) => {
-                v.push(area)
+            &mut VectorArray::Vector(ref mut v) => {
+                v.push(area);
             }
         }
+
+        // debugging stuff below
+        trace!("AreaFrameAllocator: updated {} area: =======================================", if available { "available" } else { "occupied" });
+        match if available { &self.available } else { &self.occupied } {
+            &VectorArray::Array((ref count, ref arr)) => {
+                trace!("   Array[{}]: {:?}", count, arr);
+            }
+            & VectorArray::Vector(ref v) => {
+                trace!("   Vector: {:?}", v);
+            }
+        }
+
+
         Ok(())
     }
 
@@ -158,7 +172,7 @@ impl AreaFrameAllocator {
         };
     }
 
-
+    /// Call this when the kernel heap has been set up
     pub fn alloc_ready(&mut self) {
         self.available.upgrade_to_vector();
         self.occupied.upgrade_to_vector();

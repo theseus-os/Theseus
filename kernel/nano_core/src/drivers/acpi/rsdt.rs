@@ -24,6 +24,10 @@ impl Rxsdt for Rsdt {
             i: 0
         })
     }
+
+    fn length(&self) -> usize {
+        self.0.length as usize
+    }
 }
 
 pub struct RsdtIter {
