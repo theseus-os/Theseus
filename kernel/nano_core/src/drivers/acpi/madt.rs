@@ -31,6 +31,17 @@ impl Madt {
             return;
         };
 
+        let mut lapic_locked = ::interrupts::apic::get_lapic();
+        let mut local_apic = lapic_locked.as_mut().expect("Madt::init(): local_apic wasn't yet inited!");
+        let me = local_apic.id() as u8;
+
+        if local_apic.x2 {
+            debug!("    X2APIC me: {}", me);
+        } else {
+            debug!("    APIC me: {}, LAPIC vaddr: {:#X}", me, local_apic.virt_addr);
+        }
+
+
         if let Some(madt) = madt {
             debug!("  APIC: {:#x}: {:#x}", madt.local_address, madt.flags);
         
@@ -38,7 +49,12 @@ impl Madt {
                 debug!("      {:?}", madt_entry);
                 match madt_entry {
                     MadtEntry::LocalApic(ap_local_apic) => { 
-
+                        if ap_local_apic.id == me {
+                            debug!("        This is my local APIC");
+                        }
+                        else {
+                            debug!("        This is a different AP's APIC");
+                        }
                     }
                     _ => {
 

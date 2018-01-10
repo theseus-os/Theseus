@@ -24,6 +24,7 @@ pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
 mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
+pub mod apic;
 mod pic;
 pub mod tsc;
 
@@ -88,11 +89,12 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 
 /// Interface to our PIC (programmable interrupt controller) chips.
 /// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
-static mut PIC: pic::ChainedPics = pic::ChainedPics::new(0x20, 0x28);
+static PIC: Once<pic::ChainedPics> = Once::new();
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 static TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
 static GDT: Once<gdt::Gdt> = Once::new();
+
 
 
 /// Sets the TSS's privilege stack 0 (RSP0) entry, which points to the stack that 
@@ -111,18 +113,16 @@ pub fn tss_set_rsp0(new_value: usize) {
 
 
 
-/// initializes the interrupt subsystem and IRQ handlers with exceptions
+/// initializes the interrupt subsystem and exception-related IRQs, but no other IRQs.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
 pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable: usize) {
     assert_has_not_been_called!("interrupts::init was called more than once!");
-
     
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
     use x86_64::PrivilegeLevel;
     use x86_64::VirtualAddress;
-
 
     // set up TSS and get pointer to it    
     let tss_ptr: u64 = {
@@ -215,7 +215,29 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
             idt[i].set_handler_fn(unimplemented_interrupt_handler);
         }
 
+    }
 
+    
+    {
+        info!("trying to load IDT...");
+        IDT.load();
+        info!("loaded interrupt descriptor table.");
+    }
+
+}
+
+
+pub fn init_handlers_apic() {
+    // first, mask all PIC interrupts / disable the PIC
+    PIC.call_once( || {
+        pic::ChainedPics::init(None, None, 0xFF, 0xFF) // disable all PIC IRQs
+    });
+}
+
+
+pub fn init_handlers_pic() {
+    {
+        let mut idt = IDT.lock(); // withholds interrupts
 		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
 
@@ -243,17 +265,14 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
         idt[0x2E].set_handler_fn(primary_ata);
     }
-    {
-        info!("trying to load IDT...");
-        IDT.load();
-        info!("loaded interrupt descriptor table.");
-    }
 
     // init PIC, PIT and RTC interrupts
     unsafe{ 
         let master_pic_mask: u8 = 0x0; // allow every interrupt
         let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
-        PIC.initialize(master_pic_mask, slave_pic_mask); 
+        PIC.call_once( || {
+            pic::ChainedPics::init(None, None, master_pic_mask, slave_pic_mask) // disable all PIC IRQs
+        });
     }
 
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
@@ -347,7 +366,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
-	unsafe { PIC.notify_end_of_interrupt(0x20); }
+	PIC.try().expect("IRQ 0x20: PIC not initialized").notify_end_of_interrupt(0x20);
 }
 
 
@@ -361,7 +380,7 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 
     keyboard::handle_keyboard_input(scan_code);	
 
-    unsafe { PIC.notify_end_of_interrupt(0x21); }
+    PIC.try().expect("IRQ 0x21: PIC not initialized").notify_end_of_interrupt(0x21);
 }
 
 
@@ -377,19 +396,24 @@ pub static mut SPURIOUS_COUNT: u64 = 0;
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     unsafe { SPURIOUS_COUNT += 1; } // cheap counter just for debug info
 
-    let irq_regs = unsafe { PIC.read_isr_irr() };
-
-    // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
-    // (pretty sure this will never happen)
-    // if it was a real IRQ7, we do need to ack it by sending an EOI
-    if irq_regs.master_isr & 0x80 == 0x80 {
-        println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
-        warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
-        unsafe { PIC.notify_end_of_interrupt(0x27); }
+    if let Some(pic) = PIC.try() {
+        let irq_regs = pic.read_isr_irr();
+        // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
+        // (pretty sure this will never happen)
+        // if it was a real IRQ7, we do need to ack it by sending an EOI
+        if irq_regs.master_isr & 0x80 == 0x80 {
+            println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
+            pic.notify_end_of_interrupt(0x27);
+        }
+        else {
+            // do nothing. Do not send an EOI.
+        }
     }
     else {
-        // do nothing. Do not send an EOI.
+        error!("spurious_interrupt_handler(): PIC wasn't initialized!");
     }
+
 }
 
 
@@ -424,58 +448,63 @@ extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
     
     ata_pio::handle_primary_interrupt();
 
-    
-    unsafe { PIC.notify_end_of_interrupt(0x2e); }
+    PIC.try().expect("IRQ 0x21: PIC not initialized").notify_end_of_interrupt(0x2e);
 }
 
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-
-    println_unsafe!("UNIMPLEMENTED IRQ!!! {}", unsafe { PIC.read_isr_irr() });
+    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
+    println_unsafe!("UNIMPLEMENTED IRQ!!! {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x22_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x22 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
+    println_unsafe!("\nCaught 0x22 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x23_handler(stack_frame: &mut ExceptionStackFrame) {
+    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
 	println_unsafe!("\nCaught 0x23 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x24_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x24 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());
+    println_unsafe!("\nCaught 0x24 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x25_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x25 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x25 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x26_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x26 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x26 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x29_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x29 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x29 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
@@ -483,32 +512,36 @@ extern "x86-interrupt" fn irq_0x29_handler(stack_frame: &mut ExceptionStackFrame
 
 
 extern "x86-interrupt" fn irq_0x2A_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2A interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2A interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2B_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2B interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2B interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2C_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2C interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2C interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2D_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2D interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2D interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }

@@ -300,7 +300,7 @@ pub fn init(boot_info: BootInformation) -> Result<MemoryManagementInfo, &'static
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
-    debug!("rsdt_phys_addr: {:#X}", rsdt_phys_addr.unwrap());
+    debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
     
     let memory_map_tag = try!(boot_info.memory_map_tag().ok_or("Memory map tag not found"));
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("Elf sections tag not found"));

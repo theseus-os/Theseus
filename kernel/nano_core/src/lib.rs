@@ -217,6 +217,24 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
     let mut kernel_mmi = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
     
+    // now that we have a heap, we can create basic things like state_store
+    state_store::init();
+    // unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+    trace!("state_store initialized.");
+
+
+    // initialize basic exception handling interrupts
+    let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
+    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
+    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
+    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
+
+
+    {
+        trace!("calling drivers::early_init()");
+        drivers::early_init(&mut kernel_mmi);
+    }
+
     // parse the nano_core ELF object to load its symbols into our metadata
     {
         let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
@@ -224,26 +242,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
         
     
-    // now that we have a heap, we can create basic things like state_store
-    state_store::init();
-    trace!("state_store initialized.");
-
-
-    // HERE: this is the beginning of things that should be moved out of the nano_core into separate crates, called by a driver
-
-    {
-        drivers::early_init(&mut kernel_mmi);
-    }
-
-
-    // unsafe{  logger::enable_vga(); }
-
-
-    // initialize our interrupts and IDT
-    let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
-    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
-    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
-    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
+    // init other featureful (non-exception) interrupt handlers
+    interrupts::init_handlers_pic();
 
     syscall::init(syscall_stack.top_usable());
 
@@ -384,10 +384,19 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 #[no_mangle]
 pub extern "C" fn eh_personality() {}
 
+extern {
+    // these are exposed by the assembly linker, found in arch/arch_x86_64/common.asm
+    fn eputs(msg: &str);
+}
+
 #[cfg(not(test))]
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
+    // hard-code writing to the top of the vga screen just in case all else fails
+    // we to this at both the beginning and end of the panic handler in case the code in here causes yet another panic
+    unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
+
     error!("\n\nPANIC in {} at line {}:", file, line);
     error!("    {}", fmt);
 
@@ -396,6 +405,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 
     // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9
 
+    unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
     loop {}
 }
 

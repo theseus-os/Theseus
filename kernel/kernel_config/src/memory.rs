@@ -70,6 +70,9 @@ pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
 
+pub const APIC_START: usize = 0xFFFF_FFFF_F000_0000; 
+
+
 /// The kernel text region is where we load kernel modules. 
 /// It starts at the 511th P4 entry and goes up until the KERNEL_OFFSET,
 /// which is where the nano_core itself starts. 
