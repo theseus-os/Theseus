@@ -103,16 +103,12 @@ gdb:
 ### TODO: add more symbol files besides nano_core once they're split from nano_core
 
 
-### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot: $(iso)
+check_usb:
 ifneq (,$(findstring sd, $(usb)))
 ifeq ("$(wildcard /dev/$(usb))", "")
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
 	@exit 1
 endif
-	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
-	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
-	@sync
 else
 	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
 	@echo -e "For example, run the following command:"
@@ -122,6 +118,13 @@ else
 	@echo ""
 	@exit 1
 endif
+
+
+### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
+boot: check_usb $(iso)
+	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
+	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
+	@sync
 	
 
 ###################################################################################################

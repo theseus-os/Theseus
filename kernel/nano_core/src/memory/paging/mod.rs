@@ -332,7 +332,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
         let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
         let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-        let vga_display_flags = EntryFlags::WRITABLE;
+        let vga_display_flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE;
         vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
         // use remap because we already mapped it above
         mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr, size_in_bytes), vga_display_flags);

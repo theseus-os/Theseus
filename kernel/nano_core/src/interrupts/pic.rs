@@ -44,6 +44,11 @@ const CMD_END_OF_INTERRUPT: u8 = 0x20;
 // The mode in which we want to run our PICs.
 const MODE_8086: u8 = 0x01;
 
+const MASTER_CMD:  u16 = 0x20;
+const MASTER_DATA: u16 = 0x21;
+const SLAVE_CMD:   u16 = 0xA0;
+const SLAVE_DATA:  u16 = 0xA1;
+
 
 /// Each PIC chip has two interrupt status registers: 
 /// the In-Service Register (ISR) and the Interrupt Request Register (IRR). 
@@ -52,7 +57,6 @@ const MODE_8086: u8 = 0x01;
 /// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, 
 /// at which point they are marked in the ISR.
 /// see http://wiki.osdev.org/8259_PIC#ISR_and_IRR
-#[derive(Debug)]
 pub struct IrqStatusRegisters {
     pub master_isr: u8,
     pub master_irr: u8,
@@ -63,6 +67,11 @@ impl fmt::Display for IrqStatusRegisters {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Master ISR: {:#b}, Master IRR:{:#b}, Slave ISR: {:#b}, Slave IRR: {:#b}", 
                 self.master_isr, self.master_irr, self.slave_isr, self.slave_irr)
+    }
+}
+impl fmt::Debug for IrqStatusRegisters {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }
 
@@ -89,7 +98,7 @@ impl Pic {
 
     /// Notify us that an interrupt has been handled and that we're ready
     /// for more.
-    fn end_of_interrupt(&mut self) {
+    fn end_of_interrupt(&self) {
         // SAFE because 
         unsafe {
             self.command.write(CMD_END_OF_INTERRUPT);
@@ -105,60 +114,48 @@ pub struct ChainedPics {
 impl ChainedPics {
     /// Create a new interface for the standard PIC1 and PIC2 controllers,
     /// specifying the desired interrupt offsets.
-    pub const fn new(master_offset: u8, slave_offset: u8) -> ChainedPics {
-        ChainedPics {
+    /// Then, it initializes the PICs in a standard chained fashion, 
+    /// because even if we don't use them (and disable them for APIC instead),
+    /// we still need to remap them to avoid a spurious interrupt clashing with an exception.
+    /// If the offsets are None, they default to 0x20 for master and 0x28 for slave, which is standard.
+    pub fn init(master_offset: Option<u8>, slave_offset: Option<u8>, master_mask: u8, slave_mask: u8) -> ChainedPics {
+        assert_has_not_been_called!("ChainedPics::initialize was called twice!!");
+
+        let mut cpic = ChainedPics {
             pics: [
                 Pic {
-                    offset: master_offset,
-                    command: port_io::Port::new(0x20),
-                    data: port_io::Port::new(0x21),
+                    offset: master_offset.unwrap_or(0x20),
+                    command: port_io::Port::new(MASTER_CMD),
+                    data: port_io::Port::new(MASTER_DATA),
                 },
                 Pic {
-                    offset: slave_offset,
-                    command: port_io::Port::new(0xA0),
-                    data: port_io::Port::new(0xA1),
+                    offset: slave_offset.unwrap_or(0x28),
+                    command: port_io::Port::new(SLAVE_CMD),
+                    data: port_io::Port::new(SLAVE_DATA),
                 },
             ]
+        };
+        // SAFE: we already checked that we are the only ones to have called this constructor.
+        unsafe {
+            cpic.configure(master_mask, slave_mask);
         }
+        cpic
     }
+
 
     /// Initialize both our PICs.  We initialize them together, at the same
     /// time, because it's traditional to do so, and because I/O operations
     /// might not be instantaneous on older processors.
-    /// Unsafe because we are changing the way the PIC works, 
-    /// which could potentially stop certain interrupts from occurring.
-    pub unsafe fn initialize(&mut self, master_mask: u8, slave_mask: u8) {
-        // We need to add a delay between writes to our PICs, especially on
-        // older motherboards.  But we don't necessarily have any kind of
-        // timers yet, because most of them require interrupts.  Various
-        // older versions of Linux and other PC operating systems have
-        // worked around this by writing garbage data to port 0x80, which
-        // allegedly takes long enough to make everything work on most
-        // hardware.  Here, `io_wait` is a closure.
-        let wait_port: port_io::Port<u8> = port_io::Port::new(0x80);
-        let io_wait = || { wait_port.write(0) };
-
-        // Save our original interrupt masks, because I'm too lazy to
-        // figure out reasonable values.  We'll restore these when we're
-        // done.
-        // let saved_mask1 = self.pics[0].data.read();
-        // let saved_mask2 = self.pics[1].data.read();
-        // info!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
-        // println_unsafe!("saved masks: {:#x}, {:#x}", saved_mask1, saved_mask2); 
-
+    unsafe fn configure(&mut self, master_mask: u8, slave_mask: u8) {
+      
         // mask all interrupts during init
-        self.pics[0].data.write(0xFF);
-        io_wait();
-        self.pics[1].data.write(0xFF);
-        io_wait();
-
+        self.mask_irqs(0xFF, 0xFF);
 
         // pre-emptively acknowledge both PICs in case they have pending unhandled irqs
         self.pics[0].command.write(CMD_END_OF_INTERRUPT);
         io_wait();
         self.pics[1].command.write(CMD_END_OF_INTERRUPT);
         io_wait();
-
 
         // Tell each PIC that we're going to send it a three-byte
         // initialization sequence on its data port.
@@ -185,13 +182,7 @@ impl ChainedPics {
         self.pics[1].data.write(MODE_8086);
         io_wait();
 
-        
-        // 0 means enabled, 1 means disabled (masked)
-        self.pics[0].data.write(master_mask);
-        io_wait();
-        self.pics[1].data.write(slave_mask); 
-        io_wait();
-
+        self.mask_irqs(master_mask, slave_mask);
 
         // pre-emptively acknowledge both PICs in case they have pending unhandled irqs
         // this is generally unnecessary but doesn't hurt if the interrupt hardware is misbehaving
@@ -202,6 +193,21 @@ impl ChainedPics {
 
     }
 
+    /// Each mask is a bitwise mask for each IRQ line, with the master's IRQ bit 2 (0x100) 
+    /// affecting the entire slave IRQ mask. So if the master's IRQ line 2 is masked (disabled),
+    /// all slave IRQs (0x28 to 0x2F) are masked.
+    /// If a bit is set to 1, it is masked (disabled). If set to 0, it is unmasked (enabled).
+    pub fn mask_irqs(&self, master_mask: u8, slave_mask: u8) {
+        // SAFE: we are guaranteed to have initialized this structure in its constructor.
+        unsafe {
+            self.pics[1].data.write(slave_mask);
+            io_wait();
+            self.pics[0].data.write(master_mask);
+            io_wait();
+        }
+    }
+ 
+
     /// Do we handle this interrupt?
     fn handles_interrupt(&self, interrupt_id: u8) -> bool {
         self.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
@@ -210,7 +216,7 @@ impl ChainedPics {
     /// Figure out which (if any) PICs in our chain need to know about this
     /// interrupt.  This is tricky, because all interrupts from `pics[1]`
     /// get chained through `pics[0]`.
-    pub fn notify_end_of_interrupt(&mut self, interrupt_id: u8) {
+    pub fn notify_end_of_interrupt(&self, interrupt_id: u8) {
         if self.handles_interrupt(interrupt_id) {
             if self.pics[1].handles_interrupt(interrupt_id) {
                 self.pics[1].end_of_interrupt();
@@ -242,4 +248,17 @@ impl ChainedPics {
             }
         }
     }
+}
+
+
+#[inline(always)]
+fn io_wait() {
+    // We need to add a short delay between writes to our PICs, especially on
+    // older motherboards.  But we don't necessarily have any kind of
+    // timers yet, because most of them require interrupts.  Various
+    // older versions of Linux and other PC operating systems have
+    // worked around this by writing garbage data to port 0x80, which
+    // allegedly takes long enough to make everything work on most hardware.
+    use x86_64::instructions::port::outb;
+    unsafe { outb(0x80, 0); }
 }
