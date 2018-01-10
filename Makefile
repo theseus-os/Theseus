@@ -53,8 +53,10 @@ endif ## BYPASS_RUSTC_CHECK
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 QEMU_FLAGS += -cpu Haswell
-#QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev-u1 
-#QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.dat
+
+## basic networking with a standard e1000 ethernet card
+QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1 
+# QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.dat
 
 #drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 

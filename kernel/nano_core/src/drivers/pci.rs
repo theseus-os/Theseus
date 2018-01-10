@@ -1,7 +1,7 @@
 use port_io::Port;
 use spin::{Once, Mutex};
 use alloc::rc::Rc;
-use collections::Vec;
+use alloc::Vec;
 use core::fmt;
 
 //data written here sets information at CONFIG_DATA
