@@ -243,7 +243,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         
     
     // init other featureful (non-exception) interrupt handlers
-    interrupts::init_handlers_pic();
+    // interrupts::init_handlers_pic();
+    interrupts::init_handlers_apic();
+    debug!("ENABLING INTERRUPTS FOR APIC TESTING!");
+    interrupts::enable_interrupts();
 
     syscall::init(syscall_stack.top_usable());
 
@@ -384,10 +387,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 #[no_mangle]
 pub extern "C" fn eh_personality() {}
 
-extern {
-    // these are exposed by the assembly linker, found in arch/arch_x86_64/common.asm
-    fn eputs(msg: &str);
-}
+// extern {
+//     // these are exposed by the assembly linker, found in arch/arch_x86_64/common.asm
+//     fn eputs(msg: &str); // TODO FIXME: can't use this until we specify the address of the VGA buffer as an argument
+// }
 
 #[cfg(not(test))]
 #[lang = "panic_fmt"]
@@ -395,7 +398,7 @@ extern {
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
     // hard-code writing to the top of the vga screen just in case all else fails
     // we to this at both the beginning and end of the panic handler in case the code in here causes yet another panic
-    unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
+    // unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
 
     error!("\n\nPANIC in {} at line {}:", file, line);
     error!("    {}", fmt);
@@ -405,7 +408,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 
     // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9
 
-    unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
+    // unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
     loop {}
 }
 
