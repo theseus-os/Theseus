@@ -227,10 +227,19 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
 
 pub fn init_handlers_apic() {
-    // first, mask all PIC interrupts / disable the PIC
+    // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
     PIC.call_once( || {
         pic::ChainedPics::init(None, None, 0xFF, 0xFF) // disable all PIC IRQs
     });
+
+    {
+        let mut idt = IDT.lock(); // withholds interrupts
+
+        // quick test to just try these two out, since the PIC is not using our static IDT
+        idt[0x20].set_handler_fn(apic_timer_handler);
+        idt[0x27].set_handler_fn(apic_spurious_interrupt_handler); 
+        idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_0xff_handler); 
+    }
 }
 
 
@@ -266,13 +275,11 @@ pub fn init_handlers_pic() {
     }
 
     // init PIC, PIT and RTC interrupts
-    unsafe{ 
-        let master_pic_mask: u8 = 0x0; // allow every interrupt
-        let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
-        PIC.call_once( || {
-            pic::ChainedPics::init(None, None, master_pic_mask, slave_pic_mask) // disable all PIC IRQs
-        });
-    }
+    let master_pic_mask: u8 = 0x0; // allow every interrupt
+    let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
+    PIC.call_once( || {
+        pic::ChainedPics::init(None, None, master_pic_mask, slave_pic_mask) // disable all PIC IRQs
+    });
 
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
@@ -359,6 +366,33 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 
 
 
+// 0x20
+extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
+    info!("APIC TIMER HANDLER!");
+
+    let mut lapic_locked = apic::get_lapic();
+    let mut local_apic = lapic_locked.as_mut().expect("apic_timer_handler(): local_apic wasn't yet inited!");
+    local_apic.eoi(0x20);
+}
+
+
+// 0x27
+extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
+    info!("APIC SPURIOUS INTERRUPT HANDLER!");
+
+    let mut lapic_locked = apic::get_lapic();
+    let mut local_apic = lapic_locked.as_mut().expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
+    local_apic.eoi(0x27);
+}
+
+// 0x27
+extern "x86-interrupt" fn apic_0xff_handler(stack_frame: &mut ExceptionStackFrame) {
+    info!("APIC 0xFF HANDLER!");
+
+    let mut lapic_locked = apic::get_lapic();
+    let mut local_apic = lapic_locked.as_mut().expect("apic_0xff_handler(): local_apic wasn't yet inited!");
+    local_apic.eoi(0xFF);
+}
 
 
 // 0x20
