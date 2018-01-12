@@ -24,6 +24,7 @@ pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
 pub mod apic;
+pub mod ioapic;
 mod pic;
 pub mod tsc;
 
@@ -242,7 +243,7 @@ pub fn init_handlers_apic() {
 
         // quick test to just try these two out, since the PIC is not using our static IDT
         idt[0x20].set_handler_fn(apic_timer_handler);
-        idt[0x21].set_handler_fn(apic_0x01_handler);
+        idt[0x21].set_handler_fn(ioapic_keyboard_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
     }
 }
@@ -375,20 +376,38 @@ pub static mut APIC_TIMER_TICKS: usize = 0;
 extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     unsafe { 
         APIC_TIMER_TICKS += 1;
-        info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
+        // info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
     }
 
-    let mut lapic_locked = apic::get_lapic();
-    let mut local_apic = lapic_locked.as_mut().expect("apic_timer_handler(): local_apic wasn't yet inited!");
-    local_apic.eoi();
+    // let mut lapic_locked = apic::get_lapic();
+    // let mut local_apic = lapic_locked.as_mut().expect("apic_timer_handler(): local_apic wasn't yet inited!");
+    // local_apic.eoi();
+    
+    // quick fix for lockless apic eoi
+    unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
+
+    // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
+    schedule!();
 }
 
-extern "x86-interrupt" fn apic_0x01_handler(stack_frame: &mut ExceptionStackFrame) {
-    info!("APIC 0x01 HANDLER!");
+extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
+    info!("APIC KEYBOARD HANDLER!");
 
-    let mut lapic_locked = apic::get_lapic();
-    let mut local_apic = lapic_locked.as_mut().expect("apic_0x01_handler(): local_apic wasn't yet inited!");
-    local_apic.eoi();
+    // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
+    let scan_code: u8 = { 
+        KEYBOARD.lock().read() 
+    };
+	// trace!("KBD: {:?}", scan_code);
+
+    keyboard::handle_keyboard_input(scan_code);	
+
+
+    // let mut lapic_locked = apic::get_lapic();
+    // let mut local_apic = lapic_locked.as_mut().expect("apic_0x01_handler(): local_apic wasn't yet inited!");
+    // local_apic.eoi();
+
+    // quick fix for lockless apic eoi
+    unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
@@ -498,8 +517,6 @@ fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
 //0x2e
 extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
 
-    //let placeholder = 2;
-    
     ata_pio::handle_primary_interrupt();
 
     PIC.try().expect("IRQ 0x21: PIC not initialized").notify_end_of_interrupt(0x2e);

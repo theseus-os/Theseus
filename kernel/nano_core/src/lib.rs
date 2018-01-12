@@ -264,7 +264,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+    // unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
     trace!("state_store initialized.");
 
 
@@ -290,8 +290,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
-    debug!("ENABLING INTERRUPTS FOR APIC TESTING!");
-    interrupts::enable_interrupts();
 
     syscall::init(syscall_stack.top_usable());
 
@@ -319,60 +317,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
 
-    println!("initialization done!");
-
-	//interrupts::enable_interrupts(); //apparently this line is unecessary
-	println!("enabled interrupts!");
-    
-    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
-    
-    let ref bus_zero = bus_array[0];
-    let ref slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
-    println!("pci config data {:#x}", pci::pci_read(0,0,0,0x0c));
-    println!("{:?}", bus_zero);
-    // pci::allocate_mem();
-    let data = ata_pio::pio_read(0xE0,0).unwrap();
-    
-    println!("ATA PIO read data: ==========================");
-    for sh in data.iter() {
-        print!("{:#x} ", sh);
-    }
-    println!("=============================================");
-
-    let paddr = pci::read_from_disk(0xE0,0).unwrap() as usize;
-
-    // TO CHECK PHYSICAL MEMORY:
-    //  In QEMU, press Ctrl + Alt + 2
-    //  xp/x 0x2b5000   
-    //        ^^ substitute the frame_start value
-    // xp means "print physical memory",   /x means format as hex
-
-
-
-    let vaddr: usize = {
-        let tasklist = task::get_tasklist().read();
-        let mut curr_task = tasklist.get_current().unwrap().write();
-        let curr_mmi = curr_task.mmi.as_ref().unwrap();
-        let mut curr_mmi_locked = curr_mmi.lock();
-        use memory::*;
-        let vaddr = curr_mmi_locked.map_dma_memory(paddr, 512, PRESENT | WRITABLE);
-        println!("\n========== VMAs after DMA ============");
-        for vma in curr_mmi_locked.vmas.iter() {
-            println!("    vma: {:?}", vma);
-        }
-        println!("=====================================");
-        vaddr
-    };
-    let dataptr = vaddr as *const u16;
-    let dma_data = unsafe { collections::slice::from_raw_parts(dataptr, 256) };
-    println!("======================DMA read data phys_addr: {:#x}: ==========================", paddr);
-    for i in 0..256 {
-        print!("{:#x} ", dma_data[i]);
-    }
-    println!("\n========================================================");
-
-    // println!("DMA TEST paddr={:#x}", paddr);
+    println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
+    interrupts::enable_interrupts();
+    // schedule!();  // this will happen on the first timer interrupt anyway
+	
 
 
     // create a second task to test context switching
@@ -389,13 +337,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
     
-    // try to schedule in the second task
-    info!("attempting to schedule away from zeroth init task");
-    schedule!(); // this automatically enables interrupts right now
 
-
-    // the idle thread's (Task 0) busy loop
-    trace!("Entering Task0's idle loop");
 	
     // attempt to parse a test kernel module
     if false {
@@ -466,8 +408,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         tasklist_mut.spawn_userspace(module, None);
     }
 
-
-    debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
+    interrupts::enable_interrupts();
+    debug!("rust_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
     assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
