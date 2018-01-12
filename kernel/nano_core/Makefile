@@ -44,7 +44,7 @@ clean:
 
 
 cargo: 
-	cargo clean   ## temporarily calling cargo clean to fix nano_core makefile
+#cargo clean   ## temporarily calling cargo clean to fix nano_core makefile
 	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS=${RUSTFLAGS} xargo build $(XARGO_RELEASE_ARG) --target $(TARGET)  ## target arg must be a target name, not the file path.
 
 

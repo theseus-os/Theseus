@@ -219,7 +219,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    // unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+    unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
     trace!("state_store initialized.");
 
 
