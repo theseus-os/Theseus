@@ -11,7 +11,7 @@ use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLeve
 
 static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
-static mut print_to_vga: bool = false;
+static mut PRINT_TO_VGA: bool = false;
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
@@ -45,7 +45,7 @@ impl LogColor {
 
 /// quick dirty hack to trigger printing to vga once it's set up
 pub unsafe fn enable_vga() {
-    print_to_vga = true;
+    PRINT_TO_VGA = true;
 }
 
 struct Logger;
@@ -69,7 +69,7 @@ impl ::log::Log for Logger {
             let _ = serial_port::write_fmt_log(color_str, prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
 
             unsafe {
-                if print_to_vga {
+                if PRINT_TO_VGA {
                     println_unsafe!("{} {}", prefix, record.args().clone());
                 }
             }

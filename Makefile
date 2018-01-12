@@ -107,6 +107,7 @@ gdb:
 
 
 check_usb:
+	@echo -e  'RUST_FEATURES = $(RUST_FEATURES)'
 ifneq (,$(findstring sd, $(usb)))
 ifeq ("$(wildcard /dev/$(usb))", "")
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
@@ -124,6 +125,7 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
+boot : export RUST_FEATURES = --features "no_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
