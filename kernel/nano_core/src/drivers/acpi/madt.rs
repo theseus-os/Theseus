@@ -59,7 +59,7 @@ impl Madt {
                     }
                     MadtEntry::IoApic(ioa) => {
                         ioapic_count += 1;
-                        ioapic::create(active_table, ioa.id, ioa.address as usize, ioa.gsi_base);
+                        ioapic::create(active_table, ioa.id, ioa.address as usize, ioa.gsi_base).expect("FAILED to create IoApic!");
                         let mut ioapic_locked = ioapic::get_ioapic();
                         let mut ioapic_ref = ioapic_locked.as_mut().expect("Couldn't get ioapic_ref!");
                         ioapic_ref.set_irq(0x1, me as u8, 0x21); // map keyboard interrupt (0x21 in IDT) to lapic 0's (me's) IoApic irq 0x1 

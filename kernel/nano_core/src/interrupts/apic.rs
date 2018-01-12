@@ -128,9 +128,13 @@ impl LocalApic {
         assert!(!self.x2, "an x2apic system must not use enable_apic(), it should use enable_x2apic() instead.");
 
         // globally enable the apic by setting the xapic_enable bit
-        let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
-        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | is_bsp | IA32_APIC_XAPIC_ENABLE);
-        info!("LAPIC ID {:#x} is_bsp: {}", self.id(), is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
+        let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
+        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | bsp_bit | IA32_APIC_XAPIC_ENABLE);
+        let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
+        info!("LAPIC ID {:#x} is_bsp: {}", self.id(), is_bsp);
+        if is_bsp {
+            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::APIC, ::atomic::Ordering::Release);
+        }
 
 
         // init APIC to a clean state, based on: http://wiki.osdev.org/APIC_timer#Example_code_in_ASM
@@ -153,11 +157,14 @@ impl LocalApic {
         
         debug!("in enable_x2apic");
         // globally enable the x2apic, which includes also setting the xapic enable bit
-        let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
-        debug!("in enable_x2apic 1: is_bsp: {:#X}", is_bsp);
-        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | is_bsp | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE);
+        let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
+        debug!("in enable_x2apic 1: bsp_bit: {:#X}", bsp_bit);
+        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | bsp_bit | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE);
         debug!("in enable_x2apic 2: new apic_base: {:#X}", rdmsr(IA32_APIC_BASE));
-
+        let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
+        if is_bsp {
+            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::x2apic, ::atomic::Ordering::Release);
+        }
 
         // init x2APIC to a clean state, just as in enable_apic() above 
         // info!("x2LAPIC ID {:#x} (cluster {:#X} logical {:#X}), is_bsp: {}", self.version(), cluster_id, logical_id, is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
@@ -177,7 +184,7 @@ impl LocalApic {
         
         wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE) as u64); // set bit 8 to start receiving interrupts (still need to "sti")
         debug!("in enable_x2apic end");
-        info!("x2LAPIC ID {:#x}  is_bsp: {}", self.version(), is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
+        info!("x2LAPIC ID {:#x}  is_bsp: {}", self.id(), is_bsp);
     }
 
 

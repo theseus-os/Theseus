@@ -17,6 +17,7 @@ use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
+use atomic::{Ordering, Atomic};
 
 // re-expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
@@ -44,6 +45,15 @@ static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
 pub static IDT: LockedIdt = LockedIdt::new();
+
+pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum InterruptChip {
+    APIC,
+    x2apic,
+    PIC,
+}
 
 pub enum AvailableSegmentSelector {
     KernelCode,
@@ -371,6 +381,26 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut Exc
 }
 
 
+
+/// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
+/// irq arg is only used for PIC
+fn eoi(irq: Option<u8>) {
+    match INTERRUPT_CHIP.load(Ordering::Acquire) {
+        InterruptChip::APIC => {
+            // quick fix for lockless apic eoi
+            unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
+        }
+        InterruptChip::x2apic => {
+            unsafe { ::x86::shared::msr::wrmsr(0x80b, 0); }
+        }
+        InterruptChip::PIC => {
+            PIC.try().expect("IRQ 0x20: PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi no arg provided"));
+        }
+    }
+}
+
+
+
 pub static mut APIC_TIMER_TICKS: usize = 0;
 // 0x20
 extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
@@ -383,15 +413,14 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
     // let mut local_apic = lapic_locked.as_mut().expect("apic_timer_handler(): local_apic wasn't yet inited!");
     // local_apic.eoi();
     
-    // quick fix for lockless apic eoi
-    unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
-
+    eoi(None);
+    
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
     schedule!();
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-    info!("APIC KEYBOARD HANDLER!");
+    // info!("APIC KEYBOARD HANDLER!");
 
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
@@ -406,8 +435,7 @@ extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionSta
     // let mut local_apic = lapic_locked.as_mut().expect("apic_0x01_handler(): local_apic wasn't yet inited!");
     // local_apic.eoi();
 
-    // quick fix for lockless apic eoi
-    unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
+    eoi(None);
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
@@ -415,20 +443,19 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 
     let mut lapic_locked = apic::get_lapic();
     let mut local_apic = lapic_locked.as_mut().expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
-    local_apic.eoi();
+    
+    eoi(None);
 }
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
     let mut lapic_locked = apic::get_lapic();
     let mut local_apic = lapic_locked.as_mut().expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
-    let isr = local_apic.get_isr();
-    let irr = local_apic.get_irr();
-    println_unsafe!("APIC ISR: {:?}, IRR: {:?}", isr, irr);
+    // let isr = local_apic.get_isr();
+    // let irr = local_apic.get_irr();
+    // println_unsafe!("APIC ISR: {:?}, IRR: {:?}", isr, irr);
 
-    // loop { }
-    local_apic.eoi();
-
+    eoi(None);
 }
 
 
@@ -439,7 +466,7 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut
 extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
-	PIC.try().expect("IRQ 0x20: PIC not initialized").notify_end_of_interrupt(0x20);
+	eoi(Some(0x20));
 }
 
 
@@ -453,7 +480,7 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
 
     keyboard::handle_keyboard_input(scan_code);	
 
-    PIC.try().expect("IRQ 0x21: PIC not initialized").notify_end_of_interrupt(0x21);
+    eoi(Some(0x21));
 }
 
 
@@ -477,7 +504,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
         if irq_regs.master_isr & 0x80 == 0x80 {
             println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
-            pic.notify_end_of_interrupt(0x27);
+            eoi(Some(0x27));
         }
         else {
             // do nothing. Do not send an EOI.
@@ -508,7 +535,7 @@ fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     unsafe { PIC.notify_end_of_interrupt(0x28); }
+//     eoi(Some(0x28));
     
 //     rtc::handle_rtc_interrupt();
 // }
@@ -519,7 +546,7 @@ extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
 
     ata_pio::handle_primary_interrupt();
 
-    PIC.try().expect("IRQ 0x21: PIC not initialized").notify_end_of_interrupt(0x2e);
+    eoi(Some(0x2e));
 }
 
 

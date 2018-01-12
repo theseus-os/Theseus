@@ -36,6 +36,7 @@ extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+extern crate atomic;
 extern crate xmas_elf;
 extern crate rustc_demangle;
 extern crate goblin;
@@ -264,7 +265,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    // unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+    if cfg!(feature = "no_serial") {
+         // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
+        unsafe{  logger::enable_vga(); }
+    }
     trace!("state_store initialized.");
 
 
