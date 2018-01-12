@@ -70,7 +70,10 @@ pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
 
-pub const APIC_START: usize = 0xFFFF_FFFF_F000_0000; 
+/// Typically starts at base physical address 0xFEE0_0000
+pub const APIC_START: usize = 0xFFFF_FFFF_0000_0000 + 0xFEE0_0000; 
+/// Typically starts at base physical address 0xFEC0_0000
+pub const IOAPIC_START: usize = 0xFFFF_FFFF_0000_0000 + 0xFEC0_0000;
 
 
 /// The kernel text region is where we load kernel modules. 

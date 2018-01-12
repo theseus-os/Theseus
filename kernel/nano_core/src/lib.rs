@@ -219,7 +219,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+    // unsafe{  logger::enable_vga(); } // uncomment this to enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
     trace!("state_store initialized.");
 
 
@@ -245,8 +245,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
-    debug!("ENABLING INTERRUPTS FOR APIC TESTING!");
-    interrupts::enable_interrupts();
 
     syscall::init(syscall_stack.top_usable());
 
@@ -274,7 +272,9 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
 
-    println_unsafe!("initialization done! (interrupts enabled?: {})", interrupts::interrupts_enabled());
+    println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
+    interrupts::enable_interrupts();
+    // schedule!();  // this will happen on the first timer interrupt anyway
 	
 
 
@@ -292,13 +292,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
     
-    // try to schedule in the second task
-    info!("attempting to schedule away from zeroth init task");
-    schedule!(); // this automatically enables interrupts right now
 
-
-    // the idle thread's (Task 0) busy loop
-    trace!("Entering Task0's idle loop");
 	
     // attempt to parse a test kernel module
     if false {
@@ -365,8 +359,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         tasklist_mut.spawn_userspace(module, None);
     }
 
-
-    debug!("rust_main(): entering idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
+    interrupts::enable_interrupts();
+    debug!("rust_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 
     assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 

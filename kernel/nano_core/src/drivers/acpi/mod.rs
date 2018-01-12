@@ -147,8 +147,10 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
         // inform the frame allocator that the physical frames where the top-level RSDT/XSDT table exists
         // is now off-limits and should not be touched
-        let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address() as usize, rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
-        try!(FRAME_ALLOCATOR.try().unwrap().lock().add_area(rxsdt_area, false));
+        {
+            let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address() as usize, rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
+            try!(FRAME_ALLOCATOR.try().unwrap().lock().add_area(rxsdt_area, false));
+        }
 
         rxsdt.map_all(active_table); // TODO: FIXME: change this to not be an identity mapping, but rather to use our VirtualAddressAllocator
 

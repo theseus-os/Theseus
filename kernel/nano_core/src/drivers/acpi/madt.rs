@@ -1,6 +1,7 @@
 use core::mem;
 
 use memory::{Frame, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use interrupts::ioapic;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -41,7 +42,7 @@ impl Madt {
             debug!("    APIC me: {}, LAPIC vaddr: {:#X}", me, local_apic.virt_addr);
         }
 
-
+        let mut ioapic_count = 0;
         if let Some(madt) = madt {
             debug!("  APIC: {:#x}: {:#x}", madt.local_address, madt.flags);
         
@@ -56,12 +57,23 @@ impl Madt {
                             debug!("        This is a different AP's APIC");
                         }
                     }
+                    MadtEntry::IoApic(ioa) => {
+                        ioapic_count += 1;
+                        ioapic::create(active_table, ioa.id, ioa.address as usize, ioa.gsi_base);
+                        let mut ioapic_locked = ioapic::get_ioapic();
+                        let mut ioapic_ref = ioapic_locked.as_mut().expect("Couldn't get ioapic_ref!");
+                        ioapic_ref.set_irq(0x1, me as u8, 0x21); // map keyboard interrupt (0x21 in IDT) to lapic 0's (me's) IoApic irq 0x1 
+                        
+                        
+                    }
                     _ => {
 
                     }
                 }
             }
         }
+
+        assert!(ioapic_count <= 1, "FATAL ERROR: multiple I/O APICs are not yet supported!");
 
     }
 

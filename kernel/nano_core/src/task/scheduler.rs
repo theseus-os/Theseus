@@ -12,6 +12,7 @@ use super::{get_tasklist, Task};
 ///
 /// Interrupts MUST be disabled before this function runs. 
 pub unsafe fn schedule() -> bool {
+    assert!(::interrupts::interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("schedule [0]: current_taskid={}", current_taskid);
@@ -65,16 +66,18 @@ pub unsafe fn schedule() -> bool {
 
 
 /// invokes the scheduler to pick a new task, but first disables interrupts. 
-/// Interrupts will be automatically re-enabled after scheduling. 
+/// Interrupts will be automatically re-enabled after scheduling, iff they were enabled initially.
+/// This iff condition allows us to perform a context switch directly to another task, if we wish... which we never do as of now.
 /// The current thread may be picked again, it doesn't affect the current thread's runnability.
 #[macro_export]
 macro_rules! schedule {
     () => (    
         {
             unsafe {
-                $crate::interrupts::disable_interrupts();
+                let _held_ints = ::irq_safety::hold_interrupts();
+                // $crate::interrupts::disable_interrupts();
                 $crate::task::scheduler::schedule();
-                $crate::interrupts::enable_interrupts();
+                // $crate::interrupts::enable_interrupts();
             }
         }
     )

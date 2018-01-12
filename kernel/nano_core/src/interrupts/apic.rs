@@ -4,7 +4,7 @@ use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
-use kernel_config::memory::{APIC_START, KERNEL_OFFSET};
+use kernel_config::memory::{APIC_START};
 
 static LOCAL_APIC: Mutex<Option<LocalApic>> = Mutex::new(None);
 
@@ -80,7 +80,11 @@ pub fn get_lapic() -> MutexGuard<'static, Option<LocalApic>> {
 /// Local APIC
 pub struct LocalApic {
     pub virt_addr: VirtualAddress,
-    pub x2: bool
+    pub x2: bool,
+    // phys_addr: PhysicalAddress,
+    // processor: u8,
+    // id: u8,
+    // flags: u32,
 }
 
 impl LocalApic {
@@ -105,7 +109,7 @@ impl LocalApic {
             let page = Page::containing_address(lapic.virt_addr);
             let frame = Frame::containing_address(phys_addr);
 			let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-            active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+            active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
         }
 
         if lapic.x2 { 
@@ -126,7 +130,7 @@ impl LocalApic {
         // globally enable the apic by setting the xapic_enable bit
         let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
         wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | is_bsp | IA32_APIC_XAPIC_ENABLE);
-        info!("LAPIC ID {:#x} is_bsp: {}", self.version(), is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
+        info!("LAPIC ID {:#x} is_bsp: {}", self.id(), is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
 
 
         // init APIC to a clean state, based on: http://wiki.osdev.org/APIC_timer#Example_code_in_ASM
@@ -183,7 +187,7 @@ impl LocalApic {
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
         // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
         self.write_reg(APIC_REG_LVT_TIMER, 0x20 | APIC_TIMER_PERIODIC); // TODO: FIXME: change 0x20, it's the IRQ number we use for timer
-        self.write_reg(APIC_REG_INIT_COUNT, 0x100000);
+        self.write_reg(APIC_REG_INIT_COUNT, 0x800000);
 
         // stuff below taken from Tifflin rust-os
         self.write_reg(APIC_REG_LVT_THERMAL, 0);
@@ -199,7 +203,7 @@ impl LocalApic {
         debug!("in init_timer_x2 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
         // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
         debug!("in init_timer_x2 3");wrmsr(IA32_X2APIC_LVT_TIMER, 0x20 | APIC_TIMER_PERIODIC as u64); // TODO: FIXME: change 0x20, it's the IRQ number we use for timer
-        debug!("in init_timer_x2 4");wrmsr(IA32_X2APIC_INIT_COUNT, 0x100000);
+        debug!("in init_timer_x2 4");wrmsr(IA32_X2APIC_INIT_COUNT, 0x800000);
 
         // stuff below taken from Tifflin rust-os
         debug!("in init_timer_x2 5"); wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
