@@ -409,10 +409,6 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
         APIC_TIMER_TICKS += 1;
         // info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
     }
-
-    // let mut lapic_locked = apic::get_lapic();
-    // let mut local_apic = lapic_locked.as_mut().expect("apic_timer_handler(): local_apic wasn't yet inited!");
-    // local_apic.eoi();
     
     eoi(None);
     
@@ -431,27 +427,19 @@ extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionSta
 
     keyboard::handle_keyboard_input(scan_code);	
 
-
-    // let mut lapic_locked = apic::get_lapic();
-    // let mut local_apic = lapic_locked.as_mut().expect("apic_0x01_handler(): local_apic wasn't yet inited!");
-    // local_apic.eoi();
-
     eoi(None);
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     info!("APIC SPURIOUS INTERRUPT HANDLER!");
 
-    let mut lapic_locked = apic::get_lapic();
-    let mut local_apic = lapic_locked.as_mut().expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
-    
     eoi(None);
 }
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
-    let mut lapic_locked = apic::get_lapic();
-    let mut local_apic = lapic_locked.as_mut().expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
+    // let mut lapics_locked = apic::get_lapics();
+    // let mut local_apic = lapics_locked.get_mut(&MY_APIC_ID!!).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
     // let isr = local_apic.get_isr();
     // let irr = local_apic.get_irr();
     // println_unsafe!("APIC ISR: {:?}, IRR: {:?}", isr, irr);

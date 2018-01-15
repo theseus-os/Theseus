@@ -9,7 +9,7 @@ use arch::{pause, ArchTaskState};
 use alloc::boxed::Box;
 use core::fmt;
 use core::ops::DerefMut;
-use memory::{Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
+use memory::{get_kernel_mmi_ref, Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 
 #[macro_use] pub mod scheduler;
@@ -19,14 +19,6 @@ type TaskId = usize;
 type AtomicTaskId = AtomicUsize;
 
 
-/// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
-
-/// returns the kernel's `MemoryManagementInfo`, if initialized.
-/// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
-    KERNEL_MMI.try().map( |r| r.clone())
-}
 
 /// The `TaskId` of the currently executing `Task`
 static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
@@ -146,7 +138,7 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, mut next: &mut Task) {
+    pub fn context_switch(&mut self, next: &mut Task) {
         // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
@@ -328,18 +320,14 @@ impl TaskList {
     /// basically just sets up a Task structure around the bootstrapped kernel thread,
     /// the one that enters `rust_main()`.
     /// Returns a reference to the `Task`, protected by a `RwLock`
-    pub fn init_task_zero(&mut self, task_zero_mmi: MemoryManagementInfo) -> Result<&Arc<RwLock<Task>>, &str> {
+    pub fn init_task_zero(&mut self, kernel_mmi: Arc<MutexIrqSafe<MemoryManagementInfo>>) -> Result<&Arc<RwLock<Task>>, &str> {
         assert_has_not_been_called!("init_task_zero was already called once!");
-
-        let mmi_ref = KERNEL_MMI.call_once( || {
-            Arc::new(MutexIrqSafe::new(task_zero_mmi))
-        });
 
         let id_zero: TaskId = 0;
         let mut task_zero = Task::new(id_zero);
         task_zero.runstate = RunState::RUNNABLE;
         task_zero.running_on_cpu = 0; // only one CPU core is up right now
-        task_zero.mmi = Some(mmi_ref.clone());
+        task_zero.mmi = Some(kernel_mmi);
 
         task_zero.kstack = {
             extern "C" {
@@ -391,7 +379,7 @@ impl TaskList {
             new_task.set_name(String::from(thread_name));
 
             // the new kernel thread uses the same kernel address space
-            new_task.mmi = Some(KERNEL_MMI.try().expect("spawn_kthread(): KERNEL_MMI was not initialized!!").clone());
+            new_task.mmi = Some(get_kernel_mmi_ref().expect("spawn_kthread(): KERNEL_MMI was not initialized!!").clone());
 
             // create and set up a new kstack
             let kstack: Stack = {
@@ -457,8 +445,8 @@ impl TaskList {
             // currently, we manually copy all of the existing mappings into the new MMI struct (kernel mappings).
             // there is probably a better way to do this by copying the page table frames themselves... or something else. 
             let new_userspace_mmi = {
-
-                let mut kernel_mmi_locked = KERNEL_MMI.try().expect("spawn_userspace(): KERNEL_MMI was not yet initialized!").lock();
+                let kernel_mmi_ref = get_kernel_mmi_ref().expect("spawn_userspace(): KERNEL_MMI was not yet initialized!");
+                let mut kernel_mmi_locked = kernel_mmi_ref.lock();
                 
                 // create a new kernel stack for this userspace task
                 let kstack: Stack = kernel_mmi_locked.alloc_stack(4).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");

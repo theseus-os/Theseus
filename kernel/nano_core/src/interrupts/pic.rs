@@ -193,7 +193,7 @@ impl ChainedPics {
 
     }
 
-    /// Each mask is a bitwise mask for each IRQ line, with the master's IRQ bit 2 (0x100) 
+    /// Each mask is a bitwise mask for each IRQ line, with the master's IRQ line 2 (0x4) 
     /// affecting the entire slave IRQ mask. So if the master's IRQ line 2 is masked (disabled),
     /// all slave IRQs (0x28 to 0x2F) are masked.
     /// If a bit is set to 1, it is masked (disabled). If set to 0, it is unmasked (enabled).

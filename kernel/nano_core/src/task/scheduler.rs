@@ -51,8 +51,8 @@ pub unsafe fn schedule() -> bool {
     }
 
     // we want mutable references to mutable tasks
-    let mut curr: &mut Task = &mut (*current_task); // as &mut Task; 
-    let mut next: &mut Task = &mut (*next_task); // as &mut Task; 
+    let curr: &mut Task = &mut (*current_task); // as &mut Task; 
+    let next: &mut Task = &mut (*next_task); // as &mut Task; 
 
     // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 

@@ -10,7 +10,7 @@ use spin::RwLock;
 
 // use stop::kstop;
 
-use memory::{ActivePageTable, Page, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{MemoryManagementInfo, ActivePageTable, Page, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
@@ -28,7 +28,7 @@ pub use self::rsdp::RSDP;
 pub mod hpet;
 // mod dmar;
 mod fadt;
-mod madt;
+pub mod madt;
 mod rsdt;
 mod sdt;
 mod xsdt;
@@ -36,6 +36,7 @@ mod xsdt;
 mod rxsdt;
 mod rsdp;
 
+/// The address that an AP jumps to when it first is booted by the BSP
 const TRAMPOLINE: usize = 0x7E00;
 const AP_STARTUP: usize = TRAMPOLINE + 512;
 
@@ -118,7 +119,7 @@ fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static S
 // }
 
 /// Parse the ACPI tables to gather CPU, interrupt, and timer information
-pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'static str> {
     {
         let mut sdt_ptrs = SDT_POINTERS.write();
         *sdt_ptrs = Some(BTreeMap::new());
@@ -165,12 +166,12 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         }
 
         Fadt::init(active_table);
-        Madt::init(active_table);
-        // Dmar::init(active_table);
         Hpet::init(active_table);
+        let madt_iter = Madt::init(active_table);
+        // Dmar::init(active_table);
         // init_namespace();
 
-        Ok(())
+        madt_iter
 
     } 
     else {

@@ -610,6 +610,7 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
     let mut text_shndx:   Option<usize> = None;
     let mut rodata_shndx: Option<usize> = None;
     let mut data_shndx:   Option<usize> = None;
+    let mut bss_shndx:   Option<usize> = None;
 
     for (shndx, sec) in elf_file.section_iter().enumerate() {
         // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
@@ -638,11 +639,25 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
                 };
             }
         }
+        // look for .bss section
+        else if let Ok(ShType::NoBits) = sec.get_type() {
+            // skip null section and any empty sections
+            let sec_size = sec.size() as usize;
+            if sec_size == 0 { continue; }
+
+            if let Ok(name) = sec.get_name(&elf_file) {
+                if name == ".bss" {
+                    assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
+                    bss_shndx = Some(shndx);
+                }
+            }
+        }
     }
 
     let text_shndx = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
     let rodata_shndx = try!(rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF"));
     let data_shndx = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
+    let bss_shndx = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
 
@@ -670,40 +685,46 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
                             // debug!("parse_nano_core(): name: {}, vaddr: {:#X}", name, sec_vaddr);
 
                             let demangled = demangle_symbol(name);
-                            let new_section = match entry.shndx() {
-                                text_shndx => {
-                                    LoadedSection::Text(TextSection{
+                            let new_section = {
+                                if entry.shndx() as usize == text_shndx {
+                                    Some(LoadedSection::Text(TextSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
                                 }
-                                rodata_shndx => {
-                                    LoadedSection::Rodata(RodataSection{
+                                else if entry.shndx() as usize == rodata_shndx {
+                                    Some(LoadedSection::Rodata(RodataSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
                                 }
-                                data_shndx => {
-                                    LoadedSection::Data(DataSection{
+                                else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
+                                    Some(LoadedSection::Data(DataSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
+                                }
+                                else {
+                                    error!("Unexpected entry.shndx(): {}", entry.shndx());
+                                    None
                                 }
                             };
 
-                            sections.push(Arc::new(new_section));
+                            if new_section.is_some() {
+                                sections.push(Arc::new(new_section.unwrap()));
+                            }
                         }
                     }
                 }

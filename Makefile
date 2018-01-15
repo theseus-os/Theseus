@@ -54,7 +54,7 @@ QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial
 ## the most recent CPU model supported by QEMU 2.5.0
 QEMU_FLAGS += -cpu Broadwell
 ## multicore 
-#QEMU_FLAGS += -smp 2
+QEMU_FLAGS += -smp 4
 
 ## basic networking with a standard e1000 ethernet card
 QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1 
