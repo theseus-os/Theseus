@@ -6,13 +6,17 @@ pub mod acpi;
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
-use memory::{MemoryManagementInfo, PageTable};
+use memory::{MemoryManagementInfo, PageTable, Stack};
 
-pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) {
+
+/// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
+pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     assert_has_not_been_called!("drivers::early_init was called more than once!");
     vga_buffer::show_splash_screen();
     
-    {
+
+    // first, we do things that require access to the active page table to perform memory mappings
+    let (apic_table_iter, active_table_phys_addr) = {
         // destructure the kernel's MMI so we can access its page table and vmas
         let &mut MemoryManagementInfo { 
             page_table: ref mut kernel_page_table, 
@@ -22,20 +26,34 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) {
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 // first, init the local apic info
-                unsafe { ::interrupts::apic::init(active_table); }
+                ::interrupts::apic::init(active_table);
                 
                 // then init/parse the ACPI tables to fill in the APIC details, among other things
-                acpi::init(active_table);
+                let madt_iter = try!(acpi::init(active_table));
+
+                // create the ioapic (we only support a single IoApic right now)
+                try!(acpi::madt::handle_ioapic_entry(madt_iter.clone(), active_table));
+                
+                (madt_iter, active_table.physical_address())
             }
             _ => {
                 error!("drivers::early_init(): couldn't get kernel's active_table!");
-                return;
+                return Err("Couldn't get kernel's active_table");
             }
         }
-    }
+    };
+
+    
+    // second, we do things that don't need a reference to the active page table,
+    // such as setting up the other cores (APs) on this system
+    acpi::madt::handle_apic_table(apic_table_iter, kernel_mmi);
+
+
+    Ok(())
 }
 
-/// This is for functions that require the memory subsystem to be initialized. 
+
+
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);

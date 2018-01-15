@@ -1,7 +1,9 @@
 use core::mem;
-
-use memory::{Frame, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use core::intrinsics::{atomic_load, atomic_store};
+use memory::{FRAME_ALLOCATOR, Stack, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
+use interrupts::apic::{LocalApic, has_x2apic, get_current_lapic_id, is_bsp, APIC_VIRT_ADDR, BSP_PROCESSOR_ID};
+use core::ops::DerefMut;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -11,7 +13,11 @@ use core::sync::atomic::Ordering;
 
 // use device::local_apic::LOCAL_APIC;
 // use interrupt;
-// use start::{kstart_ap, CPU_COUNT, AP_READY};
+use start::{kstart_ap, AP_READY_FLAG};
+
+
+
+
 
 /// The Multiple APIC Descriptor Table
 #[derive(Debug)]
@@ -22,180 +28,25 @@ pub struct Madt {
 }
 
 impl Madt {
-    pub fn init(active_table: &mut ActivePageTable) {
+    pub fn init(active_table: &mut ActivePageTable) -> Result<MadtIter, &'static str> {
+        assert_has_not_been_called!("Madt::init() was called more than once! It should only be called by the bootstrap processor (bsp).");
+        
+        if !is_bsp() {
+            error!("You can only call Madt::init() from the bootstrap processor (bsp), not other cores!");
+            return Err("Cannot call Madt::init() from non-bsp cores");
+        }
+        
         let madt_sdt = find_sdt("APIC");
         let madt = if madt_sdt.len() == 1 {
             load_table(get_sdt_signature(madt_sdt[0]));
-            Madt::new(madt_sdt[0])
+            Madt::new(madt_sdt[0]).ok_or("Couldn't find MADT table")
         } else {
             error!("Unable to find MADT");
-            return;
+            Err("could not find MADT table (signature 'APIC')")
         };
 
-        let mut lapic_locked = ::interrupts::apic::get_lapic();
-        let mut local_apic = lapic_locked.as_mut().expect("Madt::init(): local_apic wasn't yet inited!");
-        let me = local_apic.id() as u8;
-
-        if local_apic.x2 {
-            debug!("    X2APIC me: {}", me);
-        } else {
-            debug!("    APIC me: {}, LAPIC vaddr: {:#X}", me, local_apic.virt_addr);
-        }
-
-        let mut ioapic_count = 0;
-        if let Some(madt) = madt {
-            debug!("  APIC: {:#x}: {:#x}", madt.local_address, madt.flags);
-        
-            for madt_entry in madt.iter() {
-                debug!("      {:?}", madt_entry);
-                match madt_entry {
-                    MadtEntry::LocalApic(ap_local_apic) => { 
-                        if ap_local_apic.id == me {
-                            debug!("        This is my local APIC");
-                        }
-                        else {
-                            debug!("        This is a different AP's APIC");
-                        }
-                    }
-                    MadtEntry::IoApic(ioa) => {
-                        ioapic_count += 1;
-                        ioapic::create(active_table, ioa.id, ioa.address as usize, ioa.gsi_base).expect("FAILED to create IoApic!");
-                        let mut ioapic_locked = ioapic::get_ioapic();
-                        let mut ioapic_ref = ioapic_locked.as_mut().expect("Couldn't get ioapic_ref!");
-                        ioapic_ref.set_irq(0x1, me as u8, 0x21); // map keyboard interrupt (0x21 in IDT) to lapic 0's (me's) IoApic irq 0x1 
-                        
-                        
-                    }
-                    _ => {
-
-                    }
-                }
-            }
-        }
-
-        assert!(ioapic_count <= 1, "FATAL ERROR: multiple I/O APICs are not yet supported!");
-
+        madt.map(|m| m.iter())
     }
-
-
-
-
-    // pub fn init_old(active_table: &mut ActivePageTable) {
-    //     let madt_sdt = find_sdt("APIC");
-    //     let madt = if madt_sdt.len() == 1 {
-    //         load_table(get_sdt_signature(madt_sdt[0]));
-    //         Madt::new(madt_sdt[0])
-    //     } else {
-    //         error!("Unable to find MADT");
-    //         return;
-    //     };
-
-    //     if let Some(madt) = madt {
-    //         debug!("  APIC: {:>08X}: {}", madt.local_address, madt.flags);
-
-    //         let local_apic = unsafe { &mut LOCAL_APIC };
-    //         let me = local_apic.id() as u8;
-
-    //         if local_apic.x2 {
-    //             debug!("    X2APIC {}", me);
-    //         } else {
-    //             debug!("    XAPIC {}: {:>08X}", me, local_apic.address);
-    //         }
-
-    //         if cfg!(feature = "multi_core") {
-    //             let trampoline_frame = Frame::containing_address(PhysicalAddress::new(TRAMPOLINE));
-    //             let trampoline_page = Page::containing_address(VirtualAddress::new(TRAMPOLINE));
-
-    //             // Map trampoline
-    //             let result = active_table.map_to(trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-    //             result.flush(active_table);
-
-    //             for madt_entry in madt.iter() {
-    //                 debug!("      {:?}", madt_entry);
-    //                 match madt_entry {
-    //                     MadtEntry::LocalApic(ap_local_apic) => if ap_local_apic.id == me {
-    //                         debug!("        This is my local APIC");
-    //                     } else {
-    //                         if ap_local_apic.flags & 1 == 1 {
-    //                             // Increase CPU ID
-    //                             CPU_COUNT.fetch_add(1, Ordering::SeqCst);
-
-    //                             // Allocate a stack
-    //                             let stack_start = allocate_frames(64).expect("no more frames in acpi stack_start").start_address().get() + ::KERNEL_OFFSET;
-    //                             let stack_end = stack_start + 64 * 4096;
-
-    //                             let ap_ready = TRAMPOLINE as *mut u64;
-    //                             let ap_cpu_id = unsafe { ap_ready.offset(1) };
-    //                             let ap_page_table = unsafe { ap_ready.offset(2) };
-    //                             let ap_stack_start = unsafe { ap_ready.offset(3) };
-    //                             let ap_stack_end = unsafe { ap_ready.offset(4) };
-    //                             let ap_code = unsafe { ap_ready.offset(5) };
-
-    //                             // Set the ap_ready to 0, volatile
-    //                             unsafe { atomic_store(ap_ready, 0) };
-    //                             unsafe { atomic_store(ap_cpu_id, ap_local_apic.id as u64) };
-    //                             unsafe { atomic_store(ap_page_table, active_table.address() as u64) };
-    //                             unsafe { atomic_store(ap_stack_start, stack_start as u64) };
-    //                             unsafe { atomic_store(ap_stack_end, stack_end as u64) };
-    //                             unsafe { atomic_store(ap_code, kstart_ap as u64) };
-    //                             AP_READY.store(false, Ordering::SeqCst);
-
-    //                             debug!("        AP {}:", ap_local_apic.id);
-
-    //                             // Send INIT IPI
-    //                             {
-    //                                 let mut icr = 0x4500;
-    //                                 if local_apic.x2 {
-    //                                     icr |= (ap_local_apic.id as u64) << 32;
-    //                                 } else {
-    //                                     icr |= (ap_local_apic.id as u64) << 56;
-    //                                 }
-    //                                 debug!(" IPI...");
-    //                                 local_apic.set_icr(icr);
-    //                             }
-
-    //                             // Send START IPI
-    //                             {
-    //                                 //Start at 0x0800:0000 => 0x8000. Hopefully the bootloader code is still there
-    //                                 let ap_segment = (AP_STARTUP >> 12) & 0xFF;
-    //                                 let mut icr = 0x4600 | ap_segment as u64;
-
-    //                                 if local_apic.x2 {
-    //                                     icr |= (ap_local_apic.id as u64) << 32;
-    //                                 } else {
-    //                                     icr |= (ap_local_apic.id as u64) << 56;
-    //                                 }
-
-    //                                 debug!(" SIPI...");
-    //                                 local_apic.set_icr(icr);
-    //                             }
-
-    //                             // Wait for trampoline ready
-    //                             debug!(" Wait...");
-    //                             while unsafe { atomic_load(ap_ready) } == 0 {
-    //                                 interrupt::pause();
-    //                             }
-    //                             debug!(" Trampoline...");
-    //                             while ! AP_READY.load(Ordering::SeqCst) {
-    //                                 interrupt::pause();
-    //                             }
-    //                             debug!(" Ready");
-
-    //                             active_table.flush_all();
-    //                         } else {
-    //                             warn!("        CPU Disabled");
-    //                         }
-    //                     },
-    //                     _ => ()
-    //                 }
-    //             }
-
-    //             // Unmap trampoline
-    //             let (result, _frame) = active_table.unmap_return(trampoline_page, false);
-    //             result.flush(active_table);
-    //         }
-    //     }
-    // }
 
     pub fn new(sdt: &'static Sdt) -> Option<Madt> {
         if &sdt.signature == b"APIC" && sdt.data_len() >= 8 { //Not valid if no local address and flags
@@ -220,6 +71,212 @@ impl Madt {
     }
 }
 
+
+
+pub fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    let mut ioapic_count = 0;
+    for madt_entry in madt_iter {
+        match madt_entry {
+            MadtEntry::IoApic(ioa) => {
+                ioapic_count += 1;
+                ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base);
+            }
+            // we only handle IoApic entries here
+            _ => { }
+        }
+    }
+
+    if ioapic_count == 1 {
+        Ok(())
+    }
+    else {
+        error!("We need exactly 1 IoApic (found {}), cannot support more than 1, or 0 IoApics.", ioapic_count);
+        Err("Found more than one IoApic")
+    }
+}
+
+
+/// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
+pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+
+    let mut active_table_phys_addr: Option<PhysicalAddress> = None;
+
+    {
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+        } = kernel_mmi;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                // Map trampoline frame, i.e., where the new AP will start
+                let trampoline_frame = Frame::containing_address(TRAMPOLINE);
+                let trampoline_page = Page::containing_address(TRAMPOLINE);
+
+                {
+                    let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+                    active_table.map_to(trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut());
+                }
+                active_table_phys_addr = Some(active_table.physical_address());
+            }
+            _ => {
+                error!("handle_apic_table(): couldn't get kernel's active_table!");
+                return Err("Couldn't get kernel's active_table");
+            }
+        }
+    }
+
+    let active_table_phys_addr = try!(active_table_phys_addr.ok_or("Couldn't get kernel's active_table physical address"));
+
+    let mut lapics_locked = ::interrupts::apic::get_lapics();
+    let me = try!(get_current_lapic_id().ok_or("Madt::init(): couldn't get current lapic id")); 
+
+    if ::interrupts::apic::has_x2apic() {
+        debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic yes.", me);
+    } else {
+        debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic, LAPIC vaddr: {:#X}", 
+                me, APIC_VIRT_ADDR.try().expect("Madt::init(): APIC_VIRT_ADDR wasn't yet initialized!"));
+    }
+    
+
+    // in this function, we only handle LocalApics
+    for madt_entry in madt_iter {
+        debug!("      {:?}", madt_entry);
+        match madt_entry {
+            MadtEntry::LocalApic(lapic_madt) => { 
+
+                if lapic_madt.apic_id == me {
+                    debug!("        This is my local APIC");
+                    // For the BSP's own processor core, no real work is needed. 
+                    // Just set its own id as the system-wide BSP id, and add itself to the list of local apics
+                    BSP_PROCESSOR_ID.call_once( || lapic_madt.processor); 
+                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags);
+
+                    // set the BSP to receive keyboard interrupts through the IoApic
+                    let mut ioapic_locked = ioapic::get_ioapic();
+                    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
+                    ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    
+                    // add the BSP lapic to the list (should be the first one)
+                    assert!(lapics_locked.is_empty(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
+                    lapics_locked.insert(lapic_madt.processor, bsp_lapic);
+                }
+                else {
+                    debug!("        This is a different AP's APIC");
+                    // start up this AP, and have it create a new LocalApic for itself. 
+                    // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
+                    if false {
+                    let mut bsp_lapic = try!(BSP_PROCESSOR_ID.try().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let ap_stack = kernel_mmi.alloc_stack(64).expect("could not allocate AP stack!");
+                    bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
+                    }
+                }
+            }
+            // only care about new local apics right now
+            _ => { }
+        }
+    }
+
+
+    // TODO: FIXME: this should be done by each APIC itself, not done by the BSP for everyone.
+    // for madt_entry in madt_iter {
+    //     // now that we've loaded all the local apics, we can load other things that depend on them
+    //     match madt_entry {
+    //         MadtEntry::NonMaskableInterrupt(nmi) => {
+    //             if nmi.processor == 0xFF {
+    //                 // set NMI on all processors
+    //                 for mut lapic in lapics_locked.values_mut() {
+    //                     lapic.set_nmi(nmi.lint, nmi.flags);
+    //                 }
+    //             }
+    //             else {
+    //                 match lapics_locked.get_mut(&nmi.processor) {
+    //                     Some(l) => l.set_nmi(nmi.lint, nmi.flags),
+    //                     None => {
+    //                         error!("MadtNMI for unknown lapic: {:?}", nmi);
+    //                         return Err("Found MadtNonMaskableInterrupt entry for local APIC that didn't exist!");
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         _ => {  }
+    //     }
+    // }
+
+    Ok(())  
+}
+
+
+
+/// Called by the BSP to initialize the given `new_lapic` using IPIs.
+fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_table_paddr: PhysicalAddress, ap_stack: Stack) {
+    
+    let ap_ready = TRAMPOLINE as *mut u64;
+    let ap_processor_id = unsafe { ap_ready.offset(1) };
+    let ap_apic_id = unsafe { ap_ready.offset(2) };
+    let ap_flags = unsafe { ap_ready.offset(3) };
+    let ap_page_table = unsafe { ap_ready.offset(4) };
+    let ap_stack_start = unsafe { ap_ready.offset(5) };
+    let ap_stack_end = unsafe { ap_ready.offset(6) };
+    let ap_code = unsafe { ap_ready.offset(7) };
+
+    // Set the ap_ready to 0, volatile
+    unsafe { atomic_store(ap_ready, 0) };
+    unsafe { atomic_store(ap_processor_id, new_lapic.processor as u64) };
+    unsafe { atomic_store(ap_apic_id, new_lapic.apic_id as u64) };
+    unsafe { atomic_store(ap_flags, new_lapic.flags as u64) };
+    unsafe { atomic_store(ap_page_table, active_table_paddr as u64) };
+    unsafe { atomic_store(ap_stack_start, ap_stack.bottom() as u64) };
+    unsafe { atomic_store(ap_stack_end, ap_stack.top_unusable() as u64) };
+    unsafe { atomic_store(ap_code, kstart_ap as u64) };
+    AP_READY_FLAG.store(false, Ordering::SeqCst);
+
+    info!("Bringing up AP proc: {} apic_id: {}:", new_lapic.processor, new_lapic.apic_id);
+
+    // Send INIT IPI
+    {
+        let mut icr = 0x4500;
+        if has_x2apic() {
+            icr |= (new_lapic.apic_id as u64) << 32;
+        } else {
+            icr |= (new_lapic.apic_id as u64) << 56;
+        }
+        print!(" IPI...");
+        bsp_lapic.set_icr(icr);
+    }
+
+    // Send START IPI
+    {
+        //Start at 0x0800:0000 => 0x8000. Hopefully the bootloader code is still there
+        let ap_segment = (AP_STARTUP >> 12) & 0xFF;
+        let mut icr = 0x4600 | ap_segment as u64;
+
+        if has_x2apic() {
+            icr |= (new_lapic.apic_id as u64) << 32;
+        } else {
+            icr |= (new_lapic.apic_id as u64) << 56;
+        }
+
+        print!(" SIPI...");
+        bsp_lapic.set_icr(icr);
+    }
+
+    // Wait for trampoline ready
+    print!(" Wait...");
+    while unsafe { atomic_load(ap_ready) } == 0 {
+        ::arch::pause();
+    }
+    print!(" Trampoline...");
+    while ! AP_READY_FLAG.load(Ordering::SeqCst) {
+        ::arch::pause();
+    }
+    println!(" Ready");
+
+}
+
+
+
 /// MADT Local APIC
 #[derive(Debug)]
 #[repr(packed)]
@@ -227,7 +284,7 @@ pub struct MadtLocalApic {
     /// Processor ID
     pub processor: u8,
     /// Local APIC ID
-    pub id: u8,
+    pub apic_id: u8,
     /// Flags. 1 means that the processor is enabled
     pub flags: u32
 }
@@ -288,6 +345,7 @@ pub enum MadtEntry {
     Unknown(u8)
 }
 
+#[derive(Clone)]
 pub struct MadtIter {
     sdt: &'static Sdt,
     i: usize

@@ -14,6 +14,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(compiler_fences)]
 #![feature(iterator_step_by)]
+#![feature(core_intrinsics)]
 #![no_std]
 
 
@@ -74,6 +75,7 @@ mod memory;
 mod interrupts;
 mod syscall;
 mod mod_mgmt;
+mod start;
 
 // TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
@@ -261,7 +263,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
-    let mut kernel_mmi = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
+    let kernel_mmi_ref = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -273,19 +275,28 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // initialize basic exception handling interrupts
-    let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
-    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
-    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
+    let (double_fault_stack, privilege_stack, syscall_stack) = { 
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        (
+            kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
+            kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack"),
+            kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack")
+        )
+    };
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
 
     {
         trace!("calling drivers::early_init()");
-        drivers::early_init(&mut kernel_mmi);
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        drivers::early_init(&mut kernel_mmi).unwrap();
     }
+
+    // loop { }
 
     // parse the nano_core ELF object to load its symbols into our metadata
     {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
         let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
     }
@@ -310,7 +321,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // TODO: transform this into something more like "task::init(initial_mmi)"
     {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(kernel_mmi).unwrap();
+        tasklist_mut.init_task_zero(kernel_mmi_ref).unwrap();
     }
 
     // initialize the kernel console
@@ -345,7 +356,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
     // attempt to parse a test kernel module
     if false {
-        let kernel_mmi_ref = task::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
         memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
         // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());

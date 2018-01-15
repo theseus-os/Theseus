@@ -1,12 +1,83 @@
 use core::ptr::{read_volatile, write_volatile};
-use spin::{Mutex, MutexGuard};
+use spin::{Mutex, MutexGuard, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 use kernel_config::memory::{APIC_START};
+use alloc::BTreeMap;
 
-static LOCAL_APIC: Mutex<Option<LocalApic>> = Mutex::new(None);
+lazy_static! {
+    static ref LOCAL_APICS: Mutex<BTreeMap<u8, LocalApic>> = Mutex::new(BTreeMap::new());
+}
+
+/// The processor id (from the ACPI MADT table) of the bootstrap processor
+pub static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
+
+pub static APIC_VIRT_ADDR: Once<VirtualAddress> = Once::new();
+
+/// Returns true if the machine has support for x2apic
+pub fn has_x2apic() -> bool {
+    static is_x2: Once<bool> = Once::new(); // caches the result
+    let res = is_x2.call_once( || {
+        CpuId::new().get_feature_info().unwrap().has_x2apic()
+    });
+    *res // because it's a reference
+}
+
+/// Returns a reference to the list of LocalApics, one per processor core
+pub fn get_lapics() -> MutexGuard<'static, BTreeMap<u8, LocalApic>> {
+	LOCAL_APICS.lock()
+}
+
+
+/// Returns the APIC ID of the currently executing processor core
+pub fn get_current_lapic_id() -> Option<u8> {
+    let raw = if has_x2apic() {
+        unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
+    } else {
+        match APIC_VIRT_ADDR.try() {
+            Some(apic_start) => unsafe { read_volatile((apic_start + APIC_REG_LAPIC_ID as usize) as *const u32) },
+            None => {
+                error!("get_current_lapic_id(): APIC_VIRT_ADDR was None -- call apic::init() first.");
+                return None;
+            }
+        }
+    };
+    Some((raw >> 24) as u8)
+}
+
+
+/// Returns true if the currently executing processor core is the bootstrap processor, 
+/// i.e., the first procesor to run 
+pub fn is_bsp() -> bool {
+    unsafe { 
+        rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
+    }
+}
+
+
+/// initially maps the base APIC MMIO register frames so that we can know which LAPIC (processor core) we are,
+/// and because it only needs to be done once -- not every time we bring up a new AP core
+pub fn init(active_table: &mut ActivePageTable) {
+    assert_has_not_been_called!("Error: tried to call apic::init() more than once!");
+
+    let x2 = has_x2apic();
+    let phys_addr = unsafe { rdmsr(IA32_APIC_BASE) };
+    debug!("is x2apic? {}.  IA32_APIC_BASE: {:#X}", x2, phys_addr);
+    // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
+    // x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
+    // writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
+    let virt_addr = APIC_START as VirtualAddress;
+    if !has_x2apic() {
+        let page = Page::containing_address(virt_addr);
+        let frame = Frame::containing_address(phys_addr as PhysicalAddress);
+        let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+        active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+    }
+
+    APIC_VIRT_ADDR.call_once( || virt_addr);
+}
 
 pub const APIC_SPURIOUS_INTERRUPT_VECTOR: u32 = 0xFF; // as recommended by everyone on os dev wiki
 const IA32_APIC_XAPIC_ENABLE: u64 = 1 << 11; // 0x800
@@ -47,85 +118,51 @@ const APIC_REG_TIMER_DIVIDE           : u32 =  0x3E0;
 
 
 
-
-
-pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-    let mut la = LOCAL_APIC.lock();
-	if let Some(_) = *la {
-		error!("apic::init() was already called! It cannot be called twice.");
-		Err("apic::init() was already called before.")
-	}
-	else {
-		*la = Some( unsafe { LocalApic::create(active_table) } );
-		Ok(())
-	}
-}
-
-// pub fn init_ap() -> Result<(), &'static str> {
-// 	let mut la = LOCAL_APIC.lock();
-// 	if let Some(ref mut lapic) = *la {
-//     	unsafe { lapic.enable_apic(); }
-// 		Ok(())
-// 	}
-// 	else {
-// 		error!("apic::init() hasn't yet been called!");
-// 		Err("apic::init() has to be called first")
-// 	}
-// }
-
-pub fn get_lapic() -> MutexGuard<'static, Option<LocalApic>> {
-	LOCAL_APIC.lock()
-}
-
 /// Local APIC
+#[derive(Debug)]
 pub struct LocalApic {
     pub virt_addr: VirtualAddress,
-    pub x2: bool,
-    // phys_addr: PhysicalAddress,
-    // processor: u8,
-    // id: u8,
-    // flags: u32,
+    pub phys_addr: PhysicalAddress,
+    pub processor: u8,
+    pub apic_id: u8,
+    pub flags: u32,
 }
 
 impl LocalApic {
-    unsafe fn create(active_table: &mut ActivePageTable) -> LocalApic {
-		debug!("IA32_APIC_BASE: {:#X}", rdmsr(IA32_APIC_BASE));
+    /// This MUST be invoked from the AP core that is booting up.
+    /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
+    pub fn new(processor: u8, apic_id: u8, flags: u32) -> LocalApic {
+		
+        assert!(flags == 1, "LocalApic::create() processor was disabled! (flags != 1)");
 		let mut lapic = LocalApic {
 			virt_addr: APIC_START as VirtualAddress,
-			x2: CpuId::new().get_feature_info().unwrap().has_x2apic(),
+            // redox bitmasked the base paddr with 0xFFFF_0000, os dev wiki says 0xFFFF_F000 ...
+            // seems like 0xFFFF_F000 is more correct since it just frame/page-aligns the address
+            phys_addr: ( unsafe { rdmsr(IA32_APIC_BASE) } as usize & 0xFFFF_F000) as PhysicalAddress,
+            processor: processor,
+            apic_id: apic_id,
+            flags: flags,
 		};
 
-        // let x2apic_version_support - CpuIid::new().get_feature_info().unwrap().
-		debug!("Apic has x2apic?  {}", lapic.x2);
 
-        // redox bitmasked the base paddr with 0xFFFF_0000, os dev wiki says 0xFFFF_F000 ...
-        // seems like 0xFFFF_F000 is more correct since it just frame/page-aligns the address
-        let phys_addr = (rdmsr(IA32_APIC_BASE) as usize & 0xFFFF_F000) as PhysicalAddress;
-		
-        // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
-		// x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
-		// writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
-        if !lapic.x2 {
-            let page = Page::containing_address(lapic.virt_addr);
-            let frame = Frame::containing_address(phys_addr);
-			let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-            active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+        unsafe {
+            if has_x2apic() { 
+                lapic.enable_x2apic();
+                lapic.init_timer_x2(); 
+            } 
+            else { 
+                lapic.enable_apic();
+                lapic.init_timer(); 
+            }
         }
 
-        if lapic.x2 { 
-            lapic.enable_x2apic();
-            lapic.init_timer_x2(); 
-        } 
-        else { 
-            lapic.enable_apic();
-            lapic.init_timer(); 
-        }
+        info!("Found new processor core ({:?})", lapic);
 		lapic
     }
 
     /// enables the spurious interrupt vector, which enables the APIC itself.
     unsafe fn enable_apic(&mut self) {
-        assert!(!self.x2, "an x2apic system must not use enable_apic(), it should use enable_x2apic() instead.");
+        assert!(!has_x2apic(), "an x2apic system must not use enable_apic(), it should use enable_x2apic() instead.");
 
         // globally enable the apic by setting the xapic_enable bit
         let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
@@ -153,7 +190,7 @@ impl LocalApic {
     }
 
     unsafe fn enable_x2apic(&mut self) {
-        assert!(self.x2, "an apic/xapic system must not use enable_x2apic(), it should use enable_apic() instead.");
+        assert!(has_x2apic(), "an apic/xapic system must not use enable_x2apic(), it should use enable_apic() instead.");
         
         debug!("in enable_x2apic");
         // globally enable the x2apic, which includes also setting the xapic enable bit
@@ -189,7 +226,7 @@ impl LocalApic {
 
 
     unsafe fn init_timer(&mut self) {
-        assert!(!self.x2, "an x2apic system must not use init_timer(), it should use init_timerx2() instead.");
+        assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timerx2() instead.");
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
         // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
@@ -205,7 +242,7 @@ impl LocalApic {
     }
 
     unsafe fn init_timer_x2(&mut self) {
-        assert!(self.x2, "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
+        assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
         debug!("in init_timer_x2 start");
         debug!("in init_timer_x2 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
         // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
@@ -222,25 +259,28 @@ impl LocalApic {
     }
 
     unsafe fn read_reg(&self, reg: u32) -> u32 {
-        assert!(!self.x2, "an x2apic system must not use the MMIO read/write_reg() functions.");
+        assert!(!has_x2apic(), "an x2apic system must not use the MMIO read/write_reg() functions.");
         read_volatile((self.virt_addr + reg as usize) as *const u32)
     }
 
     unsafe fn write_reg(&mut self, reg: u32, value: u32) {
-        assert!(!self.x2, "an x2apic system must not use the MMIO read/write_reg() functions.");
+        assert!(!has_x2apic(), "an x2apic system must not use the MMIO read/write_reg() functions.");
         write_volatile((self.virt_addr + reg as usize) as *mut u32, value);
     }
 
-    pub fn id(&self) -> u32 {
-        if self.x2 {
+    pub fn id(&self) -> u8 {
+        let raw = if has_x2apic() {
             unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
         } else {
             unsafe { self.read_reg(APIC_REG_LAPIC_ID) }
-        }
+        };
+        let id = (raw >> 24) as u8;
+        assert!(id == self.apic_id, "LocalApic::id() wasn't the same as given apic_id!");
+        id
     }
 
     pub fn version(&self) -> u32 {
-        if self.x2 {
+        if has_x2apic() {
             unsafe { (rdmsr(IA32_X2APIC_VERSION) & 0xFFFF_FFFF) as u32 }
         } else {
             unsafe { self.read_reg(APIC_REG_LAPIC_VERSION) }
@@ -248,7 +288,7 @@ impl LocalApic {
     }
 
     pub fn icr(&self) -> u64 {
-        if self.x2 {
+        if has_x2apic() {
             unsafe { rdmsr(IA32_X2APIC_ICR) }
         } else {
             unsafe {
@@ -258,7 +298,7 @@ impl LocalApic {
     }
 
     pub fn set_icr(&mut self, value: u64) {
-        if self.x2 {
+        if has_x2apic() {
             unsafe { wrmsr(IA32_X2APIC_ICR, value); }
         } else {
             unsafe {
@@ -272,7 +312,7 @@ impl LocalApic {
 
     pub fn ipi(&mut self, apic_id: usize) {
         let mut icr = 0x4040;
-        if self.x2 {
+        if has_x2apic() {
             icr |= (apic_id as u64) << 32;
         } else {
             icr |= (apic_id as u64) << 56;
@@ -283,7 +323,7 @@ impl LocalApic {
     pub fn eoi(&mut self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
         unsafe {
-            if self.x2 {
+            if has_x2apic() {
                 wrmsr(IA32_X2APIC_EOI, 0); 
             } else {
                 self.write_reg(APIC_REG_EOI, 0);
@@ -291,10 +331,30 @@ impl LocalApic {
         }
     }
 
+    /// lint can be either 0 or 1, since each local APIC has two LVT LINTs
+    /// (Local Vector Table Local INTerrupts)
+    pub fn set_nmi(&mut self, lint: u8, flags: u16) {
+        unsafe {
+            if has_x2apic() {
+                match lint {
+                    0 => wrmsr(IA32_X2APIC_LVT_LINT0, (flags << 12) as u64 | APIC_NMI as u64), // or APIC_NMI | 0x2000 ??
+                    1 => wrmsr(IA32_X2APIC_LVT_LINT1, (flags << 12) as u64 | APIC_NMI as u64),
+                    _ => panic!("set_nmi(): invalid lint {}!"),
+                }
+            } else {
+                match lint {
+                    0 => self.write_reg(APIC_REG_LVT_LINT0, (flags << 12) as u32 | APIC_NMI), // or APIC_NMI | 0x2000 ??
+                    1 => self.write_reg(APIC_REG_LVT_LINT1, (flags << 12) as u32 | APIC_NMI),
+                    _ => panic!("set_nmi(): invalid lint {}!"),
+                }
+            }
+        }
+    }
+
 
     pub fn get_isr(&mut self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
         unsafe {
-            if self.x2 {
+            if has_x2apic() {
                 ( 
                     rdmsr(IA32_X2APIC_ISR0) as u32, 
                     rdmsr(IA32_X2APIC_ISR1) as u32,
@@ -324,7 +384,7 @@ impl LocalApic {
 
     pub fn get_irr(&mut self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
         unsafe {
-            if self.x2 {
+            if has_x2apic() {
                 ( 
                     rdmsr(IA32_X2APIC_IRR0) as u32, 
                     rdmsr(IA32_X2APIC_IRR1) as u32,

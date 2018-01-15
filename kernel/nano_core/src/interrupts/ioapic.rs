@@ -1,30 +1,25 @@
 use core::ptr::{read_volatile, write_volatile};
-use spin::{Mutex, MutexGuard};
+use spin::{Mutex, MutexGuard, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 use kernel_config::memory::{IOAPIC_START, KERNEL_OFFSET};
 
-static IOAPIC: Mutex<Option<IoApic>> = Mutex::new(None);
+static IOAPIC: Once<Mutex<IoApic>> = Once::new();
 
 
-pub fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32)
-              -> Result<(), &'static str> 
+pub fn init(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32)
+            -> &'static Mutex<IoApic>
 {
-    let mut ioapic = IOAPIC.lock();
-	if let Some(_) = *ioapic {
-		error!("ioapic::create() was already called! We don't currently support multiple IoApics.");
-		Err("ioapic::create() was already called.")
-	}
-	else {
-		*ioapic = Some( unsafe { IoApic::create(active_table, id, phys_addr, gsi_base) } );
-		Ok(())
-	}
+    let ioapic: &'static Mutex<IoApic> = IOAPIC.call_once( || {
+	    unsafe { Mutex::new(IoApic::create(active_table, id, phys_addr, gsi_base)) }
+    });
+    ioapic
 }
 
-pub fn get_ioapic() -> MutexGuard<'static, Option<IoApic>> {
-	IOAPIC.lock()
+pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
+	IOAPIC.try().map( |ioapic| ioapic.lock())
 }
 
 
@@ -38,10 +33,7 @@ pub struct IoApic {
 }
 
 impl IoApic {
-    unsafe fn create(active_table: &mut ActivePageTable, 
-                     id: u8, phys_addr: PhysicalAddress, 
-                     gsi_base: u32) 
-                     -> IoApic {
+    fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> IoApic {
 		let mut ioapic = IoApic {
 			virt_addr: IOAPIC_START as VirtualAddress,
 			id: id,

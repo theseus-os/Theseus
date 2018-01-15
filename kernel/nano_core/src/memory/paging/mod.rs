@@ -17,6 +17,9 @@ use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
 use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
 
+use x86_64::registers::control_regs;
+use x86_64::instructions::tlb;
+
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_PAGE_TABLE_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
@@ -171,8 +174,6 @@ impl ActivePageTable {
                    f: F)
         where F: FnOnce(&mut Mapper)
     {
-        use x86_64::registers::control_regs;
-        use x86_64::instructions::tlb;
 
         {
             let backup = Frame::containing_address(control_regs::cr3().0 as usize);
@@ -199,7 +200,6 @@ impl ActivePageTable {
     // pub fn switch(&mut self, new_table: &InactivePageTable) -> InactivePageTable {
     pub fn switch(&mut self, new_table: &InactivePageTable) -> (InactivePageTable, ActivePageTable) {
         use x86_64::PhysicalAddress;
-        use x86_64::registers::control_regs;
 
         let old_table = InactivePageTable {
             p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
@@ -214,6 +214,12 @@ impl ActivePageTable {
         (old_table, unsafe { ActivePageTable::new() } )
     }
 
+
+    /// Returns the physical address of this page table's top-level entry,
+    /// e.g., the value of the CR3 register on x86
+    pub fn physical_address(&self) -> PhysicalAddress {
+        control_regs::cr3().0 as usize as PhysicalAddress
+    }
 }
 
 
@@ -290,7 +296,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             assert!(section.start_address() as usize % PAGE_SIZE == 0,
                     "sections need to be page aligned");
 
-            let flags = EntryFlags::from_multiboot2_section_flags(&section);
+            let flags = EntryFlags::from_multiboot2_section_flags(&section) | EntryFlags::GLOBAL;
 
             // even though the linker stipulates that the kernel sections have a higher-half virtual address,
             // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
@@ -324,7 +330,9 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
         mapper.map_frames(Frame::range_inclusive_addr(0x0, 0x10_0000), 
                           Page::containing_address(KERNEL_OFFSET as VirtualAddress), 
-                          EntryFlags::PRESENT, allocator);
+                          EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
+        vmas[index] = VirtualMemoryArea::new(KERNEL_OFFSET, 0x10_0000, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel low memory (BIOS)");
+        index += 1;
 
         // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
         // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
@@ -332,7 +340,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
         let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
         let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-        let vga_display_flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE;
+        let vga_display_flags = EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
         vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
         // use remap because we already mapped it above
         mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr, size_in_bytes), vga_display_flags);

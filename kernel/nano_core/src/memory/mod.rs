@@ -22,14 +22,26 @@ use spin::{Once, Mutex};
 use core::ops::DerefMut;
 use alloc::Vec;
 use alloc::string::String;
+use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 use task;
 use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
 use mod_mgmt::metadata;
+use irq_safety::MutexIrqSafe;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
 
+
+
+/// The memory management info and address space of the kernel
+static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+
+/// returns the kernel's `MemoryManagementInfo`, if initialized.
+/// If not, it returns None.
+pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
+    KERNEL_MMI.try().map( |r| r.clone())
+}
 
 
 /// The one and only frame allocator, a singleton. 
@@ -296,7 +308,7 @@ impl VirtualMemoryArea {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) -> Result<MemoryManagementInfo, &'static str> {
+pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagementInfo>>, &'static str> {
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
@@ -420,11 +432,17 @@ pub fn init(boot_info: BootInformation) -> Result<MemoryManagementInfo, &'static
     };
 
     // return the kernel's (task_zero's) memory info 
-    Ok(MemoryManagementInfo {
+    let kernel_mmi = MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
         vmas: task_zero_vmas,
         stack_allocator: kernel_stack_allocator, 
-    })
+    };
+
+    let kernel_mmi_ref = KERNEL_MMI.call_once( || {
+        Arc::new(MutexIrqSafe::new(kernel_mmi))
+    });
+
+    Ok(kernel_mmi_ref.clone())
 
 }
 
