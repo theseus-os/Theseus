@@ -4,7 +4,7 @@ use memory::{FRAME_ALLOCATOR, Stack, MemoryManagementInfo, Frame, PageTable, Act
 use interrupts::ioapic;
 use interrupts::apic::{LocalApic, has_x2apic, get_current_lapic_id, is_bsp, APIC_VIRT_ADDR, BSP_PROCESSOR_ID};
 use core::ops::DerefMut;
-use kernel_config::memory::PAGE_SIZE;
+use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -266,13 +266,14 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     // let new_apic_id = 1 << new_lapic.apic_id;
 
     // this is likely wrong, as I don't think LDR should be set to the apic_id of the destination core
+    // According to Intel docs, LDR is only used for logical addressing mode
     // // set destination mask for current proc (BSP) ... (not sure if needed)
     // let bsp_id = bsp_lapic.apic_id;
     // bsp_lapic.set_ldr(0x00FF_FFFF | ((bsp_id as u32) << 24));
     
     // Send INIT IPI
     {
-        let mut icr = 0xC4500; // 0x500 means INIT Delivery Mode, 0x4000 means Assert Level (not de-assert)
+        let mut icr = 0x4500; // 0x500 means INIT Delivery Mode, 0x4000 means Assert Level (not de-assert)
         if has_x2apic() {
             icr |= (new_apic_id as u64) << 32;
         } else {
@@ -290,8 +291,8 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     // Send START IPI
     {
         //Start at 0x0800:0000 => 0x8000. We copied the ap_startup_start code into AP_STARTUP earlier, in handle_apic_entry()
-        let ap_segment = (AP_STARTUP >> 12) & 0xFF; // the frame number where we want the AP to start executing from boot
-        let mut icr = 0xC4600 | ap_segment as u64;
+        let ap_segment = (AP_STARTUP >> PAGE_SHIFT) & 0xFF; // the frame number where we want the AP to start executing from boot
+        let mut icr = 0x4600 | ap_segment as u64;
 
         if has_x2apic() {
             icr |= (new_apic_id as u64) << 32;

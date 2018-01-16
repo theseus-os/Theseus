@@ -105,7 +105,7 @@ const APIC_REG_IRR                    : u32 =  0x200;	// Interrupt Request Regis
 const APIC_REG_ErrStatus              : u32 =  0x280;	// Error Status
 const APIC_REG_LVT_CMCI               : u32 =  0x2F0;	// LVT CMCI Registers (?)
 const APIC_REG_ICR_LOW                : u32 =  0x300;	// Interrupt Command Register (1/2)
-const APIC_REG_ICR_HIGH               : u32 =  0x300;	// Interrupt Command Register (2/2)
+const APIC_REG_ICR_HIGH               : u32 =  0x310;	// Interrupt Command Register (2/2)
 const APIC_REG_LVT_TIMER              : u32 =  0x320;
 const APIC_REG_LVT_THERMAL            : u32 =  0x330; // Thermal sensor
 const APIC_REG_LVT_PMI                : u32 =  0x340; // Performance Monitoring information
@@ -315,10 +315,12 @@ impl LocalApic {
             unsafe {
                 trace!("waiting to send ipi...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
-                trace!("sending ipi...");
-                self.write_reg(APIC_REG_ICR_HIGH, (value >> 32) as u32);
-                trace!("wrote high, writing low...");
-                self.write_reg(APIC_REG_ICR_LOW, value as u32); // this issues the IPI
+                let high = (value >> 32) as u32;
+                trace!("sending ipi with high value {:#X} ...", high);
+                self.write_reg(APIC_REG_ICR_HIGH, high);
+                let low = value as u32;
+                trace!("wrote high, writing low value {:#X} ...", low);
+                self.write_reg(APIC_REG_ICR_LOW, low ); // this issues the IPI
                 trace!("wrote low, waiting for ipi to finish...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
                 trace!("ipi finished.");
