@@ -347,7 +347,8 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
 
 
         // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
-        mapper.p4_mut().clear_entry(0);
+        // ACTUALLY we cannot do this until we have booted up all the APs
+        // mapper.p4_mut().clear_entry(0);
     });
 
 

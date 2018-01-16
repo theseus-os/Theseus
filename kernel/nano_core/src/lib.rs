@@ -286,6 +286,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     drivers::init(console_queue_producer);
 
 
+    // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
+    // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
+    // ACTUALLY we cannot do this until we have booted up all the APs
+    // TODO this: mapper.p4_mut().clear_entry(0);
+
 
     println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
     interrupts::enable_interrupts();
@@ -428,3 +433,29 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
+
+
+// symbols exposed in the initial assembly boot files
+// DO NOT DEREFERENCE THESE DIRECTLY!! THEY ARE SIMPLY ADDRESSES USED FOR SIZE CALCULATIONS.
+// A DIRECT ACCESS WILL CAUSE A PAGE FAULT
+extern {
+    static ap_startup_start: usize;
+    static ap_startup_end: usize;
+}
+
+use kernel_config::memory::KERNEL_OFFSET;
+fn get_ap_startup_start() -> usize {
+    let addr = unsafe {
+        (&ap_startup_start as *const _ as usize) + KERNEL_OFFSET
+    };
+    debug!("ap_startup_start addr: {:#x}", addr);
+    addr
+}
+
+fn get_ap_startup_end() -> usize {
+    let addr = unsafe {
+        (&ap_startup_end as *const _ as usize) + KERNEL_OFFSET
+    };
+    debug!("ap_startup_end addr: {:#x}", addr);
+    addr
+} 
