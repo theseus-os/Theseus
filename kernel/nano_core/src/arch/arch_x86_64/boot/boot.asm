@@ -13,7 +13,7 @@ KERNEL_OFFSET equ 0xFFFFFFFF80000000
 global start
 
 ; Section must have the permissions of .text
-section .init.text progbits alloc exec nowrite
+section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 start:
 	; The bootloader has loaded us into 32-bit protected mode on a x86
@@ -220,6 +220,7 @@ set_up_SSE:
 
 ; Prints `ERR: ` and the given error code to screen and hangs.
 ; parameter: error code (in ascii) in al
+global _error
 _error:
 	mov dword [0xb8000], 0x4f524f45
 	mov dword [0xb8004], 0x4f3a4f52

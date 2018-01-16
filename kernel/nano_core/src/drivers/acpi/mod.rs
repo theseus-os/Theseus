@@ -37,8 +37,9 @@ mod rxsdt;
 mod rsdp;
 
 /// The address that an AP jumps to when it first is booted by the BSP
-const TRAMPOLINE: usize = 0x7E00;
-const AP_STARTUP: usize = TRAMPOLINE + 512;
+const AP_STARTUP: PhysicalAddress = 0x8000; 
+/// small 512-byte .bss area for AP startup data passed from the BSP in long mode (Rust) code
+const TRAMPOLINE: PhysicalAddress = AP_STARTUP - 512;
 
 fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static Sdt {
     

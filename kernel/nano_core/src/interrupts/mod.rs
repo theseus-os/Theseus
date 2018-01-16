@@ -222,7 +222,7 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
-            idt[i].set_handler_fn(unimplemented_interrupt_handler);
+            idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
     }
@@ -406,7 +406,7 @@ pub static mut APIC_TIMER_TICKS: usize = 0;
 extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     unsafe { 
         APIC_TIMER_TICKS += 1;
-        // info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
+        info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
     }
     
     eoi(None);
@@ -416,7 +416,7 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-    // info!("APIC KEYBOARD HANDLER!");
+    info!("APIC KEYBOARD HANDLER!");
 
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
@@ -438,10 +438,34 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
     // let mut lapics_locked = apic::get_lapics();
-    // let mut local_apic = lapics_locked.get_mut(&MY_APIC_ID!!).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
+    // let mut local_apic = lapics_locked.get_mut(&0).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
     // let isr = local_apic.get_isr();
     // let irr = local_apic.get_irr();
-    // println_unsafe!("APIC ISR: {:?}, IRR: {:?}", isr, irr);
+    use kernel_config::memory::APIC_START;
+    use core::ptr::read_volatile;
+    unsafe {
+        println_unsafe!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
+            // ISR
+            read_volatile((APIC_START + 0x100) as *const u32),
+            read_volatile((APIC_START + 0x110) as *const u32),
+            read_volatile((APIC_START + 0x120) as *const u32),
+            read_volatile((APIC_START + 0x130) as *const u32),
+            read_volatile((APIC_START + 0x140) as *const u32),
+            read_volatile((APIC_START + 0x150) as *const u32),
+            read_volatile((APIC_START + 0x160) as *const u32),
+            read_volatile((APIC_START + 0x170) as *const u32),
+            // IRR
+            read_volatile((APIC_START + 0x200) as *const u32),
+            read_volatile((APIC_START + 0x210) as *const u32),
+            read_volatile((APIC_START + 0x220) as *const u32),
+            read_volatile((APIC_START + 0x230) as *const u32),
+            read_volatile((APIC_START + 0x240) as *const u32),
+            read_volatile((APIC_START + 0x250) as *const u32),
+            read_volatile((APIC_START + 0x260) as *const u32),
+            read_volatile((APIC_START + 0x270) as *const u32)
+        );
+
+    }
 
     eoi(None);
 }

@@ -98,7 +98,7 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
-    /// maps the given VirtualAddress to the contiguous range of Frames 
+    /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
     /// `size_in_bytes` specifies the length in bytes of the mapping. 
     pub fn map_frames<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator

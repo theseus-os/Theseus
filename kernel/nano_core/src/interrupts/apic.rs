@@ -148,11 +148,11 @@ impl LocalApic {
         unsafe {
             if has_x2apic() { 
                 lapic.enable_x2apic();
-                lapic.init_timer_x2(); 
+                lapic.init_timer_x2();  // this should be called later once the IDT is fully populated
             } 
             else { 
                 lapic.enable_apic();
-                lapic.init_timer(); 
+                lapic.init_timer(); // this should be called later once the IDT is fully populated
             }
         }
 
@@ -168,16 +168,27 @@ impl LocalApic {
         let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
         wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | bsp_bit | IA32_APIC_XAPIC_ENABLE);
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
-        info!("LAPIC ID {:#x} is_bsp: {}", self.id(), is_bsp);
+        info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
             ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::APIC, ::atomic::Ordering::Release);
         }
 
 
-        // init APIC to a clean state, based on: http://wiki.osdev.org/APIC_timer#Example_code_in_ASM
-        self.write_reg(APIC_REG_DFR, 0xFFFF_FFFF);
-        let old_ldr = self.read_reg(APIC_REG_LDR);
-        self.write_reg(APIC_REG_LDR, old_ldr & 0x00FF_FFFF | 1); // flat logical addressing
+        // init APIC to a clean state
+        // see this: http://wiki.osdev.org/APIC#Logical_Destination_Mode
+        // let old_dfr = self.read_reg(APIC_REG_DFR);
+        // self.write_reg(APIC_REG_DFR, old_dfr | 0xF000_0000); 
+
+        self.write_reg(APIC_REG_DFR, 0xFFFF_FFFF); // Flat destination mode (only bits [31:27] matter, should be all 1s. All 0s would be cluster mode)
+        // let old_ldr = self.read_reg(APIC_REG_LDR);
+        // debug!("old_dr: {:#x}, old_ldr: {:#x}", old_dfr, old_ldr);
+        // TODO FIXME: i think the below line might set the IPI destination as processor 0  (1 << 0) ???
+        //             or perhaps it's a bitmask of which destination apic_ids the current (BSP) core will accept IPIs for?
+        // self.write_reg(APIC_REG_LDR, old_ldr & 0x00FF_FFFF | 1); // 2  | 4 | 8);  // (1 << (24 + 1)) /* 1 << 0 ... apic_id?? */); // flat logical addressing
+        // above: don't set LDR (just to be consistent with steps in x2apic mode, because in x2apic mode we cannot set our own APIC IDs, they're read only)
+        
+        // Now, I'm pretty sure that reading the LDR will give us the current core's apic_id
+        info!("enable_apic(): LDR = {:#X}", self.read_reg(APIC_REG_LDR));
         self.write_reg(APIC_REG_LVT_TIMER, APIC_DISABLE);
         self.write_reg(APIC_REG_LVT_PMI, APIC_NMI);
         self.write_reg(APIC_REG_LVT_LINT0, APIC_DISABLE);
@@ -204,13 +215,13 @@ impl LocalApic {
         }
 
         // init x2APIC to a clean state, just as in enable_apic() above 
-        // info!("x2LAPIC ID {:#x} (cluster {:#X} logical {:#X}), is_bsp: {}", self.version(), cluster_id, logical_id, is_bsp == IA32_APIC_BASE_MSR_IS_BSP);
         // Note: in x2apic, there is not DFR reg because only cluster mode is enabled; there is no flat logical mode
         // Note: in x2apic, the IA32_X2APIC_LDR is read-only.
         let ldr = rdmsr(IA32_X2APIC_LDR);
         debug!("in enable_x2apic 0.1");
         let cluster_id = (ldr >> 16) & 0xFFFF; // highest 16 bits
         let logical_id = ldr & 0xFFFF; // lowest 16 bits
+        info!("x2LAPIC ID {:#x} (cluster {:#X} logical {:#X}), is_bsp: {}", self.version(), cluster_id, logical_id, is_bsp);
         debug!("in enable_x2apic 0.2"); wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64);
         debug!("in enable_x2apic 0.3"); wrmsr(IA32_X2APIC_LVT_PMI, APIC_NMI as u64);
         debug!("in enable_x2apic 0.4"); wrmsr(IA32_X2APIC_LVT_LINT0, APIC_DISABLE as u64);
@@ -225,7 +236,7 @@ impl LocalApic {
     }
 
 
-    unsafe fn init_timer(&mut self) {
+    pub unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timerx2() instead.");
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -241,7 +252,7 @@ impl LocalApic {
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); 
     }
 
-    unsafe fn init_timer_x2(&mut self) {
+    pub unsafe fn init_timer_x2(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
         debug!("in init_timer_x2 start");
         debug!("in init_timer_x2 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -302,10 +313,15 @@ impl LocalApic {
             unsafe { wrmsr(IA32_X2APIC_ICR, value); }
         } else {
             unsafe {
+                trace!("waiting to send ipi...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
+                trace!("sending ipi...");
                 self.write_reg(APIC_REG_ICR_HIGH, (value >> 32) as u32);
-                self.write_reg(APIC_REG_ICR_LOW, value as u32);
+                trace!("wrote high, writing low...");
+                self.write_reg(APIC_REG_ICR_LOW, value as u32); // this issues the IPI
+                trace!("wrote low, waiting for ipi to finish...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
+                trace!("ipi finished.");
             }
         }
     }
@@ -328,6 +344,15 @@ impl LocalApic {
             } else {
                 self.write_reg(APIC_REG_EOI, 0);
             }
+        }
+    }
+
+
+    pub fn set_ldr(&mut self, value: u32) {
+        assert!(!has_x2apic(),"set_ldr(): Setting LDR MSR for x2apic is forbidden! (causes GPF)");
+        unsafe {
+            let old_ldr = self.read_reg(APIC_REG_LDR);
+            self.write_reg(APIC_REG_LDR, old_ldr & 0x00FF_FFFF | value);
         }
     }
 

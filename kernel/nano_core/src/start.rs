@@ -28,7 +28,9 @@ pub unsafe extern fn kstart_ap(args_ptr: *const KernelArgsAp) -> ! {
         let stack_start = args.stack_start as usize;
         let stack_end = args.stack_end as usize;
 
-        println_unsafe!("kstart_ap: {:?}", args);
+        ::serial_port::serial_out("\x1b[33m[W] in kstart_ap! \x1b[0m\n");
+        // debug!("kstart_ap: {:?}", args);
+
         loop { }
 
         // Initialize paging

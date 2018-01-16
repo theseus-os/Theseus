@@ -4,6 +4,7 @@ use memory::{FRAME_ALLOCATOR, Stack, MemoryManagementInfo, Frame, PageTable, Act
 use interrupts::ioapic;
 use interrupts::apic::{LocalApic, has_x2apic, get_current_lapic_id, is_bsp, APIC_VIRT_ADDR, BSP_PROCESSOR_ID};
 use core::ops::DerefMut;
+use kernel_config::memory::PAGE_SIZE;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -98,6 +99,9 @@ pub fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTab
 
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
 pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+    // SAFE: just getting const values from boot assembly code
+    debug!("ap_startup_end: {:#x}, start: {:#x}", ::get_ap_startup_end(), ::get_ap_startup_start());
+    let ap_startup_size_in_bytes = ::get_ap_startup_end() - ::get_ap_startup_start();
 
     let mut active_table_phys_addr: Option<PhysicalAddress> = None;
 
@@ -109,14 +113,22 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
-                // Map trampoline frame, i.e., where the new AP will start
+                // Map trampoline frame and the ap_startup code to the AP_STARTUP frame
                 let trampoline_frame = Frame::containing_address(TRAMPOLINE);
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
-
+                
                 {
                     let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.map_to(trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut());
+                    active_table.map_to(trampoline_page, trampoline_frame, 
+                                        EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
+                    );
+                    active_table.map_frames(Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
+                                            Page::containing_address(AP_STARTUP), 
+                                            EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
+                    );
                 }
+
+
                 active_table_phys_addr = Some(active_table.physical_address());
             }
             _ => {
@@ -138,6 +150,23 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                 me, APIC_VIRT_ADDR.try().expect("Madt::init(): APIC_VIRT_ADDR wasn't yet initialized!"));
     }
     
+    // we mapped these two addresses earlier
+    let src_ptr = ::get_ap_startup_start() as VirtualAddress as *const u8;
+    let dest_ptr = AP_STARTUP as VirtualAddress as *mut u8; // we identity mapped this paddr above
+    debug!("copying ap_startup code to AP_STARTUP, {} bytes", ap_startup_size_in_bytes);
+    use core::ptr::copy_nonoverlapping; // just like memcpy
+    // obviously unsafe, but we've mapped everything 
+    unsafe {
+        copy_nonoverlapping(src_ptr, dest_ptr, ap_startup_size_in_bytes);
+    }
+    // now, the ap startup code should be at paddr AP_STARTUP
+
+
+    // we need to enable interrupts here to let IPIs work?
+    // debug!("enabling interrupts in bring_up_ap (they were {})",
+    //         if ::interrupts::interrupts_enabled() { "enabled" } else { "not enabled" });
+    // ::interrupts::enable_interrupts();
+
 
     // in this function, we only handle LocalApics
     for madt_entry in madt_iter {
@@ -165,11 +194,9 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                     debug!("        This is a different AP's APIC");
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    if false {
                     let mut bsp_lapic = try!(BSP_PROCESSOR_ID.try().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let ap_stack = kernel_mmi.alloc_stack(64).expect("could not allocate AP stack!");
                     bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
-                    }
                 }
             }
             // only care about new local apics right now
@@ -178,7 +205,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
     }
 
 
-    // TODO: FIXME: this should be done by each APIC itself, not done by the BSP for everyone.
+    
     // for madt_entry in madt_iter {
     //     // now that we've loaded all the local apics, we can load other things that depend on them
     //     match madt_entry {
@@ -191,6 +218,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
     //             }
     //             else {
     //                 match lapics_locked.get_mut(&nmi.processor) {
+        // TODO: FIXME: this should be done by each APIC itself, not done by the BSP for everyone. We should only do the BSP's here.
     //                     Some(l) => l.set_nmi(nmi.lint, nmi.flags),
     //                     None => {
     //                         error!("MadtNMI for unknown lapic: {:?}", nmi);
@@ -212,6 +240,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
 fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_table_paddr: PhysicalAddress, ap_stack: Stack) {
     
+    
     let ap_ready = TRAMPOLINE as *mut u64;
     let ap_processor_id = unsafe { ap_ready.offset(1) };
     let ap_apic_id = unsafe { ap_ready.offset(2) };
@@ -232,50 +261,72 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     unsafe { atomic_store(ap_code, kstart_ap as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
-    info!("Bringing up AP proc: {} apic_id: {}:", new_lapic.processor, new_lapic.apic_id);
+    info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
+    let new_apic_id = new_lapic.apic_id; 
+    // let new_apic_id = 1 << new_lapic.apic_id;
 
+    // this is likely wrong, as I don't think LDR should be set to the apic_id of the destination core
+    // // set destination mask for current proc (BSP) ... (not sure if needed)
+    // let bsp_id = bsp_lapic.apic_id;
+    // bsp_lapic.set_ldr(0x00FF_FFFF | ((bsp_id as u32) << 24));
+    
     // Send INIT IPI
     {
-        let mut icr = 0x4500;
+        let mut icr = 0xC4500; // 0x500 means INIT Delivery Mode, 0x4000 means Assert Level (not de-assert)
         if has_x2apic() {
-            icr |= (new_lapic.apic_id as u64) << 32;
+            icr |= (new_apic_id as u64) << 32;
         } else {
-            icr |= (new_lapic.apic_id as u64) << 56;
+            icr |= ( new_apic_id as u64) << 56; // destination apic id 
         }
-        print!(" IPI...");
+        // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
+        debug!(" IPI...");
         bsp_lapic.set_icr(icr);
     }
+
+    debug!("waiting 10 ms...");
+    wait10ms();
+    debug!("done waiting.");
 
     // Send START IPI
     {
-        //Start at 0x0800:0000 => 0x8000. Hopefully the bootloader code is still there
-        let ap_segment = (AP_STARTUP >> 12) & 0xFF;
-        let mut icr = 0x4600 | ap_segment as u64;
+        //Start at 0x0800:0000 => 0x8000. We copied the ap_startup_start code into AP_STARTUP earlier, in handle_apic_entry()
+        let ap_segment = (AP_STARTUP >> 12) & 0xFF; // the frame number where we want the AP to start executing from boot
+        let mut icr = 0xC4600 | ap_segment as u64;
 
         if has_x2apic() {
-            icr |= (new_lapic.apic_id as u64) << 32;
+            icr |= (new_apic_id as u64) << 32;
         } else {
-            icr |= (new_lapic.apic_id as u64) << 56;
+            icr |= (new_apic_id as u64) << 56;
         }
-
-        print!(" SIPI...");
+        // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
+        debug!(" SIPI...");
         bsp_lapic.set_icr(icr);
     }
 
+
+    // TODO: we may need to send a second START IPI on real hardware???
+
     // Wait for trampoline ready
-    print!(" Wait...");
+    debug!(" Wait...");
     while unsafe { atomic_load(ap_ready) } == 0 {
         ::arch::pause();
     }
-    print!(" Trampoline...");
+    debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
         ::arch::pause();
     }
-    println!(" Ready");
+    debug!(" AP {} is in Rust code. Ready!", new_apic_id);
 
 }
 
-
+/// super shitty approximation, busy wait to wait a random bit of time.
+/// probably closer to a whole second than just 10ms
+fn wait10ms() {
+    let mut i = 10000000; 
+    while i > 0 {
+        i -= 1;
+    }
+}
 
 /// MADT Local APIC
 #[derive(Debug)]
