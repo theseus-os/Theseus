@@ -333,7 +333,7 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     trace!("Entering Task0's idle loop");
 	
     // attempt to parse a test kernel module
-    if true {
+    if false {
         let kernel_mmi_ref = task::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
         memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();

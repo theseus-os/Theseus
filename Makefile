@@ -51,7 +51,12 @@ endif ## BYPASS_RUSTC_CHECK
 ###################################################################################################
 
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio -cpu Haswell -net none
+QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS += -cpu Haswell
+
+## basic networking with a standard e1000 ethernet card
+QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1 
+# QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.dat
 
 #drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
@@ -129,12 +134,12 @@ grub-isofiles := build/grub-isofiles
 
 ### This target builds an .iso OS image from the userspace and kernel.
 $(iso): kernel userspace $(grub_cfg)
-	@rm -rf $(grub-isofiles) 
+	@rm -rf $(grub-isofiles)
 ### copy userspace module build files
 	@mkdir -p $(grub-isofiles)/modules
 	@cp userspace/build/* $(grub-isofiles)/modules/
 ### copy kernel module build files and add the __k_ prefix
-	@for f in kernel/build/* kernel/build/*/* ; do \
+	@for f in `find ./kernel/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
 	done
 ### copy kernel boot image files
