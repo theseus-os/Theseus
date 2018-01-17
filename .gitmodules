@@ -7,5 +7,5 @@
 	branch = master
 [submodule "libs/irq_safety"]
 	path = libs/irq_safety
-	url = https://github.com/kevinaboos/irq_safety
+	url = https://github.com/kevinaboos/irq_safety.git
 	branch = master
