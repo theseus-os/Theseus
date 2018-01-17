@@ -1,9 +1,13 @@
 use port_io::Port;
 use spin::{Once, Mutex};
 use alloc::rc::Rc;
-use core::sync::atomic::{AtomicBool, Ordering};
-use alloc::Vec;
+//use collections::Vec;
 use core::fmt;
+use memory;
+use drivers::ata_pio;
+use core::sync::atomic::{AtomicBool, Ordering};
+use task;
+use vec;
 
 //data written here sets information at CONFIG_DATA
 const CONFIG_ADDRESS: u16 = 0xCF8;
@@ -15,10 +19,9 @@ static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DATA));
 
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
-
 pub static BAR4_BASE: Once<u16> = Once::new();
-pub static DMA_FINISHED: AtomicBool = AtomicBool::new(true);
 
+pub static DMA_FINISHED: AtomicBool = AtomicBool::new(true);
 ///the ports to the DMA primary and secondary command and status bytes
 // pub static PCI_COMMAND_PORT: Once<Mutex<Port<u16>>> = Once::new(); // I don't think we need this? --Kevin
 pub static DMA_PRIM_COMMAND_BYTE: Once<Mutex<Port<u8>>> = Once::new();
@@ -29,20 +32,49 @@ pub static DMA_SEC_STATUS_BYTE: Once<Mutex<Port<u8>>> = Once::new();
 pub static DMA_PRIM_PRDT_ADDR: Once<Mutex<Port<u32>>> = Once::new();
 pub static DMA_SEC_PRDT_ADDR: Once<Mutex<Port<u32>>> = Once::new();
 
-//used to read from PCI config, additionally initializes PCI buses to be used
-pub fn pci_config_read(bus: u32, slot: u32, func: u32, offset: u32)->u16{
-    
-    //data to be written to CONFIG_ADDRESS
+
+
+fn pci_address(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
     let lbus = bus as u32;
     let lslot = slot as u32;
     let lfunc = func as u32;
     let loffset = offset as u32;
-    let address: u32 = (lbus << 16) | (lslot << 11) | (lfunc << 8) | (loffset & 0xfc) | 0x8000_0000;
+    let address: u32 = (lbus << 16) | (lslot << 11) | (lfunc << 8) | (loffset & 0xFC) | 0x8000_0000;
+    address
+}
 
-    unsafe { PCI_CONFIG_ADDRESS_PORT.lock().write(address); }
+
+/// read from PCI device
+pub fn pci_read(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
+    unsafe { 
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
+    }
     let inval = PCI_CONFIG_DATA_PORT.lock().read() >> ((offset & 2) * 8);
     (inval & 0xffff) as u16
 }
+
+pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u16) {
+    unsafe { 
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
+    }
+    unsafe{PCI_CONFIG_DATA_PORT.lock().write((value as u32) << ((offset & 2) * 8));}
+    
+}
+
+/// sets the PCI device's bit 3 in the Command portion, which is apparently needed 
+pub fn pci_set_command_bus_master_bit(bus: u16, slot: u16, func: u16) {
+    unsafe { 
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, GET_COMMAND));
+        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+        trace!("pci_set_command_bus_master_bit: PCIDev: B:{} S:{} F:{} read value: {:#x}", 
+                bus, slot, func, inval);
+        PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 2));
+        trace!("pci_set_command_bus_master_bit: PCIDev: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
+                bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
+    }
+}
+
+
 
 /// struct representing PCI Bus, contains array of PCI Devices
 #[derive(Debug)]
@@ -73,52 +105,38 @@ pub struct PciBus {
 //
 #[derive(Debug)]
 pub struct PciDev{
-    //slot number
-    pub slot: u8,
-    pub exists: bool,
     pub device_id: u16, 
     pub vendor_id: u16,
-    pub func: u16,
+    pub command: u16,
+    pub status: u16,
     /// class can be used to determine device type http://wiki.osdev.org/PCI#Class_Codes 
     pub class: u8,
     /// subclass can also be used to determine device type http://wiki.osdev.org/PCI#Class_Codes 
     pub subclass: u8,
+    pub header_type: u8,
+    pub bar4: u16,
+
+
+    pub bus: u16,
+    pub slot: u16,
+    pub func: u16,
 }
 
 impl fmt::Display for PciDev { 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "slot: {}, exists: {}, device_id: {:#x}, vendor_id: {:#x}, func: {}, class: {:#x}, subclass: {:#x}", 
-            self.slot, self.exists, self.device_id, self.vendor_id, self.func, self.class, self.subclass)
+        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bar4: {:#x}", 
+            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bar4)
     }
 }
 
-// impl Default for PciDev{
-//     fn default()-> PciDev{
-//         PciDev {
-//             slot: 0xFF, 
-//             exists: false, 
-//             device_id: 0xFFFF, 
-//             vendor_id: 0xFFFF, 
-//             func: 0xFFFF,
-//             class_code: 0xFFFF
-//         }
-//     }
-// }
 
-// impl Copy for PciDev{}
-
-// impl Clone for PciDev {
-//     fn clone(&self) -> PciDev {
-//         *self
-//     }
-// }
-
-
-
-const GET_VENDOR_ID: u16 = 0;
-const GET_DEVICE_ID: u16 = 2;
-const GET_CLASS_ID:  u16 = 0xA;
-
+const PCI_VENDOR_ID:    u16 = 0x0;
+const GET_DEVICE_ID:    u16 = 0x2;
+const GET_COMMAND:      u16 = 0x4;
+const GET_STATUS:       u16 = 0x6;
+const GET_CLASS_ID:     u16 = 0xA;
+const GET_HEADER_TYPE:  u16 = 0xE;
+const GET_BAR4:         u16 = 0x20;
 
 //initializes structure containing PCI buses and their attached devices
 pub fn init_pci_buses(){
@@ -138,31 +156,39 @@ pub fn init_pci_buses(){
                 for f in 0..8 {
 
                     //sets vendor id of device
-                    let vendor_id = pci_config_read(bus, slot, f, GET_VENDOR_ID);
-                    let mut device: PciDev;
+                    let vendor_id = pci_read(bus, slot, f, PCI_VENDOR_ID);
+                    let device: PciDev;
                     
                     //if vendor ID is 0xFFFF, no device is connected
                     if vendor_id == 0xFFFF {
                         continue;
-                        // device = PciDev{..Default::default()};
                     }
-
                     //otherwise, gets class code and device id and adds a count to how many devices connected to bus
                     else {
                         num_connected += 1;
-                        let device_id = pci_config_read(bus, slot, f, GET_DEVICE_ID);
-                        let class_word = pci_config_read(bus, slot, f, GET_CLASS_ID);
+                        let device_id = pci_read(bus, slot, f, GET_DEVICE_ID);
+                        let command = pci_read(bus, slot, f, GET_COMMAND);
+                        let status = pci_read(bus, slot, f, GET_STATUS);
+                        let class_word = pci_read(bus, slot, f, GET_CLASS_ID);
                         let class: u8 = (class_word >> 8) as u8;
                         let subclass: u8 = (class_word & 0xFF) as u8;
+                        let _bist: u8 = (pci_read(bus, slot, f, GET_HEADER_TYPE) >> 8) as u8;
+                        let header_type: u8 = (pci_read(bus, slot, f, GET_HEADER_TYPE) & 0xFF) as u8;
+                        let bar4 = pci_read(bus, slot, f, GET_BAR4);
 
                         device = PciDev {
-                            slot: slot as u8, 
-                            exists: true, 
-                            device_id: device_id, 
                             vendor_id: vendor_id,
-                            func: f,
+                            device_id: device_id, 
+                            command: command,
+                            status: status,
                             class: class,
                             subclass: subclass, 
+                            header_type:  header_type,
+                            bar4: bar4,
+
+                            bus: bus, 
+                            slot: slot, 
+                            func: f, 
                         };
 
                         debug!("found pci device: {}", device);
@@ -182,9 +208,8 @@ pub fn init_pci_buses(){
 	
 }
 
-
-/*
 ///PCI DMA, currently set for primary bus
+/* 
 
 ///sets the ports for PCI DMA configuration access using BAR4 information
 pub fn set_dma_ports(){
