@@ -8,6 +8,7 @@
 ; except according to those terms.
 
 ; Kernel is linked to run at -2Gb
+global KERNEL_OFFSET
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
 global start
@@ -32,7 +33,7 @@ start:
 	;
 	; We subtract KERNEL_OFFSET from the stack address because we are not yet
 	; mapped to the higher half
-	mov esp, initial_stack_top - KERNEL_OFFSET
+	mov esp, initial_bsp_stack_top - KERNEL_OFFSET
 
 	; The multiboot2 specification requires the bootloader to load a pointer
 	; to the multiboot2 information structure in the `ebx` register. Here we
@@ -256,7 +257,7 @@ start_high:
 	
 	; for easy use of multiboot2 data structures,
 	; we preserve an identity mapping that's the same as the higher-half mapping.
-	; The rust code in remap_the_kernel() will erase the kernel's identity mapping later.
+	; The rust code will erase the kernel's identity mapping later before jumping to userspace programs.
 	;;; ; get rid of the old identity map, but
 	;;; ; continue to identity map the first Mb
 	;;; mov rax, low_p2_table - KERNEL_OFFSET
@@ -360,8 +361,8 @@ kernel_table:
 ; stack is properly aligned and failure to align the stack will result in
 ; undefined behavior.
 align 16
-global initial_stack_bottom
-initial_stack_bottom:
+global initial_bsp_stack_bottom
+initial_bsp_stack_bottom:
 	resb 4096 * 16
-global initial_stack_top
-initial_stack_top:
+global initial_bsp_stack_top
+initial_bsp_stack_top:

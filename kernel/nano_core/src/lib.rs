@@ -257,6 +257,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
+    // interrupts::early_idt();
+
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
     // debug!("multiboot2 boot_info: {:?}", boot_info);
@@ -488,23 +490,21 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 // DO NOT DEREFERENCE THESE DIRECTLY!! THEY ARE SIMPLY ADDRESSES USED FOR SIZE CALCULATIONS.
 // A DIRECT ACCESS WILL CAUSE A PAGE FAULT
 extern {
-    static ap_startup_start: usize;
-    static ap_startup_end: usize;
+    static ap_start_realmode: usize;
+    static ap_start_realmode_end: usize;
 }
 
 use kernel_config::memory::KERNEL_OFFSET;
-fn get_ap_startup_start() -> usize {
-    let addr = unsafe {
-        (&ap_startup_start as *const _ as usize) + KERNEL_OFFSET
-    };
-    debug!("ap_startup_start addr: {:#x}", addr);
-    addr
+/// Returns the starting virtual address of where the ap_start realmode code is.
+fn get_ap_start_realmode() -> usize {
+    let addr = unsafe { &ap_start_realmode as *const _ as usize };
+    debug!("ap_start_realmode addr: {:#x}", addr);
+    addr + KERNEL_OFFSET
 }
 
-fn get_ap_startup_end() -> usize {
-    let addr = unsafe {
-        (&ap_startup_end as *const _ as usize) + KERNEL_OFFSET
-    };
-    debug!("ap_startup_end addr: {:#x}", addr);
-    addr
+/// Returns the ending virtual address of where the ap_start realmode code is.
+fn get_ap_start_realmode_end() -> usize {
+    let addr = unsafe { &ap_start_realmode_end as *const _ as usize };
+    debug!("ap_start_realmode_end addr: {:#x}", addr);
+    addr + KERNEL_OFFSET
 } 

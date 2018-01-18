@@ -100,8 +100,8 @@ pub fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTab
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
 pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // SAFE: just getting const values from boot assembly code
-    debug!("ap_startup_end: {:#x}, start: {:#x}", ::get_ap_startup_end(), ::get_ap_startup_start());
-    let ap_startup_size_in_bytes = ::get_ap_startup_end() - ::get_ap_startup_start();
+    debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
+    let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
 
     let mut active_table_phys_addr: Option<PhysicalAddress> = None;
 
@@ -151,7 +151,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
     }
     
     // we mapped these two addresses earlier
-    let src_ptr = ::get_ap_startup_start() as VirtualAddress as *const u8;
+    let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
     let dest_ptr = AP_STARTUP as VirtualAddress as *mut u8; // we identity mapped this paddr above
     debug!("copying ap_startup code to AP_STARTUP, {} bytes", ap_startup_size_in_bytes);
     use core::ptr::copy_nonoverlapping; // just like memcpy
@@ -290,7 +290,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
 
     // Send START IPI
     {
-        //Start at 0x0800:0000 => 0x8000. We copied the ap_startup_start code into AP_STARTUP earlier, in handle_apic_entry()
+        //Start at 0x0800:0000 => 0x8000. We copied the ap_start_realmode code into AP_STARTUP earlier, in handle_apic_entry()
         let ap_segment = (AP_STARTUP >> PAGE_SHIFT) & 0xFF; // the frame number where we want the AP to start executing from boot
         let mut icr = 0x4600 | ap_segment as u64;
 

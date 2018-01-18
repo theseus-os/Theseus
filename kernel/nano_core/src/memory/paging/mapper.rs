@@ -86,7 +86,7 @@ impl Mapper {
         let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
         let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
 
-        assert!(p1[page.p1_index()].is_unused());
+        assert!(p1[page.p1_index()].is_unused(), "map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
         p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
     }
 
@@ -108,6 +108,22 @@ impl Mapper {
         }
     }
 
+    /// SPECIAL USE CASES ONLY! 
+    /// Just like `map_frames()`, this function maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
+    /// `size_in_bytes` specifies the length in bytes of the mapping. 
+    /// If any pages in the range of requested mappings are already mapped, those are silently skipped. 
+    /// Use case:  filling in holes in a range of frames in which some have already been mapped.
+    pub fn map_frames_skip_used<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        for (ctr, frame) in frame_range.enumerate() {
+            let page = start_page + ctr;
+            if self.translate_page(page).is_some() {
+                continue;
+            }
+            self.map_to(page, frame, flags, allocator);
+        }
+    }
 
     /// maps the Page containing the given virtual address to the given Frame
     pub fn map_virtual_address<A>(&mut self, virt_addr: VirtualAddress, frame: Frame, flags: EntryFlags, allocator: &mut A)
