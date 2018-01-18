@@ -332,15 +332,15 @@ impl TaskList {
         task_zero.kstack = {
             extern "C" {
                 // these are exposed by the assembly linker, found in arch/arch_x86_64/boot.asm
-                static initial_stack_top: usize;
-                static initial_stack_bottom: usize;
+                static initial_bsp_stack_top: usize;
+                static initial_bsp_stack_bottom: usize;
             }
 
             use memory::Stack;
             // SAFE because we're just accessing linker defines
             unsafe {
-                let task_zero_stack_top = &initial_stack_top as *const _ as usize;
-                let task_zero_stack_bottom = &initial_stack_bottom as *const _ as usize;
+                let task_zero_stack_top = &initial_bsp_stack_top as *const _ as usize;
+                let task_zero_stack_bottom = &initial_bsp_stack_bottom as *const _ as usize;
                 debug!("CREATING TASK ZERO STACK at top={:#x} bottom={:#x}", task_zero_stack_top, task_zero_stack_bottom);
                 Some(Stack::new(task_zero_stack_top, task_zero_stack_bottom))
             }

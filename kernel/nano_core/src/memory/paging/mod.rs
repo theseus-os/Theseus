@@ -20,7 +20,7 @@ use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
 use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_PAGE_TABLE_INDEX};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 mod entry;
@@ -182,14 +182,14 @@ impl ActivePageTable {
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
             // overwrite recursive mapping
-            self.p4_mut()[RECURSIVE_PAGE_TABLE_INDEX].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+            self.p4_mut()[RECURSIVE_P4_INDEX].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
             tlb::flush_all();
 
             // execute f in the new context
             f(self);
 
             // restore recursive mapping to original p4 table
-            p4_table[RECURSIVE_PAGE_TABLE_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
             tlb::flush_all();
         }
 
@@ -205,10 +205,11 @@ impl ActivePageTable {
             p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
         };
         unsafe {
+            debug!("ActivePageTable::switch() old_table: {:#X}, new_table: {:#X}", old_table.p4_frame.start_address(), new_table.p4_frame.start_address());
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
         
-        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
+        debug!("ActivePageTable::switch(): NEW TABLE!!!");
 
         // old_table
         (old_table, unsafe { ActivePageTable::new() } )
@@ -238,12 +239,13 @@ impl InactivePageTable {
             let table = temporary_page.map_table_frame(frame.clone(), active_table);
             table.zero();
 
-            table[RECURSIVE_PAGE_TABLE_INDEX].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
 
             // start out by copying all the kernel sections into the new inactive table
             table.copy_entry_from_table(active_table.p4(), KERNEL_TEXT_P4_INDEX);
             table.copy_entry_from_table(active_table.p4(), KERNEL_HEAP_P4_INDEX);
             table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
+
         }
         temporary_page.unmap(active_table);
 
@@ -276,25 +278,39 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
 
+
+    let test_virt_addr = 0xffffffff80228450; 
+    debug!("TEST: old_pgtbl va {:#x}  ->  pa {:#X}", 
+            test_virt_addr, active_table.translate(test_virt_addr).unwrap());
+
+
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         // clear out the initially-mapped kernel entries of P4
-        // (they are initialized in InactivePageTable::new())
+        // (they were initialized in InactivePageTable::new())
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
-        // map the allocated kernel text sections
+
         let mut index = 0;
+     
+        // map the allocated kernel text sections
         for section in elf_sections_tag.sections() {
             if section.size() == 0 || !section.is_allocated() {
                 // skip sections that aren't loaded to memory
                 continue;
             }
+            
+            debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
 
-            assert!(section.start_address() as usize % PAGE_SIZE == 0,
-                    "sections need to be page aligned");
+            if !address_is_page_aligned(section.start_address() as usize) {
+                error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
+                // panic!("section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
+                // return;
+                continue;
+            }
 
             let flags = EntryFlags::from_multiboot2_section_flags(&section) | EntryFlags::GLOBAL;
 
@@ -315,24 +331,28 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             }
 
             vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, "KERNEL ELF SECTION TODO FIXME");
-            debug!("mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
             
             // map the whole range of frames in this section
             mapper.map_frames(Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
                               Page::containing_address(start_virt_addr), 
                               flags, allocator);
+            debug!("mapped kernel section: {} at addr: {:?}", section.name(), vmas[index]);
 
             index += 1;
         }
 
-        // let's just go ahead and map the entire first megabyte of physical memory,
+        
+        // go ahead and map the entire first megabyte of physical memory,
         // which happens to include ACPI tables, VGA memory, etc
         // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
-        mapper.map_frames(Frame::range_inclusive_addr(0x0, 0x10_0000), 
-                          Page::containing_address(KERNEL_OFFSET as VirtualAddress), 
+        mapper.map_frames_skip_used(Frame::range_inclusive_addr(0x0, 0x10_0000),
+                          Page::containing_address(KERNEL_OFFSET as VirtualAddress),
                           EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
         vmas[index] = VirtualMemoryArea::new(KERNEL_OFFSET, 0x10_0000, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel low memory (BIOS)");
+        debug!("mapped low bios memory: {:?}", vmas[index]);
         index += 1;
+
+
 
         // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
         // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
@@ -340,10 +360,19 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
         let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
         let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-        let vga_display_flags = EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+        let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
         vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
-        // use remap because we already mapped it above
         mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr, size_in_bytes), vga_display_flags);
+        // mapper.map_frames(Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_START, size_in_bytes), 
+        //                   Page::containing_address(vga_display_virt_addr), 
+        //                   vga_display_flags, allocator);
+        debug!("mapped kernel section: {} at addr: {:?}", "vga buffer", vmas[index]);
+        index += 1;
+
+        debug!("TEST: new_pgtbl va {:#x}  ->  pa {:#X}", 
+                test_virt_addr, mapper.translate(test_virt_addr).unwrap());
+                
+
 
 
         // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
@@ -351,8 +380,9 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // mapper.p4_mut().clear_entry(0);
     });
 
-
+    debug!("switching to new page table...");
     let (_old_table, new_active_table) = active_table.switch(&new_table);
+    debug!("switched to new page table.");
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok(new_active_table)

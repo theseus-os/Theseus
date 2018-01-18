@@ -50,7 +50,7 @@ pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections
 pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
 /// Value: 510. The 510th entry is used for the recursive P4 mapping.
-pub const RECURSIVE_PAGE_TABLE_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
+pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
 /// Value: 508. The 508th entry is used for all kernel stacks

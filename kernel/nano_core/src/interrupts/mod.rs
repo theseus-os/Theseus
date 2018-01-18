@@ -123,6 +123,35 @@ pub fn tss_set_rsp0(new_value: usize) {
 }
 
 
+pub fn early_idt() {
+    { 
+        let mut idt = IDT.lock(); // withholds interrupts
+
+        // SET UP FIXED EXCEPTION HANDLERS
+        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
+        // missing: 0x01 debug exception
+        // missing: 0x02 non-maskable interrupt exception
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        // missing: 0x04 overflow exception
+        // missing: 0x05 bound range exceeded exception
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
+        idt.device_not_available.set_handler_fn(device_not_available_handler);
+        unsafe {
+            idt.double_fault.set_handler_fn(double_fault_handler);
+                // .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
+        }
+        // reserved: 0x09 coprocessor segment overrun exception
+        // missing: 0x0a invalid TSS exception
+        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
+        // missing: 0x0c stack segment exception
+        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
+        idt.page_fault.set_handler_fn(early_page_fault_handler);
+    }
+
+    IDT.load();
+    info!("loaded early IDT.");
+}
+
 
 /// initializes the interrupt subsystem and exception-related IRQs, but no other IRQs.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
@@ -257,6 +286,10 @@ pub fn init_handlers_apic() {
         idt[0x21].set_handler_fn(ioapic_keyboard_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
     }
+
+
+    // now it's safe to enable every LocalApic's LVT_TIMER interrupt (for scheduling)
+    
 }
 
 
@@ -337,6 +370,16 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Excepti
     loop {}
 }
 
+
+extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
+    use x86_64::registers::control_regs;
+    error!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+                                  {:?}\n{:#?}",
+             control_regs::cr2(),
+             error_code,
+             stack_frame);
+    loop {}
+}
 
 
 extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
