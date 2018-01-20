@@ -118,14 +118,20 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
                 
                 {
-                    let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.map_to(trampoline_page, trampoline_frame, 
-                                        EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
-                    );
-                    active_table.map_frames(Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
-                                            Page::containing_address(AP_STARTUP), 
-                                            EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
-                    );
+                    // let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+                    // active_table.map_to(trampoline_page, trampoline_frame, 
+                    //                     EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
+                    // );
+                    // active_table.map_frames(Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
+                    //                         Page::containing_address(AP_STARTUP), 
+                    //                         EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
+                    // );
+
+                    // now that we're identity mapping the first megabyte and the kernel ELF sections in remap_the_kernel(), 
+                    // we should just use remap() here instead of map_to()
+                    active_table.remap(trampoline_page, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+                    active_table.remap_pages(Page::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
+                                            EntryFlags::PRESENT | EntryFlags::WRITABLE);
                 }
 
 

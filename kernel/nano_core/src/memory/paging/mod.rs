@@ -278,12 +278,6 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
     };
 
-
-    let test_virt_addr = 0xffffffff80228450; 
-    debug!("TEST: old_pgtbl va {:#x}  ->  pa {:#X}", 
-            test_virt_addr, active_table.translate(test_virt_addr).unwrap());
-
-
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
@@ -319,15 +313,15 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
             // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
             let mut start_phys_addr = section.start_address() as PhysicalAddress;
-            if start_phys_addr >= super::KERNEL_OFFSET { 
+            if start_phys_addr >= KERNEL_OFFSET { 
                 // true for all sections but the first section (inittext)
-                start_phys_addr -= super::KERNEL_OFFSET;
+                start_phys_addr -= KERNEL_OFFSET;
             }
             
             let mut start_virt_addr = section.start_address() as VirtualAddress;
-            if start_virt_addr < super::KERNEL_OFFSET { 
+            if start_virt_addr < KERNEL_OFFSET { 
                 // special case to handle the first section only
-                start_virt_addr += super::KERNEL_OFFSET;
+                start_virt_addr += KERNEL_OFFSET;
             }
 
             vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, "KERNEL ELF SECTION TODO FIXME");
@@ -336,7 +330,16 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
             mapper.map_frames(Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
                               Page::containing_address(start_virt_addr), 
                               flags, allocator);
-            debug!("mapped kernel section: {} at addr: {:?}", section.name(), vmas[index]);
+            debug!("     mapped kernel section: {} at addr: {:?}", section.name(), vmas[index]);
+
+
+            // also, to allows the APs to boot up, we identity map the kernel sections too
+            // (lower half virtual addresses mapped to same lower half physical addresses)
+            // we will unmap these later before we start booting to userspace processes
+            mapper.map_frames(Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
+                              Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
+                              flags, allocator);
+            debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, section.size());
 
             index += 1;
         }
@@ -349,6 +352,10 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
                           Page::containing_address(KERNEL_OFFSET as VirtualAddress),
                           EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
         vmas[index] = VirtualMemoryArea::new(KERNEL_OFFSET, 0x10_0000, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel low memory (BIOS)");
+        // also do an identity mapping for AP booting
+        mapper.map_frames_skip_used(Frame::range_inclusive_addr(0x0, 0x10_0000),
+                          Page::containing_address(0x0 as VirtualAddress),
+                          EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
         debug!("mapped low bios memory: {:?}", vmas[index]);
         index += 1;
 
@@ -367,14 +374,11 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         //                   Page::containing_address(vga_display_virt_addr), 
         //                   vga_display_flags, allocator);
         debug!("mapped kernel section: {} at addr: {:?}", "vga buffer", vmas[index]);
+        // also do an identity mapping for AP booting
+        mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr - KERNEL_OFFSET, size_in_bytes), vga_display_flags);
         index += 1;
 
-        debug!("TEST: new_pgtbl va {:#x}  ->  pa {:#X}", 
-                test_virt_addr, mapper.translate(test_virt_addr).unwrap());
-                
-
-
-
+        
         // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
         // ACTUALLY we cannot do this until we have booted up all the APs
         // mapper.p4_mut().clear_entry(0);
