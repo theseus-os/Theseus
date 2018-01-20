@@ -201,7 +201,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
                     let mut bsp_lapic = try!(BSP_PROCESSOR_ID.try().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
-                    let ap_stack = kernel_mmi.alloc_stack(64).expect("could not allocate AP stack!");
+                    let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
                     bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
                 }
             }
