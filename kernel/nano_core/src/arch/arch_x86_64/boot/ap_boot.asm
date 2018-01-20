@@ -16,9 +16,27 @@ section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 global ap_start_protected_mode
 ap_start_protected_mode:
-    ; call set_up_paging_ap
+    call set_up_paging_ap
+	
 
-		; Enable:
+    ; each character is reversed in the dword cuz of little endianness
+	mov dword [0xb8018], 0x4f2E4f2E ; ".."
+    mov dword [0xb801c], 0x4f504f2E ; ".P"
+	mov dword [0xb8020], 0x4f544f47 ; "GT"
+	mov dword [0xb8024], 0x4f4C4f42 ; "BL"
+
+	; Load the 64-bit GDT
+	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
+
+	; Load the code selector via a far jmp
+	; From now on instructions are 64 bits and this file is invalid
+	jmp GDT_AP.code:long_mode_start_ap; -> !
+
+
+
+
+set_up_paging_ap:
+	; Enable:
 	;     PGE: (Page Global Extentions)
 	;     PAE: (Physical Address Extension)
 	;     PSE: (Physical Size Extentions)
@@ -43,53 +61,8 @@ ap_start_protected_mode:
 	mov eax, cr0
 	or eax, (1 << 31) | (1 << 16) ; PG | WP
 	mov cr0, eax
-	
 
-    ; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8018], 0x4f2E4f2E ; ".."
-    mov dword [0xb801c], 0x4f504f2E ; ".P"
-	mov dword [0xb8020], 0x4f544f47 ; "GT"
-	mov dword [0xb8024], 0x4f4C4f42 ; "BL"
-
-	; Load the 64-bit GDT
-	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
-	; lgdt [GDT_AP.ptr_low]
-
-	; Load the code selector with a far jmp
-	; From now on instructions are 64 bits and this file is invalid
-	jmp GDT_AP.code:long_mode_start_ap; -> !
-
-
-
-
-; set_up_paging_ap:
-; 	; Enable:
-; 	;     PGE: (Page Global Extentions)
-; 	;     PAE: (Physical Address Extension)
-; 	;     PSE: (Physical Size Extentions)
-; 	mov eax, cr4
-; 	or eax, (1 << 7) | (1 << 5) | (1 << 1)
-; 	mov cr4, eax
-
-; 	; load P4 to cr3 register (cpu uses this to access the P4 table)
-;     ; to set up paging for the newly-booted AP, 
-;     ; use the same page table that the BSP Rust code set up for us in the trampoline
-; 	mov eax, [AP_PAGE_TABLE]
-; 	mov cr3, eax
-
-; 	; set the no execute (bit 11), long mode (bit 8), and SYSCALL Enable (bit 0)
-; 	; bits in the EFER MSR (model specific register)
-; 	mov ecx, 0xC0000080
-; 	rdmsr
-; 	or eax, (1 <<11) | (1 << 8) | (1 << 0) ; NXE, LME, SCE
-; 	wrmsr
-
-; 	; enable paging and write protection in the cr0 register
-; 	mov eax, cr0
-; 	or eax, (1 << 31) | (1 << 16) ; PG | WP
-; 	mov cr0, eax
-
-;     ret
+    ret
 
 
 
@@ -134,20 +107,23 @@ start_high_ap:
 	mov dword [0xb8030 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
 	mov dword [0xb8034 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
 
+	; move to the new stack that was alloc'd for this AP
+	mov rcx, [AP_STACK_END]
+	lea rsp, [rcx - 256]
 
-	; for easy use of multiboot2 data structures,
-	; we preserve an identity mapping that's the same as the higher-half mapping.
-	; The rust code will erase the kernel's identity mapping later before jumping to userspace programs.
-	;;; ; get rid of the old identity map, but
-	;;; ; continue to identity map the first Mb
-	;;; mov rax, low_p2_table - KERNEL_OFFSET
-	;;; or rax, 11b ; present + writable
-	;;; mov [rel low_p3_table], rax
+    ; Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack
+	mov rdi, [AP_PROCESSOR_ID]
+	mov rsi, [AP_APIC_ID]
+	mov rdx, [AP_FLAGS]
+	mov rcx, [AP_STACK_START]
+	mov r8,  [AP_STACK_END]
+	mov rax, qword [AP_CODE]
 
 
-
-
-	jmp $
+	; we signal the BSP that we're booting into Rust code, 
+	; and that we're done using the trampoline space
+	mov qword [AP_READY], 1
+	jmp rax
 
 
 
@@ -165,10 +141,8 @@ start_high_ap:
 ; 	call rust_main
 
 ; 	; rust main returned, print `OS returned!`
-; 	mov rdi, strings.os_return
-; 	call eputs
 
-; 	; If the system has nothing more to do, put the computer into an
+; 	; If the system has nothing more to do, put the core into an
 ; 	; infinite loop. To do that:
 ; 	; 1) Disable interrupts with cli (clear interrupt enable in eflags).
 ; 	;    They are already disabled by the bootloader, so this is not needed.
