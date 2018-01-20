@@ -100,14 +100,14 @@ clear_prefetch:
 
     ; jump to protected mode. "dword" here tells nasm to generate a 32-bit instruction,
     ; even though we're still in 16-bit mode. GCC's "as" assembler can't do that! haha
-    jmp dword 0x8:protected_mode_ap_trampoline  
+    jmp dword 0x8:prot_mode 
 
 
 extern ap_start_protected_mode
 
 section .init.text32ap progbits alloc exec
 bits 32
-protected_mode_ap_trampoline:
+prot_mode:
 
     ; set up new segment selectors. Code selector is already set correctly)
     ; GDT: kernel code is 0x08, kernel data is 0x10

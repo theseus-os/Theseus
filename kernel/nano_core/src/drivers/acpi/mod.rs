@@ -38,7 +38,7 @@ mod rsdp;
 
 /// The address that an AP jumps to when it first is booted by the BSP
 const AP_STARTUP: PhysicalAddress = 0x8000; 
-/// small 512-byte .bss area for AP startup data passed from the BSP in long mode (Rust) code.
+/// small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
 /// Value: 0x7E00
 const TRAMPOLINE: PhysicalAddress = AP_STARTUP - 512;
 

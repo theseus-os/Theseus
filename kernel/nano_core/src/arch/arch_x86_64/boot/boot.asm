@@ -8,7 +8,6 @@
 ; except according to those terms.
 
 ; Kernel is linked to run at -2Gb
-global KERNEL_OFFSET
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
 global start
