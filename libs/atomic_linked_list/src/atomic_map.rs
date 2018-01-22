@@ -1,9 +1,12 @@
-//! A generic, singly-linked list data structure that is lock-free 
+//! A generic map based on a singly-linked list data structure that is lock-free 
 //! and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.
 //! Each node remains in the same spot in memory once it is allocated,
 //! and will not be reallocated,
-//! which allows an external thread to maintain a reference to it safely 
-//! (but really, only a Weak reference is safe to maintain, to catch possible Node deletion).
+//! which allows an external thread to maintain a reference to it safely.
+//!
+//! Currently we do not allow nodes to be deleted, so it's only useful for certain purposes.
+//! Later on, once deletions are supported, it will not be safe to maintain out-of-band references
+//! to items in the data structure, rather only weak references. 
 //!
 //! New elements are inserted at the head of the list, and then the head's next pointer 
 //! is set up to the point to the node that was previously the head. 
@@ -110,6 +113,17 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
 	/// Otherwise, returns None. 
 	pub fn get(&self, key: K) -> Option<&V> {
 		for pair in self.iter() {
+			if key == *pair.0 {
+				return Some(pair.1);
+			}
+		}
+		None
+	}
+
+    /// Returns a mutable reference to the value matching the given key, if present. 
+	/// Otherwise, returns None. 
+	pub fn get_mut(&self, key: K) -> Option<&mut V> {
+		for pair in self.iter_mut() {
 			if key == *pair.0 {
 				return Some(pair.1);
 			}

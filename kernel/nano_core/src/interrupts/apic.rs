@@ -11,10 +11,23 @@ lazy_static! {
     static ref LOCAL_APICS: Mutex<BTreeMap<u8, LocalApic>> = Mutex::new(BTreeMap::new());
 }
 
-/// The processor id (from the ACPI MADT table) of the bootstrap processor
-pub static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
+/// The VirtualAddress where the APIC chip has been mapped.
+static APIC_VIRT_ADDR: Once<VirtualAddress> = Once::new();
 
-pub static APIC_VIRT_ADDR: Once<VirtualAddress> = Once::new();
+/// The processor id (from the ACPI MADT table) of the bootstrap processor
+static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
+
+pub fn get_bsp_id() -> Option<u8> {
+    BSP_PROCESSOR_ID.try().cloned()
+}
+
+/// Returns true if the currently executing processor core is the bootstrap processor, 
+/// i.e., the first procesor to run 
+pub fn is_bsp() -> bool {
+    unsafe { 
+        rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
+    }
+}
 
 /// Returns true if the machine has support for x2apic
 pub fn has_x2apic() -> bool {
@@ -32,29 +45,22 @@ pub fn get_lapics() -> MutexGuard<'static, BTreeMap<u8, LocalApic>> {
 
 
 /// Returns the APIC ID of the currently executing processor core
-pub fn get_current_lapic_id() -> Option<u8> {
+pub fn get_my_apic_id() -> Result<u8, &'static str> {
     let raw = if has_x2apic() {
         unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
     } else {
         match APIC_VIRT_ADDR.try() {
             Some(apic_start) => unsafe { read_volatile((apic_start + APIC_REG_LAPIC_ID as usize) as *const u32) },
             None => {
-                error!("get_current_lapic_id(): APIC_VIRT_ADDR was None -- call apic::init() first.");
-                return None;
+                error!("get_my_apic_id(): APIC_VIRT_ADDR was None -- call apic::init() first.");
+                return Err("Couldn't get my apic_id: APIC_VIRT_ADDR was None");
             }
         }
     };
-    Some((raw >> 24) as u8)
+    Ok((raw >> 24) as u8)
 }
 
 
-/// Returns true if the currently executing processor core is the bootstrap processor, 
-/// i.e., the first procesor to run 
-pub fn is_bsp() -> bool {
-    unsafe { 
-        rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
-    }
-}
 
 
 /// initially maps the base APIC MMIO register frames so that we can know which LAPIC (processor core) we are,
@@ -126,12 +132,13 @@ pub struct LocalApic {
     pub processor: u8,
     pub apic_id: u8,
     pub flags: u32,
+    pub is_bsp: bool,
 }
 
 impl LocalApic {
     /// This MUST be invoked from the AP core that is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(processor: u8, apic_id: u8, flags: u32) -> LocalApic {
+    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool) -> LocalApic {
 		
         assert!(flags == 1, "LocalApic::create() processor was disabled! (flags != 1)");
 		let mut lapic = LocalApic {
@@ -142,8 +149,12 @@ impl LocalApic {
             processor: processor,
             apic_id: apic_id,
             flags: flags,
+            is_bsp: is_bsp,
 		};
 
+        if is_bsp {
+            BSP_PROCESSOR_ID.call_once( || apic_id); 
+        }
 
         unsafe {
             if has_x2apic() { 

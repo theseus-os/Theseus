@@ -7,10 +7,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use x86_64;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use spin::{Mutex, Once};
-use irq_safety::MutexIrqSafe;
 use port_io::Port;
 use drivers::input::keyboard;
 use drivers::ata_pio;
@@ -18,6 +18,8 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, C
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
 use atomic::{Ordering, Atomic};
+use atomic_linked_list::atomic_map::AtomicMap;
+use memory::VirtualAddress;
 
 // re-expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
@@ -30,7 +32,7 @@ mod pic;
 pub mod tsc;
 
 
-
+/// The index of the double fault stack in a TaskStateSegment (TSS)
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 
@@ -43,8 +45,23 @@ static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
-
+/// The single system-wide IDT
+/// TODO FIXME this should be per-core instead of system-wide
 pub static IDT: LockedIdt = LockedIdt::new();
+
+/// Interface to our PIC (programmable interrupt controller) chips.
+/// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
+static PIC: Once<pic::ChainedPics> = Once::new();
+static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
+
+/// The TSS list, one per core, indexed by a key of apic_id
+lazy_static! {
+    static ref TSS: AtomicMap<u8, TaskStateSegment> = AtomicMap::new();
+}
+/// The GDT list, one per core, indexed by a key of apic_id
+lazy_static! {
+    static ref GDT: AtomicMap<u8, gdt::Gdt> = AtomicMap::new();
+}
 
 pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
 
@@ -97,32 +114,20 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 
 
 
-/// Interface to our PIC (programmable interrupt controller) chips.
-/// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
-static PIC: Once<pic::ChainedPics> = Once::new();
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
-static TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
-static GDT: Once<gdt::Gdt> = Once::new();
-
-
-
-/// Sets the TSS's privilege stack 0 (RSP0) entry, which points to the stack that 
+/// Sets the current core's TSS privilege stack 0 (RSP0) entry, which points to the stack that 
 /// the x86_64 hardware automatically switches to when transitioning from Ring 3 -> Ring 0.
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
-pub fn tss_set_rsp0(new_value: usize) {
-    use x86_64::VirtualAddress;
-    if let Some(mut tss) = TSS.try_lock() {
-        tss.privilege_stack_table[0] = VirtualAddress(new_value);
-    }
-    else {
-        panic!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
-    }
+pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
+    let my_apic_id = try!(apic::get_my_apic_id());
+    let mut tss_entry = try!(TSS.get_mut(my_apic_id).ok_or("No TSS for the current core's apid id"));
+    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
+    Ok(())
 }
 
 
-pub fn early_idt() {
+pub fn init_early_exceptions() {
     { 
         let mut idt = IDT.lock(); // withholds interrupts
 
@@ -135,10 +140,7 @@ pub fn early_idt() {
         // missing: 0x05 bound range exceeded exception
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler);
-                // .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
-        }
+        idt.double_fault.set_handler_fn(double_fault_handler);
         // reserved: 0x09 coprocessor segment overrun exception
         // missing: 0x0a invalid TSS exception
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
@@ -148,74 +150,21 @@ pub fn early_idt() {
     }
 
     IDT.load();
-    info!("loaded early IDT.");
+    info!("loaded early IDT with exception handlers only.");
 }
+
+
+
+
 
 
 /// initializes the interrupt subsystem and exception-related IRQs, but no other IRQs.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
-pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable: usize) {
-    assert_has_not_been_called!("interrupts::init was called more than once!");
-    
-    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
-    use x86_64::instructions::tables::load_tss;
-    use x86_64::PrivilegeLevel;
-    use x86_64::VirtualAddress;
-
-    // set up TSS and get pointer to it    
-    let tss_ptr: u64 = {
-        let mut tss = TSS.lock();
-        // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-        tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
-
-        // get the pointer to the raw TSS structure inside the TSS mutex, required for x86's load tss instruction
-        &*tss as *const _ as u64
-    };
-    
-
-    let gdt = GDT.call_once(|| {
-        let mut gdt = gdt::Gdt::new();
-
-        // this order of code segments must be preserved: kernel cs, kernel ds, user cs 32, user ds 32, user cs 64, user ds 64, tss
-
-        KERNEL_CODE_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
-        });
-        KERNEL_DATA_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
-        });
-        USER_CODE_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_CODE_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
-        });
-        TSS_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
-        });
-        gdt
-    });
-    gdt.load();
-
-
-    debug!("Loaded GDT: {}", gdt);
-
-    unsafe {
-        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
-        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
-        
-        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-    }
-
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
+       -> Result<(), &'static str> {
+    let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
+    create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     {
         let mut idt = IDT.lock(); // withholds interrupts
@@ -263,8 +212,88 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         info!("loaded interrupt descriptor table.");
     }
 
+    Ok(())
+
 }
 
+
+pub fn init_ap(apic_id: u8, 
+               double_fault_stack_top_unusable: VirtualAddress, 
+               privilege_stack_top_unusable: VirtualAddress) { 
+    info!("Setting up TSS & GDT for AP {}", apic_id);
+    create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+
+
+    info!("trying to load IDT for AP {}...", apic_id);
+    IDT.load();
+    info!("loaded IDT for AP {}.", apic_id);
+}
+
+
+fn create_tss_gdt(apic_id: u8, 
+                  double_fault_stack_top_unusable: VirtualAddress, 
+                  privilege_stack_top_unusable: VirtualAddress) {
+    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
+    use x86_64::instructions::tables::load_tss;
+    use x86_64::PrivilegeLevel;
+
+    // set up TSS and get pointer to it    
+    let tss_ptr: u64 = {
+        let mut tss = TaskStateSegment::new();
+        // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
+        tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable);
+        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable);
+
+        // insert into TSS list
+        TSS.insert(apic_id, tss);
+        let ptr = TSS.get(apic_id).unwrap();
+        ptr as *const _ as u64
+    };
+    
+
+    // set up this AP's GDT
+    {
+        let mut gdt = gdt::Gdt::new();
+
+        // the below ordering of segments must be preserved: kernel cs, kernel ds, user cs 32, user ds 32, user cs 64, user ds 64, tss
+        // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
+
+        KERNEL_CODE_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
+        });
+        KERNEL_DATA_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
+        });
+        USER_CODE_32_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_DATA_32_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_CODE_64_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3)
+        });
+        USER_DATA_64_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
+        });
+        TSS_SELECTOR.call_once(|| {
+            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
+        });
+        
+        gdt.load();
+        debug!("Loaded GDT for apic {}: {}", apic_id, gdt);
+
+        GDT.insert(apic_id, gdt);
+    }
+
+    unsafe {
+        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
+        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
+        
+        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+    }
+}
 
 pub fn init_handlers_apic() {
     // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC

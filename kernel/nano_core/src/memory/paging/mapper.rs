@@ -7,12 +7,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use x86_64;
 use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
-use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{Frame, FrameAllocator};
 use core::ptr::Unique;
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, MAX_PAGE_NUMBER, PAGE_SIZE};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -144,7 +144,6 @@ impl Mapper {
 
     pub fn remap(&mut self, page: Page, new_flags: EntryFlags) {
         use x86_64::instructions::tlb;
-        use x86_64::VirtualAddress;
 
         let p1 = self.p4_mut()
             .next_table_mut(page.p4_index())
@@ -154,7 +153,7 @@ impl Mapper {
         let frame = p1[page.p1_index()].pointed_frame().expect("remap(): page frame not mapped");
         p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(x86_64::VirtualAddress(page.start_address()));
     }   
 
 
@@ -165,11 +164,10 @@ impl Mapper {
         }
     }
 
-
+    /// Remove the virtual memory mapping for the given `Page`.
     pub fn unmap<A>(&mut self, page: Page, _allocator: &mut A)
         where A: FrameAllocator
     {
-        use x86_64::VirtualAddress;
         use x86_64::instructions::tlb;
 
         assert!(self.translate(page.start_address()).is_some());
@@ -181,7 +179,7 @@ impl Mapper {
             .expect("mapping code does not support huge pages");
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(x86_64::VirtualAddress(page.start_address()));
         // TODO free p(1,2,3) table if empty
         // allocator.deallocate_frame(frame);
     }

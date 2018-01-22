@@ -54,6 +54,7 @@ extern crate keycodes_ascii; // for keyboard
 extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate dfqueue; // decoupled, fault-tolerant queue
+extern crate atomic_linked_list;
 
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
@@ -208,7 +209,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
-    // interrupts::early_idt();
+    // interrupts::init_early_exceptions();
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
@@ -239,20 +240,22 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
 
-    {
-        trace!("calling drivers::early_init()");
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::early_init(&mut kernel_mmi).unwrap();
-    }
-
-    // loop { }
-
     // parse the nano_core ELF object to load its symbols into our metadata
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
     }
+
+
+    // now we initialize ACPI/APIC barebones stuff
+    let madt_iter = {
+        trace!("calling drivers::early_init()");
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        drivers::early_init(&mut kernel_mmi).unwrap() 
+    };
+
+
         
     
     // init other featureful (non-exception) interrupt handlers
@@ -269,13 +272,9 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
     // debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
-    // create the initial `Task`, called task_zero
-    // this is scoped in order to automatically release the tasklist RwLockIrqSafe
-    // TODO: transform this into something more like "task::init(initial_mmi)"
-    {
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();
-        tasklist_mut.init_task_zero(kernel_mmi_ref).unwrap();
-    }
+    // create the initial `Task`, i.e., task_zero
+    let bsp_apic_id = interrupts::apic::get_bsp_id().unwrap();
+    task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
     let console_queue_producer = console::console_init(task::get_tasklist().write());
@@ -284,9 +283,17 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     drivers::init(console_queue_producer);
 
 
+    // boot up the other cores (APs)
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
+        info!("Finished handling all of the AP cores.");
+    }
+
+
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
-    // ACTUALLY we cannot do this until we have booted up all the APs
+    // we cannot do this until we have booted up all the APs
     // TODO this: mapper.p4_mut().clear_entry(0);
 
 
@@ -441,6 +448,8 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 // DO NOT DEREFERENCE THESE DIRECTLY!! THEY ARE SIMPLY ADDRESSES USED FOR SIZE CALCULATIONS.
 // A DIRECT ACCESS WILL CAUSE A PAGE FAULT
 extern {
+    static initial_bsp_stack_top: usize;
+    static initial_bsp_stack_bottom: usize;
     static ap_start_realmode: usize;
     static ap_start_realmode_end: usize;
 }
@@ -459,3 +468,15 @@ fn get_ap_start_realmode_end() -> usize {
     debug!("ap_start_realmode_end addr: {:#x}", addr);
     addr + KERNEL_OFFSET
 } 
+
+fn get_bsp_stack_bottom() -> usize {
+    unsafe {
+        &initial_bsp_stack_bottom as *const _ as usize
+    }
+}
+
+fn get_bsp_stack_top() -> usize {
+    unsafe {
+        &initial_bsp_stack_top as *const _ as usize
+    }
+}
