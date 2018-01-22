@@ -39,7 +39,7 @@ impl Gdt {
         }
     }
 
-    pub fn load(&'static self) {
+    pub fn load(&self) {
         use x86_64::instructions::tables::{DescriptorTablePointer, lgdt};
         use core::mem::size_of;
 

@@ -1,5 +1,8 @@
 use core::sync::atomic::{AtomicBool, Ordering};
-use memory::VirtualAddress;
+use memory;
+use memory::{VirtualAddress};
+use interrupts;
+use task;
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -25,20 +28,24 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
 
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 
-    loop { }
-
-    // Initialize paging
-    // let tcb_offset = paging::init_ap(processor_id, bsp_table, stack_start, stack_end);
-
-    // Set up GDT for AP
-    // gdt::init(tcb_offset, stack_end);
-
-    // Set up IDT for AP
-    // idt::init();
+    // initialize interrupts by using the same IDT and interrupt handlers for all APs (will this work? maybe)
+    let mut kernel_mmi_ref = memory::get_kernel_mmi_ref().expect("couldn't get kernel_mmi_ref");
+    let (double_fault_stack, privilege_stack) = { 
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        (
+            kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
+            kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack"),
+        )
+    };
+    interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable()); 
+    
+    task::init(kernel_mmi_ref, apic_id, stack_start, stack_end);
 
     // init AP as a new local APIC
     let mut lapics_locked = ::interrupts::apic::get_lapics();
-    lapics_locked.insert(processor_id, ::interrupts::apic::LocalApic::new(processor_id, apic_id, flags));
+    lapics_locked.insert(apic_id, ::interrupts::apic::LocalApic::new(processor_id, apic_id, flags, false));
+    
+    // TODO: FIXME: process NmiInterruptLapic entries in the MADT 
 
     // set a flag telling the BSP that this AP has finished initializing
     AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop
@@ -49,5 +56,5 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
     // }
 
     loop { }
-    // ::kmain_ap(processor_id);
+    // ::kmain_ap(apic_id);
 }

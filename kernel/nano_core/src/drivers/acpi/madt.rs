@@ -1,10 +1,9 @@
 use core::mem;
 use core::intrinsics::{atomic_load, atomic_store};
-use memory::{FRAME_ALLOCATOR, Stack, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use memory::{Stack, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
-use interrupts::apic::{LocalApic, has_x2apic, get_current_lapic_id, is_bsp, APIC_VIRT_ADDR, BSP_PROCESSOR_ID};
-use core::ops::DerefMut;
-use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
+use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id};
+use kernel_config::memory::PAGE_SHIFT;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -38,18 +37,20 @@ impl Madt {
         }
         
         let madt_sdt = find_sdt("APIC");
-        let madt = if madt_sdt.len() == 1 {
+        if madt_sdt.len() == 1 {
             load_table(get_sdt_signature(madt_sdt[0]));
-            Madt::new(madt_sdt[0]).ok_or("Couldn't find MADT table")
+            let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
+            let iter = madt.iter();
+            handle_ioapic_entry(iter.clone(), active_table);
+            handle_bsp_entry(iter.clone(), active_table);
+            Ok(iter)
         } else {
             error!("Unable to find MADT");
             Err("could not find MADT table (signature 'APIC')")
-        };
-
-        madt.map(|m| m.iter())
+        }
     }
 
-    pub fn new(sdt: &'static Sdt) -> Option<Madt> {
+    fn new(sdt: &'static Sdt) -> Option<Madt> {
         if &sdt.signature == b"APIC" && sdt.data_len() >= 8 { //Not valid if no local address and flags
             let local_address = unsafe { *(sdt.data_address() as *const u32) };
             let flags = unsafe { *(sdt.data_address() as *const u32).offset(1) };
@@ -64,7 +65,7 @@ impl Madt {
         }
     }
 
-    pub fn iter(&self) -> MadtIter {
+    fn iter(&self) -> MadtIter {
         MadtIter {
             sdt: self.sdt,
             i: 8 // Skip local controller address and flags
@@ -73,8 +74,7 @@ impl Madt {
 }
 
 
-
-pub fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let mut ioapic_count = 0;
     for madt_entry in madt_iter {
         match madt_entry {
@@ -97,8 +97,43 @@ pub fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTab
 }
 
 
+fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    let mut lapics_locked = ::interrupts::apic::get_lapics();
+    let me = try!(get_my_apic_id());
+
+    for madt_entry in madt_iter {
+        match madt_entry {
+             MadtEntry::LocalApic(lapic_madt) => { 
+                if lapic_madt.apic_id == me {
+                    debug!("        This is my (the BSP's) local APIC");
+                    // For the BSP's own processor core, no real work is needed. 
+                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true);
+
+                    // set the BSP to receive keyboard interrupts through the IoApic
+                    let mut ioapic_locked = ioapic::get_ioapic();
+                    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
+                    ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    
+                    // add the BSP lapic to the list (should be empty until here)
+                    assert!(lapics_locked.is_empty(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
+                    lapics_locked.insert(lapic_madt.processor, bsp_lapic);
+
+                    // there's only ever one BSP, so we can return here
+                    return Ok(());
+                }
+            }
+            _ => { }
+        }
+    }
+
+    error!("Couldn't find BSP LocalApic in Madt!");
+    Err("Couldn't find BSP LocalApic in Madt!")
+}
+
+
+
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
-pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // SAFE: just getting const values from boot assembly code
     debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
     let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
@@ -118,15 +153,6 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
                 
                 {
-                    // let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-                    // active_table.map_to(trampoline_page, trampoline_frame, 
-                    //                     EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
-                    // );
-                    // active_table.map_frames(Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
-                    //                         Page::containing_address(AP_STARTUP), 
-                    //                         EntryFlags::PRESENT | EntryFlags::WRITABLE, fa.deref_mut()
-                    // );
-
                     // now that we're identity mapping the first megabyte and the kernel ELF sections in remap_the_kernel(), 
                     // we should just use remap() here instead of map_to()
                     active_table.remap(trampoline_page, EntryFlags::PRESENT | EntryFlags::WRITABLE);
@@ -138,7 +164,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
                 active_table_phys_addr = Some(active_table.physical_address());
             }
             _ => {
-                error!("handle_apic_table(): couldn't get kernel's active_table!");
+                error!("handle_ap_cores(): couldn't get kernel's active_table!");
                 return Err("Couldn't get kernel's active_table");
             }
         }
@@ -147,13 +173,12 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
     let active_table_phys_addr = try!(active_table_phys_addr.ok_or("Couldn't get kernel's active_table physical address"));
 
     let mut lapics_locked = ::interrupts::apic::get_lapics();
-    let me = try!(get_current_lapic_id().ok_or("Madt::init(): couldn't get current lapic id")); 
+    let me = try!(get_my_apic_id());
 
     if ::interrupts::apic::has_x2apic() {
         debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic yes.", me);
     } else {
-        debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic, LAPIC vaddr: {:#X}", 
-                me, APIC_VIRT_ADDR.try().expect("Madt::init(): APIC_VIRT_ADDR wasn't yet initialized!"));
+        debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic", me);
     }
     
     // we mapped these two addresses earlier
@@ -168,7 +193,7 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
     // now, the ap startup code should be at paddr AP_STARTUP
 
 
-    // we need to enable interrupts here to let IPIs work?
+    // do we need to enable interrupts here to let IPIs work? No we don't!
     // debug!("enabling interrupts in bring_up_ap (they were {})",
     //         if ::interrupts::interrupts_enabled() { "enabled" } else { "not enabled" });
     // ::interrupts::enable_interrupts();
@@ -181,26 +206,13 @@ pub fn handle_apic_table(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementI
             MadtEntry::LocalApic(lapic_madt) => { 
 
                 if lapic_madt.apic_id == me {
-                    debug!("        This is my local APIC");
-                    // For the BSP's own processor core, no real work is needed. 
-                    // Just set its own id as the system-wide BSP id, and add itself to the list of local apics
-                    BSP_PROCESSOR_ID.call_once( || lapic_madt.processor); 
-                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags);
-
-                    // set the BSP to receive keyboard interrupts through the IoApic
-                    let mut ioapic_locked = ioapic::get_ioapic();
-                    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
-                    ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
-                    
-                    // add the BSP lapic to the list (should be the first one)
-                    assert!(lapics_locked.is_empty(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    lapics_locked.insert(lapic_madt.processor, bsp_lapic);
+                    debug!("        skipping BSP's local apic");
                 }
                 else {
                     debug!("        This is a different AP's APIC");
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    let mut bsp_lapic = try!(BSP_PROCESSOR_ID.try().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  lapics_locked.get_mut(&bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
                     bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
                 }

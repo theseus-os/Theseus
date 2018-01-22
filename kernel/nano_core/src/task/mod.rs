@@ -19,12 +19,30 @@ type TaskId = usize;
 type AtomicTaskId = AtomicUsize;
 
 
-
+// TODO FIXME CURRENT_TASK no longer makes sense, there is not a single system-wide current task.
+// THERE SHOULD BE ONE PER CORE
 /// The `TaskId` of the currently executing `Task`
 static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
 pub fn get_current_task_id() -> TaskId {
     CURRENT_TASK.load(Ordering::Acquire)
 }
+
+
+
+pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, bsp_apic_id: u8,
+            stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
+            -> Result<Arc<RwLock<Task>>, &'static str> {
+    let mut tasklist_mut = get_tasklist().write();
+    tasklist_mut.init_idle_task(kernel_mmi_ref, bsp_apic_id, stack_bottom, stack_top)
+                .map( |t| t.clone())
+}
+
+pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+               apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
+               -> Result<Arc<RwLock<Task>>, &'static str> {
+    init(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
+}
+
 
 /// Used to ensure that context switches are done atomically
 static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
@@ -68,7 +86,7 @@ pub struct Task {
     pub id: TaskId,
     /// which cpu core the Task is currently running on.
     /// negative if not currently running.
-    pub running_on_cpu: i8,
+    pub running_on_cpu: isize,
     /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
     /// architecture-specific task state, e.g., registers.
@@ -84,6 +102,9 @@ pub struct Task {
     pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
+    /// Whether or not this task is pinned to a certain core
+    /// The idle tasks (like idle_task) are always pinned to their respective cores
+    pub pinned_core: Option<u8>,
 }
 
 
@@ -101,6 +122,7 @@ impl Task {
             ustack: None,
             mmi: None,
             new_userspace_entry_addr: None,
+            pinned_core: None,
         }
     }
 
@@ -163,7 +185,7 @@ impl Task {
 
         // update runstates
         self.running_on_cpu = -1; // no longer running
-        next.running_on_cpu = 0; // only one CPU right now
+        next.running_on_cpu = 0; // only one CPU right now TODO FIXME
 
 
         // change the privilege stack (RSP0) in the TSS
@@ -250,7 +272,7 @@ impl fmt::Display for Task {
 /// a singleton that represents all tasks
 pub struct TaskList {
     list: BTreeMap<TaskId, Arc<RwLock<Task>>>,
-    taskid_counter: usize,
+    taskid_counter: AtomicUsize,
 }
 
 impl TaskList {
@@ -259,8 +281,7 @@ impl TaskList {
 
         TaskList {
             list: BTreeMap::new(),
-            // start at 1, task_zero is reserved for intial kernel thread
-            taskid_counter: 1,
+            taskid_counter: AtomicUsize::new(0),
         }
     }
 
@@ -283,22 +304,8 @@ impl TaskList {
     /// this function doesn't actually set up the task's members, e.g., stack, registers, memory areas.
     pub fn new_task(&mut self) -> Result<&Arc<RwLock<Task>>, &str> {
 
-        // first, find a free task id!
-        if self.taskid_counter >= MAX_NR_TASKS {
-            self.taskid_counter = 1;
-        }
-        let starting_taskid: usize = self.taskid_counter;
-
-        // find the next unused id
-        while self.list.contains_key(&TaskId::from(self.taskid_counter)) {
-            self.taskid_counter += 1;
-            if starting_taskid == self.taskid_counter {
-                return Err("unable to find free id for new task");
-            }
-        }
-
-        let new_id = TaskId::from(self.taskid_counter);
-        self.taskid_counter += 1;
+        // TODO: re-use old task IDs again, instead of blindly counting up
+        let new_id = self.taskid_counter.fetch_add(1, Ordering::Acquire);
 
         // insert the new context into the list
         match self.list.insert(new_id, Arc::new(RwLock::new(Task::new(new_id)))) {
@@ -316,50 +323,37 @@ impl TaskList {
 
 
 
-    /// initialize the first `Task` with special id = 0.
-    /// basically just sets up a Task structure around the bootstrapped kernel thread,
-    /// the one that enters `rust_main()`.
+    /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
+    /// The idle task is a task that runs by default (one per core) when no other task is running.
     /// Returns a reference to the `Task`, protected by a `RwLock`
-    pub fn init_task_zero(&mut self, kernel_mmi: Arc<MutexIrqSafe<MemoryManagementInfo>>) -> Result<&Arc<RwLock<Task>>, &str> {
-        assert_has_not_been_called!("init_task_zero was already called once!");
+    fn init_idle_task(&mut self, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+                          apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
+                          -> Result<&Arc<RwLock<Task>>, &'static str> {
 
-        let id_zero: TaskId = 0;
-        let mut task_zero = Task::new(id_zero);
-        task_zero.runstate = RunState::RUNNABLE;
-        task_zero.running_on_cpu = 0; // only one CPU core is up right now
-        task_zero.mmi = Some(kernel_mmi);
+        // TODO: re-use old task IDs again, instead of blindly counting up
+        let new_id = self.taskid_counter.fetch_add(1, Ordering::Acquire);
+        let mut idle_task = Task::new(new_id);
+        idle_task.runstate = RunState::RUNNABLE;
+        idle_task.running_on_cpu = apic_id as isize; 
+        idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
+        idle_task.mmi = Some(kernel_mmi_ref);
+        idle_task.kstack = Some(Stack::new(stack_top, stack_bottom));
+        debug!("IDLE TASK STACK (apic {}) at top={:#x} bottom={:#x}", apic_id, stack_top, stack_bottom);
 
-        task_zero.kstack = {
-            extern "C" {
-                // these are exposed by the assembly linker, found in arch/arch_x86_64/boot.asm
-                static initial_bsp_stack_top: usize;
-                static initial_bsp_stack_bottom: usize;
-            }
-
-            use memory::Stack;
-            // SAFE because we're just accessing linker defines
-            unsafe {
-                let task_zero_stack_top = &initial_bsp_stack_top as *const _ as usize;
-                let task_zero_stack_bottom = &initial_bsp_stack_bottom as *const _ as usize;
-                debug!("CREATING TASK ZERO STACK at top={:#x} bottom={:#x}", task_zero_stack_top, task_zero_stack_bottom);
-                Some(Stack::new(task_zero_stack_top, task_zero_stack_bottom))
-            }
-        };
-
-        CURRENT_TASK.store(id_zero, Ordering::SeqCst); // set this as the current task, obviously
+        CURRENT_TASK.store(new_id, Ordering::SeqCst); // set this as the current task, obviously
 
         // insert the new context into the list
-        match self.list.insert(id_zero, Arc::new(RwLock::new(task_zero))) {
+        match self.list.insert(new_id, Arc::new(RwLock::new(idle_task))) {
             None => {
                 // None indicates that the insertion didn't overwrite anything, which is what we want
-                debug!("Successfully created initial task0");
-                let tz = self.list.get(&id_zero).expect("init_task_zero(): couldn't find task_zero in tasklist");
+                debug!("Successfully created idle task for AP {}", apic_id);
+                let tz = self.list.get(&new_id).expect("init_idle_task(): couldn't find idle_task in tasklist");
                 scheduler::add_task_to_runqueue(tz.clone());
                 Ok(tz)
             }
             _ => {
-                panic!("WTF: task_zero already existed?!?");
-                Err("WTF: task_zero already existed?!?")
+                panic!("WTF: idle_task already existed?!?");
+                Err("WTF: idle_task already existed?!?")
             }
         }
     }
