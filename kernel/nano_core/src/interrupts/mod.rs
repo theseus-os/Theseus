@@ -251,8 +251,8 @@ fn create_tss_gdt(apic_id: u8,
 
         // insert into TSS list
         TSS.insert(apic_id, tss);
-        let tss_ref = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
-        let ptr = &tss_ref as *const _ as u64;
+        let tss_ref: &TaskStateSegment = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        let ptr = tss_ref as *const _ as u64;
         debug!("Created TSS for apic {}: ptr = {:#X}.  TSS: {:?}", apic_id, ptr, tss_ref);
         ptr
     };
