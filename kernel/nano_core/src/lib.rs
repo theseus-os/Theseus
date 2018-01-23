@@ -368,7 +368,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 
     // create and jump to the first userspace thread
-    if false
+    if true
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -376,7 +376,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         tasklist_mut.spawn_userspace(module, Some("test_program_1"));
     }
 
-    if false
+    if true
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -385,7 +385,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if false
+    if true
     {
         debug!("trying out a system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -394,7 +394,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // a second duplicate syscall test user task
-    if false
+    if true
     {
         debug!("trying out a receive system call module");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
