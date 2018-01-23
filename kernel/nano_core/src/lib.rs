@@ -209,7 +209,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
-    // interrupts::init_early_exceptions();
+    // initialize basic exception handlers
+    interrupts::init_early_exceptions();
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
@@ -227,19 +228,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
     trace!("state_store initialized.");
 
-
-    // initialize basic exception handling interrupts
-    let (double_fault_stack, privilege_stack, syscall_stack) = { 
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        (
-            kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
-            kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack"),
-            kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack")
-        )
-    };
-    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
-
-
     // parse the nano_core ELF object to load its symbols into our metadata
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -252,8 +240,21 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     let madt_iter = {
         trace!("calling drivers::early_init()");
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::early_init(&mut kernel_mmi).unwrap() 
+        drivers::early_init(&mut kernel_mmi).expect("Failed to get MADT (APIC) table iterator!")
     };
+
+
+    // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
+    let (double_fault_stack, privilege_stack, syscall_stack) = { 
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        (
+            kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
+            kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack"),
+            kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack")
+        )
+    };
+    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+                    .expect("failed to initialize interrupts!");
 
 
         
@@ -264,13 +265,13 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     syscall::init(syscall_stack.top_usable());
 
-    // debug!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
-    // debug!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
-    // debug!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
-    // debug!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
-    // debug!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
-    // debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
-    // debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
+    debug!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
+    debug!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
+    debug!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
+    debug!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
+    debug!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
+    debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
+    debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, i.e., task_zero
     let bsp_apic_id = interrupts::apic::get_bsp_id().unwrap();
@@ -284,17 +285,30 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // boot up the other cores (APs)
-    {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
-        info!("Finished handling all of the AP cores.");
-    }
+    // {
+    //     let mut kernel_mmi = kernel_mmi_ref.lock();
+    //     drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
+    //     info!("Finished handling all of the AP cores.");
+    // }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
-    // TODO this: mapper.p4_mut().clear_entry(0);
+    {
+        use memory::PageTable;
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        let ref mut kernel_page_table = kernel_mmi.page_table;
+        
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                for i in 0 .. 500 { // TODO: how many should we clear? Def not the upper ones for the kernel
+                    active_table.p4_mut().clear_entry(i); 
+                }
+            }
+            _ => { }
+        }
+    }
 
 
     println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
@@ -354,7 +368,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
@@ -362,7 +376,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         tasklist_mut.spawn_userspace(module, Some("test_program_1"));
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   

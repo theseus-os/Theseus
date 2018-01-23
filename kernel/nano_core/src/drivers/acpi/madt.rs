@@ -41,8 +41,8 @@ impl Madt {
             load_table(get_sdt_signature(madt_sdt[0]));
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
-            handle_ioapic_entry(iter.clone(), active_table);
-            handle_bsp_entry(iter.clone(), active_table);
+            try!(handle_ioapic_entry(iter.clone(), active_table));
+            try!(handle_bsp_entry(iter.clone(), active_table));
             Ok(iter)
         } else {
             error!("Unable to find MADT");

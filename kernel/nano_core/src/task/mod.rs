@@ -193,7 +193,10 @@ impl Task {
         {
             use interrupts::tss_set_rsp0;
             let next_kstack = next.get_kstack().expect("context_switch(): error: next task's kstack was None!");
-            tss_set_rsp0(next_kstack.bottom() + (next_kstack.size() / 2)); // the middle half of the stack
+            // set it to the middle half of the stack ... TODO: WHY though?
+            let new_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); 
+            tss_set_rsp0(new_rsp0).unwrap();  // TODO FIXME: handle this better, i.e., cancel the context switch and roll back to prev task
+            trace!("context_switch(): set tss rsp0 to {:#X}", new_rsp0);
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
@@ -436,8 +439,6 @@ impl TaskList {
             let mut ustack: Option<Stack> = None;
 
             // create a new InactivePageTable to represent the new process's address space. 
-            // currently, we manually copy all of the existing mappings into the new MMI struct (kernel mappings).
-            // there is probably a better way to do this by copying the page table frames themselves... or something else. 
             let new_userspace_mmi = {
                 let kernel_mmi_ref = get_kernel_mmi_ref().expect("spawn_userspace(): KERNEL_MMI was not yet initialized!");
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
