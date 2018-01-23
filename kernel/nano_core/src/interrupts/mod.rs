@@ -242,7 +242,7 @@ fn create_tss_gdt(apic_id: u8,
     use x86_64::PrivilegeLevel;
 
     // set up TSS and get pointer to it    
-    let tss_ptr: u64 = {
+    let tss_ref = {
         let mut tss = TaskStateSegment::new();
         // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
         tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable);
@@ -251,9 +251,8 @@ fn create_tss_gdt(apic_id: u8,
         // insert into TSS list
         TSS.insert(apic_id, tss);
         let tss_ref: &TaskStateSegment = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
-        let ptr = tss_ref as *const _ as u64;
-        debug!("Created TSS for apic {}: ptr = {:#X}.  TSS: {:?}", apic_id, ptr, tss_ref);
-        ptr
+        debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
+        tss_ref
     };
     
 
@@ -283,7 +282,7 @@ fn create_tss_gdt(apic_id: u8,
             gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
         });
         TSS_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
+            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref), PrivilegeLevel::Ring0)
         });
         
         GDT.insert(apic_id, gdt);
