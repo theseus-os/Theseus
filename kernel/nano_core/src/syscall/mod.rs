@@ -206,8 +206,8 @@ fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
 	// set up user code segment and kernel code segment
     // I believe the cs segment below should be 0x18, not 0x1B, because it's an offset, not a true descriptor with privilege level masks. 
     //      Beelzebub (vercas) sets it as 0x18.
-    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
-    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
+    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 & (!0b11); // TODO FIXME: should this be UserCode64 ??!?
+    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
     let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
     unsafe { wrmsr(IA32_STAR, (star_val as u64) << 32); }   //  [63:48] User CS, [47:32] Kernel CS
     debug!("Set IA32_STAR to {:#x}", star_val);

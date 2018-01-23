@@ -88,25 +88,25 @@ pub enum AvailableSegmentSelector {
 pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
     let seg: &SegmentSelector = match selector {
         AvailableSegmentSelector::KernelCode => {
-            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!")
+            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::KernelData => {
-            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!")
+            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode32 => {
-            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
+            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
+            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode64 => {
-            USER_CODE_64_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
+            USER_CODE_64_SELECTOR.try().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
+            USER_DATA_64_SELECTOR.try().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::Tss => {
-            TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
+            TSS_SELECTOR.try().expect("TSS_SELECTOR wasn't yet inited!")
         }
     };
 
@@ -122,8 +122,12 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
     let my_apic_id = try!(apic::get_my_apic_id());
-    let mut tss_entry = try!(TSS.get_mut(my_apic_id).ok_or("No TSS for the current core's apid id"));
+    let mut tss_entry = try!(TSS.get_mut(my_apic_id).ok_or_else(|| {
+        error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
+        "No TSS for the current core's apid id" 
+    }));
     tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
+    trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
 }
 
@@ -159,12 +163,13 @@ pub fn init_early_exceptions() {
 
 
 
-/// initializes the interrupt subsystem and exception-related IRQs, but no other IRQs.
+/// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
        -> Result<(), &'static str> {
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
+    info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     {
@@ -203,10 +208,9 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
         for i in 32..255 {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
-
     }
 
-    
+    // try to load our new IDT    
     {
         info!("trying to load IDT...");
         IDT.load();
@@ -247,8 +251,10 @@ fn create_tss_gdt(apic_id: u8,
 
         // insert into TSS list
         TSS.insert(apic_id, tss);
-        let ptr = TSS.get(apic_id).unwrap();
-        ptr as *const _ as u64
+        let tss_ref = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        let ptr = &tss_ref as *const _ as u64;
+        debug!("Created TSS for apic {}: ptr = {:#X}.  TSS: {:?}", apic_id, ptr, tss_ref);
+        ptr
     };
     
 
@@ -281,10 +287,10 @@ fn create_tss_gdt(apic_id: u8,
             gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
         });
         
-        gdt.load();
-        debug!("Loaded GDT for apic {}: {}", apic_id, gdt);
-
         GDT.insert(apic_id, gdt);
+        let gdt_ref = GDT.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        gdt_ref.load();
+        debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
     }
 
     unsafe {
@@ -304,6 +310,8 @@ pub fn init_handlers_apic() {
 
     {
         let mut idt = IDT.lock(); // withholds interrupts
+        
+        // exceptions (IRQS from 0 -31) have already been inited before
 
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
