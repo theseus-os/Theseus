@@ -196,7 +196,7 @@ impl Task {
             // set it to the middle half of the stack ... TODO: WHY though?
             let new_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); 
             tss_set_rsp0(new_rsp0).unwrap();  // TODO FIXME: handle this better, i.e., cancel the context switch and roll back to prev task
-            trace!("context_switch(): set tss rsp0 to {:#X}", new_rsp0);
+            // trace!("context_switch(): set tss rsp0 to {:#X}", new_rsp0);
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions

@@ -285,11 +285,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // boot up the other cores (APs)
-    // {
-    //     let mut kernel_mmi = kernel_mmi_ref.lock();
-    //     drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
-    //     info!("Finished handling all of the AP cores.");
-    // }
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
+        info!("Finished handling all of the AP cores.");
+    }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]

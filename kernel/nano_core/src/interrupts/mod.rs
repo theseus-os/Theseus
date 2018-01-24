@@ -126,7 +126,7 @@ pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> 
         "No TSS for the current core's apid id" 
     }));
     tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
-    trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
+    // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
 }
 
@@ -516,8 +516,8 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
-    // let mut lapics_locked = apic::get_lapics();
-    // let mut local_apic = lapics_locked.get_mut(&0).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
+    // let mut all_lapics = apic::get_lapics();
+    // let mut local_apic = all_lapics.get_mut(&0).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
     // let isr = local_apic.get_isr();
     // let irr = local_apic.get_irr();
     use kernel_config::memory::APIC_START;
