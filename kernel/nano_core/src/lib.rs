@@ -87,7 +87,9 @@ use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::TaskList;
 use alloc::string::String;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use core::ops::DerefMut;
+use interrupts::tsc;
 use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 
@@ -197,6 +199,12 @@ fn fourth_thread_main(arg: u64) -> Option<String> {
     println!("Hello from fourth thread, arg: {:?}!!", arg);
     None
 }
+
+
+
+/// An atomic flag used for synchronizing progress between the BSP and all APs.
+/// False means the BSP hasn't finished with initialization yet.
+pub static BSP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 
 #[no_mangle]
@@ -314,7 +322,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
     interrupts::enable_interrupts();
     // schedule!();  // this will happen on the first timer interrupt anyway
-	
+    BSP_READY_FLAG.store(true, Ordering::SeqCst); // BSP is finished initializing
 
 
     // create a second task to test context switching
