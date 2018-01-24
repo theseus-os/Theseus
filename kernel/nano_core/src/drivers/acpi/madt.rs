@@ -115,7 +115,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
                     
                     // add the BSP lapic to the list (should be empty until here)
-                    assert!(lapics_locked.is_empty(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
+                    assert!(lapics_locked.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
                     lapics_locked.insert(lapic_madt.processor, bsp_lapic);
 
                     // there's only ever one BSP, so we can return here
@@ -212,7 +212,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                     debug!("        This is a different AP's APIC");
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  lapics_locked.get_mut(&bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
                     bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
                 }

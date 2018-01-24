@@ -5,10 +5,11 @@ use x86::shared::msr::*;
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 use kernel_config::memory::{APIC_START};
-use alloc::BTreeMap;
+use atomic_linked_list::atomic_map::AtomicMap;
+
 
 lazy_static! {
-    static ref LOCAL_APICS: Mutex<BTreeMap<u8, LocalApic>> = Mutex::new(BTreeMap::new());
+    static ref LOCAL_APICS: AtomicMap<u8, LocalApic> = AtomicMap::new();
 }
 
 /// The VirtualAddress where the APIC chip has been mapped.
@@ -31,16 +32,16 @@ pub fn is_bsp() -> bool {
 
 /// Returns true if the machine has support for x2apic
 pub fn has_x2apic() -> bool {
-    static is_x2: Once<bool> = Once::new(); // caches the result
-    let res = is_x2.call_once( || {
+    static IS_X2APIC: Once<bool> = Once::new(); // caches the result
+    let res: &bool = IS_X2APIC.call_once( || {
         CpuId::new().get_feature_info().unwrap().has_x2apic()
     });
-    *res // because it's a reference
+    *res // because call_once returns a reference to the cached IS_X2APIC value
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core
-pub fn get_lapics() -> MutexGuard<'static, BTreeMap<u8, LocalApic>> {
-	LOCAL_APICS.lock()
+pub fn get_lapics() -> &'static AtomicMap<u8, LocalApic> {
+	&LOCAL_APICS
 }
 
 
