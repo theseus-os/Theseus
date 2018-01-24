@@ -224,7 +224,8 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
 pub fn init_ap(apic_id: u8, 
                double_fault_stack_top_unusable: VirtualAddress, 
-               privilege_stack_top_unusable: VirtualAddress) { 
+               privilege_stack_top_unusable: VirtualAddress)
+               -> Result<(), &'static str> {
     info!("Setting up TSS & GDT for AP {}", apic_id);
     create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -232,6 +233,7 @@ pub fn init_ap(apic_id: u8,
     info!("trying to load IDT for AP {}...", apic_id);
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
+    Ok(())
 }
 
 
@@ -261,30 +263,31 @@ fn create_tss_gdt(apic_id: u8,
     {
         let mut gdt = gdt::Gdt::new();
 
-        // the below ordering of segments must be preserved: kernel cs, kernel ds, user cs 32, user ds 32, user cs 64, user ds 64, tss
+        // the following order of segments must be preserved: 
+        // 0) null descriptor 
+        // 1) kernel cs
+        // 2) kernel ds
+        // 3) user cs 32
+        // 4) user ds 32
+        // 5) user cs 64
+        // 6) user ds 64
+        // 7-8) tss
         // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
 
-        KERNEL_CODE_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
-        });
-        KERNEL_DATA_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
-        });
-        USER_CODE_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_CODE_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
-        });
-        TSS_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref), PrivilegeLevel::Ring0)
-        });
+        let kernel_cs = gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
+        KERNEL_CODE_SELECTOR.call_once(|| kernel_cs);
+        let kernel_ds = gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
+        KERNEL_DATA_SELECTOR.call_once(|| kernel_ds);
+        let user_cs_32 = gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_32_SELECTOR.call_once(|| user_cs_32);
+        let user_ds_32 = gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_32_SELECTOR.call_once(|| user_ds_32);
+        let user_cs_64 = gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
+        let user_ds_64 = gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
+        let tss = gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref), PrivilegeLevel::Ring0);
+        TSS_SELECTOR.call_once(|| tss);
         
         GDT.insert(apic_id, gdt);
         let gdt_ref = GDT.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
@@ -486,13 +489,17 @@ pub static mut APIC_TIMER_TICKS: usize = 0;
 extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     unsafe { 
         APIC_TIMER_TICKS += 1;
-        info!("APIC TIMER HANDLER! TICKS = {}", APIC_TIMER_TICKS);
+        info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS);
     }
     
     eoi(None);
     
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
-    schedule!();
+    if let Ok(id) = apic::get_my_apic_id() {
+        if id == 0 {
+            schedule!();
+        }
+    }
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
@@ -517,7 +524,7 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
-    // let mut all_lapics = apic::get_lapics();
+    // let all_lapics = apic::get_lapics();
     // let mut local_apic = all_lapics.get_mut(&0).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
     // let isr = local_apic.get_isr();
     // let irr = local_apic.get_irr();

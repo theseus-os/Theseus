@@ -98,7 +98,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 
 
 fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-    let mut lapics_locked = ::interrupts::apic::get_lapics();
+    let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id());
 
     for madt_entry in madt_iter {
@@ -115,8 +115,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
                     
                     // add the BSP lapic to the list (should be empty until here)
-                    assert!(lapics_locked.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    lapics_locked.insert(lapic_madt.processor, bsp_lapic);
+                    assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
+                    all_lapics.insert(lapic_madt.processor, bsp_lapic);
 
                     // there's only ever one BSP, so we can return here
                     return Ok(());
@@ -172,7 +172,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
 
     let active_table_phys_addr = try!(active_table_phys_addr.ok_or("Couldn't get kernel's active_table physical address"));
 
-    let mut lapics_locked = ::interrupts::apic::get_lapics();
+    let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id());
 
     if ::interrupts::apic::has_x2apic() {
@@ -212,7 +212,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                     debug!("        This is a different AP's APIC");
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  lapics_locked.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
                     bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
                 }
@@ -230,12 +230,12 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     //         MadtEntry::NonMaskableInterrupt(nmi) => {
     //             if nmi.processor == 0xFF {
     //                 // set NMI on all processors
-    //                 for mut lapic in lapics_locked.values_mut() {
+    //                 for mut lapic in all_lapics.values_mut() {
     //                     lapic.set_nmi(nmi.lint, nmi.flags);
     //                 }
     //             }
     //             else {
-    //                 match lapics_locked.get_mut(&nmi.processor) {
+    //                 match all_lapics.get_mut(&nmi.processor) {
         // TODO: FIXME: this should be done by each APIC itself, not done by the BSP for everyone. We should only do the BSP's here.
     //                     Some(l) => l.set_nmi(nmi.lint, nmi.flags),
     //                     None => {
