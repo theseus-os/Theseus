@@ -2,6 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use interrupts;
 use syscall;
+use task;
 use BSP_READY_FLAG;
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -45,8 +46,8 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
     // NOTE: code below here depends on the BSP having inited the rest of the system-wide things first
 
     // initialize interrupts (including TSS/GDT) for this AP
+    let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: kernel_mmi ref was None");
     let (double_fault_stack, privilege_stack, syscall_stack) = { 
-        let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: kernel_mmi ref was None");
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
@@ -59,6 +60,7 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
 
     syscall::init(syscall_stack.top_usable());
 
+    task::init_ap(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
 
     interrupts::enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 

@@ -3,6 +3,7 @@ pub mod ata_pio;
 pub mod pci;
 pub mod acpi;
 
+
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;

@@ -148,8 +148,8 @@ unsafe extern "C" fn syscall_handler() {
     // here: once the stack is set up and registers are saved and remapped to local rust vars, then we can do anything we want
     // asm!("sti"); // TODO: we could consider letting interrupts occur while in a system call. Probably should do that. 
     
-    let curr_id = ::task::get_current_task_id();
-    trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
+    let curr_id = ::task::get_my_current_task_id();
+    trace!("syscall_handler: curr_tid={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
            curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
