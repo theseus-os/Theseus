@@ -97,7 +97,8 @@ impl ArchTaskState {
         asm!("mov rbp, $0" : : "r"(next.registers.rbp) : "memory" : "intel", "volatile");
 
 
-        // enable interrupts again
+        // re-enable interrupts, because the saved/restored rflags values won't have the interrupt flag set
+        // because they were saved above (in a context that had interrupts disabled)
         asm!("sti" : : : "memory" : "volatile");
     }
 

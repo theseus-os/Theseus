@@ -10,27 +10,6 @@ KERNEL_OFFSET = 0xFFFFFFFF80000000;
 
 SECTIONS {
 
-	/* 
-	. = 0x8000;
-
-	.header ALIGN(4K) :
-	{
-		KEEP(*(.multiboot_header))
-	}
-
-	. = 0x9000;
-
-	.realmodetext ALIGN(4K) : 
-	{
-		*(.realmodetext*)
-	}
-
-	.realmoderodata ALIGN(4K) :
-	{
-		*(.realmoderodata*)
-	}
-	*/
-
 	. = 1M;
 
 	.init ALIGN(4K) :
