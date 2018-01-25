@@ -319,9 +319,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 
-    println_unsafe!("initialization done! Enabling interrupts, schedule away from Task 0 ...");
+    println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
-    // schedule!();  // this will happen on the first timer interrupt anyway
     BSP_READY_FLAG.store(true, Ordering::SeqCst); // BSP is finished initializing
 
 

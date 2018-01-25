@@ -23,7 +23,7 @@ pub struct KernelArgsAp {
 }
 
 /// Entry to rust for an AP.
-/// The arguments 
+/// The arguments must match the invocation order in "ap_boot.asm"
 #[no_mangle]
 pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: VirtualAddress, stack_end: VirtualAddress) -> ! {
 

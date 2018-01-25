@@ -182,16 +182,13 @@ impl Task {
                 "scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}", next.pinned_core, apic_id);
 
 
-        let curr_id: usize = self.id;
-        let next_id: usize = next.id;
-        
         if false {
             trace!("context_switch: AP {} switching from {}({}) to {}({})", apic_id, self.name, self.id, next.name, next.id);
             // use serial_port;
             // serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-            // serial_port::serial_outb((curr_id + 48) as u8);
+            // serial_port::serial_outb((self.id + 48) as u8);
             // serial_port::serial_out(" to ");
-            // serial_port::serial_outb((next_id + 48) as u8);
+            // serial_port::serial_outb((next.id + 48) as u8);
             // serial_port::serial_out(" \x1b[0m\n");
         }
 
@@ -250,8 +247,6 @@ impl Task {
             }
         }
        
-       
-        // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
         CURRENT_TASKS.insert(apic_id, next.id); 
 
