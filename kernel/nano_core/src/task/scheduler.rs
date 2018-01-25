@@ -20,18 +20,20 @@ pub unsafe fn schedule() -> bool {
     let current_task: *mut Task;
     let next_task: *mut Task; 
 
-    // this is scoped to ensure that the tasklist's RwLockIrqSafe is released at the end.
-    // we only request a read lock cuz we're not modifying the list here, 
-    // rather just trying to find one that is runnable 
-    {
-        if let Some(selected_next_task) = select_next_task(&mut RUNQUEUE.write()) {
-            next_task = selected_next_task.write().deref_mut();  // as *mut Task;
-        }
-        else {
+    let apic_id = match ::interrupts::apic::get_my_apic_id() {
+        Ok(id) => id,
+        _ => {
+            error!("Couldn't get apic_id in schedule()");
             return false;
         }
-    } // RUNQUEUE is released here
+    };
 
+    if let Some(selected_next_task) = select_next_task(apic_id) {
+        next_task = selected_next_task.write().deref_mut();  // as *mut Task;
+    }
+    else {
+        return false;
+    }
 
     if next_task as usize == 0 {
         // keep the same current task
@@ -41,8 +43,8 @@ pub unsafe fn schedule() -> bool {
     // same scoping reasons as above: to release the tasklist lock and the lock around current_task
     {
         let tasklist_immut = &get_tasklist().read(); // no need to modify the tasklist
-        current_task = tasklist_immut.get_current().expect("spawn(): get_current failed in getting current_task")
-                        .write().deref_mut() as *mut Task; 
+        current_task = tasklist_immut.get_my_current_task().expect("spawn(): get_my_current_task() failed in getting current_task")
+                       .write().deref_mut() as *mut Task; 
     }
 
     if current_task == next_task {
@@ -56,7 +58,7 @@ pub unsafe fn schedule() -> bool {
 
     // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 
-    curr.context_switch(next); 
+    curr.context_switch(next, apic_id); 
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
@@ -75,9 +77,7 @@ macro_rules! schedule {
         {
             unsafe {
                 let _held_ints = ::irq_safety::hold_interrupts();
-                // $crate::interrupts::disable_interrupts();
                 $crate::task::scheduler::schedule();
-                // $crate::interrupts::enable_interrupts();
             }
         }
     )
@@ -87,6 +87,7 @@ macro_rules! schedule {
 type TaskRef = Arc<RwLock<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
+/// Currently there is a single system-wide run queue, 
 lazy_static! {
     static ref RUNQUEUE: RwLockIrqSafe<RunQueue> = RwLockIrqSafe::new(VecDeque::with_capacity(100));
 }
@@ -105,20 +106,34 @@ pub fn remove_task_from_runqueue(task: TaskRef) {
 
 /// this defines the scheduler policy.
 /// returns None if there is no schedule-able task
-fn select_next_task(runqueue_locked: &mut RwLockIrqSafeWriteGuard<RunQueue>) -> Option<TaskRef>  {
-    
+fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
+
+    let mut runqueue_locked = RUNQUEUE.write();
     let mut index_chosen: Option<usize> = None;
 
+    for (i, task) in runqueue_locked.iter().enumerate() {
+        let t = task.read();
 
-    for i in 0..runqueue_locked.len() {
+        // must be runnable
+        if !t.is_runnable() {
+            continue;
+        }
 
-        if let Some(t) = runqueue_locked.get(i) {
-            if t.read().is_runnable() {
-                // found the first runnable task
-                index_chosen = Some(i);
-                break; 
+        // must not be running on any other cores
+        if t.is_running() {
+            continue;
+        }
+
+        // if this task is pinned, it must not be pinned to a different core
+        if let Some(pinned) = t.pinned_core {
+            if pinned != apic_id {
+                continue;
             }
         }
+            
+        // found a runnable task!
+        index_chosen = Some(i);
+        break; 
     }
 
     if let Some(index) = index_chosen {

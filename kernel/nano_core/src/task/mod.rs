@@ -11,21 +11,27 @@ use core::fmt;
 use core::ops::DerefMut;
 use memory::{get_kernel_mmi_ref, Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
+use atomic_linked_list::atomic_map::AtomicMap;
 
 #[macro_use] pub mod scheduler;
 
 
-type TaskId = usize;
-type AtomicTaskId = AtomicUsize;
 
-
-// TODO FIXME CURRENT_TASK no longer makes sense, there is not a single system-wide current task.
-// THERE SHOULD BE ONE PER CORE
-/// The `TaskId` of the currently executing `Task`
-static CURRENT_TASK: AtomicTaskId = ATOMIC_USIZE_INIT;
-pub fn get_current_task_id() -> TaskId {
-    CURRENT_TASK.load(Ordering::Acquire)
+/// The id of the currently executing `Task`, per-core.
+lazy_static! {
+    static ref CURRENT_TASKS: AtomicMap<u8, usize> = AtomicMap::new();
 }
+/// Get the id of the currently running Task on a specific core
+pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
+    CURRENT_TASKS.get(apic_id).cloned()
+}
+/// Get the id of the currently running Task on this current task
+pub fn get_my_current_task_id() -> Option<usize> {
+    ::interrupts::apic::get_my_apic_id().ok().and_then(|id| {
+        get_current_task_id(id)
+    })
+}
+
 
 
 
@@ -83,7 +89,7 @@ impl<A, R> KthreadCall<A, R> {
 
 pub struct Task {
     /// the unique id of this Task, similar to Linux's pid.
-    pub id: TaskId,
+    pub id: usize,
     /// which cpu core the Task is currently running on.
     /// negative if not currently running.
     pub running_on_cpu: isize,
@@ -111,7 +117,7 @@ pub struct Task {
 impl Task {
 
     /// creates a new Task structure and initializes it to be non-Runnable.
-    fn new(task_id: TaskId) -> Task {
+    fn new(task_id: usize) -> Task {
         Task {
             id: task_id,
             runstate: RunState::INITING,
@@ -138,11 +144,11 @@ impl Task {
 
     /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
-        (self.running_on_cpu >= 0)
+        self.running_on_cpu >= 0
     }
 
     pub fn is_runnable(&self) -> bool {
-        (self.runstate == RunState::RUNNABLE)
+        self.runstate == RunState::RUNNABLE
     }
 
     // TODO: implement this
@@ -160,7 +166,7 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, next: &mut Task) {
+    pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("context_switch [0], getting lock.");
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
@@ -168,24 +174,30 @@ impl Task {
         }
 
         // debug!("context_switch [1], testing runstates.");
-        assert!(next.runstate == RunState::RUNNABLE, "scheduler bug: chosen 'next' Task was not RUNNABLE!");
+        assert!(next.runstate == RunState::RUNNABLE, 
+                "scheduler bug: chosen 'next' Task was not RUNNABLE!");
+        assert!(next.running_on_cpu == -1, 
+                "scheduler bug: chosen 'next' Task was already running on AP {}", apic_id);
+        assert!(next.pinned_core == None || next.pinned_core == Some(apic_id), 
+                "scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}", next.pinned_core, apic_id);
+
 
         let curr_id: usize = self.id;
         let next_id: usize = next.id;
         
         if false {
-            // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id, next.name, next.id;
-            use serial_port;
-            serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-            serial_port::serial_outb((curr_id + 48) as u8);
-            serial_port::serial_out(" to ");
-            serial_port::serial_outb((next_id + 48) as u8);
-            serial_port::serial_out(" \x1b[0m\n");
+            trace!("context_switch: AP {} switching from {}({}) to {}({})", apic_id, self.name, self.id, next.name, next.id);
+            // use serial_port;
+            // serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
+            // serial_port::serial_outb((curr_id + 48) as u8);
+            // serial_port::serial_out(" to ");
+            // serial_port::serial_outb((next_id + 48) as u8);
+            // serial_port::serial_out(" \x1b[0m\n");
         }
 
         // update runstates
         self.running_on_cpu = -1; // no longer running
-        next.running_on_cpu = 0; // only one CPU right now TODO FIXME
+        next.running_on_cpu = apic_id as isize; // now running on this core
 
 
         // change the privilege stack (RSP0) in the TSS
@@ -241,7 +253,7 @@ impl Task {
        
         // debug!("context_switch [2], setting CURRENT_TASK.");
         // update the current task to `next`
-        CURRENT_TASK.store(next.id, Ordering::SeqCst);
+        CURRENT_TASKS.insert(apic_id, next.id); 
 
         // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
@@ -274,7 +286,7 @@ impl fmt::Display for Task {
 
 /// a singleton that represents all tasks
 pub struct TaskList {
-    list: BTreeMap<TaskId, Arc<RwLock<Task>>>,
+    list: BTreeMap<usize, Arc<RwLock<Task>>>,
     taskid_counter: AtomicUsize,
 }
 
@@ -289,17 +301,19 @@ impl TaskList {
     }
 
     /// returns a shared reference to the current `Task`
-    fn get_current(&self) -> Option<&Arc<RwLock<Task>>> {
-        self.list.get(&CURRENT_TASK.load(Ordering::SeqCst))
+    fn get_my_current_task(&self) -> Option<&Arc<RwLock<Task>>> {
+        get_my_current_task_id().and_then(|id| {
+            self.list.get(&id)
+        })
     }
 
     /// returns a shared reference to the `Task` specified by the given `task_id`
-    pub fn get_task(&self, task_id: &TaskId) -> Option<&Arc<RwLock<Task>>> {
+    pub fn get_task(&self, task_id: &usize) -> Option<&Arc<RwLock<Task>>> {
         self.list.get(task_id)
     }
 
     /// Get a iterator for the list of contexts.
-    pub fn iter(&self) -> ::alloc::btree_map::Iter<TaskId, Arc<RwLock<Task>>> {
+    pub fn iter(&self) -> ::alloc::btree_map::Iter<usize, Arc<RwLock<Task>>> {
         self.list.iter()
     }
 
@@ -341,9 +355,10 @@ impl TaskList {
         idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
         idle_task.mmi = Some(kernel_mmi_ref);
         idle_task.kstack = Some(Stack::new(stack_top, stack_bottom));
-        debug!("IDLE TASK STACK (apic {}) at top={:#x} bottom={:#x}", apic_id, stack_top, stack_bottom);
+        debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
 
-        CURRENT_TASK.store(new_id, Ordering::SeqCst); // set this as the current task, obviously
+        // set this as this core's current task, since it's obviously running
+        CURRENT_TASKS.insert(apic_id, new_id); 
 
         // insert the new context into the list
         match self.list.insert(new_id, Arc::new(RwLock::new(idle_task))) {
@@ -576,7 +591,7 @@ impl TaskList {
     ///
     /// ## Returns
     /// An Option with a reference counter for the removed Task.
-    pub fn remove(&mut self, id: TaskId) -> Option<Arc<RwLock<Task>>> {
+    pub fn remove(&mut self, id: usize) -> Option<Arc<RwLock<Task>>> {
         self.list.remove(&id)
     }
 
@@ -640,7 +655,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     let kthread_call_stack_ptr: *mut KthreadCall<A, R>;
     {
         let tasklist = get_tasklist().read();
-        let currtask = tasklist.get_current().expect("kthread_wrapper(): get_current failed in getting kstack").read();
+        let currtask = tasklist.get_my_current_task().expect("kthread_wrapper(): get_my_current_task() failed in getting kstack").read();
         let kstack = currtask.get_kstack().expect("kthread_wrapper(): get_kstack failed.");
         // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
@@ -675,7 +690,8 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
         let tasklist: RwLockIrqSafeReadGuard<_> = get_tasklist().read();
-        tasklist.get_current().unwrap().write().set_runstate(RunState::EXITED);
+        tasklist.get_my_current_task().expect("kthread_wrapper(): couldn't get_my_current_task() after kthread func returned.")
+                .write().set_runstate(RunState::EXITED);
     }
 
     // {
@@ -709,7 +725,7 @@ fn userspace_wrapper() -> ! {
 
     { // scoped to release tasklist lock before calling jump_to_userspace
         let tasklist = get_tasklist().read();
-        let mut currtask = tasklist.get_current().expect("userspace_wrapper(): get_current failed").write();
+        let mut currtask = tasklist.get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
         current_task = currtask.deref_mut() as *mut Task;

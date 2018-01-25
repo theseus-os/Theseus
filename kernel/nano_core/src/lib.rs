@@ -282,7 +282,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
 
     // create the initial `Task`, i.e., task_zero
-    let bsp_apic_id = interrupts::apic::get_bsp_id().unwrap();
+    let bsp_apic_id = interrupts::apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
