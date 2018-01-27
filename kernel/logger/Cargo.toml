@@ -5,6 +5,8 @@ version = "0.1.0"
 
 [dependencies]
 
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
