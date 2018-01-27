@@ -183,13 +183,7 @@ impl Task {
 
 
         if false {
-            trace!("context_switch: AP {} switching from {}({}) to {}({})", apic_id, self.name, self.id, next.name, next.id);
-            // use serial_port;
-            // serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-            // serial_port::serial_outb((self.id + 48) as u8);
-            // serial_port::serial_out(" to ");
-            // serial_port::serial_outb((next.id + 48) as u8);
-            // serial_port::serial_out(" \x1b[0m\n");
+            // trace!("context_switch: switching from {}({}) to {}({})", self.name, self.id, next.name, next.id);
         }
 
         // update runstates

@@ -20,7 +20,6 @@ use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
 use alloc::string::String;
-use serial_port::serial_out;
 use kernel_config::memory::KERNEL_OFFSET;
 use state_store::{SSCached, get_state, insert_state};
 
@@ -182,12 +181,12 @@ impl VgaWriter {
 impl fmt::Write for VgaWriter {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         
-        serial_out(s); // mirror to serial port
+        let ret = serial_port::write_str(s); // mirror to serial port
         
         for byte in s.bytes() {
             self.write_byte(byte)
         }
-        Ok(())
+        ret
     }
 }
 
