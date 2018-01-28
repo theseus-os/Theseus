@@ -92,6 +92,7 @@ use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {

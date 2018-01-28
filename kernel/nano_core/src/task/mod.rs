@@ -166,8 +166,8 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("context_switch [0], getting lock.");
+    pub fn context_switch(&mut self, mut next: &mut Task) {
+        // debug!("context_switch [0]: prev {}({}), next {}({}).", self.name, self.id, next.name, next.id);
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
@@ -385,7 +385,7 @@ impl TaskList {
             // create and set up a new kstack
             let kstack: Stack = {
                 let mut mmi = new_task.mmi.as_mut().expect("spawn_kthread: new_task.mmi was None!").lock();
-                mmi.alloc_stack(4).expect("spawn_kthread: couldn't allocate kernel stack!")
+                mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_kthread: couldn't allocate kernel stack!")
             };
 
             // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
@@ -448,7 +448,7 @@ impl TaskList {
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
                 
                 // create a new kernel stack for this userspace task
-                let kstack: Stack = kernel_mmi_locked.alloc_stack(4).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
+                let kstack: Stack = kernel_mmi_locked.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
                 // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
                 let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
                 unsafe { 
@@ -529,7 +529,7 @@ impl TaskList {
                             }
 
                             // allocate a new userspace stack
-                            let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
+                            let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 16)
                                                                                    .expect("spawn_userspace: couldn't allocate new user stack!");
                             ustack = Some(user_stack); 
                             new_user_vmas.push(user_stack_vma);
