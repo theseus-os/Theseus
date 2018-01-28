@@ -205,11 +205,11 @@ impl ActivePageTable {
             p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
         };
         unsafe {
-            debug!("ActivePageTable::switch() old_table: {:#X}, new_table: {:#X}", old_table.p4_frame.start_address(), new_table.p4_frame.start_address());
+            // debug!("ActivePageTable::switch() old_table: {:#X}, new_table: {:#X}", old_table.p4_frame.start_address(), new_table.p4_frame.start_address());
             control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
         
-        debug!("ActivePageTable::switch(): NEW TABLE!!!");
+        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
 
         // old_table
         (old_table, unsafe { ActivePageTable::new() } )
