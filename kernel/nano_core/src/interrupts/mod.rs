@@ -489,7 +489,7 @@ pub static mut APIC_TIMER_TICKS: usize = 0;
 extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     unsafe { 
         APIC_TIMER_TICKS += 1;
-        info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS);
+        // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS);
     }
     
     eoi(None);
@@ -503,7 +503,7 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-    info!("APIC KEYBOARD HANDLER!");
+    // info!("APIC KEYBOARD HANDLER!");
 
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
