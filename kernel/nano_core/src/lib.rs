@@ -88,6 +88,7 @@ use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -228,8 +229,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
 
     // initialize our interrupts and IDT
     let double_fault_stack = kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack");
-    let privilege_stack = kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack");
-    let syscall_stack = kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack");
+    let privilege_stack = kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate privilege stack");
+    let syscall_stack = kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack");
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable());
 
     syscall::init(syscall_stack.top_usable());
@@ -278,7 +279,8 @@ pub extern "C" fn rust_main(multiboot_information_physical_address: usize) {
     
     // try to schedule in the second task
     info!("attempting to schedule away from zeroth init task");
-    schedule!(); // this automatically enables interrupts right now
+    schedule!(); 
+    schedule!(); // call this twice because the first time it will choose task 0 again
 
 
     // the idle thread's (Task 0) busy loop

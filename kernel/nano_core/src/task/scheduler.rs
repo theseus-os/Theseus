@@ -74,7 +74,8 @@ macro_rules! schedule {
             unsafe {
                 $crate::interrupts::disable_interrupts();
                 $crate::task::scheduler::schedule();
-                $crate::interrupts::enable_interrupts();
+                // interrupts are enabled at the end of switch_to() anyway
+                // $crate::interrupts::enable_interrupts();
             }
         }
     )
