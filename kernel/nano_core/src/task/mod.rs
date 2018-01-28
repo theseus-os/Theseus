@@ -10,7 +10,7 @@ use alloc::boxed::Box;
 use core::fmt;
 use core::ops::DerefMut;
 use memory::{get_kernel_mmi_ref, Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
-use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
+use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 #[macro_use] pub mod scheduler;
@@ -166,8 +166,8 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("context_switch [0], getting lock.");
+    pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8) {
+        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
@@ -182,15 +182,6 @@ impl Task {
                 "scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}", next.pinned_core, apic_id);
 
 
-        if false {
-            trace!("context_switch: AP {} switching from {}({}) to {}({})", apic_id, self.name, self.id, next.name, next.id);
-            // use serial_port;
-            // serial_port::serial_out("\x1b[33m[W] context_switch: switching from ");
-            // serial_port::serial_outb((self.id + 48) as u8);
-            // serial_port::serial_out(" to ");
-            // serial_port::serial_outb((next.id + 48) as u8);
-            // serial_port::serial_out(" \x1b[0m\n");
-        }
 
         // update runstates
         self.running_on_cpu = -1; // no longer running
@@ -202,10 +193,9 @@ impl Task {
         {
             use interrupts::tss_set_rsp0;
             let next_kstack = next.get_kstack().expect("context_switch(): error: next task's kstack was None!");
-            // set it to the middle half of the stack ... TODO: WHY though?
-            let new_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); 
-            tss_set_rsp0(new_rsp0).unwrap();  // TODO FIXME: handle this better, i.e., cancel the context switch and roll back to prev task
-            // trace!("context_switch(): set tss rsp0 to {:#X}", new_rsp0);
+            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2);
+            tss_set_rsp0(new_tss_rsp0); // the middle half of the stack
+            // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
@@ -391,7 +381,7 @@ impl TaskList {
             // create and set up a new kstack
             let kstack: Stack = {
                 let mut mmi = new_task.mmi.as_mut().expect("spawn_kthread: new_task.mmi was None!").lock();
-                mmi.alloc_stack(4).expect("spawn_kthread: couldn't allocate kernel stack!")
+                mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_kthread: couldn't allocate kernel stack!")
             };
 
             // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
@@ -454,7 +444,7 @@ impl TaskList {
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
                 
                 // create a new kernel stack for this userspace task
-                let kstack: Stack = kernel_mmi_locked.alloc_stack(4).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
+                let kstack: Stack = kernel_mmi_locked.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
                 // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
                 let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
                 unsafe { 
@@ -535,7 +525,7 @@ impl TaskList {
                             }
 
                             // allocate a new userspace stack
-                            let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 4)
+                            let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 16)
                                                                                    .expect("spawn_userspace: couldn't allocate new user stack!");
                             ustack = Some(user_stack); 
                             new_user_vmas.push(user_stack_vma);

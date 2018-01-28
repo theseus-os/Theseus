@@ -45,14 +45,15 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
     
-    pci::init_pci_buses();
-    // ata_pio::init_ata_devices();
+    for dev in pci::pci_device_iter() {
+        debug!("Found pci device: {:?}", dev);
+    }
 
 
 
-    
-    //testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
+    // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*
+    ata_pio::init_ata_devices();
     let test_arr: [u16; 256] = [630;256];
     println!("Value from ATA identification function: {}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
     let begin = ata_pio::pio_read(0xE0,0);
@@ -67,7 +68,6 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     }
     */
 
-    // pci::init_pci_buses();
     /*
     let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
     let ref bus_zero = bus_array[0];

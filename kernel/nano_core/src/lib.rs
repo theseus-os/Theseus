@@ -15,6 +15,7 @@
 #![feature(compiler_fences)]
 #![feature(iterator_step_by)]
 #![feature(core_intrinsics)]
+#![feature(conservative_impl_trait)]
 #![no_std]
 
 
@@ -92,6 +93,7 @@ use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -257,8 +259,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
-            kernel_mmi.alloc_stack(4).expect("could not allocate privilege stack"),
-            kernel_mmi.alloc_stack(4).expect("could not allocate syscall stack")
+            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate privilege stack"),
+            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack")
         )
     };
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
@@ -337,7 +339,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         { tasklist_mut.spawn_kthread(test_loop_2, None, "test_loop_2"); } 
         { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
     }
-    
 
 	
     // attempt to parse a test kernel module
@@ -497,3 +498,55 @@ fn get_bsp_stack_top() -> usize {
         &initial_bsp_stack_top as *const _ as usize
     }
 }
+
+
+
+// CODE FOR TESTING ATA DMA
+/*
+let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
+    
+    let ref bus_zero = bus_array[0];
+    let ref slot_zero = bus_zero.connected_devices[0]; 
+    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
+    println!("{:?}", bus_zero);
+    // pci::allocate_mem();
+    let data = ata_pio::pio_read(0xE0,0).unwrap();
+    
+    println!("ATA PIO read data: ==========================");
+    for sh in data.iter() {
+        print!("{:#x} ", sh);
+    }
+    println!("=============================================");
+    
+    let paddr = pci::read_from_disk(0xE0,0).unwrap() as usize;
+
+    // TO CHECK PHYSICAL MEMORY:
+    //  In QEMU, press Ctrl + Alt + 2
+    //  xp/x 0x2b5000   
+    //        ^^ substitute the frame_start value
+    // xp means "print physical memory",   /x means format as hex
+
+
+
+    let vaddr: usize = {
+        let tasklist = task::get_tasklist().read();
+        let mut curr_task = tasklist.get_current().unwrap().write();
+        let curr_mmi = curr_task.mmi.as_ref().unwrap();
+        let mut curr_mmi_locked = curr_mmi.lock();
+        use memory::*;
+        let vaddr = curr_mmi_locked.map_dma_memory(paddr, 512, PRESENT | WRITABLE);
+        println!("\n========== VMAs after DMA ============");
+        for vma in curr_mmi_locked.vmas.iter() {
+            println!("    vma: {:?}", vma);
+        }
+        println!("=====================================");
+        vaddr
+    };
+    let dataptr = vaddr as *const u16;
+    let dma_data = unsafe { collections::slice::from_raw_parts(dataptr, 256) };
+    println!("======================DMA read data phys_addr: {:#x}: ==========================", paddr);
+    for i in 0..256 {
+        print!("{:#x} ", dma_data[i]);
+    }
+    println!("\n========================================================");
+*/

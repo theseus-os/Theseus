@@ -78,6 +78,8 @@ macro_rules! schedule {
             unsafe {
                 let _held_ints = ::irq_safety::hold_interrupts();
                 $crate::task::scheduler::schedule();
+                // interrupts are enabled at the end of switch_to() anyway
+                // $crate::interrupts::enable_interrupts();
             }
         }
     )
