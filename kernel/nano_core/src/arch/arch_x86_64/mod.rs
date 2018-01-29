@@ -20,35 +20,30 @@ impl ArchTaskState {
     }
 
 
-    /// performs the actual context switch.
-    /// right now, `next` doesn't need to be mutable.
+    /// Performs the actual context switch. DOES NOT RE-ENABLE INTERRUPTS.
     #[inline(never)]
     #[naked]
     pub unsafe fn switch_to(&mut self, next: &ArchTaskState) {
-
-        // debug!("switch_to [0]");
-
-        // The following registers must be saved on x86_64:  (http://cons.mit.edu/sp17/x86-64-architecture-guide.html)
-        // rbx, r12, r13, r14, r15, rsp, rbp
-        // We also save rflags and the pdrp (cr3), both of which need to be saved
-
-        // NOTE: xv6 saves rbx, rsp, rbp, rsi, rdi 
-        // ..... do we need to save rsi and rdi?  
-        // No, I don't think so. 
-        
-        // NOTE: osdev wiki saves rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags, cr3
-        // http://wiki.osdev.org/Kernel_Multitasking
-        // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
-        // No, I don't think so. 
-
-
         /*
          * NOTE: address spaces are changed in the general `context_switch()` function now, not here!
          * as such, there is no need to modify cr3 here (it was changed just before calling this function)
          */
 
-        // self.save_registers();
-        // next.restore_registers();
+        // debug!("switch_to [0]");
+
+        // The following registers must be saved on x86_64:  (http://cons.mit.edu/sp17/x86-64-architecture-guide.html)
+        // rbx, r12, r13, r14, r15, rsp, rbp
+        // We also save rflags
+
+        // NOTE: xv6 saves rbx, rsp, rbp, rsi, rdi 
+        // ..... do we need to save rsi and rdi?  
+        // No, I don't think so, but it doesn't really hurt
+        
+        // NOTE: osdev wiki saves rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags
+        // http://wiki.osdev.org/Kernel_Multitasking
+        // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
+        // No, I don't think so. 
+
 
         // save & restore rflags
         asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
@@ -96,65 +91,88 @@ impl ArchTaskState {
         asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
         asm!("mov rbp, $0" : : "r"(next.registers.rbp) : "memory" : "intel", "volatile");
 
+        // this version of the function does NOT re-enable interrupts
 
-        // re-enable interrupts, because the saved/restored rflags values won't have the interrupt flag set
-        // because they were saved above (in a context that had interrupts disabled)
-        asm!("sti" : : : "memory" : "volatile");
     }
 
 
-    // /// saves current registers into this Task's arch state
-    // #[inline(never)]
-    // #[naked]
-    // unsafe fn save_registers(&mut self) {
-    //     // save rflags
-    //     asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
+    /// Performs the actual context switch. This re-enables interrupts.
+    #[inline(never)]
+    #[naked]
+    pub unsafe fn switch_to_reenable_interrupts(&mut self, next: &ArchTaskState) {
+        /*
+         * NOTE: address spaces are changed in the general `context_switch()` function now, not here!
+         * as such, there is no need to modify cr3 here (it was changed just before calling this function)
+         */
 
-    //     // save rbx
-    //     asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
+        // debug!("switch_to [0]");
+
+        // The following registers must be saved on x86_64:  (http://cons.mit.edu/sp17/x86-64-architecture-guide.html)
+        // rbx, r12, r13, r14, r15, rsp, rbp
+        // We also save rflags
+
+        // NOTE: xv6 saves rbx, rsp, rbp, rsi, rdi 
+        // ..... do we need to save rsi and rdi?  
+        // No, I don't think so, but it doesn't really hurt
         
-    //     // save r12 - r15
-    //     asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
-    //     asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
-    //     asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
-    //     asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
-
-    //     // save the stack pointer
-    //     asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
-
-    //     // save the base pointer
-    //     asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
-
-    // }
+        // NOTE: osdev wiki saves rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags
+        // http://wiki.osdev.org/Kernel_Multitasking
+        // ..... do we need to save rax, rbx, rcx, rdx, rsi, rdi, rip? 
+        // No, I don't think so. 
 
 
-    // /// restores registers from this Task's arch state
-    // #[inline(never)]
-    // #[naked]
-    // unsafe fn restore_registers(&self) {
-    //     // restore rflags
-    //     asm!("push $0 ; popfq" : : "r"(self.registers.rflags) : "memory" : "intel", "volatile");
+        // save & restore rflags
+        asm!("pushfq ; pop $0" : "=r"(self.registers.rflags) : : "memory" : "intel", "volatile");
+        asm!("push $0 ; popfq" : : "r"(next.registers.rflags) : "memory" : "intel", "volatile");
 
-    //     // restore rbx
-    //     asm!("mov rbx, $0" : : "r"(self.registers.rbx) : "memory" : "intel", "volatile");
+        // save & restore rbx
+        asm!("mov $0, rbx" : "=r"(self.registers.rbx) : : "memory" : "intel", "volatile");
+        asm!("mov rbx, $0" : : "r"(next.registers.rbx) : "memory" : "intel", "volatile");
         
-    //     // restore r12 - r15
-    //     asm!("mov r12, $0" : : "r"(self.registers.r12) : "memory" : "intel", "volatile");
-    //     asm!("mov r13, $0" : : "r"(self.registers.r13) : "memory" : "intel", "volatile");
-    //     asm!("mov r14, $0" : : "r"(self.registers.r14) : "memory" : "intel", "volatile");
-    //     asm!("mov r15, $0" : : "r"(self.registers.r15) : "memory" : "intel", "volatile");
+        // save & restore r12 - r15
+        asm!("mov $0, r12" : "=r"(self.registers.r12) : : "memory" : "intel", "volatile");
+        asm!("mov r12, $0" : : "r"(next.registers.r12) : "memory" : "intel", "volatile");
+        asm!("mov $0, r13" : "=r"(self.registers.r13) : : "memory" : "intel", "volatile");
+        asm!("mov r13, $0" : : "r"(next.registers.r13) : "memory" : "intel", "volatile");
+        asm!("mov $0, r14" : "=r"(self.registers.r14) : : "memory" : "intel", "volatile");
+        asm!("mov r14, $0" : : "r"(next.registers.r14) : "memory" : "intel", "volatile");
+        asm!("mov $0, r15" : "=r"(self.registers.r15) : : "memory" : "intel", "volatile");
+        asm!("mov r15, $0" : : "r"(next.registers.r15) : "memory" : "intel", "volatile");
 
-    //     // restore the stack pointer
-    //     asm!("mov rsp, $0" : : "r"(self.registers.rsp) : "memory" : "intel", "volatile");
+        if true {
+            // TESTING extra regs
+            // save & restore rax, rcx, rdx, rdi, rsi
+            asm!("mov $0, rax" : "=r"(self.registers.rax) : : "memory" : "intel", "volatile");
+            asm!("mov rax, $0" : : "r"(next.registers.rax) : "memory" : "intel", "volatile");
 
-    //     // restore the base pointer
-    //     asm!("mov rbp, $0" : : "r"(self.registers.rbp) : "memory" : "intel", "volatile");
+            asm!("mov $0, rcx" : "=r"(self.registers.rcx) : : "memory" : "intel", "volatile");
+            asm!("mov rcx, $0" : : "r"(next.registers.rcx) : "memory" : "intel", "volatile");
 
-    // }
+            asm!("mov $0, rdx" : "=r"(self.registers.rdx) : : "memory" : "intel", "volatile");
+            asm!("mov rdx, $0" : : "r"(next.registers.rdx) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rdi" : "=r"(self.registers.rdi) : : "memory" : "intel", "volatile");
+            asm!("mov rdi, $0" : : "r"(next.registers.rdi) : "memory" : "intel", "volatile");
+
+            asm!("mov $0, rsi" : "=r"(self.registers.rsi) : : "memory" : "intel", "volatile");
+            asm!("mov rsi, $0" : : "r"(next.registers.rsi) : "memory" : "intel", "volatile");
+
+        }
+
+        // save & restore the stack pointer
+        asm!("mov $0, rsp" : "=r"(self.registers.rsp) : : "memory" : "intel", "volatile");
+        asm!("mov rsp, $0" : : "r"(next.registers.rsp) : "memory" : "intel", "volatile");
+
+        // save & restore the base pointer
+        asm!("mov $0, rbp" : "=r"(self.registers.rbp) : : "memory" : "intel", "volatile");
+        asm!("mov rbp, $0" : : "r"(next.registers.rbp) : "memory" : "intel", "volatile");
+
+        // this version of the function does re-enable interrupts
+        asm!("sti" : : : "memory" : "intel", "volatile");
+
+    }
 
 
-    // pub unsafe fn jump_to_userspace_sysret(&self, stack_ptr: usize, function_ptr: usize) {
-    //  }
 
     pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         

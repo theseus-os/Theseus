@@ -410,6 +410,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         tasklist_mut.spawn_userspace(module, None);
     }
 
+
     interrupts::enable_interrupts();
     debug!("rust_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
 

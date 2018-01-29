@@ -166,8 +166,8 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, mut next: &mut Task) {
-        // debug!("context_switch [0]: prev {}({}), next {}({}).", self.name, self.id, next.name, next.id);
+    pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8, reenable_interrupts: bool) {
+        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
@@ -248,9 +248,14 @@ impl Task {
         CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
 
 
-        // NOTE:  interrupts are automatically enabled at the end of switch_to
+        // NOTE: if reenable_interrupts == true, interrupts are re-enabled at the end of switch_to()
         unsafe {
-            self.arch_state.switch_to(&next.arch_state);
+            if reenable_interrupts {
+                self.arch_state.switch_to_reenable_interrupts(&next.arch_state);
+            }
+            else {
+                self.arch_state.switch_to(&next.arch_state);
+            }
         }
 
     }
@@ -669,7 +674,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
 
-
+    ::interrupts::enable_interrupts();
     info!("about to call kthread func, interrupts are {}", ::interrupts::interrupts_enabled());
 
     // actually invoke the function spawned in this kernel thread
@@ -692,8 +697,8 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
 
-    trace!("attempting to unschedule kthread...");
-    schedule!();
+    trace!("attempting to unschedule kthread... interrupts {}", ::interrupts::interrupts_enabled());
+    yield_task!();
 
     // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")
