@@ -500,11 +500,10 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
             schedule!();
         }
     }
+    // schedule!();
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-    // info!("APIC KEYBOARD HANDLER!");
-
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
         KEYBOARD.lock().read() 
