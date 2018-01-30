@@ -298,13 +298,13 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
             icr |= ( new_apic_id as u64) << 56; // destination apic id 
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        debug!(" IPI...");
+        // debug!(" IPI...");
         bsp_lapic.set_icr(icr);
     }
 
-    debug!("waiting 10 ms...");
+    // debug!("waiting 10 ms...");
     wait10ms();
-    debug!("done waiting.");
+    // debug!("done waiting.");
 
     // Send START IPI
     {
@@ -318,7 +318,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
             icr |= (new_apic_id as u64) << 56;
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        debug!(" SIPI...");
+        // debug!(" SIPI...");
         bsp_lapic.set_icr(icr);
     }
 
@@ -326,15 +326,15 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     // TODO: we may need to send a second START IPI on real hardware???
 
     // Wait for trampoline ready
-    debug!(" Wait...");
+    // debug!(" Wait...");
     while unsafe { atomic_load(ap_ready) } == 0 {
         ::arch::pause();
     }
-    debug!(" Trampoline...");
+    // debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
         ::arch::pause();
     }
-    debug!(" AP {} is in Rust code. Ready!", new_apic_id);
+    info!(" AP {} is in Rust code. Ready!", new_apic_id);
 
 }
 

@@ -149,10 +149,11 @@ impl Iterator for PageIter {
 /// the owner of the recursively defined P4 page table. 
 pub struct ActivePageTable {
     mapper: Mapper,
+    p4_frame: Frame,
 }
 impl fmt::Debug for ActivePageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ActivePageTable(p4: {:#X})", self.physical_address()) 
+        write!(f, "ActivePageTable(p4: {:#X})", self.p4_frame.start_address()) 
     }
 }
 
@@ -171,8 +172,13 @@ impl DerefMut for ActivePageTable {
 }
 
 impl ActivePageTable {
-    unsafe fn new() -> ActivePageTable {
-        ActivePageTable { mapper: Mapper::new() }
+    fn new(p4: Frame) -> ActivePageTable {
+        unsafe { 
+            ActivePageTable { 
+                mapper: Mapper::new(),
+                p4_frame: p4,
+            }
+        }
     }
 
     /// temporarily maps the given `InactivePageTable` to the recursive entry (510th entry) 
@@ -186,7 +192,7 @@ impl ActivePageTable {
     {
 
         {
-            let backup = Frame::containing_address(control_regs::cr3().0 as usize);
+            let backup = get_current_p4();
 
             // map temporary_page to current p4 table
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
@@ -206,30 +212,35 @@ impl ActivePageTable {
         temporary_page.unmap(self);
     }
 
-    /// returns the old_table as an InactivePageTable, and the newly-created ActivePageTable.
-    // pub fn switch(&mut self, new_table: &InactivePageTable) -> InactivePageTable {
-    pub fn switch(&mut self, new_table: &InactivePageTable) -> (InactivePageTable, ActivePageTable) {
+
+    /// returns the newly-created ActivePageTable, based on the given new_table.
+    /// No need to return the old_table as an InactivePageTable, since we're not doing that anymore.
+    /// Instead, the old_table remains "active" because other cores may use it.
+    pub fn switch(&mut self, new_table: &PageTable) -> ActivePageTable {
         use x86_64::PhysicalAddress;
+        // debug!("ActivePageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
-        let old_table = InactivePageTable {
-            p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
+        // if this is the first time the new page table has been used, it will be an InactivePageTable,
+        // otherwise, it will already be an ActivePageTable. 
+        // Either way, we need its p4_frame value, since that's what we'll be changing cr3 to. 
+        let new_active_table_p4: Frame = match new_table {
+            &PageTable::Inactive(ref inactive_table) => inactive_table.p4_frame.clone(),
+            &PageTable::Active(ref active_table) => active_table.p4_frame.clone(),
         };
-        unsafe {
-            // debug!("ActivePageTable::switch() old_table: {:#X}, new_table: {:#X}", old_table.p4_frame.start_address(), new_table.p4_frame.start_address());
-            control_regs::cr3_write(PhysicalAddress(new_table.p4_frame.start_address() as u64));
-        }
-        
-        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
 
-        // old_table
-        (old_table, unsafe { ActivePageTable::new() } )
+        // perform the actual page table switch
+        unsafe {
+            control_regs::cr3_write(PhysicalAddress(new_active_table_p4.start_address() as u64));
+        }
+        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
+        
+        ActivePageTable::new(new_active_table_p4)
     }
 
 
-    /// Returns the physical address of this page table's top-level entry,
-    /// e.g., the value of the CR3 register on x86
+    /// Returns the physical address of this page table's top-level p4 frame
     pub fn physical_address(&self) -> PhysicalAddress {
-        control_regs::cr3().0 as usize as PhysicalAddress
+        self.p4_frame.start_address()
     }
 }
 
@@ -271,11 +282,17 @@ impl InactivePageTable {
 
 #[derive(Debug)]
 pub enum PageTable {
-    Uninitialized,
     Active(ActivePageTable),
     Inactive(InactivePageTable),
 }
 
+
+/// Returns the current top-level page table frame, e.g., cr3 on x86
+pub fn get_current_p4() -> Frame {
+    unsafe {
+        Frame::containing_address(control_regs::cr3().0 as usize)
+    }
+}
 
 
 pub fn remap_the_kernel<A>(allocator: &mut A, 
@@ -288,7 +305,9 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     // the temporary page uses the very last address of the kernel heap, so it'll pretty much never collide
     let mut temporary_page = TemporaryPage::new(allocator);
 
-    let mut active_table: ActivePageTable = unsafe { ActivePageTable::new() };
+    // bootstrap an active_table from the currently-loaded page table
+    let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
+
     let mut new_table: InactivePageTable = {
         let frame = try!(allocator.allocate_frame().ok_or("couldn't allocate frame"));
         InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
@@ -390,7 +409,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         //                   Page::containing_address(vga_display_virt_addr), 
         //                   vga_display_flags, allocator);
         debug!("mapped kernel section: {} at addr: {:?}", "vga buffer", vmas[index]);
-        // also do an identity mapping for AP booting
+        // also do an identity mapping for APs that need it while booting
         mapper.remap_pages(Page::range_inclusive_addr(vga_display_virt_addr - KERNEL_OFFSET, size_in_bytes), vga_display_flags);
         index += 1;
 
@@ -400,9 +419,9 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
         // mapper.p4_mut().clear_entry(0);
     });
 
-    debug!("switching to new page table...");
-    let (_old_table, new_active_table) = active_table.switch(&new_table);
-    debug!("switched to new page table.");
+    debug!("switching to new page table {:?}", new_table);
+    let new_active_table = active_table.switch(&PageTable::Inactive(new_table));
+    debug!("switched to new page table {:?}.", new_active_table);
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok(new_active_table)
@@ -421,7 +440,7 @@ pub unsafe fn stack_trace() {
     // println_unsafe!("TRACE: {:>016X}", rbp);
     error!("TRACE: {:>016X}", rbp);
     //Maximum 64 frames
-    let active_table = ActivePageTable::new();
+    let active_table = ActivePageTable::new(get_current_p4());
     for _frame in 0..64 {
         if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
             if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {

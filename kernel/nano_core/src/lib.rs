@@ -380,7 +380,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // create and jump to the first userspace thread
-    if false {
     if true
     {
         debug!("trying to jump to userspace");
@@ -413,7 +412,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
         tasklist_mut.spawn_userspace(module, None);
-    }
     }
 
 
