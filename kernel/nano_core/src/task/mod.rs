@@ -175,7 +175,7 @@ impl Task {
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8, reenable_interrupts: bool) {
-        debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
+        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
@@ -214,36 +214,38 @@ impl Task {
         {
             use memory::{PageTable};
 
-            let prev_mmi = self.mmi.as_mut().expect("context_switch: couldn't get prev task's MMI!");
-            let next_mmi = next.mmi.as_mut().expect("context_switch: couldn't get next task's MMI!");
-
+            let prev_mmi = self.mmi.as_ref().expect("context_switch: couldn't get prev task's MMI!");
+            let next_mmi = next.mmi.as_ref().expect("context_switch: couldn't get next task's MMI!");
+            
 
             if Arc::ptr_eq(prev_mmi, next_mmi) {
                 // do nothing because we're not changing address spaces
-                debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
+                // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
             }
             else {
-
                 // time to change to a different address space and switch the page tables!
-                debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
 
                 let mut prev_mmi_locked = prev_mmi.lock();
                 let mut next_mmi_locked = next_mmi.lock();
+                // debug!("context_switch [3]: switching tables! From {} {:?} to {} {:?}", 
+                //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
+                
 
-
-                let (prev_table_now_inactive, new_active_table) = {
+                let new_active_table = {
                     // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
-                    match (&mut prev_mmi_locked.page_table, &mut next_mmi_locked.page_table) {
-                        (&mut PageTable::Active(ref mut active_table), &mut PageTable::Inactive(ref inactive_table)) => {
-                            active_table.switch(inactive_table)
+                    match &mut prev_mmi_locked.page_table {
+                        &mut PageTable::Active(ref mut active_table) => {
+                            active_table.switch(&next_mmi_locked.page_table)
                         }
                         _ => {
-                            panic!("context_switch(): prev_table must be an ActivePageTable, next_table must be an InactivePageTable!");
+                            panic!("context_switch(): prev_table must be an ActivePageTable!");
                         }
                     }
                 };
-
-                prev_mmi_locked.set_page_table(PageTable::Inactive(prev_table_now_inactive));
+                
+                // since we're no longer changing the prev page table to be inactive, just leave it be,
+                // and only change the next task's page table to active 
+                // (it was either active already, or it was previously inactive (and now active) if it was the first time it had been run)
                 next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); 
 
             }
@@ -346,8 +348,8 @@ impl TaskList {
     /// The idle task is a task that runs by default (one per core) when no other task is running.
     /// Returns a reference to the `Task`, protected by a `RwLock`
     fn init_idle_task(&mut self, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
-                          apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-                          -> Result<&Arc<RwLock<Task>>, &'static str> {
+                      apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
+                      -> Result<&Arc<RwLock<Task>>, &'static str> {
 
         // TODO: re-use old task IDs again, instead of blindly counting up
         let new_id = self.taskid_counter.fetch_add(1, Ordering::Acquire);
@@ -394,7 +396,7 @@ impl TaskList {
             new_task.set_name(String::from(thread_name));
 
             // the new kernel thread uses the same kernel address space
-            new_task.mmi = Some(get_kernel_mmi_ref().expect("spawn_kthread(): KERNEL_MMI was not initialized!!").clone());
+            new_task.mmi = Some(get_kernel_mmi_ref().expect("spawn_kthread(): KERNEL_MMI was not initialized!!"));
 
             // create and set up a new kstack
             let kstack: Stack = {

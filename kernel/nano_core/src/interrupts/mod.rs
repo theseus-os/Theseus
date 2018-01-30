@@ -253,7 +253,7 @@ fn create_tss_gdt(apic_id: u8,
         // insert into TSS list
         TSS.insert(apic_id, tss);
         let tss_ref: &TaskStateSegment = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
-        debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
+        // debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
         tss_ref
     };
     
@@ -291,7 +291,7 @@ fn create_tss_gdt(apic_id: u8,
         GDT.insert(apic_id, gdt);
         let gdt_ref = GDT.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
         gdt_ref.load();
-        debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
+        // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
     }
 
     unsafe {

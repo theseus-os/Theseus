@@ -325,17 +325,12 @@ impl LocalApic {
             unsafe { wrmsr(IA32_X2APIC_ICR, value); }
         } else {
             unsafe {
-                trace!("waiting to send ipi...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
                 let high = (value >> 32) as u32;
-                trace!("sending ipi with high value {:#X} ...", high);
                 self.write_reg(APIC_REG_ICR_HIGH, high);
                 let low = value as u32;
-                trace!("wrote high, writing low value {:#X} ...", low);
                 self.write_reg(APIC_REG_ICR_LOW, low ); // this issues the IPI
-                trace!("wrote low, waiting for ipi to finish...");
                 while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
-                trace!("ipi finished.");
             }
         }
     }

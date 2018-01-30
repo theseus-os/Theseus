@@ -37,7 +37,7 @@ pub type VirtualAddress = usize;
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
-/// returns the kernel's `MemoryManagementInfo`, if initialized.
+/// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
 pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
     KERNEL_MMI.try().cloned()
