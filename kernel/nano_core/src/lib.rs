@@ -324,6 +324,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     interrupts::enable_interrupts();
     BSP_READY_FLAG.store(true, Ordering::SeqCst); // BSP is finished initializing
 
+    {
+        // just wait a while for the APs to boot up -- not necessary,
+        // but waiting for their runqueues to be ready helps distribute tasks among them evenly
+        let mut i = 10000000; // usize::max_value();
+        while i > 0 {
+            i -= 1;
+        }
+    }
 
     // create a second task to test context switching
     if true {
@@ -376,6 +384,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 
     // create and jump to the first userspace thread
+    if false {
     if true
     {
         debug!("trying to jump to userspace");
@@ -408,6 +417,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
         tasklist_mut.spawn_userspace(module, None);
+    }
     }
 
 
@@ -442,14 +452,12 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    // hard-code writing to the top of the vga screen just in case all else fails
-    // we to this at both the beginning and end of the panic handler in case the code in here causes yet another panic
-    // unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
+    let apic_id = interrupts::apic::get_my_apic_id().ok();
 
-    error!("\n\nPANIC in {} at line {}:", file, line);
+    error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     error!("    {}", fmt);
 
-    println_unsafe!("\n\nPANIC in {} at line {}:", file, line);
+    println_unsafe!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     println_unsafe!("    {}", fmt);
 
     // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9

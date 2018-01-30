@@ -2,7 +2,10 @@ use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeWriteGuard};
-use spin::RwLock;
+use spin::{RwLock, Mutex};
+use atomic_linked_list::atomic_map::AtomicMap;
+use core::sync::atomic::{Ordering};
+use interrupts::apic::get_lapics;
 
 use super::{get_tasklist, Task};
 
@@ -110,19 +113,84 @@ macro_rules! yield_task {
 type TaskRef = Arc<RwLock<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
-/// Currently there is a single system-wide run queue, 
+/// There is one runqueue per core, each core can only access its own private runqueue
+/// and select a task from that runqueue to schedule in.
 lazy_static! {
-    static ref RUNQUEUE: RwLockIrqSafe<RunQueue> = RwLockIrqSafe::new(VecDeque::with_capacity(100));
+    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
-pub fn add_task_to_runqueue(task: TaskRef) {
-    RUNQUEUE.write().push_back(task);
+
+/// Creates a new runqueue for the given core
+pub fn init_runqueue(which_core: u8) {
+    trace!("Created runqueue for core {}", which_core);
+    RUNQUEUES.insert(which_core, RwLockIrqSafe::new(RunQueue::new()));
+}
+
+/// Adds a `Task` reference to the given core's runqueue
+pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+    if let Some(ref mut rq) = RUNQUEUES.get_mut(which_core) {
+        debug!("Added task to runqueue {}, {:?}", which_core, task);
+        rq.write().push_back(task);
+        Ok(())
+    }
+    else {
+        error!("add_task_to_specific_runqueue(): couldn't get core {}'s runqueue!", which_core);
+        Err("couldn't get runqueue for requested core")
+    }
+}
+
+/// Returns the "least busy" core, which is currently very simple, based on runqueue size.
+fn get_least_busy_core() -> Option<u8> {
+    let mut min_rq: Option<(u8, usize)> = None;
+
+    for (id, rq) in RUNQUEUES.iter() {
+        let rq_size = rq.read().len();
+
+        if let Some(min) = min_rq {
+            if rq_size < min.1 {
+                min_rq = Some((*id, rq_size));
+            }
+        }
+        else {
+            min_rq = Some((*id, rq_size));
+        }
+    }
+
+    min_rq.map(|m| m.0)
+} 
+
+
+/// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
+/// and adds a `Task` reference to that core's runqueue.
+pub fn add_task_to_runqueue(task: TaskRef) -> Result<(), &'static str> {
+    let mut core_id: Option<u8> = get_least_busy_core();
+    // as a backup option, just choose the first runqueue
+    if core_id.is_none() {
+        core_id = RUNQUEUES.iter().next().map( |v| *v.0);
+    }
+
+    match core_id {
+        Some(id) => {
+            add_task_to_specific_runqueue(id, task)
+        }
+        _ => {
+            error!("Couldn't find any runqueues to add Task {:?}", task);
+            Err("couldn't find a suitable runqueue to add task!")
+        }
+    }
 }
 
 
 // TODO: test this function
-pub fn remove_task_from_runqueue(task: TaskRef) {
-    RUNQUEUE.write().retain(|x| Arc::ptr_eq(&x, &task));
+pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+    if let Some(ref mut rq) = RUNQUEUES.get_mut(which_core) {
+        rq.write().retain(|x| Arc::ptr_eq(&x, &task));
+        Ok(())
+    }
+    else {
+        error!("remove_task_from_runqueue(): couldn't get core {}'s runqueue!", which_core);
+        Err("couldn't get runqueue for requested core")
+    }
 }
 
 
@@ -131,7 +199,7 @@ pub fn remove_task_from_runqueue(task: TaskRef) {
 /// returns None if there is no schedule-able task
 fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
-    let mut runqueue_locked = RUNQUEUE.write();
+    let mut runqueue_locked = try_opt!(RUNQUEUES.get_mut(apic_id)).write();
     let mut index_chosen: Option<usize> = None;
 
     for (i, task) in runqueue_locked.iter().enumerate() {
@@ -142,7 +210,7 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
             continue;
         }
 
-        // must not be running on any other cores
+        // must not be running
         if t.is_running() {
             continue;
         }
@@ -150,7 +218,9 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         // if this task is pinned, it must not be pinned to a different core
         if let Some(pinned) = t.pinned_core {
             if pinned != apic_id {
-                continue;
+                // with per-core runqueues, this should never happen!
+                panic!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                // continue;
             }
         }
             
@@ -168,14 +238,4 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         None
     }
 
-
-
-    // let mut next_task = 0 as *mut Task; // a null Task ptr
-
-    // if next_task as usize == 0 {
-    //    None 
-    // }
-    // else {
-    //     Some(&mut *next_task)
-    // }
 }
