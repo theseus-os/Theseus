@@ -35,11 +35,12 @@ pub fn get_my_current_task_id() -> Option<usize> {
 
 
 
-pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, bsp_apic_id: u8,
+pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<Arc<RwLock<Task>>, &'static str> {
+    scheduler::init_runqueue(apic_id);
     let mut tasklist_mut = get_tasklist().write();
-    tasklist_mut.init_idle_task(kernel_mmi_ref, bsp_apic_id, stack_bottom, stack_top)
+    tasklist_mut.init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
                 .map( |t| t.clone())
 }
 
@@ -113,6 +114,13 @@ pub struct Task {
     pub pinned_core: Option<u8>,
 }
 
+impl fmt::Debug for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {}, runstate: {:?}, pinned: {:?}}}", 
+               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core)
+    }
+}
+
 
 impl Task {
 
@@ -167,7 +175,7 @@ impl Task {
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8, reenable_interrupts: bool) {
-        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
+        debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         // Set the global lock to avoid the unsafe operations below from causing issues
         while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
@@ -195,7 +203,7 @@ impl Task {
             let next_kstack = next.get_kstack().expect("context_switch(): error: next task's kstack was None!");
             let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2);
             tss_set_rsp0(new_tss_rsp0); // the middle half of the stack
-            // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
@@ -208,12 +216,12 @@ impl Task {
 
             if Arc::ptr_eq(prev_mmi, next_mmi) {
                 // do nothing because we're not changing address spaces
-                // debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
+                debug!("context_switch [3]: prev_mmi is the same as next_mmi!");
             }
             else {
 
                 // time to change to a different address space and switch the page tables!
-                // debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
+                debug!("context_switch [3]: switching tables! ({} to {})", self.name, next.name);
 
                 let mut prev_mmi_locked = prev_mmi.lock();
                 let mut next_mmi_locked = next_mmi.lock();
@@ -340,6 +348,7 @@ impl TaskList {
         // TODO: re-use old task IDs again, instead of blindly counting up
         let new_id = self.taskid_counter.fetch_add(1, Ordering::Acquire);
         let mut idle_task = Task::new(new_id);
+        idle_task.name = format!("idle_task_ap{}", apic_id);
         idle_task.runstate = RunState::RUNNABLE;
         idle_task.running_on_cpu = apic_id as isize; 
         idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
@@ -356,11 +365,11 @@ impl TaskList {
                 // None indicates that the insertion didn't overwrite anything, which is what we want
                 debug!("Successfully created idle task for AP {}", apic_id);
                 let tz = self.list.get(&new_id).expect("init_idle_task(): couldn't find idle_task in tasklist");
-                scheduler::add_task_to_runqueue(tz.clone());
+                scheduler::add_task_to_specific_runqueue(apic_id, tz.clone());
                 Ok(tz)
             }
             _ => {
-                panic!("WTF: idle_task already existed?!?");
+                panic!("WTF: idle_task on core {} already existed?!?", apic_id);
                 Err("WTF: idle_task already existed?!?")
             }
         }
@@ -418,7 +427,7 @@ impl TaskList {
 
         }
 
-        scheduler::add_task_to_runqueue(new_task_locked.clone());
+        try!(scheduler::add_task_to_runqueue(new_task_locked.clone()));
 
         Ok(new_task_locked)
     }
@@ -561,7 +570,7 @@ impl TaskList {
         }
 
 
-        scheduler::add_task_to_runqueue(new_task_locked.clone());
+        try!(scheduler::add_task_to_runqueue(new_task_locked.clone()));
 
 
         debug!("spawn_userspace [end]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());

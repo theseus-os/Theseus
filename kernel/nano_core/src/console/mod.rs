@@ -37,7 +37,7 @@ macro_rules! print {
             use core::fmt::Write;
             use alloc::String;
             let mut s: String = String::new();
-            write!(&mut s, $($arg)*);
+            write!(&mut s, $($arg)*).expect("Writing to String in print!() macro failed!");
             $crate::console::print_to_console(s).unwrap();
     });
 }
@@ -48,7 +48,7 @@ static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 pub fn print_to_console<S>(s: S) -> Result<(), &'static str> where S: Into<String> {
     let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()));
-    PRINT_PRODUCER.try().expect("Console print producer isn't yet initialized!").enqueue(output_event);
+    try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
     Ok(())
 }
 

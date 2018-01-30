@@ -533,9 +533,14 @@ pub fn get_module(name: &str) -> Result<&'static ModuleArea, &'static str> {
 
 
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     number: usize,
+}
+impl fmt::Debug for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Frame(paddr: {:#X})", self.start_address()) 
+    }
 }
 
 impl Frame {

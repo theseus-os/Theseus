@@ -30,9 +30,14 @@ mod mapper;
 
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
     number: usize,
+}
+impl fmt::Debug for Page {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Page(vaddr: {:#X})", self.start_address()) 
+    }
 }
 
 impl Page {
@@ -121,7 +126,7 @@ impl SubAssign<usize> for Page {
 }
 
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PageIter {
     start: Page,
     end: Page,
@@ -144,6 +149,11 @@ impl Iterator for PageIter {
 /// the owner of the recursively defined P4 page table. 
 pub struct ActivePageTable {
     mapper: Mapper,
+}
+impl fmt::Debug for ActivePageTable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ActivePageTable(p4: {:#X})", self.physical_address()) 
+    }
 }
 
 impl Deref for ActivePageTable {
@@ -229,6 +239,11 @@ impl ActivePageTable {
 pub struct InactivePageTable {
     p4_frame: Frame,
 }
+impl fmt::Debug for InactivePageTable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "InactivePageTable(p4: {:#X})", self.p4_frame.start_address()) 
+    }
+}
 
 impl InactivePageTable {
     pub fn new(frame: Frame,
@@ -254,6 +269,7 @@ impl InactivePageTable {
 }
 
 
+#[derive(Debug)]
 pub enum PageTable {
     Uninitialized,
     Active(ActivePageTable),
@@ -391,3 +407,43 @@ pub fn remap_the_kernel<A>(allocator: &mut A,
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok(new_active_table)
 }
+
+
+/// Get a stack trace, borrowed from Redox
+/// TODO: Check for stack being mapped before dereferencing
+#[inline(never)]
+pub unsafe fn stack_trace() {
+    use core::mem;
+
+    let mut rbp: usize;
+    asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
+
+    // println_unsafe!("TRACE: {:>016X}", rbp);
+    error!("TRACE: {:>016X}", rbp);
+    //Maximum 64 frames
+    let active_table = ActivePageTable::new();
+    for _frame in 0..64 {
+        if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
+            if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
+                let rip = *(rip_rbp as *const usize);
+                if rip == 0 {
+                    // println_unsafe!(" {:>016X}: EMPTY RETURN", rbp);
+                    error!(" {:>016X}: EMPTY RETURN", rbp);
+                    break;
+                }
+                // println_unsafe!("  {:>016X}: {:>016X}", rbp, rip);
+                error!("  {:>016X}: {:>016X}", rbp, rip);
+                rbp = *(rbp as *const usize);
+                // symbol_trace(rip);
+            } else {
+                // println_unsafe!("  {:>016X}: GUARD PAGE", rbp);
+                error!("  {:>016X}: GUARD PAGE", rbp);
+                break;
+            }
+        } else {
+            // println_unsafe!("  {:>016X}: RBP OVERFLOW", rbp);
+            error!("  {:>016X}: RBP OVERFLOW", rbp);
+        }
+    }
+}
+

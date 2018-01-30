@@ -493,14 +493,14 @@ extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFra
     }
     
     eoi(None);
-    
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
-    if let Ok(id) = apic::get_my_apic_id() {
-        if id == 0 {
-            schedule!();
-        }
-    }
-    // schedule!();
+    
+    // if let Ok(id) = apic::get_my_apic_id() {
+    //     if id == 0 {
+    //         schedule!();
+    //     }
+    // }
+    schedule!();
 }
 
 extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
