@@ -6,6 +6,7 @@ use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 use kernel_config::memory::{APIC_START};
 use atomic_linked_list::atomic_map::AtomicMap;
+use drivers::acpi::madt::{MadtEntry, MadtIter};
 
 
 lazy_static! {
@@ -139,7 +140,7 @@ pub struct LocalApic {
 impl LocalApic {
     /// This MUST be invoked from the AP core that is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool) -> LocalApic {
+    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool, madt_iter: MadtIter) -> LocalApic {
 		
         assert!(flags == 1, "LocalApic::create() processor was disabled! (flags != 1)");
 		let mut lapic = LocalApic {
@@ -168,6 +169,7 @@ impl LocalApic {
             }
         }
 
+        lapic.parse_and_set_nmi(madt_iter);
         info!("Found new processor core ({:?})", lapic);
 		lapic
     }
@@ -279,6 +281,26 @@ impl LocalApic {
         // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
         debug!("in init_timer_x2 7"); wrmsr(IA32_X2APIC_DIV_CONF, 3);
         debug!("in init_timer_x2 end");
+    }
+
+
+    /// Parses and sets up the NonMaskableInterrupt (NMI) for this LocalApic,
+    /// based on the entries in the given `MadtIter`.
+    fn parse_and_set_nmi(&mut self, madt_iter: MadtIter) {
+        for madt_entry in madt_iter {
+            match madt_entry {
+                MadtEntry::NonMaskableInterrupt(nmi) => {
+                    trace!("Lapic {} looking at NMI entry {:?}", self.apic_id, nmi);
+                    // if this is an NMI entry for this lapic, or for all lapics, use it
+                    if nmi.processor == self.apic_id || nmi.processor == 0xFF  {
+                        self.set_nmi(nmi.lint, nmi.flags);   
+                        debug!("Set NMI for LocalApic {}, NMI Entry: {:?}", self.apic_id, nmi);                     
+                    }
+                }
+                _ => {  }
+            }
+        }
+
     }
 
     unsafe fn read_reg(&self, reg: u32) -> u32 {

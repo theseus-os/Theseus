@@ -66,8 +66,6 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
         },
         2 =>{
 
-            // FIXME: Hey wenqiu, please fix this now that you can use real strings (CStr/CString)
-
             let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             use dbus::sysrecv;
 

@@ -5,6 +5,7 @@ use syscall;
 use task;
 use BSP_READY_FLAG;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+use drivers::acpi::madt::MadtIter;
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -26,13 +27,15 @@ pub struct KernelArgsAp {
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
 #[no_mangle]
-pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: VirtualAddress, stack_end: VirtualAddress) -> ! {
+pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
+                        stack_start: VirtualAddress, stack_end: VirtualAddress,
+                        madt_iter: &MadtIter) -> ! {
 
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 
     // init AP as a new local APIC
     let all_lapics = ::interrupts::apic::get_lapics();
-    all_lapics.insert(apic_id, ::interrupts::apic::LocalApic::new(processor_id, apic_id, flags, false));
+    all_lapics.insert(apic_id, ::interrupts::apic::LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone()));
 
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop
@@ -41,9 +44,6 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
     while ! BSP_READY_FLAG.load(Ordering::SeqCst) {
         ::arch::pause();
     }
-
-    // TODO FIXME: set up NMI by handling Nmi Madt entries on thsi AP.
-
     // NOTE: code below here depends on the BSP having inited the rest of the system-wide things first
 
     // initialize interrupts (including TSS/GDT) for this AP
@@ -68,5 +68,7 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, stack_start: 
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 
            if interrupts::interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" });
 
-    loop { }
+    loop { 
+        ::arch::pause();
+    }
 }
