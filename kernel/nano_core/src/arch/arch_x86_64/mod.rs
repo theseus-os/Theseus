@@ -176,11 +176,6 @@ impl ArchTaskState {
 
     pub unsafe fn jump_to_userspace(&self, stack_ptr: usize, function_ptr: usize) {
         
-        // // first, save the current task's registers
-        // self.save_registers();
-        // // no need to restore registers here from a next task, since we're using special args instead
-
-
         // Steps to jumping to userspace:
         // 1) push stack segment selector (ss), i.e., the user_data segment selector
         // 2) push the userspace stack pointer
@@ -199,19 +194,12 @@ impl ArchTaskState {
 
         let ss: u16 = get_segment_selector(AvailableSegmentSelector::UserData64).0;
         let cs: u16 = get_segment_selector(AvailableSegmentSelector::UserCode64).0;
-
         
-
-        // Redox sets the IOPL and interrupt enable flag using the following:  (3 << 12 | 1 << 9)
-        // let mut flags: usize = 0;
-        // asm!("pushf; pop $0" : "=r" (flags) : : "memory" : "volatile");
-        // let rflags: usize = (3 << 12) | (1 << 9); // what Redox does. TODO FIXME: Redox no longer sets IOPL bit
-        let rflags: usize = (3 << 12) | (1 << 9);
+        // interrupts must be enabled in the rflags for the new userspace task
+        let rflags: usize = 1 << 9; // just set the interrupt bit, not the IOPL 
         
-        // let rflags: usize = flags | 0x0200; // interrupts must be enabled in the rflags for the new userspace task
-        // let rflags: usize = flags & !0x200; // quick test: disable interrupts in userspace
-
         // debug!("jump_to_userspace: rflags = {:#x}, userspace interrupts: {}", rflags, rflags & 0x200 == 0x200);
+
 
 
         // for Step 6, save rax before using it below

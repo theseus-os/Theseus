@@ -9,7 +9,7 @@
 
 use x86_64;
 use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
@@ -21,10 +21,8 @@ use atomic::{Ordering, Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 
-// re-expose these functions from within this interrupt module
-pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
-
+mod exceptions;
 mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
 pub mod apic;
@@ -32,6 +30,10 @@ pub mod ioapic;
 mod pic;
 pub mod tsc;
 
+
+// re-expose these functions from within this interrupt module
+pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
+pub use self::exceptions::init_early_exceptions;
 
 /// The index of the double fault stack in a TaskStateSegment (TSS)
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
@@ -47,7 +49,7 @@ static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
 /// The single system-wide IDT
-/// TODO FIXME this should be per-core instead of system-wide
+/// Note: this could be per-core instead of system-wide, if needed.
 pub static IDT: LockedIdt = LockedIdt::new();
 
 /// Interface to our PIC (programmable interrupt controller) chips.
@@ -132,36 +134,6 @@ pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> 
 }
 
 
-pub fn init_early_exceptions() {
-    { 
-        let mut idt = IDT.lock(); // withholds interrupts
-
-        // SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        // missing: 0x02 non-maskable interrupt exception
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(device_not_available_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(early_page_fault_handler);
-    }
-
-    IDT.load();
-    info!("loaded early IDT with exception handlers only.");
-}
-
-
-
-
-
 
 /// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
@@ -176,24 +148,24 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
         let mut idt = IDT.lock(); // withholds interrupts
 
         // SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
+        idt.divide_by_zero.set_handler_fn(exceptions::divide_by_zero_handler);
         // missing: 0x01 debug exception
         // missing: 0x02 non-maskable interrupt exception
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.breakpoint.set_handler_fn(exceptions::breakpoint_handler);
         // missing: 0x04 overflow exception
         // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(device_not_available_handler);
+        idt.invalid_opcode.set_handler_fn(exceptions::invalid_opcode_handler);
+        idt.device_not_available.set_handler_fn(exceptions::device_not_available_handler);
         unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
+            idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
         }
         // reserved: 0x09 coprocessor segment overrun exception
         // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
+        idt.segment_not_present.set_handler_fn(exceptions::segment_not_present_handler);
         // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
+        idt.general_protection_fault.set_handler_fn(exceptions::general_protection_fault_handler);
+        idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
         // reserved: 0x0f vector 15
         // missing: 0x10 floating point exception
         // missing: 0x11 alignment check exception
@@ -378,91 +350,6 @@ pub fn init_handlers_pic() {
 
 
 
-/// interrupt 0x00
-extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
-    loop {}
-}
-
-/// interrupt 0x03
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-}
-
-/// interrupt 0x06
-extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-    loop {}
-}
-
-/// interrupt 0x07
-/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
-extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-
-    loop {}
-}
-
-
-extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
-    error!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
-                                  {:?}\n{:#?}",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
-    loop {}
-}
-
-
-extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
-                                  {:?}\n{:#?}",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
-    loop {}
-}
-
-extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_unsafe!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
-    loop {}
-}
-
-
-
-/// this shouldn't really ever happen, but I added the handler anyway
-/// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
-extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    // use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
-                                  {:#b}\n{:#?}",
-//             control_regs::cr2(),
-             error_code,
-             stack_frame);
-
-    loop {}
-}
-
-
-extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
-                                  {:#b}\n{:#?}",
-             error_code,
-             stack_frame);
-
-
-    // TODO: kill the offending process
-    loop {}
-}
-
 
 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
@@ -508,7 +395,7 @@ extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionSta
     let scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
-	// trace!("KBD: {:?}", scan_code);
+	trace!("APIC KBD (AP {:?}): scan_code {:?}", apic::get_my_apic_id(), scan_code);
 
     keyboard::handle_keyboard_input(scan_code);	
 

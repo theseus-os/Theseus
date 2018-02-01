@@ -437,10 +437,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 #[no_mangle]
 pub extern "C" fn eh_personality() {}
 
-// extern {
-//     // these are exposed by the assembly linker, found in arch/arch_x86_64/common.asm
-//     fn eputs(msg: &str); // TODO FIXME: can't use this until we specify the address of the VGA buffer as an argument
-// }
 
 #[cfg(not(test))]
 #[lang = "panic_fmt"]
@@ -450,13 +446,12 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 
     error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     error!("    {}", fmt);
+    unsafe { memory::stack_trace(); }
 
     println_unsafe!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     println_unsafe!("    {}", fmt);
 
-    // TODO: check out Redox's unwind implementation: https://github.com/redox-os/kernel/blob/b364d052f20f1aa8bf4c756a0a1ea9caa6a8f381/src/arch/x86_64/interrupt/trace.rs#L9
 
-    // unsafe { eputs(format!("PANIC in {} at line {}:", file, line).as_str()); }
     loop {}
 }
 

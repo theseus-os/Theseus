@@ -101,33 +101,50 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id());
 
-    for madt_entry in madt_iter {
+    let mut ioapic_locked = ioapic::get_ioapic();
+    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
+
+
+    for madt_entry in madt_iter.clone() {
         match madt_entry {
              MadtEntry::LocalApic(lapic_madt) => { 
                 if lapic_madt.apic_id == me {
                     debug!("        This is my (the BSP's) local APIC");
                     // For the BSP's own processor core, no real work is needed. 
-                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true);
+                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone());
 
                     // set the BSP to receive keyboard interrupts through the IoApic
-                    let mut ioapic_locked = ioapic::get_ioapic();
-                    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
                     ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    // ioapic_ref.set_irq(0x1, 0xFF, 0x21); 
+                    // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                     
                     // add the BSP lapic to the list (should be empty until here)
                     assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
                     all_lapics.insert(lapic_madt.processor, bsp_lapic);
 
-                    // there's only ever one BSP, so we can return here
-                    return Ok(());
+                    // there's only ever one BSP, so we can exit the loop here
+                    break;
                 }
             }
             _ => { }
         }
     }
 
-    error!("Couldn't find BSP LocalApic in Madt!");
-    Err("Couldn't find BSP LocalApic in Madt!")
+    let bsp_id = try!(get_bsp_id().ok_or("Couldn't find BSP LocalApic in Madt!"));
+
+    // now that we've established the BSP,  go through the interrupt source override entries
+    for madt_entry in madt_iter {
+        match madt_entry {
+            MadtEntry::IntSrcOverride(int_src) => {
+                assert!(int_src.gsi <= (u8::max_value() as u32), "Unsupported: gsi value is larger than size of u8: {:?}", int_src);
+                // using BSP for now, but later we could redirect the IRQ to more (or all) cores
+                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8); 
+            } 
+            _ => { }
+        }
+    }
+
+    Ok(())
 }
 
 
@@ -193,14 +210,8 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     // now, the ap startup code should be at paddr AP_STARTUP
 
 
-    // do we need to enable interrupts here to let IPIs work? No we don't!
-    // debug!("enabling interrupts in bring_up_ap (they were {})",
-    //         if ::interrupts::interrupts_enabled() { "enabled" } else { "not enabled" });
-    // ::interrupts::enable_interrupts();
-
-
     // in this function, we only handle LocalApics
-    for madt_entry in madt_iter {
+    for madt_entry in madt_iter.clone() {
         debug!("      {:?}", madt_entry);
         match madt_entry {
             MadtEntry::LocalApic(lapic_madt) => { 
@@ -214,7 +225,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
                     let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
-                    bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack);
+                    bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack, madt_iter.clone());
                 }
             }
             // only care about new local apics right now
@@ -222,42 +233,18 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
         }
     }
 
-
-    
-    // for madt_entry in madt_iter {
-    //     // now that we've loaded all the local apics, we can load other things that depend on them
-    //     match madt_entry {
-    //         MadtEntry::NonMaskableInterrupt(nmi) => {
-    //             if nmi.processor == 0xFF {
-    //                 // set NMI on all processors
-    //                 for mut lapic in all_lapics.values_mut() {
-    //                     lapic.set_nmi(nmi.lint, nmi.flags);
-    //                 }
-    //             }
-    //             else {
-    //                 match all_lapics.get_mut(&nmi.processor) {
-        // TODO: FIXME: this should be done by each APIC itself, not done by the BSP for everyone. We should only do the BSP's here.
-    //                     Some(l) => l.set_nmi(nmi.lint, nmi.flags),
-    //                     None => {
-    //                         error!("MadtNMI for unknown lapic: {:?}", nmi);
-    //                         return Err("Found MadtNonMaskableInterrupt entry for local APIC that didn't exist!");
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         _ => {  }
-    //     }
-    // }
-
     Ok(())  
 }
 
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
-fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_table_paddr: PhysicalAddress, ap_stack: Stack) {
-    
+fn bring_up_ap(bsp_lapic: &mut LocalApic,
+               new_lapic: &MadtLocalApic, 
+               active_table_paddr: PhysicalAddress, 
+               ap_stack: Stack,
+               madt_iter: MadtIter) 
+{
     
     let ap_ready = TRAMPOLINE as *mut u64;
     let ap_processor_id = unsafe { ap_ready.offset(1) };
@@ -267,6 +254,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     let ap_stack_start = unsafe { ap_ready.offset(5) };
     let ap_stack_end = unsafe { ap_ready.offset(6) };
     let ap_code = unsafe { ap_ready.offset(7) };
+    let ap_madt_table = unsafe { ap_ready.offset(8) };
 
     // Set the ap_ready to 0, volatile
     unsafe { atomic_store(ap_ready, 0) };
@@ -277,6 +265,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic, new_lapic: &MadtLocalApic, active_tabl
     unsafe { atomic_store(ap_stack_start, ap_stack.bottom() as u64) };
     unsafe { atomic_store(ap_stack_end, ap_stack.top_unusable() as u64) };
     unsafe { atomic_store(ap_code, kstart_ap as u64) };
+    unsafe { atomic_store(ap_madt_table, &madt_iter as *const _ as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
@@ -381,8 +370,8 @@ pub struct MadtIntSrcOverride {
     pub bus_source: u8,
     /// IRQ Source
     pub irq_source: u8,
-    /// Global system interrupt base
-    pub gsi_base: u32,
+    /// Global system interrupt
+    pub gsi: u32,
     /// Flags
     pub flags: u16
 }

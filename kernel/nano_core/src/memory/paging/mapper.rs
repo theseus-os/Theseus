@@ -154,6 +154,7 @@ impl Mapper {
         p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
         tlb::flush(x86_64::VirtualAddress(page.start_address()));
+        // TODO broadcast IPI
     }   
 
 
@@ -180,6 +181,8 @@ impl Mapper {
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
         tlb::flush(x86_64::VirtualAddress(page.start_address()));
+        // TODO broadcast IPI
+        
         // TODO free p(1,2,3) table if empty
         // allocator.deallocate_frame(frame);
     }
