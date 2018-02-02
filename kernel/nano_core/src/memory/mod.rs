@@ -549,6 +549,11 @@ impl Frame {
             end: end,
         }
     }
+    //added by ramla
+    pub fn inc_number(&mut self){
+        self.number = self.number +1;
+    }
+    
 }
 
 struct FrameIter {

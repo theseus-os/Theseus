@@ -43,6 +43,19 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
     None
 }
 
+/// Returns a reference to the `PciDevice` with the given vendor id and device id... Ramla
+pub fn get_pci_device_vd(vendor_id: u16, device_id: u16) -> Option<&'static PciDevice> {
+    for b in get_pci_buses() {
+        for d in &b.devices {
+            if d.vendor_id == vendor_id && d.device_id == device_id {
+                return Some(&d);
+            }
+        }
+    }
+    
+    None
+}
+
 /// Returns an iterator that iterates over all `PciDevice`s,
 /// and, if uninitialized, it initializes the PCI bus & scans it to enumerates devices.
 pub fn pci_device_iter() -> impl Iterator<Item = &'static PciDevice> {
@@ -64,8 +77,8 @@ fn pci_address(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
 }
 
 
-/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
+/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.  Ramla
+pub fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
     unsafe { 
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
     }
@@ -83,7 +96,7 @@ fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
 }
 
 /// write data to the specified `offset` on the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
+pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
     unsafe { 
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
         PCI_CONFIG_DATA_PORT.lock().write((value) << ((offset & 2) * 8));
