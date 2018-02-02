@@ -15,7 +15,7 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::Mapper;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
-use super::*; //{MAX_MEMORY_AREAS, VirtualMemoryArea};
+use super::*;
 
 use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;

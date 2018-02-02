@@ -84,6 +84,16 @@ impl IoApic {
         unsafe { self.read_reg(0x2) }
     }
 
+    /// Masks (disables) the given IRQ line. 
+    /// NOTE: this function is UNTESTED!
+    pub fn mask_irq(&mut self, irq: u8) {
+        let irq_reg: u32 = 0x10 + (2 * irq as u32);
+        unsafe {
+            let direction = self.read_reg(irq_reg);
+            self.write_reg(irq_reg, direction | (1 << 16));
+        }
+    }
+
     /// Set IRQ to an interrupt vector.
     /// # Arguments
     /// ioapic_irq: the IRQ number that this interrupt will trigger on this IoApic.

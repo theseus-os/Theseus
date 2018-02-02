@@ -7,7 +7,7 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use core::sync::atomic::{Ordering};
 use interrupts::apic::get_lapics;
 
-use super::{get_tasklist, Task};
+use super::{Task, get_my_current_task};
 
 /// This function performs a context switch.
 /// This is unsafe because we have to maintain references to the current and next tasks
@@ -24,7 +24,7 @@ pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
     let next_task: *mut Task; 
 
     let apic_id = match ::interrupts::apic::get_my_apic_id() {
-        Ok(id) => id,
+        Some(id) => id,
         _ => {
             error!("Couldn't get apic_id in schedule()");
             return false;
@@ -45,9 +45,8 @@ pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
     
     // same scoping reasons as above: to release the tasklist lock and the lock around current_task
     {
-        let tasklist_immut = &get_tasklist().read(); // no need to modify the tasklist
-        current_task = tasklist_immut.get_my_current_task().expect("spawn(): get_my_current_task() failed in getting current_task")
-                       .write().deref_mut() as *mut Task; 
+        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
+                                            .write().deref_mut() as *mut Task; 
     }
 
     if current_task == next_task {
