@@ -561,6 +561,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 /// An Option with a reference counter for the removed Task.
 pub fn remove_task(id: usize) -> Option<Arc<RwLock<Task>>> {
     unimplemented!();
+// assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
     // TASKLIST.remove(id)
 }
 

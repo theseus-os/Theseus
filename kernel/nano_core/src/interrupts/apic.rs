@@ -402,8 +402,10 @@ impl LocalApic {
         let dest = destination.as_icr_value();
         let icr = NORMAL_IPI_ICR | (irq as u64) | dest;
 
-        trace!("send_ipi(): setting icr value to {:#X}", icr);
+        // trace!("send_ipi(): setting icr value to {:#X}", icr);
         self.set_icr(icr);
+
+        // interrupts are released (restored) here when _held_ints is dropped
     }
 
 
@@ -411,7 +413,9 @@ impl LocalApic {
     /// a TLB flush of the given `VirtualAddress`
     pub fn send_tlb_shootdown_ipi(&mut self, vaddr: VirtualAddress) {
         // temporary page is not shared across cores
-        if vaddr == 0xFFFF_FFFF_FFFF_F000 { 
+        use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
+        const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
+        if vaddr == TEMPORARY_PAGE_FRAME { 
             return;
         }
         
@@ -419,7 +423,7 @@ impl LocalApic {
         if core_count <= 1 {
             return; // skip sending IPIs if there are no other cores running
         }
-        trace!("send_tlb_shootdown_ipi(): (AP {}) vaddr: {:#X}, core_count: {}", 
+        trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
                 get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
 
         {

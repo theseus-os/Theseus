@@ -200,12 +200,9 @@ impl Mapper {
 
 /// broadcasts TLB shootdown IPI
 fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
-
-    return; // temporarily disabling this
-
     use interrupts::apic::{get_my_apic_id, get_lapics};
     if let Some(ref mut my_lapic) = get_my_apic_id().and_then(|id| get_lapics().get_mut(id)) {
-        trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
+        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
         my_lapic.send_tlb_shootdown_ipi(vaddr);
     }
 }
