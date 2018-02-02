@@ -40,10 +40,10 @@ pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
 
     if next_task as usize == 0 {
         // keep the same current task
-        return false; // tasklist is automatically unlocked here, thanks RwLockIrqSafeReadGuard!
+        return false;
     }
     
-    // same scoping reasons as above: to release the tasklist lock and the lock around current_task
+    // same scoping reasons as above: to release the lock around current_task
     {
         current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
                                             .write().deref_mut() as *mut Task; 
@@ -51,7 +51,7 @@ pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
 
     if current_task == next_task {
         // no need to switch if the chosen task is the same as the current task
-        return false; // tasklist is automatically unlocked here
+        return false;
     }
 
     // we want mutable references to mutable tasks

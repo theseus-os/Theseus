@@ -634,7 +634,9 @@ extern "x86-interrupt" fn irq_0x2D_handler(stack_frame: &mut ExceptionStackFrame
 
 
 extern "x86-interrupt" fn ipi_handler(stack_frame: &mut ExceptionStackFrame) {
-    trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+    // Currently, IPIs are only used for TLB shootdowns.
+    
+    // trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
     apic::handle_tlb_shootdown_ipi();
 
     eoi(None);
