@@ -118,6 +118,13 @@ pub struct e1000_rx_desc {
         errors: u8,
         special: u16,
 }
+use core::fmt;
+impl fmt::Debug for e1000_rx_desc {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
+                        self.addr, self.length, self.checksum, self.status, self.errors, self.special)
+        }
+}
 
 impl Default for e1000_rx_desc {
         fn default() -> e1000_rx_desc {
@@ -141,6 +148,12 @@ pub struct e1000_tx_desc {
         status: u8,
         css: u8,
         special : u16,
+}
+impl fmt::Debug for e1000_tx_desc {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}",
+                        self.addr, self.length, self.cso, self.cmd, self.status, self.css, self.special)
+        }
 }
 
 impl Default for e1000_tx_desc {
@@ -236,7 +249,7 @@ impl e1000_nc{
         }
        
         pub fn mem_map (&mut self,ref dev:&PciDevice){
-                //debug!("i217_mem_map: {0}, mem_base: {1}, io_base: {2}", self.bar_type, self.mem_base, self.io_base);
+                //debug!("i217_mem_map: {0}, mem_base: {1}, io_basej: {2}", self.bar_type, self.mem_base, self.io_base);
                 //debug!("usize bytes: {}", size_of(usize));
 
                 //find out amount of space needed
@@ -251,7 +264,7 @@ impl e1000_nc{
                 pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
                 //check that value is restored
                 let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-                debug!("original bar0: {}", bar0);
+                debug!("original bar0: {:#X}", bar0);
 
                 // get a reference to the kernel's memory mapping information
                 let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -270,13 +283,13 @@ impl e1000_nc{
                         let phys_addr = self.mem_base + inc as usize ;
                         let mut virt_addr = (0xFFFF_FFFF_0000_0000 + self.mem_base) + inc as usize; // it can't conflict with anything else, ask me for more info
                         
-                        debug!("phys_address: {0}, requested virt_address {1}", phys_addr,virt_addr);
+                        debug!("phys_address: {:#X}, requested virt_address {:#X}", phys_addr,virt_addr);
                         
                         //change from mutable once we can multiple pages at once
                         let page = Page::containing_address(virt_addr);
                         let frame = Frame::containing_address(phys_addr as PhysicalAddress);
                         let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-                        debug!("page: {:?}, frame {:?}",page,frame);
+                        debug!("page: {:#X}, frame {:#X}",page.start_address(),frame.start_address());
 
                         // we can only map stuff if the kernel_page_table is Active
                         // which you can be guaranteed it will be if you're in kernel code
@@ -293,7 +306,7 @@ impl e1000_nc{
                         /**************************************/
                 }
                 self.mem_base = 0xFFFF_FFFF_0000_0000 + self.mem_base;
-                debug!("new mem_base: {}",self.mem_base);
+                debug!("new mem_base: {:#X}",self.mem_base);
                 
                 //checking device status register
                 let val: u32 = unsafe { read_volatile((self.mem_base + REG_STATUS as usize) as *const u32) };
@@ -339,6 +352,7 @@ impl e1000_nc{
                         unsafe{
                         head_pmem = virt_addr;
                         tail_pmem = virt_addr + 4095; //One page is allocated
+                        trace!("head_pmem: {:#X}, tail_pmem: {:#X}", head_pmem, tail_pmem);
                         }
         }
 
@@ -488,9 +502,12 @@ impl e1000_nc{
                 debug!("pointers: {:x}, {:x}",ptr, ptr1);
 
                 let raw_ptr = ptr1 as *mut e1000_rx_desc;
+                debug!("size of e1000_rx_desc: {}, e1000_tx_desc: {}", 
+                        ::core::mem::size_of::<e1000_rx_desc>(), ::core::mem::size_of::<e1000_tx_desc>());
                 //self.rx_descs.from_raw_parts(ptr1,0,E1000_NUM_RX_DESC);
                 unsafe{ self.rx_descs = Vec::from_raw_parts(raw_ptr, 0, E1000_NUM_RX_DESC);}
                 //unsafe{debug!("Address of Rx desc: {:?}, value: {:?}",ptr, *pr1);}
+                debug!("rx_descs: {:?}, capacity: {}", self.rx_descs, self.rx_descs.capacity());
 
                 for i in 0..E1000_NUM_RX_DESC
                 {
@@ -588,7 +605,7 @@ impl e1000_nc{
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 //self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
                 self.tx_descs[self.tx_cur as usize].length = p_len;
-                self.tx_descs[self.tx_cur as usize].cmd = (CMD_EOP | CMD_IFCS | CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
+                self.tx_descs[self.tx_cur as usize].cmd = (CMD_EOP | CMD_IFCS | CMD_RPS | CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
                 self.tx_descs[self.tx_cur as usize].status = 0;
 
                 let old_cur: u8 = self.tx_cur as u8;
@@ -598,6 +615,7 @@ impl e1000_nc{
                 self. writeCommand(REG_TXDESCTAIL, self.tx_cur as u32);   
                 debug!("THD {}",self.readCommand(REG_TXDESCHEAD));
                 debug!("TDT!{}",self.readCommand(REG_TXDESCTAIL));
+                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
                 debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
                 debug!("Waiting for packet to send!");
                 
