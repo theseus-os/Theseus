@@ -1,21 +1,17 @@
 use core::{mem, ptr};
 use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
+use spin::Once; 
 
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 
 use super::sdt::Sdt;
 use super::{ACPI_TABLE, find_sdt, load_table, get_sdt_signature};
 
-#[repr(packed)]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct GenericAddressStructure {
-    address_space: u8,
-    bit_width: u8,
-    bit_offset: u8,
-    access_size: u8,
-    pub address: u64,
-}
+
+static HPET_VIRT_ADDR: Once<VirtualAddress> = Once::new();
+
+
 
 #[repr(packed)]
 #[derive(Debug)]
@@ -63,15 +59,27 @@ impl Hpet {
     }
 }
 
+#[repr(packed)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GenericAddressStructure {
+    address_space: u8,
+    bit_width: u8,
+    bit_offset: u8,
+    access_size: u8,
+    pub address: u64,
+}
+
 impl GenericAddressStructure {
-    pub unsafe fn init(&self, active_table: &mut ActivePageTable) {
-        let page = Page::containing_address(self.address as VirtualAddress);
+    pub fn init(&self, active_table: &mut ActivePageTable) {
+        let vaddr = (self.address + 0xFFFF_FFFF_0000_0000) as VirtualAddress;
+        let page = Page::containing_address(vaddr);
         let frame = Frame::containing_address(self.address as PhysicalAddress);
         let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
         active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+        HPET_VIRT_ADDR.call_once(|| vaddr);
     }
 
-    pub unsafe fn read_u64(&self, offset: usize) -> u64{
+    pub unsafe fn read_u64(&self, offset: usize) -> u64 {
         read_volatile((self.address as usize + offset) as *const u64)
     }
 
