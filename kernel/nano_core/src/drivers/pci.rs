@@ -284,8 +284,7 @@ pub fn set_prdt(start_add: u32) -> Result<u32, ()>{
     let prdt_ref = &prdt[0] as *const u64;
     // TODO: first, translate prdt_ref to physicaladdress
     let prdt_paddr = {
-        let tasklist = task::get_tasklist().read();
-        let curr_task = tasklist.get_current().unwrap().write();
+        let curr_task = get_my_current_task().unwrap().write();
         let curr_mmi = curr_task.mmi.as_ref().unwrap();
         let mut curr_mmi_locked = curr_mmi.lock();
         curr_mmi_locked.translate(prdt_ref as usize)
@@ -432,8 +431,7 @@ pub fn read_from_disk_v2(drive: u8, lba: u32, sector_count: u32) -> Result<Physi
 
         //gets the physical address of the prdt and sends that to the DMA prdt register
         let prdt_paddr = {
-            let tasklist = task::get_tasklist().read();
-            let curr_task = tasklist.get_current().unwrap().write();
+            let curr_task = get_my_current_task().unwrap().write();
             let curr_mmi = curr_task.mmi.as_ref().unwrap();
             let mut curr_mmi_locked = curr_mmi.lock();
             curr_mmi_locked.translate(prdt_ref as usize)

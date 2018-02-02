@@ -154,7 +154,7 @@ impl Mapper {
         p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
         tlb::flush(x86_64::VirtualAddress(page.start_address()));
-        // TODO broadcast IPI
+        broadcast_tlb_shootdown(page.start_address());
     }   
 
 
@@ -181,7 +181,7 @@ impl Mapper {
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
         tlb::flush(x86_64::VirtualAddress(page.start_address()));
-        // TODO broadcast IPI
+        broadcast_tlb_shootdown(page.start_address());
         
         // TODO free p(1,2,3) table if empty
         // allocator.deallocate_frame(frame);
@@ -193,5 +193,19 @@ impl Mapper {
         for page in page_range {
             self.unmap(page, allocator);
         }
+    }
+}
+
+
+
+/// broadcasts TLB shootdown IPI
+fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
+
+    return; // temporarily disabling this
+
+    use interrupts::apic::{get_my_apic_id, get_lapics};
+    if let Some(ref mut my_lapic) = get_my_apic_id().and_then(|id| get_lapics().get_mut(id)) {
+        trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
+        my_lapic.send_tlb_shootdown_ipi(vaddr);
     }
 }

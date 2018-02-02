@@ -7,6 +7,19 @@ use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, Vir
 use kernel_config::memory::{APIC_START};
 use atomic_linked_list::atomic_map::AtomicMap;
 use drivers::acpi::madt::{MadtEntry, MadtIter};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+
+
+
+/// The IRQ number used for IPIs
+pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
+/// The virtual address used for TLB shootdown IPIs
+pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(usize::max_value()); 
+/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize =AtomicUsize::new(usize::max_value()); 
+/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
+pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
+
 
 
 lazy_static! {
@@ -47,22 +60,45 @@ pub fn get_lapics() -> &'static AtomicMap<u8, LocalApic> {
 
 
 /// Returns the APIC ID of the currently executing processor core
-pub fn get_my_apic_id() -> Result<u8, &'static str> {
+pub fn get_my_apic_id() -> Option<u8> {
     let raw = if has_x2apic() {
         unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
     } else {
         match APIC_VIRT_ADDR.try() {
             Some(apic_start) => unsafe { read_volatile((apic_start + APIC_REG_LAPIC_ID as usize) as *const u32) },
             None => {
-                error!("get_my_apic_id(): APIC_VIRT_ADDR was None -- call apic::init() first.");
-                return Err("Couldn't get my apic_id: APIC_VIRT_ADDR was None");
+                return None;
             }
         }
     };
-    Ok((raw >> 24) as u8)
+    Some((raw >> 24) as u8)
 }
 
 
+/// The possible destination shorthand values for IPI ICR. 
+/// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
+pub enum LapicIpiDestination {
+    One(u8),
+    Me,
+    All,
+    AllButMe,
+}
+impl LapicIpiDestination {
+    pub fn as_icr_value(&self) -> u64 {
+        match self {
+            &LapicIpiDestination::One(apic_id) => { 
+                if has_x2apic() {
+                    (apic_id as u64) << 32
+                } else {
+                    (apic_id as u64) << 56
+                }
+            }
+            &LapicIpiDestination::Me           => 0b01 << 18, // 0x4_0000
+            &LapicIpiDestination::All          => 0b10 << 18, // 0x8_0000
+            &LapicIpiDestination::AllButMe     => 0b11 << 18, // 0xC_0000
+        }
+    }
+}
 
 
 /// initially maps the base APIC MMIO register frames so that we can know which LAPIC (processor core) we are,
@@ -347,25 +383,68 @@ impl LocalApic {
             unsafe { wrmsr(IA32_X2APIC_ICR, value); }
         } else {
             unsafe {
-                while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
+                while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {} // wait until ready
                 let high = (value >> 32) as u32;
-                self.write_reg(APIC_REG_ICR_HIGH, high);
+                self.write_reg(APIC_REG_ICR_HIGH, high); // sets part of ICR register, but doesn't yet issue the IPI
                 let low = value as u32;
-                self.write_reg(APIC_REG_ICR_LOW, low ); // this issues the IPI
-                while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {}
+                self.write_reg(APIC_REG_ICR_LOW, low ); // this actually issues the IPI
+                while self.read_reg(APIC_REG_ICR_LOW) & 1 << 12 == 1 << 12 {} // wait until finished
             }
         }
     }
 
-    pub fn ipi(&mut self, apic_id: usize) {
-        let mut icr = 0x4040;
-        if has_x2apic() {
-            icr |= (apic_id as u64) << 32;
-        } else {
-            icr |= (apic_id as u64) << 56;
-        }
+    /// Send an IPI to the cores specified by the given destination
+    pub fn send_ipi(&mut self, irq: u8, destination: LapicIpiDestination) {
+        const NORMAL_IPI_ICR: u64 = 0x4000;
+
+        let _held_ints = ::irq_safety::hold_interrupts();
+        
+        let dest = destination.as_icr_value();
+        let icr = NORMAL_IPI_ICR | (irq as u64) | dest;
+
+        trace!("send_ipi(): setting icr value to {:#X}", icr);
         self.set_icr(icr);
     }
+
+
+    /// Sends an IPI to all other cores (except me) to trigger 
+    /// a TLB flush of the given `VirtualAddress`
+    pub fn send_tlb_shootdown_ipi(&mut self, vaddr: VirtualAddress) {
+        // temporary page is not shared across cores
+        if vaddr == 0xFFFF_FFFF_FFFF_F000 { 
+            return;
+        }
+        
+        let core_count = get_lapics().iter().count();
+        if core_count <= 1 {
+            return; // skip sending IPIs if there are no other cores running
+        }
+        trace!("send_tlb_shootdown_ipi(): (AP {}) vaddr: {:#X}, core_count: {}", 
+                get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
+
+        {
+            // acquire lock
+            while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
+                ::arch::pause();
+            }
+
+
+            TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
+            TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core
+            
+            self.send_ipi(TLB_SHOOTDOWN_IPI_IRQ, LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
+
+            // wait for all other cores to handle this IPI
+            // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
+            while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0  { 
+                ::arch::pause();
+            }
+        
+            // release lock
+            TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
+        }
+    }
+
 
     pub fn eoi(&mut self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
@@ -466,4 +545,19 @@ impl LocalApic {
             }
         }
     }
+}
+
+
+/// Handles a TLB shootdown ipi by flushing the VirtualAddress 
+/// currently stored in TLB_SHOOTDOWN_IPI_VIRT_ADDR.
+pub fn handle_tlb_shootdown_ipi() {
+    let apic_id = get_my_apic_id().unwrap_or(0xFF);
+    let vaddr = TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
+
+    trace!("handle_tlb_shootdown_ipi(): flushing vaddr {:#X}", vaddr);
+
+    use x86_64::instructions::tlb;
+    tlb::flush(::x86_64::VirtualAddress(vaddr));
+
+    TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }

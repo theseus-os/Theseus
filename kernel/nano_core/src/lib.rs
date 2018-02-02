@@ -86,7 +86,7 @@ mod start;
 
 use spin::RwLockWriteGuard;
 use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
-use task::TaskList;
+use task::{spawn_kthread, spawn_userspace};
 use alloc::string::String;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use core::ops::DerefMut;
@@ -227,7 +227,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("multiboot2 boot_info: {:?}", boot_info);
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (task_zero)
+    // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
     let kernel_mmi_ref = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
     
     // now that we have a heap, we can create basic things like state_store
@@ -288,7 +288,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
-    let console_queue_producer = console::console_init(task::get_tasklist().write());
+    let console_queue_producer = console::init();
 
     // initialize the rest of our drivers
     drivers::init(console_queue_producer);
@@ -334,18 +334,16 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         }
     }
 
-    // create a second task to test context switching
+    // create some extra tasks to test context switching
     if true {
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();    
-        { let _second_task = tasklist_mut.spawn_kthread(first_thread_main, Some(6),  "first_thread"); }
-        { let _second_task = tasklist_mut.spawn_kthread(second_thread_main, 6, "second_thread"); }
-        { let _second_task = tasklist_mut.spawn_kthread(third_thread_main, String::from("hello"), "third_thread"); } 
-        { let _second_task = tasklist_mut.spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread"); }
+        spawn_kthread(first_thread_main, Some(6),  "first_thread");
+        spawn_kthread(second_thread_main, 6, "second_thread");
+        spawn_kthread(third_thread_main, String::from("hello"), "third_thread");
+        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread");
 
-        // must be lexically scoped like this to avoid the "multiple mutable borrows" error
-        { tasklist_mut.spawn_kthread(test_loop_1, None, "test_loop_1"); }
-        { tasklist_mut.spawn_kthread(test_loop_2, None, "test_loop_2"); } 
-        { tasklist_mut.spawn_kthread(test_loop_3, None, "test_loop_3"); } 
+        spawn_kthread(test_loop_1, None, "test_loop_1");
+        spawn_kthread(test_loop_2, None, "test_loop_2"); 
+        spawn_kthread(test_loop_3, None, "test_loop_3"); 
     }
 
 	
@@ -383,35 +381,31 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     if true
     {
         debug!("trying to jump to userspace");
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        tasklist_mut.spawn_userspace(module, Some("test_program_1"));
+        spawn_userspace(module, Some("test_program_1"));
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        tasklist_mut.spawn_userspace(module, Some("test_program_2"));
+        spawn_userspace(module, Some("test_program_2"));
     }
 
     // create and jump to a userspace thread that tests syscalls
     if true
     {
         debug!("trying out a system call module");
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
-        tasklist_mut.spawn_userspace(module, None);
+        spawn_userspace(module, None);
     }
 
     // a second duplicate syscall test user task
     if true
     {
         debug!("trying out a receive system call module");
-        let mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList> = task::get_tasklist().write();   
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
-        tasklist_mut.spawn_userspace(module, None);
+        spawn_userspace(module, None);
     }
 
 
@@ -421,6 +415,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
+        arch::pause();
     }
 
 
@@ -442,7 +437,7 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    let apic_id = interrupts::apic::get_my_apic_id().ok();
+    let apic_id = interrupts::apic::get_my_apic_id().unwrap_or(0xFF);
 
     error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     error!("    {}", fmt);
@@ -531,8 +526,7 @@ let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
 
 
     let vaddr: usize = {
-        let tasklist = task::get_tasklist().read();
-        let mut curr_task = tasklist.get_current().unwrap().write();
+        let mut curr_task = get_my_current_task().unwrap().write();
         let curr_mmi = curr_task.mmi.as_ref().unwrap();
         let mut curr_mmi_locked = curr_mmi.lock();
         use memory::*;

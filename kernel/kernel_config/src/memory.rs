@@ -41,10 +41,6 @@ pub const MAX_VIRTUAL_ADDRESS: usize = 0xFFFF_FFFF_FFFF_FFFF;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
-/// This is 32, because Rust currently supports default initialization of 
-/// primitive arrays that are up to 32 elements long.
-pub const MAX_MEMORY_AREAS: usize = 32;
-
 /// Value: 512. 
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections

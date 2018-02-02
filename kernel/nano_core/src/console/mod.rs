@@ -2,12 +2,11 @@ use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
 use alloc::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
-use task::TaskList;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use rtc;
-
+use task::spawn_kthread;
 
 
 // original print macro
@@ -101,7 +100,7 @@ impl ConsoleOutputEvent {
 
 
 /// the console owns and creates the event queue, and returns a producer reference to the queue.
-pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQueueProducer<ConsoleEvent> {
+pub fn init() -> DFQueueProducer<ConsoleEvent> {
     assert_has_not_been_called!("console_init was called more than once!");
 
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
@@ -113,7 +112,7 @@ pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQu
 
     print_to_console("Console says hello!");
     
-    tasklist_mut.spawn_kthread(main_loop, console_consumer, "console_loop");
+    spawn_kthread(main_loop, console_consumer, "console_loop");
     returned_producer
 }
 

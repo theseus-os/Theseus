@@ -123,7 +123,7 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
-    let my_apic_id = try!(apic::get_my_apic_id());
+    let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
     let mut tss_entry = try!(TSS.get_mut(my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
@@ -292,10 +292,12 @@ pub fn init_handlers_apic() {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
-        // quick test to just try these two out, since the PIC is not using our static IDT
         idt[0x20].set_handler_fn(apic_timer_handler);
         idt[0x21].set_handler_fn(ioapic_keyboard_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
+
+
+        idt[apic::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
 
 
@@ -627,5 +629,14 @@ extern "x86-interrupt" fn irq_0x2D_handler(stack_frame: &mut ExceptionStackFrame
     println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
+}
+
+
+
+extern "x86-interrupt" fn ipi_handler(stack_frame: &mut ExceptionStackFrame) {
+    trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+    apic::handle_tlb_shootdown_ipi();
+
+    eoi(None);
 }
 

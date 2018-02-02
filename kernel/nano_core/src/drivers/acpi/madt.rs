@@ -99,7 +99,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 
 fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let all_lapics = ::interrupts::apic::get_lapics();
-    let me = try!(get_my_apic_id());
+    let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
     let mut ioapic_locked = ioapic::get_ioapic();
     let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
@@ -112,9 +112,25 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     debug!("        This is my (the BSP's) local APIC");
                     // For the BSP's own processor core, no real work is needed. 
                     let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone());
+                    let bsp_id = bsp_lapic.id();
 
-                    // set the BSP to receive keyboard interrupts through the IoApic
-                    ioapic_ref.set_irq(0x1, bsp_lapic.id(), 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    // set the BSP to receive regular PIC interrupts routed through the IoApic
+                    ioapic_ref.set_irq(0x0, bsp_id, 0x20);
+                    ioapic_ref.set_irq(0x1, bsp_id, 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    // skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used
+                    ioapic_ref.set_irq(0x3, bsp_id, 0x23);
+                    ioapic_ref.set_irq(0x4, bsp_id, 0x24);
+                    ioapic_ref.set_irq(0x5, bsp_id, 0x25);
+                    ioapic_ref.set_irq(0x6, bsp_id, 0x26);
+                    ioapic_ref.set_irq(0x7, bsp_id, 0x27);
+                    ioapic_ref.set_irq(0x8, bsp_id, 0x28);
+                    ioapic_ref.set_irq(0x9, bsp_id, 0x29);
+                    ioapic_ref.set_irq(0xa, bsp_id, 0x2a);
+                    ioapic_ref.set_irq(0xb, bsp_id, 0x2b);
+                    ioapic_ref.set_irq(0xc, bsp_id, 0x2c);
+                    ioapic_ref.set_irq(0xd, bsp_id, 0x2d);
+                    ioapic_ref.set_irq(0xe, bsp_id, 0x2e);
+                    ioapic_ref.set_irq(0xf, bsp_id, 0x2f);
                     // ioapic_ref.set_irq(0x1, 0xFF, 0x21); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                     
@@ -190,7 +206,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     let active_table_phys_addr = try!(active_table_phys_addr.ok_or("Couldn't get kernel's active_table physical address"));
 
     let all_lapics = ::interrupts::apic::get_lapics();
-    let me = try!(get_my_apic_id());
+    let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
     if ::interrupts::apic::has_x2apic() {
         debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic yes.", me);
@@ -270,13 +286,6 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 
-    // let new_apic_id = 1 << new_lapic.apic_id;
-
-    // this is likely wrong, as I don't think LDR should be set to the apic_id of the destination core
-    // According to Intel docs, LDR is only used for logical addressing mode
-    // // set destination mask for current proc (BSP) ... (not sure if needed)
-    // let bsp_id = bsp_lapic.apic_id;
-    // bsp_lapic.set_ldr(0x00FF_FFFF | ((bsp_id as u32) << 24));
     
     // Send INIT IPI
     {
