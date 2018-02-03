@@ -23,6 +23,15 @@ pub fn init_early_exceptions() {
         // missing: 0x0c stack segment exception
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
         idt.page_fault.set_handler_fn(early_page_fault_handler);
+        // reserved: 0x0f vector 15
+        // missing: 0x10 floating point exception
+        // missing: 0x11 alignment check exception
+        // missing: 0x12 machine check exception
+        // missing: 0x13 SIMD floating point exception
+        // missing: 0x14 virtualization vector 20
+        // missing: 0x15 - 0x1d SIMD floating point exception
+        // missing: 0x1e security exception
+        // reserved: 0x1f
     }
 
     IDT.load();
