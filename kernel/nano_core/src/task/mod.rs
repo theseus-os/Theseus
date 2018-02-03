@@ -1,5 +1,6 @@
 
-use spin::{Once, Mutex, RwLock};
+use spin::{Once, RwLock};
+use irq_safety::MutexIrqSafe;
 use alloc::{BTreeMap, Vec};
 use alloc::string::String;
 use alloc::arc::Arc;
@@ -39,7 +40,7 @@ lazy_static! {
 
 
 
-pub fn init(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>, apic_id: u8,
+pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<Arc<RwLock<Task>>, &'static str> {
     CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));               
@@ -48,7 +49,7 @@ pub fn init(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>, apic_id: u8,
                 .map( |t| t.clone())
 }
 
-pub fn init_ap(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>, 
+pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
                apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
                -> Result<Arc<RwLock<Task>>, &'static str> {
     init(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
@@ -107,7 +108,7 @@ pub struct Task {
     pub ustack: Option<Stack>,
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
-    pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
+    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
@@ -326,7 +327,7 @@ pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLock<Task>>> {
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
 /// Returns a reference to the `Task`, protected by a `RwLock`
-pub fn init_idle_task(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>,
+pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
                       -> Result<Arc<RwLock<Task>>, &'static str> {
 
@@ -546,7 +547,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 
     assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
     new_task.ustack = ustack;
-    new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
+    new_task.mmi = Some(Arc::new(MutexIrqSafe::new(new_userspace_mmi)));
     new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
     let new_task_id = new_task.id;
 

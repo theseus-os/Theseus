@@ -19,6 +19,7 @@ pub mod virtual_address_allocator;
 
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
+use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
 use alloc::Vec;
 use alloc::string::String;
@@ -34,11 +35,11 @@ pub type VirtualAddress = usize;
 
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
 /// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<Arc<Mutex<MemoryManagementInfo>>> {
+pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
     KERNEL_MMI.try().cloned()
 }
 
@@ -307,7 +308,7 @@ impl VirtualMemoryArea {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) -> Result<Arc<Mutex<MemoryManagementInfo>>, &'static str> {
+pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagementInfo>>, &'static str> {
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
@@ -438,7 +439,7 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<Mutex<MemoryManagementInfo
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {
-        Arc::new(Mutex::new(kernel_mmi))
+        Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
     Ok(kernel_mmi_ref.clone())
