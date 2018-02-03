@@ -27,7 +27,6 @@ use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HE
 use task;
 use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
 use mod_mgmt::metadata;
-use irq_safety::MutexIrqSafe;
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
@@ -35,11 +34,11 @@ pub type VirtualAddress = usize;
 
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<Arc<Mutex<MemoryManagementInfo>>> = Once::new();
 
 /// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
+pub fn get_kernel_mmi_ref() -> Option<Arc<Mutex<MemoryManagementInfo>>> {
     KERNEL_MMI.try().cloned()
 }
 
@@ -308,7 +307,7 @@ impl VirtualMemoryArea {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagementInfo>>, &'static str> {
+pub fn init(boot_info: BootInformation) -> Result<Arc<Mutex<MemoryManagementInfo>>, &'static str> {
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
@@ -439,7 +438,7 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {
-        Arc::new(MutexIrqSafe::new(kernel_mmi))
+        Arc::new(Mutex::new(kernel_mmi))
     });
 
     Ok(kernel_mmi_ref.clone())

@@ -10,7 +10,7 @@ pub fn init_early_exceptions() {
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
         // missing: 0x01 debug exception
-        // missing: 0x02 non-maskable interrupt exception
+        idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         // missing: 0x04 overflow exception
         // missing: 0x05 bound range exceeded exception
@@ -37,6 +37,30 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
     println_unsafe!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
     loop {}
 }
+
+
+
+/// interrupt 0x02
+pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
+    use core::sync::atomic::Ordering;
+    use super::apic;
+
+    // currently we're using NMIs to send TLB shootdown IPIs
+    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
+    if vaddr != 0 {
+        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+        apic::handle_tlb_shootdown_ipi();
+        return;
+    }
+    
+    // if vaddr is 0, then it's a regular NMI    
+    println_unsafe!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
+             stack_frame.instruction_pointer,
+             stack_frame);
+    
+    loop { }
+}
+
 
 /// interrupt 0x03
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
