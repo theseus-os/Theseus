@@ -17,7 +17,8 @@ use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
-use atomic::{Ordering, Atomic};
+use core::sync::atomic::{AtomicUsize, Ordering};
+use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 
@@ -270,8 +271,9 @@ pub fn init_handlers_apic() {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
-        idt[0x20].set_handler_fn(apic_timer_handler);
-        idt[0x21].set_handler_fn(ioapic_keyboard_handler);
+        idt[0x20].set_handler_fn(pit_timer_handler);
+        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x22].set_handler_fn(lapic_timer_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
 
@@ -291,10 +293,9 @@ pub fn init_handlers_pic() {
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
 
         // MASTER PIC starts here (0x20 - 0x27)
-        idt[0x20].set_handler_fn(timer_handler);
+        idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
-        
-        idt[0x22].set_handler_fn(irq_0x22_handler); 
+        // there is no IRQ 0x22        
         idt[0x23].set_handler_fn(irq_0x23_handler); 
         idt[0x24].set_handler_fn(irq_0x24_handler); 
         idt[0x25].set_handler_fn(irq_0x25_handler); 
@@ -313,6 +314,7 @@ pub fn init_handlers_pic() {
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
+        // 0x2F missing right now
     }
 
     // init PIC, PIT and RTC interrupts
@@ -344,33 +346,23 @@ fn eoi(irq: Option<u8>) {
             unsafe { ::x86::shared::msr::wrmsr(0x80b, 0); }
         }
         InterruptChip::PIC => {
-            PIC.try().expect("IRQ 0x20: PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi no arg provided"));
+            PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
         }
     }
 }
 
 
 
-pub static mut APIC_TIMER_TICKS: usize = 0;
-// 0x20
-extern "x86-interrupt" fn apic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    unsafe { 
-        APIC_TIMER_TICKS += 1;
-        // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS);
-    }
-    
-    eoi(None);
-    // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
-    
-    // if let Ok(id) = apic::get_my_apic_id() {
-    //     if id == 0 {
-    //         schedule!();
-    //     }
-    // }
-    schedule!();
+/// 0x20
+extern "x86-interrupt" fn pit_timer_handler(stack_frame: &mut ExceptionStackFrame) {
+    pit_clock::handle_timer_interrupt();
+
+	eoi(Some(0x20));
 }
 
-extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
+
+/// 0x21
+extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
         KEYBOARD.lock().read() 
@@ -379,8 +371,22 @@ extern "x86-interrupt" fn ioapic_keyboard_handler(stack_frame: &mut ExceptionSta
 
     keyboard::handle_keyboard_input(scan_code);	
 
-    eoi(None);
+    eoi(Some(0x21));
 }
+
+
+pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+/// 0x22
+extern "x86-interrupt" fn lapic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
+    let ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
+    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), ticks);
+    
+    eoi(None);
+    // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
+    
+    schedule!();
+}
+
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     info!("APIC SPURIOUS INTERRUPT HANDLER!");
@@ -423,30 +429,6 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut
     eoi(None);
 }
 
-
-
-
-
-// 0x20
-extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
-    pit_clock::handle_timer_interrupt();
-
-	eoi(Some(0x20));
-}
-
-
-// 0x21
-extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
-    // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
-    let scan_code: u8 = { 
-        KEYBOARD.lock().read() 
-    };
-	// trace!("KBD: {:?}", scan_code);
-
-    keyboard::handle_keyboard_input(scan_code);	
-
-    eoi(Some(0x21));
-}
 
 
 pub static mut SPURIOUS_COUNT: u64 = 0;
