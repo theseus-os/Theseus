@@ -38,6 +38,7 @@ You will need to install the following packages:
 If you're on Windows using WSL, you'll need to do the following:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
   * Set an X display, by running `export DISPLAY=:0`. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with `echo "export DISPLAY=:0" >> ~/.bashrc`.
+  * If you get this error: `Could not initialize SDL(No available video device) - exiting`, then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
 
 When you first check out the project, don't forget to checkout all the submodule repositories too:
 `$ git submodule update --init --recursive`
