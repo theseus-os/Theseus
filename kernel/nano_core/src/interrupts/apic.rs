@@ -14,9 +14,9 @@ use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 /// The IRQ number used for IPIs
 pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
 /// The virtual address used for TLB shootdown IPIs
-pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(usize::max_value()); 
+pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(0); 
 /// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize =AtomicUsize::new(usize::max_value()); 
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0); 
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 
@@ -396,22 +396,34 @@ impl LocalApic {
     /// Send an IPI to the cores specified by the given destination
     pub fn send_ipi(&mut self, irq: u8, destination: LapicIpiDestination) {
         const NORMAL_IPI_ICR: u64 = 0x4000;
-
-        let _held_ints = ::irq_safety::hold_interrupts();
         
         let dest = destination.as_icr_value();
         let icr = NORMAL_IPI_ICR | (irq as u64) | dest;
 
         // trace!("send_ipi(): setting icr value to {:#X}", icr);
         self.set_icr(icr);
-
-        // interrupts are released (restored) here when _held_ints is dropped
     }
+
+
+    /// Send a NMI IPI to the cores specified by the given destination
+    pub fn send_nmi_ipi(&mut self, destination: LapicIpiDestination) {
+        const NORMAL_IPI_ICR: u64 = 0x4000;
+        const NMI_DELIVERY_MODE: u64 = 0b100 << 8;
+        
+        let dest = destination.as_icr_value();
+        let icr = NORMAL_IPI_ICR | NMI_DELIVERY_MODE | dest;
+
+        // trace!("send_ipi(): setting icr value to {:#X}", icr);
+        self.set_icr(icr);
+    }
+
 
 
     /// Sends an IPI to all other cores (except me) to trigger 
     /// a TLB flush of the given `VirtualAddress`
     pub fn send_tlb_shootdown_ipi(&mut self, vaddr: VirtualAddress) {
+
+
         // temporary page is not shared across cores
         use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
         const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
@@ -423,30 +435,47 @@ impl LocalApic {
         if core_count <= 1 {
             return; // skip sending IPIs if there are no other cores running
         }
+
+
+        // kernel locks MUST NOT BE HELD when calling this
+        // if let Some(kmmi) = ::memory::get_kernel_mmi_ref() {
+        //     // test to see if the kernel lock can be acquired
+        //     if kmmi.try_lock().is_none() {  
+        //         error!("send_tlb_shootdown_ipi(): KERNEL_MMI lock must not be held when calling this!"); 
+        //         return;
+        //     }
+        // }
+        
         trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
                 get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
-
-        {
-            // acquire lock
-            while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
-                ::arch::pause();
-            }
-
-
-            TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
-            TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core
-            
-            self.send_ipi(TLB_SHOOTDOWN_IPI_IRQ, LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
-
-            // wait for all other cores to handle this IPI
-            // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
-            while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0  { 
-                ::arch::pause();
-            }
         
-            // release lock
-            TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
+        // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
+        // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
+        let _held_ints = ::irq_safety::hold_interrupts(); 
+
+        // acquire lock
+        while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
+            ::arch::pause();
         }
+
+        TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
+        TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core 
+
+        // let's try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling
+        self.send_nmi_ipi(LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
+        // self.send_ipi(TLB_SHOOTDOWN_IPI_IRQ, LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
+
+        // wait for all other cores to handle this IPI
+        // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
+        while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0  { 
+            ::arch::pause();
+        }
+    
+        // clear TLB shootdown data
+        TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(0, Ordering::Release);
+
+        // release lock
+        TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
     }
 
 
@@ -558,7 +587,7 @@ pub fn handle_tlb_shootdown_ipi() {
     let apic_id = get_my_apic_id().unwrap_or(0xFF);
     let vaddr = TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
 
-    trace!("handle_tlb_shootdown_ipi(): flushing vaddr {:#X}", vaddr);
+    trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
 
     use x86_64::instructions::tlb;
     tlb::flush(::x86_64::VirtualAddress(vaddr));

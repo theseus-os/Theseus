@@ -84,7 +84,6 @@ mod start;
 
 
 use spin::RwLockWriteGuard;
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
 use task::{spawn_kthread, spawn_userspace};
 use alloc::string::String;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};

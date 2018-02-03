@@ -138,44 +138,22 @@ pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> 
 /// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
-pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
-       -> Result<(), &'static str> {
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) -> Result<(), &'static str> {
+
+    init_early_exceptions(); // this was probably already done earlier, but it doesn't hurt to make sure
+
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
+    // here, we just need to set up special stacks for exceptions, others have already been set up
     {
         let mut idt = IDT.lock(); // withholds interrupts
-
-        // SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(exceptions::divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        // missing: 0x02 non-maskable interrupt exception
-        idt.breakpoint.set_handler_fn(exceptions::breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(exceptions::invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(exceptions::device_not_available_handler);
         unsafe {
             idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
         }
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(exceptions::segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(exceptions::general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
-        // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
-
+       
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);

@@ -1,6 +1,5 @@
 
-use spin::{Once, RwLock};
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe, RwLockIrqSafeReadGuard};
+use spin::{Once, Mutex, RwLock};
 use alloc::{BTreeMap, Vec};
 use alloc::string::String;
 use alloc::arc::Arc;
@@ -33,25 +32,28 @@ pub fn get_my_current_task_id() -> Option<usize> {
 }
 
 
+/// Used to ensure that context switches are done atomically on each core
+lazy_static! {
+    static ref CONTEXT_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
+}
 
 
-pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
+
+pub fn init(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<Arc<RwLock<Task>>, &'static str> {
+    CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));               
     scheduler::init_runqueue(apic_id);
     init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
                 .map( |t| t.clone())
 }
 
-pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+pub fn init_ap(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>, 
                apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
                -> Result<Arc<RwLock<Task>>, &'static str> {
     init(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
 }
 
-
-/// Used to ensure that context switches are done atomically
-static CONTEXT_SWITCH_LOCK: AtomicBool = ATOMIC_BOOL_INIT;
 
 
 #[repr(u8)] // one byte
@@ -104,8 +106,8 @@ pub struct Task {
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Stack>,
     /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & MutexIrqSafe because it's shared between other tasks in the same address space
-    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
+    /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
+    pub mmi: Option<Arc<Mutex<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
@@ -178,8 +180,18 @@ impl Task {
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8, reenable_interrupts: bool) {
         // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
-        // Set the global lock to avoid the unsafe operations below from causing issues
-        while CONTEXT_SWITCH_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
+        
+        let my_context_switch_lock: &AtomicBool;
+        if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(apic_id) {
+            my_context_switch_lock = csl;
+        } 
+        else {
+            error!("context_switch(): no context switch lock present for AP {}, skipping context switch!", apic_id);
+            return;
+        }
+        
+        // acquire this core's context switch lock
+        while my_context_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) {
             pause();
         }
 
@@ -256,8 +268,8 @@ impl Task {
         // update the current task to `next`
         CURRENT_TASKS.insert(apic_id, next.id); 
 
-        // FIXME: releasing the lock here is a temporary workaround, as there is only one CPU active right now
-        CONTEXT_SWITCH_LOCK.store(false, Ordering::SeqCst);
+        // release this core's context switch lock
+        my_context_switch_lock.store(false, Ordering::SeqCst);
 
 
         // NOTE: if reenable_interrupts == true, interrupts are re-enabled at the end of switch_to()
@@ -314,7 +326,7 @@ pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLock<Task>>> {
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
 /// Returns a reference to the `Task`, protected by a `RwLock`
-pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+pub fn init_idle_task(kernel_mmi_ref: Arc<Mutex<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
                       -> Result<Arc<RwLock<Task>>, &'static str> {
 
@@ -534,7 +546,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 
     assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
     new_task.ustack = ustack;
-    new_task.mmi = Some(Arc::new(MutexIrqSafe::new(new_userspace_mmi)));
+    new_task.mmi = Some(Arc::new(Mutex::new(new_userspace_mmi)));
     new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
     let new_task_id = new_task.id;
 
