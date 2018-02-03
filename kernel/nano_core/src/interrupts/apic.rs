@@ -290,8 +290,8 @@ impl LocalApic {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timerx2() instead.");
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
-        // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
-        self.write_reg(APIC_REG_LVT_TIMER, 0x20 | APIC_TIMER_PERIODIC); // TODO: FIXME: change 0x20, it's the IRQ number we use for timer
+        // map APIC timer to an interrupt handler in the IDT
+        self.write_reg(APIC_REG_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC); 
         self.write_reg(APIC_REG_INIT_COUNT, 0x800000);
 
         // stuff below taken from Tifflin rust-os
@@ -306,8 +306,8 @@ impl LocalApic {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
         debug!("in init_timer_x2 start");
         debug!("in init_timer_x2 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
-        // map APIC timer to an interrupt, here we use 0x20 (IRQ 32)
-        debug!("in init_timer_x2 3");wrmsr(IA32_X2APIC_LVT_TIMER, 0x20 | APIC_TIMER_PERIODIC as u64); // TODO: FIXME: change 0x20, it's the IRQ number we use for timer
+        // map APIC timer to an interrupt
+        debug!("in init_timer_x2 3");wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64);
         debug!("in init_timer_x2 4");wrmsr(IA32_X2APIC_INIT_COUNT, 0x800000);
 
         // stuff below taken from Tifflin rust-os

@@ -172,7 +172,7 @@ fn handle_key_event(keyevent: KeyEvent) {
                 ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
                 rtc::get_rtc_ticks().ok(),
                 unsafe{::interrupts::SPURIOUS_COUNT},
-                unsafe{::interrupts::APIC_TIMER_TICKS});
+                ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
         return; 
     }
 
