@@ -519,16 +519,14 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
 
 /// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module_index(index: usize) -> Result<&'static ModuleArea, &'static str> {
-    let modules = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
-    modules.get(index).ok_or("module index out of range")
+pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
+    MODULE_AREAS.try().and_then(|modules| modules.get(index))
 }
 
 
 /// returns the `ModuleArea` corresponding to the given module name.
-pub fn get_module(name: &str) -> Result<&'static ModuleArea, &'static str> {
-    let modules = try!(MODULE_AREAS.try().ok_or("MODULE_AREAS not initialized"));
-    modules.iter().filter(|&&m| m.name == name).next().ok_or("module not found")
+pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
+    MODULE_AREAS.try().and_then(|modules| modules.iter().filter(|&&m| m.name == name).next())
 }
 
 
