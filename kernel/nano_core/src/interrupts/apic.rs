@@ -304,8 +304,8 @@ impl LocalApic {
 
     pub unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2() instead.");
-        let calibrated_count = self.calibrate_apic_timer(10000); // 10 ms period
-        let apic_period = 0x800000; // calibrated_count
+        let calibrated_count = self.calibrate_apic_timer(40000); // 40 ms period
+        let apic_period = calibrated_count; // old value: 2000000
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
