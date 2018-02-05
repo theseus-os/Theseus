@@ -285,14 +285,33 @@ impl LocalApic {
         info!("x2LAPIC ID {:#x}  is_bsp: {}", self.id(), is_bsp);
     }
 
+    /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
+    unsafe fn calibrate_apic_timer(&mut self, microseconds: u32) -> u32 {
+        assert!(!has_x2apic(), "an x2apic system must not use calibrate_apic_timer(), it should use calibrate_apic_timer_x2() instead.");
+        self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16
+        const initial_count: u32 = 0xFFFF_FFFF;
+        
+        self.write_reg(APIC_REG_INIT_COUNT, initial_count); // set counter to max value
+
+        // wait for PIT for 10ms (a single 100 Hz period)
+        super::pit_clock::pit_wait(microseconds).unwrap(); // 10 ms period
+
+        self.write_reg(APIC_REG_LVT_TIMER, APIC_DISABLE); // stop apic timer
+        let after = self.read_reg(APIC_REG_CURRENT_COUNT);
+        let elapsed = initial_count - after;
+        elapsed
+    }
 
     pub unsafe fn init_timer(&mut self) {
-        assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timerx2() instead.");
+        assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2() instead.");
+        let calibrated_count = self.calibrate_apic_timer(10000); // 10 ms period
+        let apic_period = 0x800000; // calibrated_count
+        trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
         // map APIC timer to an interrupt handler in the IDT
         self.write_reg(APIC_REG_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC); 
-        self.write_reg(APIC_REG_INIT_COUNT, 0x800000);
+        self.write_reg(APIC_REG_INIT_COUNT, apic_period); 
 
         // stuff below taken from Tifflin rust-os
         self.write_reg(APIC_REG_LVT_THERMAL, 0);
