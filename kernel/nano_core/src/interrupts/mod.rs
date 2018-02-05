@@ -367,7 +367,7 @@ extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame
     let scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
-	trace!("APIC KBD (AP {:?}): scan_code {:?}", apic::get_my_apic_id(), scan_code);
+	// trace!("APIC KBD (AP {:?}): scan_code {:?}", apic::get_my_apic_id(), scan_code);
 
     keyboard::handle_keyboard_input(scan_code);	
 

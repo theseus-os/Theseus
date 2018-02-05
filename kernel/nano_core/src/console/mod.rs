@@ -36,7 +36,10 @@ macro_rules! print {
             use core::fmt::Write;
             use alloc::String;
             let mut s: String = String::new();
-            write!(&mut s, $($arg)*).expect("Writing to String in print!() macro failed!");
+            match write!(&mut s, $($arg)*) {
+                Ok(_) => { }
+                Err(e) => panic!("Writing to String in print!() macro failed, error: {}", e),
+            }
             $crate::console::print_to_console(s).unwrap();
     });
 }
@@ -184,7 +187,10 @@ fn handle_key_event(keyevent: KeyEvent) {
     match ascii {
         Some(c) => { 
             // we echo key presses directly to the console without needing to queue an event
-            vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
+            // vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
+            use alloc::string::ToString;
+            vga_buffer::print_string(&c.to_string());
+            // trace!("  {}  ", c);
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
