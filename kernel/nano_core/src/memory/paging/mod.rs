@@ -438,7 +438,7 @@ pub unsafe fn stack_trace() {
     asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
 
     // println_unsafe!("TRACE: {:>016X}", rbp);
-    error!("TRACE: {:>016X}", rbp);
+    error!("STACK TRACE: {:>016X}", rbp);
     //Maximum 64 frames
     let active_table = ActivePageTable::new(get_current_p4());
     for _frame in 0..64 {

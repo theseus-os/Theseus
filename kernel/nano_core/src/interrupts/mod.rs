@@ -14,7 +14,7 @@ use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::input::keyboard;
 use drivers::ata_pio;
-use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
+use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -466,14 +466,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut Exception
 
 
 fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
-    if let Some(ticks) = rtc_ticks {      
-        if (ticks % (CONFIG_TIMESLICE_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
-            schedule!();
-        }
-    }
-    else {
-        error!("RTC interrupt function: unable to get RTC_TICKS system-wide state.")
-    }
+    trace!("rtc_interrupt_func: rtc_ticks = {:?}", rtc_ticks);
 }
 
 // //0x28

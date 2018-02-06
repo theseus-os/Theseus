@@ -5,6 +5,7 @@ use x86::shared::msr::*;
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 use kernel_config::memory::{APIC_START};
+use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use drivers::acpi::madt::{MadtEntry, MadtIter};
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
@@ -304,8 +305,8 @@ impl LocalApic {
 
     pub unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2() instead.");
-        let calibrated_count = self.calibrate_apic_timer(40000); // 40 ms period
-        let apic_period = calibrated_count; // old value: 2000000
+        let calibrated_count = self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
+        let apic_period = calibrated_count;
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
