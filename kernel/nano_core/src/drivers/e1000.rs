@@ -12,6 +12,7 @@ use core::ops::DerefMut;
 use drivers::pci::pci_read_32;
 use drivers::pci::pci_write;
 use drivers::pci::get_pci_device_vd;
+use drivers::pci::pci_set_command_bus_master_bit;
 
 static INTEL_VEND: u16 =        0x8086;  // Vendor ID for Intel 
 static E1000_DEV:  u16 =        0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -108,6 +109,8 @@ const LSTA_TU: u32 =                          (1 << 3);    // Transmit Underrun
 
 const E1000_NUM_RX_DESC: usize =  8;
 const E1000_NUM_TX_DESC: usize = 8;
+const E1000_SIZE_RX_DESC: usize = 256;
+const E1000_SIZE_TX_DESC: usize = 256;
 
 #[repr(C)]
 pub struct e1000_rx_desc {
@@ -249,6 +252,7 @@ impl e1000_nc{
         }
        
         pub fn mem_map (&mut self,ref dev:&PciDevice){
+                pci_set_command_bus_master_bit(dev.bus, dev.slot, dev.func);
                 //debug!("i217_mem_map: {0}, mem_base: {1}, io_basej: {2}", self.bar_type, self.mem_base, self.io_base);
                 //debug!("usize bytes: {}", size_of(usize));
 
@@ -514,11 +518,8 @@ impl e1000_nc{
                         unsafe{
                         //rx_descs[i] = (struct e1000_rx_desc *)((uint8_t *)descs + i*16);
                         let mut var = e1000_rx_desc::default();
-                        //TODO: change to allocate DMA
-                        let x: Box<[u8;8192]> = Box::new([0;8192]);
-                        let ptr = Box::into_raw(x);
-                        let v_addr = ptr as usize;
-                        var.addr = translate_address(v_addr) as u64;
+                                            
+                        var.addr = translate_address(allocate_dma(E1000_SIZE_RX_DESC)) as u64;
                         debug!("packet buffer: {:x}",var.addr);
 
                         var.status = 0;
@@ -545,7 +546,7 @@ impl e1000_nc{
                 self.writeCommand(REG_RXDESCHEAD, 0);//head pointer for reeive descriptor buffer, points to 16B
                 self.writeCommand(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32);//Tail pointer for receive descriptor buffer, point to 16B
                 self.rx_cur = 0;
-                self.writeCommand(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_8192);
+                self.writeCommand(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
 
         }               
         
@@ -567,7 +568,7 @@ impl e1000_nc{
                 {
                         //tx_descs[i] = (struct e1000_tx_desc *)((uint8_t*)descs + i*16);
                         let mut var = e1000_tx_desc::default();
-                        var.addr = translate_address(allocate_dma(256)) as u64;
+                        var.addr = 0;//translate_address(allocate_dma(256)) as u64;
                         var.cmd = 0;
                         var.status = 0 as u8; //(0x1)
                         self.tx_descs.push(var);
@@ -603,7 +604,7 @@ impl e1000_nc{
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 let ptr = translate_address(p_data);
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
-                //self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
+                self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
                 self.tx_descs[self.tx_cur as usize].length = p_len;
                 self.tx_descs[self.tx_cur as usize].cmd = (CMD_EOP | CMD_IFCS | CMD_RPS | CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
                 self.tx_descs[self.tx_cur as usize].status = 0;
@@ -630,11 +631,11 @@ impl e1000_nc{
         }        
         
         // Enable Interrupts 
-        pub fn enableInterrupt(&self) {
+        /*pub fn enableInterrupt(&self) {
                 self.writeCommand(REG_IMASK ,0x1F6DC);
                 self.writeCommand(REG_IMASK ,0xff & !4);
                 self.readCommand(0xc0); //??? flex write to interrupt control pg.266
-        }      
+        }*/      
 
         pub fn checkState(&self){
                 debug!("REG_CTRL {:x}",self.readCommand(REG_CTRL));
@@ -670,10 +671,10 @@ impl e1000_nc{
                 }
                 else return false;
 
-        }                             
+        }*/                             
         
         // This method should be called by the interrupt handler
-        pub fn fire (InterruptContext * p_interruptContext) {
+       /* pub fn fire (InterruptContext * p_interruptContext) {
                 if ( p_interruptContext->getInteruptNumber() == pciConfigHeader->getIntLine()+IRQ0)
                 {        
                         uint32_t status = readCommand(0xc0);
@@ -713,14 +714,7 @@ impl e1000_nc{
                         writeCommand(REG_RXDESCTAIL, old_cur );
                 }
 
-        }    
-        
-        // Returns the MAC address
-        pub fn getMacAddress () -> *u8 {
-        
-        }                         
-        
-          */     
+        }  */                              
 
 }
 //static mut i217_nc: e1000_nc;
