@@ -50,7 +50,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
         e1000_nc.startLink();
 
         e1000_nc.clearMulticast();
-
+        //register interrupts
         //e1000_nc.enableInterrupt();
 
         e1000_nc.rxinit();
@@ -62,9 +62,9 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
         
 
         //create a message
-        //let a: usize = 0x0000_ffff_0000_ffff_0000_ffff_0000_ffff;
-        let a :[usize;8] = [0;8];
-        let length :u16 = 64;
+        let a: usize = 0x0000_ffff_4444_3333_2222_1111_2222_ffff;
+        //let a :[usize;1] = [15;1];
+        let length :u16 = 6;
         let add = &a as *const usize;
         let add1 = add as usize;
         e1000_nc.sendPacket(add1, length);
