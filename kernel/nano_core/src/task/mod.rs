@@ -5,9 +5,10 @@ use alloc::{BTreeMap, Vec};
 use alloc::string::String;
 use alloc::arc::Arc;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
-use arch::{pause, ArchTaskState};
+use arch::{pause, Context};
 use alloc::boxed::Box;
 use core::fmt;
+use core::mem;
 use core::ops::DerefMut;
 use memory::{get_kernel_mmi_ref, Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
@@ -91,15 +92,15 @@ impl<A, R> KthreadCall<A, R> {
 
 
 pub struct Task {
-    /// the unique id of this Task, similar to Linux's pid.
+    /// the unique id of this Task.
     pub id: usize,
     /// which cpu core the Task is currently running on.
     /// negative if not currently running.
     pub running_on_cpu: isize,
     /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
-    /// architecture-specific task state, e.g., registers.
-    pub arch_state: ArchTaskState,
+    /// the saved stack pointer value, used for context switching.
+    pub saved_sp: usize,
     /// the simple name of this Task
     pub name: String,
     /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
@@ -135,7 +136,7 @@ impl Task {
             id: task_id,
             runstate: RunState::INITING,
             running_on_cpu: -1, // not running on any cpu
-            arch_state: ArchTaskState::new(),
+            saved_sp: 0,
             name: format!("task{}", task_id),
             kstack: None,
             ustack: None,
@@ -179,7 +180,7 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8, reenable_interrupts: bool) {
+    pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8) {
         // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         
         let my_context_switch_lock: &AtomicBool;
@@ -272,15 +273,14 @@ impl Task {
         // release this core's context switch lock
         my_context_switch_lock.store(false, Ordering::SeqCst);
 
-
-        // NOTE: if reenable_interrupts == true, interrupts are re-enabled at the end of switch_to()
         unsafe {
-            if reenable_interrupts {
-                self.arch_state.switch_to_reenable_interrupts(&next.arch_state);
+            extern {
+                /// This is defined in boot.asm
+                fn task_switch(ptr_to_prev_sp: *mut usize, next_sp_value: usize);
             }
-            else {
-                self.arch_state.switch_to(&next.arch_state);
-            }
+
+            // debug!("context_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
+            task_switch(&mut self.saved_sp as *mut usize, next.saved_sp);
         }
 
     }
@@ -377,12 +377,14 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
         try!(mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("spawn_kthread: couldn't allocate kernel stack!"))
     };
 
-    // When this new task is scheduled in, the first spot on the kstack will be popped as the next instruction pointer
-    // as such, putting a function pointer on the top of the kstack will cause it to be invoked.
-    let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
-    unsafe { 
-        *(func_ptr as *mut usize) = kthread_wrapper::<A, R> as usize;
-        debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, kthread_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, kthread_wrapper::<A, R> as usize);
+    // When this new task is scheduled in, a `Context` struct be popped off the stack,
+    // and then at the end of that struct is the next instruction that will be popped off as part of the "ret" instruction. 
+    // So we need to allocate space for the saved context registers to be popped off when this task is switch to.
+    let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
+    unsafe {
+        *new_context_ptr = Context::new(kthread_wrapper::<A, R> as usize);
+        new_task.saved_sp = new_context_ptr as usize; 
+        debug!("spawn_kthread(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
     }
 
     // set up the kthread stuff
@@ -399,7 +401,6 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
     }
 
 
-    new_task.arch_state.set_stack(func_ptr); // the top of the kstack
     new_task.kstack = Some(kstack);
     new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
 
@@ -441,15 +442,17 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
         
         // create a new kernel stack for this userspace task
         let kstack: Stack = kernel_mmi_locked.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
-        // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
-        let func_ptr: usize = kstack.top_usable(); // the top-most usable address on the kstack
-        unsafe { 
-            *(func_ptr as *mut usize) = userspace_wrapper as usize;
-            debug!("checking func_ptr: func_ptr={:#x} *func_ptr={:#x}, userspace_wrapper={:#x}", func_ptr as usize, *(func_ptr as *const usize) as usize, userspace_wrapper as usize);
+        // allocate space for the saved context registers to be popped off when this task is switch to.
+        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
+        unsafe {
+            // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
+            *new_context_ptr = Context::new(userspace_wrapper as usize);
+            new_task.saved_sp = new_context_ptr as usize; 
+            debug!("spawn_userspace(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
         }
+    
         new_task.kstack = Some(kstack);
-        new_task.arch_state.set_stack(func_ptr); // the top of the kstack
-        // unlike kthread_spawn, we don't need any arguments at the bottom of the stack,
+        // unlike kthread_spawn, we don't need to place any arguments at the bottom of the stack,
         // because we can just utilize the task's userspace entry point member
 
 
@@ -458,7 +461,6 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
             page_table: ref mut kernel_page_table, 
             ..  // don't need to access the kernel's VMA list or stack allocator, we already allocated a kstack above
         } = *kernel_mmi_locked;
-
         
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
@@ -625,7 +627,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
     trace!("attempting to unschedule kthread... interrupts {}", ::interrupts::interrupts_enabled());
-    yield_task!();
+    schedule!();
 
     // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")
@@ -657,7 +659,7 @@ fn userspace_wrapper() -> ! {
     // SAFE: current_task is checked for null
     unsafe {
         let curr: &mut Task = &mut (*current_task); // dereference current_task and get a ref to it
-        curr.arch_state.jump_to_userspace(ustack_top, entry_func);
+        ::arch::jump_to_userspace(ustack_top, entry_func);
     }
 
 

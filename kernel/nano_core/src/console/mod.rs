@@ -113,7 +113,7 @@ pub fn init() -> DFQueueProducer<ConsoleEvent> {
         console_consumer.obtain_producer()
     });
 
-    print_to_console("Console says hello!");
+    print_to_console("Console says hello!\n");
     
     spawn_kthread(main_loop, console_consumer, "console_loop");
     returned_producer

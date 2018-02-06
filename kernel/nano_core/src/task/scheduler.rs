@@ -14,7 +14,7 @@ use super::{Task, get_my_current_task};
 /// beyond the duration of their task locks and the singular task_list lock.
 ///
 /// Interrupts MUST be disabled before this function runs. 
-pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
+pub unsafe fn schedule() -> bool {
     assert!(::interrupts::interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
@@ -60,7 +60,7 @@ pub unsafe fn schedule(reenable_interrupts: bool) -> bool {
 
     // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 
-    curr.context_switch(next, apic_id, reenable_interrupts); 
+    curr.context_switch(next, apic_id); 
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
@@ -79,33 +79,11 @@ macro_rules! schedule {
         {
             unsafe {
                 $crate::interrupts::disable_interrupts();
-                $crate::task::scheduler::schedule(false);
-                // interrupts are enabled at the end of switch_to() anyway
-                // $crate::interrupts::enable_interrupts();
+                $crate::task::scheduler::schedule();
             }
         }
     )
 }
-
-
-/// invokes the scheduler to pick a new task, but first disables interrupts. 
-/// DO NOT CALL THIS FROM WITHIN AN INTERRUPT HANDLER! Interrupts will be automatically re-enabled after scheduling.
-/// This iff condition allows us to perform a context switch directly to another task, if we wish... which we never do as of now.
-/// The current thread may be picked again, it doesn't affect the current thread's runnability.
-#[macro_export]
-macro_rules! yield_task {
-    () => (    
-        {
-            unsafe {
-                $crate::interrupts::disable_interrupts();
-                $crate::task::scheduler::schedule(true);
-                // interrupts are enabled at the end of switch_to() anyway
-                // $crate::interrupts::enable_interrupts();
-            }
-        }
-    )
-}
-
 
 
 
