@@ -9,7 +9,7 @@ pub const CONFIG_PIT_FREQUENCY_HZ: u32 = 1000;
 pub const CONFIG_RTC_FREQUENCY_HZ: usize = 128;
 
 /// The timeslice period, specified in microseconds.
-pub const CONFIG_TIMESLICE_PERIOD_MICROSECONDS: u32 = 10000; // 10ms
+pub const CONFIG_TIMESLICE_PERIOD_MICROSECONDS: u32 = 8000; // 8ms
 
 /// the heartbeat period in milliseconds
 pub const CONFIG_HEARTBEAT_PERIOD_MS: usize = 10000;
