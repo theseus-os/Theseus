@@ -182,12 +182,14 @@ pub struct PciDevice {
     pub header_type: u8,
     pub bist: u8,
     pub bars: [u32; 6],
+    pub int_pin: u8,
+    pub int_line: u8,
 }
 
 impl fmt::Display for PciDevice { 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bars: {:?}", 
-            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bars)
+        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bars: {:?}, int_pin: {:#x}, int_line: {:X}", 
+            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bars, self.int_pin, self.int_line)
     }
 }
 
@@ -237,6 +239,8 @@ fn scan_pci() -> Vec<PciBus> {
                                         pci_read_32(bus, slot, f, PCI_BAR4), 
                                         pci_read_32(bus, slot, f, PCI_BAR5), 
                                         ],
+                    int_pin:            pci_read_8(bus, slot, f, PCI_INTERRUPT_PIN),
+                    int_line:           pci_read_8(bus, slot, f, PCI_INTERRUPT_LINE),
                 };
 
 

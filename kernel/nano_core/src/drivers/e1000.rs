@@ -546,7 +546,9 @@ impl e1000_nc{
                 self.writeCommand(REG_RXDESCHEAD, 0);//head pointer for reeive descriptor buffer, points to 16B
                 self.writeCommand(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32);//Tail pointer for receive descriptor buffer, point to 16B
                 self.rx_cur = 0;
-                self.writeCommand(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
+                self.writeCommand(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
+                //self.writeCommand(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
+
 
         }               
         
@@ -634,7 +636,7 @@ impl e1000_nc{
         /*pub fn enableInterrupt(&self) {
                 self.writeCommand(REG_IMASK ,0x1F6DC);
                 self.writeCommand(REG_IMASK ,0xff & !4);
-                self.readCommand(0xc0); //??? flex write to interrupt control pg.266
+                self.readCommand(0xc0); // clear all interrupts
         }*/      
 
         pub fn checkState(&self){
@@ -714,7 +716,28 @@ impl e1000_nc{
                         writeCommand(REG_RXDESCTAIL, old_cur );
                 }
 
-        }  */                              
+        }  */ 
+
+        pub fn get_mac (&self, mac_low: &mut u16, mac_next: &mut u16, mac_high: &mut u16){
+                //let mac_32_low = self.readCommand(0x5400);
+                //let mac_32_high = self.readCommand(0x5404);
+                //debug!("get mac low: {:x} high: {:x}", mac_32_low,mac_32_high);
+                *mac_low = self.mac[0] as u16 + ((self.mac[1] as u16) << 8);
+                *mac_next = self.mac[2] as u16 + ((self.mac[3] as u16) << 8);
+                *mac_high = self.mac[4] as u16 + ((self.mac[5] as u16) << 8);
+        } 
+
+        pub fn get_mac_mem (&self){
+                let mac_32_low = self.readCommand(0x5400);
+                let mac_32_high = self.readCommand(0x5404);
+                debug!("get mac low: {:x} high: {:x}", mac_32_low,mac_32_high);
+        }
+
+        pub fn poll_rx(&self){
+                while(self.rx_descs[self.rx_cur as usize].status&0xF) ==0{
+                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
+                }
+        }                            
 
 }
 //static mut i217_nc: e1000_nc;
