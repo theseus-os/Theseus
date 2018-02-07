@@ -58,8 +58,12 @@ QEMU_FLAGS += -cpu Broadwell
 QEMU_FLAGS += -smp 4
 
 ## basic networking with a standard e1000 ethernet card
-QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1 
-# QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.dat
+#QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1,mac=11:22:33:44:55:66 
+#QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.pcap
+
+#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:22:33:44:55:66 -net dump,file=netdump.pcap
+QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
+#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
 
 #drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
