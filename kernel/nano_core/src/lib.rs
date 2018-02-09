@@ -449,11 +449,16 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
     loop {}
 }
 
+/// This function isn't used since our Theseus target.json file
+/// chooses panic=abort (as does our build process), 
+/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
 #[allow(non_snake_case)]
+#[lang = "eh_unwind_resume"]
 #[no_mangle]
-pub extern "C" fn _Unwind_Resume() -> ! {
-    error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
+pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
+    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    println_unsafe!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    trace!("hey");
     loop {}
 }
 
