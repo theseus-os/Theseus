@@ -17,21 +17,36 @@ struct Chunk {
 	size_in_pages: usize,
 }
 impl Chunk {
-	fn as_owned_pages(&self) -> OwnedContiguousPages {
-		OwnedContiguousPages {
-			start: self.start_page,
-			num_pages: self.size_in_pages,
+	fn as_owned_pages(&self) -> OwnedPages {
+		// subtract one because it's an inclusive range
+		let end_page = self.start_page + self.size_in_pages - 1;
+		OwnedPages {
+			pages: Page::range_inclusive(self.start_page, end_page),							
 		}
 	}
 }
 
 
 #[derive(Debug)]
-pub struct OwnedContiguousPages {
-	pub start: Page,
-	pub num_pages: usize,
+pub struct OwnedPages {
+	pub pages: PageIter,
 }
-impl Drop for OwnedContiguousPages {
+
+impl OwnedPages {
+	pub fn start_address(&self) -> VirtualAddress {
+		self.pages.start_address()
+	}
+}
+// use core::ops::Deref;
+// impl Deref for OwnedPages {
+//     type Target = PageIter;
+
+//     fn deref(&self) -> &PageIter {
+//         &self.pages
+//     }
+// }
+
+impl Drop for OwnedPages {
     #[inline]
     fn drop(&mut self) {
         deallocate_pages(self);
@@ -60,7 +75,7 @@ lazy_static!{
 /// Convenience function for allocating pages by giving the number of bytes
 /// rather than the number of pages. It will still allocated whole pages
 /// by rounding up the number of bytes. 
-pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedContiguousPages, &'static str> {
+pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedPages, &'static str> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
 }
@@ -71,7 +86,7 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedContiguousPages,
 /// Allocation is quick, technically O(n) but generally will allocate immediately
 /// because the largest free chunks are stored at the front of the list.
 /// Fragmentation isn't cleaned up until we're out of address space, but not really a big deal.
-pub fn allocate_pages(num_pages: usize) -> Result<OwnedContiguousPages, &'static str> {
+pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 
 	if num_pages == 0 {
 		return Err("requested to allocate 0 pages...");
@@ -126,7 +141,7 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedContiguousPages, &'static
 }
 
 
-fn deallocate_pages(_pages: &mut OwnedContiguousPages) -> Result<(), ()> {
+fn deallocate_pages(_pages: &mut OwnedPages) -> Result<(), ()> {
 	warn!("deallocated_pages: trying to dealloc: {:?}", _pages);
 	Err(())
 	// unimplemented!();
