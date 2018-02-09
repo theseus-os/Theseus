@@ -459,10 +459,20 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[allow(non_snake_case)]
 #[lang = "eh_unwind_resume"]
 #[no_mangle]
+#[cfg(all(target_os = "windows", target_env = "gnu"))]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
     println_unsafe!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    trace!("hey");
+    loop {}
+}
+
+
+#[allow(non_snake_case)]
+#[no_mangle]
+#[cfg(not(target_os = "windows"))]
+pub extern "C" fn _Unwind_Resume() -> ! {
+    error!("\n\nin _Unwind_Resume, unimplemented!");
+    println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 

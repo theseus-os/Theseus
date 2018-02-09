@@ -3,8 +3,7 @@ use spin::{Mutex, MutexGuard, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
-use kernel_config::memory::{APIC_START};
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags, OwnedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use drivers::acpi::madt::{MadtEntry, MadtIter};
@@ -27,8 +26,8 @@ lazy_static! {
     static ref LOCAL_APICS: AtomicMap<u8, LocalApic> = AtomicMap::new();
 }
 
-/// The VirtualAddress where the APIC chip has been mapped.
-static APIC_VIRT_ADDR: Once<VirtualAddress> = Once::new();
+/// The Page where the APIC chip has been mapped.
+static APIC_PAGE: Once<OwnedPages> = Once::new();
 
 /// The processor id (from the ACPI MADT table) of the bootstrap processor
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
@@ -60,19 +59,24 @@ pub fn get_lapics() -> &'static AtomicMap<u8, LocalApic> {
 }
 
 
-/// Returns the APIC ID of the currently executing processor core
+/// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
     let raw = if has_x2apic() {
         unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
     } else {
-        match APIC_VIRT_ADDR.try() {
-            Some(apic_start) => unsafe { read_volatile((apic_start + APIC_REG_LAPIC_ID as usize) as *const u32) },
+        match APIC_PAGE.try() {
+            Some(apic_page) => unsafe { read_volatile((apic_page.start_address() + APIC_REG_LAPIC_ID as usize) as *const u32) },
             None => {
                 return None;
             }
         }
     };
     Some((raw >> 24) as u8)
+}
+
+/// Returns a reference to the LocalApic for the currently executing processsor core.
+pub fn get_my_apic() -> Option<&'static LocalApic> {
+    get_my_apic_id().and_then(|id| LOCAL_APICS.get(id))
 }
 
 
@@ -104,7 +108,7 @@ impl LapicIpiDestination {
 
 /// initially maps the base APIC MMIO register frames so that we can know which LAPIC (processor core) we are,
 /// and because it only needs to be done once -- not every time we bring up a new AP core
-pub fn init(active_table: &mut ActivePageTable) {
+pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     assert_has_not_been_called!("Error: tried to call apic::init() more than once!");
 
     let x2 = has_x2apic();
@@ -113,15 +117,15 @@ pub fn init(active_table: &mut ActivePageTable) {
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
     // x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
     // writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
-    let virt_addr = APIC_START as VirtualAddress;
-    if !has_x2apic() {
-        let page = Page::containing_address(virt_addr);
+    let apic_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
+    if !has_x2apic() {;
         let frame = Frame::containing_address(phys_addr as PhysicalAddress);
         let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-        active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+        active_table.map_to(apic_page.pages.start, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
     }
 
-    APIC_VIRT_ADDR.call_once( || virt_addr);
+    APIC_PAGE.call_once( || apic_page);
+    Ok(())
 }
 
 pub const APIC_SPURIOUS_INTERRUPT_VECTOR: u32 = 0xFF; // as recommended by everyone on os dev wiki
@@ -181,7 +185,7 @@ impl LocalApic {
 		
         assert!(flags == 1, "LocalApic::create() processor was disabled! (flags != 1)");
 		let mut lapic = LocalApic {
-			virt_addr: APIC_START as VirtualAddress,
+			virt_addr: APIC_PAGE.try().expect("LocalApic::new(): APIC_PAGE wasn't initialized, you must call apic::init() first!").start_address(),
             // redox bitmasked the base paddr with 0xFFFF_0000, os dev wiki says 0xFFFF_F000 ...
             // seems like 0xFFFF_F000 is more correct since it just frame/page-aligns the address
             phys_addr: ( unsafe { rdmsr(IA32_APIC_BASE) } as usize & 0xFFFF_F000) as PhysicalAddress,
@@ -364,7 +368,7 @@ impl LocalApic {
         read_volatile((self.virt_addr + reg as usize) as *const u32)
     }
 
-    unsafe fn write_reg(&mut self, reg: u32, value: u32) {
+    unsafe fn write_reg(&self, reg: u32, value: u32) {
         assert!(!has_x2apic(), "an x2apic system must not use the MMIO read/write_reg() functions.");
         write_volatile((self.virt_addr + reg as usize) as *mut u32, value);
     }
@@ -499,7 +503,7 @@ impl LocalApic {
     }
 
 
-    pub fn eoi(&mut self) {
+    pub fn eoi(&self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
         unsafe {
             if has_x2apic() {
@@ -540,7 +544,7 @@ impl LocalApic {
     }
 
 
-    pub fn get_isr(&mut self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    pub fn get_isr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
         unsafe {
             if has_x2apic() {
                 ( 
@@ -570,7 +574,7 @@ impl LocalApic {
     }
 
 
-    pub fn get_irr(&mut self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    pub fn get_irr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
         unsafe {
             if has_x2apic() {
                 ( 

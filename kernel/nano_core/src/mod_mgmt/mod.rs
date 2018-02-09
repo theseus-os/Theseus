@@ -10,9 +10,8 @@ use spin::Mutex;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
-use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
-use memory::virtual_address_allocator::OwnedPages;
-use kernel_config::memory::{PAGE_SIZE, BYTES_PER_ADDR};
+use memory::{VirtualMemoryArea, VirtualAddress, OwnedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+use kernel_config::memory::BYTES_PER_ADDR;
 use goblin::elf::reloc::*;
 
 
@@ -235,8 +234,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                                                  Result<OwnedPages, &'static str>, 
                                                  Result<OwnedPages, &'static str>) = {
         let mut allocate_pages_closure = |size_in_bytes: usize| {
-            use memory::virtual_address_allocator::allocate_pages_by_bytes;
-            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes));
+            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
             use memory::FRAME_ALLOCATOR;
             let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
 

@@ -27,12 +27,21 @@ impl Chunk {
 }
 
 
+/// Rpresents an allocated range of virtual addresses, specified in pages. 
+/// These pages are not mapped to any physical memory frames, you must do that separately.
+/// This object represents ownership of those pages; if this object falls out of scope,
+/// it will be dropped, and the pages will be unmapped and de-allocated. 
+/// Thus, it ensures memory safety by guaranteeing that this object must be held 
+/// in order to access data stored in these mapped pages, 
+/// just like a MutexGuard guarantees that data protected by a Mutex can only be accessed
+/// while that Mutex's lock is held. 
 #[derive(Debug)]
 pub struct OwnedPages {
 	pub pages: PageIter,
 }
 
 impl OwnedPages {
+	/// Returns the start address of the first page. 
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
@@ -75,21 +84,24 @@ lazy_static!{
 /// Convenience function for allocating pages by giving the number of bytes
 /// rather than the number of pages. It will still allocated whole pages
 /// by rounding up the number of bytes. 
-pub fn allocate_pages_by_bytes(num_bytes: usize) -> Result<OwnedPages, &'static str> {
+/// See [allocate_pages]](allocate_pages)
+pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<OwnedPages> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
 }
 
 
-/// Allocates the given number of pages:  just reserves the virtual addresses,
-/// has nothing to do with allocating actual frames of memory.
+/// Allocates the given number of pages, but simply reserves the virtual addresses; 
+/// it does not allocate actual physical memory frames nor do any mapping. 
+/// Thus these pages aren't directly usable until they are mapped to physical frames. 
 /// Allocation is quick, technically O(n) but generally will allocate immediately
 /// because the largest free chunks are stored at the front of the list.
 /// Fragmentation isn't cleaned up until we're out of address space, but not really a big deal.
-pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
+pub fn allocate_pages(num_pages: usize) -> Option<OwnedPages> {
 
 	if num_pages == 0 {
-		return Err("requested to allocate 0 pages...");
+		error!("allocate_pages(): requested an allocation of 0 pages... stupid!");
+		return None;
 	}
 
 	// the Page where the newly-allocated Chunk starts, which we'll return if successfully allocated.
@@ -109,7 +121,7 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 			if remaining_size == 0 {
 				// if the chunk is exactly the right size, just update it in-place as 'allocated'
 				c.allocated = true;
-				return Ok(c.as_owned_pages())
+				return Some(c.as_owned_pages())
 			}
 
 			// here: we have the chunk and we need to split it up into two chunks
@@ -133,16 +145,17 @@ pub fn allocate_pages(num_pages: usize) -> Result<OwnedPages, &'static str> {
 		};
 		let ret = new_chunk.as_owned_pages();
 		locked_list.push_back(new_chunk);
-		Ok(ret)
+		Some(ret)
 	}
 	else {
-		Err("VirtualAddressAllocator: out of virtual address space.")
+		error!("VirtualAddressAllocator: out of virtual address space."); 
+		return None;
 	}
 }
 
 
 fn deallocate_pages(_pages: &mut OwnedPages) -> Result<(), ()> {
-	warn!("deallocated_pages: trying to dealloc: {:?}", _pages);
+	warn!("Virtual Address Allocator: deallocated_pages is not yet implemented, trying to dealloc: {:?}", _pages);
 	Err(())
 	// unimplemented!();
 }
