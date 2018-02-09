@@ -338,12 +338,9 @@ pub fn init_handlers_pic() {
 /// irq arg is only used for PIC
 fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
-        InterruptChip::APIC => {
-            // quick fix for lockless apic eoi
-            unsafe { ::core::ptr::write_volatile((::kernel_config::memory::APIC_START + 0xB0 as usize) as *mut u32, 0); }
-        }
+        InterruptChip::APIC |
         InterruptChip::x2apic => {
-            unsafe { ::x86::shared::msr::wrmsr(0x80b, 0); }
+            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").eoi();
         }
         InterruptChip::PIC => {
             PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
@@ -396,35 +393,18 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
-    // let all_lapics = apic::get_lapics();
-    // let mut local_apic = all_lapics.get_mut(&0).expect("apic_spurious_interrupt_handler(): local_apic wasn't yet inited!");
-    // let isr = local_apic.get_isr();
-    // let irr = local_apic.get_irr();
-    use kernel_config::memory::APIC_START;
-    use core::ptr::read_volatile;
-    unsafe {
-        println_unsafe!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
-            // ISR
-            read_volatile((APIC_START + 0x100) as *const u32),
-            read_volatile((APIC_START + 0x110) as *const u32),
-            read_volatile((APIC_START + 0x120) as *const u32),
-            read_volatile((APIC_START + 0x130) as *const u32),
-            read_volatile((APIC_START + 0x140) as *const u32),
-            read_volatile((APIC_START + 0x150) as *const u32),
-            read_volatile((APIC_START + 0x160) as *const u32),
-            read_volatile((APIC_START + 0x170) as *const u32),
-            // IRR
-            read_volatile((APIC_START + 0x200) as *const u32),
-            read_volatile((APIC_START + 0x210) as *const u32),
-            read_volatile((APIC_START + 0x220) as *const u32),
-            read_volatile((APIC_START + 0x230) as *const u32),
-            read_volatile((APIC_START + 0x240) as *const u32),
-            read_volatile((APIC_START + 0x250) as *const u32),
-            read_volatile((APIC_START + 0x260) as *const u32),
-            read_volatile((APIC_START + 0x270) as *const u32)
-        );
 
+    if let Some(lapic) = apic::get_my_apic() {
+        let isr = lapic.get_isr(); 
+        let irr = lapic.get_irr();
+        println_unsafe!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
+                         isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7, irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);
     }
+    else {
+        println_unsafe!("apic_unimplemented_interrupt_handler: couldn't get my apic.");
+    }
+
+    loop { }
 
     eoi(None);
 }

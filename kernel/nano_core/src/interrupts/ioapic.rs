@@ -3,8 +3,7 @@ use spin::{Mutex, MutexGuard, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
-use kernel_config::memory::{IOAPIC_START, KERNEL_OFFSET};
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags, allocate_pages, OwnedPages};
 
 static IOAPIC: Once<Mutex<IoApic>> = Once::new();
 
@@ -26,7 +25,7 @@ pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
 /// An IoApic 
 #[derive(Debug)]
 pub struct IoApic {
-    pub virt_addr: VirtualAddress,
+    pub page: OwnedPages,
     pub id: u8,
     phys_addr: PhysicalAddress,
     gsi_base: u32,
@@ -35,7 +34,7 @@ pub struct IoApic {
 impl IoApic {
     fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> IoApic {
 		let mut ioapic = IoApic {
-			virt_addr: IOAPIC_START as VirtualAddress,
+			page: allocate_pages(1).expect("IoApic::create(): couldn't allocated virtual page!"),
 			id: id,
             phys_addr: phys_addr,
             gsi_base: gsi_base,
@@ -44,7 +43,7 @@ impl IoApic {
 		debug!("Creating new IoApic: {:?}", ioapic); 
 
         {
-            let page = Page::containing_address(ioapic.virt_addr);
+            let page = ioapic.page.pages.start;
             let frame = Frame::containing_address(ioapic.phys_addr);
 			let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
             active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
@@ -58,15 +57,15 @@ impl IoApic {
     unsafe fn read_reg(&self, reg: u32) -> u32 {
         // to read from an IoApic reg, we first write which register we want to read from,
         // then we read the value from it in the next register
-        write_volatile((self.virt_addr + 0x0) as *mut u32, reg);
-        read_volatile((self.virt_addr + 0x10) as *const u32)
+        write_volatile((self.page.start_address() + 0x0) as *mut u32, reg);
+        read_volatile((self.page.start_address() + 0x10) as *const u32)
     }
 
     unsafe fn write_reg(&mut self, reg: u32, value: u32) {
         // to write to an IoApic reg, we first write which register we want to write to,
         // then we write the value to it in the next register
-        write_volatile((self.virt_addr + 0x0) as *mut u32, reg);
-        write_volatile((self.virt_addr + 0x10) as *mut u32, value);
+        write_volatile((self.page.start_address() + 0x0) as *mut u32, reg);
+        write_volatile((self.page.start_address() + 0x10) as *mut u32, value);
     }
 
     /// I/O APIC id.

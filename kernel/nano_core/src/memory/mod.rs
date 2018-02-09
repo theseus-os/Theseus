@@ -14,8 +14,9 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
-pub mod virtual_address_allocator;
+mod virtual_address_allocator;
 
+pub use self::virtual_address_allocator::{allocate_pages, allocate_pages_by_bytes, OwnedPages};
 
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
@@ -73,14 +74,6 @@ pub struct MemoryManagementInfo {
 
 impl MemoryManagementInfo {
 
-    // pub fn new(stack_allocator: stack_allocator::StackAllocator) -> Self {
-    //     MemoryManagementInfo {
-    //         page_table: PageTable::Uninitialized,
-    //         vmas: Vec::new(),
-    //         stack_allocator: stack_allocator,
-    //     }
-    // }
-
     pub fn set_page_table(&mut self, pgtbl: PageTable) {
         self.page_table = pgtbl;
     }
@@ -115,8 +108,6 @@ impl MemoryManagementInfo {
         }
     }
 }
-
-
 
 
 /// An area of physical memory. 

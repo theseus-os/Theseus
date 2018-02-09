@@ -63,16 +63,11 @@ pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
 
 /// The virtual address where the initial kernel (the nano_core) is mapped to.
 /// Actual value: 0xFFFFFFFF80000000.
-/// i.e., the linear offset between physical memory and kernel memory
-/// so the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
+/// i.e., the linear offset between physical memory and kernel memory.
+/// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
 /// This is -2GiB from the end of the 64-bit address space.
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
-
-/// Typically starts at base physical address 0xFEE0_0000
-pub const APIC_START: usize = 0xFFFF_FFFF_0000_0000 + 0xFEE0_0000; 
-/// Typically starts at base physical address 0xFEC0_0000
-pub const IOAPIC_START: usize = 0xFFFF_FFFF_0000_0000 + 0xFEC0_0000;
 
 
 /// The kernel text region is where we load kernel modules. 

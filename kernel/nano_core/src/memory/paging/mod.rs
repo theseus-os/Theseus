@@ -130,8 +130,8 @@ impl SubAssign<usize> for Page {
 /// from `start` to `end`, both inclusive.
 #[derive(Debug)]
 pub struct PageIter {
-    start: Page,
-    end: Page,
+    pub start: Page,
+    pub end: Page,
 }
 
 impl PageIter {

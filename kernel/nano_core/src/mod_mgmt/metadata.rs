@@ -1,8 +1,7 @@
 use spin::Mutex;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
-use memory::VirtualAddress;
-use memory::virtual_address_allocator::OwnedPages;
+use memory::{VirtualAddress, OwnedPages};
 
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
