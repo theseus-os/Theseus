@@ -98,6 +98,16 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
+    /// maps the given Page to a randomly selected (newly allocated) Frame
+    pub fn map_pages<A>(&mut self, page_range: PageIter, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        for page in page_range {
+            self.map(page, flags, allocator);
+        }
+    }
+
+
     /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
     /// `size_in_bytes` specifies the length in bytes of the mapping. 
     pub fn map_frames<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
@@ -123,14 +133,6 @@ impl Mapper {
             }
             self.map_to(page, frame, flags, allocator);
         }
-    }
-
-    /// maps the Page containing the given virtual address to the given Frame
-    pub fn map_virtual_address<A>(&mut self, virt_addr: VirtualAddress, frame: Frame, flags: EntryFlags, allocator: &mut A)
-        where A: FrameAllocator
-    {
-        let page: Page = Page::containing_address(virt_addr);
-        self.map_to(page, frame, flags, allocator)
     }
 
     /// maps the given frame's physical address to the same virtual address

@@ -11,7 +11,7 @@ use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
-use memory::virtual_address_allocator::OwnedContiguousPages;
+use memory::virtual_address_allocator::OwnedPages;
 use kernel_config::memory::{PAGE_SIZE, BYTES_PER_ADDR};
 use goblin::elf::reloc::*;
 
@@ -230,22 +230,21 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     };
 
     // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<OwnedContiguousPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Result<OwnedContiguousPages, &'static str>,
-                                                 Result<OwnedContiguousPages, &'static str>, 
-                                                 Result<OwnedContiguousPages, &'static str>) = {
+    // and map them to random frames as writable, returns Result<OwnedPages, &'static str>
+    let (text_pages, rodata_pages, data_pages): (Result<OwnedPages, &'static str>,
+                                                 Result<OwnedPages, &'static str>, 
+                                                 Result<OwnedPages, &'static str>) = {
         let mut allocate_pages_closure = |size_in_bytes: usize| {
             use memory::virtual_address_allocator::allocate_pages_by_bytes;
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes));
             use memory::FRAME_ALLOCATOR;
             let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
 
-            // right now we're just simply copying small sections to the new memory
-            // so we have to map those pages to real (randomly chosen) frames first
-            for p in 0..allocated_pages.num_pages {
-                // because we're copying bytes to the newly allocated pages, we need to make them writaable too
-                active_table.map(allocated_pages.start + p, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut());
-            }
+            // Right now we're just simply copying small sections to the new memory,
+            // so we have to map those pages to real (randomly chosen) frames first. 
+            // because we're copying bytes to the newly allocated pages, we need to make them writeable too, 
+            // and then change the page permissions (by using remap) later. 
+            active_table.map_pages(allocated_pages.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut());
             Ok(allocated_pages)
         };
 
@@ -291,7 +290,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref tp) = text_pages {
-                                let dest_addr = tp.start.start_address() + (sec.offset() as usize) - text_offset.unwrap();
+                                let dest_addr = tp.start_address() + (sec.offset() as usize) - text_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -340,7 +339,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref rp) = rodata_pages {
-                                let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
+                                let dest_addr = rp.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -381,7 +380,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref dp) = data_pages {
-                                let dest_addr = dp.start.start_address() + (sec.offset() as usize) - data_offset.unwrap();
+                                let dest_addr = dp.start_address() + (sec.offset() as usize) - data_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -535,24 +534,18 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
     let all_pages = {
-        let mut all_pages: Vec<OwnedContiguousPages> = Vec::new();
-        
-        let mut remap = |allocated_pages: &OwnedContiguousPages, flags| {
-            for p in 0..allocated_pages.num_pages {
-                active_table.remap(allocated_pages.start + p, flags);
-            }
-        };
+        let mut all_pages: Vec<OwnedPages> = Vec::new();
 
         if let Ok(tp) = text_pages { 
-            remap(&tp, EntryFlags::PRESENT); // present and not noexec
+            active_table.remap_pages(tp.pages.clone(), EntryFlags::PRESENT); // present and not noexec
             all_pages.push(tp); 
         }
         if let Ok(rp) = rodata_pages { 
-            remap(&rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE); // present (just readable)
+            active_table.remap_pages(rp.pages.clone(), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE); // present (just readable)
             all_pages.push(rp); 
         }
         if let Ok(dp) = data_pages { 
-            remap(&dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE); // read/write
+            active_table.remap_pages(dp.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE); // read/write
             all_pages.push(dp); 
         }
 

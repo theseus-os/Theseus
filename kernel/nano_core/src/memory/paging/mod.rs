@@ -126,10 +126,28 @@ impl SubAssign<usize> for Page {
 }
 
 
-#[derive(Debug, Clone)]
+/// An iterator over a range of contiguous pages,
+/// from `start` to `end`, both inclusive.
+#[derive(Debug)]
 pub struct PageIter {
     start: Page,
     end: Page,
+}
+
+impl PageIter {
+    /// Create a duplicate of this PageIter. 
+    /// We do this instead of implementing/deriving the Clone trait
+    /// because we want to prevent Rust from cloning `PageIter`s implicitly.
+    pub fn clone(&self) -> PageIter {
+        PageIter {
+            start: self.start,
+            end: self.end,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start.start_address()
+    }
 }
 
 impl Iterator for PageIter {

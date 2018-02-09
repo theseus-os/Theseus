@@ -2,7 +2,7 @@ use spin::Mutex;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use memory::VirtualAddress;
-use memory::virtual_address_allocator::OwnedContiguousPages;
+use memory::virtual_address_allocator::OwnedPages;
 
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
@@ -71,7 +71,7 @@ pub fn get_symbol<S: Into<String>>(symbol: S) -> Weak<LoadedSection> {
 pub struct LoadedCrate {
     pub crate_name: String,
     pub sections: Vec<Arc<LoadedSection>>,
-    pub owned_pages: Vec<OwnedContiguousPages>,
+    pub owned_pages: Vec<OwnedPages>,
     // crate_dependencies: Vec<LoadedCrate>,
 }
 
