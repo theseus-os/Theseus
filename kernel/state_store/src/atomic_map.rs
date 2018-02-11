@@ -33,11 +33,11 @@ impl<K, V> Node<K, V> where K: PartialEq {
 }
 
 #[derive(Debug)]
-pub struct AtomicMap<K, V> where K: PartialEq {
+pub struct AtomicMap<K, V> where K: PartialEq, V {
     head: AtomicPtr<Node<K, V>>,
 }
 
-impl<K, V> AtomicMap<K, V> where K: PartialEq {
+impl<K, V> AtomicMap<K, V> where K: PartialEq, V {
     /// create a new empty AtomicMap.
     pub fn new() -> AtomicMap<K, V> {
         AtomicMap {
@@ -119,22 +119,18 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
 		None
 	}
 
+    /// Returns a mutable reference to the value matching the given key, if present. 
+	/// Otherwise, returns None. 
+	pub fn get_mut(&self, key: &K) -> Option<&mut V> {
+		for pair in self.iter_mut() {
+			if key == pair.0 {
+				return Some(pair.1);
+			}
+		}
+		None
+	}
 
-    /// Returns a mutable reference to the value matching the given key, if present.
-    /// Otherwise, returns None.
-    /// In order to maintain memory safety (to ensure atomicity), getting a value as mutable
-    /// requires `self` (this `AtomicMap` instance) to be borrowed mutably. 
-    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
-        for pair in self.iter_mut() {
-                if key == *pair.0 {
-                        return Some(pair.1);
-                }
-        }
-        None
-    }
-
-
-    /// Returns a forward iterator through this map. 
+    /// Returns a forward iterator through this linked list. 
     pub fn iter(&self) -> AtomicMapIter<K, V> {
         AtomicMapIter {
             curr: &self.head, //load(Ordering::Acquire),
@@ -142,12 +138,9 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
         }
     }
 
-    /// This should only be used internally, as we don't want outside entities
-    /// holding mutable references to data here.
-    /// Returns a forward iterator through this map,
+    /// returns a forward iterator through this linked list,
     /// allowing mutation of inner values but not keys.
-    /// This is safe because we do not permit deletion from this map type.
-    fn iter_mut(&self) -> AtomicMapIterMut<K, V> {
+    pub fn iter_mut(&self) -> AtomicMapIterMut<K, V> {
         AtomicMapIterMut {
             curr: &self.head, //load(Ordering::Acquire),
             // _phantom: PhantomData,
