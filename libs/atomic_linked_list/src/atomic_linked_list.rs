@@ -52,7 +52,7 @@ impl<T> AtomicLinkedList<T> {
 
         let max_attempts = if max_attempts == 0 { 1 } else { max_attempts }; // ensure we try at least once 
 
-        let mut node_ptr = Box::into_raw(Box::new(Node::new(data))); // we must wrap Nodes in Box to keep them around
+        let node_ptr = Box::into_raw(Box::new(Node::new(data))); // we must wrap Nodes in Box to keep them around
 
         for _attempt in 0..max_attempts {
             // start the attempt by grabbing the head value
