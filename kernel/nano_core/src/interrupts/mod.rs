@@ -60,7 +60,7 @@ static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 /// The TSS list, one per core, indexed by a key of apic_id
 lazy_static! {
-    static ref TSS: AtomicMap<u8, TaskStateSegment> = AtomicMap::new();
+    static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 }
 /// The GDT list, one per core, indexed by a key of apic_id
 lazy_static! {
@@ -125,10 +125,10 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
     let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
-    let mut tss_entry = try!(TSS.get_mut(my_apic_id).ok_or_else(|| {
+    let mut tss_entry = try!(TSS.get(&my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
-    }));
+    })).lock();
     tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
     // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
@@ -203,8 +203,8 @@ fn create_tss_gdt(apic_id: u8,
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable);
 
         // insert into TSS list
-        TSS.insert(apic_id, tss);
-        let tss_ref: &TaskStateSegment = TSS.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        TSS.insert(apic_id, Mutex::new(tss));
+        let tss_ref = TSS.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
         // debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
         tss_ref
     };
@@ -237,11 +237,12 @@ fn create_tss_gdt(apic_id: u8,
         USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
         let user_ds_64 = gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
         USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
-        let tss = gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref), PrivilegeLevel::Ring0);
+        use core::ops::Deref;
+        let tss = gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref.lock().deref()), PrivilegeLevel::Ring0);
         TSS_SELECTOR.call_once(|| tss);
         
         GDT.insert(apic_id, gdt);
-        let gdt_ref = GDT.get(apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
         gdt_ref.load();
         // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
     }
@@ -340,7 +341,7 @@ fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
         InterruptChip::APIC |
         InterruptChip::x2apic => {
-            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").eoi();
+            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").read().eoi();
         }
         InterruptChip::PIC => {
             PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
@@ -394,7 +395,8 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut Exce
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
     println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
 
-    if let Some(lapic) = apic::get_my_apic() {
+    if let Some(lapic_ref) = apic::get_my_apic() {
+        let lapic = lapic_ref.read();
         let isr = lapic.get_isr(); 
         let irr = lapic.get_irr();
         println_unsafe!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 

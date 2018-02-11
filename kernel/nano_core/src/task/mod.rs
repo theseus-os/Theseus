@@ -24,7 +24,7 @@ lazy_static! {
 }
 /// Get the id of the currently running Task on a specific core
 pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
-    CURRENT_TASKS.get(apic_id).cloned()
+    CURRENT_TASKS.get(&apic_id).cloned()
 }
 /// Get the id of the currently running Task on this current task
 pub fn get_my_current_task_id() -> Option<usize> {
@@ -184,7 +184,7 @@ impl Task {
         // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         
         let my_context_switch_lock: &AtomicBool;
-        if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(apic_id) {
+        if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(&apic_id) {
             my_context_switch_lock = csl;
         } 
         else {
@@ -308,13 +308,13 @@ static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 /// returns a shared reference to the current `Task`
 pub fn get_my_current_task() -> Option<&'static Arc<RwLock<Task>>> {
     get_my_current_task_id().and_then(|id| {
-        TASKLIST.get(id)
+        TASKLIST.get(&id)
     })
 }
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLock<Task>>> {
-    TASKLIST.get(task_id)
+    TASKLIST.get(&task_id)
 }
 
 /// Get a iterator for the list of contexts.

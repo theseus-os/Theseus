@@ -105,7 +105,7 @@ pub fn init_runqueue(which_core: u8) {
 
 /// Adds a `Task` reference to the given core's runqueue
 pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-    if let Some(ref mut rq) = RUNQUEUES.get_mut(which_core) {
+    if let Some(ref rq) = RUNQUEUES.get(&which_core) {
         debug!("Added task to runqueue {}, {:?}", which_core, task);
         rq.write().push_back(task);
         Ok(())
@@ -160,7 +160,7 @@ pub fn add_task_to_runqueue(task: TaskRef) -> Result<(), &'static str> {
 
 // TODO: test this function
 pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-    if let Some(ref mut rq) = RUNQUEUES.get_mut(which_core) {
+    if let Some(ref rq) = RUNQUEUES.get(&which_core) {
         rq.write().retain(|x| Arc::ptr_eq(&x, &task));
         Ok(())
     }
@@ -176,7 +176,7 @@ pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'
 /// returns None if there is no schedule-able task
 fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
-    let mut runqueue_locked = try_opt!(RUNQUEUES.get_mut(apic_id)).write();
+    let mut runqueue_locked = try_opt!(RUNQUEUES.get(&apic_id)).write();
     let mut index_chosen: Option<usize> = None;
 
     for (i, task) in runqueue_locked.iter().enumerate() {

@@ -6,6 +6,8 @@ use task;
 use BSP_READY_FLAG;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use drivers::acpi::madt::MadtIter;
+use interrupts::apic::{LocalApic, get_lapics};
+use spin::RwLock;
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -33,8 +35,8 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 
     // init AP as a new local APIC
-    let all_lapics = ::interrupts::apic::get_lapics();
-    all_lapics.insert(apic_id, ::interrupts::apic::LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone()));
+    let all_lapics = get_lapics();
+    all_lapics.insert(apic_id, RwLock::new(LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())));
 
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop

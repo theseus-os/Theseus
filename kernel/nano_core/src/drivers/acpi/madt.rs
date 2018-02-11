@@ -1,9 +1,11 @@
 use core::mem;
 use core::intrinsics::{atomic_load, atomic_store};
+use core::ops::DerefMut;
 use memory::{Stack, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
 use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id};
 use kernel_config::memory::PAGE_SHIFT;
+use spin::RwLock;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -136,7 +138,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     
                     // add the BSP lapic to the list (should be empty until here)
                     assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    all_lapics.insert(lapic_madt.processor, bsp_lapic);
+                    all_lapics.insert(lapic_madt.processor, RwLock::new(bsp_lapic));
 
                     // there's only ever one BSP, so we can exit the loop here
                     break;
@@ -239,9 +241,10 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                     debug!("        This is a different AP's APIC");
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    let mut bsp_lapic = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get_mut(bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let bsp_lapic_ref = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get(&bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let mut bsp_lapic = bsp_lapic_ref.write();
                     let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
-                    bring_up_ap(bsp_lapic, lapic_madt, active_table_phys_addr, ap_stack, madt_iter.clone());
+                    bring_up_ap(bsp_lapic.deref_mut(), lapic_madt, active_table_phys_addr, ap_stack, madt_iter.clone());
                 }
             }
             // only care about new local apics right now
