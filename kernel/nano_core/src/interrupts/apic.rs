@@ -1,5 +1,5 @@
 use core::ptr::{read_volatile, write_volatile};
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, MutexGuard, RwLock, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
@@ -23,7 +23,7 @@ pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 
 
 lazy_static! {
-    static ref LOCAL_APICS: AtomicMap<u8, LocalApic> = AtomicMap::new();
+    static ref LOCAL_APICS: AtomicMap<u8, RwLock<LocalApic>> = AtomicMap::new();
 }
 
 /// The Page where the APIC chip has been mapped.
@@ -54,7 +54,7 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core
-pub fn get_lapics() -> &'static AtomicMap<u8, LocalApic> {
+pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
 	&LOCAL_APICS
 }
 
@@ -75,8 +75,8 @@ pub fn get_my_apic_id() -> Option<u8> {
 }
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
-pub fn get_my_apic() -> Option<&'static LocalApic> {
-    get_my_apic_id().and_then(|id| LOCAL_APICS.get(id))
+pub fn get_my_apic() -> Option<&'static RwLock<LocalApic>> {
+    get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
 }
 
 
