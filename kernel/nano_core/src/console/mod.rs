@@ -2,12 +2,11 @@ use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
 use alloc::string::String;
 use irq_safety::RwLockIrqSafeWriteGuard;
-use task::TaskList;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use rtc;
-
+use task::spawn_kthread;
 
 
 // original print macro
@@ -35,8 +34,12 @@ macro_rules! println {
 macro_rules! print {
     ($($arg:tt)*) => ({
             use core::fmt::Write;
+            use alloc::String;
             let mut s: String = String::new();
-            write!(&mut s, $($arg)*);
+            match write!(&mut s, $($arg)*) {
+                Ok(_) => { }
+                Err(e) => panic!("Writing to String in print!() macro failed, error: {}", e),
+            }
             $crate::console::print_to_console(s).unwrap();
     });
 }
@@ -47,7 +50,7 @@ static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 pub fn print_to_console<S>(s: S) -> Result<(), &'static str> where S: Into<String> {
     let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()));
-    PRINT_PRODUCER.try().expect("Console print producer isn't yet initialized!").enqueue(output_event);
+    try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
     Ok(())
 }
 
@@ -100,7 +103,7 @@ impl ConsoleOutputEvent {
 
 
 /// the console owns and creates the event queue, and returns a producer reference to the queue.
-pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQueueProducer<ConsoleEvent> {
+pub fn init() -> DFQueueProducer<ConsoleEvent> {
     assert_has_not_been_called!("console_init was called more than once!");
 
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
@@ -110,9 +113,9 @@ pub fn console_init(mut tasklist_mut: RwLockIrqSafeWriteGuard<TaskList>) -> DFQu
         console_consumer.obtain_producer()
     });
 
-    print_to_console("Console says hello!");
+    print_to_console("Console says hello!\n");
     
-    tasklist_mut.spawn_kthread(main_loop, console_consumer, "console_loop");
+    spawn_kthread(main_loop, console_consumer, "console_loop");
     returned_producer
 }
 
@@ -168,10 +171,11 @@ fn handle_key_event(keyevent: KeyEvent) {
     }
 
     if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}", 
+        debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
                 ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
                 rtc::get_rtc_ticks().ok(),
-                unsafe{::interrupts::SPURIOUS_COUNT});
+                unsafe{::interrupts::SPURIOUS_COUNT},
+                ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
         return; 
     }
 
@@ -183,7 +187,10 @@ fn handle_key_event(keyevent: KeyEvent) {
     match ascii {
         Some(c) => { 
             // we echo key presses directly to the console without needing to queue an event
-            vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
+            // vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
+            use alloc::string::ToString;
+            vga_buffer::print_string(&c.to_string());
+            // trace!("  {}  ", c);
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 

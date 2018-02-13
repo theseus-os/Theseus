@@ -1156,7 +1156,7 @@ impl CStr {
         unsafe { &*(&self.inner as *const [c_char] as *const [u8]) }
     }
 
-    /// Yields a [`&str`] slice if the `CStr` contains valid UTF-8.
+    /// Returns a [`&str`] slice if the `CStr` contains valid UTF-8.
     ///
     /// If the contents of the `CStr` are valid UTF-8 data, this
     /// function will return the corresponding [`&str`] slice. Otherwise,

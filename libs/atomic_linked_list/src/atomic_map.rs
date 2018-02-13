@@ -1,9 +1,12 @@
-//! A generic, singly-linked list data structure that is lock-free 
+//! A generic map based on a singly-linked list data structure that is lock-free 
 //! and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.
 //! Each node remains in the same spot in memory once it is allocated,
 //! and will not be reallocated,
-//! which allows an external thread to maintain a reference to it safely 
-//! (but really, only a Weak reference is safe to maintain, to catch possible Node deletion).
+//! which allows an external thread to maintain a reference to it safely.
+//!
+//! Currently we do not allow nodes to be deleted, so it's only useful for certain purposes.
+//! Later on, once deletions are supported, it will not be safe to maintain out-of-band references
+//! to items in the data structure, rather only weak references. 
 //!
 //! New elements are inserted at the head of the list, and then the head's next pointer 
 //! is set up to the point to the node that was previously the head. 
@@ -12,7 +15,6 @@
 
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicPtr, Ordering};
-use core::marker::PhantomData;
 
 
 struct Node<K, V> where K: PartialEq {
@@ -67,7 +69,7 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
 
 
 		// here, if the key did not exist, add a new node including that key-value pair
-        let mut node_ptr = Box::into_raw(Box::new(Node::new(key, value))); // we must wrap Nodes in Box to keep them around
+        let node_ptr = Box::into_raw(Box::new(Node::new(key, value))); // we must wrap Nodes in Box to keep them around
 
         let max_attempts = if max_attempts == 0 { 1 } else { max_attempts }; // ensure we try at least once 
         for _attempt in 0..max_attempts {
@@ -108,16 +110,31 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
 
 	/// Returns a reference to the value matching the given key, if present. 
 	/// Otherwise, returns None. 
-	pub fn get(&self, key: K) -> Option<&V> {
+	pub fn get(&self, key: &K) -> Option<&V> {
 		for pair in self.iter() {
-			if key == *pair.0 {
+			if key == pair.0 {
 				return Some(pair.1);
 			}
 		}
 		None
 	}
 
-    /// Returns a forward iterator through this linked list. 
+
+    /// Returns a mutable reference to the value matching the given key, if present.
+    /// Otherwise, returns None.
+    /// In order to maintain memory safety (to ensure atomicity), getting a value as mutable
+    /// requires `self` (this `AtomicMap` instance) to be borrowed mutably. 
+    pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+        for pair in self.iter_mut() {
+                if key == *pair.0 {
+                        return Some(pair.1);
+                }
+        }
+        None
+    }
+
+
+    /// Returns a forward iterator through this map. 
     pub fn iter(&self) -> AtomicMapIter<K, V> {
         AtomicMapIter {
             curr: &self.head, //load(Ordering::Acquire),
@@ -125,9 +142,12 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
         }
     }
 
-    /// returns a forward iterator through this linked list,
+    /// This should only be used internally, as we don't want outside entities
+    /// holding mutable references to data here.
+    /// Returns a forward iterator through this map,
     /// allowing mutation of inner values but not keys.
-    pub fn iter_mut(&self) -> AtomicMapIterMut<K, V> {
+    /// This is safe because we do not permit deletion from this map type.
+    fn iter_mut(&self) -> AtomicMapIterMut<K, V> {
         AtomicMapIterMut {
             curr: &self.head, //load(Ordering::Acquire),
             // _phantom: PhantomData,

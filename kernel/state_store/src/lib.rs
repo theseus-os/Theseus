@@ -160,7 +160,7 @@ pub fn get_state<S: Any>() -> SSCached<S> {
 
 fn get_state_internal<S: Any>() -> Option<Weak<S>> {
 	SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0
-		.get(TypeId::of::<S>())                       // get the Option<Arc<Any>> value
+		.get(&TypeId::of::<S>())                       // get the Option<Arc<Any>> value
 		.and_then( |g| g.downcast_ref::<Arc<S>>())    // if it's Some(g), then downcast g to S
 		.map( |dcast_arc| Arc::downgrade(dcast_arc))  // transform result of downcast to weak ptr
 }

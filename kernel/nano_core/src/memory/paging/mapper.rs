@@ -7,12 +7,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use x86_64;
 use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
-use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{Frame, FrameAllocator};
 use core::ptr::Unique;
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, MAX_PAGE_NUMBER, PAGE_SIZE};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -86,7 +86,7 @@ impl Mapper {
         let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
         let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
 
-        assert!(p1[page.p1_index()].is_unused());
+        assert!(p1[page.p1_index()].is_unused(), "map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
         p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
     }
 
@@ -98,33 +98,41 @@ impl Mapper {
         self.map_to(page, frame, flags, allocator)
     }
 
-    /// maps the given VirtualAddress to the contiguous range of Frames 
-    /// corresponding to the given PhysicalAddress.
-    /// `size_in_bytes` specifies the length in bytes of the mapping. 
-    pub fn map_contiguous_frames<A>(&mut self, 
-                             phys_addr: PhysicalAddress,
-                             size_in_bytes: usize,
-                             virt_addr: VirtualAddress, 
-                             flags: EntryFlags, 
-                             allocator: &mut A)
+    /// maps the given Page to a randomly selected (newly allocated) Frame
+    pub fn map_pages<A>(&mut self, page_range: PageIter, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let start_frame = Frame::containing_address(phys_addr);
-        let end_frame = Frame::containing_address(phys_addr + size_in_bytes - 1);
-        let mut frame_counter = 0;
-        for frame in Frame::range_inclusive(start_frame, end_frame) {
-            self.map_virtual_address(virt_addr + frame_counter * PAGE_SIZE, frame, flags, allocator);
-            frame_counter += 1;
+        for page in page_range {
+            self.map(page, flags, allocator);
         }
     }
 
 
-    /// maps the Page containing the given virtual address to the given Frame
-    pub fn map_virtual_address<A>(&mut self, virt_addr: VirtualAddress, frame: Frame, flags: EntryFlags, allocator: &mut A)
+    /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
+    /// `size_in_bytes` specifies the length in bytes of the mapping. 
+    pub fn map_frames<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
         where A: FrameAllocator
     {
-        let page: Page = Page::containing_address(virt_addr);
-        self.map_to(page, frame, flags, allocator)
+        for (ctr, frame) in frame_range.enumerate() {
+            self.map_to(start_page + ctr, frame, flags, allocator);
+        }
+    }
+
+    /// SPECIAL USE CASES ONLY! 
+    /// Just like `map_frames()`, this function maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
+    /// `size_in_bytes` specifies the length in bytes of the mapping. 
+    /// If any pages in the range of requested mappings are already mapped, those are silently skipped. 
+    /// Use case:  filling in holes in a range of frames in which some have already been mapped.
+    pub fn map_frames_skip_used<A>(&mut self, frame_range: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        for (ctr, frame) in frame_range.enumerate() {
+            let page = start_page + ctr;
+            if self.translate_page(page).is_some() {
+                continue;
+            }
+            self.map_to(page, frame, flags, allocator);
+        }
     }
 
     /// maps the given frame's physical address to the same virtual address
@@ -138,7 +146,6 @@ impl Mapper {
 
     pub fn remap(&mut self, page: Page, new_flags: EntryFlags) {
         use x86_64::instructions::tlb;
-        use x86_64::VirtualAddress;
 
         let p1 = self.p4_mut()
             .next_table_mut(page.p4_index())
@@ -148,7 +155,8 @@ impl Mapper {
         let frame = p1[page.p1_index()].pointed_frame().expect("remap(): page frame not mapped");
         p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(x86_64::VirtualAddress(page.start_address()));
+        broadcast_tlb_shootdown(page.start_address());
     }   
 
 
@@ -159,11 +167,10 @@ impl Mapper {
         }
     }
 
-
+    /// Remove the virtual memory mapping for the given `Page`.
     pub fn unmap<A>(&mut self, page: Page, _allocator: &mut A)
         where A: FrameAllocator
     {
-        use x86_64::VirtualAddress;
         use x86_64::instructions::tlb;
 
         assert!(self.translate(page.start_address()).is_some());
@@ -175,7 +182,9 @@ impl Mapper {
             .expect("mapping code does not support huge pages");
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
-        tlb::flush(VirtualAddress(page.start_address()));
+        tlb::flush(x86_64::VirtualAddress(page.start_address()));
+        broadcast_tlb_shootdown(page.start_address());
+        
         // TODO free p(1,2,3) table if empty
         // allocator.deallocate_frame(frame);
     }
@@ -186,5 +195,17 @@ impl Mapper {
         for page in page_range {
             self.unmap(page, allocator);
         }
+    }
+}
+
+
+
+/// broadcasts TLB shootdown IPI
+fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
+    
+    use interrupts::apic::get_my_apic;
+    if let Some(my_lapic) = get_my_apic() {
+        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
+        my_lapic.write().send_tlb_shootdown_ipi(vaddr);
     }
 }

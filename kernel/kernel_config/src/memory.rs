@@ -41,16 +41,12 @@ pub const MAX_VIRTUAL_ADDRESS: usize = 0xFFFF_FFFF_FFFF_FFFF;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
-/// This is 32, because Rust currently supports default initialization of 
-/// primitive arrays that are up to 32 elements long.
-pub const MAX_MEMORY_AREAS: usize = 32;
-
 /// Value: 512. 
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections
 pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
 /// Value: 510. The 510th entry is used for the recursive P4 mapping.
-pub const RECURSIVE_PAGE_TABLE_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
+pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
 /// Value: 508. The 508th entry is used for all kernel stacks
@@ -61,13 +57,17 @@ pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
+/// The size in pages of each kernel stack. 
+/// If it's too small, complex kernel functions will overflow, causing a page fault / double fault.
+pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
 
 /// The virtual address where the initial kernel (the nano_core) is mapped to.
 /// Actual value: 0xFFFFFFFF80000000.
-/// i.e., the linear offset between physical memory and kernel memory
-/// so the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
+/// i.e., the linear offset between physical memory and kernel memory.
+/// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
 /// This is -2GiB from the end of the 64-bit address space.
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
+
 
 
 /// The kernel text region is where we load kernel modules. 
@@ -83,7 +83,7 @@ pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 
 /// which is the slot right below the recursive P4 entry (510)
 /// actual value: 0o177777_776_000_000_000_0000, or 0xFFFF_FF00_0000_0000
 pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 16 * 1024 * 1024; // 16 MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 

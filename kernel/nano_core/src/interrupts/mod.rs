@@ -7,28 +7,36 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use x86_64;
 use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::{Mutex, Once};
-use irq_safety::MutexIrqSafe;
 use port_io::Port;
 use drivers::input::keyboard;
 use drivers::ata_pio;
-use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
+use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use atomic::{Atomic};
+use atomic_linked_list::atomic_map::AtomicMap;
+use memory::VirtualAddress;
 
-// re-expose these functions from within this interrupt module
-pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 
-
+mod exceptions;
 mod gdt;
 pub mod pit_clock; // TODO: shouldn't be pub
+pub mod apic;
+pub mod ioapic;
 mod pic;
 pub mod tsc;
 
 
+// re-expose these functions from within this interrupt module
+pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
+pub use self::exceptions::init_early_exceptions;
 
+/// The index of the double fault stack in a TaskStateSegment (TSS)
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 
@@ -41,8 +49,32 @@ static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
-
+/// The single system-wide IDT
+/// Note: this could be per-core instead of system-wide, if needed.
 pub static IDT: LockedIdt = LockedIdt::new();
+
+/// Interface to our PIC (programmable interrupt controller) chips.
+/// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
+static PIC: Once<pic::ChainedPics> = Once::new();
+static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
+
+/// The TSS list, one per core, indexed by a key of apic_id
+lazy_static! {
+    static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
+}
+/// The GDT list, one per core, indexed by a key of apic_id
+lazy_static! {
+    static ref GDT: AtomicMap<u8, gdt::Gdt> = AtomicMap::new();
+}
+
+pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum InterruptChip {
+    APIC,
+    x2apic,
+    PIC,
+}
 
 pub enum AvailableSegmentSelector {
     KernelCode,
@@ -59,25 +91,25 @@ pub enum AvailableSegmentSelector {
 pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
     let seg: &SegmentSelector = match selector {
         AvailableSegmentSelector::KernelCode => {
-            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR failed to init!")
+            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::KernelData => {
-            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR failed to init!")
+            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode32 => {
-            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
+            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
+            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode64 => {
-            USER_CODE_64_SELECTOR.try().expect("USER_CODE_32_SELECTOR failed to init!")
+            USER_CODE_64_SELECTOR.try().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.try().expect("USER_DATA_32_SELECTOR failed to init!")
+            USER_DATA_64_SELECTOR.try().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::Tss => {
-            TSS_SELECTOR.try().expect("TSS_SELECTOR failed to init!")
+            TSS_SELECTOR.try().expect("TSS_SELECTOR wasn't yet inited!")
         }
     };
 
@@ -86,88 +118,134 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 
 
 
-/// Interface to our PIC (programmable interrupt controller) chips.
-/// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
-static mut PIC: pic::ChainedPics = pic::ChainedPics::new(0x20, 0x28);
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
-static TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
-static GDT: Once<gdt::Gdt> = Once::new();
-
-
-/// Sets the TSS's privilege stack 0 (RSP0) entry, which points to the stack that 
+/// Sets the current core's TSS privilege stack 0 (RSP0) entry, which points to the stack that 
 /// the x86_64 hardware automatically switches to when transitioning from Ring 3 -> Ring 0.
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
-pub fn tss_set_rsp0(new_value: usize) {
-    use x86_64::VirtualAddress;
-    if let Some(mut tss) = TSS.try_lock() {
-        tss.privilege_stack_table[0] = VirtualAddress(new_value);
-    }
-    else {
-        panic!("FATAL ERROR: TSS was locked in tss_set_rsp0!!");
-    }
+pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
+    let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
+    let mut tss_entry = try!(TSS.get(&my_apic_id).ok_or_else(|| {
+        error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
+        "No TSS for the current core's apid id" 
+    })).lock();
+    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
+    // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
+    Ok(())
 }
 
 
 
-/// initializes the interrupt subsystem and IRQ handlers with exceptions
+/// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
 /// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
-pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable: usize) {
-    assert_has_not_been_called!("interrupts::init was called more than once!");
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) -> Result<(), &'static str> {
 
-    
+    init_early_exceptions(); // this was probably already done earlier, but it doesn't hurt to make sure
+
+    let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
+    info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
+    create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+
+    // here, we just need to set up special stacks for exceptions, others have already been set up
+    {
+        let mut idt = IDT.lock(); // withholds interrupts
+        unsafe {
+            idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
+                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
+        }
+       
+        // fill all IDT entries with an unimplemented IRQ handler
+        for i in 32..255 {
+            idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
+        }
+    }
+
+    // try to load our new IDT    
+    {
+        info!("trying to load IDT...");
+        IDT.load();
+        info!("loaded interrupt descriptor table.");
+    }
+
+    Ok(())
+
+}
+
+
+pub fn init_ap(apic_id: u8, 
+               double_fault_stack_top_unusable: VirtualAddress, 
+               privilege_stack_top_unusable: VirtualAddress)
+               -> Result<(), &'static str> {
+    info!("Setting up TSS & GDT for AP {}", apic_id);
+    create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+
+
+    info!("trying to load IDT for AP {}...", apic_id);
+    IDT.load();
+    info!("loaded IDT for AP {}.", apic_id);
+    Ok(())
+}
+
+
+fn create_tss_gdt(apic_id: u8, 
+                  double_fault_stack_top_unusable: VirtualAddress, 
+                  privilege_stack_top_unusable: VirtualAddress) {
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
     use x86_64::PrivilegeLevel;
-    use x86_64::VirtualAddress;
-
 
     // set up TSS and get pointer to it    
-    let tss_ptr: u64 = {
-        let mut tss = TSS.lock();
+    let tss_ref = {
+        let mut tss = TaskStateSegment::new();
         // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-        tss.privilege_stack_table[0] = VirtualAddress(privilege_stack_top_unusable);
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = VirtualAddress(double_fault_stack_top_unusable);
+        tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable);
+        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable);
 
-        // get the pointer to the raw TSS structure inside the TSS mutex, required for x86's load tss instruction
-        &*tss as *const _ as u64
+        // insert into TSS list
+        TSS.insert(apic_id, Mutex::new(tss));
+        let tss_ref = TSS.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        // debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
+        tss_ref
     };
     
 
-    let gdt = GDT.call_once(|| {
+    // set up this AP's GDT
+    {
         let mut gdt = gdt::Gdt::new();
 
-        // this order of code segments must be preserved: kernel cs, kernel ds, user cs 32, user ds 32, user cs 64, user ds 64, tss
+        // the following order of segments must be preserved: 
+        // 0) null descriptor 
+        // 1) kernel cs
+        // 2) kernel ds
+        // 3) user cs 32
+        // 4) user ds 32
+        // 5) user cs 64
+        // 6) user ds 64
+        // 7-8) tss
+        // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
 
-        KERNEL_CODE_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0)
-        });
-        KERNEL_DATA_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0)
-        });
-        USER_CODE_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_32_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_CODE_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3)
-        });
-        USER_DATA_64_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3)
-        });
-        TSS_SELECTOR.call_once(|| {
-            gdt.add_entry(gdt::Descriptor::tss_segment(tss_ptr), PrivilegeLevel::Ring0)
-        });
-        gdt
-    });
-    gdt.load();
-
-
-    debug!("Loaded GDT: {}", gdt);
+        let kernel_cs = gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
+        KERNEL_CODE_SELECTOR.call_once(|| kernel_cs);
+        let kernel_ds = gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
+        KERNEL_DATA_SELECTOR.call_once(|| kernel_ds);
+        let user_cs_32 = gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_32_SELECTOR.call_once(|| user_cs_32);
+        let user_ds_32 = gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_32_SELECTOR.call_once(|| user_ds_32);
+        let user_cs_64 = gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
+        let user_ds_64 = gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
+        use core::ops::Deref;
+        let tss = gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref.lock().deref()), PrivilegeLevel::Ring0);
+        TSS_SELECTOR.call_once(|| tss);
+        
+        GDT.insert(apic_id, gdt);
+        let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        gdt_ref.load();
+        // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
+    }
 
     unsafe {
         set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
@@ -176,54 +254,49 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
         load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
     }
+}
 
+pub fn init_handlers_apic() {
+    // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
+    PIC.call_once( || {
+        pic::ChainedPics::init(None, None, 0xFF, 0xFF) // disable all PIC IRQs
+    });
 
     {
         let mut idt = IDT.lock(); // withholds interrupts
-
-        // SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        // missing: 0x02 non-maskable interrupt exception
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(device_not_available_handler);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
-        }
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
-        // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
+        
+        // exceptions (IRQS from 0 -31) have already been inited before
 
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
-            idt[i].set_handler_fn(unimplemented_interrupt_handler);
+            idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
+        idt[0x20].set_handler_fn(pit_timer_handler);
+        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x22].set_handler_fn(lapic_timer_handler);
+        idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
+
+        idt[apic::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
+    }
+
+
+    // now it's safe to enable every LocalApic's LVT_TIMER interrupt (for scheduling)
+    
+}
+
+
+pub fn init_handlers_pic() {
+    {
+        let mut idt = IDT.lock(); // withholds interrupts
 		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
 
         // MASTER PIC starts here (0x20 - 0x27)
-        idt[0x20].set_handler_fn(timer_handler);
+        idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
-        
-        idt[0x22].set_handler_fn(irq_0x22_handler); 
+        // there is no IRQ 0x22        
         idt[0x23].set_handler_fn(irq_0x23_handler); 
         idt[0x24].set_handler_fn(irq_0x24_handler); 
         idt[0x25].set_handler_fn(irq_0x25_handler); 
@@ -242,19 +315,15 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
-    }
-    {
-        info!("trying to load IDT...");
-        IDT.load();
-        info!("loaded interrupt descriptor table.");
+        // 0x2F missing right now
     }
 
     // init PIC, PIT and RTC interrupts
-    unsafe{ 
-        let master_pic_mask: u8 = 0x0; // allow every interrupt
-        let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
-        PIC.initialize(master_pic_mask, slave_pic_mask); 
-    }
+    let master_pic_mask: u8 = 0x0; // allow every interrupt
+    let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
+    PIC.call_once( || {
+        pic::ChainedPics::init(None, None, master_pic_mask, slave_pic_mask) // disable all PIC IRQs
+    });
 
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
@@ -264,105 +333,84 @@ pub fn init(double_fault_stack_top_unusable: usize, privilege_stack_top_unusable
 
 
 
-/// interrupt 0x00
-extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
-    loop {}
-}
 
-/// interrupt 0x03
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-}
 
-/// interrupt 0x06
-extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-    loop {}
-}
-
-/// interrupt 0x07
-/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
-extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-
-    loop {}
+/// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
+/// irq arg is only used for PIC
+fn eoi(irq: Option<u8>) {
+    match INTERRUPT_CHIP.load(Ordering::Acquire) {
+        InterruptChip::APIC |
+        InterruptChip::x2apic => {
+            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").read().eoi();
+        }
+        InterruptChip::PIC => {
+            PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
+        }
+    }
 }
 
 
 
-extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
-                                  {:?}\n{:#?}",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
-    loop {}
-}
-
-extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_unsafe!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
-    loop {}
-}
-
-
-
-/// this shouldn't really ever happen, but I added the handler anyway
-/// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
-extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    // use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
-                                  {:#b}\n{:#?}",
-//             control_regs::cr2(),
-             error_code,
-             stack_frame);
-
-    loop {}
-}
-
-
-extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
-                                  {:#b}\n{:#?}",
-             error_code,
-             stack_frame);
-
-
-    // TODO: kill the offending process
-    loop {}
-}
-
-
-
-
-
-// 0x20
-extern "x86-interrupt" fn timer_handler(stack_frame: &mut ExceptionStackFrame) {
+/// 0x20
+extern "x86-interrupt" fn pit_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
-	unsafe { PIC.notify_end_of_interrupt(0x20); }
+	eoi(Some(0x20));
 }
 
 
-// 0x21
+/// 0x21
 extern "x86-interrupt" fn keyboard_handler(stack_frame: &mut ExceptionStackFrame) {
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
         KEYBOARD.lock().read() 
     };
-	// trace!("KBD: {:?}", scan_code);
+	// trace!("APIC KBD (AP {:?}): scan_code {:?}", apic::get_my_apic_id(), scan_code);
 
     keyboard::handle_keyboard_input(scan_code);	
 
-    unsafe { PIC.notify_end_of_interrupt(0x21); }
+    eoi(Some(0x21));
 }
+
+
+pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+/// 0x22
+extern "x86-interrupt" fn lapic_timer_handler(stack_frame: &mut ExceptionStackFrame) {
+    let ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
+    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), ticks);
+    
+    eoi(None);
+    // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
+    
+    schedule!();
+}
+
+
+extern "x86-interrupt" fn apic_spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
+    info!("APIC SPURIOUS INTERRUPT HANDLER!");
+
+    eoi(None);
+}
+
+extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
+    println_unsafe!("APIC UNIMPLEMENTED IRQ!!!");
+
+    if let Some(lapic_ref) = apic::get_my_apic() {
+        let lapic = lapic_ref.read();
+        let isr = lapic.get_isr(); 
+        let irr = lapic.get_irr();
+        println_unsafe!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
+                         isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7, irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);
+    }
+    else {
+        println_unsafe!("apic_unimplemented_interrupt_handler: couldn't get my apic.");
+    }
+
+    loop { }
+
+    eoi(None);
+}
+
 
 
 pub static mut SPURIOUS_COUNT: u64 = 0;
@@ -377,32 +425,30 @@ pub static mut SPURIOUS_COUNT: u64 = 0;
 extern "x86-interrupt" fn spurious_interrupt_handler(stack_frame: &mut ExceptionStackFrame ) {
     unsafe { SPURIOUS_COUNT += 1; } // cheap counter just for debug info
 
-    let irq_regs = unsafe { PIC.read_isr_irr() };
-
-    // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
-    // (pretty sure this will never happen)
-    // if it was a real IRQ7, we do need to ack it by sending an EOI
-    if irq_regs.master_isr & 0x80 == 0x80 {
-        println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
-        warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
-        unsafe { PIC.notify_end_of_interrupt(0x27); }
+    if let Some(pic) = PIC.try() {
+        let irq_regs = pic.read_isr_irr();
+        // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
+        // (pretty sure this will never happen)
+        // if it was a real IRQ7, we do need to ack it by sending an EOI
+        if irq_regs.master_isr & 0x80 == 0x80 {
+            println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
+            eoi(Some(0x27));
+        }
+        else {
+            // do nothing. Do not send an EOI.
+        }
     }
     else {
-        // do nothing. Do not send an EOI.
+        error!("spurious_interrupt_handler(): PIC wasn't initialized!");
     }
+
 }
 
 
 
 fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
-    if let Some(ticks) = rtc_ticks {      
-        if (ticks % (CONFIG_TIMESLICE_PERIOD_MS * CONFIG_RTC_FREQUENCY_HZ / 1000)) == 0 {
-            schedule!();
-        }
-    }
-    else {
-        error!("RTC interrupt function: unable to get RTC_TICKS system-wide state.")
-    }
+    trace!("rtc_interrupt_func: rtc_ticks = {:?}", rtc_ticks);
 }
 
 // //0x28
@@ -411,7 +457,7 @@ fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     unsafe { PIC.notify_end_of_interrupt(0x28); }
+//     eoi(Some(0x28));
     
 //     rtc::handle_rtc_interrupt();
 // }
@@ -420,62 +466,65 @@ fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
 //0x2e
 extern "x86-interrupt" fn primary_ata(stack_frame:&mut ExceptionStackFrame ) {
 
-    //let placeholder = 2;
-    
     ata_pio::handle_primary_interrupt();
 
-    
-    unsafe { PIC.notify_end_of_interrupt(0x2e); }
+    eoi(Some(0x2e));
 }
 
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(stack_frame: &mut ExceptionStackFrame) {
-
-    println_unsafe!("UNIMPLEMENTED IRQ!!! {}", unsafe { PIC.read_isr_irr() });
+    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
+    println_unsafe!("UNIMPLEMENTED IRQ!!! {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x22_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x22 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
+    println_unsafe!("\nCaught 0x22 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x23_handler(stack_frame: &mut ExceptionStackFrame) {
+    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
 	println_unsafe!("\nCaught 0x23 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x24_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x24 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());
+    println_unsafe!("\nCaught 0x24 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x25_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x25 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x25 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x26_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x26 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x26 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 extern "x86-interrupt" fn irq_0x29_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x29 interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x29 interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
@@ -483,33 +532,48 @@ extern "x86-interrupt" fn irq_0x29_handler(stack_frame: &mut ExceptionStackFrame
 
 
 extern "x86-interrupt" fn irq_0x2A_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2A interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2A interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2B_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2B interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2B interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2C_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2C interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2C interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
 }
 
 
 extern "x86-interrupt" fn irq_0x2D_handler(stack_frame: &mut ExceptionStackFrame) {
-	println_unsafe!("\nCaught 0x2D interrupt: {:#?}", stack_frame);
-    println_unsafe!("IrqRegs: {}", unsafe { PIC.read_isr_irr() });
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2D interrupt: {:#?}", stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
+}
+
+
+
+extern "x86-interrupt" fn ipi_handler(stack_frame: &mut ExceptionStackFrame) {
+    // Currently, IPIs are only used for TLB shootdowns.
+    
+    // trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+    apic::handle_tlb_shootdown_ipi();
+
+    eoi(None);
 }
 

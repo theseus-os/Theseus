@@ -39,7 +39,7 @@ impl Gdt {
         }
     }
 
-    pub fn load(&'static self) {
+    pub fn load(&self) {
         use x86_64::instructions::tables::{DescriptorTablePointer, lgdt};
         use core::mem::size_of;
 
@@ -133,10 +133,11 @@ impl Descriptor {
     }
     
 
-    // pub fn tss_segment(tss: &'static TaskStateSegment) -> Descriptor {
-    pub fn tss_segment(ptr: u64) -> Descriptor {
+    pub fn tss_segment(tss: &TaskStateSegment) -> Descriptor {
         use core::mem::size_of;
         use bit_field::BitField;
+
+        let ptr = tss as *const _ as u64;
 
         let mut low = DescriptorFlags::PRESENT.bits();
         // base

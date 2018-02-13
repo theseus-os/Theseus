@@ -66,8 +66,6 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
         },
         2 =>{
 
-            // FIXME: Hey wenqiu, please fix this now that you can use real strings (CStr/CString)
-
             let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             use dbus::sysrecv;
 
@@ -148,8 +146,8 @@ unsafe extern "C" fn syscall_handler() {
     // here: once the stack is set up and registers are saved and remapped to local rust vars, then we can do anything we want
     // asm!("sti"); // TODO: we could consider letting interrupts occur while in a system call. Probably should do that. 
     
-    let curr_id = ::task::get_current_task_id();
-    trace!("syscall_handler: curr_tid={}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
+    let curr_id = ::task::get_my_current_task_id();
+    trace!("syscall_handler: curr_tid={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
            curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
@@ -206,8 +204,8 @@ fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
 	// set up user code segment and kernel code segment
     // I believe the cs segment below should be 0x18, not 0x1B, because it's an offset, not a true descriptor with privilege level masks. 
     //      Beelzebub (vercas) sets it as 0x18.
-    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 - 3;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
-    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;   // FIXME: more correct to do "& (!0b11);" rather than "-3"
+    let user_cs = get_segment_selector(AvailableSegmentSelector::UserCode32).0 & (!0b11); // TODO FIXME: should this be UserCode64 ??!?
+    let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
     let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
     unsafe { wrmsr(IA32_STAR, (star_val as u64) << 32); }   //  [63:48] User CS, [47:32] Kernel CS
     debug!("Set IA32_STAR to {:#x}", star_val);

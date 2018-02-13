@@ -10,9 +10,8 @@ use spin::Mutex;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
-use memory::{VirtualMemoryArea, VirtualAddress, PhysicalAddress, EntryFlags, ActivePageTable, FRAME_ALLOCATOR};
-use memory::virtual_address_allocator::OwnedContiguousPages;
-use kernel_config::memory::{PAGE_SIZE, BYTES_PER_ADDR};
+use memory::{VirtualMemoryArea, VirtualAddress, OwnedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+use kernel_config::memory::BYTES_PER_ADDR;
 use goblin::elf::reloc::*;
 
 
@@ -230,22 +229,20 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     };
 
     // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<OwnedContiguousPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Result<OwnedContiguousPages, &'static str>,
-                                                 Result<OwnedContiguousPages, &'static str>, 
-                                                 Result<OwnedContiguousPages, &'static str>) = {
+    // and map them to random frames as writable, returns Result<OwnedPages, &'static str>
+    let (text_pages, rodata_pages, data_pages): (Result<OwnedPages, &'static str>,
+                                                 Result<OwnedPages, &'static str>, 
+                                                 Result<OwnedPages, &'static str>) = {
         let mut allocate_pages_closure = |size_in_bytes: usize| {
-            use memory::virtual_address_allocator::allocate_pages_by_bytes;
-            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes));
+            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
             use memory::FRAME_ALLOCATOR;
             let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
 
-            // right now we're just simply copying small sections to the new memory
-            // so we have to map those pages to real (randomly chosen) frames first
-            for p in 0..allocated_pages.num_pages {
-                // because we're copying bytes to the newly allocated pages, we need to make them writaable too
-                active_table.map(allocated_pages.start + p, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut());
-            }
+            // Right now we're just simply copying small sections to the new memory,
+            // so we have to map those pages to real (randomly chosen) frames first. 
+            // because we're copying bytes to the newly allocated pages, we need to make them writeable too, 
+            // and then change the page permissions (by using remap) later. 
+            active_table.map_pages(allocated_pages.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut());
             Ok(allocated_pages)
         };
 
@@ -291,7 +288,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref tp) = text_pages {
-                                let dest_addr = tp.start.start_address() + (sec.offset() as usize) - text_offset.unwrap();
+                                let dest_addr = tp.start_address() + (sec.offset() as usize) - text_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -340,7 +337,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref rp) = rodata_pages {
-                                let dest_addr = rp.start.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
+                                let dest_addr = rp.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -381,7 +378,7 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
                             }
 
                             if let Ok(ref dp) = data_pages {
-                                let dest_addr = dp.start.start_address() + (sec.offset() as usize) - data_offset.unwrap();
+                                let dest_addr = dp.start_address() + (sec.offset() as usize) - data_offset.unwrap();
 
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
@@ -535,24 +532,18 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
     let all_pages = {
-        let mut all_pages: Vec<OwnedContiguousPages> = Vec::new();
-        
-        let mut remap = |allocated_pages: &OwnedContiguousPages, flags| {
-            for p in 0..allocated_pages.num_pages {
-                active_table.remap(allocated_pages.start + p, flags);
-            }
-        };
+        let mut all_pages: Vec<OwnedPages> = Vec::new();
 
         if let Ok(tp) = text_pages { 
-            remap(&tp, EntryFlags::PRESENT); // present and not noexec
+            active_table.remap_pages(tp.pages.clone(), EntryFlags::PRESENT); // present and not noexec
             all_pages.push(tp); 
         }
         if let Ok(rp) = rodata_pages { 
-            remap(&rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE); // present (just readable)
+            active_table.remap_pages(rp.pages.clone(), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE); // present (just readable)
             all_pages.push(rp); 
         }
         if let Ok(dp) = data_pages { 
-            remap(&dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE); // read/write
+            active_table.remap_pages(dp.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE); // read/write
             all_pages.push(dp); 
         }
 
@@ -610,6 +601,7 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
     let mut text_shndx:   Option<usize> = None;
     let mut rodata_shndx: Option<usize> = None;
     let mut data_shndx:   Option<usize> = None;
+    let mut bss_shndx:   Option<usize> = None;
 
     for (shndx, sec) in elf_file.section_iter().enumerate() {
         // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
@@ -638,11 +630,25 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
                 };
             }
         }
+        // look for .bss section
+        else if let Ok(ShType::NoBits) = sec.get_type() {
+            // skip null section and any empty sections
+            let sec_size = sec.size() as usize;
+            if sec_size == 0 { continue; }
+
+            if let Ok(name) = sec.get_name(&elf_file) {
+                if name == ".bss" {
+                    assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
+                    bss_shndx = Some(shndx);
+                }
+            }
+        }
     }
 
     let text_shndx = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
     let rodata_shndx = try!(rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF"));
     let data_shndx = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
+    let bss_shndx = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
 
@@ -670,40 +676,46 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
                             // debug!("parse_nano_core(): name: {}, vaddr: {:#X}", name, sec_vaddr);
 
                             let demangled = demangle_symbol(name);
-                            let new_section = match entry.shndx() {
-                                text_shndx => {
-                                    LoadedSection::Text(TextSection{
+                            let new_section = {
+                                if entry.shndx() as usize == text_shndx {
+                                    Some(LoadedSection::Text(TextSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
                                 }
-                                rodata_shndx => {
-                                    LoadedSection::Rodata(RodataSection{
+                                else if entry.shndx() as usize == rodata_shndx {
+                                    Some(LoadedSection::Rodata(RodataSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
                                 }
-                                data_shndx => {
-                                    LoadedSection::Data(DataSection{
+                                else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
+                                    Some(LoadedSection::Data(DataSection{
                                         symbol: demangled.symbol,
                                         abs_symbol: demangled.full,
                                         hash: demangled.hash,
                                         virt_addr: sec_vaddr,
                                         size: 0, // TODO FIXME: is it necessary to calculate the size?
                                         global: true,
-                                    })
+                                    }))
+                                }
+                                else {
+                                    error!("Unexpected entry.shndx(): {}", entry.shndx());
+                                    None
                                 }
                             };
 
-                            sections.push(Arc::new(new_section));
+                            if new_section.is_some() {
+                                sections.push(Arc::new(new_section.unwrap()));
+                            }
                         }
                     }
                 }

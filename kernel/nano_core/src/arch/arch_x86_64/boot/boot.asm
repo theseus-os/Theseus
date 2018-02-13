@@ -13,7 +13,7 @@ KERNEL_OFFSET equ 0xFFFFFFFF80000000
 global start
 
 ; Section must have the permissions of .text
-section .init.text progbits alloc exec nowrite
+section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 start:
 	; The bootloader has loaded us into 32-bit protected mode on a x86
@@ -32,7 +32,7 @@ start:
 	;
 	; We subtract KERNEL_OFFSET from the stack address because we are not yet
 	; mapped to the higher half
-	mov esp, initial_stack_top - KERNEL_OFFSET
+	mov esp, initial_bsp_stack_top - KERNEL_OFFSET
 
 	; The multiboot2 specification requires the bootloader to load a pointer
 	; to the multiboot2 information structure in the `ebx` register. Here we
@@ -220,6 +220,7 @@ set_up_SSE:
 
 ; Prints `ERR: ` and the given error code to screen and hangs.
 ; parameter: error code (in ascii) in al
+global _error
 _error:
 	mov dword [0xb8000], 0x4f524f45
 	mov dword [0xb8004], 0x4f3a4f52
@@ -255,7 +256,7 @@ start_high:
 	
 	; for easy use of multiboot2 data structures,
 	; we preserve an identity mapping that's the same as the higher-half mapping.
-	; The rust code in remap_the_kernel() will erase the kernel's identity mapping later.
+	; The rust code will erase the kernel's identity mapping later before jumping to userspace programs.
 	;;; ; get rid of the old identity map, but
 	;;; ; continue to identity map the first Mb
 	;;; mov rax, low_p2_table - KERNEL_OFFSET
@@ -305,6 +306,43 @@ KEXIT:
 .loop:
 	hlt
 	jmp .loop
+
+
+
+; Performs the actual context switch from prev to next task.
+; First argument  (rdi): mutable pointer to the previous task's stack pointer
+; Second argument (rsi): the value of the next task's stack pointer
+global task_switch
+task_switch: 
+	push rbx
+	push rbp
+	push r12
+	push r13
+	push r14
+	push r15
+
+	; save current stack pointer into prev task
+	mov [rdi], rsp
+	; load stack pointer from next task
+	mov rsp, rsi
+
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop rbp
+	pop rbx
+	; pops the last value off the top of the stack,
+	; so the new task's stack top must point to a target function
+	ret
+
+
+
+
+
+
+
+
 
 section .rodata
 ; TODO TSS <http://wiki.osdev.org/Task_State_Segment>
@@ -359,8 +397,8 @@ kernel_table:
 ; stack is properly aligned and failure to align the stack will result in
 ; undefined behavior.
 align 16
-global initial_stack_bottom
-initial_stack_bottom:
-	resb 4096 * 5
-global initial_stack_top
-initial_stack_top:
+global initial_bsp_stack_bottom
+initial_bsp_stack_bottom:
+	resb 4096 * 16
+global initial_bsp_stack_top
+initial_bsp_stack_top:
