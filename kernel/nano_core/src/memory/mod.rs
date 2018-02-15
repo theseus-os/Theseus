@@ -46,12 +46,19 @@ pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
 
 
 /// The one and only frame allocator, a singleton. 
-pub static FRAME_ALLOCATOR: Once<Mutex<AreaFrameAllocator>> = Once::new();
+pub static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
 
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
     frame_allocator.allocate_frame()
+}
+
+
+/// Convenience method for allocating several contiguous Frames.
+pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
+    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
+    frame_allocator.allocate_frames(num_frames)
 }
 
 
@@ -367,8 +374,8 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
     occupied[2] = PhysicalMemoryArea::new(boot_info.start_address() - KERNEL_OFFSET, boot_info.end_address()-boot_info.start_address(), 1, 0); // preserve bootloader info (optional)
 
     let fa = try!( AreaFrameAllocator::new(available, avail_index, occupied, 3));
-    let frame_allocator_mutex: &Mutex<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        Mutex::new( fa ) 
+    let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
+        MutexIrqSafe::new( fa ) 
     });
 
     let mut kernel_vmas: [VirtualMemoryArea; 32] = Default::default();
@@ -560,7 +567,7 @@ impl Frame {
         Frame { number: self.number }
     }
 
-    fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
+    pub fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
         FrameIter {
             start: start,
             end: end,
@@ -610,9 +617,16 @@ impl SubAssign<usize> for Frame {
     }
 }
 
+#[derive(Debug)]
 pub struct FrameIter {
-    start: Frame,
-    end: Frame,
+    pub start: Frame,
+    pub end: Frame,
+}
+
+impl FrameIter {
+    pub fn start_address(&self) -> PhysicalAddress {
+        self.start.start_address()
+    }
 }
 
 impl Iterator for FrameIter {
@@ -631,5 +645,6 @@ impl Iterator for FrameIter {
 
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter>;
     fn deallocate_frame(&mut self, frame: Frame);
 }

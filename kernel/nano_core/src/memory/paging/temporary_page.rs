@@ -80,6 +80,12 @@ impl FrameAllocator for TinyAllocator {
         None
     }
 
+    
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter> {
+        unimplemented!();
+    }
+
+
     fn deallocate_frame(&mut self, frame: Frame) {
         for frame_option in &mut self.0 {
             if frame_option.is_none() {
