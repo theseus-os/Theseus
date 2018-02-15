@@ -414,7 +414,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 }
 
 
-/// Spawns a new  userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
+/// Spawns a new userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
 /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
 pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<RwLock<Task>>, &'static str> {
 
@@ -422,12 +422,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
     debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(
-        match name {
-            Some(x) => x,
-            None => module.name(),
-        }
-    ));
+    new_task.set_name(String::from(name.unwrap_or(module.name())));
 
     let mut ustack: Option<Stack> = None;
 

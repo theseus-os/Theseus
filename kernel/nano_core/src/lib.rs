@@ -121,12 +121,21 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
 
 fn test_loop_3(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_3!");
+
+    {
+        use memory::{PhysicalMemoryArea, FRAME_ALLOCATOR};
+        let test_area = PhysicalMemoryArea::new(0xFFF7000, 0x10000, 1, 3);
+        FRAME_ALLOCATOR.try().unwrap().lock().add_area(test_area, false).unwrap();
+    }
+
+
     loop {
         let mut i = 10000000; // usize::max_value();
         while i > 0 {
             i -= 1;
             // if i % 3 == 0 {
-            //     debug!("GOT FRAME: {:?}", memory::allocate_frame()); // TODO REMOVE
+            //     debug!("GOT FRAME: {:?}",  memory::allocate_frame()); // TODO REMOVE
+            //     debug!("GOT FRAMES: {:?}", memory::allocate_frames(20)); // TODO REMOVE
             // }
         }
         print!("3");
