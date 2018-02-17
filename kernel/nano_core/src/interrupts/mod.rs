@@ -22,6 +22,8 @@ use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 
+use drivers::e1000;
+
 
 mod exceptions;
 mod gdt;
@@ -271,10 +273,11 @@ pub fn init_handlers_apic() {
         for i in 32..255 {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
-
+        
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
+        idt[0x2B].set_handler_fn(nic_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
 
@@ -293,6 +296,7 @@ pub fn init_handlers_pic() {
 		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
 
+       
         // MASTER PIC starts here (0x20 - 0x27)
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
@@ -316,6 +320,7 @@ pub fn init_handlers_pic() {
 
         idt[0x2E].set_handler_fn(primary_ata);
         // 0x2F missing right now
+
     }
 
     // init PIC, PIT and RTC interrupts
@@ -350,7 +355,6 @@ fn eoi(irq: Option<u8>) {
 }
 
 
-
 /// 0x20
 extern "x86-interrupt" fn pit_timer_handler(stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
@@ -383,6 +387,12 @@ extern "x86-interrupt" fn lapic_timer_handler(stack_frame: &mut ExceptionStackFr
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
     
     schedule!();
+}
+
+/// 0x2B
+extern "x86-interrupt" fn nic_handler(stack_frame: &mut ExceptionStackFrame) {
+    e1000::e1000_handler();
+	eoi(Some(0x2B));
 }
 
 

@@ -2,23 +2,17 @@ pub mod input;
 pub mod ata_pio;
 pub mod pci;
 pub mod acpi;
-
 pub mod e1000;
-pub mod arp;
+pub mod test_nic_driver;
+
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
-use drivers::e1000::e1000_nc;
-use drivers::pci::PciDevice;
-use drivers::arp::arp_packet;
+use drivers::test_nic_driver::DHCP_request_packet;
 
-//????
-use drivers::pci::get_pci_device_vd;
-static INTEL_VEND: u16 =  0x8086;  // Vendor ID for Intel 
-static E1000_DEV:  u16 =  0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-
+use drivers::e1000::init_nic;
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -60,6 +54,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
         debug!("Found pci device: {:?}", dev);
     }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 
 <<<<<<< HEAD
@@ -180,6 +175,10 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
 
     
 >>>>>>> Driver with basic Tx working
+=======
+    init_nic();
+    //DHCP_request_packet();
+>>>>>>> updated e1000 driver with a DMA struct and interrupt handler
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

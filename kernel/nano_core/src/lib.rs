@@ -89,7 +89,7 @@ use alloc::string::String;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use core::ops::DerefMut;
 use interrupts::tsc;
-use drivers::{ata_pio, pci};
+use drivers::{ata_pio, pci, test_nic_driver};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
@@ -145,6 +145,9 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
+
+    //sending packet -
+    //test_nic_driver::DHCP_request_packet();
     
     unsafe{
         let mut table = get_connection_table().write();
