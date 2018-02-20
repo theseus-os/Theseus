@@ -133,15 +133,16 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     }
 }
 
-
+fn test_driver(_: Option<u64>) {
+    print!("TESTING DRIVER!!");
+    test_nic_driver::DHCP_request_packet();
+}
 
 
 fn first_thread_main(arg: Option<u64>) -> u64  {
     println!("Hello from first thread, arg: {:?}!!", arg);
 
-    //sending packet -
-    //test_nic_driver::DHCP_request_packet();
-    
+   
     unsafe{
         let mut table = get_connection_table().write();
         let mut connection = table.get_connection(String::from("bus.connection.first"))
@@ -336,17 +337,20 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         }
     }
 
-    // create some extra tasks to test context switching
     if true {
+        spawn_kthread(test_driver, None,  "driver_test_thread");
+    }
+
+    // create some extra tasks to test context switching
+    /*if true {
         spawn_kthread(first_thread_main, Some(6),  "first_thread");
         spawn_kthread(second_thread_main, 6, "second_thread");
         spawn_kthread(third_thread_main, String::from("hello"), "third_thread");
         spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread");
-
         spawn_kthread(test_loop_1, None, "test_loop_1");
         spawn_kthread(test_loop_2, None, "test_loop_2"); 
         spawn_kthread(test_loop_3, None, "test_loop_3"); 
-    }
+    }*/
 
 	
     // attempt to parse a test kernel module

@@ -11,6 +11,7 @@ use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalA
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
 use drivers::pci::pci_read_32;
+use drivers::pci::pci_read_8;
 use drivers::pci::pci_write;
 use drivers::pci::get_pci_device_vd;
 use drivers::pci::pci_set_command_bus_master_bit;
@@ -20,6 +21,7 @@ static E1000_DEV:  u16 =        0x100E;  // Device ID for the e1000 Qemu, Bochs,
 const E1000_I217: u16 =         0x153A;  // Device ID for Intel I217
 const E1000_82577LM: u16 =      0x10EA;  // Device ID for Intel 82577LM
 const PCI_BAR0:u16 =            0x10;
+const PCI_INTERRUPT_LINE:        u16 = 0x3C;
 
 const REG_CTRL: u32 =        0x0000;
 const REG_STATUS: u32 =      0x0008;
@@ -46,6 +48,7 @@ const REG_RADV: u32 =         0x282C; // RX Int. Absolute Delay Timer
 const REG_RSRPD: u32 =        0x2C00; // RX Small Packet Detect Interrupt
  
 const REG_MTA: u32 =          0x5200; 
+const REG_CRCERRS: u32 =      0x4000;        
  
 const REG_TIPG: u32 =         0x0410;      // Transmit Inter Packet Gap
 const ECTRL_SLU: u32 =        0x40;        //set link up
@@ -507,13 +510,25 @@ impl nic{
         pub fn start_link (&self) -> bool { 
                 //for i217 just check that bit1 is set of reg status
                 let val = self.read_command(REG_CTRL);
-                self.write_command(REG_CTRL, val|0x40);
+                self.write_command(REG_CTRL, val | 0x40 | 0x20);
+
+                let val = self.read_command(REG_CTRL);
+                self.write_command(REG_CTRL, val & !(1<<3) & !(1<<7) & !(1<<30) & !(1<<31));
+
+                debug!("REG_CTRL: {:#X}", self.read_command(REG_CTRL));
+
                 return true;           
         } 
 
         pub fn clear_multicast (&self) {
                 for i in 0..128{
 		        self.write_command(REG_MTA + (i * 4), 0);
+                }
+        }
+
+        pub fn clear_statistics (&self) {
+                for i in 0..64{
+		        self.write_command(REG_CRCERRS + (i * 4), 0);
                 }
         }      
 
@@ -762,10 +777,13 @@ pub fn init_nic() {
         let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
         debug!("e1000 Device found: {:?}", pci_dev);
         let e1000_pci = pci_dev.unwrap();
-        debug!("e1000 Device unwrapped: {:?}", pci_dev);
+        //debug!("e1000 Device unwrapped: {:?}", pci_dev);
         let mut e1000_nc = E1000_NIC.lock();       
-        debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
+        //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
+        //pci_write(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE,0x2B);
+        debug!("Int line: {}" ,pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE));
+
         e1000_nc.init(e1000_pci);
         e1000_nc.mem_map(e1000_pci);
         e1000_nc.mem_map_dma();
@@ -773,6 +791,7 @@ pub fn init_nic() {
         e1000_nc.read_mac_addr();
         e1000_nc.start_link();
         e1000_nc.clear_multicast();
+        e1000_nc.clear_statistics();
         e1000_nc.enable_interrupts();
         e1000_nc.rx_init();
         e1000_nc.tx_init();

@@ -91,7 +91,7 @@ fn pci_read_16(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
 } 
 
 /// read 8-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
+pub fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
     pci_read_32(bus, slot, func, offset) as u8
 }
 
