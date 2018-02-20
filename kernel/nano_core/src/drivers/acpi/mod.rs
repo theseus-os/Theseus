@@ -70,7 +70,7 @@ fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static S
         let start_page = Page::containing_address(sdt_address as VirtualAddress) + 1; // the next page, we already did the first one
         let end_page = Page::containing_address(sdt_address + (sdt.length as usize));
         for page in Page::range_inclusive(start_page, end_page) {
-            if let Some(frame) = active_table.translate_page(page) {
+            if let Some(_frame) = active_table.translate_page(page) {
                 trace!("extra length sdt_address {:#x} was already mapped!", sdt_address);
             }
             else {
@@ -143,7 +143,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
     }
 
     // Search for RSDP
-    if let Some((rsdp, rsdp_mapped_pages)) = RSDP::get_rsdp(active_table) {
+    if let Some((rsdp, _rsdp_mapped_pages)) = RSDP::get_rsdp(active_table) {
         let rxsdt = get_sdt(rsdp.sdt_address(), active_table);
         debug!("rxsdt: {:?}", rxsdt);
 
@@ -180,13 +180,14 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         }
 
         Fadt::init(active_table);
-        Hpet::init(active_table);
+        try!(Hpet::init(active_table));
         let madt_iter = Madt::init(active_table);
         // Dmar::init(active_table);
         // init_namespace();
 
         madt_iter
 
+        // _rsdp_mapped_pages is dropped and auto-unmapped here
     } 
     else {
         error!("NO RSDP FOUND");

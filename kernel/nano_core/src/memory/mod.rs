@@ -7,31 +7,30 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub use self::area_frame_allocator::AreaFrameAllocator;
-pub use self::paging::*; //{Page, PageIter, PageTable, ActivePageTable, InactivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
-pub use self::stack_allocator::{StackAllocator, Stack};
 
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
 
-pub use self::paging::virtual_address_allocator::{allocate_pages, allocate_pages_by_bytes, AllocatedPages};
+
+pub use self::area_frame_allocator::AreaFrameAllocator;
+pub use self::paging::*;
+pub use self::stack_allocator::{StackAllocator, Stack};
+
 
 use multiboot2::BootInformation;
-use spin::{Once, Mutex};
+use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
 use alloc::Vec;
-use alloc::string::String;
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use task;
 use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
 use mod_mgmt::metadata;
 
+
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
-
 
 
 /// The memory management info and address space of the kernel

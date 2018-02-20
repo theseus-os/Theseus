@@ -2,7 +2,6 @@ extern crate keycodes_ascii; // our own crate in "libs/" dir
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
-use core::default::Default;
 use spin::Once;
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;

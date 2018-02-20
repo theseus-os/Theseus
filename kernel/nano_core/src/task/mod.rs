@@ -1,18 +1,18 @@
 
-use spin::{Once, RwLock};
+use spin::RwLock;
 use irq_safety::MutexIrqSafe;
-use alloc::{BTreeMap, Vec};
+use alloc::Vec;
 use alloc::string::String;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use arch::{pause, Context};
 use alloc::boxed::Box;
 use core::fmt;
 use core::mem;
 use core::ops::DerefMut;
-use memory::{get_kernel_mmi_ref, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, PhysicalAddress};
+use memory::{get_kernel_mmi_ref, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use atomic_linked_list::atomic_map::{AtomicMap, AtomicMapIter, AtomicMapIterMut};
+use atomic_linked_list::atomic_map::AtomicMap;
 
 #[macro_use] pub mod scheduler;
 
@@ -60,6 +60,7 @@ pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 #[repr(u8)] // one byte
 #[derive(PartialEq, Debug, Copy, Clone)]
+#[allow(dead_code)]
 pub enum RunState {
     /// in the midst of setting up the task
     INITING = 0,
@@ -217,9 +218,15 @@ impl Task {
         {
             use interrupts::tss_set_rsp0;
             let next_kstack = next.kstack.as_ref().expect("context_switch(): error: next task's kstack was None!");
-            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2);
-            tss_set_rsp0(new_tss_rsp0); // the middle half of the stack
-            // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
+            if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+                // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            }
+            else {
+                error!("context_switch(): failed to set AP {} TSS RSP0, aborting context switch!", apic_id);
+                my_context_switch_lock.store(false, Ordering::SeqCst);
+                return;
+            }
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
@@ -601,7 +608,8 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 ///
 /// ## Returns
 /// An Option with a reference counter for the removed Task.
-pub fn remove_task(id: usize) -> Option<Arc<RwLock<Task>>> {
+#[allow(dead_code)]
+pub fn remove_task(_id: usize) -> Option<Arc<RwLock<Task>>> {
     unimplemented!();
 // assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
     // TASKLIST.remove(id)
@@ -667,25 +675,19 @@ fn userspace_wrapper() -> ! {
 
     debug!("userspace_wrapper [0]");
 
-    // the three things we need to invoke jump_to_userspace
-    let current_task: *mut Task; 
+    // the things we need to invoke jump_to_userspace
     let ustack_top: usize;
     let entry_func: usize; 
 
     { // scoped to release tasklist lock before calling jump_to_userspace
-        let mut currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
-        current_task = currtask.deref_mut() as *mut Task;
     }
-
     debug!("userspace_wrapper [1]: ustack_top: {:#x}, module_entry: {:#x}", ustack_top, entry_func);
 
-
-    assert!(current_task as usize != 0, "userspace_wrapper(): current_task was null!");
-    // SAFE: current_task is checked for null
+    // SAFE: just jumping to userspace 
     unsafe {
-        let curr: &mut Task = &mut (*current_task); // dereference current_task and get a ref to it
         ::arch::jump_to_userspace(ustack_top, entry_func);
     }
 

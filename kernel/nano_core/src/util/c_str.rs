@@ -24,10 +24,12 @@ use alloc::String;
 
 
 /// Taken from Rust std lib
+#[allow(non_camel_case_types)]
 pub type c_char = i8;
 
 /// memchr/memrchr implementations taken from the std lib memchr backup implementation
 /// (typically used on platforms where a memchr implementation doesn't exist)
+#[allow(dead_code)]
 mod memchr{
 
 	#[inline(always)] // reduces constant overhead

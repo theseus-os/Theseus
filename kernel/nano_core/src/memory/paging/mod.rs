@@ -7,10 +7,19 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+mod virtual_address_allocator;
+mod entry;
+mod table;
+mod temporary_page;
+mod mapper;
+
+
 pub use self::entry::*;
-use memory::{Frame, FRAME_ALLOCATOR, FrameAllocator, AllocatedPages};
 pub use self::temporary_page::TemporaryPage;
-pub use self::mapper::Mapper;
+pub use self::mapper::*;
+pub use self::virtual_address_allocator::*;
+
+
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
 use super::*;
@@ -19,13 +28,8 @@ use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned};
-use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
-pub mod virtual_address_allocator;
-mod entry;
-mod table;
-mod temporary_page;
-mod mapper;
 
 
 
@@ -170,78 +174,6 @@ impl Iterator for PageIter {
         }
     }
 }
-
-/// Represents a mapped range of virtual addresses, specified in pages. 
-/// This object also represents ownership of those pages; if this object falls out of scope,
-/// it will be dropped, and the pages will be unmapped, and if they were allocated, then also de-allocated. 
-/// Thus, it ensures memory safety by guaranteeing that this object must be held 
-/// in order to access data stored in these mapped pages, 
-/// just like a MutexGuard guarantees that data protected by a Mutex can only be accessed
-/// while that Mutex's lock is held. 
-#[derive(Debug)]
-pub struct MappedPages {
-    /// The P4 Frame of the ActivePageTable that this MappedPages was originally mapped into. 
-    page_table_p4: Frame,
-    /// The actual range of pages contained by this mapping
-    pages: PageIter,
-    /// The AllocatedPages that were covered by this mapping. 
-    /// If is_some(), it means the pages were allocated by the virtual_address_allocator
-    /// and should be deallocated. 
-    /// If is_none(), then it was pre-reserved without allocation and doesn't need to be "freed",
-    /// but rather just unmapped.
-    allocated: Option<AllocatedPages>,
-}
-
-impl MappedPages {
-	/// Returns the start address of the first page. 
-	pub fn start_address(&self) -> VirtualAddress {
-		self.pages.start_address()
-	}
-
-    /// Constructs a MappedPages object from an already existing mapping.
-    /// Useful for creating idle task Stacks, for example. 
-    pub fn from_existing(already_mapped_pages: PageIter) -> MappedPages {
-        MappedPages {
-            page_table_p4: get_current_p4(),
-            pages: already_mapped_pages,
-            allocated: None,
-        }
-    }
-}
-
-impl Drop for MappedPages {
-    #[inline]
-    fn drop(&mut self) {
-        // skip logging temp page unmapping, since it's the most common
-        if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-            warn!("MappedPages::drop(): unmapping {:?}", self);
-        } 
-
-        // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
-        // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
-
-        assert!(get_current_p4() == self.page_table_p4, 
-                "MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
-                 cannot unmap MappedPages from a different page table than they were originally mapped to!",
-                 get_current_p4(), self.page_table_p4);
-
-        let mut frame_allocator = match FRAME_ALLOCATOR.try() {
-            Some(fa) => fa.lock(),
-            _ => {
-                error!("MappedPages::drop(): couldn't get FRAME_ALLOCATOR!");
-                return;
-            }
-        };
-        let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
-        if let Err(e) = active_table.unmap(self.pages.clone(), frame_allocator.deref_mut()) {
-            error!("MappedPages::drop(): failed to unmap!");
-        }
-
-        // Note that the AllocatedPages will automatically be dropped here too,
-        // we do not need to call anything to make that happen
-    }
-}
-
 
 
 /// the owner of the recursively defined P4 page table. 
@@ -398,9 +330,7 @@ pub enum PageTable {
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 pub fn get_current_p4() -> Frame {
-    unsafe {
-        Frame::containing_address(control_regs::cr3().0 as usize)
-    }
+    Frame::containing_address(control_regs::cr3().0 as usize)
 }
 
 

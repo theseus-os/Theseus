@@ -64,7 +64,6 @@ bitflags! {
 impl EntryFlags {
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
-        // ::{ELF_SECTION_ALLOCATED, ELF_SECTION_WRITABLE, ELF_SECTION_EXECUTABLE};
 
         let mut flags = EntryFlags::empty();
 
@@ -103,8 +102,6 @@ impl EntryFlags {
     }
 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
-        use xmas_elf::program::{FLAG_R, FLAG_W, FLAG_X};
-        
         let mut flags = EntryFlags::empty();
         
         if prog_flags.is_read() {

@@ -297,7 +297,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
-    let console_queue_producer = console::init();
+    let console_queue_producer = console::init().unwrap();
 
     // initialize the rest of our drivers
     drivers::init(console_queue_producer);
@@ -352,14 +352,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // create some extra tasks to test context switching
     if true {
-        spawn_kthread(first_thread_main, Some(6),  "first_thread");
-        spawn_kthread(second_thread_main, 6, "second_thread");
-        spawn_kthread(third_thread_main, String::from("hello"), "third_thread");
-        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread");
+        spawn_kthread(first_thread_main, Some(6),  "first_thread").unwrap();
+        spawn_kthread(second_thread_main, 6, "second_thread").unwrap();
+        spawn_kthread(third_thread_main, String::from("hello"), "third_thread").unwrap();
+        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread").unwrap();
 
-        spawn_kthread(test_loop_1, None, "test_loop_1");
-        spawn_kthread(test_loop_2, None, "test_loop_2"); 
-        spawn_kthread(test_loop_3, None, "test_loop_3"); 
+        spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
+        spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
+        spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
     }
 
 	
@@ -398,14 +398,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_1"));
+        spawn_userspace(module, Some("test_program_1")).unwrap();
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_2"));
+        spawn_userspace(module, Some("test_program_2")).unwrap();
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -413,7 +413,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a system call module");
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
-        spawn_userspace(module, None);
+        spawn_userspace(module, None).unwrap();
     }
 
     // a second duplicate syscall test user task
@@ -421,7 +421,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a receive system call module");
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
-        spawn_userspace(module, None);
+        spawn_userspace(module, None).unwrap();
     }
 
     interrupts::enable_interrupts();
@@ -436,9 +436,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // cleanup here
-    logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
-    
-    
+    // logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 
 }
 

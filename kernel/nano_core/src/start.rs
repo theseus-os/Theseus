@@ -15,17 +15,6 @@ use spin::RwLock;
 pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 
-#[repr(packed)]
-#[derive(Debug)]
-pub struct KernelArgsAp {
-    processor_id: u64,
-    apic_id: u64,
-    flags: u64,
-    page_table: u64,
-    stack_start: u64,
-    stack_end: u64,
-}
-
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
 pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
