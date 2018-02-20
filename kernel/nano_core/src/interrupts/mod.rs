@@ -277,7 +277,7 @@ pub fn init_handlers_apic() {
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
-        idt[0x2B].set_handler_fn(nic_handler);
+        idt[0x2B].set_handler_fn(irq_0x2B_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
 
@@ -314,7 +314,8 @@ pub fn init_handlers_pic() {
 
         idt[0x29].set_handler_fn(irq_0x29_handler); 
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
-        idt[0x2B].set_handler_fn(irq_0x2B_handler); 
+        idt[0x2B].set_handler_fn(irq_0x2B_handler);
+        //idt[0x2B].set_handler_fn(nic_handler); 
         idt[0x2C].set_handler_fn(irq_0x2C_handler); 
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
@@ -393,6 +394,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(stack_frame: &mut ExceptionStackFrame) {
+    debug!("nic handler called");
     e1000::e1000_handler();
 	eoi(Some(0x2B));
 }
