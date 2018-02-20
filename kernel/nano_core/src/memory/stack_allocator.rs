@@ -10,8 +10,11 @@ pub struct StackAllocator {
 impl StackAllocator {
     /// Create a new `StackAllocator` that allocates random frames
     /// and maps them to the given range of `Page`s.
-    pub fn new(page_range: PageIter, usermode: bool) -> StackAllocator {
-        StackAllocator { range: page_range, usermode: usermode }
+    pub fn new(range: PageIter, usermode: bool) -> StackAllocator {
+        StackAllocator { 
+            range: range, 
+            usermode: usermode,
+        }
     }
 }
 
@@ -57,9 +60,9 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                for page in Page::range_inclusive(start, end) {
-                    active_table.map(page, flags, frame_allocator);
-                }
+                let stack_pages = try_opt!(active_table.map_pages(
+                    Page::range_inclusive(start, end), flags, frame_allocator).ok()
+                );
 
                 let stack_vma = VirtualMemoryArea::new(
                     start.start_address(),
@@ -71,7 +74,7 @@ impl StackAllocator {
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some( (Stack::new(top_of_stack, start.start_address()), stack_vma) )
+                Some( (Stack::new(top_of_stack, start.start_address(), stack_pages), stack_vma) )
             }
             _ => {
                 error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
@@ -85,14 +88,16 @@ impl StackAllocator {
 pub struct Stack {
     top: usize,
     bottom: usize,
+    pages: MappedPages,
 }
 
 impl Stack {
-    pub fn new(top: usize, bottom: usize) -> Stack {
+    pub fn new(top: usize, bottom: usize, pages: MappedPages) -> Stack {
         assert!(top > bottom);
         Stack {
             top: top,
             bottom: bottom,
+            pages: pages,
         }
     }
 

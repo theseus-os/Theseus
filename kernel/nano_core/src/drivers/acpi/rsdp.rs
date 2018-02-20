@@ -1,5 +1,9 @@
 use kernel_config::memory::KERNEL_OFFSET;
-use memory::{Frame, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags};
+use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use core::ops::DerefMut;
+
+const RDSP_SEARCH_START: PhysicalAddress = 0xE_0000;
+const RDSP_SEARCH_END:   PhysicalAddress = 0xF_FFFF;
 
 /// RSDP
 #[derive(Copy, Clone, Debug)]
@@ -17,15 +21,25 @@ pub struct RSDP {
 }
 
 impl RSDP {
-    /// Search for the RSDP
-    pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<RSDP> {
-        let start_addr = 0xE_0000 + KERNEL_OFFSET;
-        let end_addr = 0xF_FFFF + KERNEL_OFFSET;
-        // The whole area from 0x0 to 0x10_0000 has already been mapped to the higher half in remap_the_kernel()
-
-        let rsdp = RSDP::search(start_addr, end_addr);
+    /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
+    /// Returns the RDSP structure and the pages that are currently mapping it.
+    pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<(RSDP, MappedPages)> {
+        let size: usize = RDSP_SEARCH_END - RDSP_SEARCH_START;
+        let pages = try_opt!(allocate_pages_by_bytes(size));
+        let search_range = Frame::range_inclusive(
+            Frame::containing_address(RDSP_SEARCH_START),
+            Frame::containing_address(RDSP_SEARCH_END)
+        );
+        
+        let mapped_pages = {
+            let allocator_mutex = try_opt!(FRAME_ALLOCATOR.try());
+            let mut allocator = allocator_mutex.lock();
+            try_opt!(active_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.deref_mut()).ok())
+        };
+        let rsdp = RSDP::search(mapped_pages.start_address(), mapped_pages.start_address() + size);
         debug!("Found RSDP at addr {:#X}: {:?}", &rsdp as *const _ as usize, rsdp);
-        rsdp
+        
+        rsdp.and_then(|r| Some((r, mapped_pages)))
     }
 
     fn search(start_addr: usize, end_addr: usize) -> Option<RSDP> {

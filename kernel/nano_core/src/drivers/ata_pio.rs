@@ -98,7 +98,7 @@ fn read_primary_data_port()-> Result<[u16; 256], u16>{
 	for word in 0..256{
 		let mut loop_count = 0;
 
-    	while(!ata_data_transfer_ready()){
+    	while !ata_data_transfer_ready() {
 			loop_count +=1;
 			trace!("data port not ready in read_primary_data_port function");
 			if loop_count > 1000{
@@ -119,7 +119,7 @@ fn write_primary_data_port(arr: [u16;256])-> Result<u16, u16>{
 	for index in 0..256{
 
 		let mut loop_count = 0;
-		while(!ata_data_transfer_ready()){
+		while !ata_data_transfer_ready() {
 			//breaks loop and returns 
 			loop_count += 1;
 			trace!("data port not ready in write_primary_data_port function");
@@ -176,11 +176,11 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     
     
     //wait for update-in-progress value (bit 7 of COMMAND_IO port) to be set to 0
-    command_value =(COMMAND_IO.lock().read());
-    while ((command_value>>7)%2 != 0)  {
+    command_value = COMMAND_IO.lock().read();
+    while ((command_value>>7) % 2) != 0  {
         //trace to debug and view value being received
         trace!("{}: update-in-progress in disk drive COMMAND_IO bit 7 not cleared", command_value);
-        command_value = (COMMAND_IO.lock().read());
+        command_value = COMMAND_IO.lock().read();
     }
     
     
@@ -191,13 +191,13 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     
 	//waits for error bit or data ready bit to set, one of these should set at this point
     command_value = COMMAND_IO.lock().read();
-    while((command_value>>3)%2 ==0 && command_value%2 == 0){
-        trace!("{} is bit 0 of COMMAND_IO which should be cleared, {} is bit 6 which should be set",command_value, command_value>>3);
+    while ((command_value >> 3) % 2) == 0 && (command_value % 2) == 0 {
+        trace!("{} is bit 0 of COMMAND_IO which should be cleared, {} is bit 6 which should be set", command_value, command_value >> 3);
         command_value = COMMAND_IO.lock().read();
     }
 
 	//if error is the value set, returns all 0 AtaIdentify
-	if command_value%2 == 1{
+	if (command_value % 2) == 1 {
 		trace!("Error bit is set");
 		
 		return identify_data;

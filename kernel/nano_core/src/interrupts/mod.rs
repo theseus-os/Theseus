@@ -265,7 +265,7 @@ pub fn init_handlers_apic() {
     {
         let mut idt = IDT.lock(); // withholds interrupts
         
-        // exceptions (IRQS from 0 -31) have already been inited before
+        // exceptions (IRQS from 0-31) have already been inited before
 
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
@@ -408,7 +408,7 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(stack_frame: &mut
 
     loop { }
 
-    eoi(None);
+    // eoi(None);
 }
 
 

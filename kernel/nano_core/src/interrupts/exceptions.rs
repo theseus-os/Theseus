@@ -99,7 +99,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 
 pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
-    error!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+    error!("\nEXCEPTION: PAGE FAULT (early handler) while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}",
              control_regs::cr2(),
              error_code,
@@ -128,10 +128,8 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 /// this shouldn't really ever happen, but I added the handler anyway
 /// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    // use x86_64::registers::control_regs;
     println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",
-//             control_regs::cr2(),
              error_code,
              stack_frame);
 

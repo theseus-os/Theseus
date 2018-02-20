@@ -10,7 +10,7 @@ use spin::Mutex;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
-use memory::{VirtualMemoryArea, VirtualAddress, OwnedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+use memory::{VirtualMemoryArea, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
 use kernel_config::memory::BYTES_PER_ADDR;
 use goblin::elf::reloc::*;
 
@@ -128,14 +128,14 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_name: &str, active_table: &mut ActivePageTable)
+pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &str, active_table: &mut ActivePageTable)
     -> Result<LoadedCrate, &'static str>
 {
     // all kernel module crate names must start with "__k_"
     const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
 
+    let start_addr = mapped_pages.start_address() as usize as *const u8;
     debug!("Parsing Elf kernel crate: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
-    let start_addr = start_addr as *const u8;
     if start_addr.is_null() {
         error!("parse_elf_kernel_crate(): start_addr is null!");
         return Err("start_addr for parse_elf_kernel_crate is null!");
@@ -229,24 +229,24 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
     };
 
     // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<OwnedPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Result<OwnedPages, &'static str>,
-                                                 Result<OwnedPages, &'static str>, 
-                                                 Result<OwnedPages, &'static str>) = {
+    // and map them to random frames as writable, returns Result<MappedPages, &'static str>
+    let (text_pages, rodata_pages, data_pages): (Result<MappedPages, &'static str>,
+                                                 Result<MappedPages, &'static str>, 
+                                                 Result<MappedPages, &'static str>) = {
+        use memory::FRAME_ALLOCATOR;
+        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+
         let mut allocate_pages_closure = |size_in_bytes: usize| {
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
-            use memory::FRAME_ALLOCATOR;
-            let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
 
             // Right now we're just simply copying small sections to the new memory,
             // so we have to map those pages to real (randomly chosen) frames first. 
             // because we're copying bytes to the newly allocated pages, we need to make them writeable too, 
             // and then change the page permissions (by using remap) later. 
-            active_table.map_pages(allocated_pages.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut());
-            Ok(allocated_pages)
+            active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
         };
 
-        // we must allocated these pages separately because they will have different flags
+        // we must allocate these pages separately because they will have different flags
         (
             allocate_pages_closure(text_bytecount), 
             allocate_pages_closure(rodata_bytecount), 
@@ -531,34 +531,29 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
-    let all_pages = {
-        let mut all_pages: Vec<OwnedPages> = Vec::new();
-
-        if let Ok(tp) = text_pages { 
-            active_table.remap_pages(tp.pages.clone(), EntryFlags::PRESENT); // present and not noexec
-            all_pages.push(tp); 
-        }
-        if let Ok(rp) = rodata_pages { 
-            active_table.remap_pages(rp.pages.clone(), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE); // present (just readable)
-            all_pages.push(rp); 
-        }
-        if let Ok(dp) = data_pages { 
-            active_table.remap_pages(dp.pages.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE); // read/write
-            all_pages.push(dp); 
-        }
-
-        all_pages
-    };
+    let mut all_pages: Vec<MappedPages> = Vec::with_capacity(3); // max 3, for text, rodata, data
+    if let Ok(tp) = text_pages { 
+        try!(active_table.remap(&tp, EntryFlags::PRESENT)); // present and not noexec
+        all_pages.push(tp);
+    }
+    if let Ok(rp) = rodata_pages { 
+        try!(active_table.remap(&rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
+        all_pages.push(rp);
+    }
+    if let Ok(dp) = data_pages { 
+        try!(active_table.remap(&dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
+        all_pages.push(dp);
+    }
     
-
     // extract just the sections from the section map
     let (_keys, values): (Vec<usize>, Vec<Arc<LoadedSection>>) = loaded_sections.into_iter().unzip();
     let kernel_module_name_prefix_end = KERNEL_MODULE_NAME_PREFIX.len();
 
+
     Ok(LoadedCrate {
         crate_name: String::from(module_name.get(kernel_module_name_prefix_end..).unwrap()), 
         sections: values,
-        owned_pages: all_pages,
+        mapped_pages: all_pages,
     })
 
 }
@@ -567,10 +562,10 @@ pub fn parse_elf_kernel_crate(start_addr: VirtualAddress, size: usize, module_na
 
 // parses the nano_core ELF file, which is not loaded (because it is already loaded and running right out of the gate) 
 // but rather searched for global symbols, which are added to the system map and the crate metadata
-pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<LoadedCrate, &'static str> {
+pub fn parse_nano_core(mapped_pages: MappedPages, size: usize) -> Result<LoadedCrate, &'static str> {
     const module_name: &'static str = "nano_core";
+    let start_addr = mapped_pages.start_address() as usize as *const u8;
     debug!("Parsing nano_core: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
-    let start_addr = start_addr as *const u8;
     if start_addr.is_null() {
         error!("parse_nano_core(): start_addr is null!");
         return Err("start_addr for parse_nano_core is null!");
@@ -601,7 +596,7 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
     let mut text_shndx:   Option<usize> = None;
     let mut rodata_shndx: Option<usize> = None;
     let mut data_shndx:   Option<usize> = None;
-    let mut bss_shndx:   Option<usize> = None;
+    let mut bss_shndx:    Option<usize> = None;
 
     for (shndx, sec) in elf_file.section_iter().enumerate() {
         // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
@@ -645,10 +640,10 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
         }
     }
 
-    let text_shndx = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
+    let text_shndx   = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
     let rodata_shndx = try!(rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF"));
-    let data_shndx = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
-    let bss_shndx = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
+    let data_shndx   = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
+    let bss_shndx    = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
 
@@ -728,7 +723,7 @@ pub fn parse_nano_core(start_addr: VirtualAddress, size: usize) -> Result<Loaded
     Ok(LoadedCrate {
         crate_name: String::from("nano_core"), 
         sections: loaded_sections,
-        owned_pages: Vec::default(),
+        mapped_pages: vec![mapped_pages],
     })
 }
 

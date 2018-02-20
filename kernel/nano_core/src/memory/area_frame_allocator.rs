@@ -165,13 +165,6 @@ impl AreaFrameAllocator {
             }
         };
     }
-
-    /// Call this when the kernel heap has been set up
-    pub fn alloc_ready(&mut self) {
-        self.available.upgrade_to_vector();
-        self.occupied.upgrade_to_vector();
-    }
-
 }
 
 impl FrameAllocator for AreaFrameAllocator {
@@ -242,7 +235,15 @@ impl FrameAllocator for AreaFrameAllocator {
         }
     }
 
+    
     fn deallocate_frame(&mut self, _frame: Frame) {
         unimplemented!()
+    }
+
+
+    /// Call this when the kernel heap has been set up
+    fn alloc_ready(&mut self) {
+        self.available.upgrade_to_vector();
+        self.occupied.upgrade_to_vector();
     }
 }

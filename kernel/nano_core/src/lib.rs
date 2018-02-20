@@ -68,8 +68,8 @@ extern crate test_lib;
 extern crate rtc;
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+#[macro_use] pub mod util; // must come first because it contains just macros
 #[macro_use] mod drivers;  
-#[macro_use] mod util;
 mod arch;
 #[macro_use] mod task;
 #[macro_use] mod dbus;
@@ -235,7 +235,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
-    let kernel_mmi_ref = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
+    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -270,6 +270,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack")
         )
     };
+    // the three stacks we allocated above are never dropped because they stay in scope in this function,
+    // but IMO that's not a great design, and they should probably be stored by the interrupt module and the syscall module instead.
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
                     .expect("failed to initialize interrupts!");
 
@@ -304,14 +306,21 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // boot up the other cores (APs)
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
-        info!("Finished handling all of the AP cores.");
+        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi)
+                        .expect("Error handling AP cores");
+        info!("Finished handling and booting up all {} AP cores.", ap_count);
     }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
+    ::core::mem::drop(identity_mapped_pages);
+
+    // NOTE that we save the `higher_half_mapped_pages` here too
+    
+
+    // TODO: verify that the identity-mapped sections are now all zeros 
     {
         use memory::PageTable;
         let mut kernel_mmi = kernel_mmi_ref.lock();
