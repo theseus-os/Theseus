@@ -1,7 +1,6 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
 use alloc::string::String;
-use irq_safety::RwLockIrqSafeWriteGuard;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};

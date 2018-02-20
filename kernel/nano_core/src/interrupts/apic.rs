@@ -1,9 +1,9 @@
 use core::ptr::{read_volatile, write_volatile};
-use spin::{Mutex, MutexGuard, RwLock, Once};
+use spin::{RwLock, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags, OwnedPages, allocate_pages};
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use drivers::acpi::madt::{MadtEntry, MadtIter};
@@ -27,7 +27,7 @@ lazy_static! {
 }
 
 /// The Page where the APIC chip has been mapped.
-static APIC_PAGE: Once<OwnedPages> = Once::new();
+static APIC_PAGE: Once<MappedPages> = Once::new();
 
 /// The processor id (from the ACPI MADT table) of the bootstrap processor
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
@@ -114,17 +114,23 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
     let phys_addr = unsafe { rdmsr(IA32_APIC_BASE) };
     debug!("is x2apic? {}.  IA32_APIC_BASE: {:#X}", x2, phys_addr);
+    
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
-    // x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
+    // IMO, x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
     // writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
-    let apic_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
-    if !has_x2apic() {;
-        let frame = Frame::containing_address(phys_addr as PhysicalAddress);
-        let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-        active_table.map_to(apic_page.pages.start, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
+    if !has_x2apic() {
+        let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
+        let frames = Frame::range_inclusive(Frame::containing_address(phys_addr as PhysicalAddress), Frame::containing_address(phys_addr as PhysicalAddress));
+        let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
+        let apic_mapped_page = try!(active_table.map_allocated_pages_to(
+            new_page, 
+            frames, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+            fa.deref_mut())
+        );
+        APIC_PAGE.call_once( || apic_mapped_page);
     }
 
-    APIC_PAGE.call_once( || apic_page);
     Ok(())
 }
 
@@ -446,7 +452,6 @@ impl LocalApic {
     /// Sends an IPI to all other cores (except me) to trigger 
     /// a TLB flush of the given `VirtualAddress`
     pub fn send_tlb_shootdown_ipi(&mut self, vaddr: VirtualAddress) {
-
 
         // temporary page is not shared across cores
         use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};

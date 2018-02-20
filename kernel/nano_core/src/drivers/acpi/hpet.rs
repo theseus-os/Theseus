@@ -3,13 +3,13 @@ use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
 use spin::Once; 
 
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
+use memory::{MappedPages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
 
 use super::sdt::Sdt;
 use super::{ACPI_TABLE, find_sdt, load_table, get_sdt_signature};
 
 
-static HPET_VIRT_ADDR: Once<VirtualAddress> = Once::new();
+static HPET_PAGE: Once<MappedPages> = Once::new();
 
 
 
@@ -30,31 +30,31 @@ pub struct Hpet {
 }
 
 impl Hpet {
-    pub fn init(active_table: &mut ActivePageTable) {
+    pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         let hpet_sdt = find_sdt("HPET");
-        let hpet = if hpet_sdt.len() == 1 {
-            load_table(get_sdt_signature(hpet_sdt[0]));
-            Hpet::new(hpet_sdt[0], active_table)
-        } else {
-            error!("Unable to find HPET");
-            return;
-        };
+        let hpet = try!( 
+            if hpet_sdt.len() == 1 {
+                load_table(get_sdt_signature(hpet_sdt[0]));
+                Hpet::new(hpet_sdt[0], active_table)
+            } else {
+                error!("Unable to find HPET SDT");
+                Err("unable to find HPET SDT")
+            }
+        );
+        debug!("  HPET: {:X} {:?}", hpet.hpet_number, hpet);
 
-        if let Some(hpet) = hpet {
-            debug!("  HPET: {:X} {:?}", hpet.hpet_number, hpet);
-
-            let mut hpet_t = ACPI_TABLE.hpet.write();
-            *hpet_t = Some(hpet);
-        }
+        let mut hpet_t = ACPI_TABLE.hpet.write();
+        *hpet_t = Some(hpet);
+        Ok(())
     }
 
-    pub fn new(sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Option<Hpet> {
+    pub fn new(sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<Hpet, &'static str> {
         if &sdt.signature == b"HPET" && sdt.length as usize >= mem::size_of::<Hpet>() {
             let s = unsafe { ptr::read((sdt as *const Sdt) as *const Hpet) };
-            unsafe { s.base_address.init(active_table) };
-            Some(s)
+            unsafe { try!(s.base_address.init(active_table)) };
+            Ok(s)
         } else {
-            None
+            Err("Couldn't create new Hpet SDT")
         }
     }
 }
@@ -70,13 +70,14 @@ pub struct GenericAddressStructure {
 }
 
 impl GenericAddressStructure {
-    pub fn init(&self, active_table: &mut ActivePageTable) {
+    pub fn init(&self, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         let vaddr = (self.address + 0xFFFF_FFFF_0000_0000) as VirtualAddress;
         let page = Page::containing_address(vaddr);
         let frame = Frame::containing_address(self.address as PhysicalAddress);
         let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-        active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut());
-        HPET_VIRT_ADDR.call_once(|| vaddr);
+        let hpet_page = try!(active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut()));
+        HPET_PAGE.call_once(|| hpet_page);
+        Ok(())
     }
 
     pub unsafe fn read_u64(&self, offset: usize) -> u64 {

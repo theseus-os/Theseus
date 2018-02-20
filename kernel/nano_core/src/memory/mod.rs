@@ -14,9 +14,8 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
-mod virtual_address_allocator;
 
-pub use self::virtual_address_allocator::{allocate_pages, allocate_pages_by_bytes, OwnedPages};
+pub use self::paging::virtual_address_allocator::{allocate_pages, allocate_pages_by_bytes, AllocatedPages};
 
 use multiboot2::BootInformation;
 use spin::{Once, Mutex};
@@ -75,6 +74,11 @@ pub struct MemoryManagementInfo {
     /// the list of virtual memory areas mapped currently in this Task's address space
     pub vmas: Vec<VirtualMemoryArea>,
 
+    /// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
+    /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
+    /// Someday this could likely replace the vmas list, but VMAs offer sub-page granularity for now.
+    pub extra_mapped_pages: Vec<MappedPages>,
+
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
     pub stack_allocator: stack_allocator::StackAllocator,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 }
@@ -92,7 +96,7 @@ impl MemoryManagementInfo {
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
     /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator } = self;
+        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
     
         match page_table {
             &mut PageTable::Active(ref mut active_table) => {
@@ -243,8 +247,7 @@ impl VirtualMemoryArea {
 
         // check that the end_page won't be invalid
         if (self.start + self.size) < 1 {
-            // return an "empty" iterator (one that goes from 1 to 0, so no iterations happen)
-            return Page::range_inclusive( Page::containing_address(PAGE_SIZE), Page::containing_address(0) );
+            return PageIter::empty();
         }
         
         let start_page = Page::containing_address(self.start);
@@ -306,7 +309,7 @@ impl VirtualMemoryArea {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagementInfo>>, &'static str> {
+pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> {
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
@@ -318,7 +321,7 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
     // Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
     // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
     // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
-    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in remap_the_kernel.
+    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.
     let kernel_phys_start: PhysicalAddress = try!(elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
         .map(|s| s.start_address())
@@ -378,26 +381,9 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
         MutexIrqSafe::new( fa ) 
     });
 
-    let mut kernel_vmas: [VirtualMemoryArea; 32] = Default::default();
-    let mut active_table = paging::remap_the_kernel(frame_allocator_mutex.lock().deref_mut(), &boot_info, &mut kernel_vmas).unwrap();
-
-
-    // The heap memory must be mapped before it can initialized! Map it and then init it here. 
-    use self::paging::Page;
-    use heap_irq_safe;
-    let heap_start_page = Page::containing_address(KERNEL_HEAP_START);
-    let heap_end_page = Page::containing_address(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE - 1);
-    let heap_flags = paging::EntryFlags::WRITABLE;
-    let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-    for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        active_table.map(page, heap_flags, frame_allocator_mutex.lock().deref_mut());
-    }
-    heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
-
-    // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
-    {
-        frame_allocator_mutex.lock().alloc_ready();
-    }
+    let (active_table, kernel_vmas, higher_half_mapped_pages, identity_mapped_pages) = try!(
+        paging::init(frame_allocator_mutex, &boot_info)
+    );
 
 
     // copy the list of modules (currently used for userspace programs)
@@ -417,9 +403,7 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
     });
 
 
-    let mut task_zero_vmas: Vec<VirtualMemoryArea> = kernel_vmas.to_vec();
-    task_zero_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
-    task_zero_vmas.push(heap_vma);
+    
 
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
@@ -432,7 +416,8 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
     // return the kernel's (task_zero's) memory info 
     let kernel_mmi = MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
-        vmas: task_zero_vmas,
+        vmas: kernel_vmas,
+        extra_mapped_pages: higher_half_mapped_pages,
         stack_allocator: kernel_stack_allocator, 
     };
 
@@ -440,7 +425,7 @@ pub fn init(boot_info: BootInformation) -> Result<Arc<MutexIrqSafe<MemoryManagem
         Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    Ok(kernel_mmi_ref.clone())
+    Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
 
 }
 
@@ -477,34 +462,30 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
-                let module_flags = EntryFlags::PRESENT;
-                {
-                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.map_frames(Frame::range_inclusive_addr(module.start_address(), module.size()), 
-                                            Page::containing_address(module.start_address() as VirtualAddress), // identity mapping
-                                            module_flags, frame_allocator.deref_mut());  
-                }
+                let temp_module_mapping = {
+                    let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for crate module"));
+                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+                    try!( active_table.map_allocated_pages_to(
+                        new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                        EntryFlags::PRESENT, frame_allocator.deref_mut())
+                    )
+                };
 
                 let new_crate = try!( {
                     // the nano_core requires special handling because it has already been loaded,
                     // we just need to parse its symbols and add them to the symbol table & crate metadata lists
                     if module.name() == "__k_nano_core" {
-                        parse_nano_core(module.start_address(), module.size())
+                        parse_nano_core(temp_module_mapping, module.size())
                     }
                     else {
-                        parse_elf_kernel_crate(module.start_address(), module.size(), module.name(), active_table)
+                        parse_elf_kernel_crate(temp_module_mapping, module.size(), module.name(), active_table)
                     }
                 });
-
-                // now we can unmap the module because we're done reading from it in the ELF parser
-                {
-                    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                    active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
-                }
 
                 info!("loaded new crate: {}", new_crate.crate_name);
                 Ok(metadata::add_crate(new_crate))
 
+                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
             }
             _ => {
                 error!("load_kernel_crate(): error getting kernel's active page table to map module.");
@@ -627,6 +608,16 @@ impl FrameIter {
     pub fn start_address(&self) -> PhysicalAddress {
         self.start.start_address()
     }
+
+    /// Create a duplicate of this FrameIter. 
+    /// We do this instead of implementing/deriving the Clone trait
+    /// because we want to prevent Rust from cloning `FrameIter`s implicitly.
+    pub fn clone(&self) -> FrameIter {
+        FrameIter {
+            start: self.start.clone(),
+            end: self.end.clone(),
+        }
+    }
 }
 
 impl Iterator for FrameIter {
@@ -647,4 +638,6 @@ pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
     fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter>;
     fn deallocate_frame(&mut self, frame: Frame);
+    /// Call this when a heap is set up, and the `alloc` types can be used.
+    fn alloc_ready(&mut self);
 }

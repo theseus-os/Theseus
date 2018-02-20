@@ -6,11 +6,11 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 // use syscall::io::{Io, Pio};
 
-use spin::RwLock;
+use spin::{Mutex, RwLock};
 
 // use stop::kstop;
 
-use memory::{MemoryManagementInfo, ActivePageTable, Page, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{ActivePageTable, Page, MappedPages, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
@@ -36,6 +36,9 @@ mod xsdt;
 mod rxsdt;
 mod rsdp;
 
+
+
+
 /// The address that an AP jumps to when it first is booted by the BSP
 const AP_STARTUP: PhysicalAddress = 0x8000; 
 /// small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
@@ -53,7 +56,10 @@ fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static S
         }
         else {
             let frame = Frame::containing_address(page.start_address() as PhysicalAddress);
-            active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut());
+            ACPI_TABLE_MAPPED_PAGES.lock().push(
+                active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
+                            .expect("get_sdt(): couldn't map page to frame")
+            );
         }
     }
 
@@ -69,7 +75,11 @@ fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static S
             }
             else {
                 let frame = Frame::containing_address(page.start_address() as PhysicalAddress);
-                active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut());
+                ACPI_TABLE_MAPPED_PAGES.lock().push(
+                    active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
+                                .expect("get_sdt(): couldn't map page to frame")
+                );
+        
             }
         }
     }
@@ -133,7 +143,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
     }
 
     // Search for RSDP
-    if let Some(rsdp) = RSDP::get_rsdp(active_table) {
+    if let Some((rsdp, rsdp_mapped_pages)) = RSDP::get_rsdp(active_table) {
         let rxsdt = get_sdt(rsdp.sdt_address(), active_table);
         debug!("rxsdt: {:?}", rxsdt);
 
@@ -152,7 +162,9 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         // is now off-limits and should not be touched
         {
             let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address() as usize, rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
-            try!(FRAME_ALLOCATOR.try().unwrap().lock().add_area(rxsdt_area, false));
+            try!(
+                try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock().add_area(rxsdt_area, false)
+            );
         }
 
         rxsdt.map_all(active_table); // TODO: FIXME: change this to not be an identity mapping, but rather to use our VirtualAddressAllocator
@@ -281,3 +293,7 @@ pub static ACPI_TABLE: Acpi = Acpi {
     hpet: RwLock::new(None),
     next_ctx: RwLock::new(0),
 };
+
+lazy_static! {
+    static ref ACPI_TABLE_MAPPED_PAGES: Mutex<Vec<MappedPages>> = Mutex::new(Vec::new());
+}
