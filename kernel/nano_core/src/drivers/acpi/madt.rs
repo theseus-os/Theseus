@@ -83,7 +83,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
         match madt_entry {
             MadtEntry::IoApic(ioa) => {
                 ioapic_count += 1;
-                ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base);
+                try!(ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base));
             }
             // we only handle IoApic entries here
             _ => { }

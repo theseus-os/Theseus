@@ -1,4 +1,3 @@
-use kernel_config::memory::KERNEL_OFFSET;
 use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use core::ops::DerefMut;
 

@@ -3,8 +3,6 @@ use spin::{Once, Mutex};
 use core::sync::atomic::{Ordering};
 use interrupts::pit_clock;
 
-#[allow(dead_code)]
-
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
 
 //port data is read/write from
@@ -385,21 +383,21 @@ impl Default for AtaDevices{
 impl ::core::fmt::Display for AtaIdentifyData {
 	fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result
 	{
-		write!(f, "AtaIdentifyData {{");
-		write!(f, " flags: {:#x}", self.flags);
-		write!(f, " serial_number: {:?}", RawString(&self.serial_number));
-		write!(f, " firmware_ver: {:?}", RawString(&self.firmware_ver));
-		write!(f, " model_number: {:?}", RawString(&self.model_number));
-		write!(f, " sect_per_int: {}", self.sect_per_int & 0xFF);
-		write!(f, " capabilities: [{:#x},{:#x}]", self.capabilities[0], self.capabilities[1]);
-		write!(f, " valid_ext_data: {}", self.valid_ext_data);
-		write!(f, " size_of_rw_multiple: {}", self.size_of_rw_multiple);
-		write!(f, " sector_count_28: {:#x}", self.sector_count_28);
-		write!(f, " sector_count_48: {:#x}", self.sector_count_48);
-		write!(f, " physical_sector_size: {}", self.physical_sector_size);
-		write!(f, " words_per_logical_sector: {}", self.words_per_logical_sector);
-		write!(f, "}}");
-		Ok( () )
+		try!(write!(f, "AtaIdentifyData {{"));
+		try!(write!(f, "  flags: {:#x}", self.flags));
+		try!(write!(f, "  serial_number: {:?}", RawString(&self.serial_number)));
+		try!(write!(f, "  firmware_ver: {:?}", RawString(&self.firmware_ver)));
+		try!(write!(f, "  model_number: {:?}", RawString(&self.model_number)));
+		try!(write!(f, "  sect_per_int: {}", self.sect_per_int & 0xFF));
+		try!(write!(f, "  capabilities: [{:#x},{:#x}]", self.capabilities[0], self.capabilities[1]));
+		try!(write!(f, "  valid_ext_data: {}", self.valid_ext_data));
+		try!(write!(f, "  size_of_rw_multiple: {}", self.size_of_rw_multiple));
+		try!(write!(f, "  sector_count_28: {:#x}", self.sector_count_28));
+		try!(write!(f, "  sector_count_48: {:#x}", self.sector_count_48));
+		try!(write!(f, "  physical_sector_size: {}", self.physical_sector_size));
+		try!(write!(f, "  words_per_logical_sector: {}", self.words_per_logical_sector));
+		try!(write!(f, "}}"));
+		Ok(())
 	}
 }
 

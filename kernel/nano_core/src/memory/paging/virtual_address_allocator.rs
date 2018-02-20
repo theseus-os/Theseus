@@ -55,7 +55,9 @@ impl AllocatedPages {
 impl Drop for AllocatedPages {
     #[inline]
     fn drop(&mut self) {
-        deallocate_pages(self);
+        if let Err(_) = deallocate_pages(self) {
+			error!("AllocatedPages::drop(): error deallocating pages");
+		}
     }
 }
 
@@ -153,6 +155,6 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 fn deallocate_pages(_pages: &mut AllocatedPages) -> Result<(), ()> {
 	warn!("Virtual Address Allocator: deallocated_pages is not yet implemented, trying to dealloc: {:?}", _pages);
-	Err(())
+	Ok(())
 	// unimplemented!();
 }

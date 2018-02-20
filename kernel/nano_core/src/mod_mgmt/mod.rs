@@ -2,16 +2,12 @@ use xmas_elf;
 use xmas_elf::ElfFile;
 use xmas_elf::sections::{SectionHeader, SectionData, ShType};
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
-use core::mem;
 use core::slice;
-use core::ptr;
 use core::ops::DerefMut;
-use spin::Mutex;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
-use alloc::arc::{Arc, Weak};
+use alloc::arc::Arc;
 use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
-use kernel_config::memory::BYTES_PER_ADDR;
 use goblin::elf::reloc::*;
 
 
@@ -431,7 +427,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             if sec_size == 0 { continue; }
 
             // offset is the destination 
-            use xmas_elf::sections::SectionData::{Rela32, Rela64};
+            use xmas_elf::sections::SectionData::Rela64;
             use xmas_elf::symbol_table::Entry;
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info());
 
@@ -563,9 +559,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 // parses the nano_core ELF file, which is not loaded (because it is already loaded and running right out of the gate) 
 // but rather searched for global symbols, which are added to the system map and the crate metadata
 pub fn parse_nano_core(mapped_pages: MappedPages, size: usize) -> Result<LoadedCrate, &'static str> {
-    const module_name: &'static str = "nano_core";
     let start_addr = mapped_pages.start_address() as usize as *const u8;
-    debug!("Parsing nano_core: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
+    debug!("Parsing nano_core: start_addr {:#x}, size {:#x}({})", start_addr as usize, size, size);
     if start_addr.is_null() {
         error!("parse_nano_core(): start_addr is null!");
         return Err("start_addr for parse_nano_core is null!");
