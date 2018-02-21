@@ -45,7 +45,7 @@ impl Madt {
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
             try!(handle_ioapic_entry(iter.clone(), active_table));
-            try!(handle_bsp_entry(iter.clone(), active_table));
+            try!(handle_bsp_entry(iter.clone()));
             Ok(iter)
         } else {
             error!("Unable to find MADT");
@@ -100,7 +100,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 }
 
 
-fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
@@ -175,8 +175,8 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
 
     let active_table_phys_addr: PhysicalAddress;
-    let trampoline_mapped_page: MappedPages;
-    let ap_startup_mapped_pages: MappedPages;
+    let _trampoline_mapped_page: MappedPages; // must be held until APs are booted up
+    let ap_startup_mapped_pages: MappedPages; // must be held until APs are booted up
 
     {
         let &mut MemoryManagementInfo { 
@@ -195,7 +195,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
                 let trampoline_frame = Frame::containing_address(TRAMPOLINE);
                 
-                trampoline_mapped_page = try!( active_table.map_to(
+                _trampoline_mapped_page = try!( active_table.map_to(
                     trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
                 );
                 ap_startup_mapped_pages = try!( active_table.map_frames(

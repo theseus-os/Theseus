@@ -19,7 +19,7 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 /// The arguments must match the invocation order in "ap_boot.asm"
 pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
                  stack_start: VirtualAddress, stack_end: VirtualAddress,
-                 madt_iter: &MadtIter) -> ! 
+                 madt_iter: MadtIter) -> ! 
 {
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 

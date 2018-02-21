@@ -254,7 +254,7 @@ impl Mapper {
                 .ok_or("mapping code does not support huge pages")
             );
             
-            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
+            let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
             p1[page.p1_index()].set_unused();
 
             tlb::flush(x86_64::VirtualAddress(page.start_address()));
@@ -327,8 +327,8 @@ impl Drop for MappedPages {
     fn drop(&mut self) {
         // skip logging temp page unmapping, since it's the most common
         if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-            warn!("MappedPages::drop(): unmapping {:?}", self);
-        } 
+            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
+        }
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
@@ -345,9 +345,10 @@ impl Drop for MappedPages {
                 return;
             }
         };
+        
         let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
         if let Err(e) = active_table.unmap(self.pages.clone(), frame_allocator.deref_mut()) {
-            error!("MappedPages::drop(): failed to unmap!");
+            error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 
         // Note that the AllocatedPages will automatically be dropped here too,

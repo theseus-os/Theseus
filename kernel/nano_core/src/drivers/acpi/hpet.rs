@@ -51,7 +51,7 @@ impl Hpet {
     pub fn new(sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<Hpet, &'static str> {
         if &sdt.signature == b"HPET" && sdt.length as usize >= mem::size_of::<Hpet>() {
             let s = unsafe { ptr::read((sdt as *const Sdt) as *const Hpet) };
-            unsafe { try!(s.base_address.init(active_table)) };
+            try!(s.base_address.init(active_table));
             Ok(s)
         } else {
             Err("Couldn't create new Hpet SDT")
@@ -74,7 +74,7 @@ impl GenericAddressStructure {
         let vaddr = (self.address + 0xFFFF_FFFF_0000_0000) as VirtualAddress;
         let page = Page::containing_address(vaddr);
         let frame = Frame::containing_address(self.address as PhysicalAddress);
-        let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+        let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
         let hpet_page = try!(active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE, fa.deref_mut()));
         HPET_PAGE.call_once(|| hpet_page);
         Ok(())

@@ -111,8 +111,8 @@ impl MemoryManagementInfo {
                 }
             }
             _ => {
-                // panic, because this should never happen
-                panic!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable!");
+                error!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable! \
+                        You must not call alloc_stack on an MMI page table that isn't currently the ActivePageTable.");
                 None
             }
         }

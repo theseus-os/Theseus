@@ -21,12 +21,9 @@
 //! different base interrupts, because DOS used interrupt 0x21 for system
 //! calls.
 
-#![feature(const_fn)]
-#![no_std]
-
-extern crate port_io;
 
 use core::fmt;
+use port_io;
 
 
 /// Command sent to read the Interrupt Request Register.
