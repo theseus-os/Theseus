@@ -644,7 +644,6 @@ pub fn parse_nano_core(mapped_pages: MappedPages, size: usize) -> Result<LoadedC
 
     let loaded_sections = {
         let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
-        let mut globals: BTreeSet<(VirtualAddress, &str)> = BTreeSet::new();
         use xmas_elf::symbol_table::Entry;
         for entry in symtab.iter() {
             use xmas_elf::symbol_table::Visibility;

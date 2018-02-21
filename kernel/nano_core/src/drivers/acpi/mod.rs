@@ -10,7 +10,8 @@ use spin::{Mutex, RwLock};
 
 // use stop::kstop;
 
-use memory::{ActivePageTable, Page, MappedPages, PhysicalMemoryArea, PhysicalAddress, VirtualAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use kernel_config::memory::address_page_offset;
 use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
@@ -37,54 +38,93 @@ mod rxsdt;
 mod rsdp;
 
 
-
-
 /// The address that an AP jumps to when it first is booted by the BSP
 const AP_STARTUP: PhysicalAddress = 0x8000; 
 /// small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
 /// Value: 0x7E00
 const TRAMPOLINE: PhysicalAddress = AP_STARTUP - 512;
 
-fn get_sdt(sdt_address: usize, active_table: &mut ActivePageTable) -> &'static Sdt {
-    
-    let mut allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-    
-    {
-        let page = Page::containing_address(sdt_address as VirtualAddress); // FIXME: temp using identity mapping
-        if let Some(frame) = active_table.translate_page(page) {
-            trace!("initial sdt_address {:#x} was already mapped to frame {:#x}!", sdt_address, frame.start_address());
-        }
-        else {
-            let frame = Frame::containing_address(page.start_address() as PhysicalAddress);
-            ACPI_TABLE_MAPPED_PAGES.lock().push(
-                active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
-                            .expect("get_sdt(): couldn't map page to frame")
-            );
-        }
-    }
 
-    let sdt = unsafe { &*(sdt_address as *const Sdt) };
+pub struct Acpi {
+    pub fadt: RwLock<Option<Fadt>>,
+    // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
+    pub hpet: RwLock<Option<Hpet>>,
+    pub next_ctx: RwLock<u64>,
+}
 
-    // Map extra SDT frames if required
-    {
-        let start_page = Page::containing_address(sdt_address as VirtualAddress) + 1; // the next page, we already did the first one
-        let end_page = Page::containing_address(sdt_address + (sdt.length as usize));
-        for page in Page::range_inclusive(start_page, end_page) {
-            if let Some(_frame) = active_table.translate_page(page) {
-                trace!("extra length sdt_address {:#x} was already mapped!", sdt_address);
+pub static ACPI_TABLE: Acpi = Acpi {
+    fadt: RwLock::new(None),
+    // namespace: RwLock::new(None),
+    hpet: RwLock::new(None),
+    next_ctx: RwLock::new(0),
+};
+
+lazy_static! {
+    static ref ACPI_TABLE_MAPPED_PAGES: Mutex<BTreeMap<Frame, MappedPages>> = Mutex::new(BTreeMap::new());
+}
+
+
+
+fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> Result<&'static Sdt, &'static str> {
+    
+    let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
+    let addr_offset = address_page_offset(sdt_address);
+    let first_frame = Frame::containing_address(sdt_address);
+
+    // first, make sure the given sdt_address is mapped to a virtual memory Page, so we can access it
+    let sdt_virt_addr = {
+        let opt: Option<VirtualAddress> = {
+            let frame_to_page_mappings = ACPI_TABLE_MAPPED_PAGES.lock();
+            if let Some(mapped_page) = frame_to_page_mappings.get(&first_frame) {
+                // the given sdt_address has already been mapped
+                // trace!("get_sdt(): sdt_address {:#X} ({:?}) was already mapped to Page {:?}.", sdt_address, first_frame, mapped_page);
+                Some(mapped_page.start_address() + addr_offset)
             }
             else {
-                let frame = Frame::containing_address(page.start_address() as PhysicalAddress);
-                ACPI_TABLE_MAPPED_PAGES.lock().push(
-                    active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
-                                .expect("get_sdt(): couldn't map page to frame")
-                );
-        
+                None
+            }
+        };
+        if let Some(vaddr) = opt {
+            vaddr
+        }
+        else {
+            // here, the given sdt_address has not yet been mapped, so map it
+            let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
+            let mapped_page = try!(active_table.map_allocated_pages_to(
+                pages, Frame::range_inclusive(first_frame.clone(), first_frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
+            );
+            let vaddr = mapped_page.start_address() + addr_offset;
+            // trace!("get_sdt(): mapping sdt_address {:#X} ({:?}) to virt_addr {:#X}.", sdt_address, first_frame, vaddr);
+            
+            ACPI_TABLE_MAPPED_PAGES.lock().insert(first_frame.clone(), mapped_page);
+
+            vaddr
+        }
+    };
+
+    // SAFE: sdt_virt_addr was mapped above
+    let sdt = unsafe { &*(sdt_virt_addr as *const Sdt) };
+    // debug!("get_sdt(): sdt = {:?}", sdt);
+
+    // Map extra SDT frames if required
+    let end_frame = Frame::containing_address(sdt_address + sdt.length as usize);
+    for frame in Frame::range_inclusive(first_frame + 1, end_frame) { // +1 because we already mapped first_frame above
+        let mut frame_to_page_mappings = ACPI_TABLE_MAPPED_PAGES.lock();
+        {
+            if let Some(_mapped_page) = frame_to_page_mappings.get(&frame) {
+                // trace!("get_sdt():     extra length sdt_address {:?} was already mapped to {:?}!", frame, _mapped_page);
+                continue;
             }
         }
+
+        let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
+        let mapped_page = try!(active_table.map_allocated_pages_to(
+            pages, Frame::range_inclusive(frame.clone(), frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
+        );
+        frame_to_page_mappings.insert(frame, mapped_page);
     }
 
-    sdt
+    Ok(sdt)
 }
 
 // fn init_aml_table(sdt: &'static Sdt) {
@@ -144,7 +184,11 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
     // Search for RSDP
     if let Some((rsdp, _rsdp_mapped_pages)) = RSDP::get_rsdp(active_table) {
-        let rxsdt = get_sdt(rsdp.sdt_address(), active_table);
+        // { 
+        //     ACPI_TABLE_MAPPED_PAGES.lock().push(_rsdp_mapped_pages);
+        // }
+
+        let rxsdt = try!(get_sdt(rsdp.sdt_address(), active_table));
         debug!("rxsdt: {:?}", rxsdt);
 
         let rxsdt: Box<Rxsdt + Send + Sync> = {
@@ -167,11 +211,25 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
             );
         }
 
-        rxsdt.map_all(active_table); // TODO: FIXME: change this to not be an identity mapping, but rather to use our VirtualAddressAllocator
+        try!(rxsdt.map_all(active_table));
+
+        {
+            let mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
+            debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", mapped_pages);
+        }
 
 
-        for sdt_address in rxsdt.iter() {
-            let sdt = unsafe { &*(sdt_address as *const Sdt) };
+        for sdt_paddr in rxsdt.iter() {
+            let sdt_vaddr: VirtualAddress = {
+                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
+                    page.start_address() + address_page_offset(sdt_paddr)
+                }
+                else {
+                    error!("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr: {:#X}", sdt_paddr);
+                    return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for every sdt_paddr");
+                }
+            };
+            let sdt = unsafe { &*(sdt_vaddr as *const Sdt) };
 
             let signature = get_sdt_signature(sdt);
             if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {
@@ -179,7 +237,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
             }
         }
 
-        Fadt::init(active_table);
+        try!(Fadt::init(active_table));
         try!(Hpet::init(active_table));
         let madt_iter = Madt::init(active_table);
         // Dmar::init(active_table);
@@ -187,7 +245,8 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
         madt_iter
 
-        // _rsdp_mapped_pages is dropped and auto-unmapped here
+        // _rsdp_mapped_pages is dropped here and auto-unmapped
+
     } 
     else {
         error!("NO RSDP FOUND");
@@ -279,22 +338,4 @@ pub fn get_index_from_signature(signature: SdtSignature) -> Option<usize> {
     }
 
     None
-}
-
-pub struct Acpi {
-    pub fadt: RwLock<Option<Fadt>>,
-    // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
-    pub hpet: RwLock<Option<Hpet>>,
-    pub next_ctx: RwLock<u64>,
-}
-
-pub static ACPI_TABLE: Acpi = Acpi {
-    fadt: RwLock::new(None),
-    // namespace: RwLock::new(None),
-    hpet: RwLock::new(None),
-    next_ctx: RwLock::new(0),
-};
-
-lazy_static! {
-    static ref ACPI_TABLE_MAPPED_PAGES: Mutex<Vec<MappedPages>> = Mutex::new(Vec::new());
 }

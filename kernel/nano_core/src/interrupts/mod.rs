@@ -72,7 +72,7 @@ pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::AP
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InterruptChip {
     APIC,
-    x2apic,
+    X2APIC,
     PIC,
 }
 
@@ -141,7 +141,7 @@ pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> 
 /// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) -> Result<(), &'static str> {
 
-    init_early_exceptions(); // this was probably already done earlier, but it doesn't hurt to make sure
+    init_early_exceptions(); // this was probably already done earlier, but it doesn't hurt to do it again
 
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
@@ -154,6 +154,8 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
             idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
         }
+        // we can load the newer, better page fault handler now that virtual memory has been set up
+        idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
        
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
@@ -340,7 +342,7 @@ pub fn init_handlers_pic() {
 fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
         InterruptChip::APIC |
-        InterruptChip::x2apic => {
+        InterruptChip::X2APIC => {
             apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").read().eoi();
         }
         InterruptChip::PIC => {
@@ -378,8 +380,8 @@ extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFram
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
-    let ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), ticks);
+    let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
+    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
     
     eoi(None);
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
@@ -532,7 +534,7 @@ extern "x86-interrupt" fn irq_0x29_handler(_stack_frame: &mut ExceptionStackFram
 }
 
 
-
+#[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2A_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x2A interrupt: {:#?}", _stack_frame);
@@ -541,7 +543,7 @@ extern "x86-interrupt" fn irq_0x2A_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
-
+#[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x2B interrupt: {:#?}", _stack_frame);
@@ -550,7 +552,7 @@ extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
-
+#[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2C_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x2C interrupt: {:#?}", _stack_frame);
@@ -559,7 +561,7 @@ extern "x86-interrupt" fn irq_0x2C_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
-
+#[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x2D interrupt: {:#?}", _stack_frame);

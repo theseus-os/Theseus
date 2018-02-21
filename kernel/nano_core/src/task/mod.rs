@@ -60,7 +60,6 @@ pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 #[repr(u8)] // one byte
 #[derive(PartialEq, Debug, Copy, Clone)]
-#[allow(dead_code)]
 pub enum RunState {
     /// in the midst of setting up the task
     INITING = 0,
@@ -608,7 +607,6 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 ///
 /// ## Returns
 /// An Option with a reference counter for the removed Task.
-#[allow(dead_code)]
 pub fn remove_task(_id: usize) -> Option<Arc<RwLock<Task>>> {
     unimplemented!();
 // assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");

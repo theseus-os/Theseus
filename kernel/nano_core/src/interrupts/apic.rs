@@ -157,7 +157,7 @@ const APIC_REG_SIR                    : u32 =  0xF0;	// Spurious Interrupt Vecto
 const APIC_REG_ISR                    : u32 =  0x100;	// In-Service Register (First of 8)
 const APIC_REG_TMR                    : u32 =  0x180;	// Trigger Mode (1/8)
 const APIC_REG_IRR                    : u32 =  0x200;	// Interrupt Request Register (1/8)
-const APIC_REG_ErrStatus              : u32 =  0x280;	// Error Status
+const APIC_REG_ERROR_STATUS           : u32 =  0x280;	// Error Status
 const APIC_REG_LVT_CMCI               : u32 =  0x2F0;	// LVT CMCI Registers (?)
 const APIC_REG_ICR_LOW                : u32 =  0x300;	// Interrupt Command Register (1/2)
 const APIC_REG_ICR_HIGH               : u32 =  0x310;	// Interrupt Command Register (2/2)
@@ -216,6 +216,7 @@ impl LocalApic {
             }
         }
 
+        debug!("lapic {}, parsing and setting nmi...", apic_id);
         lapic.parse_and_set_nmi(madt_iter);
         info!("Found new processor core ({:?})", lapic);
 		lapic
@@ -272,7 +273,7 @@ impl LocalApic {
         debug!("in enable_x2apic 2: new apic_base: {:#X}", rdmsr(IA32_APIC_BASE));
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
         if is_bsp {
-            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::x2apic, ::atomic::Ordering::Release);
+            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::X2APIC, ::atomic::Ordering::Release);
         }
 
         // init x2APIC to a clean state, just as in enable_apic() above 
@@ -300,16 +301,16 @@ impl LocalApic {
     unsafe fn calibrate_apic_timer(&mut self, microseconds: u32) -> u32 {
         assert!(!has_x2apic(), "an x2apic system must not use calibrate_apic_timer(), it should use calibrate_apic_timer_x2() instead.");
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16
-        const initial_count: u32 = 0xFFFF_FFFF;
+        const INITIAL_COUNT: u32 = 0xFFFF_FFFF;
         
-        self.write_reg(APIC_REG_INIT_COUNT, initial_count); // set counter to max value
+        self.write_reg(APIC_REG_INIT_COUNT, INITIAL_COUNT); // set counter to max value
 
         // wait for PIT for 10ms (a single 100 Hz period)
         super::pit_clock::pit_wait(microseconds).unwrap(); // 10 ms period
 
         self.write_reg(APIC_REG_LVT_TIMER, APIC_DISABLE); // stop apic timer
         let after = self.read_reg(APIC_REG_CURRENT_COUNT);
-        let elapsed = initial_count - after;
+        let elapsed = INITIAL_COUNT - after;
         elapsed
     }
 

@@ -36,7 +36,7 @@ impl IoApic {
         let ioapic_mapped_page = {
     		let new_page = try!(allocate_pages(1).ok_or("IoApic::create(): couldn't allocated virtual page!"));
             let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-			let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
             try!(active_table.map_allocated_pages_to(new_page, frame, 
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
                 fa.deref_mut())

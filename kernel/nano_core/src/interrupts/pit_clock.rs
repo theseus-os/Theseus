@@ -94,12 +94,12 @@ pub fn handle_timer_interrupt() {
 
     // everything below here is just used for TSC calibration
     use interrupts::tsc::{TscTicks, set_tsc_frequency, tsc_ticks};
-    static mut start_tsc: TscTicks = TscTicks::default();
+    static mut START_TSC: TscTicks = TscTicks::default();
     
     if ticks == 250 {
         // SAFE: just accessing variables used for timing calc, no bad effects.
         unsafe {
-            start_tsc = tsc_ticks(); 
+            START_TSC = tsc_ticks(); 
         }
     }
 
@@ -107,7 +107,7 @@ pub fn handle_timer_interrupt() {
         use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ;
         let end_tsc = tsc_ticks(); 
         // SAFE: just accessing variables used for timing calc, no bad effects.
-        if let Some(diff) = unsafe { end_tsc.sub(&start_tsc) } {
+        if let Some(diff) = unsafe { end_tsc.sub(&START_TSC) } {
             let tsc_freq = diff.into() * (CONFIG_PIT_FREQUENCY_HZ as u64 / 250); // multiplied by 4 because we're just measuring a 250ms interval
             info!("TSC frequency calculated by PIT is: {}", tsc_freq);
             set_tsc_frequency(tsc_freq);

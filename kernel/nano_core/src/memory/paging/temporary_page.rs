@@ -83,7 +83,7 @@ impl FrameAllocator for TinyAllocator {
     }
 
     
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter> {
+    fn allocate_frames(&mut self, _num_frames: usize) -> Option<FrameIter> {
         unimplemented!();
     }
 

@@ -19,6 +19,10 @@
 #![no_std]
 
 
+#![allow(dead_code)] //  to suppress warnings for unused functions/methods
+#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+
+
 // #![feature(compiler_builtins_lib)]  // this is needed for our odd approach of including the nano_core as a library for other kernel crates
 // extern crate compiler_builtins; // this is needed for our odd approach of including the nano_core as a library for other kernel crates
 
@@ -32,7 +36,7 @@ extern crate spin; // core spinlocks
 extern crate multiboot2;
 #[macro_use] extern crate bitflags;
 extern crate x86;
-#[macro_use] extern crate x86_64;
+extern crate x86_64;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
@@ -61,7 +65,7 @@ extern crate atomic_linked_list;
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
 extern crate serial_port;
-#[macro_use] extern crate logger;
+extern crate logger;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
 extern crate test_lib;
@@ -84,13 +88,10 @@ mod start;
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 
 
-use spin::RwLockWriteGuard;
 use task::{spawn_kthread, spawn_userspace};
 use alloc::string::String;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use core::ops::DerefMut;
-use interrupts::tsc;
-use drivers::{ata_pio, pci};
+use core::sync::atomic::{AtomicBool, Ordering};
+// use drivers::{ata_pio, pci};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
@@ -248,7 +249,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // parse the nano_core ELF object to load its symbols into our metadata
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
     }
 

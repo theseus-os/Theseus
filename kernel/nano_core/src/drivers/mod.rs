@@ -1,5 +1,4 @@
 pub mod input; 
-#[allow(dead_code)]
 pub mod ata_pio;
 pub mod pci;
 pub mod acpi;

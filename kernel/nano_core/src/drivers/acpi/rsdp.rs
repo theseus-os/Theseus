@@ -1,4 +1,4 @@
-use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, VirtualAddress, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use core::ops::DerefMut;
 
 const RDSP_SEARCH_START: PhysicalAddress = 0xE_0000;
@@ -41,7 +41,8 @@ impl RSDP {
         rsdp.and_then(|r| Some((r, mapped_pages)))
     }
 
-    fn search(start_addr: usize, end_addr: usize) -> Option<RSDP> {
+    /// Searches a region of memory for thee RSDP table, which is identified by the "RSD PTR " signature.
+    fn search(start_addr: VirtualAddress, end_addr: VirtualAddress) -> Option<RSDP> {
         for i in 0 .. (end_addr + 1 - start_addr)/16 {
             let rsdp = unsafe { &*((start_addr + i * 16) as *const RSDP) };
             if &rsdp.signature == b"RSD PTR " {
@@ -52,11 +53,11 @@ impl RSDP {
     }
 
     /// Get the RSDT or XSDT address
-    pub fn sdt_address(&self) -> usize {
+    pub fn sdt_address(&self) -> PhysicalAddress {
         if self.revision >= 2 {
-            self.xsdt_address as usize
+            self.xsdt_address as PhysicalAddress
         } else {
-            self.rsdt_address as usize
+            self.rsdt_address as PhysicalAddress
         }
     }
 }
