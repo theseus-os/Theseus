@@ -49,6 +49,12 @@ impl<L> Table<L>
         assert!(index < ENTRIES_PER_PAGE_TABLE, "clear_entry: index of was out of bounds!");
         self.entries[index].set_unused();
     }
+
+    pub fn get_entry_value(&self, index: usize) -> u64 {
+        // bounds check
+        assert!(index < ENTRIES_PER_PAGE_TABLE, "get_entry_value: index of was out of bounds!");
+        self.entries[index].value()
+    }
 }
 
 impl<L> Table<L>
