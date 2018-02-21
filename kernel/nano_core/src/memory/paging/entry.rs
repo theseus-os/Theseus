@@ -43,6 +43,10 @@ impl Entry {
     pub fn copy(&self) -> Entry {
         Entry(self.0)
     }
+
+    pub fn value(&self) -> u64 {
+        self.0
+    }
 }
 
 bitflags! {

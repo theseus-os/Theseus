@@ -277,22 +277,13 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
                     .expect("failed to initialize interrupts!");
 
 
-        
-    
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
 
     syscall::init(syscall_stack.top_usable());
 
-    debug!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
-    debug!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
-    debug!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
-    debug!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
-    debug!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
-    debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
-    debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
-
+  
     // create the initial `Task`, i.e., task_zero
     let bsp_apic_id = interrupts::apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
@@ -317,11 +308,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
     ::core::mem::drop(identity_mapped_pages);
-
-    // NOTE that we save the `higher_half_mapped_pages` here too
-    
-
-    // TODO: verify that the identity-mapped sections are now all zeros 
     {
         use memory::PageTable;
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -329,9 +315,12 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
-                for i in 0 .. 500 { // TODO: how many should we clear? Def not the upper ones for the kernel
-                    active_table.p4_mut().clear_entry(i); 
-                }
+                // for i in 0 .. 512 { 
+                //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
+                // }
+
+                // clear the 0th P4 entry, which covers any outstanding identity mappings
+                active_table.p4_mut().clear_entry(0); 
             }
             _ => { }
         }
