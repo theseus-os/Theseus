@@ -99,7 +99,8 @@ impl IoApic {
     /// ioapic_irq: the IRQ number that this interrupt will trigger on this IoApic.
     /// lapic_id: the id of the LocalApic that should handle this interrupt.
     /// irq_vector: the system-wide (PIC-based) IRQ vector number,
-    /// which after remapping is usually 0x20 to 0x2F  (0x20 is timer, 0x21 is keyboard, etc)
+    /// which after remapping is 0x20 to 0x2F  (0x20 is timer, 0x21 is keyboard, etc).
+    /// See interrupts::PIC_MASTER_OFFSET.
     pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
         let vector = irq_vector as u8;
 

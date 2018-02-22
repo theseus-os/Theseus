@@ -35,6 +35,7 @@ pub mod tsc;
 // re-expose these functions from within this interrupt module
 pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 pub use self::exceptions::init_early_exceptions;
+pub use self::pic::PIC_MASTER_OFFSET;
 
 /// The index of the double fault stack in a TaskStateSegment (TSS)
 const DOUBLE_FAULT_IST_INDEX: usize = 0;
@@ -54,8 +55,8 @@ static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 pub static IDT: LockedIdt = LockedIdt::new();
 
 /// Interface to our PIC (programmable interrupt controller) chips.
-/// We want to map hardware interrupts to 0x20 (for PIC1) or 0x28 (for PIC2).
 static PIC: Once<pic::ChainedPics> = Once::new();
+/// The Keyboard data port, port 0x60.
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 /// The TSS list, one per core, indexed by a key of apic_id
@@ -261,7 +262,7 @@ fn create_tss_gdt(apic_id: u8,
 pub fn init_handlers_apic() {
     // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
     PIC.call_once( || {
-        pic::ChainedPics::init(None, None, 0xFF, 0xFF) // disable all PIC IRQs
+        pic::ChainedPics::init(0xFF, 0xFF) // disable all PIC IRQs
     });
 
     {
@@ -324,7 +325,7 @@ pub fn init_handlers_pic() {
     let master_pic_mask: u8 = 0x0; // allow every interrupt
     let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
     PIC.call_once( || {
-        pic::ChainedPics::init(None, None, master_pic_mask, slave_pic_mask) // disable all PIC IRQs
+        pic::ChainedPics::init(master_pic_mask, slave_pic_mask) // disable all PIC IRQs
     });
 
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
@@ -357,7 +358,7 @@ fn eoi(irq: Option<u8>) {
 extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
-	eoi(Some(0x20));
+	eoi(Some(PIC_MASTER_OFFSET));
 }
 
 
@@ -373,7 +374,7 @@ extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFram
         error!("keyboard_handler: error handling keyboard input: {:?}", e);
     }
 
-    eoi(Some(0x21));
+    eoi(Some(PIC_MASTER_OFFSET + 0x1));
 }
 
 
@@ -383,7 +384,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
     
-    eoi(None);
+    eoi(None); // None, because it cannot possibly be a PIC interrupt
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
     
     schedule!();
@@ -437,7 +438,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut Exceptio
         if irq_regs.master_isr & 0x80 == 0x80 {
             println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
-            eoi(Some(0x27));
+            eoi(Some(PIC_MASTER_OFFSET + 0x7));
         }
         else {
             // do nothing. Do not send an EOI.
@@ -461,7 +462,7 @@ fn rtc_interrupt_func(rtc_ticks: Option<usize>) {
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     eoi(Some(0x28));
+//     eoi(Some(PIC_MASTER_OFFSET + 0x8));
     
 //     rtc::handle_rtc_interrupt();
 // }
@@ -472,7 +473,7 @@ extern "x86-interrupt" fn primary_ata(_stack_frame:&mut ExceptionStackFrame ) {
 
     ata_pio::handle_primary_interrupt();
 
-    eoi(Some(0x2e));
+    eoi(Some(PIC_MASTER_OFFSET + 0xe));
 }
 
 
