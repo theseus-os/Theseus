@@ -223,10 +223,20 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
+    unsafe {
+        // print RUST
+        asm!("  mov dword ptr [0xFFFFFFFF800b802c], 0x4f554f52; \
+	            mov dword ptr [0xFFFFFFFF800b8030], 0x4f544f53;"
+                : : : : "intel"
+        );
+    }
+    
+
     // first, bring up the logger so we can debug
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
+
     // initialize basic exception handlers
     interrupts::init_early_exceptions();
 
@@ -237,7 +247,18 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
-    
+
+
+    // unsafe {
+    //     // print MEMORY
+    //     asm!("  mov dword ptr [0xFFFFFFFF800b80f0], 0x4f454f4d; \
+    //             mov dword ptr [0xFFFFFFFF800b80f4], 0x4f4f4f4d; \
+	//             mov dword ptr [0xFFFFFFFF800b80f8], 0x4f594f4f;"
+    //             : : : : "intel"
+    //     );
+    // }
+
+
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     if cfg!(feature = "no_serial") {

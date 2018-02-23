@@ -310,13 +310,19 @@ impl InactivePageTable {
             table.copy_entry_from_table(active_table.p4(), KERNEL_TEXT_P4_INDEX);
             table.copy_entry_from_table(active_table.p4(), KERNEL_HEAP_P4_INDEX);
             table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
-
         }
         
-        // temporary_page is auto unmapped here 
-        // temporary_page.unmap(active_table);
+        unsafe {
+            // print MEMORY
+            asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f354f35;"
+                    : : : : "intel"
+            );
+        }
 
         InactivePageTable { p4_frame: frame }
+
+        // temporary_page is auto unmapped here 
+        // temporary_page.unmap(active_table);
     }
 }
 
@@ -340,6 +346,13 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // bootstrap an active_table from the currently-loaded page table
     let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
 
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f2f4f2f;"
+                : : : : "intel"
+        );
+    }
+
     let (frame, temp_frames1, temp_frames2) = {
         let mut allocator = allocator_mutex.lock(); 
         (
@@ -348,12 +361,35 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()]
         )
     };
+
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f304f30;"
+                : : : : "intel"
+        );
+    }
+
     let mut new_table: InactivePageTable = {
         InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1))
     };
 
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f364f36;"
+                : : : : "intel"
+        );
+    }
+
+
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));
 
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f374f37;"
+                : : : : "intel"
+        );
+    }
+    
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
@@ -366,6 +402,12 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
+        unsafe {
+            // print MEMORY
+            asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f324f32;"
+                    : : : : "intel"
+            );
+        }
 
         // scoped to release the frame allocator lock
         {
@@ -386,7 +428,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     return Err("Kernel ELF Section was not page-aligned");
                 }
 
-                let flags = EntryFlags::from_multiboot2_section_flags(&section) | EntryFlags::GLOBAL;
+                let flags = EntryFlags::from_multiboot2_section_flags(&section); // | EntryFlags::GLOBAL;
 
                 // even though the linker stipulates that the kernel sections have a higher-half virtual address,
                 // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
@@ -428,30 +470,13 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 index += 1;
             }
 
-            
-            // // go ahead and map the entire first megabyte of physical memory,
-            // // which happens to include ACPI tables, VGA memory, etc
-            // // (0x0 - 0x10_0000) => (0xFFFF_FFFF_8000_0000 - 0xFFFF_FFFF_8010_0000)
-            // mapper.map_frames_skip_used(Frame::range_inclusive_addr(0x0, 0x10_0000),
-            //                   Page::containing_address(KERNEL_OFFSET as VirtualAddress),
-            //                   EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
-            // vmas[index] = VirtualMemoryArea::new(KERNEL_OFFSET, 0x10_0000, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel low memory (BIOS)");
-            // // also do an identity mapping for AP booting
-            // mapper.map_frames_skip_used(Frame::range_inclusive_addr(0x0, 0x10_0000),
-            //                   Page::containing_address(0x0 as VirtualAddress),
-            //                   EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator);
-            // debug!("mapped low bios memory: {:?}", vmas[index]);
-            // index += 1;
-
-
-
             // remap the VGA display memory as writable, which goes from 0xA_0000 - 0xC_0000 (exclusive)
             // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
             const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
             let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-            let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE /*| EntryFlags::GLOBAL*/ | EntryFlags::NO_CACHE;
             vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
                 Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_START, size_in_bytes), 
@@ -472,6 +497,12 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
     })); // TemporaryPage is dropped here
 
+unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f334f33;"
+                : : : : "intel"
+        );
+    }
 
     debug!("switching to new page table {:?}", new_table);
     let mut new_active_table = active_table.switch(&PageTable::Inactive(new_table));
@@ -492,11 +523,22 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         (heap_pages, heap_vma)
     };
 
+    // debug!("mapped and inited the heap, VMA: {:?}", heap_vma);
     // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
+
+    // unsafe {
+    //     // print MEMORY
+    //     asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f344f34;"
+    //             : : : : "intel"
+    //     );
+    // }
+
 
     let mut kernel_vmas: Vec<VirtualMemoryArea> = vmas.to_vec();
     kernel_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
     kernel_vmas.push(heap_vma);
+
+    debug!("kernel_vmas: {:?}", kernel_vmas);
 
     let mut higher_half: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half.push(heap_pages);

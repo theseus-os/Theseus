@@ -114,7 +114,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
                 if lapic_madt.apic_id == me {
                     debug!("        This is my (the BSP's) local APIC");
                     // For the BSP's own processor core, no real work is needed. 
-                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone());
+                    let mut bsp_lapic = try!(LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone()));
                     let bsp_id = bsp_lapic.id();
 
                     use interrupts::PIC_MASTER_OFFSET;
@@ -314,13 +314,13 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
             icr |= ( new_apic_id as u64) << 56; // destination apic id 
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        // debug!(" IPI...");
+        debug!(" IPI... icr: {:#X}", icr);
         bsp_lapic.set_icr(icr);
     }
 
-    // debug!("waiting 10 ms...");
+    debug!("waiting 10 ms...");
     wait10ms();
-    // debug!("done waiting.");
+    debug!("done waiting.");
 
     // Send START IPI
     {
@@ -334,7 +334,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
             icr |= (new_apic_id as u64) << 56;
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        // debug!(" SIPI...");
+        debug!(" SIPI... icr: {:#X}", icr);
         bsp_lapic.set_icr(icr);
     }
 
@@ -342,11 +342,11 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     // TODO: we may need to send a second START IPI on real hardware???
 
     // Wait for trampoline ready
-    // debug!(" Wait...");
+    debug!(" Wait...");
     while unsafe { atomic_load(ap_ready) } == 0 {
         ::arch::pause();
     }
-    // debug!(" Trampoline...");
+    debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
         ::arch::pause();
     }

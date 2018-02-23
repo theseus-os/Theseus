@@ -14,3 +14,5 @@ pub fn log2(value: usize) -> usize {
 
     result
 }
+
+
