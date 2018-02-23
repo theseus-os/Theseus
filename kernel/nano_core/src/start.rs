@@ -55,7 +55,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not used as one apic in the list.
-    let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone());
+    let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())
+                      .expect("kstart_ap(): failed to create LocalApic");
     get_lapics().insert(apic_id, RwLock::new(lapic));
 
     interrupts::enable_interrupts();

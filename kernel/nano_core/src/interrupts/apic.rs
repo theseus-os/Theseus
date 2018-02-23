@@ -62,10 +62,18 @@ pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
     let raw = if has_x2apic() {
-        unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
+        // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
+        unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
+        let x2_id = unsafe { rdmsr(IA32_X2APIC_APICID) as u32 };
+        debug!("get_my_apic_id(): read msr, got {}", x2_id);
+        x2_id
     } else {
         match APIC_PAGE.try() {
-            Some(apic_page) => unsafe { read_volatile((apic_page.start_address() + APIC_REG_LAPIC_ID as usize) as *const u32) },
+            Some(apic_page) => unsafe { 
+                // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
+                wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE);
+                read_volatile((apic_page.start_address() + APIC_REG_LAPIC_ID as usize) as *const u32) 
+            },
             None => {
                 return None;
             }
@@ -113,14 +121,15 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
     let x2 = has_x2apic();
     let phys_addr = unsafe { rdmsr(IA32_APIC_BASE) };
-    debug!("is x2apic? {}.  IA32_APIC_BASE: {:#X}", x2, phys_addr);
+    debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
     
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
     // IMO, x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
     // writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
     if !has_x2apic() {
         let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
-        let frames = Frame::range_inclusive(Frame::containing_address(phys_addr as PhysicalAddress), Frame::containing_address(phys_addr as PhysicalAddress));
+        let frames = Frame::range_inclusive(Frame::containing_address(phys_addr as PhysicalAddress), 
+                                            Frame::containing_address(phys_addr as PhysicalAddress));
         let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
         let apic_mapped_page = try!(active_table.map_allocated_pages_to(
             new_page, 
@@ -176,8 +185,8 @@ const APIC_REG_TIMER_DIVIDE           : u32 =  0x3E0;
 /// Local APIC
 #[derive(Debug)]
 pub struct LocalApic {
-    pub virt_addr: VirtualAddress,
-    pub phys_addr: PhysicalAddress,
+    /// Only exists for xapic, should be None for x2apic systems.
+    pub virt_addr: Option<VirtualAddress>,
     pub processor: u8,
     pub apic_id: u8,
     pub flags: u32,
@@ -185,16 +194,18 @@ pub struct LocalApic {
 }
 
 impl LocalApic {
-    /// This MUST be invoked from the AP core that is booting up.
+    /// This MUST be invoked from the AP core itself when it is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool, madt_iter: MadtIter) -> LocalApic {
-		
-        assert!(flags == 1, "LocalApic::create() processor was disabled! (flags != 1)");
+    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool, madt_iter: MadtIter) 
+        -> Result<LocalApic, &'static str>
+    {
+        if flags != 1 {
+            error!("LocalApic::new() processor was disabled! (flags {:#X} must equal 0x1)", flags);
+            return Err("flags were not 0x1, which means the processor was disabled!");
+        }
+
 		let mut lapic = LocalApic {
-			virt_addr: APIC_PAGE.try().expect("LocalApic::new(): APIC_PAGE wasn't initialized, you must call apic::init() first!").start_address(),
-            // redox bitmasked the base paddr with 0xFFFF_0000, os dev wiki says 0xFFFF_F000 ...
-            // seems like 0xFFFF_F000 is more correct since it just frame/page-aligns the address
-            phys_addr: ( unsafe { rdmsr(IA32_APIC_BASE) } as usize & 0xFFFF_F000) as PhysicalAddress,
+			virt_addr: None, // None by default (for x2apics). if xapic, it will be set to Some later
             processor: processor,
             apic_id: apic_id,
             flags: flags,
@@ -208,18 +219,21 @@ impl LocalApic {
         unsafe {
             if has_x2apic() { 
                 lapic.enable_x2apic();
-                lapic.init_timer_x2();  // this should be called later once the IDT is fully populated
+                lapic.init_timer_x2apic();
             } 
             else { 
+                lapic.virt_addr = Some(
+                    try!(APIC_PAGE.try().ok_or("APIC_PAGE wasn't initialized, call apic::init() first!")).start_address()
+                );
                 lapic.enable_apic();
-                lapic.init_timer(); // this should be called later once the IDT is fully populated
+                lapic.init_timer();
             }
         }
 
-        debug!("lapic {}, parsing and setting nmi...", apic_id);
         lapic.parse_and_set_nmi(madt_iter);
         info!("Found new processor core ({:?})", lapic);
-		lapic
+        // loop { }
+		Ok(lapic)
     }
 
     /// enables the spurious interrupt vector, which enables the APIC itself.
@@ -228,7 +242,7 @@ impl LocalApic {
 
         // globally enable the apic by setting the xapic_enable bit
         let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
-        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | bsp_bit | IA32_APIC_XAPIC_ENABLE);
+        wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE);
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
         info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
@@ -238,10 +252,7 @@ impl LocalApic {
 
         // init APIC to a clean state
         // see this: http://wiki.osdev.org/APIC#Logical_Destination_Mode
-        // let old_dfr = self.read_reg(APIC_REG_DFR);
-        // self.write_reg(APIC_REG_DFR, old_dfr | 0xF000_0000); 
-
-        self.write_reg(APIC_REG_DFR, 0xFFFF_FFFF); // Flat destination mode (only bits [31:27] matter, should be all 1s. All 0s would be cluster mode)
+        self.write_reg(APIC_REG_DFR, 0xFFFF_FFFF); // Flat destination mode (only the 8 MSBs, bits [31:27] matter, should be all 1s. All 0s would be cluster mode)
         // let old_ldr = self.read_reg(APIC_REG_LDR);
         // debug!("old_dr: {:#x}, old_ldr: {:#x}", old_dfr, old_ldr);
         // TODO FIXME: i think the below line might set the IPI destination as processor 0  (1 << 0) ???
@@ -283,7 +294,9 @@ impl LocalApic {
         debug!("in enable_x2apic 0.1");
         let cluster_id = (ldr >> 16) & 0xFFFF; // highest 16 bits
         let logical_id = ldr & 0xFFFF; // lowest 16 bits
-        info!("x2LAPIC ID {:#x} (cluster {:#X} logical {:#X}), is_bsp: {}", self.version(), cluster_id, logical_id, is_bsp);
+        info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}", self.id(), self.version(), cluster_id, logical_id, is_bsp);
+        // NOTE: we're not yet using logical or cluster mode APIC addressing, but rather only physical APIC addressing
+        
         debug!("in enable_x2apic 0.2"); wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64);
         debug!("in enable_x2apic 0.3"); wrmsr(IA32_X2APIC_LVT_PMI, APIC_NMI as u64);
         debug!("in enable_x2apic 0.4"); wrmsr(IA32_X2APIC_LVT_LINT0, APIC_DISABLE as u64);
@@ -291,8 +304,8 @@ impl LocalApic {
         debug!("in enable_x2apic 0.6"); wrmsr(IA32_X2APIC_TPR, 0);
         
         
-        
-        wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE) as u64); // set bit 8 to start receiving interrupts (still need to "sti")
+        // set bit 8 to start receiving interrupts (still need to "sti")
+        wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE) as u64); 
         debug!("in enable_x2apic end");
         info!("x2LAPIC ID {:#x}  is_bsp: {}", self.id(), is_bsp);
     }
@@ -314,10 +327,28 @@ impl LocalApic {
         elapsed
     }
 
-    pub unsafe fn init_timer(&mut self) {
-        assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2() instead.");
-        let calibrated_count = self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
-        let apic_period = calibrated_count;
+
+    /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
+    unsafe fn calibrate_x2apic_timer(&mut self, microseconds: u32) -> u64 {
+        assert!(has_x2apic(), "an apic/xapic system must not use calibrate_x2apic_timer(), it should use calibrate_apic_timer_x2() instead.");
+        wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16
+        const INITIAL_COUNT: u64 = 0xFFFF_FFFF;
+        
+        wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT); // set counter to max value
+
+        // wait for PIT for 10ms (a single 100 Hz period)
+        super::pit_clock::pit_wait(microseconds).unwrap(); // 10 ms period
+
+        wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64); // stop apic timer
+        let after = rdmsr(IA32_X2APIC_CUR_COUNT);
+        let elapsed = INITIAL_COUNT - after;
+        elapsed
+    }
+
+
+    unsafe fn init_timer(&mut self) {
+        assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.");
+        let apic_period = self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -325,7 +356,6 @@ impl LocalApic {
         self.write_reg(APIC_REG_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC); 
         self.write_reg(APIC_REG_INIT_COUNT, apic_period); 
 
-        // stuff below taken from Tifflin rust-os
         self.write_reg(APIC_REG_LVT_THERMAL, 0);
         self.write_reg(APIC_REG_LVT_ERROR, 0);
 
@@ -333,21 +363,25 @@ impl LocalApic {
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); 
     }
 
-    pub unsafe fn init_timer_x2(&mut self) {
-        assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
-        debug!("in init_timer_x2 start");
-        debug!("in init_timer_x2 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
-        // map APIC timer to an interrupt
-        debug!("in init_timer_x2 3");wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64);
-        debug!("in init_timer_x2 4");wrmsr(IA32_X2APIC_INIT_COUNT, 0x800000);
 
-        // stuff below taken from Tifflin rust-os
-        debug!("in init_timer_x2 5"); wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
-        debug!("in init_timer_x2 6"); wrmsr(IA32_X2APIC_ESR, 0);
+    unsafe fn init_timer_x2apic(&mut self) {
+        assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
+        let x2apic_period = self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
+        trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
+
+        debug!("in init_timer_x2apic start");
+        debug!("in init_timer_x2apic 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
+        
+        // map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for
+        wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64); 
+        wrmsr(IA32_X2APIC_INIT_COUNT, x2apic_period); 
+
+        debug!("in init_timer_x2apic 5"); wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
+        debug!("in init_timer_x2apic 6"); wrmsr(IA32_X2APIC_ESR, 0);
 
         // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-        debug!("in init_timer_x2 7"); wrmsr(IA32_X2APIC_DIV_CONF, 3);
-        debug!("in init_timer_x2 end");
+        debug!("in init_timer_x2apic 7"); wrmsr(IA32_X2APIC_DIV_CONF, 3);
+        debug!("in init_timer_x2apic end");
     }
 
 
@@ -371,13 +405,13 @@ impl LocalApic {
     }
 
     unsafe fn read_reg(&self, reg: u32) -> u32 {
-        assert!(!has_x2apic(), "an x2apic system must not use the MMIO read/write_reg() functions.");
-        read_volatile((self.virt_addr + reg as usize) as *const u32)
+        assert!(!has_x2apic(), "an x2apic system must not use the MMIO read_reg() function, it must use rdmsr() insetad.");
+        read_volatile((self.virt_addr.expect("LocalApic::read_reg(): virt_addr was None!") + reg as usize) as *const u32)
     }
 
     unsafe fn write_reg(&self, reg: u32, value: u32) {
-        assert!(!has_x2apic(), "an x2apic system must not use the MMIO read/write_reg() functions.");
-        write_volatile((self.virt_addr + reg as usize) as *mut u32, value);
+        assert!(!has_x2apic(), "an x2apic system must not use the MMIO write_reg() function, it must use wrmsr() instead.");
+        write_volatile((self.virt_addr.expect("LocalApic::read_reg(): virt_addr was None!") + reg as usize) as *mut u32, value);
     }
 
     pub fn id(&self) -> u8 {
@@ -466,16 +500,6 @@ impl LocalApic {
             return; // skip sending IPIs if there are no other cores running
         }
 
-
-        // kernel locks MUST NOT BE HELD when calling this
-        // if let Some(kmmi) = ::memory::get_kernel_mmi_ref() {
-        //     // test to see if the kernel lock can be acquired
-        //     if kmmi.try_lock().is_none() {  
-        //         error!("send_tlb_shootdown_ipi(): KERNEL_MMI lock must not be held when calling this!"); 
-        //         return;
-        //     }
-        // }
-        
         trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
                 get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
         
@@ -529,7 +553,8 @@ impl LocalApic {
         }
     }
 
-    /// lint can be either 0 or 1, since each local APIC has two LVT LINTs
+    /// Set the NonMaskableInterrupt redirect for this LocalApic.
+    /// Argument `lint` can be either 0 or 1, since each local APIC has two LVT LINTs
     /// (Local Vector Table Local INTerrupts)
     pub fn set_nmi(&mut self, lint: u8, flags: u16) {
         unsafe {

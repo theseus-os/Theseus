@@ -17,14 +17,6 @@ ap_start_realmode:
     ; we use real mode segment addressing here
     ; in which PhysicalAddr = Segment * 16 + Offset
     ; Address is <SegmentHex:OffsetHex>, so B000:8000 => 0xB8000
-    ; mov ax, 0xB000
-    ; mov ds, ax     ; you can't move an immediate value directly into a segment register like "ds"
-    ; mov si, 0x8000
-    ; mov eax, 0x4f4E4f4f
-    ; stdsd ; store double word from eax into segment address ds:si 
-    
-    ;mov [0xB000:0x8000], 0x4f4E ; "AP"
-    ;mov [0xb8002], 0x4f4F ; "P"
 
     ; need to use BIOS interrupts to write to vga buffer, not mem-mapped 0xb8000
     mov ah, 0x0E

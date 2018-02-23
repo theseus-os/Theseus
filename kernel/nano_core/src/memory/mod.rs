@@ -368,6 +368,14 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         avail_index += 1;
     }
 
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b8040], 0x4f454f4d; \
+                mov dword ptr [0xFFFFFFFF800b8044], 0x4f4f4f4d; \
+	            mov dword ptr [0xFFFFFFFF800b8048], 0x4f594f52;"
+                : : : : "intel"
+        );
+    }
 
     // init the frame allocator
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
@@ -380,16 +388,34 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         MutexIrqSafe::new( fa ) 
     });
 
+    unsafe {
+        // print PAGING
+        asm!("  mov dword ptr [0xFFFFFFFF800b804c], 0x4f414f50; \
+                mov dword ptr [0xFFFFFFFF800b8050], 0x4f494f47; \
+	            mov dword ptr [0xFFFFFFFF800b8054], 0x4f474f4e;"
+                : : : : "intel"
+        );
+    }
+
     let (active_table, kernel_vmas, higher_half_mapped_pages, identity_mapped_pages) = try!(
         paging::init(frame_allocator_mutex, &boot_info)
     );
+    debug!("Done with paging::init()!, active_table: {:?}", active_table);
+
+    // unsafe {
+    //     // print MEMORY
+    //     asm!("  mov dword ptr [0xFFFFFFFF800b8058], 0x4f444f44; \
+    //             mov dword ptr [0xFFFFFFFF800b805b], 0x4f4f4f4d; \
+	//             mov dword ptr [0xFFFFFFFF800b8060], 0x4f594f52;"
+    //             : : : : "intel"
+    //     );
+    // }
 
 
     // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
         let mut modules: Vec<ModuleArea> = Vec::new();
         for m in boot_info.module_tags() {
-            // debug!("Module: {:?}", m);
             let mod_area = ModuleArea {
                 mod_start: m.start_address(), 
                 mod_end:   m.end_address(), 
@@ -400,6 +426,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         }
         modules
     });
+
 
 
     
