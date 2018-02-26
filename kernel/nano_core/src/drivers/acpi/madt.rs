@@ -156,7 +156,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
             MadtEntry::IntSrcOverride(int_src) => {
                 assert!(int_src.gsi <= (u8::max_value() as u32), "Unsupported: gsi value is larger than size of u8: {:?}", int_src);
                 // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8); 
+                //ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8); 
+                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + 0x20);
             } 
             _ => { }
         }

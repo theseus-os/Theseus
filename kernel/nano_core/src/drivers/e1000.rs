@@ -6,8 +6,6 @@ use alloc::boxed::Box;
 use irq_safety::MutexIrqSafe;
 
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, VirtualAddress, Page, Frame, PageTable, EntryFlags, FrameAllocator,allocate_pages};
-//use memory::{inc_number,inc_number};
-//use task::{get_kernel_mmi_ref};
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
 use drivers::pci::pci_read_32;
@@ -16,105 +14,105 @@ use drivers::pci::pci_write;
 use drivers::pci::get_pci_device_vd;
 use drivers::pci::pci_set_command_bus_master_bit;
 
-static INTEL_VEND: u16 =        0x8086;  // Vendor ID for Intel 
-static E1000_DEV:  u16 =        0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-const E1000_I217: u16 =         0x153A;  // Device ID for Intel I217
-const E1000_82577LM: u16 =      0x10EA;  // Device ID for Intel 82577LM
-const PCI_BAR0:u16 =            0x10;
-const PCI_INTERRUPT_LINE:        u16 = 0x3C;
+static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
+static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
+const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
+const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
+const PCI_BAR0:                 u16 = 0x10;
+const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
-const REG_CTRL: u32 =        0x0000;
-const REG_STATUS: u32 =      0x0008;
-const REG_EEPROM: u32 =      0x0014;
-const REG_CTRL_EXT: u32 =    0x0018;
-const REG_IMASK: u32 =       0x00D0;
-const REG_RCTRL: u32 =       0x0100;
-const REG_RXDESCLO: u32 =    0x2800;
-const REG_RXDESCHI: u32 =    0x2804;
-const REG_RXDESCLEN: u32 =   0x2808;
-const REG_RXDESCHEAD: u32 =  0x2810;
-const REG_RXDESCTAIL: u32 =  0x2818;
+const REG_CTRL:                 u32 = 0x0000;
+const REG_STATUS:               u32 = 0x0008;
+const REG_EEPROM:               u32 = 0x0014;
+const REG_CTRL_EXT:             u32 = 0x0018;
+const REG_IMASK:                u32 = 0x00D0;
+const REG_RCTRL:                u32 = 0x0100;
+const REG_RXDESCLO:             u32 = 0x2800;
+const REG_RXDESCHI:             u32 = 0x2804;
+const REG_RXDESCLEN:            u32 = 0x2808;
+const REG_RXDESCHEAD:           u32 = 0x2810;
+const REG_RXDESCTAIL:           u32 = 0x2818;
 
-const REG_TCTRL: u32 =       0x0400;
-const REG_TXDESCLO: u32 =    0x3800;
-const REG_TXDESCHI: u32 =    0x3804;
-const REG_TXDESCLEN: u32 =   0x3808;
-const REG_TXDESCHEAD: u32 =  0x3810;
-const REG_TXDESCTAIL: u32 =  0x3818;
+const REG_TCTRL:                u32 = 0x0400;
+const REG_TXDESCLO:             u32 = 0x3800;
+const REG_TXDESCHI:             u32 = 0x3804;
+const REG_TXDESCLEN:            u32 = 0x3808;
+const REG_TXDESCHEAD:           u32 = 0x3810;
+const REG_TXDESCTAIL:           u32 = 0x3818;
 
-const REG_RDTR: u32 =         0x2820; // RX Delay Timer Register
-const REG_RXDCTL: u32 =       0x3828; // RX Descriptor Control
-const REG_RADV: u32 =         0x282C; // RX Int. Absolute Delay Timer
-const REG_RSRPD: u32 =        0x2C00; // RX Small Packet Detect Interrupt
+const REG_RDTR:                 u32 = 0x2820; // RX Delay Timer Register
+const REG_RXDCTL:               u32 = 0x3828; // RX Descriptor Control
+const REG_RADV:                 u32 = 0x282C; // RX Int. Absolute Delay Timer
+const REG_RSRPD:                u32 = 0x2C00; // RX Small Packet Detect Interrupt
  
-const REG_MTA: u32 =          0x5200; 
-const REG_CRCERRS: u32 =      0x4000;        
+const REG_MTA:                  u32 = 0x5200; 
+const REG_CRCERRS:              u32 = 0x4000;        
  
-const REG_TIPG: u32 =         0x0410;      // Transmit Inter Packet Gap
-const ECTRL_SLU: u32 =        0x40;        //set link up
+const REG_TIPG:                 u32 = 0x0410;      // Transmit Inter Packet Gap
+const ECTRL_SLU:                u32 = 0x40;        //set link up
 
  
-const RCTL_EN: u32 =                          (1 << 1);    // Receiver Enable
-const RCTL_SBP: u32 =                         (1 << 2);    // Store Bad Packets
-const RCTL_UPE: u32 =                         (1 << 3);    // Unicast Promiscuous Enabled
-const RCTL_MPE: u32 =                         (1 << 4);    // Multicast Promiscuous Enabled
-const RCTL_LPE: u32 =                         (1 << 5);    // Long Packet Reception Enable
-const RCTL_LBM_NONE: u32 =                    (0 << 6);    // No Loopback
-const RCTL_LBM_PHY: u32 =                     (3 << 6);    // PHY or external SerDesc loopback
-const RTCL_RDMTS_HALF: u32 =                  (0 << 8);    // Free Buffer Threshold is 1/2 of RDLEN
-const RTCL_RDMTS_QUARTER: u32 =               (1 << 8);    // Free Buffer Threshold is 1/4 of RDLEN
-const RTCL_RDMTS_EIGHTH: u32 =                (2 << 8);    // Free Buffer Threshold is 1/8 of RDLEN
-const RCTL_MO_36: u32 =                       (0 << 12);   // Multicast Offset - bits 47:36
-const RCTL_MO_35: u32 =                       (1 << 12);   // Multicast Offset - bits 46:35
-const RCTL_MO_34: u32 =                       (2 << 12);   // Multicast Offset - bits 45:34
-const RCTL_MO_32: u32 =                       (3 << 12);   // Multicast Offset - bits 43:32
-const RCTL_BAM: u32 =                         (1 << 15);   // Broadcast Accept Mode
-const RCTL_VFE: u32 =                         (1 << 18);   // VLAN Filter Enable
-const RCTL_CFIEN: u32 =                       (1 << 19);   // Canonical Form Indicator Enable
-const RCTL_CFI: u32 =                         (1 << 20);   // Canonical Form Indicator Bit Value
-const RCTL_DPF: u32 =                         (1 << 22);   // Discard Pause Frames
-const RCTL_PMCF: u32 =                        (1 << 23);   // Pass MAC Control Frames
-const RCTL_SECRC: u32 =                       (1 << 26);   // Strip Ethernet CRC
+const RCTL_EN:                  u32 = (1 << 1);    // Receiver Enable
+const RCTL_SBP:                 u32 = (1 << 2);    // Store Bad Packets
+const RCTL_UPE:                 u32 = (1 << 3);    // Unicast Promiscuous Enabled
+const RCTL_MPE:                 u32 = (1 << 4);    // Multicast Promiscuous Enabled
+const RCTL_LPE:                 u32 = (1 << 5);    // Long Packet Reception Enable
+const RCTL_LBM_NONE:            u32 = (0 << 6);    // No Loopback
+const RCTL_LBM_PHY:             u32 = (3 << 6);    // PHY or external SerDesc loopback
+const RTCL_RDMTS_HALF:          u32 = (0 << 8);    // Free Buffer Threshold is 1/2 of RDLEN
+const RTCL_RDMTS_QUARTER:       u32 = (1 << 8);    // Free Buffer Threshold is 1/4 of RDLEN
+const RTCL_RDMTS_EIGHTH:        u32 = (2 << 8);    // Free Buffer Threshold is 1/8 of RDLEN
+const RCTL_MO_36:               u32 = (0 << 12);   // Multicast Offset - bits 47:36
+const RCTL_MO_35:               u32 = (1 << 12);   // Multicast Offset - bits 46:35
+const RCTL_MO_34:               u32 = (2 << 12);   // Multicast Offset - bits 45:34
+const RCTL_MO_32:               u32 = (3 << 12);   // Multicast Offset - bits 43:32
+const RCTL_BAM:                 u32 = (1 << 15);   // Broadcast Accept Mode
+const RCTL_VFE:                 u32 = (1 << 18);   // VLAN Filter Enable
+const RCTL_CFIEN:               u32 = (1 << 19);   // Canonical Form Indicator Enable
+const RCTL_CFI:                 u32 = (1 << 20);   // Canonical Form Indicator Bit Value
+const RCTL_DPF:                 u32 = (1 << 22);   // Discard Pause Frames
+const RCTL_PMCF:                u32 = (1 << 23);   // Pass MAC Control Frames
+const RCTL_SECRC:               u32 = (1 << 26);   // Strip Ethernet CRC
  
 // Buffer Sizes
-const RCTL_BSIZE_256: u32 =                   (3 << 16);
-const RCTL_BSIZE_512: u32 =                   (2 << 16);
-const RCTL_BSIZE_1024: u32 =                  (1 << 16);
-const RCTL_BSIZE_2048: u32 =                  (0 << 16);
-const RCTL_BSIZE_4096: u32 =                  ((3 << 16) | (1 << 25));
-const RCTL_BSIZE_8192: u32 =                  ((2 << 16) | (1 << 25));
-const RCTL_BSIZE_16384: u32 =                 ((1 << 16) | (1 << 25));
+const RCTL_BSIZE_256:           u32 = (3 << 16);
+const RCTL_BSIZE_512:           u32 = (2 << 16);
+const RCTL_BSIZE_1024:          u32 = (1 << 16);
+const RCTL_BSIZE_2048:          u32 = (0 << 16);
+const RCTL_BSIZE_4096:          u32 = ((3 << 16) | (1 << 25));
+const RCTL_BSIZE_8192:          u32 = ((2 << 16) | (1 << 25));
+const RCTL_BSIZE_16384:         u32 = ((1 << 16) | (1 << 25));
  
  
 // Transmit Command
  
-const CMD_EOP: u32 =                          (1 << 0);    // End of Packet
-const CMD_IFCS: u32 =                         (1 << 1);   // Insert FCS
-const CMD_IC: u32 =                           (1 << 2);    // Insert Checksum
-const CMD_RS: u32 =                           (1 << 3);   // Report Status
-const CMD_RPS: u32 =                          (1 << 4);   // Report Packet Sent
-const CMD_VLE: u32 =                          (1 << 6);    // VLAN Packet Enable
-const CMD_IDE: u32 =                          (1 << 7);    // Interrupt Delay Enable
+const CMD_EOP:                  u32 = (1 << 0);    // End of Packet
+const CMD_IFCS:                 u32 = (1 << 1);   // Insert FCS
+const CMD_IC:                   u32 = (1 << 2);    // Insert Checksum
+const CMD_RS:                   u32 = (1 << 3);   // Report Status
+const CMD_RPS:                  u32 = (1 << 4);   // Report Packet Sent
+const CMD_VLE:                  u32 = (1 << 6);    // VLAN Packet Enable
+const CMD_IDE:                  u32 = (1 << 7);    // Interrupt Delay Enable
  
  
 // TCTL Register
  
-const TCTL_EN: u32 =                          (1 << 1);    // Transmit Enable
-const TCTL_PSP: u32 =                         (1 << 3);    // Pad Short Packets
-const TCTL_CT_SHIFT: u32 =                    4;          // Collision Threshold
-const TCTL_COLD_SHIFT: u32 =                  12;          // Collision Distance
-const TCTL_SWXOFF: u32 =                      (1 << 22);   // Software XOFF Transmission
-const TCTL_RTLC: u32 =                        (1 << 24);   // Re-transmit on Late Collision
+const TCTL_EN:                  u32 = (1 << 1);    // Transmit Enable
+const TCTL_PSP:                 u32 = (1 << 3);    // Pad Short Packets
+const TCTL_CT_SHIFT:            u32 = 4;          // Collision Threshold
+const TCTL_COLD_SHIFT:          u32 = 12;          // Collision Distance
+const TCTL_SWXOFF:              u32 = (1 << 22);   // Software XOFF Transmission
+const TCTL_RTLC:                u32 = (1 << 24);   // Re-transmit on Late Collision
  
-const TSTA_DD: u32 =                          (1 << 0);    // Descriptor Done
-const TSTA_EC: u32 =                          (1 << 1);    // Excess Collisions
-const TSTA_LC: u32 =                          (1 << 2);    // Late Collision
-const LSTA_TU: u32 =                          (1 << 3);    // Transmit Underrun
+const TSTA_DD:                  u32 = (1 << 0);    // Descriptor Done
+const TSTA_EC:                  u32 = (1 << 1);    // Excess Collisions
+const TSTA_LC:                  u32 = (1 << 2);    // Late Collision
+const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
 
-const E1000_NUM_RX_DESC: usize =  8;
-const E1000_NUM_TX_DESC: usize = 8;
-const E1000_SIZE_RX_DESC: usize = 256;
-const E1000_SIZE_TX_DESC: usize = 256;
+const E1000_NUM_RX_DESC:        usize = 8;
+const E1000_NUM_TX_DESC:        usize = 8;
+const E1000_SIZE_RX_DESC:       usize = 256;
+const E1000_SIZE_TX_DESC:       usize = 256;
 
 #[repr(C,packed)]
 pub struct e1000_rx_desc {
@@ -188,6 +186,7 @@ pub struct nic {
         tx_descs: Vec<e1000_tx_desc>, // Transmit Descriptor Buffers???
         rx_cur: u16,      // Current Receive Descriptor Buffer
         tx_cur: u16,
+        rx_buf_addr: [usize;E1000_NUM_RX_DESC], //stores the virtual address of rx buffers
 }
 
 
@@ -263,6 +262,7 @@ impl nic{
                         tx_descs: Vec::with_capacity(E1000_NUM_TX_DESC),
                         rx_cur: 0,
                         tx_cur: 0,
+                        rx_buf_addr: [0;E1000_NUM_RX_DESC],
                 }
         }
 
@@ -555,8 +555,8 @@ impl nic{
                         unsafe{
                         //rx_descs[i] = (struct e1000_rx_desc *)((uint8_t *)descs + i*16);
                         let mut var = e1000_rx_desc::default();
-                                            
-                        var.addr = translate_v2p(NIC_DMA_ALLOCATOR.allocate_dma_mem(E1000_SIZE_RX_DESC)) as u64;
+                        self.rx_buf_addr[i] = NIC_DMA_ALLOCATOR.allocate_dma_mem(E1000_SIZE_RX_DESC);                    
+                        var.addr = translate_v2p(self.rx_buf_addr[i]) as u64;
                         debug!("packet buffer: {:x}",var.addr);
 
                         var.status = 0;
@@ -637,7 +637,8 @@ impl nic{
                  
         }  
 
-        // Send a packet
+        // Send a packet, assuming the data is already in contiguous memory
+        //p_data is address of tranmit buffer
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> i32 {
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
@@ -694,34 +695,36 @@ impl nic{
 
         // Handle a packet reception.
         pub fn handle_receive(&mut self) {
-                       //print status of all packets until EoP
-                        while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
-                                //TODO:Print out message?
-                                debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
-                                let old_cur = self.rx_cur as u32;
-                                self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-                                self.write_command(REG_RXDESCTAIL, old_cur );
-                        }
+                //print status of all packets until EoP
+                /*while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+                        self.write_command(REG_RXDESCTAIL, old_cur );
+                }*/
 
-                        //TODO: Print packets
-                         /*while (self.rx_descs[self.rx_cur as usize].status & 0x1)==0x1{
-                                //got_packet = true;
-                                let length = self.rx_descs[self.rx_cur as usize].length;
-                                let packet = self.rx_descs[self.rx_cur as usize].addr as *const u8;
-                                //print packet of length bytes
-                                debug!("Packet {}: ", self.rx_cur);
+                //TODO: Print packets
+                while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
+                        //got_packet = true;
+                        let length = self.rx_descs[self.rx_cur as usize].length;
+                        let packet = self.rx_buf_addr[self.rx_cur as usize] as *const u8;
+                        //print packet of length bytes
+                        debug!("Packet {}: ", self.rx_cur);
 
-                                for i in 0..length {
-                                        unsafe { debug!("{}",*(packet.offset(i as isize)));}
-                                }
+                        for i in 0..length {
+                                let points_at = unsafe{ *packet.offset(i as isize ) };
+                                //debug!("{}",points_at);
+                                debug!("{:x}",points_at);
+                        }                    
+                        
 
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
 
-
-                                self.rx_descs[self.rx_cur as usize].status = 0;
-                                let old_cur = self.rx_cur as u32;
-                                self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-                                self.write_command(REG_RXDESCTAIL, old_cur );
-                        }*/
+                        self.write_command(REG_RXDESCTAIL, old_cur );
+                }
 
                 
         }  
@@ -734,23 +737,6 @@ impl nic{
                         self.handle_receive();
                 }
                 
-        }
-
-        //Function to see if correct MAC address was stored in Nic struct
-        pub fn get_mac (&self, mac_low: &mut u16, mac_next: &mut u16, mac_high: &mut u16){
-                //let mac_32_low = self.read_command(0x5400);
-                //let mac_32_high = self.read_command(0x5404);
-                //debug!("get mac low: {:x} high: {:x}", mac_32_low,mac_32_high);
-                *mac_low = self.mac[0] as u16 + ((self.mac[1] as u16) << 8);
-                *mac_next = self.mac[2] as u16 + ((self.mac[3] as u16) << 8);
-                *mac_high = self.mac[4] as u16 + ((self.mac[5] as u16) << 8);
-        } 
-
-        //Function to see if correct MAC address is already stored in memory
-        pub fn get_mac_mem (&self){
-                let mac_32_low = self.read_command(0x5400);
-                let mac_32_high = self.read_command(0x5404);
-                debug!("get mac low: {:x} high: {:x}", mac_32_low,mac_32_high);
         }
 
                                     
@@ -769,6 +755,7 @@ lazy_static! {
                         tx_descs: Vec::with_capacity(E1000_NUM_TX_DESC),
                         rx_cur: 0,
                         tx_cur: 0,
+                        rx_buf_addr: [0;E1000_NUM_RX_DESC],
                 });
 }
 
