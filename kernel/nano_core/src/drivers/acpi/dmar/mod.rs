@@ -94,7 +94,7 @@ pub struct DmarDrhd {
 
 impl DmarDrhd {
     pub fn get(&self, active_table: &mut ActivePageTable) -> &'static mut Drhd {
-        let result = active_table.identity_map(Frame::containing_address(PhysicalAddress::new(self.base as usize)), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE);
+        let result = active_table.map_to(Page::containing_address(self.base as usize), Frame::containing_address(self.base as usize), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE);
         result.flush(active_table);
         unsafe { &mut *(self.base as *mut Drhd) }
     }

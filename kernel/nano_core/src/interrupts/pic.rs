@@ -21,12 +21,11 @@
 //! different base interrupts, because DOS used interrupt 0x21 for system
 //! calls.
 
-#![feature(const_fn)]
-#![no_std]
-
-extern crate port_io;
 
 use core::fmt;
+use port_io;
+
+pub const PIC_MASTER_OFFSET: u8 = 0x20;
 
 
 /// Command sent to read the Interrupt Request Register.
@@ -115,21 +114,21 @@ impl ChainedPics {
     /// Create a new interface for the standard PIC1 and PIC2 controllers,
     /// specifying the desired interrupt offsets.
     /// Then, it initializes the PICs in a standard chained fashion, 
+    /// which involved mapping the master PIC to 0x20 and the slave to 0x28 (standard rempaping),
     /// because even if we don't use them (and disable them for APIC instead),
     /// we still need to remap them to avoid a spurious interrupt clashing with an exception.
-    /// If the offsets are None, they default to 0x20 for master and 0x28 for slave, which is standard.
-    pub fn init(master_offset: Option<u8>, slave_offset: Option<u8>, master_mask: u8, slave_mask: u8) -> ChainedPics {
+    pub fn init(master_mask: u8, slave_mask: u8) -> ChainedPics {
         assert_has_not_been_called!("ChainedPics::initialize was called twice!!");
 
         let mut cpic = ChainedPics {
             pics: [
                 Pic {
-                    offset: master_offset.unwrap_or(0x20),
+                    offset: PIC_MASTER_OFFSET,
                     command: port_io::Port::new(MASTER_CMD),
                     data: port_io::Port::new(MASTER_DATA),
                 },
                 Pic {
-                    offset: slave_offset.unwrap_or(0x28),
+                    offset: PIC_MASTER_OFFSET + 8, // 8 IRQ lines per PIC
                     command: port_io::Port::new(SLAVE_CMD),
                     data: port_io::Port::new(SLAVE_DATA),
                 },

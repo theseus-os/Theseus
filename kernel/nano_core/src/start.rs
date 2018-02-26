@@ -15,28 +15,14 @@ use spin::RwLock;
 pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 
-#[repr(packed)]
-#[derive(Debug)]
-pub struct KernelArgsAp {
-    processor_id: u64,
-    apic_id: u64,
-    flags: u64,
-    page_table: u64,
-    stack_start: u64,
-    stack_end: u64,
-}
-
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
-pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
-                        stack_start: VirtualAddress, stack_end: VirtualAddress,
-                        madt_iter: &MadtIter) -> ! {
-
+pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
+                 stack_start: VirtualAddress, stack_end: VirtualAddress,
+                 madt_iter: MadtIter) -> ! 
+{
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 
-    // init AP as a new local APIC
-    let all_lapics = get_lapics();
-    all_lapics.insert(apic_id, RwLock::new(LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())));
 
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop
@@ -64,6 +50,13 @@ pub unsafe fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     syscall::init(syscall_stack.top_usable());
 
     task::init_ap(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
+
+    // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
+    // we do this last (after all other initialization) in order to prevent this lapic
+    // from prematurely receiving IPIs or being used in other ways,
+    // and also to ensure that if this apic fails to init, it's not used as one apic in the list.
+    let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone());
+    get_lapics().insert(apic_id, RwLock::new(lapic));
 
     interrupts::enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 

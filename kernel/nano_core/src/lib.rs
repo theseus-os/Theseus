@@ -19,6 +19,10 @@
 #![no_std]
 
 
+#![allow(dead_code)] //  to suppress warnings for unused functions/methods
+#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+
+
 // #![feature(compiler_builtins_lib)]  // this is needed for our odd approach of including the nano_core as a library for other kernel crates
 // extern crate compiler_builtins; // this is needed for our odd approach of including the nano_core as a library for other kernel crates
 
@@ -32,7 +36,7 @@ extern crate spin; // core spinlocks
 extern crate multiboot2;
 #[macro_use] extern crate bitflags;
 extern crate x86;
-#[macro_use] extern crate x86_64;
+extern crate x86_64;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
 extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
@@ -61,15 +65,15 @@ extern crate atomic_linked_list;
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
 extern crate serial_port;
-#[macro_use] extern crate logger;
+extern crate logger;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
 extern crate test_lib;
 extern crate rtc;
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+#[macro_use] pub mod util; // must come first because it contains just macros
 #[macro_use] mod drivers;  
-#[macro_use] mod util;
 mod arch;
 #[macro_use] mod task;
 #[macro_use] mod dbus;
@@ -84,13 +88,17 @@ mod start;
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 
 
-use spin::RwLockWriteGuard;
 use task::{spawn_kthread, spawn_userspace};
 use alloc::string::String;
+<<<<<<< HEAD
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use core::ops::DerefMut;
 use interrupts::tsc;
 use drivers::{ata_pio, pci, test_nic_driver};
+=======
+use core::sync::atomic::{AtomicBool, Ordering};
+// use drivers::{ata_pio, pci};
+>>>>>>> theseus_main
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
@@ -121,12 +129,20 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
 
 fn test_loop_3(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_3!");
+    
+    // {
+    //     use memory::{PhysicalMemoryArea, FRAME_ALLOCATOR};
+    //     let test_area = PhysicalMemoryArea::new(0xFFF7000, 0x10000, 1, 3);
+    //     FRAME_ALLOCATOR.try().unwrap().lock().add_area(test_area, false).unwrap();
+    // }
+
     loop {
         let mut i = 10000000; // usize::max_value();
         while i > 0 {
             i -= 1;
             // if i % 3 == 0 {
-            //     debug!("GOT FRAME: {:?}", memory::allocate_frame()); // TODO REMOVE
+            //     debug!("GOT FRAME: {:?}",  memory::allocate_frame()); // TODO REMOVE
+            //     debug!("GOT FRAMES: {:?}", memory::allocate_frames(20)); // TODO REMOVE
             // }
         }
         print!("3");
@@ -231,7 +247,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
-    let kernel_mmi_ref = memory::init(boot_info).expect("memory::init() failed."); // consumes boot_info
+    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -244,7 +260,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // parse the nano_core ELF object to load its symbols into our metadata
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
     }
 
@@ -266,32 +282,25 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack")
         )
     };
+    // the three stacks we allocated above are never dropped because they stay in scope in this function,
+    // but IMO that's not a great design, and they should probably be stored by the interrupt module and the syscall module instead.
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
                     .expect("failed to initialize interrupts!");
 
 
-        
-    
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
 
     syscall::init(syscall_stack.top_usable());
 
-    debug!("KernelCode: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelCode).0); 
-    debug!("KernelData: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::KernelData).0); 
-    debug!("UserCode32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode32).0); 
-    debug!("UserData32: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData32).0); 
-    debug!("UserCode64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserCode64).0); 
-    debug!("UserData64: {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::UserData64).0); 
-    debug!("TSS:        {:#x}", interrupts::get_segment_selector(interrupts::AvailableSegmentSelector::Tss).0); 
-
+  
     // create the initial `Task`, i.e., task_zero
     let bsp_apic_id = interrupts::apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
-    let console_queue_producer = console::init();
+    let console_queue_producer = console::init().unwrap();
 
     // initialize the rest of our drivers
     drivers::init(console_queue_producer);
@@ -300,14 +309,16 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // boot up the other cores (APs)
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi);
-        info!("Finished handling all of the AP cores.");
+        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi)
+                        .expect("Error handling AP cores");
+        info!("Finished handling and booting up all {} AP cores.", ap_count);
     }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
+    ::core::mem::drop(identity_mapped_pages);
     {
         use memory::PageTable;
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -315,9 +326,12 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
-                for i in 0 .. 500 { // TODO: how many should we clear? Def not the upper ones for the kernel
-                    active_table.p4_mut().clear_entry(i); 
-                }
+                // for i in 0 .. 512 { 
+                //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
+                // }
+
+                // clear the 0th P4 entry, which covers any outstanding identity mappings
+                active_table.p4_mut().clear_entry(0); 
             }
             _ => { }
         }
@@ -342,15 +356,16 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // create some extra tasks to test context switching
-    /*if true {
-        spawn_kthread(first_thread_main, Some(6),  "first_thread");
-        spawn_kthread(second_thread_main, 6, "second_thread");
-        spawn_kthread(third_thread_main, String::from("hello"), "third_thread");
-        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread");
-        spawn_kthread(test_loop_1, None, "test_loop_1");
-        spawn_kthread(test_loop_2, None, "test_loop_2"); 
-        spawn_kthread(test_loop_3, None, "test_loop_3"); 
-    }*/
+    if true {
+        spawn_kthread(first_thread_main, Some(6),  "first_thread").unwrap();
+        spawn_kthread(second_thread_main, 6, "second_thread").unwrap();
+        spawn_kthread(third_thread_main, String::from("hello"), "third_thread").unwrap();
+        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread").unwrap();
+
+        spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
+        spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
+        spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
+    }
 
 	
     // attempt to parse a test kernel module
@@ -388,14 +403,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_1"));
+        spawn_userspace(module, Some("test_program_1")).unwrap();
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_2"));
+        spawn_userspace(module, Some("test_program_2")).unwrap();
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -403,7 +418,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a system call module");
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
-        spawn_userspace(module, None);
+        spawn_userspace(module, None).unwrap();
     }
 
     // a second duplicate syscall test user task
@@ -411,7 +426,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a receive system call module");
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
-        spawn_userspace(module, None);
+        spawn_userspace(module, None).unwrap();
     }
 
     interrupts::enable_interrupts();
@@ -426,9 +441,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // cleanup here
-    logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
-    
-    
+    // logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 
 }
 

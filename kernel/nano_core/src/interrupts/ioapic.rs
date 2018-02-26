@@ -1,20 +1,19 @@
 use core::ptr::{read_volatile, write_volatile};
 use spin::{Mutex, MutexGuard, Once};
-use x86::current::cpuid::CpuId;
-use x86::shared::msr::*;
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags, allocate_pages, OwnedPages};
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 
 static IOAPIC: Once<Mutex<IoApic>> = Once::new();
 
 
 pub fn init(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32)
-            -> &'static Mutex<IoApic>
+            -> Result<&'static Mutex<IoApic>, &'static str>
 {
-    let ioapic: &'static Mutex<IoApic> = IOAPIC.call_once( || {
-	    unsafe { Mutex::new(IoApic::create(active_table, id, phys_addr, gsi_base)) }
+    let ioapic = try!(IoApic::create(active_table, id, phys_addr, gsi_base));
+    let res = IOAPIC.call_once( || {
+	    Mutex::new(ioapic)
     });
-    ioapic
+    Ok(res)
 }
 
 pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
@@ -25,31 +24,33 @@ pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
 /// An IoApic 
 #[derive(Debug)]
 pub struct IoApic {
-    pub page: OwnedPages,
+    pub page: MappedPages,
     pub id: u8,
     phys_addr: PhysicalAddress,
     gsi_base: u32,
 }
 
 impl IoApic {
-    fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> IoApic {
-		let mut ioapic = IoApic {
-			page: allocate_pages(1).expect("IoApic::create(): couldn't allocated virtual page!"),
+    fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
+
+        let ioapic_mapped_page = {
+    		let new_page = try!(allocate_pages(1).ok_or("IoApic::create(): couldn't allocated virtual page!"));
+            let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
+            try!(active_table.map_allocated_pages_to(new_page, frame, 
+                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+                fa.deref_mut())
+            )
+        };
+        
+        let ioapic = IoApic {
+			page: ioapic_mapped_page,
 			id: id,
             phys_addr: phys_addr,
             gsi_base: gsi_base,
 		};
-
 		debug!("Creating new IoApic: {:?}", ioapic); 
-
-        {
-            let page = ioapic.page.pages.start;
-            let frame = Frame::containing_address(ioapic.phys_addr);
-			let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
-            active_table.map_to(page, frame, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut());
-        }
-      
-        ioapic
+        Ok(ioapic)
     }
 
     
@@ -98,7 +99,8 @@ impl IoApic {
     /// ioapic_irq: the IRQ number that this interrupt will trigger on this IoApic.
     /// lapic_id: the id of the LocalApic that should handle this interrupt.
     /// irq_vector: the system-wide (PIC-based) IRQ vector number,
-    /// which after remapping is usually 0x20 to 0x2F  (0x20 is timer, 0x21 is keyboard, etc)
+    /// which after remapping is 0x20 to 0x2F  (0x20 is timer, 0x21 is keyboard, etc).
+    /// See interrupts::PIC_MASTER_OFFSET.
     pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
         let vector = irq_vector as u8;
 
@@ -115,7 +117,7 @@ impl IoApic {
         low &= !(1<<11);
         low &= !0x700;
         low &= !0xff;
-        low |= (vector as u32);
+        low |= vector as u32;
         unsafe { self.write_reg(low_index, low) };
     }
 }

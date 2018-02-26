@@ -1,11 +1,9 @@
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeWriteGuard};
-use spin::{RwLock, Mutex};
+use irq_safety::RwLockIrqSafe;
+use spin::RwLock;
 use atomic_linked_list::atomic_map::AtomicMap;
-use core::sync::atomic::{Ordering};
-use interrupts::apic::get_lapics;
 
 use super::{Task, get_my_current_task};
 

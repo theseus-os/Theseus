@@ -21,7 +21,6 @@ extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
 
-use spin::{Once, Mutex};
 use core::ops::Deref;
 use alloc::allocator::{Alloc, Layout, AllocErr};
 use linked_list_allocator::Heap;

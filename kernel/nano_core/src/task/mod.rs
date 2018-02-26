@@ -1,18 +1,18 @@
 
-use spin::{Once, RwLock};
+use spin::RwLock;
 use irq_safety::MutexIrqSafe;
-use alloc::{BTreeMap, Vec};
+use alloc::Vec;
 use alloc::string::String;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, ATOMIC_USIZE_INIT, ATOMIC_BOOL_INIT};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use arch::{pause, Context};
 use alloc::boxed::Box;
 use core::fmt;
 use core::mem;
 use core::ops::DerefMut;
-use memory::{get_kernel_mmi_ref, Stack, ModuleArea, MemoryManagementInfo, VirtualAddress, PhysicalAddress};
+use memory::{get_kernel_mmi_ref, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use atomic_linked_list::atomic_map::{AtomicMap, AtomicMapIter, AtomicMapIterMut};
+use atomic_linked_list::atomic_map::AtomicMap;
 
 #[macro_use] pub mod scheduler;
 
@@ -180,7 +180,7 @@ impl Task {
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
-    pub fn context_switch(&mut self, mut next: &mut Task, apic_id: u8) {
+    pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
         
         let my_context_switch_lock: &AtomicBool;
@@ -217,9 +217,15 @@ impl Task {
         {
             use interrupts::tss_set_rsp0;
             let next_kstack = next.kstack.as_ref().expect("context_switch(): error: next task's kstack was None!");
-            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2);
-            tss_set_rsp0(new_tss_rsp0); // the middle half of the stack
-            // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
+            if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+                // debug!("context_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            }
+            else {
+                error!("context_switch(): failed to set AP {} TSS RSP0, aborting context switch!", apic_id);
+                my_context_switch_lock.store(false, Ordering::SeqCst);
+                return;
+            }
         }
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
@@ -333,7 +339,13 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     idle_task.running_on_cpu = apic_id as isize; 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
     idle_task.mmi = Some(kernel_mmi_ref);
-    idle_task.kstack = Some(Stack::new(stack_top, stack_bottom));
+    idle_task.kstack = Some( 
+        Stack::new( 
+            stack_top, 
+            stack_bottom, 
+            MappedPages::from_existing(Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom)),
+        )
+    );
     debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
     let idle_task_id = idle_task.id;
 
@@ -414,7 +426,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 }
 
 
-/// Spawns a new  userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
+/// Spawns a new userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
 /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
 pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<RwLock<Task>>, &'static str> {
 
@@ -422,12 +434,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
     debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(
-        match name {
-            Some(x) => x,
-            None => module.name(),
-        }
-    ));
+    new_task.set_name(String::from(name.unwrap_or(module.name())));
 
     let mut ustack: Option<Stack> = None;
 
@@ -460,13 +467,22 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
         
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
-                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                let mut temporary_page = TemporaryPage::new(frame_allocator.deref_mut());
+                
+                // get frame allocator reference
+                let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
+
+                let (frame, temp_frames1, temp_frames2) = {
+                    let mut allocator = allocator_mutex.lock();
+                    (
+                        try!(allocator.allocate_frame().ok_or("couldn't allocate frame")),
+                        [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()],
+                        [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()]
+                    )
+                };
 
                 // now that we have the kernel's active table, we need a new inactive table for the userspace Task
                 let mut new_inactive_table: InactivePageTable = {
-                    let frame = frame_allocator.allocate_frame().expect("no more frames");
-                    InactivePageTable::new(frame, active_table, &mut temporary_page)
+                    InactivePageTable::new(frame, active_table, TemporaryPage::new(temp_frames1))
                 };
 
                 // create a new stack allocator for this userspace process
@@ -480,24 +496,31 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 
                 // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
                 assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
-                // first we need to map the module memory region into our address space, 
+                // first we need to temporarily map the module memory region into our address space, 
                 // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
-                // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-                let module_flags: EntryFlags = EntryFlags::PRESENT;
-                active_table.map_frames(Frame::range_inclusive_addr(module.start_address(), module.size()), 
-                                        Page::containing_address(module.start_address() as VirtualAddress), // identity mapping
-                                        module_flags, frame_allocator.deref_mut());
-                use mod_mgmt;
-                let (elf_progs, entry_point) = mod_mgmt::parse_elf_executable(module.start_address() as VirtualAddress, module.size()).unwrap();
-                // now we can unmap the module because we're done reading from it in the ELF parser
-                active_table.unmap_pages(Page::range_inclusive_addr(module.start_address(), module.size()), frame_allocator.deref_mut());
+                let (elf_progs, entry_point) = {
+                    let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module"));
+                    let temp_module_mapping = {
+                        let mut allocator = allocator_mutex.lock();
+                        try!( active_table.map_allocated_pages_to(
+                                  new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                                  EntryFlags::PRESENT, allocator.deref_mut())
+                        )
+                    };
+                    use mod_mgmt;
+                    try!(mod_mgmt::parse_elf_executable(temp_module_mapping.start_address() as VirtualAddress, module.size()))
+                    
+                    // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+                };
                 
+                let mut new_mapped_pages: Vec<MappedPages> = Vec::new();
                 let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
 
                 debug!("spawn_userspace [4]: ELF entry point: {:#x}", entry_point);
                 new_task.new_userspace_entry_addr = Some(entry_point);
 
-                active_table.with(&mut new_inactive_table, &mut temporary_page, |mapper| {
+                // consumes temporary page, which auto unmaps it
+                try!( active_table.with(&mut new_inactive_table, TemporaryPage::new(temp_frames2), |mapper| {
                     /*
                         * We need to set the kernel-related entries of our new inactive_table's P4 to the same values used in the kernel's P4.
                         * However, this is done in InactivePageTable::new(), just to make sure a new page table can never be created without including the shared kernel mappings.
@@ -512,27 +535,41 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
                         // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
                         debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
                         let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
-                        mapper.map_frames(Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
-                                            Page::containing_address(prog.vma.start_address()),
-                                            new_flags, frame_allocator.deref_mut());
+                        let mapped_pages = {
+                            let mut allocator = allocator_mutex.lock();
+                            try!(mapper.map_frames(
+                                    Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
+                                    Page::containing_address(prog.vma.start_address()),
+                                    new_flags, allocator.deref_mut())
+                            )
+                        };
+                        
+                        new_mapped_pages.push(mapped_pages);
                         new_user_vmas.push(VirtualMemoryArea::new(prog.vma.start_address(), prog.vma.size(), new_flags, prog.vma.desc()));
                     }
 
                     // allocate a new userspace stack
-                    let (user_stack, user_stack_vma) = user_stack_allocator.alloc_stack(mapper, frame_allocator.deref_mut(), 16)
-                                                                            .expect("spawn_userspace: couldn't allocate new user stack!");
+                    let (user_stack, user_stack_vma) = {
+                        let mut allocator = allocator_mutex.lock();                        
+                        try!( user_stack_allocator.alloc_stack(mapper, allocator.deref_mut(), 16)
+                                                  .ok_or("spawn_userspace: couldn't allocate new user stack!")
+                        )
+                    };
                     ustack = Some(user_stack); 
                     new_user_vmas.push(user_stack_vma);
 
                     // TODO: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
 
-                });
+                    Ok(()) // mapping closure completed successfully
+
+                })); // TemporaryPage is dropped here
                 
 
                 // return a new mmi struct (for the new userspace task) to the enclosing scope
                 MemoryManagementInfo {
                     page_table: PageTable::Inactive(new_inactive_table),
                     vmas: new_user_vmas,
+                    extra_mapped_pages: new_mapped_pages,
                     stack_allocator: user_stack_allocator,
                 }
             }
@@ -570,7 +607,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 ///
 /// ## Returns
 /// An Option with a reference counter for the removed Task.
-pub fn remove_task(id: usize) -> Option<Arc<RwLock<Task>>> {
+pub fn remove_task(_id: usize) -> Option<Arc<RwLock<Task>>> {
     unimplemented!();
 // assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
     // TASKLIST.remove(id)
@@ -636,25 +673,19 @@ fn userspace_wrapper() -> ! {
 
     debug!("userspace_wrapper [0]");
 
-    // the three things we need to invoke jump_to_userspace
-    let current_task: *mut Task; 
+    // the things we need to invoke jump_to_userspace
     let ustack_top: usize;
     let entry_func: usize; 
 
     { // scoped to release tasklist lock before calling jump_to_userspace
-        let mut currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
-        current_task = currtask.deref_mut() as *mut Task;
     }
-
     debug!("userspace_wrapper [1]: ustack_top: {:#x}, module_entry: {:#x}", ustack_top, entry_func);
 
-
-    assert!(current_task as usize != 0, "userspace_wrapper(): current_task was null!");
-    // SAFE: current_task is checked for null
+    // SAFE: just jumping to userspace 
     unsafe {
-        let curr: &mut Task = &mut (*current_task); // dereference current_task and get a ref to it
         ::arch::jump_to_userspace(ustack_top, entry_func);
     }
 

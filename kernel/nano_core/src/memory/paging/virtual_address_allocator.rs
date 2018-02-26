@@ -17,37 +17,34 @@ struct Chunk {
 	size_in_pages: usize,
 }
 impl Chunk {
-	fn as_owned_pages(&self) -> OwnedPages {
+	fn as_allocated_pages(&self) -> AllocatedPages {
 		// subtract one because it's an inclusive range
 		let end_page = self.start_page + self.size_in_pages - 1;
-		OwnedPages {
+		AllocatedPages {
 			pages: Page::range_inclusive(self.start_page, end_page),							
 		}
 	}
 }
 
 
-/// Rpresents an allocated range of virtual addresses, specified in pages. 
+/// Represents an allocated range of virtual addresses, specified in pages. 
 /// These pages are not mapped to any physical memory frames, you must do that separately.
 /// This object represents ownership of those pages; if this object falls out of scope,
-/// it will be dropped, and the pages will be unmapped and de-allocated. 
-/// Thus, it ensures memory safety by guaranteeing that this object must be held 
-/// in order to access data stored in these mapped pages, 
-/// just like a MutexGuard guarantees that data protected by a Mutex can only be accessed
-/// while that Mutex's lock is held. 
+/// it will be dropped, and the pages will be de-allocated. 
+/// See `MappedPages` struct for a similar object that unmaps pages when dropped.
 #[derive(Debug)]
-pub struct OwnedPages {
+pub struct AllocatedPages {
 	pub pages: PageIter,
 }
 
-impl OwnedPages {
+impl AllocatedPages {
 	/// Returns the start address of the first page. 
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
 }
 // use core::ops::Deref;
-// impl Deref for OwnedPages {
+// impl Deref for AllocatedPages {
 //     type Target = PageIter;
 
 //     fn deref(&self) -> &PageIter {
@@ -55,10 +52,12 @@ impl OwnedPages {
 //     }
 // }
 
-impl Drop for OwnedPages {
+impl Drop for AllocatedPages {
     #[inline]
     fn drop(&mut self) {
-        deallocate_pages(self);
+        if let Err(_) = deallocate_pages(self) {
+			error!("AllocatedPages::drop(): error deallocating pages");
+		}
     }
 }
 
@@ -85,7 +84,7 @@ lazy_static!{
 /// rather than the number of pages. It will still allocated whole pages
 /// by rounding up the number of bytes. 
 /// See [allocate_pages]](allocate_pages)
-pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<OwnedPages> {
+pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
 }
@@ -97,7 +96,7 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<OwnedPages> {
 /// Allocation is quick, technically O(n) but generally will allocate immediately
 /// because the largest free chunks are stored at the front of the list.
 /// Fragmentation isn't cleaned up until we're out of address space, but not really a big deal.
-pub fn allocate_pages(num_pages: usize) -> Option<OwnedPages> {
+pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 	if num_pages == 0 {
 		error!("allocate_pages(): requested an allocation of 0 pages... stupid!");
@@ -121,7 +120,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<OwnedPages> {
 			if remaining_size == 0 {
 				// if the chunk is exactly the right size, just update it in-place as 'allocated'
 				c.allocated = true;
-				return Some(c.as_owned_pages())
+				return Some(c.as_allocated_pages())
 			}
 
 			// here: we have the chunk and we need to split it up into two chunks
@@ -143,7 +142,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<OwnedPages> {
 			start_page: p,
 			size_in_pages: num_pages,
 		};
-		let ret = new_chunk.as_owned_pages();
+		let ret = new_chunk.as_allocated_pages();
 		locked_list.push_back(new_chunk);
 		Some(ret)
 	}
@@ -154,8 +153,8 @@ pub fn allocate_pages(num_pages: usize) -> Option<OwnedPages> {
 }
 
 
-fn deallocate_pages(_pages: &mut OwnedPages) -> Result<(), ()> {
-	warn!("Virtual Address Allocator: deallocated_pages is not yet implemented, trying to dealloc: {:?}", _pages);
-	Err(())
+fn deallocate_pages(_pages: &mut AllocatedPages) -> Result<(), ()> {
+	trace!("Virtual Address Allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", _pages);
+	Ok(())
 	// unimplemented!();
 }

@@ -7,8 +7,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::{Frame, FrameAllocator, PhysicalMemoryArea};
+use memory::{Frame, FrameAllocator, FrameIter, PhysicalMemoryArea};
 use alloc::Vec;
+use kernel_config::memory::PAGE_SIZE;
+
 
 /// A stand-in for a Union
 pub enum VectorArray<T: Clone> {
@@ -59,14 +61,6 @@ pub struct AreaFrameAllocator {
 impl AreaFrameAllocator {
     pub fn new(available: [PhysicalMemoryArea; 32], avail_len: usize, occupied: [PhysicalMemoryArea; 32], occ_len: usize) 
                -> Result<AreaFrameAllocator, &'static str> {
-        // if available.len() > 32 || occupied.len() > 32 {
-        //     error!("length of slice must be <= 32, available[{}] occupied[{}]", available.len(), occupied.len());
-        //     return Err("initial available or occupied slice is too long");
-        // }
-        // let mut avail: [PhysicalMemoryArea; 32] = Default::default();
-        // avail[0 .. available.len()].copy_from_slice(available);
-        // let mut occ: [PhysicalMemoryArea; 32] = Default::default();
-        // occ[0 .. occupied.len()].copy_from_slice(occupied);
 
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::containing_address(0),
@@ -171,16 +165,46 @@ impl AreaFrameAllocator {
             }
         };
     }
-
-    /// Call this when the kernel heap has been set up
-    pub fn alloc_ready(&mut self) {
-        self.available.upgrade_to_vector();
-        self.occupied.upgrade_to_vector();
-    }
-
 }
 
 impl FrameAllocator for AreaFrameAllocator {
+
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter> {
+        // this is just a shitty way to get contiguous frames, since right now it's really easy to get them
+        // it wastes the frames that are allocated 
+
+        if let Some(first_frame) = self.allocate_frame() {
+            let first_frame_paddr = first_frame.start_address();
+
+            // here, we successfully got the first frame, so try to allocate the rest
+            for i in 1..num_frames {
+                if let Some(f) = self.allocate_frame() {
+                    if f.start_address() == (first_frame_paddr + (i * PAGE_SIZE)) {
+                        // still getting contiguous frames, so we're good
+                        continue;
+                    }
+                    else {
+                        // didn't get a contiguous frame, so let's try again
+                        warn!("AreaFrameAllocator::allocate_frames(): could only alloc {}/{} contiguous frames (those are wasted), trying again!", i, num_frames);
+                        return self.allocate_frames(num_frames);
+                    }
+                }
+                else {
+                    error!("Error: AreaFrameAllocator::allocate_frames(): couldn't allocate {} contiguous frames, out of memory!", num_frames);
+                    return None;
+                }
+            }
+
+            // here, we have allocated enough frames, and checked that they're all contiguous
+            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameIter is inclusive
+            return Some(Frame::range_inclusive(first_frame, last_frame));
+        }
+
+        error!("Error: AreaFrameAllocator::allocate_frames(): couldn't allocate {} contiguous frames, out of memory!", num_frames);
+        None
+    }
+
+
     fn allocate_frame(&mut self) -> Option<Frame> {
         if let Some(area) = self.current_area {
             // "clone" the frame to return it if it's free. Frame doesn't
@@ -211,7 +235,15 @@ impl FrameAllocator for AreaFrameAllocator {
         }
     }
 
+    
     fn deallocate_frame(&mut self, _frame: Frame) {
         unimplemented!()
+    }
+
+
+    /// Call this when the kernel heap has been set up
+    fn alloc_ready(&mut self) {
+        self.available.upgrade_to_vector();
+        self.occupied.upgrade_to_vector();
     }
 }

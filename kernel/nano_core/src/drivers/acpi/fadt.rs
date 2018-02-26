@@ -97,20 +97,20 @@ impl Fadt {
         }
     }
 
-    pub fn init(active_table: &mut ActivePageTable) {
+    pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         let fadt_sdt = find_sdt("FACP");
         let fadt = if fadt_sdt.len() == 1 {
             load_table(get_sdt_signature(fadt_sdt[0]));
             Fadt::new(fadt_sdt[0])
         } else {
             error!("Unable to find FADT");
-            return;
+            return Err("Couldn't find FADT");
         };
 
         if let Some(fadt) = fadt {
             debug!("  FACP: {:X}  {:?}", fadt.dsdt, fadt);
 
-            let dsdt_sdt = get_sdt(fadt.dsdt as usize, active_table);
+            let dsdt_sdt = try!(get_sdt(fadt.dsdt as usize, active_table));
 
             let signature = get_sdt_signature(dsdt_sdt);
             if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {
@@ -119,6 +119,12 @@ impl Fadt {
 
             let mut fadt_t = ACPI_TABLE.fadt.write();
             *fadt_t = Some(fadt);
+            
+            Ok(())
+        }
+        else {
+            error!("Unable to find FADT");
+            return Err("Couldn't find FADT");
         }
     }
 }

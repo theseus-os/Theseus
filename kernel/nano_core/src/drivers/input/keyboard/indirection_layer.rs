@@ -2,10 +2,9 @@ extern crate keycodes_ascii; // our own crate in "libs/" dir
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
-use core::default::Default;
 use spin::Once;
 use dfqueue::DFQueueProducer;
-use console::{ConsoleEvent, ConsoleInputEvent};
+use console::ConsoleEvent;
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/

@@ -1,11 +1,12 @@
 use core::mem;
 use core::intrinsics::{atomic_load, atomic_store};
 use core::ops::DerefMut;
-use memory::{Stack, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use memory::{Stack, FRAME_ALLOCATOR, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
 use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id};
 use kernel_config::memory::PAGE_SHIFT;
 use spin::RwLock;
+use alloc::boxed::Box;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -44,7 +45,7 @@ impl Madt {
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
             try!(handle_ioapic_entry(iter.clone(), active_table));
-            try!(handle_bsp_entry(iter.clone(), active_table));
+            try!(handle_bsp_entry(iter.clone()));
             Ok(iter)
         } else {
             error!("Unable to find MADT");
@@ -82,7 +83,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
         match madt_entry {
             MadtEntry::IoApic(ioa) => {
                 ioapic_count += 1;
-                ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base);
+                try!(ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base));
             }
             // we only handle IoApic entries here
             _ => { }
@@ -99,12 +100,12 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 }
 
 
-fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
     let mut ioapic_locked = ioapic::get_ioapic();
-    let mut ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
+    let ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
 
 
     for madt_entry in madt_iter.clone() {
@@ -116,24 +117,25 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone());
                     let bsp_id = bsp_lapic.id();
 
+                    use interrupts::PIC_MASTER_OFFSET;
                     // set the BSP to receive regular PIC interrupts routed through the IoApic
-                    ioapic_ref.set_irq(0x0, bsp_id, 0x20);
-                    ioapic_ref.set_irq(0x1, bsp_id, 0x21); // map keyboard interrupt (0x21 in IDT) to IoApic irq 0x1 for just the BSP core
+                    ioapic_ref.set_irq(0x0, bsp_id, PIC_MASTER_OFFSET + 0x0);
+                    ioapic_ref.set_irq(0x1, bsp_id, PIC_MASTER_OFFSET + 0x1); // keyboard interrupt 0x1 -> 0x21 in IDT
                     // skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used
-                    ioapic_ref.set_irq(0x3, bsp_id, 0x23);
-                    ioapic_ref.set_irq(0x4, bsp_id, 0x24);
-                    ioapic_ref.set_irq(0x5, bsp_id, 0x25);
-                    ioapic_ref.set_irq(0x6, bsp_id, 0x26);
-                    ioapic_ref.set_irq(0x7, bsp_id, 0x27);
-                    ioapic_ref.set_irq(0x8, bsp_id, 0x28);
-                    ioapic_ref.set_irq(0x9, bsp_id, 0x29);
-                    ioapic_ref.set_irq(0xa, bsp_id, 0x2a);
-                    ioapic_ref.set_irq(0xb, bsp_id, 0x2b);
-                    ioapic_ref.set_irq(0xc, bsp_id, 0x2c);
-                    ioapic_ref.set_irq(0xd, bsp_id, 0x2d);
-                    ioapic_ref.set_irq(0xe, bsp_id, 0x2e);
-                    ioapic_ref.set_irq(0xf, bsp_id, 0x2f);
-                    // ioapic_ref.set_irq(0x1, 0xFF, 0x21); 
+                    ioapic_ref.set_irq(0x3, bsp_id, PIC_MASTER_OFFSET + 0x3);
+                    ioapic_ref.set_irq(0x4, bsp_id, PIC_MASTER_OFFSET + 0x4);
+                    ioapic_ref.set_irq(0x5, bsp_id, PIC_MASTER_OFFSET + 0x5);
+                    ioapic_ref.set_irq(0x6, bsp_id, PIC_MASTER_OFFSET + 0x6);
+                    ioapic_ref.set_irq(0x7, bsp_id, PIC_MASTER_OFFSET + 0x7);
+                    ioapic_ref.set_irq(0x8, bsp_id, PIC_MASTER_OFFSET + 0x8);
+                    ioapic_ref.set_irq(0x9, bsp_id, PIC_MASTER_OFFSET + 0x9);
+                    ioapic_ref.set_irq(0xa, bsp_id, PIC_MASTER_OFFSET + 0xa);
+                    ioapic_ref.set_irq(0xb, bsp_id, PIC_MASTER_OFFSET + 0xb);
+                    ioapic_ref.set_irq(0xc, bsp_id, PIC_MASTER_OFFSET + 0xc);
+                    ioapic_ref.set_irq(0xd, bsp_id, PIC_MASTER_OFFSET + 0xd);
+                    ioapic_ref.set_irq(0xe, bsp_id, PIC_MASTER_OFFSET + 0xe);
+                    ioapic_ref.set_irq(0xf, bsp_id, PIC_MASTER_OFFSET + 0xf);
+                    // ioapic_ref.set_irq(0x1, 0xFF, PIC_MASTER_OFFSET + 0x1); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                     
                     // add the BSP lapic to the list (should be empty until here)
@@ -156,8 +158,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
             MadtEntry::IntSrcOverride(int_src) => {
                 assert!(int_src.gsi <= (u8::max_value() as u32), "Unsupported: gsi value is larger than size of u8: {:?}", int_src);
                 // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                //ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8); 
-                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + 0x20);
+                use interrupts::PIC_MASTER_OFFSET;
+                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
             } 
             _ => { }
         }
@@ -169,12 +171,14 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
 
 
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
-pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
     // SAFE: just getting const values from boot assembly code
     debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
     let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
 
-    let mut active_table_phys_addr: Option<PhysicalAddress> = None;
+    let active_table_phys_addr: PhysicalAddress;
+    let _trampoline_mapped_page: MappedPages; // must be held until APs are booted up
+    let ap_startup_mapped_pages: MappedPages; // must be held until APs are booted up
 
     {
         let &mut MemoryManagementInfo { 
@@ -184,20 +188,26 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
+                // first, double check that the ap_start_realmode address is mapped and valid
+                try!(active_table.translate(::get_ap_start_realmode()).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address"));
+
+                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock();
+
                 // Map trampoline frame and the ap_startup code to the AP_STARTUP frame
-                let trampoline_frame = Frame::containing_address(TRAMPOLINE);
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
+                let trampoline_frame = Frame::containing_address(TRAMPOLINE);
                 
-                {
-                    // now that we're identity mapping the first megabyte and the kernel ELF sections in remap_the_kernel(), 
-                    // we should just use remap() here instead of map_to()
-                    active_table.remap(trampoline_page, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-                    active_table.remap_pages(Page::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes), 
-                                            EntryFlags::PRESENT | EntryFlags::WRITABLE);
-                }
+                _trampoline_mapped_page = try!( active_table.map_to(
+                    trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
+                );
+                ap_startup_mapped_pages = try!( active_table.map_frames(
+                    Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes),
+                    Page::containing_address(AP_STARTUP),
+                    EntryFlags::PRESENT | EntryFlags::WRITABLE, 
+                    allocator.deref_mut())
+                );
 
-
-                active_table_phys_addr = Some(active_table.physical_address());
+                active_table_phys_addr = active_table.physical_address();
             }
             _ => {
                 error!("handle_ap_cores(): couldn't get kernel's active_table!");
@@ -205,8 +215,6 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
             }
         }
     }
-
-    let active_table_phys_addr = try!(active_table_phys_addr.ok_or("Couldn't get kernel's active_table physical address"));
 
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
@@ -217,9 +225,9 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
         debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic", me);
     }
     
-    // we mapped these two addresses earlier
+    // we mapped and/or checked the src/dest pointers/addresses earlier
     let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
-    let dest_ptr = AP_STARTUP as VirtualAddress as *mut u8; // we identity mapped this paddr above
+    let dest_ptr = ap_startup_mapped_pages.start_address() as *mut u8; // we mapped this above
     debug!("copying ap_startup code to AP_STARTUP, {} bytes", ap_startup_size_in_bytes);
     use core::ptr::copy_nonoverlapping; // just like memcpy
     // obviously unsafe, but we've mapped everything 
@@ -228,6 +236,8 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     }
     // now, the ap startup code should be at paddr AP_STARTUP
 
+
+    let mut ap_count = 0;
 
     // in this function, we only handle LocalApics
     for madt_entry in madt_iter.clone() {
@@ -244,8 +254,9 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
                     let bsp_lapic_ref = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get(&bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
                     let mut bsp_lapic = bsp_lapic_ref.write();
-                    let ap_stack = kernel_mmi.alloc_stack(4).expect("could not allocate AP stack!");
+                    let ap_stack = try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"));
                     bring_up_ap(bsp_lapic.deref_mut(), lapic_madt, active_table_phys_addr, ap_stack, madt_iter.clone());
+                    ap_count += 1;
                 }
             }
             // only care about new local apics right now
@@ -253,7 +264,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
         }
     }
 
-    Ok(())  
+    Ok(ap_count)  
 }
 
 
@@ -287,6 +298,9 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     unsafe { atomic_store(ap_code, kstart_ap as u64) };
     unsafe { atomic_store(ap_madt_table, &madt_iter as *const _ as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
+
+    // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
+    Box::into_raw(Box::new(ap_stack)); 
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 

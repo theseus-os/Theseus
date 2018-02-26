@@ -47,3 +47,27 @@ impl Iterator for RsdtIter {
         }
     }
 }
+
+
+// impl Iterator for RsdtIter {
+//     type Item = usize;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         if self.i < self.sdt.data_len()/mem::size_of::<u32>() {
+//             let data_paddr = self.sdt.data_address() as PhysicalAddress;
+//             let data_vaddr = {
+//                 if let Some(data_page) = super::ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(data_paddr)) {
+//                     data_page.start_address() + address_page_offset(data_paddr)
+//                 }
+//                 else {
+//                     return None;
+//                 }
+//             };
+    
+//             let item = unsafe { *(data_vaddr as *const u32).offset(self.i as isize) };
+//             self.i += 1;
+//             Some(item as usize)
+//         } else {
+//             None
+//         }
+//     }
+// }

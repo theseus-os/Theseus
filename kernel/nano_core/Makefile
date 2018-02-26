@@ -9,7 +9,8 @@ PWD := $(shell pwd)
 
 KERNEL_BUILD_DIR ?= ${PWD}/../build
 CFG_DIR ?= ${PWD}/../../cfg
-RUSTFLAGS += "-C code-model=large"
+RUSTFLAGS += -C code-model=large
+RUSTFLAGS += -D unused-must-use
 
 BUILD_MODE := debug
 # BUILD_MODE := release  ## release mode currently does NOT work! See issue #14
@@ -45,7 +46,7 @@ clean:
 
 cargo: 
 #cargo clean   ## temporarily calling cargo clean to fix nano_core makefile
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS=${RUSTFLAGS} xargo build $(XARGO_RELEASE_ARG) ${RUST_FEATURES} --target $(TARGET)  ## target arg must be a target name, not the file path.
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) ${RUST_FEATURES} --target $(TARGET)  ## target arg must be a target name, not the file path.
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)

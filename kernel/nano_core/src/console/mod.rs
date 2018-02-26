@@ -1,7 +1,6 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
 use alloc::string::String;
-use irq_safety::RwLockIrqSafeWriteGuard;
 use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -38,9 +37,12 @@ macro_rules! print {
             let mut s: String = String::new();
             match write!(&mut s, $($arg)*) {
                 Ok(_) => { }
-                Err(e) => panic!("Writing to String in print!() macro failed, error: {}", e),
+                Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
             }
-            $crate::console::print_to_console(s).unwrap();
+            match $crate::console::print_to_console(s) {
+                Ok(_) => { }
+                Err(e) => error!("print_to_console() in print!() macro failed, error: {}", e),
+            }
     });
 }
 
@@ -103,7 +105,7 @@ impl ConsoleOutputEvent {
 
 
 /// the console owns and creates the event queue, and returns a producer reference to the queue.
-pub fn init() -> DFQueueProducer<ConsoleEvent> {
+pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     assert_has_not_been_called!("console_init was called more than once!");
 
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
@@ -113,10 +115,10 @@ pub fn init() -> DFQueueProducer<ConsoleEvent> {
         console_consumer.obtain_producer()
     });
 
-    print_to_console("Console says hello!\n");
+    println!("Console says hello!\n");
     
-    spawn_kthread(main_loop, console_consumer, "console_loop");
-    returned_producer
+    try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
+    Ok(returned_producer)
 }
 
 
@@ -124,7 +126,7 @@ pub fn init() -> DFQueueProducer<ConsoleEvent> {
 /// This is the only thread that is allowed to touch the vga buffer!
 /// ## Returns
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
-fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> bool { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
+fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
     use core::ops::Deref;
 
     loop { 
@@ -138,14 +140,14 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> bool { // Option<usize>
 
         match event_data {
             &ConsoleEvent::ExitEvent => {
-                vga_buffer::print_str("\nSmoothly exiting console main loop.\n");
-                return true; 
+                try!(vga_buffer::print_str("\nSmoothly exiting console main loop.\n").map_err(|_| "print_str failed"));
+                return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 handle_key_event(input_event.key_event);
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                vga_buffer::print_string(&output_event.text);
+                try!(vga_buffer::print_string(&output_event.text).map_err(|_| "print_string failed"));
             }
         }
         event.mark_completed();
@@ -189,7 +191,7 @@ fn handle_key_event(keyevent: KeyEvent) {
             // we echo key presses directly to the console without needing to queue an event
             // vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
             use alloc::string::ToString;
-            vga_buffer::print_string(&c.to_string());
+            vga_buffer::print_string(&c.to_string()).unwrap();
             // trace!("  {}  ", c);
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 

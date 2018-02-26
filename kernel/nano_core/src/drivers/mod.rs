@@ -29,7 +29,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
             // first, init the local apic info
-            ::interrupts::apic::init(active_table);
+            try!(::interrupts::apic::init(active_table));
             
             // then init/parse the ACPI tables to fill in the APIC details, among other things
             // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
