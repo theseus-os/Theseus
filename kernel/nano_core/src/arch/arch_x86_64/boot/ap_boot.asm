@@ -73,7 +73,7 @@ set_up_paging_ap:
 	;     PAE: (Physical Address Extension)
 	;     PSE: (Physical Size Extentions)
 	mov eax, cr4
-	or eax, (1 << 7) | (1 << 5) | (1 << 1)
+	or eax, (1 << 7) | (1 << 5) ; | (1 << 1)
 	mov cr4, eax
 
 	; load P4 to cr3 register (cpu uses this to access the P4 table)
@@ -152,10 +152,10 @@ start_high_ap:
 	mov gs, ax
 	
 	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8028 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."
-    mov dword [0xb802c + KERNEL_OFFSET], 0x4f494f48 ; "HI"
-	mov dword [0xb8030 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
-	mov dword [0xb8034 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
+	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."
+    mov dword [0xb804c + KERNEL_OFFSET], 0x4f494f48 ; "HI"
+	mov dword [0xb8050 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
+	mov dword [0xb8054 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
 
 	; move to the new stack that was alloc'd for this AP
 	mov rcx, [AP_STACK_END]
@@ -220,13 +220,15 @@ GDT_AP:
 .code equ $ - GDT_AP
 	dq (1<<44) | (1<<47) | (1<<41) | (1<<43) | (1<<53) ; code segment
 	; dq (1<<44) | (1<<47) | (1<<43) | (1<<53) | 0xFFFF; code segment, limit 0xFFFF
-; .data equ $ - GDT_AP
-; 	; dq (1<<44) | (1<<47) | (1<<41) | (1 << 53) ; data segment
-; 	dq (1<<44) | (1<<47) | (1<<41) | (1 << 53) ; data segment
+.data equ $ - GDT_AP
+	dq (1<<44) | (1<<47) | (1<<41) ; | (1 << 53) ; data segment
 .end equ $
+; ALIGN 4
+; 	dw 0 ; padding to make sure GDT pointer is 4-byte aligned
 .ptr_low:
 	dw .end - GDT_AP - 1
-	dd GDT_AP - KERNEL_OFFSET
+	; dd GDT_AP - KERNEL_OFFSET
+	dq GDT_AP - KERNEL_OFFSET
 .ptr:
 	dw .end - GDT_AP - 1
 	dq GDT_AP
