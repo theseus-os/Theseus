@@ -1,18 +1,12 @@
 use pci::PciDevice;
-use port_io::Port;
-use spin::{Once, Mutex};
 use alloc::Vec;
-use alloc::boxed::Box;
 use irq_safety::MutexIrqSafe;
 
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, VirtualAddress, Page, Frame, PageTable, EntryFlags, FrameAllocator,allocate_pages};
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator,allocate_pages,allocate_frames,MappedPages,FrameIter};
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
-use drivers::pci::pci_read_32;
-use drivers::pci::pci_read_8;
-use drivers::pci::pci_write;
-use drivers::pci::get_pci_device_vd;
-use drivers::pci::pci_set_command_bus_master_bit;
+use drivers::pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
+use spin::Once; 
 
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -51,7 +45,7 @@ const REG_CRCERRS:              u32 = 0x4000;
 const REG_TIPG:                 u32 = 0x0410;      // Transmit Inter Packet Gap
 const ECTRL_SLU:                u32 = 0x40;        //set link up
 
- 
+//RCTL registers 
 const RCTL_EN:                  u32 = (1 << 1);    // Receiver Enable
 const RCTL_SBP:                 u32 = (1 << 2);    // Store Bad Packets
 const RCTL_UPE:                 u32 = (1 << 3);    // Unicast Promiscuous Enabled
@@ -114,9 +108,13 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_SIZE_RX_DESC:       usize = 256;
 const E1000_SIZE_TX_DESC:       usize = 256;
 
+//to hold memory mappings
+static NIC_PAGES: Once<MappedPages> = Once::new();
+static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
+
 #[repr(C,packed)]
 pub struct e1000_rx_desc {
-        addr: u64,
+        addr: u64,      
         length: u16,
         checksum: u16,
         status: u8,
@@ -175,38 +173,35 @@ impl Default for e1000_tx_desc {
         }
 }
 
-pub struct nic {
-        bar_type: u8,     // Type of BOR0
+pub struct Nic {
+        bar_type: u8,     // Type of BAR0
         io_base: u32,     // IO Base Address
         mem_base: usize,   // MMIO Base Address
-        //pub mem_space: u32,
         eeprom_exists: bool,  // A flag indicating if eeprom exists
         mac: [u8;6],      // A buffer for storing the mac address 
-        rx_descs: Vec<e1000_rx_desc>, // Receive Descriptor Buffers ???
-        tx_descs: Vec<e1000_tx_desc>, // Transmit Descriptor Buffers???
+        rx_descs: Vec<e1000_rx_desc>, // Receive Descriptors 
+        tx_descs: Vec<e1000_tx_desc>, // Transmit Descriptors
         rx_cur: u16,      // Current Receive Descriptor Buffer
         tx_cur: u16,
         rx_buf_addr: [usize;E1000_NUM_RX_DESC], //stores the virtual address of rx buffers
 }
 
 
-pub struct DMA_allocator{
+pub struct DmaAllocator{
         start: usize, //starting address of physically contiguous memory
         end: usize, //ending address of physically contiguous memory
         current: usize, //starting address of available memory 
 }
 
-impl DMA_allocator{
+impl DmaAllocator{
 
         pub fn allocate_dma_mem(&mut self, size: usize) -> usize {
                 let prev_current;                
                         
-                if unsafe{self.end-self.current > size}{
-                        unsafe  {
-                                prev_current = self.current;
-                                self.current = self.current + size;
-                                unsafe {debug!("start: {:x} end: {:x} prev_current: {:x} current: {:x}", self.start,self.end,prev_current,self.current);}
-                        }
+                if self.end-self.current > size {
+                        prev_current = self.current;
+                        self.current = self.current + size;
+                        debug!("start: {:x} end: {:x} prev_current: {:x} current: {:x}", self.start,self.end,prev_current,self.current);
                         return prev_current;
                 }
                 else{
@@ -217,7 +212,7 @@ impl DMA_allocator{
         }
 }
 
-static mut NIC_DMA_ALLOCATOR: DMA_allocator = DMA_allocator{start:0, end:0, current:0};
+static mut NIC_DMA_ALLOCATOR: DmaAllocator = DmaAllocator{start:0, end:0, current:0};
 
 pub fn translate_v2p(v_addr : usize) -> usize {
         //translate virt address to physical address
@@ -232,7 +227,7 @@ pub fn translate_v2p(v_addr : usize) -> usize {
                 } = *kernel_mmi_locked;
                 match kernel_page_table {
                         &mut PageTable::Active(ref mut active_table) => {
-                                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                                //let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
                                 // this maps just one page to one frame (4KB). If you need to map more, ask me
                                 let phys = active_table.translate(v_addr);
                                 return phys.unwrap();
@@ -245,13 +240,10 @@ pub fn translate_v2p(v_addr : usize) -> usize {
 }
 
 
+impl Nic{
 
-
-
-impl nic{
-
-        pub fn new() -> nic{
-                nic{
+        pub fn new() -> Nic{
+                Nic{
                         bar_type : 0, 
                         io_base : 0,   
                         mem_base : 0, 
@@ -272,7 +264,7 @@ impl nic{
                 self.mem_base = (dev.bars[0] as usize) & !3; //hard coded for 32 bit, need to make conditional              
         }
        
-        pub fn mem_map (&mut self,ref dev:&PciDevice){
+        pub fn mem_map (&mut self,ref dev:&PciDevice) -> Result<(), &'static str>{
                 pci_set_command_bus_master_bit(dev.bus, dev.slot, dev.func);
                 //debug!("i217_mem_map: {0}, mem_base: {1}, io_basej: {2}", self.bar_type, self.mem_base, self.io_base);
                 //debug!("usize bytes: {}", size_of(usize));
@@ -302,47 +294,60 @@ impl nic{
                 } = *kernel_mmi_locked;
 
                 let no_pages: usize = mem_size as usize/4096; //4K pages
-                let va = allocate_pages(no_pages).expect("e1000::mem_map(): couldn't allocated virtual page!");
-                // debug!("page: {:#X}, frame {:#X}",va.pages.start.start_address(),frame.start_address());
-                for i in 0..no_pages{
-                        /***************************************/
-                        let inc = i*4096;
-                        let phys_addr = self.mem_base + inc as usize ;
-                        let virt_addr = va.pages.start + i; // it can't conflict with anything else
-                        
-                        debug!("phys_address: {:#X}, requested virt_address {:#X}", phys_addr,virt_addr.start_address());
-                        
-                        //change from mutable once we can multiple pages at once
-                        //let page = Page::containing_address(virt_addr);
-                        let frame = Frame::containing_address(phys_addr as PhysicalAddress);
-                        let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-                        debug!("page: {:#X}, frame {:#X}",va.pages.start.start_address(),frame.start_address());
 
-                        // we can only map stuff if the kernel_page_table is Active
-                        // which you can be guaranteed it will be if you're in kernel code
-                        
-                        match kernel_page_table {
-                        &mut PageTable::Active(ref mut active_table) => {
-                                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                                // this maps just one page to one frame (4KB). If you need to map more, ask me
-                                active_table.map_to(virt_addr, frame, mapping_flags, frame_allocator.deref_mut());
-                        }
-                        _ => { panic!("kernel page table wasn't an ActivePageTable!"); }
+                //allocate required no of pages
+                let pages_nic = allocate_pages(no_pages).expect("e1000::mem_map(): couldn't allocated virtual page!");
+                
+                //allocate frames at address and create a FrameIter struct 
+                let phys_addr = self.mem_base;
+                let frame_first = Frame::containing_address(phys_addr as PhysicalAddress);
+                
+                let phys_addr = self.mem_base + (4096*(no_pages-1)) as usize;
+                let frame_last = Frame::containing_address(phys_addr as PhysicalAddress);
 
-                        }
-                        /**************************************/
-                }
-                self.mem_base = va.pages.start.start_address();
+                let frames_nic = FrameIter {
+                        start: frame_first,
+                        end: frame_last,
+                };
+
+                debug!("frames start: {:#X}, frames end {:#X}",frames_nic.start.start_address(),frames_nic.end.start_address());
+                
+                let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+                
+
+                // we can only map stuff if the kernel_page_table is Active
+                // which you can be guaranteed it will be if you're in kernel code
+                self.mem_base = pages_nic.pages.start.start_address();
                 debug!("new mem_base: {:#X}",self.mem_base);
+                
+                match kernel_page_table {
+                        &mut PageTable::Active(ref mut active_table) => {
+                                let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")).lock();
+                                //let mut fa = FRAME_ALLOCATOR.try().unwrap().lock();
+                                // this maps just one page to one frame (4KB). If you need to map more, ask me
+                                let result = try!(active_table.map_allocated_pages_to(pages_nic, frames_nic, mapping_flags, fa.deref_mut()));
+                                //let result = active_table.map_allocated_pages_to(pages_nic, frames_nic, mapping_flags, fa.deref_mut());
+                                
+                                NIC_PAGES.call_once(|| result);
+                        }
+                        _ => { 
+                                panic!("kernel page table wasn't an ActivePageTable!"); 
+                                //error!("e1000::mem_map(): couldn't get kernel's active_table!");
+                                //Err("Couldn't get kernel's active_table");
+                        }
+                        
+
+                }           
                 
                 //checking device status register
                 let val: u32 = unsafe { read_volatile((self.mem_base + REG_STATUS as usize) as *const u32) };
                 debug!("DSR: {}",val);
 
+                Ok(())
 
         }
 
-        pub fn mem_map_dma(&self){
+        pub fn mem_map_dma(&self) -> Result<(), &'static str> {
                 
                 // get a reference to the kernel's memory mapping information
                 let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -354,39 +359,40 @@ impl nic{
                 ..  // don't need to access other stuff in kernel_mmi
                 } = *kernel_mmi_locked;
 
-                       
-                        //can get from virtual allocator once it's set up
-                        let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
-                        //let page = Page::containing_address(virt_addr);
-                                                
-                        let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-                        //debug!("page: {:?}, frame {:?}",page,frame);
-
-                        // we can only map stuff if the kernel_page_table is Active
-                        // which you can be guaranteed it will be if you're in kernel code
+                //will need to change this when size of RX buffers changes
+                let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
+                //let page = Page::containing_address(virt_addr);
+                                        
+                let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+                //debug!("page: {:?}, frame {:?}",page,frame);
+                
+                match kernel_page_table {
+                &mut PageTable::Active(ref mut active_table) => {
+                        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("e1000::mem_map_dma(): couldnt get FRAME_ALLOCATOR")).lock();
+                        let frame = try!(frame_allocator.allocate_frame().ok_or("e1000:mem_map_dma couldnt allocate a new frame"));
+                        // let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
+                        // let frame = frame_allocator.allocate_frame().unwrap() ;
                         
-                        match kernel_page_table {
-                        &mut PageTable::Active(ref mut active_table) => {
-                                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-                                let frame = frame_allocator.allocate_frame().unwrap();
-                                // this maps just one page to one frame (4KB). If you need to map more, ask me
-                                active_table.map_to(virt_addr.pages.start, frame, mapping_flags, frame_allocator.deref_mut());
-                        }
-                        _ => { panic!("kernel page table wasn't an ActivePageTable!"); }
+                        let result = try!(active_table.map_to(virt_addr.pages.start, frame, mapping_flags, frame_allocator.deref_mut()));
+                        NIC_DMA_PAGES.call_once(|| result);
+                }
+                _ => { panic!("kernel page table wasn't an ActivePageTable!"); }
 
-                        }
-                        /**************************************/
-                        unsafe{
-                                NIC_DMA_ALLOCATOR.start = virt_addr.pages.start.start_address();
-                                NIC_DMA_ALLOCATOR.current = virt_addr.pages.start.start_address();
-                                NIC_DMA_ALLOCATOR.end = virt_addr.pages.start.start_address()+4096; //One page is allocated
-                                trace!("head_pmem: {:#X}, tail_pmem: {:#X}", NIC_DMA_ALLOCATOR.start, NIC_DMA_ALLOCATOR.end);
-                        }
+                }
+                /**************************************/
+                unsafe{
+                        NIC_DMA_ALLOCATOR.start = virt_addr.pages.start.start_address();
+                        NIC_DMA_ALLOCATOR.current = virt_addr.pages.start.start_address();
+                        NIC_DMA_ALLOCATOR.end = virt_addr.pages.start.start_address()+4096; //One page is allocated
+                        trace!("head_pmem: {:#X}, tail_pmem: {:#X}", NIC_DMA_ALLOCATOR.start, NIC_DMA_ALLOCATOR.end);
+                }   
+              
+               Ok(())
         }
 
         fn write_command(&self,p_address:u32, p_value:u32){
 
-                if ( self.bar_type == 0 )
+                if self.bar_type == 0 
                 {
                         unsafe { write_volatile((self.mem_base+p_address as usize) as *mut u32, p_value) };
                         //MMIOUtils::write32(mem_base+p_address,p_value);
@@ -404,7 +410,7 @@ impl nic{
 
         fn read_command(&self,p_address:u32) -> u32 {
                 let mut val: u32 = 0;
-                if ( self.bar_type == 0 )
+                if self.bar_type == 0 
                 {
                         val = unsafe { read_volatile((self.mem_base+p_address as usize) as *const u32) };
                         //return MMIOUtils::read32(mem_base+p_address);
@@ -423,16 +429,16 @@ impl nic{
         }
  
         // Return true if EEProm exist, else it returns false and set the eeprom_existsdata member
-        pub fn detect_eeprom(&mut self) -> bool {
+        pub fn detect_eeprom(&mut self) {
 
-                let mut val: u32 = 0;
+                let mut val: u32;
                 let mut i: u16 = 0;
                 self.write_command(REG_EEPROM, 0x1);    
                 
                 while i < 1000 && ! self.eeprom_exists //???
                 {
                         val = self.read_command( REG_EEPROM);
-                        if((val & 0x10)==0x10){
+                        if (val & 0x10)==0x10 {
                                 self.eeprom_exists = true;
                         }
                         else{
@@ -440,19 +446,17 @@ impl nic{
                         }
                         i = i+1;
                 }
-                debug!("eeprom_exists: {}",self.eeprom_exists);
-                self.eeprom_exists       
+                debug!("eeprom_exists: {}",self.eeprom_exists);     
         } 
         
         // Read 4 bytes from a specific EEProm Address
         pub fn eeprom_read( &self,addr: u16) -> u32 {
-                let mut data: u32 = 0;
                 let mut tmp: u32 = 0;
-                if ( self.eeprom_exists)
+                if self.eeprom_exists
                 {
                         let x = ((addr) << 8) as u32;//addr bits are 15:8
                         self.write_command( REG_EEPROM, (1) | x ); //write addr to eeprom read register and simulatenously write 1 to start read bit
-                        while(tmp & 0x10 != 0x10  ){ //check read done bit
+                        while (tmp & 0x10) != 0x10 { //check read done bit
                                 tmp = self.read_command(REG_EEPROM);
                         }
                 }
@@ -460,18 +464,18 @@ impl nic{
                 {
                         let x = ((addr) << 2) as u32;//read 4 bytes (1 word)
                         self.write_command( REG_EEPROM, (1) | x); 
-                        while( tmp & 0x02 != 0x02 ){
+                        while (tmp & 0x02) != 0x02 {
                                 tmp = self.read_command(REG_EEPROM);
                         }
                 }
-                data = ((tmp >> 16) & 0x0000_FFFF); // data bits are 31:16
+                let data = (tmp >> 16) & 0x0000_FFFF; // data bits are 31:16
                 data
 
         }
 
         // Read MAC Address
         pub fn read_mac_addr(&mut self) -> bool {
-                if ( self.eeprom_exists)
+                if self.eeprom_exists
                 {
                         let mut temp: u32 = self.eeprom_read(0);
                         self.mac[0] = temp as u8 &0xff;
@@ -487,7 +491,7 @@ impl nic{
                 {
                         let mac_32_low = self.read_command(0x5400);
                         let mac_32_high = self.read_command(0x5404);
-                        if ( mac_32_low != 0 )
+                        if mac_32_low != 0 
                         {
                                 self.mac[0] = mac_32_low as u8;
                                 self.mac[1] = (mac_32_low>>8) as u8;
@@ -534,11 +538,11 @@ impl nic{
 
         // Initialize receive descriptors an buffers  ???
         pub fn rx_init(&mut self) {
-                const no_bytes : usize = 16*(E1000_NUM_RX_DESC+1);
-                /*let x: Box<[u8;no_bytes]> = Box::new([0;no_bytes]);
+                const NO_BYTES : usize = 16*(E1000_NUM_RX_DESC+1);
+                /*let x: Box<[u8;NO_BYTES]> = Box::new([0;NO_BYTES]);
                 let ptr = Box::into_raw(x);*/
                 let ptr;
-                unsafe {ptr = NIC_DMA_ALLOCATOR.allocate_dma_mem(no_bytes);}
+                unsafe {ptr = NIC_DMA_ALLOCATOR.allocate_dma_mem(NO_BYTES);}
                 let ptr1 = ptr + (16-(ptr%16));
                 debug!("pointers: {:x}, {:x}",ptr, ptr1);
 
@@ -567,7 +571,7 @@ impl nic{
                 
                 let slc = self.rx_descs.as_slice(); 
                 let slc_ptr = slc.as_ptr();
-                let mut v_addr = slc_ptr as usize;
+                let v_addr = slc_ptr as usize;
                 debug!("v address of rx_desc: {:x}",v_addr);
                 let ptr = translate_v2p(v_addr);
                 debug!("p address of rx_desc: {:x}",ptr);
@@ -591,9 +595,9 @@ impl nic{
         
         // Initialize transmit descriptors and buffers
         pub fn tx_init(&mut self) {
-                const no_bytes: usize = 16*(E1000_NUM_TX_DESC+1);
+                const NO_BYTES: usize = 16*(E1000_NUM_TX_DESC+1);
                 let ptr;
-                unsafe{ ptr = NIC_DMA_ALLOCATOR.allocate_dma_mem(no_bytes);}
+                unsafe{ ptr = NIC_DMA_ALLOCATOR.allocate_dma_mem(NO_BYTES);}
                 let ptr1 = ptr + (16-(ptr%16));
                 debug!("tx pointers: {:x}, {:x}",ptr, ptr1);
 
@@ -602,7 +606,7 @@ impl nic{
                 unsafe{ self.tx_descs = Vec::from_raw_parts(raw_ptr, 0, E1000_NUM_TX_DESC);}
                 //unsafe{debug!("Address of Rx desc: {:?}, value: {:?}",ptr, *pr1);}
                
-                for i in 0..E1000_NUM_TX_DESC
+                for _i in 0..E1000_NUM_TX_DESC
                 {
                         //tx_descs[i] = (struct e1000_tx_desc *)((uint8_t*)descs + i*16);
                         let mut var = e1000_tx_desc::default();
@@ -615,7 +619,7 @@ impl nic{
                 //TODO: don't need this, use ptr1
                 let slc = self.tx_descs.as_slice(); 
                 let slc_ptr = slc.as_ptr();
-                let mut v_addr = slc_ptr as usize;
+                let v_addr = slc_ptr as usize;
                 debug!("v address of tx_desc: {:x}",v_addr);
                 let ptr = translate_v2p(v_addr);
                 debug!("p address of tx_desc: {:x}",ptr);
@@ -639,7 +643,7 @@ impl nic{
 
         // Send a packet, assuming the data is already in contiguous memory
         //p_data is address of tranmit buffer
-        pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> i32 {
+        pub fn send_packet(&mut self, p_data: usize, p_len: u16) {
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 let ptr = translate_v2p(p_data);
@@ -661,13 +665,11 @@ impl nic{
                 debug!("Waiting for packet to send!");
                 
 
-                while((self.tx_descs[old_cur as usize].status & 0xF) == 0){
+                while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
                         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
                 }  //bit 0 should be set when done
                 debug!("Packet is sent!");  
-                return 0;
-
         }        
         
         // Enable Interrupts 
@@ -696,16 +698,16 @@ impl nic{
         // Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                /*while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                }*/
+                }
 
                 //TODO: Print packets
-                while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
+/*                 while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
                         //got_packet = true;
                         let length = self.rx_descs[self.rx_cur as usize].length;
                         let packet = self.rx_buf_addr[self.rx_cur as usize] as *const u8;
@@ -724,7 +726,7 @@ impl nic{
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
 
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                }
+                } */
 
                 
         }  
@@ -733,7 +735,7 @@ impl nic{
         //Poll for recieved messages
         pub fn rx_poll(&mut self){
                 //detect if a packet has beem received
-                if (self.rx_descs[self.rx_cur as usize].status&0xF) != 0{                        
+                if (self.rx_descs[self.rx_cur as usize].status&0xF) != 0 {                        
                         self.handle_receive();
                 }
                 
@@ -744,7 +746,7 @@ impl nic{
 }
 
 lazy_static! {
-        pub static ref E1000_NIC: MutexIrqSafe<nic> = MutexIrqSafe::new(nic{
+        pub static ref E1000_NIC: MutexIrqSafe<Nic> = MutexIrqSafe::new(Nic{
                         bar_type : 0, 
                         io_base : 0,   
                         mem_base : 0, 
@@ -759,7 +761,7 @@ lazy_static! {
                 });
 }
 
-pub fn init_nic() {
+pub fn init_nic() -> Result<(), &'static str>{
         //create a NIC device and memory map it
         let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
         debug!("e1000 Device found: {:?}", pci_dev);
@@ -772,8 +774,8 @@ pub fn init_nic() {
         debug!("Int line: {}" ,pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE));
 
         e1000_nc.init(e1000_pci);
-        e1000_nc.mem_map(e1000_pci);
-        e1000_nc.mem_map_dma();
+        try!(e1000_nc.mem_map(e1000_pci));
+        try!(e1000_nc.mem_map_dma());
         e1000_nc.detect_eeprom();
         e1000_nc.read_mac_addr();
         e1000_nc.start_link();
@@ -782,6 +784,8 @@ pub fn init_nic() {
         e1000_nc.enable_interrupts();
         e1000_nc.rx_init();
         e1000_nc.tx_init();
+
+       Ok(())
 }
 
 //TODO: Complete interrupt handler
@@ -790,12 +794,12 @@ pub fn e1000_handler () {
         let mut e1000_nc = E1000_NIC.lock();
 
         let status = e1000_nc.read_command(0xc0); //reads status and clears interrupt
-        if(status & 0x04 == 0x04)//link status change
+        if (status & 0x04 ) == 0x04//link status change
         {
                 debug!("Interrupt:link status changed");
                 e1000_nc.start_link();
         }
-        else if(status & 0x80 == 0x80)
+        else if (status & 0x80 ) == 0x80
         {
                 debug!("Interrupt: RXT");
                 e1000_nc.handle_receive();

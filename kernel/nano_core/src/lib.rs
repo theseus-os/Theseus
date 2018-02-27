@@ -90,15 +90,9 @@ mod start;
 
 use task::{spawn_kthread, spawn_userspace};
 use alloc::string::String;
-<<<<<<< HEAD
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use core::ops::DerefMut;
 use interrupts::tsc;
-use drivers::{ata_pio, pci, test_nic_driver};
-=======
-use core::sync::atomic::{AtomicBool, Ordering};
-// use drivers::{ata_pio, pci};
->>>>>>> theseus_main
+use drivers::{pci, test_nic_driver};
 use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
@@ -151,7 +145,8 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 fn test_driver(_: Option<u64>) {
     print!("TESTING DRIVER!!");
-    test_nic_driver::DHCP_request_packet();
+    test_nic_driver::dhcp_request_packet();
+
 }
 
 
@@ -303,7 +298,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     let console_queue_producer = console::init().unwrap();
 
     // initialize the rest of our drivers
-    drivers::init(console_queue_producer);
+    drivers::init(console_queue_producer).unwrap();
 
 
     // boot up the other cores (APs)
@@ -352,8 +347,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     if true {
-        spawn_kthread(test_driver, None,  "driver_test_thread");
-    }
+        spawn_kthread(test_driver, None,  "driver_test_thread").unwrap();
+    }  
 
     // create some extra tasks to test context switching
     if true {

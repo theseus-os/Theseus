@@ -323,7 +323,6 @@ impl MappedPages {
 }
 
 impl Drop for MappedPages {
-    #[inline]
     fn drop(&mut self) {
         // skip logging temp page unmapping, since it's the most common
         if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {

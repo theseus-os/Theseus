@@ -396,7 +396,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 }
 
 /// 0x2B
-extern "x86-interrupt" fn nic_handler(stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
     e1000::e1000_handler();
 	eoi(Some(0x2B));

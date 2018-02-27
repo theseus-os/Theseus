@@ -552,13 +552,6 @@ impl Frame {
             end: end,
         }
     }
-<<<<<<< HEAD
-    //added by ramla
-    pub fn inc_number(&mut self){
-        self.number = self.number +1;
-    }
-    
-=======
 
     pub fn range_inclusive_addr(phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameIter {
         FrameIter {
@@ -601,7 +594,6 @@ impl SubAssign<usize> for Frame {
             number: self.number - rhs,
         };
     }
->>>>>>> theseus_main
 }
 
 pub struct FrameIter {
