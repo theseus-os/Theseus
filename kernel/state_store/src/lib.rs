@@ -20,7 +20,7 @@ extern crate atomic_linked_list;
 use core::any::{Any, TypeId};
 use core::sync::atomic::{AtomicPtr, Ordering};
 use alloc::boxed::Box;
-use spin::{RwLock, Mutex, Once};
+use spin::{Once};
 use alloc::arc::{Arc, Weak};
 use atomic_linked_list::atomic_map::AtomicMap;
 

@@ -1,5 +1,6 @@
 ; must match definitions in bring_up_ap()
-TRAMPOLINE          equ 0x7E00
+; TRAMPOLINE below is a Physical Address!
+TRAMPOLINE          equ 0xF000
 AP_READY            equ TRAMPOLINE
 AP_PROCESSOR_ID     equ TRAMPOLINE + 8
 AP_APIC_ID          equ TRAMPOLINE + 16
@@ -9,6 +10,7 @@ AP_STACK_START      equ TRAMPOLINE + 40
 AP_STACK_END        equ TRAMPOLINE + 48
 AP_CODE             equ TRAMPOLINE + 56
 AP_MADT_TABLE       equ TRAMPOLINE + 64
+AP_IDT              equ TRAMPOLINE + 72
 
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
@@ -17,10 +19,12 @@ section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 global ap_start_protected_mode
 ap_start_protected_mode:
+	mov esp, 0xFC00; set a new stack pointer, 512 bytes below our AP_STARTUP code region
     call set_up_paging_ap
 	
 
     ; each character is reversed in the dword cuz of little endianness
+	; prints PGTBL
 	mov dword [0xb8018], 0x4f2E4f2E ; ".."
     mov dword [0xb801c], 0x4f504f2E ; ".P"
 	mov dword [0xb8020], 0x4f544f47 ; "GT"
@@ -29,14 +33,41 @@ ap_start_protected_mode:
 	; Load the 64-bit GDT
 	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
 
-	; Load the code selector via a far jmp
-	; From now on instructions are 64 bits and this file is invalid
-	jmp GDT_AP.code:long_mode_start_ap; -> !
+	; mov ax, GDT_AP.data
+	; mov ax, 0
+	; mov ss, ax
+	; mov ds, ax
+	; mov es, ax
+	; mov fs, ax
+	; mov gs, ax
 
+
+	; prints GDT
+	mov dword [0xb8028], 0x4f2E4f2E ; ".."
+    mov dword [0xb802c], 0x4f474f2E ; ".G"
+	mov dword [0xb8030], 0x4f544f44 ; "DT"
+	mov eax, 0x4f004f00
+	or eax, GDT_AP.code + 0x30 ; convert GDT_AP.code value to ASCII char
+	mov dword [0xb8034], eax ; prints GDT_AP.code value
+
+
+	; Load the code selector via a far jmp
+	; From now on instructions are 64 bits
+	jmp dword GDT_AP.code:long_mode_start_ap; -> !
+
+	; an alternative to jmp, we construct a jmp here. No difference though.
+	; push 8
+	; push long_mode_start_ap
+	; retf
 
 
 
 set_up_paging_ap:
+	; first, quickly disable paging
+	mov eax, cr0
+	and eax, 0x7FFFFFFF ; clear bit 31
+	mov cr0, eax
+
 	; Enable:
 	;     PGE: (Page Global Extentions)
 	;     PAE: (Physical Address Extension)
@@ -52,7 +83,7 @@ set_up_paging_ap:
 	mov cr3, eax
 
 	; set the no execute (bit 11), long mode (bit 8), and SYSCALL Enable (bit 0)
-	; bits in the EFER MSR (model specific register)
+	; bits in the EFER MSR (which is MSR 0xC0000080)
 	mov ecx, 0xC0000080
 	rdmsr
 	or eax, (1 <<11) | (1 << 8) | (1 << 0) ; NXE, LME, SCE
@@ -60,7 +91,7 @@ set_up_paging_ap:
 
 	; enable paging and write protection in the cr0 register
 	mov eax, cr0
-	or eax, (1 << 31) | (1 << 16) ; PG | WP
+	or eax, (1 << 31) | (1 << 16) | (1 << 0); PG | WP | PM
 	mov cr0, eax
 
     ret
@@ -69,11 +100,31 @@ set_up_paging_ap:
 
 ; ---------------------------------------- Long Mode ----------------------------------------
 bits 64
-section .init.text.64ap
+section .init.text.highap
+global long_mode_start_ap
 long_mode_start_ap:
+	; in long mode, it's okay to set data segment registers to 0
+	; ; mov rax, GDT_AP.data
+	mov ax, 0
+	mov ss, ax
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+
+
 	; Load the new GDT
 	; lgdt [rel GDT_AP.ptr]
 	lgdt [GDT_AP.ptr]
+
+
+	; mov rsp, 0xFC00
+	
+
+	; each character is reversed in the dword cuz of little endianness
+	mov dword [0xFFFFFFFF800b8038], 0x4f2E4f2E ; ".."
+    mov dword [0xFFFFFFFF800b803c], 0x4f4f4f4c ; "LO"
+	mov dword [0xFFFFFFFF800b8040], 0x4f474f4e ; "NG"
 
 	; Long jump to the higher half. Because `jmp` does not take
 	; a 64 bit address (which we need because we are practically
@@ -84,14 +135,12 @@ long_mode_start_ap:
 
 
 section .text.ap
-extern rust_main
-extern eputs
-extern puts
 
 global start_high_ap
 start_high_ap:
+	cli
 	; Set up high stack
-	add rsp, KERNEL_OFFSET
+	; add rsp, KERNEL_OFFSET
 
 	; set up the segment registers
 	; mov ax, GDT_AP.data ; data offset
@@ -166,13 +215,14 @@ start_high_ap:
 
 
 section .rodata.ap
-; TODO TSS <http://wiki.osdev.org/Task_State_Segment>
 GDT_AP:
 	dq 0 ; zero entry
 .code equ $ - GDT_AP
 	dq (1<<44) | (1<<47) | (1<<41) | (1<<43) | (1<<53) ; code segment
-.data equ $ - GDT_AP
-	dq (1<<44) | (1<<47) | (1<<41) | (1 << 53) ; data segment
+	; dq (1<<44) | (1<<47) | (1<<43) | (1<<53) | 0xFFFF; code segment, limit 0xFFFF
+; .data equ $ - GDT_AP
+; 	; dq (1<<44) | (1<<47) | (1<<41) | (1 << 53) ; data segment
+; 	dq (1<<44) | (1<<47) | (1<<41) | (1 << 53) ; data segment
 .end equ $
 .ptr_low:
 	dw .end - GDT_AP - 1

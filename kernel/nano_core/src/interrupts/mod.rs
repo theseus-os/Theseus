@@ -281,6 +281,8 @@ pub fn init_handlers_apic() {
         idt[0x21].set_handler_fn(keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
         idt[0x2B].set_handler_fn(nic_handler);
+        idt[0x24].set_handler_fn(com1_serial_handler);
+        idt[0x26].set_handler_fn(apic_irq_0x26_handler);
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
 
@@ -305,7 +307,7 @@ pub fn init_handlers_pic() {
         idt[0x21].set_handler_fn(keyboard_handler);
         // there is no IRQ 0x22        
         idt[0x23].set_handler_fn(irq_0x23_handler); 
-        idt[0x24].set_handler_fn(irq_0x24_handler); 
+        idt[0x24].set_handler_fn(com1_serial_handler); 
         idt[0x25].set_handler_fn(irq_0x25_handler); 
         idt[0x26].set_handler_fn(irq_0x26_handler); 
 
@@ -399,7 +401,29 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 extern "x86-interrupt" fn nic_handler(stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
     e1000::e1000_handler();
-	eoi(Some(0x2B));
+    eoi(Some(0x2B));
+}
+
+/// 0x24
+extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // info!("COM1 serial handler");
+
+    unsafe {
+        ::x86_64::instructions::port::inb(0x3F8); // read serial port value
+    }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0x4));
+}
+
+/// 0x26
+extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // // info!("COM1 serial handler");
+
+    // unsafe {
+    //     ::x86_64::instructions::port::inb(0x3F8); // read serial port value
+    // }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0x6));
 }
 
 
