@@ -34,7 +34,7 @@ pub struct arp_packet{
 //will only receive a response if user is mentioned in qemu flags
 //QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 
-pub fn DHCP_request_packet(){
+pub fn dhcp_request_packet(){
     let mut e1000_nc = E1000_NIC.lock();
     let packet:[u8;314] = [0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x0b,0x82,0x01,0xfc,0x42,0x08,0x00,0x45,0x00,
                                0x01,0x2c,0xa8,0x36,0x00,0x00,0xfa,0x11,0x17,0x8b,0x00,0x00,0x00,0x00,0xff,0xff,
@@ -60,5 +60,4 @@ pub fn DHCP_request_packet(){
         let addr: usize = addr as usize;
         let length: u16 = 314;
         e1000_nc.send_packet(addr, length);
-        //e1000_nc.rx_poll();
 }

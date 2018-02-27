@@ -10,8 +10,6 @@ use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
-use drivers::test_nic_driver::DHCP_request_packet;
-
 use drivers::e1000::init_nic;
 
 
@@ -46,7 +44,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 
 
-pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
+pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
     
@@ -54,13 +52,6 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
         debug!("Found pci device: {:?}", dev);
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-=======
-        e1000_nc.startLink();
-=======
     //create a NIC device and memory map it
     let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
     debug!("e1000 Device found: {:?}", pci_dev);
@@ -78,7 +69,6 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     e1000_nc.readMACAddress();
 
     e1000_nc.startLink();
->>>>>>> DHCP discovery message being sent and reply received
 
     e1000_nc.clearMulticast();
     //register interrupts
@@ -174,11 +164,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     
 
     
->>>>>>> Driver with basic Tx working
-=======
-    init_nic();
-    //DHCP_request_packet();
->>>>>>> updated e1000 driver with a DMA struct and interrupt handler
+    try!(init_nic());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*
@@ -205,4 +191,6 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
     */
+    Ok(())
+
 }

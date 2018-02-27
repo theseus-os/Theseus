@@ -661,7 +661,13 @@ pub fn parse_nano_core(mapped_pages: MappedPages, size: usize) -> Result<LoadedC
                     if let Ok(bind) = entry.get_binding() {
                         if bind == xmas_elf::symbol_table::Binding::Global {
                             let sec_vaddr = entry.value() as VirtualAddress;
-                            let name = entry.get_name(&elf_file).unwrap();
+                            let name = match entry.get_name(&elf_file) {
+                                Ok(n) => n,
+                                _ => {
+                                    warn!("parse_nano_core(): couldn't get_name(), skipping entry {:?}", entry);
+                                    continue;
+                                }
+                            };
                             // debug!("parse_nano_core(): name: {}, vaddr: {:#X}", name, sec_vaddr);
 
                             let demangled = demangle_symbol(name);
