@@ -68,8 +68,8 @@ ap_start_realmode:
     add   di, 8
 
 gdt_ptr:
-    mov  word  [es:di],  24    ; Size of GDT in bytes minus 1
-    mov  dword [es:di+2],  0x800  ; Linear address of GDT
+    mov  word  [es:di],    23       ; Size of GDT in bytes minus 1
+    mov  dword [es:di+2],  0x800    ; Linear address of GDT
  
 load_gdt:
     lgdt [es:di]        ; es:di is the addr of gdt pointer
@@ -78,6 +78,12 @@ load_gdt:
 ;     ; in al, 0x92
 ;     ; or al, 2
 ;     ; out 0x92, al
+
+    mov ax, 0x10
+    mov ss, ax
+    mov ds, ax
+    mov es, ax
+
 
     ; finally enable protected mode
     mov eax, cr0

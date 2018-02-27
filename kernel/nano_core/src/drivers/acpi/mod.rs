@@ -238,8 +238,15 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
             }
         }
 
+        // FADT is mandatory
         try!(Fadt::init(active_table));
-        try!(Hpet::init(active_table));
+        
+        // HPET is optional
+        if let Err(_) = Hpet::init(active_table) {
+            warn!("This machine has no HPET, skipping HPET init.");
+        }
+
+        // MADT is mandatory
         let madt_iter = Madt::init(active_table);
         // Dmar::init(active_table);
         // init_namespace();
