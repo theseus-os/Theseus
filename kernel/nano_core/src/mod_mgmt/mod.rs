@@ -124,7 +124,7 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &str, active_table: &mut ActivePageTable)
+pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &String, active_table: &mut ActivePageTable)
     -> Result<LoadedCrate, &'static str>
 {
     // all kernel module crate names must start with "__k_"

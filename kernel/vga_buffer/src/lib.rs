@@ -44,6 +44,13 @@ lazy_static! {
 }
 
 
+pub static EARLY_VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
+    column_position: 0,
+    buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+});
+
+
+
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use print!() instead. 
 /// Should only be used in exception contexts and early bring-up code 
@@ -65,8 +72,6 @@ pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
         Err(fmt::Error)
     }
 
-    // unsafe { VGA_WRITER.force_unlock(); }
-    // print_args(args)
 }
 
 /// This is UNSAFE because it bypasses the VGA Buffer lock. Use println!() instead. 
@@ -116,6 +121,22 @@ pub fn clear_screen() -> Result<(), ()> {
         Err(())
     }
 }
+
+
+
+#[macro_export]
+macro_rules! print_early {
+    ($($arg:tt)*) => ({
+            $crate::print_args_early(format_args!($($arg)*)).unwrap();
+    });
+}
+
+pub fn print_args_early(args: fmt::Arguments) -> fmt::Result {
+    use core::fmt::Write;
+    unsafe { EARLY_VGA_WRITER.force_unlock(); }
+    EARLY_VGA_WRITER.lock().write_fmt(args)
+}
+
 
 pub fn show_splash_screen() {
     let _ = print_str(WELCOME_STRING);

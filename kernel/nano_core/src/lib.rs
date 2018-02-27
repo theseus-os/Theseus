@@ -249,14 +249,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
 
 
-    // unsafe {
-    //     // print MEMORY
-    //     asm!("  mov dword ptr [0xFFFFFFFF800b80f0], 0x4f454f4d; \
-    //             mov dword ptr [0xFFFFFFFF800b80f4], 0x4f4f4f4d; \
-	//             mov dword ptr [0xFFFFFFFF800b80f8], 0x4f594f4f;"
-    //             : : : : "intel"
-    //     );
-    // }
+    unsafe {
+        // print MEMORY
+        asm!("  mov dword ptr [0xFFFFFFFF800b81f0], 0x4f454f4d; \
+                mov dword ptr [0xFFFFFFFF800b81f4], 0x4f4f4f4d; \
+	            mov dword ptr [0xFFFFFFFF800b81f8], 0x4f594f4f;"
+                : : : : "intel"
+        );
+    }
 
 
     // now that we have a heap, we can create basic things like state_store
@@ -409,14 +409,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_1")).unwrap();
+        spawn_userspace(module, Some(String::from("test_program_1"))).unwrap();
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some("test_program_2")).unwrap();
+        spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
     }
 
     // create and jump to a userspace thread that tests syscalls

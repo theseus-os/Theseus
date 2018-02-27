@@ -65,7 +65,7 @@ pub fn get_my_apic_id() -> Option<u8> {
         // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
         let x2_id = unsafe { rdmsr(IA32_X2APIC_APICID) as u32 };
-        debug!("get_my_apic_id(): read msr, got {}", x2_id);
+        // debug!("get_my_apic_id(): read msr, got {}", x2_id);
         x2_id
     } else {
         match APIC_PAGE.try() {
@@ -232,7 +232,6 @@ impl LocalApic {
 
         lapic.parse_and_set_nmi(madt_iter);
         info!("Found new processor core ({:?})", lapic);
-        // loop { }
 		Ok(lapic)
     }
 
@@ -318,8 +317,8 @@ impl LocalApic {
         
         self.write_reg(APIC_REG_INIT_COUNT, INITIAL_COUNT); // set counter to max value
 
-        // wait for PIT for 10ms (a single 100 Hz period)
-        super::pit_clock::pit_wait(microseconds).unwrap(); // 10 ms period
+        // wait or the given period using the PIT clock
+        super::pit_clock::pit_wait(microseconds).unwrap();
 
         self.write_reg(APIC_REG_LVT_TIMER, APIC_DISABLE); // stop apic timer
         let after = self.read_reg(APIC_REG_CURRENT_COUNT);
@@ -336,8 +335,8 @@ impl LocalApic {
         
         wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT); // set counter to max value
 
-        // wait for PIT for 10ms (a single 100 Hz period)
-        super::pit_clock::pit_wait(microseconds).unwrap(); // 10 ms period
+        // wait or the given period using the PIT clock
+        super::pit_clock::pit_wait(microseconds).unwrap();
 
         wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64); // stop apic timer
         let after = rdmsr(IA32_X2APIC_CUR_COUNT);
@@ -391,9 +390,10 @@ impl LocalApic {
         for madt_entry in madt_iter {
             match madt_entry {
                 MadtEntry::NonMaskableInterrupt(nmi) => {
-                    trace!("Lapic {} looking at NMI entry {:?}", self.apic_id, nmi);
+                    // NMI entries are based on the "processor" id, not the "apic_id"
+                    trace!("Lapic {} looking at NMI entry {:?}", self.processor, nmi);
                     // if this is an NMI entry for this lapic, or for all lapics, use it
-                    if nmi.processor == self.apic_id || nmi.processor == 0xFF  {
+                    if nmi.processor == self.processor || nmi.processor == 0xFF  {
                         self.set_nmi(nmi.lint, nmi.flags);   
                         debug!("Set NMI for LocalApic {}, NMI Entry: {:?}", self.apic_id, nmi);                     
                     }
@@ -430,6 +430,23 @@ impl LocalApic {
             unsafe { (rdmsr(IA32_X2APIC_VERSION) & 0xFFFF_FFFF) as u32 }
         } else {
             unsafe { self.read_reg(APIC_REG_LAPIC_VERSION) }
+        }
+    }
+
+    pub fn error(&self) -> u32 {
+        let raw = if has_x2apic() {
+            unsafe { (rdmsr(IA32_X2APIC_ESR) & 0xFFFF_FFFF) as u32 }
+        } else {
+            unsafe { self.read_reg(APIC_REG_ERROR_STATUS) }
+        };
+        raw & 0x0000_00F0
+    }
+
+    pub fn clear_error(&mut self) {
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_ESR, 0); }
+        } else {
+            unsafe { self.write_reg(APIC_REG_ERROR_STATUS, 0); }
         }
     }
 

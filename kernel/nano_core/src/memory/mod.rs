@@ -22,7 +22,7 @@ use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
-use alloc::Vec;
+use alloc::{Vec, String};
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
@@ -175,24 +175,30 @@ impl PhysicalMemoryArea {
 
 /// An area of physical memory that contains a userspace module
 /// as provided by the multiboot2-compliant bootloader
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct ModuleArea {
-    mod_start: u32,
-    mod_end: u32,
-    name: &'static str,
+    mod_start_paddr: u32,
+    mod_end_paddr: u32,
+    name: String,
+}
+impl fmt::Debug for ModuleArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ModuleArea(\"{}\", start: {:#X}, end: {:#X})", 
+                   self.name, self.mod_start_paddr, self.mod_end_paddr) 
+    }
 }
 
 impl ModuleArea {
     pub fn start_address(&self) -> PhysicalAddress {
-        self.mod_start as PhysicalAddress
+        self.mod_start_paddr as PhysicalAddress
     }
 
     pub fn size(&self) -> usize {
-        (self.mod_end - self.mod_start) as usize
+        (self.mod_end_paddr - self.mod_start_paddr) as usize
     }
 
-    pub fn name(&self) -> &'static str {
-        self.name
+    pub fn name<'a>(&'a self) -> &'a String {
+        &self.name
     }
 }
 
@@ -338,10 +344,8 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
              kernel_phys_start,
              kernel_phys_end,
              kernel_virt_end);
-    debug!("multiboot start: {:#x}, multiboot end: {:#x}",
-             boot_info.start_address(),
-             boot_info.end_address());
-    
+
+
     
     // parse the list of physical memory areas from multiboot
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
@@ -365,16 +369,8 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         };
 
         info!("  region established: start={:#x}, length={:#x}", available[avail_index].base_addr, available[avail_index].length);
+        print_early!("  region established: start={:#x}, length={:#x}\n", available[avail_index].base_addr, available[avail_index].length);
         avail_index += 1;
-    }
-
-    unsafe {
-        // print MEMORY
-        asm!("  mov dword ptr [0xFFFFFFFF800b8040], 0x4f454f4d; \
-                mov dword ptr [0xFFFFFFFF800b8044], 0x4f4f4f4d; \
-	            mov dword ptr [0xFFFFFFFF800b8048], 0x4f594f52;"
-                : : : : "intel"
-        );
     }
 
     // init the frame allocator
@@ -388,48 +384,33 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         MutexIrqSafe::new( fa ) 
     });
 
-    unsafe {
-        // print PAGING
-        asm!("  mov dword ptr [0xFFFFFFFF800b804c], 0x4f414f50; \
-                mov dword ptr [0xFFFFFFFF800b8050], 0x4f494f47; \
-	            mov dword ptr [0xFFFFFFFF800b8054], 0x4f474f4e;"
-                : : : : "intel"
-        );
-    }
+    // print_early!("Boot info: {:?}\n", boot_info);
 
+
+    // Initialize paging (create a new page table), which also initializes the kernel heap.
     let (active_table, kernel_vmas, higher_half_mapped_pages, identity_mapped_pages) = try!(
         paging::init(frame_allocator_mutex, &boot_info)
     );
+    // HERE: heap is initialized! Can now use alloc types.
+
     debug!("Done with paging::init()!, active_table: {:?}", active_table);
+    print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
 
-    // unsafe {
-    //     // print MEMORY
-    //     asm!("  mov dword ptr [0xFFFFFFFF800b8058], 0x4f444f44; \
-    //             mov dword ptr [0xFFFFFFFF800b805b], 0x4f4f4f4d; \
-	//             mov dword ptr [0xFFFFFFFF800b8060], 0x4f594f52;"
-    //             : : : : "intel"
-    //     );
-    // }
-
-
-    // copy the list of modules (currently used for userspace programs)
     MODULE_AREAS.call_once( || {
+        // parse the list of multiboot modules 
         let mut modules: Vec<ModuleArea> = Vec::new();
         for m in boot_info.module_tags() {
             let mod_area = ModuleArea {
-                mod_start: m.start_address(), 
-                mod_end:   m.end_address(), 
-                name:      m.name(),
+                mod_start_paddr: m.start_address().clone(), 
+                mod_end_paddr:   m.end_address().clone(), 
+                name:            String::from(m.name()),
             };
-            debug!("Module: {:?}", mod_area);
+            print_early!("ModuleArea: {:?}\n", mod_area);
             modules.push(mod_area);
         }
         modules
-    });
-
-
-
-    
+    });   
+    print_early!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try().unwrap());
 
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
@@ -525,13 +506,16 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
 /// returns the `ModuleArea` corresponding to the given `index`
 pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
+    debug!("get_module_index(): looking for module at index {}", index);
     MODULE_AREAS.try().and_then(|modules| modules.get(index))
 }
 
 
 /// returns the `ModuleArea` corresponding to the given module name.
 pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    MODULE_AREAS.try().and_then(|modules| modules.iter().filter(|&&m| m.name == name).next())
+    debug!("get_module(): looking for module {}", name);
+    debug!("get_module(): modules: {:?}", MODULE_AREAS.try().unwrap());
+    MODULE_AREAS.try().and_then(|modules| modules.iter().filter(|&m| m.name == name).next())
 }
 
 

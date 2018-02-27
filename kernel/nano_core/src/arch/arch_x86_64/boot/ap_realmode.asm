@@ -10,9 +10,11 @@ ap_start_realmode:
     xor ax, ax
     mov ds, ax
     mov es, ax
+    mov fs, ax
+    mov gs, ax
     mov ss, ax
 
-    mov sp, 0x7C00  ; top of stack provided by bootloader
+    mov sp, 0xFC00  ; top of stack, provided by bootloader (GRUB)
 
     ; we use real mode segment addressing here
     ; in which PhysicalAddr = Segment * 16 + Offset
@@ -87,11 +89,9 @@ load_gdt:
     nop
     nop
 clear_prefetch: 
-
-
-
     ; jump to protected mode. "dword" here tells nasm to generate a 32-bit instruction,
     ; even though we're still in 16-bit mode. GCC's "as" assembler can't do that! haha
+    ; 0x8 is for the newly-created kernel code segment from the above GDT
     jmp dword 0x8:prot_mode 
 
 
@@ -111,6 +111,7 @@ prot_mode:
     mov ss, ax
 
     ; each character is reversed in the dword cuz of little endianness
+    ; prints "AP_PROTECTED"
     mov dword [0xb8000], 0x4f504f41 ; "AP"
     mov dword [0xb8004], 0x4f504f5F ; "_P"
     mov dword [0xb8008], 0x4f4f4f52 ; "RO"

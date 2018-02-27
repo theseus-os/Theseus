@@ -270,7 +270,7 @@ start_high:
 	mov ds, ax
 	mov es, ax
 	mov fs, ax
-	; mov gs, ax
+	mov gs, ax
 
 
 	; Save the multiboot address
@@ -345,7 +345,6 @@ task_switch:
 
 
 section .rodata
-; TODO TSS <http://wiki.osdev.org/Task_State_Segment>
 GDT:
 	dq 0 ; zero entry
 .code equ $ - GDT
