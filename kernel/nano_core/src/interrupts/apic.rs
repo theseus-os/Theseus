@@ -348,6 +348,7 @@ impl LocalApic {
     unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.");
         let apic_period = self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
+        let apic_period = 0x10000; // temp for bochs, which doesn't do apic periods right
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -366,6 +367,7 @@ impl LocalApic {
     unsafe fn init_timer_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
         let x2apic_period = self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
+        let x2apic_period = 0x10000; // temp for bochs, which doesn't do x2apic periods right
         trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
 
         debug!("in init_timer_x2apic start");
@@ -421,6 +423,7 @@ impl LocalApic {
             unsafe { self.read_reg(APIC_REG_LAPIC_ID) }
         };
         let id = (raw >> 24) as u8;
+        trace!("LocalApic::id(): raw: {:#X} id: {:#X}, self.apic_id: {:#X}, self.processor: {:#X}", raw, id, self.apic_id, self.processor);
         assert!(id == self.apic_id, "LocalApic::id() wasn't the same as given apic_id!");
         id
     }

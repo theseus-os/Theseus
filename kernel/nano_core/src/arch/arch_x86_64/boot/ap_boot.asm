@@ -19,6 +19,8 @@ section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 global ap_start_protected_mode
 ap_start_protected_mode:
+	; xchg bx, bx ; bochs magic breakpoint
+	 
 	mov esp, 0xFC00; set a new stack pointer, 512 bytes below our AP_STARTUP code region
     call set_up_paging_ap
 	
@@ -33,13 +35,14 @@ ap_start_protected_mode:
 	; Load the 64-bit GDT
 	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
 
+
 	; mov ax, GDT_AP.data
-	; mov ax, 0
-	; mov ss, ax
+	; ; mov ax, 0
 	; mov ds, ax
 	; mov es, ax
 	; mov fs, ax
 	; mov gs, ax
+	; mov ss, ax
 
 
 	; prints GDT
@@ -143,7 +146,6 @@ start_high_ap:
 	; add rsp, KERNEL_OFFSET
 
 	; set up the segment registers
-	; mov ax, GDT_AP.data ; data offset
 	mov ax, 0  ; a null (0) data segment selector is fine for 64-bit instructions
 	mov ss, ax
 	mov ds, ax
@@ -213,8 +215,10 @@ start_high_ap:
 ; 	jmp .loop
 
 
-
-section .rodata.ap
+; One would expect the GDT to be in rodata, since you shouldn't need to write to it.
+; However, during the ap boot phase on real hardware, there is a write page fault
+; if you put it in rodata (i.e., map it as read-only).
+section .data.ap
 GDT_AP:
 	dq 0 ; zero entry
 .code equ $ - GDT_AP
@@ -227,8 +231,8 @@ GDT_AP:
 ; 	dw 0 ; padding to make sure GDT pointer is 4-byte aligned
 .ptr_low:
 	dw .end - GDT_AP - 1
-	; dd GDT_AP - KERNEL_OFFSET
-	dq GDT_AP - KERNEL_OFFSET
+	dd GDT_AP - KERNEL_OFFSET
+	; dq GDT_AP - KERNEL_OFFSET
 .ptr:
 	dw .end - GDT_AP - 1
 	dq GDT_AP
