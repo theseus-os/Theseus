@@ -80,9 +80,9 @@ load_gdt:
 ;     ; out 0x92, al
 
     mov ax, 0x10
-    mov ss, ax
     mov ds, ax
     mov es, ax
+    mov ss, ax
 
 
     ; finally enable protected mode
@@ -125,7 +125,7 @@ prot_mode:
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
  
-    jmp ap_start_protected_mode
+    jmp 0x08:ap_start_protected_mode
     
 
 halt:
