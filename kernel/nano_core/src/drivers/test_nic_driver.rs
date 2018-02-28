@@ -59,5 +59,5 @@ pub fn dhcp_request_packet(){
         let addr = &packet as *const u8;
         let addr: usize = addr as usize;
         let length: u16 = 314;
-        e1000_nc.send_packet(addr, length);
+        let _result = e1000_nc.send_packet(addr, length);
 }
