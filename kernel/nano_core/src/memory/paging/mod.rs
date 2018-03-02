@@ -44,10 +44,7 @@ impl fmt::Debug for Page {
 }
 
 impl Page {
-    //added by Ramla
-    pub fn inc_number(&mut self){
-        self.number = self.number +1;
-    }
+    
 	/// returns the first virtual address as the start of this Page
     pub fn containing_address(address: VirtualAddress) -> Page {
         assert!(address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000,
