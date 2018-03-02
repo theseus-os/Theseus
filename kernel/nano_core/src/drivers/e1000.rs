@@ -2,7 +2,7 @@ use pci::PciDevice;
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator,allocate_pages,allocate_frames,MappedPages,FrameIter};
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
 use drivers::pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
@@ -541,7 +541,7 @@ impl Nic{
                 let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
                 let ptr;
                 match dma_ptr{
-                        Some(x) => ptr = dma_ptr.unwrap(),
+                        Some(_x) => ptr = dma_ptr.unwrap(),
                         None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx descriptors"),
                 }
 
@@ -562,14 +562,14 @@ impl Nic{
                 {
                         let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(E1000_SIZE_RX_DESC);
                         match dma_ptr{
-                                Some(x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
+                                Some(_x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
                                 None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx buffer"),
                         } 
                                                 
                         let rx_buf = translate_v2p(self.rx_buf_addr[i]);
                         let buf_addr;
                         match rx_buf{
-                                Some(x) => buf_addr = rx_buf.unwrap() as u64,
+                                Some(_x) => buf_addr = rx_buf.unwrap() as u64,
                                 None => return Err("e1000:rx_init Couldn't translate address for rx buffers"),
                         }
                         
@@ -597,7 +597,7 @@ impl Nic{
                 let t_ptr = translate_v2p(v_addr);
                 let ptr;
                 match t_ptr{
-                        Some(x) =>  ptr = t_ptr.unwrap(),
+                        Some(_x) =>  ptr = t_ptr.unwrap(),
                         None => return Err("e1000:rx_init Couldn't translate address for rx descriptor"),
                 }
 
@@ -629,7 +629,7 @@ impl Nic{
                 let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
                 let ptr;
                 match dma_ptr{
-                        Some(x) => ptr = dma_ptr.unwrap(),
+                        Some(_x) => ptr = dma_ptr.unwrap(),
                         None => return Err("e1000:tx_init Couldn't allocate DMA mem for tx descriptor"),
                 } 
 
@@ -664,7 +664,7 @@ impl Nic{
                 let t_ptr = translate_v2p(v_addr);
                 let ptr;
                 match t_ptr{
-                        Some(x) => ptr = t_ptr.unwrap(),
+                        Some(_x) => ptr = t_ptr.unwrap(),
                         None => return Err("e1000:tx_init Couldn't translate address for tx descriptor"),
                 }
                 //let ptr = (translate_v2p(v_addr)).unwrap();
@@ -699,7 +699,7 @@ impl Nic{
                 let t_ptr = translate_v2p(p_data);
                 let ptr;
                 match t_ptr{
-                        Some(x) => ptr = t_ptr.unwrap(),
+                        Some(_x) => ptr = t_ptr.unwrap(),
                         None => return Err("e1000:send_packet Couldn't translate address for tx buffer"),
                 } 
                 //let ptr = (translate_v2p(p_data)).unwrap();
