@@ -119,7 +119,7 @@ const E1000_SIZE_TX_DESC:       usize = 256;
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
 
-/// struct to represents receive descriptors
+/// struct to represent receive descriptors
 #[repr(C,packed)]
 pub struct e1000_rx_desc {
         addr: u64,      
