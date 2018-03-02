@@ -57,7 +57,13 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     // and also to ensure that if this apic fails to init, it's not used as one apic in the list.
     let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())
                       .expect("kstart_ap(): failed to create LocalApic");
+    
+    if interrupts::apic::get_my_apic_id() != Some(apic_id) {
+        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, interrupts::apic::get_my_apic_id());
+    }
+
     get_lapics().insert(apic_id, RwLock::new(lapic));
+
 
     interrupts::enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 

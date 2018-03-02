@@ -33,6 +33,7 @@ pub unsafe fn schedule() -> bool {
         next_task = selected_next_task.write().deref_mut();  // as *mut Task;
     }
     else {
+        // keep running the same current task
         return false;
     }
 
@@ -201,6 +202,7 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
             
         // found a runnable task!
         index_chosen = Some(i);
+        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
         break; 
     }
 

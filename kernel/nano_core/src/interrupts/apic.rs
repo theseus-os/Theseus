@@ -61,26 +61,27 @@ pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
 
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
-    let raw = if has_x2apic() {
+    if has_x2apic() {
         // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
         let x2_id = unsafe { rdmsr(IA32_X2APIC_APICID) as u32 };
         // debug!("get_my_apic_id(): read msr, got {}", x2_id);
-        x2_id
+        Some(x2_id as u8)
     } else {
         match APIC_PAGE.try() {
             Some(apic_page) => unsafe { 
                 // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
                 wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE);
-                read_volatile((apic_page.start_address() + APIC_REG_LAPIC_ID as usize) as *const u32) 
+                let raw = read_volatile((apic_page.start_address() + APIC_REG_LAPIC_ID as usize) as *const u32);
+                Some((raw >> 24) as u8)
             },
             None => {
                 return None;
             }
         }
-    };
-    Some((raw >> 24) as u8)
+    }
 }
+
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
 pub fn get_my_apic() -> Option<&'static RwLock<LocalApic>> {
@@ -106,9 +107,9 @@ impl LapicIpiDestination {
                     (apic_id as u64) << 56
                 }
             }
-            &LapicIpiDestination::Me           => 0b01 << 18, // 0x4_0000
-            &LapicIpiDestination::All          => 0b10 << 18, // 0x8_0000
-            &LapicIpiDestination::AllButMe     => 0b11 << 18, // 0xC_0000
+            &LapicIpiDestination::Me       => 0b01 << 18, // 0x4_0000
+            &LapicIpiDestination::All      => 0b10 << 18, // 0x8_0000
+            &LapicIpiDestination::AllButMe => 0b11 << 18, // 0xC_0000
         }
     }
 }
@@ -199,7 +200,7 @@ impl LocalApic {
     pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool, madt_iter: MadtIter) 
         -> Result<LocalApic, &'static str>
     {
-        if flags != 1 {
+        if flags & 0x1 != 0x1 {
             error!("LocalApic::new() processor was disabled! (flags {:#X} must equal 0x1)", flags);
             return Err("flags were not 0x1, which means the processor was disabled!");
         }
@@ -417,14 +418,13 @@ impl LocalApic {
     }
 
     pub fn id(&self) -> u8 {
-        let raw = if has_x2apic() {
-            unsafe { rdmsr(IA32_X2APIC_APICID) as u32 }
+        let id: u8 = if has_x2apic() {
+            unsafe { rdmsr(IA32_X2APIC_APICID) as u32 as u8 }
         } else {
-            unsafe { self.read_reg(APIC_REG_LAPIC_ID) }
+            let raw = unsafe { self.read_reg(APIC_REG_LAPIC_ID) };
+            (raw >> 24) as u8
         };
-        let id = (raw >> 24) as u8;
-        trace!("LocalApic::id(): raw: {:#X} id: {:#X}, self.apic_id: {:#X}, self.processor: {:#X}", raw, id, self.apic_id, self.processor);
-        assert!(id == self.apic_id, "LocalApic::id() wasn't the same as given apic_id!");
+        assert!(id == self.apic_id, "LocalApic::id() {} wasn't the same as given apic_id {}!", id, self.apic_id);
         id
     }
 

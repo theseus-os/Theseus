@@ -18,7 +18,7 @@ vga: extension=vbe, update_freq=5
 cpu: count=4, ips=40000000, model=bx_generic, reset_on_triple_fault=1, cpuid_limit_winnt=0, ignore_bad_msrs=1, mwait_is_nop=0
 #cpu: count=1, ips=4000000, model=corei7_sandy_bridge_2600k, reset_on_triple_fault=1, cpuid_limit_winnt=0, ignore_bad_msrs=1, mwait_is_nop=0
 #cpuid: family=6, model=0x03, stepping=3, mmx=1, apic=xapic, sse=sse2, sse4a=0, sep=1, aes=0, xsave=0, xsaveopt=0, movbe=0, adx=0, smep=0, avx=0, avx_f16c=0, avx_fma=0, bmi=0, xop=0, tbm=0, fma4=0, vmx=1, x86_64=1, 1g_pages=0, pcid=0, fsgsbase=0, mwait=1
-#cpuid: apic=x2apic
+cpuid: apic=x2apic
 cpuid: vendor_string="GenuineIntel"
 cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU        "
 
