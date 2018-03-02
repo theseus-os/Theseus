@@ -2,7 +2,6 @@ use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::RwLockIrqSafe;
-use spin::RwLock;
 use atomic_linked_list::atomic_map::AtomicMap;
 
 use super::{Task, get_my_current_task};
@@ -86,7 +85,7 @@ macro_rules! schedule {
 
 
 
-type TaskRef = Arc<RwLock<Task>>;
+type TaskRef = Arc<RwLockIrqSafe<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
 /// There is one runqueue per core, each core can only access its own private runqueue
