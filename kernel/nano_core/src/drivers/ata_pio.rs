@@ -147,7 +147,7 @@ pub fn ata_data_transfer_ready() -> bool{
 //returns ATA identify information drive should be 0xA0 for master or 0xB0 for slave
 pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     
-    let mut command_value: u8 = COMMAND_IO.lock().read();
+    let _command_value: u8 = COMMAND_IO.lock().read();
 	let identify_data = AtaIdentifyData{..Default::default()};
     //let mut arr: [u16; 256] = [0; 256];
     //set port values for bus 0 to detect ATA device 
@@ -164,9 +164,9 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     }
 
 	
-    command_value = COMMAND_IO.lock().read();
+    let mut command_value = COMMAND_IO.lock().read();
     //if value is 0, no drive exists
-    if command_value == 0{
+    if command_value == 0 {
         trace!("No Drive Exists");
 		return identify_data;
 
@@ -175,7 +175,7 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     
     //wait for update-in-progress value (bit 7 of COMMAND_IO port) to be set to 0
     command_value = COMMAND_IO.lock().read();
-    while ((command_value>>7) % 2) != 0  {
+    while ((command_value >> 7) % 2) != 0  {
         //trace to debug and view value being received
         trace!("{}: update-in-progress in disk drive COMMAND_IO bit 7 not cleared", command_value);
         command_value = COMMAND_IO.lock().read();
@@ -183,7 +183,7 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
     
     
     //if LBAhi or LBAlo values at this point are nonzero, drive is not ATA compatible
-    if LBAMID.lock().read() != 0 || LBAHI.lock().read() !=0 {
+    if LBAMID.lock().read() != 0 || LBAHI.lock().read() != 0 {
         trace!("mid or hi LBA not set to 0 when it should be");
     }
     
@@ -201,8 +201,6 @@ pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
 		return identify_data;
 
 	}
-    
-
 
 	let identify_data = AtaIdentifyData::new(read_primary_data_port().unwrap()); 
     identify_data 

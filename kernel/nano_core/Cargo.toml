@@ -83,7 +83,7 @@ path = "../../libs/atomic_linked_list"
 
 
 [features]
-no_serial = []
+mirror_serial = []
 
 
 [lib]

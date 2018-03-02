@@ -89,11 +89,8 @@ mod start;
 
 
 use task::{spawn_kthread, spawn_userspace};
-use alloc::string::String;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use interrupts::tsc;
+use core::sync::atomic::{AtomicBool, Ordering};
 use drivers::{pci, test_nic_driver};
-use dbus::{BusConnection, BusMessage, BusConnectionTable, get_connection_table};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
 
@@ -144,78 +141,10 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 }
 
 fn test_driver(_: Option<u64>) {
-    print!("TESTING DRIVER!!");
+    println!("TESTING DRIVER!!");
     test_nic_driver::dhcp_request_packet();
 
 }
-
-
-fn first_thread_main(arg: Option<u64>) -> u64  {
-    println!("Hello from first thread, arg: {:?}!!", arg);
-
-   
-    unsafe{
-        let mut table = get_connection_table().write();
-        let mut connection = table.get_connection(String::from("bus.connection.first"))
-            .expect("Fail to create the first bus connection").write();
-        println!("Create the first connection.");
-
-  //      loop {
-            let obj = connection.receive();
-            if(obj.is_some()){
-                println!("{}", obj.unwrap().data);
-            } else {
-                println!("No message!");
-            }
- //
-  //      }
-        print!("3");
-    }
-    1
-}
-
-fn second_thread_main(arg: u64) -> u64  {
-    println!("Hello from second thread, arg: {}!!", arg);
-    unsafe {
-        let mut table = get_connection_table().write();
-        {
-            let mut connection = table.get_connection(String::from("bus.connection.second"))
-                .expect("Fail to create the second bus connection").write();
-            println!("Create the second connection.");
-            let message = BusMessage::new(String::from("bus.connection.first"), String::from("This is a message from 2 to 1."));       
-            connection.send(&message);
-        }
-
-        table.match_msg(&String::from("bus.connection.second"));
-
-        {
-            let mut connection = table.get_connection(String::from("bus.connection.first"))
-                .expect("Fail to create the first bus connection").write();
-            println!("Get the first connection.");
-            let obj = connection.receive();
-            if(obj.is_some()){
-                println!("{}", obj.unwrap().data);
-            } else {
-                println!("No message!");
-            }
-
-        }
-    }
-    2
-}
-
-
-fn third_thread_main(arg: String) -> String {
-    println!("Hello from third thread, arg: {}!!", arg);
-    String::from("3")
-}
-
-
-fn fourth_thread_main(arg: u64) -> Option<String> {
-    println!("Hello from fourth thread, arg: {:?}!!", arg);
-    None
-}
-
 
 
 /// An atomic flag used for synchronizing progress between the BSP and all APs.
@@ -246,7 +175,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    if cfg!(feature = "no_serial") {
+    if cfg!(feature = "mirror_serial") {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
         unsafe{  logger::enable_vga(); }
     }
@@ -352,11 +281,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // create some extra tasks to test context switching
     if true {
-        spawn_kthread(first_thread_main, Some(6),  "first_thread").unwrap();
-        spawn_kthread(second_thread_main, 6, "second_thread").unwrap();
-        spawn_kthread(third_thread_main, String::from("hello"), "third_thread").unwrap();
-        spawn_kthread(fourth_thread_main, 12345u64, "fourth_thread").unwrap();
-
         spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
         spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
         spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
@@ -409,7 +333,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if true
+    if false
     {
         debug!("trying out a system call module");
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
@@ -417,7 +341,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
     // a second duplicate syscall test user task
-    if true
+    if false
     {
         debug!("trying out a receive system call module");
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
