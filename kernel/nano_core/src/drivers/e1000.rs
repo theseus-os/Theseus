@@ -119,7 +119,7 @@ const E1000_SIZE_TX_DESC:       usize = 256;
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
 
-/// struct to represent receive descriptors
+/// struct to represents receive descriptors
 #[repr(C,packed)]
 pub struct e1000_rx_desc {
         addr: u64,      
@@ -155,7 +155,7 @@ impl fmt::Debug for e1000_tx_desc {
         }
 }
 
-/// struct the hold information for the network card
+/// struct to hold information for the network card
 pub struct Nic {
         /// Type of BAR0
         bar_type: u8,
@@ -181,7 +181,7 @@ pub struct Nic {
         nic_dma_allocator: DmaAllocator,
 }
 
-/// struct the stores addresses for memory allocated for DMA
+/// struct that stores addresses for memory allocated for DMA
 pub struct DmaAllocator{
         /// starting address of physically contiguous memory
         start: usize,
