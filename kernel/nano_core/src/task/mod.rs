@@ -181,7 +181,7 @@ impl Task {
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
+        // debug!("context_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
         
         let my_context_switch_lock: &AtomicBool;
         if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(&apic_id) {
@@ -198,12 +198,24 @@ impl Task {
         }
 
         // debug!("context_switch [1], testing runstates.");
-        assert!(next.runstate == RunState::RUNNABLE, 
-                "scheduler bug: chosen 'next' Task was not RUNNABLE!");
-        assert!(next.running_on_cpu == -1, 
-                "scheduler bug: chosen 'next' Task was already running on AP {}", apic_id);
-        assert!(next.pinned_core == None || next.pinned_core == Some(apic_id), 
-                "scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}", next.pinned_core, apic_id);
+        if next.runstate != RunState::RUNNABLE {
+            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was not RUNNABLE! Current: {:?}, Next: {:?}", self, next);
+            my_context_switch_lock.store(false, Ordering::SeqCst);
+            return;
+        }
+        if next.running_on_cpu != -1 {
+            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+            my_context_switch_lock.store(false, Ordering::SeqCst);
+            return;
+        }
+        if let Some(pc) = next.pinned_core {
+            if pc != apic_id {
+                error!("Skipping context_Switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+                my_context_switch_lock.store(false, Ordering::SeqCst);
+                return;
+            }
+        }
+         
 
 
 
@@ -651,6 +663,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // actually invoke the function spawned in this kernel thread
     let exit_status = func(*arg);
 
+    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
@@ -658,8 +671,6 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
                              .write().set_runstate(RunState::EXITED);
     }
 
-    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
-    trace!("attempting to unschedule kthread... interrupts {}", ::interrupts::interrupts_enabled());
     schedule!();
 
     // we should never ever reach this point

@@ -275,11 +275,26 @@ pub fn init_handlers_apic() {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
+
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
+        // idt[0x23].set_handler_fn(irq_0x23_handler);
         idt[0x24].set_handler_fn(com1_serial_handler);
+        // idt[0x25].set_handler_fn(irq_0x25_handler);
         idt[0x26].set_handler_fn(apic_irq_0x26_handler);
+        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
+
+        // idt[0x28].set_handler_fn(irq_0x28_handler);
+        // idt[0x29].set_handler_fn(irq_0x29_handler);
+        // idt[0x2a].set_handler_fn(irq_0x2A_handler);
+        // idt[0x2b].set_handler_fn(irq_0x2B_handler);
+        // idt[0x2c].set_handler_fn(irq_0x2C_handler);
+        // idt[0x2d].set_handler_fn(irq_0x2D_handler);
+        // idt[0x2e].set_handler_fn(irq_0x2E_handler);
+        // idt[0x2f].set_handler_fn(irq_0x2F_handler);
+
+
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
 
@@ -405,7 +420,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x26
 extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // // info!("COM1 serial handler");
+    // info!("APIX 0x26 IRQ handler");
 
     // unsafe {
     //     ::x86_64::instructions::port::inb(0x3F8); // read serial port value
@@ -416,7 +431,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-    info!("APIC SPURIOUS INTERRUPT HANDLER!");
+    warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
     eoi(None);
 }
@@ -446,11 +461,9 @@ pub static mut SPURIOUS_COUNT: u64 = 0;
 
 /// The Spurious interrupt handler. 
 /// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
-/// I believe the problem is something to do with still using the antiquated PIC (instead of APIC)
-/// on an SMP system with only one CPU core.
-/// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html
-/// Thus, for now, we will basically just ignore/ack it, but ideally this will no longer happen
-/// when we transition from PIC to APIC, and disable the PIC altogether. 
+/// Spurious interrupts occur a lot when using PIC on real hardware, but only occurs once when using apic/x2apic. 
+/// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
+/// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
 extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
     unsafe { SPURIOUS_COUNT += 1; } // cheap counter just for debug info
 
@@ -461,11 +474,12 @@ extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut Exceptio
         // if it was a real IRQ7, we do need to ack it by sending an EOI
         if irq_regs.master_isr & 0x80 == 0x80 {
             println_unsafe!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
-            warn!("Got real IRQ7, not spurious! (Unexpected behavior)");
+            error!("Got real IRQ7, not spurious! (Unexpected behavior)");
             eoi(Some(PIC_MASTER_OFFSET + 0x7));
         }
         else {
-            // do nothing. Do not send an EOI.
+            // do nothing. Do not send an EOI. 
+            // see https://wiki.osdev.org/8259_PIC#Spurious_IRQs
         }
     }
     else {
@@ -550,6 +564,24 @@ extern "x86-interrupt" fn irq_0x26_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
+extern "x86-interrupt" fn irq_0x27_handler(_stack_frame: &mut ExceptionStackFrame) {
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x27 interrupt: {:#?}", _stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
+
+    loop { }
+}
+
+
+extern "x86-interrupt" fn irq_0x28_handler(_stack_frame: &mut ExceptionStackFrame) {
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x28 interrupt: {:#?}", _stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
+
+    loop { }
+}
+
+
 extern "x86-interrupt" fn irq_0x29_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x29 interrupt: {:#?}", _stack_frame);
@@ -590,6 +622,24 @@ extern "x86-interrupt" fn irq_0x2C_handler(_stack_frame: &mut ExceptionStackFram
 extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_unsafe!("\nCaught 0x2D interrupt: {:#?}", _stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
+
+    loop { }
+}
+
+#[allow(non_snake_case)]
+extern "x86-interrupt" fn irq_0x2E_handler(_stack_frame: &mut ExceptionStackFrame) {
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2E interrupt: {:#?}", _stack_frame);
+    println_unsafe!("IrqRegs: {:?}", irq_regs);
+
+    loop { }
+}
+
+#[allow(non_snake_case)]
+extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFrame) {
+	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+    println_unsafe!("\nCaught 0x2F interrupt: {:#?}", _stack_frame);
     println_unsafe!("IrqRegs: {:?}", irq_regs);
 
     loop { }
