@@ -22,6 +22,8 @@ use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 
+use drivers::e1000;
+
 
 mod exceptions;
 mod gdt;
@@ -275,7 +277,6 @@ pub fn init_handlers_apic() {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
-
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
@@ -286,18 +287,15 @@ pub fn init_handlers_apic() {
         idt[0x27].set_handler_fn(spurious_interrupt_handler); 
 
         // idt[0x28].set_handler_fn(irq_0x28_handler);
-        // idt[0x29].set_handler_fn(irq_0x29_handler);
-        // idt[0x2a].set_handler_fn(irq_0x2A_handler);
-        // idt[0x2b].set_handler_fn(irq_0x2B_handler);
-        // idt[0x2c].set_handler_fn(irq_0x2C_handler);
-        // idt[0x2d].set_handler_fn(irq_0x2D_handler);
-        // idt[0x2e].set_handler_fn(irq_0x2E_handler);
-        // idt[0x2f].set_handler_fn(irq_0x2F_handler);
-
+        idt[0x29].set_handler_fn(nic_handler); // for Bochs
+        // idt[0x2A].set_handler_fn(irq_0x2A_handler);
+        idt[0x2B].set_handler_fn(nic_handler);
+        // idt[0x2C].set_handler_fn(irq_0x2C_handler);
+        // idt[0x2D].set_handler_fn(irq_0x2D_handler);
+        // idt[0x2E].set_handler_fn(irq_0x2E_handler);
+        // idt[0x2F].set_handler_fn(irq_0x2F_handler);
 
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
-
-
         idt[apic::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
 
@@ -313,6 +311,7 @@ pub fn init_handlers_pic() {
 		// SET UP CUSTOM INTERRUPT HANDLERS
 		// we can directly index the "idt" object because it implements the Index/IndexMut traits
 
+       
         // MASTER PIC starts here (0x20 - 0x27)
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(keyboard_handler);
@@ -330,12 +329,14 @@ pub fn init_handlers_pic() {
 
         idt[0x29].set_handler_fn(irq_0x29_handler); 
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
-        idt[0x2B].set_handler_fn(irq_0x2B_handler); 
+        //idt[0x2B].set_handler_fn(irq_0x2B_handler);
+        idt[0x2B].set_handler_fn(nic_handler); 
         idt[0x2C].set_handler_fn(irq_0x2C_handler); 
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
         // 0x2F missing right now
+
     }
 
     // init PIC, PIT and RTC interrupts
@@ -368,7 +369,6 @@ fn eoi(irq: Option<u8>) {
         }
     }
 }
-
 
 
 /// 0x20
@@ -407,6 +407,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     schedule!();
 }
 
+
 /// 0x24
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // info!("COM1 serial handler");
@@ -418,6 +419,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
+
 /// 0x26
 extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
     // info!("APIX 0x26 IRQ handler");
@@ -427,6 +429,14 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
     // }
 
     eoi(Some(PIC_MASTER_OFFSET + 0x6));
+}
+
+
+/// 0x2B
+extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
+    debug!("nic handler called");
+    e1000::e1000_handler();
+	eoi(Some(0x2B));
 }
 
 
@@ -648,10 +658,6 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // Currently, IPIs are only used for TLB shootdowns.
-    
-    // trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-    apic::handle_tlb_shootdown_ipi();
 
     eoi(None);
 }

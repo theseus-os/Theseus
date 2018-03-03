@@ -637,3 +637,4 @@ pub trait FrameAllocator {
     /// Call this when a heap is set up, and the `alloc` types can be used.
     fn alloc_ready(&mut self);
 }
+

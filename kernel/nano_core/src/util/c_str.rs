@@ -760,7 +760,6 @@ impl CString {
 // memory unsafe code from working by accident. Inline
 // to prevent LLVM from optimizing it away in debug builds.
 impl Drop for CString {
-    #[inline]
     fn drop(&mut self) {
         unsafe { *self.inner.get_unchecked_mut(0) = 0; }
     }

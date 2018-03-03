@@ -2,12 +2,15 @@ pub mod input;
 pub mod ata_pio;
 pub mod pci;
 pub mod acpi;
+pub mod e1000;
+pub mod test_nic_driver;
 
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
+use drivers::e1000::init_nic;
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -41,7 +44,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 
 
-pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
+pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
     assert_has_not_been_called!("drivers::init was called more than once!");
     input::keyboard::init(console_producer);
     
@@ -49,7 +52,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
         debug!("Found pci device: {:?}", dev);
     }
 
-
+    try!(init_nic());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*
@@ -76,4 +79,6 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
     println!("{:?}", bus_zero);
     */
+    Ok(())
+
 }

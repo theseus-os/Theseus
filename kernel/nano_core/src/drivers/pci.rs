@@ -43,6 +43,19 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
     None
 }
 
+/// Returns a reference to the `PciDevice` with the given vendor id and device id... Ramla
+pub fn get_pci_device_vd(vendor_id: u16, device_id: u16) -> Option<&'static PciDevice> {
+    for b in get_pci_buses() {
+        for d in &b.devices {
+            if d.vendor_id == vendor_id && d.device_id == device_id {
+                return Some(&d);
+            }
+        }
+    }
+    
+    None
+}
+
 /// Returns an iterator that iterates over all `PciDevice`s,
 /// and, if uninitialized, it initializes the PCI bus & scans it to enumerates devices.
 pub fn pci_device_iter() -> impl Iterator<Item = &'static PciDevice> {
@@ -64,8 +77,8 @@ fn pci_address(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
 }
 
 
-/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
+/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.  Ramla
+pub fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
     unsafe { 
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
     }
@@ -78,12 +91,12 @@ fn pci_read_16(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
 } 
 
 /// read 8-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
+pub fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
     pci_read_32(bus, slot, func, offset) as u8
 }
 
 /// write data to the specified `offset` on the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
+pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
     unsafe { 
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
         PCI_CONFIG_DATA_PORT.lock().write((value) << ((offset & 2) * 8));
@@ -169,12 +182,14 @@ pub struct PciDevice {
     pub header_type: u8,
     pub bist: u8,
     pub bars: [u32; 6],
+    pub int_pin: u8,
+    pub int_line: u8,
 }
 
 impl fmt::Display for PciDevice { 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bars: {:?}", 
-            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bars)
+        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bars: {:?}, int_pin: {:#x}, int_line: {:X}", 
+            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bars, self.int_pin, self.int_line)
     }
 }
 
@@ -224,6 +239,8 @@ fn scan_pci() -> Vec<PciBus> {
                                         pci_read_32(bus, slot, f, PCI_BAR4), 
                                         pci_read_32(bus, slot, f, PCI_BAR5), 
                                         ],
+                    int_pin:            pci_read_8(bus, slot, f, PCI_INTERRUPT_PIN),
+                    int_line:           pci_read_8(bus, slot, f, PCI_INTERRUPT_LINE),
                 };
 
 

@@ -20,3 +20,7 @@ build/
 # IDE files
 /.idea/
 /.vscode/
+
+# log files
+*.pcap
+*.out
