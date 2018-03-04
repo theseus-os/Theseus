@@ -46,7 +46,6 @@ extern crate atomic;
 extern crate xmas_elf;
 extern crate rustc_demangle;
 extern crate goblin;
-extern crate zero;
 
 
 // ------------------------------------
