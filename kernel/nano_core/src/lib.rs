@@ -87,7 +87,7 @@ mod start;
 
 
 use task::{spawn_kthread, spawn_userspace};
-use core::sync::atomic::{AtomicBool, Ordering};
+use alloc::String;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 
@@ -95,11 +95,13 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
-        let mut i = 10000000; // usize::max_value();
+        let mut i: usize = 10000000; // usize::max_value();
+        unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
         }
         print!("1");
+        schedule!();
     }
 }
 
@@ -107,11 +109,13 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
 fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
-        let mut i = 10000000; // usize::max_value();
+        let mut i: usize = 10000000; // usize::max_value();
+        unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
         }
         print!("2");
+        schedule!();
     }
 }
 
@@ -126,8 +130,9 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     // }
 
     loop {
-        let mut i = 10000000; // usize::max_value();
+        let mut i: usize = 10000000; // usize::max_value();
         while i > 0 {
+            unsafe { asm!(""); }
             i -= 1;
             // if i % 3 == 0 {
             //     debug!("GOT FRAME: {:?}",  memory::allocate_frame()); // TODO REMOVE
@@ -135,6 +140,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
             // }
         }
         print!("3");
+        schedule!();
     }
 }
 
@@ -145,26 +151,12 @@ fn test_driver(_: Option<u64>) {
 }
 
 
-/// An atomic flag used for synchronizing progress between the BSP and all APs.
-/// False means the BSP hasn't finished with initialization yet.
-pub static BSP_READY_FLAG: AtomicBool = AtomicBool::new(false);
-
-
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 	// start the kernel with interrupts disabled
 	unsafe { ::x86_64::instructions::interrupts::disable(); }
 	
-    unsafe {
-        // print RUST
-        asm!("  mov dword ptr [0xFFFFFFFF800b802c], 0x4f554f52; \
-	            mov dword ptr [0xFFFFFFFF800b8030], 0x4f544f53;"
-                : : : : "intel"
-        );
-    }
-    
-
     // first, bring up the logger so we can debug
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
@@ -180,16 +172,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
-
-
-    unsafe {
-        // print MEMORY
-        asm!("  mov dword ptr [0xFFFFFFFF800b81f0], 0x4f454f4d; \
-                mov dword ptr [0xFFFFFFFF800b81f4], 0x4f4f4f4d; \
-	            mov dword ptr [0xFFFFFFFF800b81f8], 0x4f594f4f;"
-                : : : : "intel"
-        );
-    }
 
 
     // now that we have a heap, we can create basic things like state_store
@@ -208,7 +190,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 
-    // now we initialize ACPI/APIC barebones stuff
+    // now we initialize ACPI/APIC barebones stuff.
+    // madt_iter must stay in scope until after all AP booting is finished so it's not prematurely dropped
     let madt_iter = {
         trace!("calling drivers::early_init()");
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -251,10 +234,12 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // boot up the other cores (APs)
     {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter, &mut kernel_mmi)
+        // we can't consume madt_iter here, it must 
+        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter.clone(), kernel_mmi_ref.clone())
                         .expect("Error handling AP cores");
+        
         info!("Finished handling and booting up all {} AP cores.", ap_count);
+        assert!(interrupts::apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
     }
 
 
@@ -283,16 +268,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
-    BSP_READY_FLAG.store(true, Ordering::SeqCst); // BSP is finished initializing
-
-    {
-        // just wait a while for the APs to boot up -- not necessary,
-        // but waiting for their runqueues to be ready helps distribute tasks among them evenly
-        let mut i = 10000000; // usize::max_value();
-        while i > 0 {
-            i -= 1;
-        }
-    }
 
     if true {
         spawn_kthread(test_driver, None,  "driver_test_thread").unwrap();

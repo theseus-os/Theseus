@@ -3,7 +3,6 @@ use memory::{VirtualAddress, get_kernel_mmi_ref};
 use interrupts;
 use syscall;
 use task;
-use BSP_READY_FLAG;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use drivers::acpi::madt::MadtIter;
 use interrupts::apic::{LocalApic, get_lapics};
@@ -19,7 +18,7 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 /// The arguments must match the invocation order in "ap_boot.asm"
 pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
                  stack_start: VirtualAddress, stack_end: VirtualAddress,
-                 madt_iter: MadtIter) -> ! 
+                 madt_iter: &MadtIter) -> ! 
 {
     info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
 
@@ -27,11 +26,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop
 
-    // wait for the BSP to finish its initialization of system-wide things (like the IDT) before enabling interrupts 
-    while ! BSP_READY_FLAG.load(Ordering::SeqCst) {
-        ::arch::pause();
-    }
-    // NOTE: code below here depends on the BSP having inited the rest of the system-wide things first
 
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: kernel_mmi ref was None");
@@ -54,7 +48,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
-    // and also to ensure that if this apic fails to init, it's not used as one apic in the list.
+    // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
     let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())
                       .expect("kstart_ap(): failed to create LocalApic");
     
