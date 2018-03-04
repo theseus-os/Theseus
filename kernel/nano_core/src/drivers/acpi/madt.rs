@@ -7,6 +7,8 @@ use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use spin::RwLock;
 use alloc::boxed::Box;
+use alloc::arc::Arc;
+use irq_safety::MutexIrqSafe;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -171,7 +173,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
 
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
-pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
+pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>) -> Result<usize, &'static str> {
     // SAFE: just getting const values from boot assembly code
     debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
     let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
@@ -183,10 +185,11 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     let _ap_startup_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
 
     {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
         let &mut MemoryManagementInfo { 
             page_table: ref mut kernel_page_table, 
             ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-        } = kernel_mmi;
+        } = &mut *kernel_mmi;
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
@@ -274,7 +277,10 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
                                                          .ok_or("Couldn't get BSP's LocalApic!")
                     );
                     let mut bsp_lapic = bsp_lapic_ref.write();
-                    let ap_stack = try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"));
+                    let ap_stack = {
+                        let mut kernel_mmi = kernel_mmi_ref.lock();
+                        try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"))
+                    };
 
                     // loop { }
 
@@ -293,6 +299,15 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
         }
     }
 
+    // wait for all cores to finish booting and init
+    info!("handle_ap_cores(): BSP is waiting for APs to boot...");
+    let mut count = ::interrupts::apic::get_lapics().iter().count();
+    while count < ap_count + 1 {
+        trace!("BSP-known count: {}", count);
+        ::arch::pause();
+        count = ::interrupts::apic::get_lapics().iter().count();
+    }
+    
     Ok(ap_count)  
 }
 
@@ -489,7 +504,7 @@ pub enum MadtEntry {
     Unknown(u8)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct MadtIter {
     sdt: &'static Sdt,
     i: usize

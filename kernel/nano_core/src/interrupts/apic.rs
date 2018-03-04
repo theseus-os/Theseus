@@ -231,6 +231,7 @@ impl LocalApic {
             }
         }
 
+        trace!("AP {} parsing NMI entries...", lapic.apic_id);
         lapic.parse_and_set_nmi(madt_iter);
         info!("Found new processor core ({:?})", lapic);
 		Ok(lapic)
@@ -391,6 +392,7 @@ impl LocalApic {
     /// based on the entries in the given `MadtIter`.
     fn parse_and_set_nmi(&mut self, madt_iter: MadtIter) {
         for madt_entry in madt_iter {
+            // trace!("Lapic {} madt_entry: {:?}", self.apic_id, madt_entry);
             match madt_entry {
                 MadtEntry::NonMaskableInterrupt(nmi) => {
                     // NMI entries are based on the "processor" id, not the "apic_id"
@@ -520,8 +522,8 @@ impl LocalApic {
             return; // skip sending IPIs if there are no other cores running
         }
 
-        trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
-                get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
+        // trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
+        //         get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
         
         // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
         // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
@@ -662,7 +664,7 @@ impl LocalApic {
 pub fn handle_tlb_shootdown_ipi(vaddr: VirtualAddress) {
     let apic_id = get_my_apic_id().unwrap_or(0xFF);
 
-    trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
+    // trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
 
     use x86_64::instructions::tlb;
     tlb::flush(::x86_64::VirtualAddress(vaddr));

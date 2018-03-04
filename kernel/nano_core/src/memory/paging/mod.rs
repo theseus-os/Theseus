@@ -312,13 +312,6 @@ impl InactivePageTable {
             table.copy_entry_from_table(active_table.p4(), KERNEL_HEAP_P4_INDEX);
             table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
         }
-        
-        unsafe {
-            // print 55
-            asm!("  mov dword ptr [0xFFFFFFFF800b80a8], 0x4f354f35;"
-                    : : : : "intel"
-            );
-        }
 
         InactivePageTable { p4_frame: frame }
 

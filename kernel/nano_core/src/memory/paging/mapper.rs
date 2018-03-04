@@ -242,25 +242,11 @@ impl Mapper {
 
             use x86_64::instructions::tlb;
 
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f304f30;"
-                        : : : : "intel"
-                );
-            }
-
             if self.translate_page(page).is_none() {
                 error!("unmap(): page {:?} was not mapped!", page);
                 return Err("unmap(): page was not mapped");
             }
             
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f314f31;"
-                        : : : : "intel"
-                );
-            }
-
             let p1 = try!(self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -268,42 +254,14 @@ impl Mapper {
                 .ok_or("mapping code does not support huge pages")
             );
             
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f324f32;"
-                        : : : : "intel"
-                );
-            }
-
             let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
             p1[page.p1_index()].set_unused();
-
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f334f33;"
-                        : : : : "intel"
-                );
-            }
 
             tlb::flush(x86_64::VirtualAddress(page.start_address()));
             broadcast_tlb_shootdown(page.start_address());
             
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f344f34;"
-                        : : : : "intel"
-                );
-            }
-
             // TODO free p(1,2,3) table if empty
             // allocator.deallocate_frame(frame);
-        }
-
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b82a8], 0x4f354f35;"
-                    : : : : "intel"
-            );
         }
 
         Ok(())
@@ -317,23 +275,8 @@ fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
     
     use interrupts::apic::get_my_apic;
     if let Some(my_lapic) = get_my_apic() {
-        unsafe {
-            // print YE
-            asm!("  mov dword ptr [0xFFFFFFFF800b87a8], 0x4f454f59;"
-                    : : : : "intel"
-            );
-        }
-
         // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
         my_lapic.write().send_tlb_shootdown_ipi(vaddr);
-    }
-    else {
-        unsafe {
-            // print NO
-            asm!("  mov dword ptr [0xFFFFFFFF800b87a8], 0x4f4f4f4e;"
-                    : : : : "intel"
-            );
-        }
     }
 }
 
@@ -388,24 +331,11 @@ impl Drop for MappedPages {
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f304f30;"
-                    : : : : "intel"
-            );
-        }
         
         assert!(get_current_p4() == self.page_table_p4, 
                 "MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
                  cannot unmap MappedPages from a different page table than they were originally mapped to!",
                  get_current_p4(), self.page_table_p4);
-
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f314f31;"
-                    : : : : "intel"
-            );
-        }
 
         let mut frame_allocator = match FRAME_ALLOCATOR.try() {
             Some(fa) => fa.lock(),
@@ -415,37 +345,10 @@ impl Drop for MappedPages {
             }
         };
         
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f324f32;"
-                    : : : : "intel"
-            );
-        }
-
         let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
 
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f334f33;"
-                    : : : : "intel"
-            );
-        }
-
         if let Err(e) = active_table.unmap(self.pages.clone(), frame_allocator.deref_mut()) {
-            unsafe {
-                // print MEMORY
-                asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f344f34;"
-                        : : : : "intel"
-                );
-            }
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
-        }
-
-        unsafe {
-            // print MEMORY
-            asm!("  mov dword ptr [0xFFFFFFFF800b81a8], 0x4f354f35;"
-                    : : : : "intel"
-            );
         }
 
         // Note that the AllocatedPages will automatically be dropped here too,
