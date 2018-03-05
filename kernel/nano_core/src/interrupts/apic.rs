@@ -662,8 +662,7 @@ impl LocalApic {
 /// Handles a TLB shootdown ipi by flushing the VirtualAddress 
 /// currently stored in TLB_SHOOTDOWN_IPI_VIRT_ADDR.
 pub fn handle_tlb_shootdown_ipi(vaddr: VirtualAddress) {
-    let apic_id = get_my_apic_id().unwrap_or(0xFF);
-
+    // let apic_id = get_my_apic_id().unwrap_or(0xFF);
     // trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
 
     use x86_64::instructions::tlb;
