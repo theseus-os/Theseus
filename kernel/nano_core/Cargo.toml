@@ -79,6 +79,8 @@ path = "../test_lib"
 path = "../../libs/atomic_linked_list"
 
 
+[profile.release]
+debug = true
 
 [features]
 mirror_serial = []

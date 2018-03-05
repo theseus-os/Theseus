@@ -116,6 +116,7 @@ struct UserTaskGsData {
 #[allow(private_no_mangle_fns)]
 #[no_mangle]
 #[naked]
+#[inline(never)]
 unsafe extern "C" fn syscall_handler() {
 
 
