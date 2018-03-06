@@ -235,8 +235,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // boot up the other cores (APs)
     {
-        // we can't consume madt_iter here, it must 
-        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter.clone(), kernel_mmi_ref.clone())
+        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone())
                         .expect("Error handling AP cores");
         
         info!("Finished handling and booting up all {} AP cores.", ap_count);
@@ -271,7 +270,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     interrupts::enable_interrupts();
 
     if true {
-        spawn_kthread(test_driver, None,  "driver_test_thread").unwrap();
+        spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
     }  
 
     // create some extra tasks to test context switching

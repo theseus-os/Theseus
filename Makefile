@@ -88,13 +88,13 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### builds and runs theseus
+### builds and runs Theseus in QEMU
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### builds and runs theseus, but pauses execution until a GDB instance is connected.
+### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 debug: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 #-monitor stdio
@@ -105,6 +105,15 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
 ### TODO: add more symbol files besides nano_core once they're split from nano_core
+
+
+
+### builds and runs Theseus in Bochs
+bochs : export RUST_FEATURES = --features "apic_timer_fixed"
+bochs: $(iso) 
+	#@qemu-img resize random_data2.img 100K
+	bochs -f bochsrc.txt -q
+
 
 
 check_usb:
@@ -188,6 +197,8 @@ help:
 	@echo -e "  gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+	@echo -e "  bochs:"
+	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
 	@echo -e "  boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"

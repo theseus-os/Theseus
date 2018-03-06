@@ -6,7 +6,6 @@ use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
-use drivers::acpi::madt::{MadtEntry, MadtIter};
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 
 
@@ -190,26 +189,20 @@ pub struct LocalApic {
     pub virt_addr: Option<VirtualAddress>,
     pub processor: u8,
     pub apic_id: u8,
-    pub flags: u32,
     pub is_bsp: bool,
 }
 
 impl LocalApic {
     /// This MUST be invoked from the AP core itself when it is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(processor: u8, apic_id: u8, flags: u32, is_bsp: bool, madt_iter: MadtIter) 
+    pub fn new(processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
         -> Result<LocalApic, &'static str>
     {
-        if flags & 0x1 != 0x1 {
-            error!("LocalApic::new() processor was disabled! (flags {:#X} must equal 0x1)", flags);
-            return Err("flags were not 0x1, which means the processor was disabled!");
-        }
 
 		let mut lapic = LocalApic {
 			virt_addr: None, // None by default (for x2apics). if xapic, it will be set to Some later
             processor: processor,
             apic_id: apic_id,
-            flags: flags,
             is_bsp: is_bsp,
 		};
 
@@ -231,8 +224,7 @@ impl LocalApic {
             }
         }
 
-        trace!("AP {} parsing NMI entries...", lapic.apic_id);
-        lapic.parse_and_set_nmi(madt_iter);
+        lapic.set_nmi(nmi_lint, nmi_flags);
         info!("Found new processor core ({:?})", lapic);
 		Ok(lapic)
     }
@@ -349,8 +341,11 @@ impl LocalApic {
 
     unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.");
-        let apic_period = self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
-        // let apic_period = 0x10000; // temp for bochs, which doesn't do apic periods right
+        let apic_period = if cfg!(feature = "apic_timer_fixed") {
+            0x10000 // for bochs, which doesn't do apic periods right
+        } else {
+            self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
+        };
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         self.write_reg(APIC_REG_TIMER_DIVIDE, 3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -368,8 +363,11 @@ impl LocalApic {
 
     unsafe fn init_timer_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
-        let x2apic_period = self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS);
-        // let x2apic_period = 0x10000; // temp for bochs, which doesn't do x2apic periods right
+        let x2apic_period = if cfg!(feature = "apic_timer_fixed") {
+            0x10000 // for bochs, which doesn't do x2apic periods right
+        } else {
+            self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
+        };
         trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
 
         debug!("in init_timer_x2apic start");
@@ -385,28 +383,6 @@ impl LocalApic {
         // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
         debug!("in init_timer_x2apic 7"); wrmsr(IA32_X2APIC_DIV_CONF, 3);
         debug!("in init_timer_x2apic end");
-    }
-
-
-    /// Parses and sets up the NonMaskableInterrupt (NMI) for this LocalApic,
-    /// based on the entries in the given `MadtIter`.
-    fn parse_and_set_nmi(&mut self, madt_iter: MadtIter) {
-        for madt_entry in madt_iter {
-            // trace!("Lapic {} madt_entry: {:?}", self.apic_id, madt_entry);
-            match madt_entry {
-                MadtEntry::NonMaskableInterrupt(nmi) => {
-                    // NMI entries are based on the "processor" id, not the "apic_id"
-                    trace!("Lapic {} looking at NMI entry {:?}", self.processor, nmi);
-                    // if this is an NMI entry for this lapic, or for all lapics, use it
-                    if nmi.processor == self.processor || nmi.processor == 0xFF  {
-                        self.set_nmi(nmi.lint, nmi.flags);   
-                        debug!("Set NMI for LocalApic {}, NMI Entry: {:?}", self.apic_id, nmi);                     
-                    }
-                }
-                _ => {  }
-            }
-        }
-
     }
 
     unsafe fn read_reg(&self, reg: u32) -> u32 {
