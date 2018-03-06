@@ -4,13 +4,12 @@ TRAMPOLINE          equ 0xF000
 AP_READY            equ TRAMPOLINE
 AP_PROCESSOR_ID     equ TRAMPOLINE + 8
 AP_APIC_ID          equ TRAMPOLINE + 16
-AP_FLAGS            equ TRAMPOLINE + 24
-AP_PAGE_TABLE       equ TRAMPOLINE + 32
-AP_STACK_START      equ TRAMPOLINE + 40
-AP_STACK_END        equ TRAMPOLINE + 48
-AP_CODE             equ TRAMPOLINE + 56
-AP_MADT_TABLE       equ TRAMPOLINE + 64
-AP_IDT              equ TRAMPOLINE + 72
+AP_PAGE_TABLE       equ TRAMPOLINE + 24
+AP_STACK_START      equ TRAMPOLINE + 32
+AP_STACK_END        equ TRAMPOLINE + 40
+AP_CODE             equ TRAMPOLINE + 48
+AP_NMI_LINT         equ TRAMPOLINE + 56
+AP_NMI_FLAGS        equ TRAMPOLINE + 64
 
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
@@ -164,14 +163,14 @@ start_high_ap:
 	lea rsp, [rcx - 256]
 
     ; Rust's calling conventions is as follows:  
-	; RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack
+	; RDI,  RSI,  RDX,  RCX,  R8,  R9,  (R10??), others on stack
 	; This order below MUST MATCH the parameter order in kstart_ap()
 	mov rdi, [AP_PROCESSOR_ID]
 	mov rsi, [AP_APIC_ID]
-	mov rdx, [AP_FLAGS]
-	mov rcx, [AP_STACK_START]
-	mov r8,  [AP_STACK_END]
-	mov r9,  [AP_MADT_TABLE]
+	mov rdx, [AP_STACK_START]
+	mov rcx, [AP_STACK_END]
+	mov r8,  [AP_NMI_LINT]
+	mov r9,  [AP_NMI_FLAGS]
 	mov rax, qword [AP_CODE]
 
 

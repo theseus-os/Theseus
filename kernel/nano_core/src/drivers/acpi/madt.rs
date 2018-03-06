@@ -46,6 +46,12 @@ impl Madt {
             load_table(get_sdt_signature(madt_sdt[0]));
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
+
+            // debug!("================ MADT Table: ===============");
+            // for e in iter.clone() {
+            //     debug!("  {:?}", e);
+            // }
+
             try!(handle_ioapic_entry(iter.clone(), active_table));
             try!(handle_bsp_entry(iter.clone()));
             Ok(iter)
@@ -112,11 +118,12 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
     for madt_entry in madt_iter.clone() {
         match madt_entry {
-             MadtEntry::LocalApic(lapic_madt) => { 
-                if lapic_madt.apic_id == me {
+             MadtEntry::LocalApic(lapic_entry) => { 
+                if lapic_entry.apic_id == me {
                     debug!("        This is my (the BSP's) local APIC");
-                    // For the BSP's own processor core, no real work is needed. 
-                    let mut bsp_lapic = try!(LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone()));
+                    let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+
+                    let mut bsp_lapic = try!(LocalApic::new(lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
                     let bsp_id = bsp_lapic.id();
 
                     use interrupts::PIC_MASTER_OFFSET;
@@ -142,7 +149,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
                     
                     // add the BSP lapic to the list (should be empty until here)
                     assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    all_lapics.insert(lapic_madt.apic_id, RwLock::new(bsp_lapic));
+                    all_lapics.insert(lapic_entry.apic_id, RwLock::new(bsp_lapic));
 
                     // there's only ever one BSP, so we can exit the loop here
                     break;
@@ -234,11 +241,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
-    if ::interrupts::apic::has_x2apic() {
-        debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic yes.", me);
-    } else {
-        debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic", me);
-    }
+    debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic {}.", me, ::interrupts::apic::has_x2apic());
     
     // we checked the src_ptr and mapped the dest_ptr earlier
     let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
@@ -258,9 +261,9 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     for madt_entry in madt_iter.clone() {
         debug!("      {:?}", madt_entry);
         match madt_entry {
-            MadtEntry::LocalApic(lapic_madt) => { 
+            MadtEntry::LocalApic(lapic_entry) => { 
 
-                if lapic_madt.apic_id == me {
+                if lapic_entry.apic_id == me {
                     debug!("        skipping BSP's local apic");
                 }
                 else {
@@ -269,6 +272,12 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
                     // for l in all_lapics.iter() {
                     //     debug!("{:?}", l);
                     // }
+
+                    if lapic_entry.flags & 0x1 != 0x1 {
+                        warn!("Processor {} apic_id {} is disabled by the hardware, cannot initialize or be used.", 
+                               lapic_entry.processor, lapic_entry.apic_id);
+                        continue;
+                    }
 
 
                     // start up this AP, and have it create a new LocalApic for itself. 
@@ -282,14 +291,15 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
                         try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"))
                     };
 
-                    // loop { }
+                    let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
                     bring_up_ap(bsp_lapic.deref_mut(), 
-                                lapic_madt, 
+                                lapic_entry,
                                 trampoline_mapped_pages.start_address(), 
                                 active_table_phys_addr, 
                                 ap_stack, 
-                                madt_iter.clone()
+                                nmi_lint,
+                                nmi_flags 
                     );
                     ap_count += 1;
                 }
@@ -312,6 +322,26 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
 }
 
 
+fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
+    for madt_entry in madt_iter {
+        match madt_entry {
+            MadtEntry::NonMaskableInterrupt(nmi) => {
+                // NMI entries are based on the "processor" id, not the "apic_id"
+                // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
+                if nmi.processor == processor || nmi.processor == 0xFF  {
+                    return (nmi.lint, nmi.flags);
+                }
+            }
+            _ => {  }
+        }
+    }
+
+    let (lint, flags) = (1, 0);
+    warn!("Couldn't find NMI entry for processor {} (<-- not apic_id). Using default lint {}, flags {}", processor, lint, flags);
+    (lint, flags)
+}
+
+
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
 fn bring_up_ap(bsp_lapic: &mut LocalApic,
@@ -319,29 +349,31 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
                trampoline_vaddr: VirtualAddress,
                active_table_paddr: PhysicalAddress, 
                ap_stack: Stack,
-               madt_iter: MadtIter) 
+               nmi_lint: u8, 
+               nmi_flags: u16) 
 {
     
-    let ap_ready = trampoline_vaddr as *mut u64;
-    let ap_processor_id = unsafe { ap_ready.offset(1) };
-    let ap_apic_id = unsafe { ap_ready.offset(2) };
-    let ap_flags = unsafe { ap_ready.offset(3) };
-    let ap_page_table = unsafe { ap_ready.offset(4) };
-    let ap_stack_start = unsafe { ap_ready.offset(5) };
-    let ap_stack_end = unsafe { ap_ready.offset(6) };
-    let ap_code = unsafe { ap_ready.offset(7) };
-    let ap_madt_table = unsafe { ap_ready.offset(8) };
+    // NOTE: These definitions MUST match those in ap_boot.asm
+    let ap_ready         = trampoline_vaddr as *mut u64;
+    let ap_processor_id  = unsafe { ap_ready.offset(1) };
+    let ap_apic_id       = unsafe { ap_ready.offset(2) };
+    let ap_page_table    = unsafe { ap_ready.offset(3) };
+    let ap_stack_start   = unsafe { ap_ready.offset(4) };
+    let ap_stack_end     = unsafe { ap_ready.offset(5) };
+    let ap_code          = unsafe { ap_ready.offset(6) };
+    let ap_nmi_lint      = unsafe { ap_ready.offset(7) };
+    let ap_nmi_flags     = unsafe { ap_ready.offset(8) };
 
     // Set the ap_ready to 0, volatile
-    unsafe { atomic_store(ap_ready, 0) };
-    unsafe { atomic_store(ap_processor_id, new_lapic.processor as u64) };
-    unsafe { atomic_store(ap_apic_id, new_lapic.apic_id as u64) };
-    unsafe { atomic_store(ap_flags, new_lapic.flags as u64) };
-    unsafe { atomic_store(ap_page_table, active_table_paddr as u64) };
-    unsafe { atomic_store(ap_stack_start, ap_stack.bottom() as u64) };
-    unsafe { atomic_store(ap_stack_end, ap_stack.top_unusable() as u64) };
-    unsafe { atomic_store(ap_code, kstart_ap as u64) };
-    unsafe { atomic_store(ap_madt_table, &madt_iter as *const _ as u64) };
+    unsafe { atomic_store(ap_ready,         0) };
+    unsafe { atomic_store(ap_processor_id,  new_lapic.processor as u64) };
+    unsafe { atomic_store(ap_apic_id,       new_lapic.apic_id as u64) };
+    unsafe { atomic_store(ap_page_table,    active_table_paddr as u64) };
+    unsafe { atomic_store(ap_stack_start,   ap_stack.bottom() as u64) };
+    unsafe { atomic_store(ap_stack_end,     ap_stack.top_unusable() as u64) };
+    unsafe { atomic_store(ap_code,          kstart_ap as u64) };
+    unsafe { atomic_store(ap_nmi_lint,      nmi_lint as u64) };
+    unsafe { atomic_store(ap_nmi_flags,     nmi_flags as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped

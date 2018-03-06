@@ -84,6 +84,7 @@ debug = true
 
 [features]
 mirror_serial = []
+apic_timer_fixed = []
 
 
 [lib]

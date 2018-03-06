@@ -4,7 +4,6 @@ use interrupts;
 use syscall;
 use task;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use drivers::acpi::madt::MadtIter;
 use interrupts::apic::{LocalApic, get_lapics};
 use spin::RwLock;
 
@@ -16,11 +15,12 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
-pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32, 
+pub fn kstart_ap(processor_id: u8, apic_id: u8, 
                  stack_start: VirtualAddress, stack_end: VirtualAddress,
-                 madt_iter: &MadtIter) -> ! 
+                 nmi_lint: u8, nmi_flags: u16) -> ! 
 {
-    info!("Booted AP: proc: {} apic: {} flags: {:#X} stack: {:#X} to {:#X}", processor_id, apic_id, flags, stack_start, stack_end);
+    info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
+           processor_id, apic_id, stack_start, stack_end, nmi_lint, nmi_flags);
 
 
     // set a flag telling the BSP that this AP has entered Rust code
@@ -49,7 +49,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    let lapic = LocalApic::new(processor_id, apic_id, flags, false, madt_iter.clone())
+    let lapic = LocalApic::new(processor_id, apic_id, false, nmi_lint, nmi_flags)
                       .expect("kstart_ap(): failed to create LocalApic");
     
     if interrupts::apic::get_my_apic_id() != Some(apic_id) {
@@ -61,7 +61,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8, flags: u32,
 
     interrupts::enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 
-           if interrupts::interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" });
+           if interrupts::interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
+    );
 
     loop { 
         schedule!();
