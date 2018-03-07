@@ -55,6 +55,7 @@ extern crate goblin;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate keycodes_ascii; // for keyboard 
+#[macro_use] extern crate util;
 extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate dfqueue; // decoupled, fault-tolerant queue
@@ -71,7 +72,6 @@ extern crate test_lib;
 extern crate rtc;
 
 #[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
-#[macro_use] pub mod util; // must come first because it contains just macros
 #[macro_use] mod drivers;  
 mod arch;
 #[macro_use] mod task;
