@@ -31,6 +31,9 @@ features = ["elf64", "goblin"]
 default-features = false
 version = "0.3.7"
 
+[dependencies.util]
+path = "../../libs/util"
+
 [dependencies.heap_irq_safe]
 path = "../../libs/heap_irq_safe"
 
