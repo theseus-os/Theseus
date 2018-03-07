@@ -1,16 +1,10 @@
-extern crate keycodes_ascii; // our own crate in "libs/" dir
-
-
-use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET};
+use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
-
-
-
 static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 
 
@@ -26,29 +20,6 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum KeyAction {
-    Pressed,
-    Released,
-}
-
-/// the KeyEvent that should be delivered to applications upon a keyboard action
-#[derive(Debug, Copy, Clone)]
-pub struct KeyEvent {
-    pub keycode: Keycode,
-    pub action: KeyAction,
-    pub modifiers: KeyboardModifiers,
-}
-
-impl KeyEvent {
-    pub fn new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers,) -> KeyEvent {
-        KeyEvent {
-            keycode, 
-            action,
-            modifiers,
-        }
-    }
-}
 
 
 #[derive(Debug)]

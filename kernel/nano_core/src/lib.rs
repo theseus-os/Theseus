@@ -63,6 +63,7 @@ extern crate atomic_linked_list;
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
+#[macro_use] extern crate console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 extern crate serial_port;
 extern crate logger;
 extern crate state_store;
@@ -70,7 +71,7 @@ extern crate state_store;
 extern crate test_lib;
 extern crate rtc;
 
-#[macro_use] mod console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+
 #[macro_use] mod drivers;  
 mod arch;
 #[macro_use] mod task;
@@ -226,7 +227,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
-    let console_queue_producer = console::init().unwrap();
+    // TODO: this should be moved back into the console once we export functions from the nano_core
+    //       such that other crates depend on the nano_core itself, rather than the nano_core depending on other crates
+    let console_queue_producer = {
+        let console_consumer = console::init().expect("Could not init console!");
+        let producer = console_consumer.obtain_producer();
+        spawn_kthread(console::main_loop, console_consumer, "console_loop").expect("Couldn't create console thread!");
+        producer
+    };
 
     // initialize the rest of our drivers
     drivers::init(console_queue_producer).unwrap();
