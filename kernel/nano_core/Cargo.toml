@@ -70,6 +70,9 @@ path = "../serial_port"
 [dependencies.logger]
 path = "../logger"
 
+[dependencies.console]
+path = "../console"
+
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 

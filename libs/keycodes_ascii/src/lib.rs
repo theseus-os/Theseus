@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-#![no_std] // use core instead of std
+#![no_std]
 
 #![feature(const_fn)]
 
@@ -32,6 +32,7 @@ pub struct KeyboardModifiers {
     pub caps_lock: bool,
     pub num_lock: bool,
 }
+
 impl KeyboardModifiers {
     /// Returns a new `KeyboardModifiers` struct with no keys pressed (all false).
     pub const fn default() -> KeyboardModifiers {
@@ -45,10 +46,34 @@ impl KeyboardModifiers {
     }
 }
 
-// unsafe impl Sync for KeyboardModifiers {}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum KeyAction {
+    Pressed,
+    Released,
+}
+
+/// the KeyEvent that should be delivered to applications upon a keyboard action
+#[derive(Debug, Copy, Clone)]
+pub struct KeyEvent {
+    pub keycode: Keycode,
+    pub action: KeyAction,
+    pub modifiers: KeyboardModifiers,
+}
+
+impl KeyEvent {
+    pub fn new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers,) -> KeyEvent {
+        KeyEvent {
+            keycode, 
+            action,
+            modifiers,
+        }
+    }
+}
 
 
-pub static KEY_RELEASED_OFFSET: u8 = 128;
+
+pub const KEY_RELEASED_OFFSET: u8 = 128;
 
 
 

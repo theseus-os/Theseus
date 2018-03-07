@@ -1,22 +1,19 @@
-use drivers::input::keyboard::KeyEvent;
-use vga_buffer;
+#![no_std]
+#![feature(alloc)]
+
+extern crate keycodes_ascii;
+extern crate vga_buffer;
+extern crate alloc;
+extern crate spin;
+extern crate dfqueue;
+#[macro_use] extern crate log;
+
+use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
-use core::sync::atomic::Ordering;
 use spin::Once;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use rtc;
-use task::spawn_kthread;
-
-
-// original print macro
-// #[macro_export]
-// macro_rules! print {
-//     ($($arg:tt)*) => ({
-//             $crate::vga_buffer::print_args(format_args!($($arg)*));
-//     });
-// }
-
-
+// use core::sync::atomic::Ordering;
+// use rtc;
 
 
 
@@ -39,7 +36,7 @@ macro_rules! print {
                 Ok(_) => { }
                 Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
             }
-            match $crate::console::print_to_console(s) {
+            match $crate::print_to_console(s) {
                 Ok(_) => { }
                 Err(e) => error!("print_to_console() in print!() macro failed, error: {}", e),
             }
@@ -104,21 +101,36 @@ impl ConsoleOutputEvent {
 }
 
 
-/// the console owns and creates the event queue, and returns a producer reference to the queue.
-pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
-    assert_has_not_been_called!("console_init was called more than once!");
+// /// the console owns and creates the event queue, and returns a producer reference to the queue.
+// pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
+//     assert_has_not_been_called!("console_init was called more than once!");
 
+//     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
+//     let console_consumer = console_dfq.into_consumer();
+//     let returned_producer = console_consumer.obtain_producer();
+//     PRINT_PRODUCER.call_once(|| {
+//         console_consumer.obtain_producer()
+//     });
+
+//     println!("Console says hello!\n");
+    
+//     try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
+//     Ok(returned_producer)
+// }
+
+
+/// the console owns and creates the event queue, and returns the queue consumer
+pub fn init() -> Result<DFQueueConsumer<ConsoleEvent>, &'static str> {
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
     let console_consumer = console_dfq.into_consumer();
-    let returned_producer = console_consumer.obtain_producer();
+
     PRINT_PRODUCER.call_once(|| {
         console_consumer.obtain_producer()
     });
 
     println!("Console says hello!\n");
-    
-    try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
-    Ok(returned_producer)
+
+    Ok(console_consumer)
 }
 
 
@@ -126,7 +138,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 /// This is the only thread that is allowed to touch the vga buffer!
 /// ## Returns
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
-fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
+pub fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
     use core::ops::Deref;
 
     loop { 
@@ -158,8 +170,6 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
 
 
 fn handle_key_event(keyevent: KeyEvent) {
-    use drivers::input::keyboard::KeyAction;
-    use keycodes_ascii::Keycode;
 
     // Ctrl+D or Ctrl+Alt+Del kills the OS
     if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
@@ -172,14 +182,14 @@ fn handle_key_event(keyevent: KeyEvent) {
         return; 
     }
 
-    if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
-                ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-                rtc::get_rtc_ticks().ok(),
-                unsafe{::interrupts::SPURIOUS_COUNT},
-                ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
-        return; 
-    }
+    // if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
+    //     debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
+    //             ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+    //             rtc::get_rtc_ticks().ok(),
+    //             unsafe{::interrupts::SPURIOUS_COUNT},
+    //             ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
+    //     return; 
+    // }
 
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
