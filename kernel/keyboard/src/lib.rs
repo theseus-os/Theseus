@@ -1,3 +1,12 @@
+#![no_std]
+
+extern crate keycodes_ascii;
+extern crate spin;
+extern crate dfqueue;
+extern crate console;
+#[macro_use] extern crate log;
+
+
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
 use dfqueue::DFQueueProducer;
@@ -11,8 +20,10 @@ static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 
+/// Initialize the keyboard driver. 
+/// Arguments: a reference to a queue onto which keyboard events should be enqueued. 
 pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
-    assert_has_not_been_called!("keyboard init was called more than once!");
+    // assert_has_not_been_called!("keyboard init was called more than once!");
     
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
@@ -45,7 +56,7 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
         x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
         x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { modifiers.shift = true }
 
-        // trigger caps lock on press only
+        // toggle caps lock on press only
         x if x == Keycode::CapsLock as u8 => { modifiers.caps_lock ^= true }
 
         x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
@@ -60,22 +71,22 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
     // second,  put the keycode and it's action (pressed or released) in the keyboard queue
     match scan_code {
         x => { 
-            let (adjusted_scan_code, action) = 
-                if x < KEY_RELEASED_OFFSET { 
-                    (scan_code, KeyAction::Pressed) 
-                } else { 
-                    (scan_code - KEY_RELEASED_OFFSET, KeyAction::Released) 
-                };
+            let (adjusted_scan_code, action) = if x < KEY_RELEASED_OFFSET { 
+                (scan_code, KeyAction::Pressed) 
+            } else { 
+                (scan_code - KEY_RELEASED_OFFSET, KeyAction::Released) 
+            };
 
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
+                    let event = ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = CONSOLE_PRODUCER.try() {
-                        producer.enqueue(ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone())));
+                        producer.enqueue(event);
                         Ok(()) // successfully queued up KeyEvent 
                     }
                     else {
-                        warn!("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized, dropping keyboard event.");
+                        warn!("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
                         Err(KeyboardInputError::EventQueueNotReady)
                     }
                 }

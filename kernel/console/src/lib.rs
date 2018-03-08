@@ -6,7 +6,7 @@ extern crate vga_buffer;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
@@ -17,38 +17,11 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
 
 
-/// calls print!() with an extra "\n" at the end. 
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
-
-/// The main printing macro, which simply pushes an output event to the console's event queue. 
-/// This ensures that only one thread (the console) ever accesses the UI, which right now is just the VGA buffer.
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ({
-            use core::fmt::Write;
-            use alloc::String;
-            let mut s: String = String::new();
-            match write!(&mut s, $($arg)*) {
-                Ok(_) => { }
-                Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
-            }
-            match $crate::print_to_console(s) {
-                Ok(_) => { }
-                Err(e) => error!("print_to_console() in print!() macro failed, error: {}", e),
-            }
-    });
-}
-
-
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 
-pub fn print_to_console<S>(s: S) -> Result<(), &'static str> where S: Into<String> {
-    let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()));
+pub fn print_to_console(s: String) -> Result<(), &'static str> {
+    let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s));
     try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
     Ok(())
 }
@@ -128,7 +101,7 @@ pub fn init() -> Result<DFQueueConsumer<ConsoleEvent>, &'static str> {
         console_consumer.obtain_producer()
     });
 
-    println!("Console says hello!\n");
+    try!(print_to_console(String::from("Console says hello!\n")));
 
     Ok(console_consumer)
 }

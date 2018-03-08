@@ -1,4 +1,3 @@
-pub mod input; 
 pub mod ata_pio;
 pub mod pci;
 pub mod acpi;
@@ -11,7 +10,7 @@ use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
 use drivers::e1000::init_nic;
-
+use keyboard;
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
@@ -46,7 +45,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
     assert_has_not_been_called!("drivers::init was called more than once!");
-    input::keyboard::init(console_producer);
+    keyboard::init(console_producer);
     
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);

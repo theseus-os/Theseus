@@ -25,27 +25,6 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
     match syscall_number{
         1 => {
 
-            // uhhh... wtf is this nonsense? encoding strings within integers? no no no. bad. 
-
-            // let mut src:String = String::from("");
-            // let mut dest:String = String::from("");
-            // let mut msg:String = String::from("");
-            // let mut temp = arg1;
-            // while(temp!=0){
-            //     src.push(((temp % 0x100) as u8) as char);
-            //     temp = temp/0x100;
-            // }
-            // temp = arg2;
-            // while(temp!=0){
-            //     dest.push(((temp % 0x100) as u8) as char);
-            //     temp = temp/0x100;
-            // }
-            // temp = arg3;
-            // while(temp!=0){
-            //     msg.push(((temp % 0x100) as u8) as char);
-            //     temp = temp/0x100;
-            // }
-            
 
             // we use CStr instead of CString to indicate a borrowed &str that we do not own
             // (userspace owns it)
