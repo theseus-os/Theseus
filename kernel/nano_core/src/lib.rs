@@ -53,7 +53,7 @@ extern crate goblin;
 // ------------------------------------
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
-extern crate keycodes_ascii; // for keyboard 
+extern crate keycodes_ascii; // for keyboard scancode translation
 #[macro_use] extern crate util;
 extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
@@ -63,34 +63,79 @@ extern crate atomic_linked_list;
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
-#[macro_use] extern crate console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+extern crate console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
 extern crate serial_port;
 extern crate logger;
 extern crate state_store;
+extern crate keyboard;
 #[macro_use] extern crate vga_buffer; 
+
 extern crate test_lib;
 extern crate rtc;
+
+
+
+// temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
+/// calls print!() with an extra "\n" at the end. 
+#[macro_export]
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}
+
+/// The main printing macro, which simply pushes an output event to the console's event queue. 
+/// This ensures that only one thread (the console) ever accesses the UI, which right now is just the VGA buffer.
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        use alloc::String;
+        let mut s: String = String::new();
+        match write!(&mut s, $($arg)*) {
+            Ok(_) => { }
+            Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
+        }
+        
+        if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
+            let vaddr = section.virt_addr();
+            let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            if let Err(e) = print_func(s) {
+                error!("print_to_console() in print!() macro failed, error: {}", e);
+            }
+        }
+        else {
+            error!("getting console::print_to_console symbol failed in print!() macro!");
+        }
+    });
+}
+
+
+
+
 
 
 #[macro_use] mod drivers;  
 mod arch;
 #[macro_use] mod task;
-#[macro_use] mod dbus;
+mod dbus;
 mod memory;
 mod interrupts;
 mod syscall;
 mod mod_mgmt;
 mod start;
 
-// TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
+// Here, we add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
+pub use task::{spawn_kthread, spawn_userspace};
 
 
-use task::{spawn_kthread, spawn_userspace};
+
 use alloc::String;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+
+
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -187,7 +232,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
-        // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
+        debug!("========================== Symbol map after __k_nano_core: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
     }
 
 
@@ -236,6 +281,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         producer
     };
 
+    
     // initialize the rest of our drivers
     drivers::init(console_queue_producer).unwrap();
 

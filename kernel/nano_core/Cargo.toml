@@ -69,9 +69,6 @@ path = "../serial_port"
 [dependencies.logger]
 path = "../logger"
 
-[dependencies.console]
-path = "../console"
-
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
@@ -83,6 +80,13 @@ path = "../test_lib"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
+
+[dependencies.console]
+path = "../console"
+
+[dependencies.keyboard]
+path = "../keyboard"
+
 
 
 [profile.release]

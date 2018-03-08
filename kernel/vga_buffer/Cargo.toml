@@ -21,9 +21,5 @@ path = "../kernel_config"
 path = "../state_store"
 
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
-
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["lib"] # "lib" does the same thing I think
