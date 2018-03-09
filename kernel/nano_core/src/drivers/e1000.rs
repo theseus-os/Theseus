@@ -764,7 +764,7 @@ impl Nic{
                         self.write_command(REG_RXDESCTAIL, old_cur );
                 }
 
-                /* // Print packets
+                /*  // Print packets
                 while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
                         //got_packet = true;
                         let length = self.rx_descs[self.rx_cur as usize].length;
@@ -784,7 +784,7 @@ impl Nic{
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
 
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                } */
+                }  */
 
                 
         }  
