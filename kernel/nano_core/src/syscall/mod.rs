@@ -87,8 +87,8 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
 }
 
 
-pub fn init(privilege_stack_top_usable: usize) {
-    enable_syscall_sysret(privilege_stack_top_usable);
+pub fn init(syscall_stack_top_usable: usize) {
+    enable_syscall_sysret(syscall_stack_top_usable);
 }
 
 
@@ -116,6 +116,7 @@ struct UserTaskGsData {
 #[allow(private_no_mangle_fns)]
 #[no_mangle]
 #[naked]
+#[inline(never)]
 unsafe extern "C" fn syscall_handler() {
 
 
@@ -146,8 +147,8 @@ unsafe extern "C" fn syscall_handler() {
     // asm!("sti"); // TODO: we could consider letting interrupts occur while in a system call. Probably should do that. 
     
     let curr_id = ::task::get_my_current_task_id();
-    trace!("syscall_handler: curr_tid={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
-           curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
+    trace!("syscall_handler: (AP {}) task id={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
+           ::interrupts::apic::get_my_apic_id().unwrap_or(0xFF), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack
@@ -178,7 +179,7 @@ unsafe extern "C" fn syscall_handler() {
 
 
 /// Configures and enables the usage and behavior of `syscall` and `sysret` instructions. 
-fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
+fn enable_syscall_sysret(syscall_stack_pointer: usize) {
 
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
@@ -186,7 +187,7 @@ fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
     use x86_64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     use alloc::boxed::Box;
     let gs_data: UserTaskGsData = UserTaskGsData {
-        kernel_stack: privilege_stack_top_usable as u64,
+        kernel_stack: syscall_stack_pointer as u64,
         // the other 3 elements below are 0, but will be init'd at the entry of every syscall_handler invocation
         user_stack: 0,
         user_ip: 0,
@@ -195,7 +196,7 @@ fn enable_syscall_sysret(privilege_stack_top_usable: usize) {
     let gs_data_ptr = Box::into_raw(Box::new(gs_data)) as u64; // puts it on the kernel heap, and prevents it from being dropped
     unsafe { wrmsr(IA32_KERNEL_GS_BASE, gs_data_ptr); }
     unsafe { wrmsr(IA32_GS_BASE, gs_data_ptr); }
-    debug!("Set KERNEL_GS_BASE and GS_BASE to include a kernel stack at {:#x}", privilege_stack_top_usable);
+    debug!("Set KERNEL_GS_BASE and GS_BASE to include a kernel stack at {:#x}", syscall_stack_pointer);
     
     // set a kernelspace entry point for the syscall instruction from userspace
     unsafe { wrmsr(IA32_LSTAR, syscall_handler as u64); }

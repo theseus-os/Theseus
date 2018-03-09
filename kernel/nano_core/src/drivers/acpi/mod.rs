@@ -11,7 +11,7 @@ use spin::{Mutex, RwLock};
 // use stop::kstop;
 
 use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
-use kernel_config::memory::address_page_offset;
+use kernel_config::memory::{PAGE_SIZE, address_page_offset};
 use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
@@ -39,10 +39,11 @@ mod rsdp;
 
 
 /// The address that an AP jumps to when it first is booted by the BSP
-const AP_STARTUP: PhysicalAddress = 0x8000; 
+/// For x2apic systems, this must be at 0x10000 or higher! 
+const AP_STARTUP: PhysicalAddress = 0x10000; 
 /// small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
-/// Value: 0x7E00
-const TRAMPOLINE: PhysicalAddress = AP_STARTUP - 512;
+/// Value: 0xF000
+const TRAMPOLINE: PhysicalAddress = AP_STARTUP - PAGE_SIZE;
 
 
 pub struct Acpi {
@@ -237,8 +238,15 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
             }
         }
 
+        // FADT is mandatory
         try!(Fadt::init(active_table));
-        try!(Hpet::init(active_table));
+        
+        // HPET is optional
+        if let Err(_) = Hpet::init(active_table) {
+            warn!("This machine has no HPET, skipping HPET init.");
+        }
+
+        // MADT is mandatory
         let madt_iter = Madt::init(active_table);
         // Dmar::init(active_table);
         // init_namespace();

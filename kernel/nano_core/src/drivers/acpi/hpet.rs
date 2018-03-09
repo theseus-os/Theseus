@@ -37,7 +37,7 @@ impl Hpet {
                 load_table(get_sdt_signature(hpet_sdt[0]));
                 Hpet::new(hpet_sdt[0], active_table)
             } else {
-                error!("Unable to find HPET SDT");
+                // warn!("Unable to find HPET SDT");
                 Err("unable to find HPET SDT")
             }
         );

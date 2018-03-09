@@ -13,7 +13,7 @@ RUSTFLAGS += -C code-model=large
 RUSTFLAGS += -D unused-must-use
 
 BUILD_MODE := debug
-# BUILD_MODE := release  ## release mode currently does NOT work! See issue #14
+#BUILD_MODE := release
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which is "debug" by default

@@ -1,12 +1,14 @@
 use core::mem;
 use core::intrinsics::{atomic_load, atomic_store};
 use core::ops::DerefMut;
-use memory::{Stack, FRAME_ALLOCATOR, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, Page, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
 use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id};
-use kernel_config::memory::PAGE_SHIFT;
+use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use spin::RwLock;
 use alloc::boxed::Box;
+use alloc::arc::Arc;
+use irq_safety::MutexIrqSafe;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
@@ -44,6 +46,12 @@ impl Madt {
             load_table(get_sdt_signature(madt_sdt[0]));
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
+
+            // debug!("================ MADT Table: ===============");
+            // for e in iter.clone() {
+            //     debug!("  {:?}", e);
+            // }
+
             try!(handle_ioapic_entry(iter.clone(), active_table));
             try!(handle_bsp_entry(iter.clone()));
             Ok(iter)
@@ -110,11 +118,12 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
     for madt_entry in madt_iter.clone() {
         match madt_entry {
-             MadtEntry::LocalApic(lapic_madt) => { 
-                if lapic_madt.apic_id == me {
+             MadtEntry::LocalApic(lapic_entry) => { 
+                if lapic_entry.apic_id == me {
                     debug!("        This is my (the BSP's) local APIC");
-                    // For the BSP's own processor core, no real work is needed. 
-                    let mut bsp_lapic = LocalApic::new(lapic_madt.processor, lapic_madt.apic_id, lapic_madt.flags, true, madt_iter.clone());
+                    let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+
+                    let mut bsp_lapic = try!(LocalApic::new(lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
                     let bsp_id = bsp_lapic.id();
 
                     use interrupts::PIC_MASTER_OFFSET;
@@ -140,7 +149,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
                     
                     // add the BSP lapic to the list (should be empty until here)
                     assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    all_lapics.insert(lapic_madt.processor, RwLock::new(bsp_lapic));
+                    all_lapics.insert(lapic_entry.apic_id, RwLock::new(bsp_lapic));
 
                     // there's only ever one BSP, so we can exit the loop here
                     break;
@@ -171,40 +180,53 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
 
 /// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
-pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
+pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>) -> Result<usize, &'static str> {
     // SAFE: just getting const values from boot assembly code
     debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
     let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
 
     let active_table_phys_addr: PhysicalAddress;
-    let _trampoline_mapped_page: MappedPages; // must be held until APs are booted up
-    let ap_startup_mapped_pages: MappedPages; // must be held until APs are booted up
+    let trampoline_mapped_pages: MappedPages; // must be held throughout APs being booted up
+    let _trampoline_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
+    let ap_startup_mapped_pages: MappedPages; // must be held throughout APs being booted up
+    let _ap_startup_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
 
     {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
         let &mut MemoryManagementInfo { 
             page_table: ref mut kernel_page_table, 
             ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-        } = kernel_mmi;
+        } = &mut *kernel_mmi;
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 // first, double check that the ap_start_realmode address is mapped and valid
                 try!(active_table.translate(::get_ap_start_realmode()).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address"));
 
-                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock();
-
-                // Map trampoline frame and the ap_startup code to the AP_STARTUP frame
+                // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
+                // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
                 let trampoline_page = Page::containing_address(TRAMPOLINE);
+                let trampoline_page_higher = Page::containing_address(TRAMPOLINE + KERNEL_OFFSET);
                 let trampoline_frame = Frame::containing_address(TRAMPOLINE);
+                let ap_startup_page = Page::containing_address(AP_STARTUP);
+                let ap_startup_page_higher = Page::containing_address(AP_STARTUP + KERNEL_OFFSET);
+                let ap_startup_frames = Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes);
+
+                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock();
                 
-                _trampoline_mapped_page = try!( active_table.map_to(
-                    trampoline_page, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
+                trampoline_mapped_pages = try!( active_table.map_to(
+                    trampoline_page, trampoline_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
                 );
                 ap_startup_mapped_pages = try!( active_table.map_frames(
-                    Frame::range_inclusive_addr(AP_STARTUP, ap_startup_size_in_bytes),
-                    Page::containing_address(AP_STARTUP),
-                    EntryFlags::PRESENT | EntryFlags::WRITABLE, 
-                    allocator.deref_mut())
+                    ap_startup_frames.clone(), ap_startup_page, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
+                );
+
+                // do same mappings for higher half (not sure if needed)
+                _trampoline_mapped_pages_higher = try!( active_table.map_to(
+                    trampoline_page_higher, trampoline_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
+                );
+                _ap_startup_mapped_pages_higher = try!( active_table.map_frames(
+                    ap_startup_frames, ap_startup_page_higher, EntryFlags::PRESENT | EntryFlags::WRITABLE, allocator.deref_mut())
                 );
 
                 active_table_phys_addr = active_table.physical_address();
@@ -219,13 +241,9 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     let all_lapics = ::interrupts::apic::get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
-    if ::interrupts::apic::has_x2apic() {
-        debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic yes.", me);
-    } else {
-        debug!("Handling APIC (lapic Madt) tables, me: {}, no x2apic", me);
-    }
+    debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic {}.", me, ::interrupts::apic::has_x2apic());
     
-    // we mapped and/or checked the src/dest pointers/addresses earlier
+    // we checked the src_ptr and mapped the dest_ptr earlier
     let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
     let dest_ptr = ap_startup_mapped_pages.start_address() as *mut u8; // we mapped this above
     debug!("copying ap_startup code to AP_STARTUP, {} bytes", ap_startup_size_in_bytes);
@@ -243,19 +261,46 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
     for madt_entry in madt_iter.clone() {
         debug!("      {:?}", madt_entry);
         match madt_entry {
-            MadtEntry::LocalApic(lapic_madt) => { 
+            MadtEntry::LocalApic(lapic_entry) => { 
 
-                if lapic_madt.apic_id == me {
+                if lapic_entry.apic_id == me {
                     debug!("        skipping BSP's local apic");
                 }
                 else {
                     debug!("        This is a different AP's APIC");
+                    // debug!("        BSP's id: {:?} .....   ALL_LAPICS:", get_bsp_id());
+                    // for l in all_lapics.iter() {
+                    //     debug!("{:?}", l);
+                    // }
+
+                    if lapic_entry.flags & 0x1 != 0x1 {
+                        warn!("Processor {} apic_id {} is disabled by the hardware, cannot initialize or be used.", 
+                               lapic_entry.processor, lapic_entry.apic_id);
+                        continue;
+                    }
+
+
                     // start up this AP, and have it create a new LocalApic for itself. 
                     // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                    let bsp_lapic_ref = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get(&bsp_id)).ok_or("Couldn't get BSP's LocalApic!"));
+                    let bsp_lapic_ref = try!(get_bsp_id().and_then( |bsp_id|  all_lapics.get(&bsp_id))
+                                                         .ok_or("Couldn't get BSP's LocalApic!")
+                    );
                     let mut bsp_lapic = bsp_lapic_ref.write();
-                    let ap_stack = try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"));
-                    bring_up_ap(bsp_lapic.deref_mut(), lapic_madt, active_table_phys_addr, ap_stack, madt_iter.clone());
+                    let ap_stack = {
+                        let mut kernel_mmi = kernel_mmi_ref.lock();
+                        try!(kernel_mmi.alloc_stack(4).ok_or("could not allocate AP stack!"))
+                    };
+
+                    let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+
+                    bring_up_ap(bsp_lapic.deref_mut(), 
+                                lapic_entry,
+                                trampoline_mapped_pages.start_address(), 
+                                active_table_phys_addr, 
+                                ap_stack, 
+                                nmi_lint,
+                                nmi_flags 
+                    );
                     ap_count += 1;
                 }
             }
@@ -264,7 +309,36 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
         }
     }
 
+    // wait for all cores to finish booting and init
+    info!("handle_ap_cores(): BSP is waiting for APs to boot...");
+    let mut count = ::interrupts::apic::get_lapics().iter().count();
+    while count < ap_count + 1 {
+        trace!("BSP-known count: {}", count);
+        ::arch::pause();
+        count = ::interrupts::apic::get_lapics().iter().count();
+    }
+    
     Ok(ap_count)  
+}
+
+
+fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
+    for madt_entry in madt_iter {
+        match madt_entry {
+            MadtEntry::NonMaskableInterrupt(nmi) => {
+                // NMI entries are based on the "processor" id, not the "apic_id"
+                // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
+                if nmi.processor == processor || nmi.processor == 0xFF  {
+                    return (nmi.lint, nmi.flags);
+                }
+            }
+            _ => {  }
+        }
+    }
+
+    let (lint, flags) = (1, 0);
+    warn!("Couldn't find NMI entry for processor {} (<-- not apic_id). Using default lint {}, flags {}", processor, lint, flags);
+    (lint, flags)
 }
 
 
@@ -272,31 +346,34 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi: &mut MemoryManagementInf
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
 fn bring_up_ap(bsp_lapic: &mut LocalApic,
                new_lapic: &MadtLocalApic, 
+               trampoline_vaddr: VirtualAddress,
                active_table_paddr: PhysicalAddress, 
                ap_stack: Stack,
-               madt_iter: MadtIter) 
+               nmi_lint: u8, 
+               nmi_flags: u16) 
 {
     
-    let ap_ready = TRAMPOLINE as *mut u64;
-    let ap_processor_id = unsafe { ap_ready.offset(1) };
-    let ap_apic_id = unsafe { ap_ready.offset(2) };
-    let ap_flags = unsafe { ap_ready.offset(3) };
-    let ap_page_table = unsafe { ap_ready.offset(4) };
-    let ap_stack_start = unsafe { ap_ready.offset(5) };
-    let ap_stack_end = unsafe { ap_ready.offset(6) };
-    let ap_code = unsafe { ap_ready.offset(7) };
-    let ap_madt_table = unsafe { ap_ready.offset(8) };
+    // NOTE: These definitions MUST match those in ap_boot.asm
+    let ap_ready         = trampoline_vaddr as *mut u64;
+    let ap_processor_id  = unsafe { ap_ready.offset(1) };
+    let ap_apic_id       = unsafe { ap_ready.offset(2) };
+    let ap_page_table    = unsafe { ap_ready.offset(3) };
+    let ap_stack_start   = unsafe { ap_ready.offset(4) };
+    let ap_stack_end     = unsafe { ap_ready.offset(5) };
+    let ap_code          = unsafe { ap_ready.offset(6) };
+    let ap_nmi_lint      = unsafe { ap_ready.offset(7) };
+    let ap_nmi_flags     = unsafe { ap_ready.offset(8) };
 
     // Set the ap_ready to 0, volatile
-    unsafe { atomic_store(ap_ready, 0) };
-    unsafe { atomic_store(ap_processor_id, new_lapic.processor as u64) };
-    unsafe { atomic_store(ap_apic_id, new_lapic.apic_id as u64) };
-    unsafe { atomic_store(ap_flags, new_lapic.flags as u64) };
-    unsafe { atomic_store(ap_page_table, active_table_paddr as u64) };
-    unsafe { atomic_store(ap_stack_start, ap_stack.bottom() as u64) };
-    unsafe { atomic_store(ap_stack_end, ap_stack.top_unusable() as u64) };
-    unsafe { atomic_store(ap_code, kstart_ap as u64) };
-    unsafe { atomic_store(ap_madt_table, &madt_iter as *const _ as u64) };
+    unsafe { atomic_store(ap_ready,         0) };
+    unsafe { atomic_store(ap_processor_id,  new_lapic.processor as u64) };
+    unsafe { atomic_store(ap_apic_id,       new_lapic.apic_id as u64) };
+    unsafe { atomic_store(ap_page_table,    active_table_paddr as u64) };
+    unsafe { atomic_store(ap_stack_start,   ap_stack.bottom() as u64) };
+    unsafe { atomic_store(ap_stack_end,     ap_stack.top_unusable() as u64) };
+    unsafe { atomic_store(ap_code,          kstart_ap as u64) };
+    unsafe { atomic_store(ap_nmi_lint,      nmi_lint as u64) };
+    unsafe { atomic_store(ap_nmi_flags,     nmi_flags as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
@@ -305,28 +382,51 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 
     
+    bsp_lapic.clear_error();
+    let esr = bsp_lapic.error();
+    debug!(" initial esr = {:#X}", esr);
+
     // Send INIT IPI
     {
-        let mut icr = 0x4500; // 0x500 means INIT Delivery Mode, 0x4000 means Assert Level (not de-assert)
+        // 0x500 means INIT Delivery Mode, 0x4000 means Assert (not de-assert), 0x8000 means level triggers
+        let mut icr = /*0x8000 |*/ 0x4000 | 0x500; 
         if has_x2apic() {
             icr |= (new_apic_id as u64) << 32;
         } else {
             icr |= ( new_apic_id as u64) << 56; // destination apic id 
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        // debug!(" IPI...");
+        debug!(" INIT IPI... icr: {:#X}", icr);
         bsp_lapic.set_icr(icr);
     }
 
-    // debug!("waiting 10 ms...");
-    wait10ms();
-    // debug!("done waiting.");
+    debug!("waiting 10 ms...");
+    ::interrupts::pit_clock::pit_wait(10000).expect("bring_up_ap(): failed to pit_wait 10 ms");
+    debug!("done waiting.");
+
+    // // Send DEASSERT INIT IPI
+    // {
+    //     // 0x500 means INIT Delivery Mode, 0x8000 means level triggers
+    //     let mut icr = 0x8000 | 0x500; 
+    //     if has_x2apic() {
+    //         icr |= (new_apic_id as u64) << 32;
+    //     } else {
+    //         icr |= ( new_apic_id as u64) << 56; // destination apic id 
+    //     }
+    //     // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
+    //     debug!(" DEASSERT IPI... icr: {:#X}", icr);
+    //     bsp_lapic.set_icr(icr);
+    // }
+
+    bsp_lapic.clear_error();
+    let esr = bsp_lapic.error();
+    debug!(" pre-SIPI esr = {:#X}", esr);
 
     // Send START IPI
     {
-        //Start at 0x0800:0000 => 0x8000. We copied the ap_start_realmode code into AP_STARTUP earlier, in handle_apic_entry()
+        //Start at 0x1000:0000 => 0x10000. We copied the ap_start_realmode code into AP_STARTUP earlier, in handle_apic_entry()
         let ap_segment = (AP_STARTUP >> PAGE_SHIFT) & 0xFF; // the frame number where we want the AP to start executing from boot
-        let mut icr = 0x4600 | ap_segment as u64;
+        let mut icr = /*0x8000 |*/ 0x4000 | 0x600 | ap_segment as u64; //0x600 means Startup IPI
 
         if has_x2apic() {
             icr |= (new_apic_id as u64) << 32;
@@ -334,19 +434,24 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
             icr |= (new_apic_id as u64) << 56;
         }
         // icr |= 1 << 11; // (1 << 11) is logical address mode, 0 is physical. Doesn't work with physical addressing mode!
-        // debug!(" SIPI...");
+        debug!(" SIPI... icr: {:#X}", icr);
         bsp_lapic.set_icr(icr);
     }
 
+    ::interrupts::pit_clock::pit_wait(300).expect("bring_up_ap(): failed to pit_wait 300 us");
+    ::interrupts::pit_clock::pit_wait(200).expect("bring_up_ap(): failed to pit_wait 200 us");
 
+    bsp_lapic.clear_error();
+    let esr = bsp_lapic.error();
+    debug!(" post-SIPI esr = {:#X}", esr);
     // TODO: we may need to send a second START IPI on real hardware???
 
     // Wait for trampoline ready
-    // debug!(" Wait...");
+    debug!(" Wait...");
     while unsafe { atomic_load(ap_ready) } == 0 {
         ::arch::pause();
     }
-    // debug!(" Trampoline...");
+    debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
         ::arch::pause();
     }
@@ -431,7 +536,7 @@ pub enum MadtEntry {
     Unknown(u8)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct MadtIter {
     sdt: &'static Sdt,
     i: usize

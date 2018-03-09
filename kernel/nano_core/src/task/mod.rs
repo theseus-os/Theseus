@@ -1,6 +1,5 @@
 
-use spin::RwLock;
-use irq_safety::MutexIrqSafe;
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use alloc::Vec;
 use alloc::string::String;
 use alloc::arc::Arc;
@@ -43,7 +42,7 @@ lazy_static! {
 
 pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-            -> Result<Arc<RwLock<Task>>, &'static str> {
+            -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
     CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));               
     scheduler::init_runqueue(apic_id);
     init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
@@ -52,7 +51,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 
 pub fn init_ap(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
                apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-               -> Result<Arc<RwLock<Task>>, &'static str> {
+               -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
     init(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
 }
 
@@ -181,7 +180,7 @@ impl Task {
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("context_switch [0]: (AP {}) prev {}({}), next {}({}).", apic_id, self.name, self.id, next.name, next.id);
+        // debug!("context_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
         
         let my_context_switch_lock: &AtomicBool;
         if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(&apic_id) {
@@ -198,12 +197,24 @@ impl Task {
         }
 
         // debug!("context_switch [1], testing runstates.");
-        assert!(next.runstate == RunState::RUNNABLE, 
-                "scheduler bug: chosen 'next' Task was not RUNNABLE!");
-        assert!(next.running_on_cpu == -1, 
-                "scheduler bug: chosen 'next' Task was already running on AP {}", apic_id);
-        assert!(next.pinned_core == None || next.pinned_core == Some(apic_id), 
-                "scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}", next.pinned_core, apic_id);
+        if next.runstate != RunState::RUNNABLE {
+            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was not RUNNABLE! Current: {:?}, Next: {:?}", self, next);
+            my_context_switch_lock.store(false, Ordering::SeqCst);
+            return;
+        }
+        if next.running_on_cpu != -1 {
+            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+            my_context_switch_lock.store(false, Ordering::SeqCst);
+            return;
+        }
+        if let Some(pc) = next.pinned_core {
+            if pc != apic_id {
+                error!("Skipping context_Switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+                my_context_switch_lock.store(false, Ordering::SeqCst);
+                return;
+            }
+        }
+         
 
 
 
@@ -298,7 +309,7 @@ impl fmt::Display for Task {
 
 /// The list of all Tasks in the system.
 lazy_static! {
-    static ref TASKLIST: AtomicMap<usize, Arc<RwLock<Task>>> = AtomicMap::new();
+    static ref TASKLIST: AtomicMap<usize, Arc<RwLockIrqSafe<Task>>> = AtomicMap::new();
 }
 
 /// The counter of task IDs
@@ -308,19 +319,19 @@ static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 
 /// returns a shared reference to the current `Task`
-pub fn get_my_current_task() -> Option<&'static Arc<RwLock<Task>>> {
+pub fn get_my_current_task() -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
     get_my_current_task_id().and_then(|id| {
         TASKLIST.get(&id)
     })
 }
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
-pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLock<Task>>> {
+pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
     TASKLIST.get(&task_id)
 }
 
 /// Get a iterator for the list of contexts.
-// pub fn iter() -> AtomicMapIter<usize, Arc<RwLock<Task>>> {
+// pub fn iter() -> AtomicMapIter<usize, Arc<RwLockIrqSafe<Task>>> {
 //     TASKLIST.iter()
 // }
 
@@ -328,10 +339,10 @@ pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLock<Task>>> {
 
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
-/// Returns a reference to the `Task`, protected by a `RwLock`
+/// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
 pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-                      -> Result<Arc<RwLock<Task>>, &'static str> {
+                      -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     let mut idle_task = Task::new();
     idle_task.name = format!("idle_task_ap{}", apic_id);
@@ -353,7 +364,7 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     CURRENT_TASKS.insert(apic_id, idle_task_id); 
 
 
-    let task_ref = Arc::new(RwLock::new(idle_task));
+    let task_ref = Arc::new(RwLockIrqSafe::new(idle_task));
     let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
@@ -371,7 +382,7 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
 /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
 pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: &str)
-        -> Result<Arc<RwLock<Task>>, &'static str> {
+        -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     let mut new_task = Task::new();
     new_task.set_name(String::from(thread_name));
@@ -413,7 +424,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
     new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
 
     let new_task_id = new_task.id;
-    let task_ref = Arc::new(RwLock::new(new_task));
+    let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
     let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
@@ -428,13 +439,13 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 
 /// Spawns a new userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
 /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
-pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<RwLock<Task>>, &'static str> {
+pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     use memory::*;
     debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(name.unwrap_or(module.name())));
+    new_task.set_name(String::from(name.unwrap_or(module.name().clone())));
 
     let mut ustack: Option<Stack> = None;
 
@@ -586,7 +597,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
     new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
     let new_task_id = new_task.id;
 
-    let task_ref = Arc::new(RwLock::new(new_task));
+    let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
     let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
@@ -607,7 +618,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<&str>) -> Result<Arc<Rw
 ///
 /// ## Returns
 /// An Option with a reference counter for the removed Task.
-pub fn remove_task(_id: usize) -> Option<Arc<RwLock<Task>>> {
+pub fn remove_task(_id: usize) -> Option<Arc<RwLockIrqSafe<Task>>> {
     unimplemented!();
 // assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
     // TASKLIST.remove(id)
@@ -651,6 +662,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     // actually invoke the function spawned in this kernel thread
     let exit_status = func(*arg);
 
+    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 
     // cleanup current thread: put it into non-runnable mode, save exit status
     {
@@ -658,8 +670,6 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
                              .write().set_runstate(RunState::EXITED);
     }
 
-    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
-    trace!("attempting to unschedule kthread... interrupts {}", ::interrupts::interrupts_enabled());
     schedule!();
 
     // we should never ever reach this point

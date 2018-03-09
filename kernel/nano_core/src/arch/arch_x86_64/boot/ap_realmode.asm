@@ -10,21 +10,15 @@ ap_start_realmode:
     xor ax, ax
     mov ds, ax
     mov es, ax
+    mov fs, ax
+    mov gs, ax
     mov ss, ax
 
-    mov sp, 0x7C00  ; top of stack provided by bootloader
+    mov sp, 0xFC00  ; top of stack, provided by bootloader (GRUB)
 
     ; we use real mode segment addressing here
     ; in which PhysicalAddr = Segment * 16 + Offset
     ; Address is <SegmentHex:OffsetHex>, so B000:8000 => 0xB8000
-    ; mov ax, 0xB000
-    ; mov ds, ax     ; you can't move an immediate value directly into a segment register like "ds"
-    ; mov si, 0x8000
-    ; mov eax, 0x4f4E4f4f
-    ; stdsd ; store double word from eax into segment address ds:si 
-    
-    ;mov [0xB000:0x8000], 0x4f4E ; "AP"
-    ;mov [0xb8002], 0x4f4F ; "P"
 
     ; need to use BIOS interrupts to write to vga buffer, not mem-mapped 0xb8000
     mov ah, 0x0E
@@ -74,8 +68,8 @@ ap_start_realmode:
     add   di, 8
 
 gdt_ptr:
-    mov  word  [es:di],  24    ; Size of GDT in bytes minus 1
-    mov  dword [es:di+2],  0x800  ; Linear address of GDT
+    mov  word  [es:di],    23       ; Size of GDT in bytes minus 1
+    mov  dword [es:di+2],  0x800    ; Linear address of GDT
  
 load_gdt:
     lgdt [es:di]        ; es:di is the addr of gdt pointer
@@ -84,6 +78,12 @@ load_gdt:
 ;     ; in al, 0x92
 ;     ; or al, 2
 ;     ; out 0x92, al
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+
 
     ; finally enable protected mode
     mov eax, cr0
@@ -95,11 +95,9 @@ load_gdt:
     nop
     nop
 clear_prefetch: 
-
-
-
     ; jump to protected mode. "dword" here tells nasm to generate a 32-bit instruction,
     ; even though we're still in 16-bit mode. GCC's "as" assembler can't do that! haha
+    ; 0x8 is for the newly-created kernel code segment from the above GDT
     jmp dword 0x8:prot_mode 
 
 
@@ -119,6 +117,7 @@ prot_mode:
     mov ss, ax
 
     ; each character is reversed in the dword cuz of little endianness
+    ; prints "AP_PROTECTED"
     mov dword [0xb8000], 0x4f504f41 ; "AP"
     mov dword [0xb8004], 0x4f504f5F ; "_P"
     mov dword [0xb8008], 0x4f4f4f52 ; "RO"
@@ -126,7 +125,7 @@ prot_mode:
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
  
-    jmp ap_start_protected_mode
+    jmp 0x08:ap_start_protected_mode
     
 
 halt:

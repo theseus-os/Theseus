@@ -16,9 +16,8 @@ x86 = "0.8.1"
 atomic = { version = "0.3.4", features = ["nightly"]}
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-xmas-elf = "0.6.1"
+xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 rustc-demangle = "0.1.5" 
-zero = "0.1.2"
 
 
 # this is needed for our odd approach of including the nano_core as a library for other kernel crates
@@ -81,9 +80,12 @@ path = "../test_lib"
 path = "../../libs/atomic_linked_list"
 
 
+[profile.release]
+debug = true
 
 [features]
-no_serial = []
+mirror_serial = []
+apic_timer_fixed = []
 
 
 [lib]

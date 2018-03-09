@@ -57,9 +57,6 @@ QEMU_FLAGS += -cpu Broadwell
 QEMU_FLAGS += -smp 4
 
 ## basic networking with a standard e1000 ethernet card
-#QEMU_FLAGS += -netdev user,id=u1 -device e1000,netdev=u1,mac=11:22:33:44:55:66 
-#QEMU_FLAGS += -object filter-dump,id=f1,netdev=u1,file=netdump.pcap
-
 #QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
@@ -94,13 +91,13 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### builds and runs theseus
+### builds and runs Theseus in QEMU
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### builds and runs theseus, but pauses execution until a GDB instance is connected.
+### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 debug: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 #-monitor stdio
@@ -111,6 +108,15 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
 ### TODO: add more symbol files besides nano_core once they're split from nano_core
+
+
+
+### builds and runs Theseus in Bochs
+bochs : export RUST_FEATURES = --features "apic_timer_fixed"
+bochs: $(iso) 
+	#@qemu-img resize random_data2.img 100K
+	bochs -f bochsrc.txt -q
+
 
 
 check_usb:
@@ -132,7 +138,7 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export RUST_FEATURES = --features "no_serial"
+boot : export RUST_FEATURES = --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -194,6 +200,8 @@ help:
 	@echo -e "  gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+	@echo -e "  bochs:"
+	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
 	@echo -e "  boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"

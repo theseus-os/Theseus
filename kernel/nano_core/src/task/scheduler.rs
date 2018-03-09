@@ -2,7 +2,6 @@ use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::RwLockIrqSafe;
-use spin::RwLock;
 use atomic_linked_list::atomic_map::AtomicMap;
 
 use super::{Task, get_my_current_task};
@@ -33,6 +32,7 @@ pub unsafe fn schedule() -> bool {
         next_task = selected_next_task.write().deref_mut();  // as *mut Task;
     }
     else {
+        // keep running the same current task
         return false;
     }
 
@@ -85,7 +85,7 @@ macro_rules! schedule {
 
 
 
-type TaskRef = Arc<RwLock<Task>>;
+type TaskRef = Arc<RwLockIrqSafe<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
 /// There is one runqueue per core, each core can only access its own private runqueue
@@ -201,6 +201,7 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
             
         // found a runnable task!
         index_chosen = Some(i);
+        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
         break; 
     }
 

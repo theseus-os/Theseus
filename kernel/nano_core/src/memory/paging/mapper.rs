@@ -246,7 +246,7 @@ impl Mapper {
                 error!("unmap(): page {:?} was not mapped!", page);
                 return Err("unmap(): page was not mapped");
             }
-
+            
             let p1 = try!(self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -331,7 +331,7 @@ impl Drop for MappedPages {
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
-
+        
         assert!(get_current_p4() == self.page_table_p4, 
                 "MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
                  cannot unmap MappedPages from a different page table than they were originally mapped to!",
@@ -346,6 +346,7 @@ impl Drop for MappedPages {
         };
         
         let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
+
         if let Err(e) = active_table.unmap(self.pages.clone(), frame_allocator.deref_mut()) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
