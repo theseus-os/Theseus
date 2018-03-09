@@ -2,16 +2,22 @@
 ### It offers the "all" and "clean" targets only
 SHELL := /bin/bash
 
+KERNEL_CRATE_MAKEFILE ?= $(shell pwd)/MakefileKernelCrate.mk
 
 KERNEL_BUILD_DIR ?= $(shell pwd)/build
 export  # export this to Makefiles in subdirectories
 
-# get all the subdirectories for making
-SUBDIRS := $(wildcard */.)
-# except for the build directory
-SUBDIRS := $(filter-out build/., $(SUBDIRS))
-# build the nano_core separately
-SUBDIRS := $(filter-out nano_core/., $(SUBDIRS))
+## get all the subdirectories for making
+#SUBDIRS := $(wildcard */.)
+## except for the build directory
+#SUBDIRS := $(filter-out build/., $(SUBDIRS))
+## build the nano_core separately
+#SUBDIRS := $(filter-out nano_core/., $(SUBDIRS))
+
+
+## We now manually define the list of subdirectories that we wish to build
+SUBDIRS := console \
+		   keyboard
 
 
 .PHONY: all clean $(SUBDIRS) nano_core
@@ -21,10 +27,12 @@ SUBDIRS := $(filter-out nano_core/., $(SUBDIRS))
 ## Note that while this does build the nano_core, the nano_core's build file does not
 ## copy any built object files into the kernel build dir, whereas the other modules do.
 $(SUBDIRS): 
-## If a directory has a Makefile, then we call it to build it as an individual module. 
-	@if [ -f $@/Makefile ]; then \
-		$(MAKE) -C $@ $(MAKECMDGOALS);  \
-	fi;
+	$(MAKE) --file ${KERNEL_CRATE_MAKEFILE} -C $@ $(MAKECMDGOALS)
+
+### If a directory has a Makefile, then we call it to build it as an individual module. 
+#	@if [ -f $@/Makefile ]; then \
+#		$(MAKE) -C $@ $(MAKECMDGOALS);  \
+#	fi;
 
 
 ## Build the nano_core separately, which is faster if done either at the beginning or end
