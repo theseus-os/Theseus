@@ -50,9 +50,10 @@ cargo:
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
-	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)	
 	@mkdir -p $(KERNEL_BUILD_DIR)
-	@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/nano_core.bin
+	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj) 
+	#@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/nano_core.bin
+	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  DEFAULT/d;/GLOBAL HIDDEN/d' > $(KERNEL_BUILD_DIR)/nano_core.sym 
 
 
 # compile assembly files

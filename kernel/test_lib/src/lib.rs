@@ -1,8 +1,10 @@
 #![no_std]
 
 extern crate test_server;
+extern crate nano_core;
 
 use test_server::*;
+use nano_core::nano_core_public_func;
 
 // #![feature(lang_items)]
 
@@ -36,6 +38,7 @@ pub fn test_lib_public(arg: u8) -> (u8, &'static str, u64) {// , bool) {
 	// warn!("yo in pub func!");
 	// test_lib_private(arg)
 	// arg * 10
+	nano_core_public_func(22);
 	let test_str: &str = HELLO_STRING;
 	let (test_u8, test_u64) = server_func2(arg, unsafe {INT_VALUE as u64});
 	unsafe { 

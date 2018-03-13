@@ -76,9 +76,6 @@ path = "../vga_buffer"
 [dependencies.rtc]
 path = "../rtc"
 
-[dependencies.test_lib]
-path = "../test_lib"
-
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 

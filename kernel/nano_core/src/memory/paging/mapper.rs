@@ -311,6 +311,12 @@ impl MappedPages {
 		self.pages.start_address()
 	}
 
+    pub fn size_in_pages(&self) -> usize {
+        // add 1 because it's an inclusive range
+        self.pages.end.number - self.pages.start.number + 1 
+    }
+
+
     /// Constructs a MappedPages object from an already existing mapping.
     /// Useful for creating idle task Stacks, for example. 
     pub fn from_existing(already_mapped_pages: PageIter) -> MappedPages {

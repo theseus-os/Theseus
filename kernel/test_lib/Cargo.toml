@@ -11,6 +11,9 @@ version = "0.1.0"
 [dependencies]
 test_server = { path = "../test_server" }
 
+[dependencies.nano_core]
+path = "../nano_core"
+
 #[dependencies.kernel_config]
 #path = "../kernel_config"
 

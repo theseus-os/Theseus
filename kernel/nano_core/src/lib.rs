@@ -16,6 +16,7 @@
 #![feature(iterator_step_by)]
 #![feature(core_intrinsics)]
 #![feature(conservative_impl_trait)]
+#![feature(used)]
 #![no_std]
 
 
@@ -68,10 +69,8 @@ extern crate console;  // I think this mod declaration MUST COME FIRST because i
 extern crate serial_port;
 extern crate logger;
 extern crate state_store;
-extern crate keyboard;
 #[macro_use] extern crate vga_buffer; 
 
-extern crate test_lib;
 extern crate rtc;
 
 
@@ -129,7 +128,7 @@ mod start;
 // and make visible/accessible to other modules that depend on nano_core functions.
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 pub use task::{spawn_kthread, spawn_userspace};
-
+pub use keycodes_ascii::*;
 
 
 use alloc::String;
@@ -197,6 +196,13 @@ fn test_driver(_: Option<u64>) {
 
 }
 
+// see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
+#[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
+#[used]
+pub fn nano_core_public_func(val: u8) {
+    error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
+}
+
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
@@ -208,6 +214,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
+    // nano_core_public_func(0); // just seeing if this keeps it in the binary
 
     // initialize basic exception handlers
     interrupts::init_early_exceptions();
@@ -229,12 +236,60 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
     trace!("state_store initialized.");
 
-    // parse the nano_core ELF object to load its symbols into our metadata
-    if true {
+    // parse our two main crates, the nano_core (the code we're already running), and the libcore (Rust no_std lib),
+    // both which satisfy dependencies that many other crates have. 
+    {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         debug!("========================== Symbol map after __k_nano_core: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
+
+        // let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
+        // debug!("========================== Symbol map after nano_core and libcore: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
     }
+
+
+
+    // attempt to parse a test kernel module
+    if true {
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
+        let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
+        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
+        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
+
+        // now let's try to invoke the test_server function we just loaded
+        let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func1").upgrade().unwrap();
+        debug!("server_func_vaddr: {:#x}", func_sec.virt_addr());
+        let server_func: fn(u8, u64) -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
+        debug!("Called server_func(10, 20) = {:?}", server_func(10, 20));
+
+        // now let's try to invoke the test_client function we just loaded
+        let client_func_sec = ::mod_mgmt::metadata::get_symbol("test_client::client_func").upgrade().unwrap();
+        debug!("client_func_vaddr: {:#x}", client_func_sec.virt_addr());
+        let client_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(client_func_sec.virt_addr()) };
+        debug!("Called client_func() = {:?}", client_func());
+
+        // now let's try to invoke the test_lib function we just loaded
+        let test_lib_public_sec = ::mod_mgmt::metadata::get_symbol("test_lib::test_lib_public").upgrade().unwrap();
+        debug!("test_lib_public_vaddr: {:#x}", client_func_sec.virt_addr());
+        let test_lib_public_func: fn(u8) -> (u8, &'static str, u64) = unsafe { ::core::mem::transmute(test_lib_public_sec.virt_addr()) };
+        debug!("Called test_lib_public() = {:?}", test_lib_public_func(10));
+    }
+
+
+    // parse the keyboard module
+    // relies on keycodes_ascii library
+    if true {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi).unwrap();
+        debug!("========================== Symbol map after __k_keyboard: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
+    }
+
 
 
     // now we initialize ACPI/APIC barebones stuff.
@@ -335,36 +390,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 	
-    // attempt to parse a test kernel module
-    if false {
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
-        let mut kernel_mmi_locked = kernel_mmi_ref.lock();
-        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
-        // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
-
-        // now let's try to invoke the test_server function we just loaded
-        let func_sec = ::mod_mgmt::metadata::get_symbol("test_server::server_func1").upgrade().unwrap();
-        debug!("server_func_vaddr: {:#x}", func_sec.virt_addr());
-        let server_func: fn(u8, u64) -> (u8, u64) = unsafe { ::core::mem::transmute(func_sec.virt_addr()) };
-        debug!("Called server_func(10, 20) = {:?}", server_func(10, 20));
-
-        // now let's try to invoke the test_client function we just loaded
-        let client_func_sec = ::mod_mgmt::metadata::get_symbol("test_client::client_func").upgrade().unwrap();
-        debug!("client_func_vaddr: {:#x}", client_func_sec.virt_addr());
-        let client_func: fn() -> (u8, u64) = unsafe { ::core::mem::transmute(client_func_sec.virt_addr()) };
-        debug!("Called client_func() = {:?}", client_func());
-
-        // now let's try to invoke the test_lib function we just loaded
-        let test_lib_public_sec = ::mod_mgmt::metadata::get_symbol("test_lib::test_lib_public").upgrade().unwrap();
-        debug!("test_lib_public_vaddr: {:#x}", client_func_sec.virt_addr());
-        let test_lib_public_func: fn(u8) -> (u8, &'static str, u64) = unsafe { ::core::mem::transmute(test_lib_public_sec.virt_addr()) };
-        debug!("Called test_lib_public() = {:?}", test_lib_public_func(10));
-    }
-
+    
     // create and jump to the first userspace thread
     if true
     {

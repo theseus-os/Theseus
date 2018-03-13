@@ -25,7 +25,7 @@ use core::ops::DerefMut;
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core};
+use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core_symbols};
 use mod_mgmt::metadata;
 
 
@@ -457,24 +457,23 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
             page_table: ref mut kernel_page_table, 
             ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
         } = kernel_mmi;
-            
-
-        // // temporarily dumping kernel VMAs
-        // {
-        //     info!("================ KERNEL VMAS ================");
-        //     for vma in kernel_vmas {
-        //         info!("   {}", vma);
-        //     }
-        // }
 
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
+                let (size, flags) = if module.name() == "__k_nano_core" {
+                    // + 1 to add space for appending a null character to the end of the symbol file string
+                    // WRITABLE because we need to write that null character
+                    (module.size() + 1, EntryFlags::PRESENT | EntryFlags::WRITABLE)
+                } else {
+                    // when reading an actual ELF object file, we only read from it
+                    (module.size(), EntryFlags::PRESENT)
+                };
                 let temp_module_mapping = {
-                    let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for crate module"));
+                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
                     let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
                     try!( active_table.map_allocated_pages_to(
-                        new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
-                        EntryFlags::PRESENT, frame_allocator.deref_mut())
+                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                        flags, frame_allocator.deref_mut())
                     )
                 };
 
@@ -482,10 +481,10 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                     // the nano_core requires special handling because it has already been loaded,
                     // we just need to parse its symbols and add them to the symbol table & crate metadata lists
                     if module.name() == "__k_nano_core" {
-                        parse_nano_core(temp_module_mapping, module.size())
+                        parse_nano_core_symbols(temp_module_mapping, size)
                     }
                     else {
-                        parse_elf_kernel_crate(temp_module_mapping, module.size(), module.name(), active_table)
+                        parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table)
                     }
                 });
 

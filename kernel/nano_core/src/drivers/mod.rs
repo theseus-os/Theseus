@@ -10,7 +10,6 @@ use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
 use drivers::e1000::init_nic;
-use keyboard;
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
@@ -45,7 +44,17 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
     assert_has_not_been_called!("drivers::init was called more than once!");
-    keyboard::init(console_producer);
+    
+    // call keyboard::init(console_producer)
+    if let Some(section) = ::mod_mgmt::metadata::get_symbol("keyboard::init").upgrade() {
+        let keyboard_init_func: fn(DFQueueProducer<ConsoleEvent>) = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        keyboard_init_func(console_producer);
+    }
+    else {
+        return Err("getting keyboard::init symbol failed!");
+    }
+
+
     
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);

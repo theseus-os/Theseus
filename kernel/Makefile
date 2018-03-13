@@ -16,9 +16,10 @@ export  # export this to Makefiles in subdirectories
 
 
 ## We now manually define the list of subdirectories that we wish to build
-SUBDIRS := console \
-		   keyboard
-
+SUBDIRS := keyboard \
+	   test_lib \
+           test_client \
+           test_server
 
 .PHONY: all clean $(SUBDIRS) nano_core
 .DEFAULT_GOAL := all 
