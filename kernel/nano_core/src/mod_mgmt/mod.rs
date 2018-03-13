@@ -10,7 +10,7 @@ use alloc::string::ToString;
 use memory::{VirtualMemoryArea, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
 use goblin::elf::reloc::*;
 use kernel_config::memory::PAGE_SIZE;
-
+use util::round_up_power_of_two;
 
 pub mod metadata;
 use self::metadata::*;
@@ -210,13 +210,13 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                 }
 
                 let align = sec.align() as usize;
-                let addend = (size + (align - 1)) & !(align - 1); // round up to the nearest "align", which is always a power of 2
+                let addend = round_up_power_of_two(size, align);
 
                 // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
                 let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
                 let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
                 if exec {
-                    trace!("  Looking at sec with size {:#X} align {:#X} --> addend {:#X}", size, align, addend);
+                    // trace!("  Looking at sec with size {:#X} align {:#X} --> addend {:#X}", size, align, addend);
                     text += addend;
                 }
                 else if write {
@@ -261,9 +261,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
     // First, we need to parse all the sections and load the text and data sections
     let mut loaded_sections: BTreeMap<usize, Arc<LoadedSection>> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
-    let mut text_offset: Option<usize> = None;
-    let mut rodata_offset: Option<usize> = None;
-    let mut data_offset: Option<usize> = None;
+    let mut text_offset:   usize = 0;
+    let mut rodata_offset: usize = 0;
+    let mut data_offset:   usize = 0;
+
     {
         for (shndx, sec) in elf_file.section_iter().enumerate() {
             // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
@@ -271,7 +272,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                 // skip null section and any empty sections
                 let sec_size = sec.size() as usize;
                 if sec_size == 0 { continue; }
-
+                let align = sec.align() as usize;
 
                 if let Ok(name) = sec.get_name(&elf_file) {
                
@@ -283,17 +284,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         let text_prefix_end:   usize = TEXT_PREFIX.len();
                         if let Some(name) = name.get(text_prefix_end..) {
                             let demangled = demangle_symbol(name);
-                            trace!("Found .text section: name {:?}, with_hash {:?}, size={:#x}", name, demangled.full, sec_size);
+                            trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
                             // let entry_flags = EntryFlags::from_elf_section_flags(sec.flags());
 
-                            if text_offset.is_none() {
-                                text_offset = Some(sec.offset() as usize);
-                            }
-
                             if let Ok(ref tp) = text_pages {
-                                let dest_addr = tp.start_address() + (sec.offset() as usize) - text_offset.unwrap();
-
+                                let dest_addr = tp.start_address() + text_offset;
+                                trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", 
+                                               dest_addr, tp.start_address(), text_offset);
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
                                     // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -312,6 +310,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                                             global: global_sections.contains(&shndx),
                                         }))
                                     );
+
+                                    text_offset += round_up_power_of_two(sec_size, align);
                                 }
                                 else {
                                     error!("expected \"Undefined\" data in .text section {}: {:?}", name, sec.get_data(&elf_file));
@@ -335,15 +335,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                             let demangled = demangle_symbol(name);
                             trace!("Found .rodata section: name {:?}, demangled {:?}, size={:#x}", name, demangled.full, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
-                            
-                            if rodata_offset.is_none() {
-                                rodata_offset = Some(sec.offset() as usize);
-                            }
 
                             if let Ok(ref rp) = rodata_pages {
-                                let dest_addr = rp.start_address() + (sec.offset() as usize) - rodata_offset.unwrap();
-                                trace!("       dest_addr: {:#X}, rodata_pages: {:#X} sec off: {:#X} rodata_offset: {:#X}", 
-                                               dest_addr, rp.start_address(), sec.offset(), rodata_offset.unwrap());
+                                let dest_addr = rp.start_address() + rodata_offset;
+                                trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", 
+                                               dest_addr, rp.start_address(), rodata_offset);
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
                                     // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -362,6 +358,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                                             global: global_sections.contains(&shndx),
                                         }))
                                     );
+
+                                    rodata_offset += round_up_power_of_two(sec_size, align);
                                 }
                                 else {
                                     error!("expected \"Undefined\" data in .rodata section {}: {:?}", name, sec.get_data(&elf_file));
@@ -378,13 +376,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                             trace!("Found .data section: name {:?}, with_hash {:?}, size={:#x}", name, demangled.full, sec_size);
                             assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
                             
-                            if data_offset.is_none() {
-                                data_offset = Some(sec.offset() as usize);
-                            }
-
                             if let Ok(ref dp) = data_pages {
-                                let dest_addr = dp.start_address() + (sec.offset() as usize) - data_offset.unwrap();
-
+                                let dest_addr = dp.start_address() + data_offset;
+                                trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
+                                               dest_addr, dp.start_address(), data_offset);
                                 // here: we're ready to copy the data/text section to the proper address
                                 if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
                                     // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -403,6 +398,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                                             global: global_sections.contains(&shndx),
                                         }))
                                     );
+
+                                    data_offset += round_up_power_of_two(sec_size, align);
                                 }
                                 else {
                                     error!("expected \"Undefined\" data in .data section {}: {:?}", name, sec.get_data(&elf_file));

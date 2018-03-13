@@ -240,11 +240,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // both which satisfy dependencies that many other crates have. 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
-        debug!("========================== Symbol map after __k_nano_core: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
+        let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
 
-        // let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
-        // debug!("========================== Symbol map after nano_core and libcore: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
+        // let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
+        // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
     }
 
 

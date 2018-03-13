@@ -21,3 +21,8 @@ pub fn log2(value: usize) -> usize {
 }
 
 
+/// rounds the given `value` to the nearest base,
+/// which must be a power of two
+pub fn round_up_power_of_two(value: usize, base: usize) -> usize {
+    (value + (base - 1)) & !(base - 1)
+}
