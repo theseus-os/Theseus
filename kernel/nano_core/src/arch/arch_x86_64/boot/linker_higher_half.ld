@@ -22,6 +22,7 @@ SECTIONS {
 	
 	.text ALIGN(4K) : AT(ADDR(.text) - KERNEL_OFFSET)
 	{
+		KEEP(*(.pre_init_array))
 		*(.text .text.*)
 	}
 

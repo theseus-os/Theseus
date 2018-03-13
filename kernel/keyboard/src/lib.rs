@@ -32,19 +32,9 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
 
 
 
-
-#[derive(Debug)]
-pub enum KeyboardInputError {
-    UnknownScancode,
-    EventQueueNotReady,
-}
-
-
-
-
 /// returns Ok(()) if everything was handled properly.
-/// returns KeyboardInputError 
-pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
+/// Otherwise, returns an error string.
+pub fn handle_keyboard_input(scan_code: u8) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
    
@@ -87,13 +77,13 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
                     }
                     else {
                         warn!("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
-                        Err(KeyboardInputError::EventQueueNotReady)
+                        Err("keyboard event queue not ready")
                     }
                 }
 
                 _ => { 
                     warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
-                    Err(KeyboardInputError::UnknownScancode) 
+                    Err("unknown keyboard scancode") 
                 }
             }
         }

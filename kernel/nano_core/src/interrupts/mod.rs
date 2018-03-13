@@ -13,7 +13,6 @@ use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::ata_pio;
-use keyboard;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
@@ -389,10 +388,19 @@ extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFram
         KEYBOARD.lock().read() 
     };
 	// trace!("APIC KBD (AP {:?}): scan_code {:?}", apic::get_my_apic_id(), scan_code);
-
-    if let Err(e) = keyboard::handle_keyboard_input(scan_code) {
-        error!("keyboard_handler: error handling keyboard input: {:?}", e);
+    
+     // call keyboard::handle_keyboard_input
+    if let Some(section) = ::mod_mgmt::metadata::get_symbol("keyboard::handle_keyboard_input").upgrade() {
+        let handle_keyboard_input_func: fn(u8) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        if let Err(e) = handle_keyboard_input_func(scan_code) {
+            error!("keyboard_handler: error handling keyboard input: {:?}", e);
+        }
     }
+    else {
+        error!("getting keyboard::init symbol failed!");
+    }
+
+   
 
     eoi(Some(PIC_MASTER_OFFSET + 0x1));
 }

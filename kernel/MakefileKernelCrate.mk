@@ -20,7 +20,7 @@ MODULE_NAME := $(strip $(shell basename ${PWD}))
 RUSTFLAGS += --emit=obj
 
 ## enable debug info even for release builds
-RUSTFLAGS += -g 
+#RUSTFLAGS += -g 
 
 ## using a large code model 
 RUSTFLAGS += -C code-model=large
@@ -40,7 +40,7 @@ clean:
 ## Builds the crate, and then copies all object files to its own module-specific subdirectory in the kernel build directory
 cargo: 
 	@mkdir -p $(KERNEL_BUILD_DIR)/${MODULE_NAME}
-	@RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build --release --target $(target)
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build --release --target $(target)
 	@for objfile in ./target/$(target)/release/deps/*.o ; do \
 		cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/${MODULE_NAME}/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/\1.o/p'` ; \
 	done

@@ -125,9 +125,9 @@ impl LoadedSection {
 /// corresponds to a single function. 
 #[derive(Debug)]
 pub struct TextSection {
-    /// The String representation of just this symbol,
-    /// without any preceding crate namespaces or anything.
-    pub symbol: String,
+    // /// The String representation of just this symbol,
+    // /// without any preceding crate namespaces or anything.
+    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
@@ -148,9 +148,9 @@ pub struct TextSection {
 /// Represents a .rodata section in a crate.
 #[derive(Debug)]
 pub struct RodataSection {
-    /// The String representation of just this symbol,
-    /// without any preceding crate namespaces or anything.
-    pub symbol: String,
+    // /// The String representation of just this symbol,
+    // /// without any preceding crate namespaces or anything.
+    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
@@ -171,9 +171,9 @@ pub struct RodataSection {
 /// Represents a .data section in a crate.
 #[derive(Debug)]
 pub struct DataSection {
-    /// The String representation of just this symbol,
-    /// without any preceding crate namespaces or anything.
-    pub symbol: String,
+    // /// The String representation of just this symbol,
+    // /// without any preceding crate namespaces or anything.
+    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
