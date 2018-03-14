@@ -11,6 +11,7 @@ KERNEL_BUILD_DIR ?= ${PWD}/../build
 CFG_DIR ?= ${PWD}/../../cfg
 RUSTFLAGS += -C code-model=large
 RUSTFLAGS += -D unused-must-use
+# RUSTFLAGS += -C link-arg=-Wl,--export-all-symbols
 
 BUILD_MODE := debug
 #BUILD_MODE := release
@@ -51,8 +52,8 @@ cargo:
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(KERNEL_BUILD_DIR)
-	@ld -n --gc-sections -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj) 
-	#@cp -vf $(nano_core-obj) $(KERNEL_BUILD_DIR)/nano_core.bin
+	# @ld -n --gc-sections $(KEEP_SYMBOLS) --print-gc-sections -Map=/tmp/nano_core.map -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj) 2> /tmp/nano_core_gc_sections.txt
+	ld -n -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)
 	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  DEFAULT/d;/GLOBAL HIDDEN/d' > $(KERNEL_BUILD_DIR)/nano_core.sym 
 
 
