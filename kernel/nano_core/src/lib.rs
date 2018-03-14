@@ -275,7 +275,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
 
-    if false {
+    if true {
         spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
     }
 
@@ -284,7 +284,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     } 
 
     // create some extra tasks to test context switching
-    if false {
+    if true {
         
         spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
         spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 

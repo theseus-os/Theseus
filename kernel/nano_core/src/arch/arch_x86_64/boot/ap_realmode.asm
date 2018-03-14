@@ -131,12 +131,6 @@ prot_mode:
     mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
-
-    mov dword [0xa7da0], 0x35353535
-    mov dword [0xa7da4], 0x35353535
-    mov dword [0xa7da8], 0x35353535
-    mov dword [0xa7dac], 0x35353535
-    mov dword [0xa7db0], 0x35353535
     
  
     jmp 0x08:ap_start_protected_mode
