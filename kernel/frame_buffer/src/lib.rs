@@ -51,25 +51,9 @@ pub struct Drawer {
 }
 impl Drawer {
     pub fn draw_pixel(&mut self) {
-        self.buffer().chars[32160].write(0x20);
-        self.buffer().chars[32161].write(0x20);
-
-        self.buffer().chars[32162].write(0x20);
-        self.buffer().chars[32163].write(0x20);
-        self.buffer().chars[32164].write(0x20);
-        self.buffer().chars[32165].write(0x20);
-        self.buffer().chars[32166].write(0x20);
-        self.buffer().chars[32167].write(0x20);
-        self.buffer().chars[32168].write(0x20);
-        self.buffer().chars[32169].write(0x20);
-        self.buffer().chars[32170].write(0x20);
-        self.buffer().chars[32171].write(0x20);
-        self.buffer().chars[32172].write(0x20);
-        self.buffer().chars[32173].write(0x20);
-        
-
-        let a =&(&self.buffer()).chars[32160].read();
-        //trace!("Symbol {:#?}", a);
+        for i in 1..100 {
+            self.buffer().chars[32160+i].write(0x20);
+        }
 
     }
 
