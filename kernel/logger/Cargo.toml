@@ -11,6 +11,9 @@ path = "../../libs/irq_safety"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
 [dependencies.serial_port]
 path = "../serial_port"
 

@@ -37,6 +37,13 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
+    ; set graphic mode
+    mov al, 0x13
+    mov ah, 0x0
+    int 0x10
+
+
+
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
     ; since this code will be forcibly loaded by GRUB multiboot above 1MB, and we're in 16-bit real mode,
     ; we cannot create a gdt regularly. We have to 

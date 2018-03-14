@@ -67,6 +67,7 @@ extern crate serial_port;
 extern crate logger;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
+#[macro_use] extern crate frame_buffer; 
 extern crate test_lib;
 extern crate rtc;
 
@@ -149,6 +150,14 @@ fn test_driver(_: Option<u64>) {
     println!("TESTING DRIVER!!");
     test_nic_driver::dhcp_request_packet();
 
+}
+
+
+fn test_framebuffer(_: Option<u64>) {
+    loop {
+        draw_pixel!();
+    }
+    
 }
 
 
@@ -269,12 +278,16 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
 
-    if true {
+    if false {
         spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
-    }  
+    }
+
+    if true {
+        spawn_kthread(test_framebuffer, None, "framebuffer_test_thread").unwrap();
+    } 
 
     // create some extra tasks to test context switching
-    if true {
+    if false {
         spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
         spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
         spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
