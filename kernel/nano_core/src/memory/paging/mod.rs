@@ -405,14 +405,20 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             let mut index = 0;    
             // map the allocated kernel text sections
             for section in elf_sections_tag.sections() {
-                if section.size() == 0 || !section.is_allocated() {
-                    // skip sections that aren't loaded to memory
+                if section.size() == 0 
+                    || !section.is_allocated() 
+                    || section.name().starts_with(".debug") 
+                {
+                    // skip sections that don't need to be loaded into memory
                     continue;
                 }
                 
                 debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
 
                 if !address_is_page_aligned(section.start_address() as usize) {
+                    if section.name().starts_with(".eh_frame") {
+                        continue; // just skip eh_frame for now
+                    }
                     error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
                     return Err("Kernel ELF Section was not page-aligned");
                 }

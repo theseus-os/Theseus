@@ -17,6 +17,7 @@
 #![feature(core_intrinsics)]
 #![feature(conservative_impl_trait)]
 #![feature(used)]
+#![feature(i128_type)]
 #![no_std]
 
 
@@ -24,8 +25,10 @@
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 
 
-// #![feature(compiler_builtins_lib)]  // this is needed for our odd approach of including the nano_core as a library for other kernel crates
-// extern crate compiler_builtins; // this is needed for our odd approach of including the nano_core as a library for other kernel crates
+// this is needed for our odd approach of loading the libcore ELF file at runtime
+#![feature(compiler_builtins_lib)]
+extern crate compiler_builtins;
+
 
 
 // ------------------------------------
@@ -65,7 +68,8 @@ extern crate atomic_linked_list;
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
-extern crate console;  // I think this mod declaration MUST COME FIRST because it includes the macro for println!
+pub mod reexports; // stupid shit to get around compiler_builtins symbol visibility being hidden
+extern crate console; 
 extern crate serial_port;
 extern crate logger;
 extern crate state_store;
@@ -130,7 +134,6 @@ mod start;
 pub use task::{spawn_kthread, spawn_userspace};
 pub use keycodes_ascii::*;
 
-
 use alloc::String;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
@@ -190,7 +193,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     }
 }
 
-fn test_driver(_: Option<u64>) {
+pub fn test_driver(_: Option<u64>) {
     println!("TESTING DRIVER!!");
     test_nic_driver::dhcp_request_packet();
 
@@ -241,10 +244,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
-        debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
+        // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
 
-        // let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
-        // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
+        let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
+        debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
     }
 
 
