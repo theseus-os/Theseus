@@ -12,6 +12,11 @@ use kernel_config::memory::PAGE_SIZE;
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
 const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
+const E1000_I219_LM_1:          u16 = 0x156F;  // Device ID for Intel I219
+const E1000_I219_LM_2:          u16 = 0x15B7;  // Device ID for Intel I219
+const E1000_I219_LM_3:          u16 = 0x15D7;  // Device ID for Intel I219
+const E1000_I219_LM_4:          u16 = 0x15E3;  // Device ID for Intel I219
+const E1000_I219_LM_5:          u16 = 0x15B9;  // Device ID for Intel I219
 const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
@@ -112,8 +117,12 @@ const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
 
 const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
-const E1000_SIZE_RX_DESC:       usize = 256;
-const E1000_SIZE_TX_DESC:       usize = 256;
+
+const E1000_SIZE_RX_DESC:       usize = 16;
+const E1000_SIZE_TX_DESC:       usize = 16;
+
+const E1000_SIZE_RX_BUFFER:     usize = 8192;
+const E1000_SIZE_TX_BUFFER:     usize = 256;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -212,7 +221,7 @@ impl DmaAllocator{
 
 
 /// translate virtual address to physical address
-pub fn translate_v2p(v_addr : usize) -> Option<usize> {
+pub fn translate_v2p(v_addr : usize) -> Result<usize, &'static str> {
         
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("e1000: translate_v2p couldnt get ref to kernel mmi");
@@ -225,14 +234,14 @@ pub fn translate_v2p(v_addr : usize) -> Option<usize> {
         match kernel_page_table {
                 &mut PageTable::Active(ref mut active_table) => {
                         
-                        //let phys = try!(active_table.translate(v_addr).ok_or("e1000:translatev2p couldnt translate v addr"));
-                        //return Ok(phys); 
-                        return active_table.translate(v_addr);
+                        let phys = try!(active_table.translate(v_addr).ok_or("e1000:translatev2p couldn't translate v addr"));
+                        return Ok(phys); 
+                        //return active_table.translate(v_addr);
                         
                 }
                 _ => { 
-                        //return Err("kernel page table wasn't an ActivePageTable!"); 
-                        return None;
+                        return Err("e1000:translatev2p kernel page table wasn't an ActivePageTable!"); 
+                        //return None;
                 }
 
         }
@@ -272,8 +281,8 @@ impl Nic{
                 debug!("original bar0: {:#X}", bar0);
 
                 // get a reference to the kernel's memory mapping information
-                let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-                //let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!"));
+                //let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+                let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!"));
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
                 // destructure the kernel's MMI so we can access its page table
@@ -285,7 +294,8 @@ impl Nic{
                 let no_pages: usize = mem_size as usize/PAGE_SIZE; //4K pages
 
                 //allocate required no of pages
-                let pages_nic = allocate_pages(no_pages).expect("e1000::mem_map(): couldn't allocated virtual page!");
+                //let pages_nic = allocate_pages(no_pages).expect("e1000::mem_map(): couldn't allocated virtual page!");
+                let pages_nic = try!(allocate_pages(no_pages).ok_or("e1000::mem_map(): couldn't allocated virtual page!"));
                 
                 //allocate frames at address and create a FrameIter struct 
                 let phys_addr = self.mem_base;
@@ -338,8 +348,8 @@ impl Nic{
         pub fn mem_map_dma(&mut self) -> Result<(), &'static str> {
                 
                 // get a reference to the kernel's memory mapping information
-                let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-                //let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!"));
+                //let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+                let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map_dma KERNEL_MMI was not yet initialized!"));
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
                 // destructure the kernel's MMI so we can access its page table
@@ -348,22 +358,39 @@ impl Nic{
                 ..  // don't need to access other stuff in kernel_mmi
                 } = *kernel_mmi_locked;
 
-                //will need to change this when size of RX buffers changes
-                let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
-                //let page = Page::containing_address(virt_addr);
+                //let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
+                
+                let num_pages;
+                let num_frames;
+                let bytes_required = (E1000_NUM_RX_DESC*E1000_SIZE_RX_BUFFER) + (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + E1000_SIZE_RX_DESC; //add an additional desc so we can make sure its 16-byte aligned
+                if bytes_required % PAGE_SIZE == 0 {
+                        num_pages =  bytes_required / PAGE_SIZE;
+                        num_frames =  bytes_required / PAGE_SIZE;
+                }
+                else {
+                       num_pages =  bytes_required / PAGE_SIZE + 1; 
+                       num_frames =  bytes_required / PAGE_SIZE + 1;  
+                }
+                
                 //let virt_addr = try!(allocate_pages(1).ok_or("e1000::mem_map_dma(): couldn't allocated virtual page!"));
-                                        
+                let virt_addr = try!(allocate_pages(num_pages).ok_or("e1000::mem_map_dma(): couldn't allocated virtual page!"));
+
+                self.nic_dma_allocator.start = virt_addr.pages.start.start_address();
+                self.nic_dma_allocator.current = virt_addr.pages.start.start_address();
+                self.nic_dma_allocator.end = virt_addr.pages.end.start_address()+PAGE_SIZE; //end of dma memory
+                trace!("head_pmem: {:#X}, tail_pmem: {:#X}", self.nic_dma_allocator.start, self.nic_dma_allocator.end);
+
                 let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
                 //debug!("page: {:?}, frame {:?}",page,frame);
                 
                 match kernel_page_table {
                 &mut PageTable::Active(ref mut active_table) => {
                         let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("e1000::mem_map_dma(): couldnt get FRAME_ALLOCATOR")).lock();
-                        let frame = try!(frame_allocator.allocate_frame().ok_or("e1000:mem_map_dma couldnt allocate a new frame"));
+                        let frames = try!(frame_allocator.allocate_frames(num_frames).ok_or("e1000:mem_map_dma couldnt allocate a new frame"));
                         // let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
                         // let frame = frame_allocator.allocate_frame().unwrap() ;
                         
-                        let result = try!(active_table.map_to(virt_addr.pages.start, frame, mapping_flags, frame_allocator.deref_mut()));
+                        let result = try!(active_table.map_allocated_pages_to(virt_addr, frames, mapping_flags, frame_allocator.deref_mut()));
                         NIC_DMA_PAGES.call_once(|| result);
                 }
                 _ =>    { 
@@ -371,13 +398,7 @@ impl Nic{
                         }
 
                 }
-                /**************************************/
-                
-                self.nic_dma_allocator.start = virt_addr.pages.start.start_address();
-                self.nic_dma_allocator.current = virt_addr.pages.start.start_address();
-                self.nic_dma_allocator.end = virt_addr.pages.start.start_address()+PAGE_SIZE; //One page is allocated
-                trace!("head_pmem: {:#X}, tail_pmem: {:#X}", self.nic_dma_allocator.start, self.nic_dma_allocator.end);
-                
+                /**************************************/                
               
                Ok(())
         }
@@ -541,11 +562,7 @@ impl Nic{
                 let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
                 let ptr;
                 match dma_ptr{
-<<<<<<< HEAD
-                        Some(x) => ptr = dma_ptr.unwrap(),
-=======
                         Some(_x) => ptr = dma_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                         None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx descriptors"),
                 }
 
@@ -564,28 +581,22 @@ impl Nic{
 
                 for i in 0..E1000_NUM_RX_DESC
                 {
-                        let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(E1000_SIZE_RX_DESC);
+                        let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(E1000_SIZE_RX_BUFFER);
                         match dma_ptr{
-<<<<<<< HEAD
-                                Some(x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
-=======
                                 Some(_x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                                 None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx buffer"),
                         } 
                                                 
-                        let rx_buf = translate_v2p(self.rx_buf_addr[i]);
+                        /* let rx_buf = translate_v2p(self.rx_buf_addr[i]);
                         let buf_addr;
                         match rx_buf{
-<<<<<<< HEAD
-                                Some(x) => buf_addr = rx_buf.unwrap() as u64,
-=======
                                 Some(_x) => buf_addr = rx_buf.unwrap() as u64,
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                                 None => return Err("e1000:rx_init Couldn't translate address for rx buffers"),
-                        }
+                        } */
                         
-                        //let buf_addr = (translate_v2p(self.rx_buf_addr[i])).unwrap();
+                        // let buf_addr = (translate_v2p(self.rx_buf_addr[i])).unwrap();
+
+                        let buf_addr = try!(translate_v2p(self.rx_buf_addr[i]));
                         let mut var = e1000_rx_desc {
                                 addr: buf_addr as u64,
                                 length: 0,
@@ -606,18 +617,15 @@ impl Nic{
                 let v_addr = slc_ptr as usize;
                 debug!("v address of rx_desc: {:x}",v_addr);
                 
-                let t_ptr = translate_v2p(v_addr);
+                /* let t_ptr = translate_v2p(v_addr);
                 let ptr;
                 match t_ptr{
-<<<<<<< HEAD
-                        Some(x) =>  ptr = t_ptr.unwrap(),
-=======
                         Some(_x) =>  ptr = t_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                         None => return Err("e1000:rx_init Couldn't translate address for rx descriptor"),
-                }
+                } */
 
                 //let ptr = (translate_v2p(v_addr)).unwrap();
+                let ptr = try!(translate_v2p(v_addr));
                 
                 debug!("p address of rx_desc: {:x}",ptr);
                 let ptr1 = (ptr & 0xFFFF_FFFF) as u32;
@@ -645,11 +653,7 @@ impl Nic{
                 let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
                 let ptr;
                 match dma_ptr{
-<<<<<<< HEAD
-                        Some(x) => ptr = dma_ptr.unwrap(),
-=======
                         Some(_x) => ptr = dma_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                         None => return Err("e1000:tx_init Couldn't allocate DMA mem for tx descriptor"),
                 } 
 
@@ -681,17 +685,15 @@ impl Nic{
                 let v_addr = slc_ptr as usize;
                 debug!("v address of tx_desc: {:x}",v_addr);
 
-                let t_ptr = translate_v2p(v_addr);
+                /* let t_ptr = translate_v2p(v_addr);
                 let ptr;
                 match t_ptr{
-<<<<<<< HEAD
-                        Some(x) => ptr = t_ptr.unwrap(),
-=======
                         Some(_x) => ptr = t_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                         None => return Err("e1000:tx_init Couldn't translate address for tx descriptor"),
-                }
+                } */
                 //let ptr = (translate_v2p(v_addr)).unwrap();
+
+                let ptr = try!(translate_v2p(v_addr));
                 
                 
                 debug!("p address of tx_desc: {:x}",ptr);
@@ -720,18 +722,16 @@ impl Nic{
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
-                let t_ptr = translate_v2p(p_data);
+                /* let t_ptr = translate_v2p(p_data);
                 let ptr;
                 match t_ptr{
-<<<<<<< HEAD
-                        Some(x) => ptr = t_ptr.unwrap(),
-=======
                         Some(_x) => ptr = t_ptr.unwrap(),
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
                         None => return Err("e1000:send_packet Couldn't translate address for tx buffer"),
-                } 
+                } */ 
                 //let ptr = (translate_v2p(p_data)).unwrap();
 
+                let ptr = try!(translate_v2p(p_data));
+                
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
                 self.tx_descs[self.tx_cur as usize].length = p_len;
@@ -784,19 +784,15 @@ impl Nic{
         /// Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                }
+                } */
 
-<<<<<<< HEAD
-                /*  // Print packets
-=======
-                /* // Print packets
->>>>>>> 33b4f4a7f95c2079a24f6ce03edebc69adf24397
+                // Print packets
                 while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
                         //got_packet = true;
                         let length = self.rx_descs[self.rx_cur as usize].length;
@@ -816,7 +812,7 @@ impl Nic{
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
 
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                }  */
+                } 
 
                 
         }  
