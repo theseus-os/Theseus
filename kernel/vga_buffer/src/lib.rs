@@ -148,7 +148,7 @@ pub struct VgaWriter {
 }
 impl VgaWriter {
     pub fn write_byte_with_color(&mut self, byte: u8, color_code: ColorCode) {
-        match byte {
+        /*match byte {
             b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
@@ -163,9 +163,8 @@ impl VgaWriter {
                 });
                 self.column_position += 1;
             }
-        }
+        }*/
     }
-
     
     pub fn write_byte(&mut self, byte: u8) {
         self.write_byte_with_color(byte, ColorCode::default())
@@ -177,7 +176,7 @@ impl VgaWriter {
     }
 
     fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
+        /*for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let buffer = self.buffer();
                 let character = buffer.chars[row][col].read();
@@ -185,17 +184,17 @@ impl VgaWriter {
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;
+        self.column_position = 0;*/
     }
 
     fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
+        /*let blank = ScreenChar {
             ascii_character: b' ',
             color_code: ColorCode::default()
         };
         for col in 0..BUFFER_WIDTH {
             self.buffer().chars[row][col].write(blank);
-        }
+        }*/
     }
 }
 
