@@ -3,6 +3,7 @@ pub mod ata_pio;
 pub mod pci;
 pub mod acpi;
 pub mod e1000;
+pub mod e1000e;
 pub mod test_nic_driver;
 
 
@@ -10,7 +11,7 @@ use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
 use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
-use drivers::e1000::init_nic;
+//use drivers::{e1000,e1000e};
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -51,8 +52,11 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
     }
+    while 1==1
+    {}
 
-    try!(init_nic());
+    try!(e1000::init_nic_e1000());
+    try!(e1000e::init_nic_e1000e());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

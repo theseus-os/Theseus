@@ -855,12 +855,13 @@ lazy_static! {
 }
 
 /// initialize the nic
-pub fn init_nic_e1000() -> Result<(), &'static str>{
+pub fn init_nic_e1000e() -> Result<(), &'static str>{
 
-        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
-        debug!("e1000 Device found: {:?}", pci_dev);
-        let e1000_pci = try!(pci_dev.ok_or("Unable to find e1000 device!"));
-        //debug!("e1000 Device unwrapped: {:?}", pci_dev);
+        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_I219_LM_1);
+        debug!("e1000e Device found: {:?}", pci_dev);
+        let e1000_pci = try!(pci_dev.ok_or("Unable to find e1000e device!"));
+
+       /*  //debug!("e1000 Device unwrapped: {:?}", pci_dev);
         let mut e1000_nc = E1000_NIC.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
@@ -879,13 +880,13 @@ pub fn init_nic_e1000() -> Result<(), &'static str>{
         try!(e1000_nc.rx_init());
         try!(e1000_nc.tx_init());
         //e1000_nc.rx_init().unwrap();
-        //e1000_nc.tx_init().unwrap();
+        //e1000_nc.tx_init().unwrap(); */
 
        Ok(())
 }
 
 //Interrupt handler for nic
-pub fn e1000_handler () {
+pub fn e1000e_handler () {
         debug!("e1000 handler");
         let mut e1000_nc = E1000_NIC.lock();
 
