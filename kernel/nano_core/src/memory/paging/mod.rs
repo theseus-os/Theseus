@@ -441,7 +441,17 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     start_virt_addr += KERNEL_OFFSET;
                 }
 
-                vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, "KERNEL ELF SECTION TODO FIXME");
+                // a dumb hack to get the VMA name to be &'static str, since there's only a few possible section names and we know them a priori
+                let static_str_name = match section.name() {
+                    ".init"              =>  "nano_core .init",
+                    ".text"              =>  "nano_core .text",
+                    ".data"              =>  "nano_core .data",
+                    ".bss"               =>  "nano_core .bss",
+                    ".rodata"            =>  "nano_core .rodata",
+                    ".gcc_except_table"  =>  "nano_core .gcc_except_table",
+                    _                    =>  "nano_core misc section",
+                };
+                vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, static_str_name);
                 
                 // map the whole range of frames in this section
                 higher_half_mapped_pages[index] = Some(try!( mapper.map_frames(
@@ -536,11 +546,11 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     // skip pages that are already mapped
                     continue;
                 }
-                print_early!("MAPPING BOOT_INFO PAGE {:?}\n", page);
+                // print_early!("MAPPING BOOT_INFO PAGE {:?}\n", page);
                 higher_half_mapped_pages[index] = Some( try!( mapper.map_to(
                     page, frame.clone(), EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
                 ));
-                print_early!("mapped bootloader info at addr: {:?}\n", vmas[index]);
+                // print_early!("mapped bootloader info at addr: {:?}\n", vmas[index]);
                 // also do an identity mapping, if maybe we need it?
                 identity_mapped_pages[index] = Some( try!( mapper.map_to(
                     Page::containing_address(page.start_address() - KERNEL_OFFSET), frame, 

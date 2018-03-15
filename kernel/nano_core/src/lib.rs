@@ -243,24 +243,24 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // both which satisfy dependencies that many other crates have. 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
 
-        let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi).unwrap();
+        let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
         debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
     }
 
 
 
     // attempt to parse a test kernel module
-    if true {
+    if false {
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
-        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked).unwrap();
+        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
 
         // now let's try to invoke the test_server function we just loaded
@@ -287,10 +287,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // relies on keycodes_ascii library
     if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi).unwrap();
-        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi).unwrap();
-        let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi).unwrap();
-        debug!("========================== Symbol map after __k_keyboard: ========================\n{}", mod_mgmt::metadata::dump_symbol_map());
+        let _one   = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _two   = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _three = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
+        // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_keyboard {}: ========================\n{}", 
+        //         _one, _two, _three, mod_mgmt::metadata::dump_symbol_map());
     }
 
 
@@ -298,7 +299,6 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // now we initialize ACPI/APIC barebones stuff.
     // madt_iter must stay in scope until after all AP booting is finished so it's not prematurely dropped
     let madt_iter = {
-        trace!("calling drivers::early_init()");
         let mut kernel_mmi = kernel_mmi_ref.lock();
         drivers::early_init(&mut kernel_mmi).expect("Failed to get MADT (APIC) table iterator!")
     };

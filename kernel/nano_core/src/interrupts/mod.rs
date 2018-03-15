@@ -397,7 +397,7 @@ extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFram
         }
     }
     else {
-        error!("getting keyboard::init symbol failed!");
+        error!("getting keyboard::handle_keyboard_input symbol failed!");
     }
 
    

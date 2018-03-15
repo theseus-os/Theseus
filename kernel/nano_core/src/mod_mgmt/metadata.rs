@@ -33,17 +33,26 @@ pub fn dump_symbol_map() -> String {
 
 /// Adds a new crate to the module tree, and adds its symbols to the system map.
 /// Returns the number of global symbols added to the system map. 
-pub fn add_crate(new_crate: LoadedCrate) -> usize {
+pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
     let mut count = 0;
     // add all the global symbols to the system map
     {
+        let crate_name = new_crate.crate_name.clone();
         let mut locked_kmap = SYSTEM_MAP.lock();
         for sec in new_crate.sections.iter().filter(|s| s.is_global()) {
+            let new_sec_size = sec.size();
+
             if let Some(key) = sec.key() {
                 let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
                 // as of now we don't expect/support replacing a symbol (section) in the system map
-                if old_val.is_some() {
-                    warn!("Unexpected: replacing existing entry in system map: {}", key);
+                if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
+                    if old_sec.size() == new_sec_size {
+                        if log_replacements { info!("Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
+                    }
+                    else {
+                        warn!("Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
+                               crate_name, old_sec.size(), new_sec_size, key);
+                    }
                 }
                 count += 1;
                 // debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);

@@ -125,7 +125,7 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &String, active_table: &mut ActivePageTable)
+pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &String, active_table: &mut ActivePageTable, log: bool)
     -> Result<LoadedCrate, &'static str>
 {
     // all kernel module crate names must start with "__k_"
@@ -233,7 +233,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
         (text, rodata, data)
     };
 
-    debug!("    crate {} needs {:#X} text bytes, {:#X} rodata bytes, {:#X} data bytes", module_name, text_bytecount, rodata_bytecount, data_bytecount);
+    if log {
+        debug!("    crate {} needs {:#X} text bytes, {:#X} rodata bytes, {:#X} data bytes", module_name, text_bytecount, rodata_bytecount, data_bytecount);
+    }
 
     // create a closure here to allocate N contiguous virtual memory pages
     // and map them to random frames as writable, returns Result<MappedPages, &'static str>
@@ -337,13 +339,12 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             if sec_name.starts_with(TEXT_PREFIX) {
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    if log { trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
 
                     if let Ok(ref tp) = text_pages {
                         let dest_addr = tp.start_address() + text_offset;
-                        trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", 
-                                        dest_addr, tp.start_address(), text_offset);
+                        if log { trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", dest_addr, tp.start_address(), text_offset); }
                         
                         // here: we're ready to copy the text section to the proper address
                         // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -366,7 +367,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         text_offset += round_up_power_of_two(sec_size, sec_align);
                     }
                     else {
-                        error!("trying to load text section, but no text_pages were allocated!!");
                         return Err("no text_pages were allocated");
                     }
                 }
@@ -379,13 +379,12 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             else if sec_name.starts_with(RODATA_PREFIX) {
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    if log { trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
 
                     if let Ok(ref rp) = rodata_pages {
                         let dest_addr = rp.start_address() + rodata_offset;
-                        trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", 
-                                        dest_addr, rp.start_address(), rodata_offset);
+                        if log { trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", dest_addr, rp.start_address(), rodata_offset); }
                         
                         // here: we're ready to copy the rodata section to the proper address
                         // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -407,6 +406,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
+                    else {
+                        return Err("no rodata_pages were allocated");
+                    }
                 }
                 else {
                     error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
@@ -417,13 +419,12 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             else if sec_name.starts_with(DATA_PREFIX) {
                 if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
                     
                     if let Ok(ref dp) = data_pages {
                         let dest_addr = dp.start_address() + data_offset;
-                        trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
-                                        dest_addr, dp.start_address(), data_offset);
+                        if log { trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", dest_addr, dp.start_address(), data_offset); }
 
                         // here: we're ready to copy the data/bss section to the proper address
                         // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -445,6 +446,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
                     }
+                    else {
+                        return Err("no data_pages were allocated for .data section");
+                    }
                 }
                 
                 else {
@@ -456,14 +460,13 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             else if sec_name.starts_with(BSS_PREFIX) {
                 if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    if log { trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let Ok(ref dp) = data_pages {
+                    if let Ok(ref dp) = data_pages { 
                         let dest_addr = dp.start_address() + data_offset;
-                        trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
-                                        dest_addr, dp.start_address(), data_offset);
+                        if log { trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", dest_addr, dp.start_address(), data_offset); }
 
                         // here: we're ready to fill the bss section with zeroes at the proper address
                         // SAFE: we have allocated the pages containing section_vaddr and mapped them above
@@ -483,6 +486,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                    else {
+                        return Err("no data_pages were allocated for .bss section");
                     }
                 }
                 
@@ -510,7 +516,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     }  // end of handling PROGBITS sections: text, data, rodata, bss
 
 
-    debug!("=========== moving on to the relocations for module {} =========", module_name);
+    if log {
+        debug!("=========== moving on to the relocations for module {} =========", module_name);
+    }
 
 
     // Second, we need to fix up the sections we just loaded with proper relocation info
@@ -524,7 +532,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             // offset is the destination 
             use xmas_elf::sections::SectionData::Rela64;
             use xmas_elf::symbol_table::Entry;
-            trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info());
+            if log { trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info()); }
 
             // currently not using eh_frame sections
             if let Ok(name) = sec.get_name(&elf_file) {
@@ -542,8 +550,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             if let Some(target_sec) = loaded_sections.get(&(sec.info() as usize)) {
                 if let Ok(Rela64(rela_arr)) = sec.get_data(&elf_file) {
                     for r in rela_arr {
-                        trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}",
-                                r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type());
+                        if log { trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type()); }
 
                         // common to all relocations: calculate the relocation destination and get the source section
                         let dest_offset = r.get_offset() as usize;
@@ -551,7 +558,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
                         let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
                         let source_sec_name = try!(source_sec_entry.get_name(&elf_file));
-                        trace!("             relevant section {:?} -- {:?}", source_sec_name, source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file)));
+                        if log { trace!("             relevant section {:?} -- {:?}", source_sec_name, source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file))); }
                         let source_sec: Arc<LoadedSection> = try!(
                             loaded_sections.get(&source_sec_shndx).cloned().or_else(|| { 
                                 // the source section was not in this object file, so check our list of loaded external crates 
@@ -572,14 +579,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         match r.get_type() {
                             R_X86_64_32 => {
                                 let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
-                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 unsafe {
                                     *(dest_ptr as *mut u32) = source_val as u32;
                                 }
                             }
                             R_X86_64_64 => {
                                 let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
-                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 unsafe {
                                     *(dest_ptr as *mut u64) = source_val as u64;
                                 }
@@ -587,14 +594,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                             R_X86_64_PC32 => {
                                 // trace!("                 dest_ptr: {:#X}, source_sec_vaddr: {:#X}, addend: {:#X}", dest_ptr, source_sec.virt_addr(), r.get_addend());
                                 let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize).wrapping_sub(dest_ptr);
-                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 unsafe {
                                     *(dest_ptr as *mut u32) = source_val as u32;
                                 }
                             }
                             R_X86_64_PC64 => {
                                 let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize).wrapping_sub(dest_ptr);
-                                trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec);
+                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 unsafe {
                                     *(dest_ptr as *mut u64) = source_val as u64;
                                 }
@@ -615,7 +622,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                 }
             }
             else {
-                warn!("Skipping Rela section {:?} for target section that wasn't loaded!", sec.get_name(&elf_file));
+                error!("Skipping Rela section {:?} for target section that wasn't loaded!", sec.get_name(&elf_file));
                 continue;
             }
         }
