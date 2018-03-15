@@ -57,9 +57,9 @@ impl Drawer {
     pub fn draw_pixel(&mut self) {
         for i in 0..300 {
             let a = 85;
-            self.buffer().chars[32160 + i*3].write(0x66);
-            self.buffer().chars[32160 + i*3+1].write(0xab);
-            self.buffer().chars[32160 + i*3+2].write(0x20);
+            self.buffer().chars[100000 + i*3].write(0x66);
+            self.buffer().chars[100000 + i*3+1].write(0xab);
+            self.buffer().chars[100000 + i*3+2].write(0x20);
 
         }
 

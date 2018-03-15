@@ -491,7 +491,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_START, size_in_bytes), 
+                Frame::range_inclusive_addr(0xFD00_0000, size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags, allocator.deref_mut())
             ));
