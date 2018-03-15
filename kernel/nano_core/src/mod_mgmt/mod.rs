@@ -203,10 +203,12 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     let (text_bytecount, rodata_bytecount, data_bytecount): (usize, usize, usize) = {
         let (mut text, mut rodata, mut data) = (0, 0, 0);
         for sec in elf_file.section_iter() {
-            if let Ok(ShType::ProgBits) = sec.get_type() {
+            let sec_typ = sec.get_type();
+            // look for .text, .rodata, .data, and .bss sections
+            if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
                 let size = sec.size() as usize;
                 if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
-                    continue; // skip non-allocated PROGBITS sections (they're useless)
+                    continue; // skip non-allocated sections (they're useless)
                 }
 
                 let align = sec.align() as usize;
@@ -220,6 +222,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                     text += addend;
                 }
                 else if write {
+                    // .bss sections have the same flags (write and alloc) as data, so combine them
                     data += addend;
                 }
                 else {
@@ -265,186 +268,246 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     let mut rodata_offset: usize = 0;
     let mut data_offset:   usize = 0;
 
-    {
-        for (shndx, sec) in elf_file.section_iter().enumerate() {
-            // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
-            if let Ok(ShType::ProgBits) = sec.get_type() {
+                
+    const TEXT_PREFIX:   &'static str = ".text.";
+    const RODATA_PREFIX: &'static str = ".rodata.";
+    const DATA_PREFIX:   &'static str = ".data.";
+    const BSS_PREFIX:    &'static str = ".bss.";
 
-                // even if we're using the next section's data (for a zero-sized section),
-                // we still want to use this current section's actual name and flags!
-                let (sec_name, sec_flags) = match sec.get_name(&elf_file) {
-                    Ok(name) => (name, sec.flags()),
+
+    for (shndx, sec) in elf_file.section_iter().enumerate() {
+        // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
+        let sec_typ = sec.get_type();
+        // look for .text, .rodata, .data, and .bss sections
+        if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
+
+            // even if we're using the next section's data (for a zero-sized section),
+            // we still want to use this current section's actual name and flags!
+            let (sec_name, sec_flags) = match sec.get_name(&elf_file) {
+                Ok(name) => (name, sec.flags()),
+                _ => {
+                    error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}", shndx, sec);
+                    return Err("couldn't get section name");
+                }
+            };
+
+            let sec = if sec.size() == 0 {
+                // This is a very rare case of a zero-sized section. 
+                // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations,
+                // typically the zero-sized section itself is a reference to the next section in the list of section headers).
+                // Thus, we need to use the *current* section's name with the *next* section's (the next section's) information,
+                // i.e., its  size, alignment, and actual data
+                match elf_file.section_header((shndx + 1) as u16) { // get the next section
+                    Ok(sec_hdr) => sec_hdr,
                     _ => {
-                        error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}", shndx, sec);
-                        return Err("couldn't get section name");
-                    }
-                };
-
-                let sec = if sec.size() == 0 {
-                    // This is a very rare case of a zero-sized section. 
-                    // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations,
-                    // typically the zero-sized section itself is a reference to the next section in the list of section headers).
-                    // Thus, we need to use the *current* section's name with the *next* section's (the next section's) information,
-                    // i.e., its  size, alignment, and actual data
-                    match elf_file.section_header((shndx + 1) as u16) { // get the next section
-                        Ok(sec_hdr) => sec_hdr,
-                        _ => {
-                            error!("parse_elf_kernel_crate(): Couldn't get next section for zero-sized section {}", shndx);
-                            return Err("couldn't get next section for a zero-sized section");
-                        }
+                        error!("parse_elf_kernel_crate(): Couldn't get next section for zero-sized section {}", shndx);
+                        return Err("couldn't get next section for a zero-sized section");
                     }
                 }
-                else {
-                    // this is the normal case, a non-zero sized section, so just use the current section
-                    sec
-                };
+            }
+            else {
+                // this is the normal case, a non-zero sized section, so just use the current section
+                sec
+            };
 
-                // get the relevant section info, i.e., size, alignment, and data contents
-                let sec_size  = sec.size()  as usize;
-                let sec_align = sec.align() as usize;
-                let sec_data  = match sec.get_data(&elf_file) {
+            // get the relevant section info, i.e., size, alignment, and data contents
+            let sec_size  = sec.size()  as usize;
+            let sec_align = sec.align() as usize;
+            let sec_data  = if sec_name.starts_with(BSS_PREFIX) { // .bss section must have Empty data
+                match sec.get_data(&elf_file) {
+                    Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
+                    _ => {
+                        error!("parse_elf_kernel_crate(): .bss section [{}] {} had data that wasn't Empty. {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        return Err(".bss section had data that wasn't Empty");
+                    }
+                }
+            } else {
+                match sec.get_data(&elf_file) {
                     Ok(SectionData::Undefined(sec_data)) => sec_data,
                     _ => {
-                        error!("parse_elf_kernel_crate(): Couldn't get section's data (expected \"Undefined\" data) for section index {}: {:?}", shndx, sec.get_data(&elf_file));
-                        return Err("couldn't get data in section");
+                        error!("parse_elf_kernel_crate(): Couldn't get data (expected \"Undefined\" data) for section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        return Err("couldn't get sec_data in .text, .data, or .rodata section");
                     }
-                };
+                }
                 
-               
-                const TEXT_PREFIX:   &'static str = ".text.";
-                const RODATA_PREFIX: &'static str = ".rodata.";
-                const DATA_PREFIX:   &'static str = ".data.";
-
-                if sec_name.starts_with(TEXT_PREFIX) {
-                    let text_prefix_end:   usize = TEXT_PREFIX.len();
-                    if let Some(name) = sec_name.get(text_prefix_end..) {
-                        let demangled = demangle_symbol(name);
-                        trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
-                        assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
-
-                        if let Ok(ref tp) = text_pages {
-                            let dest_addr = tp.start_address() + text_offset;
-                            trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", 
-                                            dest_addr, tp.start_address(), text_offset);
-                            
-                            // here: we're ready to copy the data/text section to the proper address
-                            // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                            let dest: &mut [u8] = unsafe {
-                                slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                            };
-                            dest.copy_from_slice(sec_data);
-
-                            loaded_sections.insert(shndx, 
-                                Arc::new( LoadedSection::Text(TextSection{
-                                    // symbol: demangled.symbol,
-                                    abs_symbol: demangled.full,
-                                    hash: demangled.hash,
-                                    virt_addr: dest_addr,
-                                    size: sec_size,
-                                    global: global_sections.contains(&shndx),
-                                }))
-                            );
-
-                            text_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                        else {
-                            error!("trying to load text section, but no text_pages were allocated!!");
-                            return Err("no text_pages were allocated");
-                        }
-                    }
-                    else {
-                        error!("Failed to get the .text section's name after \".text.\": {:?}", sec_name);
-                        return Err("Failed to get the .text section's name after \".text.\"!");
-                    }
-                }
-
-                else if sec_name.starts_with(RODATA_PREFIX) {
-                    let rodata_prefix_end:   usize = RODATA_PREFIX.len();
-                    if let Some(name) = sec_name.get(rodata_prefix_end..) {
-                        let demangled = demangle_symbol(name);
-                        trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
-                        assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
-
-                        if let Ok(ref rp) = rodata_pages {
-                            let dest_addr = rp.start_address() + rodata_offset;
-                            trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", 
-                                            dest_addr, rp.start_address(), rodata_offset);
-                            
-                            // here: we're ready to copy the data/text section to the proper address
-                            // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                            let dest: &mut [u8] = unsafe {
-                                slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                            };
-                            dest.copy_from_slice(sec_data);
-
-                            loaded_sections.insert(shndx, 
-                                Arc::new( LoadedSection::Rodata(RodataSection{
-                                    // symbol: demangled.symbol,
-                                    abs_symbol: demangled.full,
-                                    hash: demangled.hash,
-                                    virt_addr: dest_addr,
-                                    size: sec_size,
-                                    global: global_sections.contains(&shndx),
-                                }))
-                            );
-
-                            rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                    }
-                    else {
-                        error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
-                        return Err("Failed to get the .rodata section's name after \".rodata.\"!");
-                    }
-                }
-
-                else if sec_name.starts_with(DATA_PREFIX) {
-                    let data_prefix_len:   usize = DATA_PREFIX.len();
-                    if let Some(name) = sec_name.get(data_prefix_len..) {
-                        let demangled = demangle_symbol(name);
-                        trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
-                        assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
-                        
-                        if let Ok(ref dp) = data_pages {
-                            let dest_addr = dp.start_address() + data_offset;
-                            trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
-                                            dest_addr, dp.start_address(), data_offset);
-
-                            // here: we're ready to copy the data/text section to the proper address
-                            // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                            let dest: &mut [u8] = unsafe {
-                                slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                            };
-                            dest.copy_from_slice(sec_data);
-
-                            loaded_sections.insert(shndx, 
-                                Arc::new( LoadedSection::Data(DataSection{
-                                    // symbol: demangled.symbol,
-                                    abs_symbol: demangled.full,
-                                    hash: demangled.hash,
-                                    virt_addr: dest_addr,
-                                    size: sec_size,
-                                    global: global_sections.contains(&shndx),
-                                }))
-                            );
-
-                            data_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                    }
-                    else {
-                        error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
-                        return Err("Failed to get the .data section's name after \".data.\"!");
-                    }
-                }
-
-                else {
-                    warn!("skipping unhandled PROGBITS section {}: {:?}", sec_name, sec);
-                    continue;
-                }
-
+            };
             
+
+
+            if sec_name.starts_with(TEXT_PREFIX) {
+                if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
+                    let demangled = demangle_symbol(name);
+                    trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
+
+                    if let Ok(ref tp) = text_pages {
+                        let dest_addr = tp.start_address() + text_offset;
+                        trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", 
+                                        dest_addr, tp.start_address(), text_offset);
+                        
+                        // here: we're ready to copy the text section to the proper address
+                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                        let dest: &mut [u8] = unsafe {
+                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                        };
+                        dest.copy_from_slice(sec_data);
+
+                        loaded_sections.insert(shndx, 
+                            Arc::new( LoadedSection::Text(TextSection{
+                                // symbol: demangled.symbol,
+                                abs_symbol: demangled.full,
+                                hash: demangled.hash,
+                                virt_addr: dest_addr,
+                                size: sec_size,
+                                global: global_sections.contains(&shndx),
+                            }))
+                        );
+
+                        text_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                    else {
+                        error!("trying to load text section, but no text_pages were allocated!!");
+                        return Err("no text_pages were allocated");
+                    }
+                }
+                else {
+                    error!("Failed to get the .text section's name after \".text.\": {:?}", sec_name);
+                    return Err("Failed to get the .text section's name after \".text.\"!");
+                }
             }
+
+            else if sec_name.starts_with(RODATA_PREFIX) {
+                if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
+                    let demangled = demangle_symbol(name);
+                    trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+
+                    if let Ok(ref rp) = rodata_pages {
+                        let dest_addr = rp.start_address() + rodata_offset;
+                        trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", 
+                                        dest_addr, rp.start_address(), rodata_offset);
+                        
+                        // here: we're ready to copy the rodata section to the proper address
+                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                        let dest: &mut [u8] = unsafe {
+                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                        };
+                        dest.copy_from_slice(sec_data);
+
+                        loaded_sections.insert(shndx, 
+                            Arc::new( LoadedSection::Rodata(RodataSection{
+                                // symbol: demangled.symbol,
+                                abs_symbol: demangled.full,
+                                hash: demangled.hash,
+                                virt_addr: dest_addr,
+                                size: sec_size,
+                                global: global_sections.contains(&shndx),
+                            }))
+                        );
+
+                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                }
+                else {
+                    error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
+                    return Err("Failed to get the .rodata section's name after \".rodata.\"!");
+                }
+            }
+
+            else if sec_name.starts_with(DATA_PREFIX) {
+                if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
+                    let demangled = demangle_symbol(name);
+                    trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
+                    
+                    if let Ok(ref dp) = data_pages {
+                        let dest_addr = dp.start_address() + data_offset;
+                        trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
+                                        dest_addr, dp.start_address(), data_offset);
+
+                        // here: we're ready to copy the data/bss section to the proper address
+                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                        let dest: &mut [u8] = unsafe {
+                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
+                        };
+                        dest.copy_from_slice(sec_data);
+
+                        loaded_sections.insert(shndx, 
+                            Arc::new( LoadedSection::Data(DataSection{
+                                // symbol: demangled.symbol,
+                                abs_symbol: demangled.full,
+                                hash: demangled.hash,
+                                virt_addr: dest_addr,
+                                size: sec_size,
+                                global: global_sections.contains(&shndx),
+                            }))
+                        );
+
+                        data_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                }
+                
+                else {
+                    error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
+                    return Err("Failed to get the .data section's name after \".data.\"!");
+                }
+            }
+
+            else if sec_name.starts_with(BSS_PREFIX) {
+                if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
+                    let demangled = demangle_symbol(name);
+                    trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size);
+                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
+                    
+                    // we still use DataSection to represent the .bss sections, since they have the same flags
+                    if let Ok(ref dp) = data_pages {
+                        let dest_addr = dp.start_address() + data_offset;
+                        trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", 
+                                        dest_addr, dp.start_address(), data_offset);
+
+                        // here: we're ready to fill the bss section with zeroes at the proper address
+                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
+                        unsafe {
+                            ::core::intrinsics::write_bytes(dest_addr as *mut u8, 0, sec_size);
+                        }
+
+                        loaded_sections.insert(shndx, 
+                            Arc::new( LoadedSection::Data(DataSection{
+                                // symbol: demangled.symbol,
+                                abs_symbol: demangled.full,
+                                hash: demangled.hash,
+                                virt_addr: dest_addr,
+                                size: sec_size,
+                                global: global_sections.contains(&shndx),
+                            }))
+                        );
+
+                        data_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                }
+                
+                else {
+                    error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
+                    return Err("Failed to get the .bss section's name after \".bss.\"!");
+                }
+            }
+
+            else {
+                // some special sections are fine to ignore
+                if  sec_name.starts_with(".note") ||   // ignore GNU note sections
+                    sec_name.starts_with(".gcc")  ||   // ignore gcc special sections for now
+                    sec_name == ".text"                // ignore the header .text section (with no content)
+                {
+                    continue;    
+                }
+
+                error!("unhandled PROGBITS/NOBITS section [{}] {}", shndx, sec_name);
+                continue;
+            }
+
+        
         }
-    } // end of handling PROGBITS sections: text, data, rodata
+    }  // end of handling PROGBITS sections: text, data, rodata, bss
 
 
     debug!("=========== moving on to the relocations for module {} =========", module_name);
