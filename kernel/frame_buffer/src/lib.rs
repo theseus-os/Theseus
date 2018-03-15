@@ -5,6 +5,8 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
+#![feature(unique)]
+#![feature(asm)]
 
 extern crate spin;
 
@@ -24,6 +26,8 @@ use kernel_config::memory::KERNEL_OFFSET;
 use state_store::{SSCached, get_state, insert_state};
 
 const FRAME_BUFFER_ADDR: usize = 0xa0000;
+const FRAME_BUFFER_WIDTH:usize = 800*3;
+const FRAME_BUFFER_HEIGHT:usize = 600;
 
 
 pub static FRAME_DRAWER: Mutex<Drawer> = Mutex::new(Drawer {
@@ -51,9 +55,19 @@ pub struct Drawer {
 }
 impl Drawer {
     pub fn draw_pixel(&mut self) {
-        for i in 1..100 {
-            self.buffer().chars[32160+i].write(0x20);
+        for i in 0..300 {
+            let a = 85;
+            self.buffer().chars[32160 + i*3].write(0x66);
+            self.buffer().chars[32160 + i*3+1].write(0xab);
+            self.buffer().chars[32160 + i*3+2].write(0x20);
+
         }
+
+        unsafe{
+                asm!("mov al, 0x13": : : : "intel", "volatile");
+                asm!("mov ah, 0x00": : : : "intel", "volatile");
+        } 
+        
 
     }
 
@@ -65,7 +79,7 @@ impl Drawer {
 
 
 struct Buffer {
-    chars: [Volatile<u8>; 320*200]
+    chars: [Volatile<u8>; 640*3*480]
 }
 
 

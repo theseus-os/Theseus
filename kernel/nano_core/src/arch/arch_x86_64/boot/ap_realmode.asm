@@ -1,5 +1,5 @@
 section .init.realmodetext16 progbits alloc exec nowrite
-bits 16 ; we're in real mode, that's how APs boot up
+bits 16 ; we're in , that's how APs boot up
 
 
 global ap_start_realmode
@@ -37,10 +37,43 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
+
+
+   
     ; set graphic mode
-    mov al, 0x13
-    mov ah, 0x0
+    mov ax, 0x4f02
+    mov bx, 0x4112
     int 0x10
+
+    ;test code to find lfb address
+    ;mov ax, 0xb
+    ;mov es, ax
+    ;mov ax, 0x8000
+    ;mov di, ax
+    ;mov ax, 0x4f01
+    ;mov cx, 0x4112    
+    ;int 0x10
+
+    ;mov ax, [es:di+0x2b]
+
+    ;mov ah, 0x00
+    ;cmp ax, 0x00fd
+    ;je next
+    ;mov ah, 0x13
+    ;next:
+
+    ;mov al, ah
+    ;mov ah, 0x00
+    ;int 0x10
+
+
+;Character, return true state
+
+
+    
+
+
+
 
 
 
