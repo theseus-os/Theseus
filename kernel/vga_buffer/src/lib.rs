@@ -1,211 +1,267 @@
-//! The vga buffer that implements basic printing,
-//! including the println_unsafe macro. 
-//! Adapted from Phillip Opperman's blog os. 
+//! The vga buffer that implements basic printing in VGA text mode.
 
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
+#![feature(ptr_internals)]
 
 extern crate spin;
 extern crate volatile;
 extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
-extern crate state_store;
-#[macro_use] extern crate lazy_static;
+// #[macro_use] extern crate log;
 
 use core::ptr::Unique;
+use core::cmp::min;
 use core::fmt;
+// use core::slice;
+use core::mem;
 use spin::Mutex;
 use volatile::Volatile;
 use alloc::string::String;
+use alloc::Vec;
 use kernel_config::memory::KERNEL_OFFSET;
-use state_store::{SSCached, get_state, insert_state};
 
 /// defined by x86's physical memory maps
-const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
-/// default height of the VGA window
+const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+
+/// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
-/// default width of the VGA window
+/// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
 
 
+// #[macro_export] pub mod raw;
+pub mod raw;
 
-lazy_static! {
-    static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
-        let vga_writer = VgaWriter {
-            column_position: 0,
-            buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-        };
-        insert_state(Mutex::new(vga_writer));
-        get_state::<Mutex<VgaWriter>>()
-    };
+
+/// Specifies where we want to scroll the display, and by how much
+#[derive(Debug)]
+pub enum DisplayPosition {
+    /// Move the display to the very top of the VgaBuffer
+    Start,
+    /// Refresh the display without scrolling it
+    Same, 
+    /// Move the display down by the specified number of lines
+    Down(usize),
+    /// Move the display up by the specified number of lines
+    Up(usize),
+    /// Move the display to the very end of the VgaBuffer
+    End
 }
 
 
-pub static EARLY_VGA_WRITER: Mutex<VgaWriter> = Mutex::new(VgaWriter {
-    column_position: 0,
-    buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
-});
+type Line = [ScreenChar; BUFFER_WIDTH];
+
+const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
 
 
-
-
-/// This is UNSAFE because it bypasses the VGA Buffer lock. Use print!() instead. 
-/// Should only be used in exception contexts and early bring-up code 
-/// before the console-based print!() macro is available. 
-#[macro_export]
-macro_rules! print_unsafe {
-    ($($arg:tt)*) => ({
-            $crate::print_args_unsafe(format_args!($($arg)*)).unwrap();
-    });
+/// An instance of a VGA text buffer which can be displayed to the screen.
+pub struct VgaBuffer {
+    /// the index of the line that is currently being displayed
+    display_line: usize,
+    /// whether the display is locked to scroll with the end and show new lines as printed
+    display_scroll_end: bool,
+    /// the column position in the last line where the next character will go
+    column: usize,
+    /// the actual buffer memory that can be written to the VGA memory
+    lines: Vec<Line>,
 }
 
-#[doc(hidden)]
-pub fn print_args_unsafe(args: fmt::Arguments) -> fmt::Result {
-    if let Some(writer) = VGA_WRITER.get() {
-        unsafe{ writer.force_unlock() };
-        print_args(args)
+impl VgaBuffer {
+    /// Create a new VgaBuffer.
+    pub fn new() -> VgaBuffer {
+        VgaBuffer::with_capacity(1000)
     }
-    else {
-        Err(fmt::Error)
-    }
 
-}
+    // Create a new VgaBuffer with the given capacity, specified in number of lines. 
+    pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
+        let first_line = BLANK_LINE;
+        let mut lines = Vec::with_capacity(num_initial_lines);
+        lines.push(first_line);
 
-/// This is UNSAFE because it bypasses the VGA Buffer lock. Use println!() instead. 
-/// Should only be used in exception contexts and early bring-up code
-/// before the console-based println!() macro is available. 
-#[macro_export]
-macro_rules! println_unsafe {
-    ($fmt:expr) => (print_unsafe!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print_unsafe!(concat!($fmt, "\n"), $($arg)*));
-}
-
-
-
-pub fn print_string(s: &String) -> fmt::Result {
-    print_str(s.as_str())
-}
-
-pub fn print_str(s: &str) -> fmt::Result {
-    use core::fmt::Write;
-    if let Some(writer) = VGA_WRITER.get() {
-        writer.lock().write_str(s)
-    }
-    else {
-        Err(fmt::Error)
-    }
-}
-
-pub fn print_args(args: fmt::Arguments) -> fmt::Result {
-    use core::fmt::Write;
-    if let Some(writer) = VGA_WRITER.get() {
-        writer.lock().write_fmt(args)
-    }
-    else {
-        Err(fmt::Error)
-    }
-}
-
-pub fn clear_screen() -> Result<(), ()> {
-    if let Some(writer) = VGA_WRITER.get() {
-        let mut locked_vgawriter = writer.lock(); 
-        for _ in 0..BUFFER_HEIGHT {
-            locked_vgawriter.new_line();
+        VgaBuffer {
+            display_line: 0,
+            display_scroll_end: true,
+            column: 0,
+            lines: lines,
         }
-        Ok(())
-    }
-    else {
-        Err(())
-    }
-}
-
-
-
-#[macro_export]
-macro_rules! print_early {
-    ($($arg:tt)*) => ({
-            $crate::print_args_early(format_args!($($arg)*)).unwrap();
-    });
-}
-
-pub fn print_args_early(args: fmt::Arguments) -> fmt::Result {
-    use core::fmt::Write;
-    unsafe { EARLY_VGA_WRITER.force_unlock(); }
-    EARLY_VGA_WRITER.lock().write_fmt(args)
-}
-
-
-pub fn show_splash_screen() {
-    let _ = print_str(WELCOME_STRING);
-}
-
-pub struct VgaWriter {
-    column_position: usize,
-    buffer: Unique<Buffer>,
-}
-impl VgaWriter {
-    pub fn write_byte_with_color(&mut self, byte: u8, color_code: ColorCode) {
-        /*match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
-
-                self.buffer().chars[row][col].write(ScreenChar {
-                    ascii_character: byte,
-                    color_code: color_code,
-                });
-                self.column_position += 1;
-            }
-        }*/
     }
     
-    pub fn write_byte(&mut self, byte: u8) {
-        self.write_byte_with_color(byte, ColorCode::default())
-    }
 
+    pub fn write_str_with_color(&mut self, s: &str, color: ColorCode) {
+        for byte in s.bytes() {
+            match byte {
+                // handle new line
+                b'\n' => {
+                    self.new_line(color);
+                }
 
-    fn buffer(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
-    }
+                // handle backspace
+                // 0x08 => { }
 
-    fn new_line(&mut self) {
-        /*for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let buffer = self.buffer();
-                let character = buffer.chars[row][col].read();
-                buffer.chars[row - 1][col].write(character);
+                // all other regular bytes
+                byte => {
+                    {
+                        let mut curr_line = self.lines.last_mut().unwrap();
+                        curr_line[self.column] = ScreenChar::new(byte, color);
+                    }
+                    self.column += 1;
+
+                    if self.column == BUFFER_WIDTH { // wrap to a new line
+                        self.new_line(color); 
+                    }
+                }
             }
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;*/
+
+        // refresh the VGA text display if the changes would be visible on screen
+        // i.e., if the end of the vga buffer is visible
+        let last_line = self.lines.len() - 1;;
+        if  self.display_scroll_end || 
+            (last_line >= self.display_line && last_line <= (self.display_line + BUFFER_HEIGHT))
+        {
+            self.display(DisplayPosition::End);
+        }
+        
+        // // refresh the VGA text display if the changes would be visible on screen
+        // // keep in mind the latest write to the VGA buffer is always written into the last element of self.lines
+        // let display_line = self.display_line;
+        // let written_line = self.lines.len();
+        // if written_line >= display_line && written_line <= display_line + BUFFER_HEIGHT {
+        //     // the recent write will be visible
+        //     self.display(DisplayPosition::Same);
+        // }
+
     }
 
-    fn clear_row(&mut self, row: usize) {
-        /*let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: ColorCode::default()
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer().chars[row][col].write(blank);
-        }*/
+
+    pub fn write_string_with_color(&mut self, s: &String, color: ColorCode) {
+        self.write_str_with_color(s.as_str(), color);
     }
+
+
+    pub fn write_args(&mut self, args: fmt::Arguments) -> fmt::Result {
+        use core::fmt::Write;
+        self.write_fmt(args)
+    }
+
+    /// To create a new line, this function does the following:
+    /// 1) Clears the rest of the current line.
+    /// 2) Resets the column index to 0 (beginning of next line).
+    /// 3) Allocates a new Line and pushes it to the `lines` Vec.
+    fn new_line(&mut self, color: ColorCode) {
+        // clear out the rest of the current line
+        let ref mut lines = self.lines;
+        for c in self.column .. BUFFER_WIDTH {
+            lines.last_mut().unwrap()[c] = ScreenChar::new(b' ', color);
+        }
+        
+        self.column = 0; 
+        lines.push([ScreenChar::new(b' ', color); BUFFER_WIDTH]);
+    }
+
+
+
+    /// Displays this VgaBuffer at the given string offset by flushing it to the screen.
+    pub fn display(&mut self, position: DisplayPosition) {
+        // trace!("VgaBuffer::display(): position {:?}", position);
+        let (start, end) = match position {
+            DisplayPosition::Start => {
+                self.display_scroll_end = false;
+                self.display_line = 0;
+                (0, BUFFER_HEIGHT)
+            }
+            DisplayPosition::Up(u) => {
+                if self.display_scroll_end {
+                    // handle the case when it was previously at the end, but then scrolled up
+                    self.display_line = self.display_line.saturating_sub(BUFFER_HEIGHT);
+                }
+                self.display_scroll_end = false;
+                self.display_line = self.display_line.saturating_sub(u);
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
+            }
+            DisplayPosition::Down(d) => {
+                if self.display_scroll_end {
+                    // do nothing if we're already locked to the end
+                }
+                else {
+                    self.display_line = self.display_line.saturating_add(d);
+                    if self.display_line + BUFFER_HEIGHT >= self.lines.len() {
+                        self.display_scroll_end = true;
+                        self.display_line = self.lines.len() - 1;
+                    }
+                }
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
+            }
+            DisplayPosition::Same => {
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
+            }
+            DisplayPosition::End => {
+                self.display_scroll_end = true;
+                self.display_line = self.lines.len() - 1;
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
+            }
+        };
+
+        // trace!("   initial start {}, end {}", start, end);
+        // if we're displaying the end of the VgaBuffer, the range of characters displayed needs to start before that
+        let start = if start == (self.lines.len() - 1) {
+            start.saturating_sub(BUFFER_HEIGHT - 1)
+        } else {
+            start
+        };
+        let end = min(end, self.lines.len());       // ending line must be within the bounds of the buffer (exclusive)
+        let num_lines = end - start;
+        
+        // trace!("   adjusted start {}, end {}, num_lines {}", start, end, num_lines);
+
+        // use volatile memory to ensure the writes happen every time
+        use core::ptr::write_volatile;
+        unsafe {
+            // write the lines that we *can* get from the buffer
+            for (i, line) in (start .. end).enumerate() {
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                // trace!("   writing line ({}, {}) at addr {:#X}", i, line, addr as usize);
+                write_volatile(addr, self.lines[line]);
+            }
+
+            // fill the rest of the space, if any, with blank lines
+             if num_lines < BUFFER_HEIGHT {
+                for i in num_lines .. BUFFER_HEIGHT {
+                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                    // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
+                    write_volatile(addr, BLANK_LINE);
+                }
+             }
+        }
+
+
+        // // here, we do the actual writing of the VGA memory
+        // unsafe {
+        //     // copy lines from the our VgaBuffer to the VGA text memory
+        //     let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR as *mut Line), num_lines);
+        //     dest.copy_from_slice(&self.lines[start .. end]);
+            
+        //     // if the buffer is too small, fill in the rest of the lines
+        //     if num_lines < BUFFER_HEIGHT {
+        //         let start = BUFFER_HEIGHT - num_lines;
+        //         for line in start .. BUFFER_HEIGHT {
+        //             let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR + (line * mem::size_of::<Line>())) as *mut ScreenChar, BUFFER_WIDTH); // copy 1 line at a time
+        //             dest.copy_from_slice(&BLANK_LINE);
+        //         }
+        //     }
+        // }
+    }
+
 }
 
-impl fmt::Write for VgaWriter {
+impl fmt::Write for VgaBuffer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        
         let ret = serial_port::write_str(s); // mirror to serial port
-        
-        for byte in s.bytes() {
-            self.write_byte(byte)
-        }
+        self.write_str_with_color(s, ColorCode::default());
         ret
     }
 }
@@ -250,21 +306,15 @@ impl Default for ColorCode {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-struct ScreenChar {
+pub struct ScreenChar {
     ascii_character: u8,
     color_code: ColorCode,
 }
-
-struct Buffer {
-    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+impl ScreenChar {
+    pub const fn new(ascii: u8, color: ColorCode) -> ScreenChar {
+        ScreenChar {
+            ascii_character: ascii,
+            color_code: color,
+        }
+    }
 }
-
-
-// this doesn't line up as shown here because of the escaped backslashes,
-// but it lines up properly when printed :)
-const WELCOME_STRING: &'static str = "\n\n
- _____ _                              
-|_   _| |__   ___  ___  ___ _   _ ___ 
-  | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
-  | | | | | |  __/\\__ \\  __/ |_| \\__ \\
-  |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";

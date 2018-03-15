@@ -1,0 +1,20 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "pit_clock"
+description = "PIT (Programmable Interval Timer) support for Theseus, x86 only."
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

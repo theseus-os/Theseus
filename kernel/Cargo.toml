@@ -1,0 +1,34 @@
+[workspace]
+
+
+## The members element is required, but we really only *need* the nano_core.
+## Other crates will be built as needed, if they are actually used.
+members = [
+	"nano_core",
+]
+
+exclude = [
+	"doc",
+]
+
+
+## Cargo doesn't yet support features for virtual workspace manifests
+# [features]
+# loadable = [ "nano_core/loadable", "captain/loadable" ]
+# mirror_serial = [ "nano_core/mirror_serial" ]
+# apic_timer_fixed = [ "apic/apic_timer_fixed" ]
+
+
+
+### These profiles fix the new rustc behavior of splitting one crate into many object files. 
+### THat messes up our module loading, which is bad!
+### See this link about profiles: https://doc.rust-lang.org/cargo/reference/manifest.html
+# workaround rust-lang/rust#47074
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+# workaround rust-lang/rust#47074
+[profile.release]
+codegen-units = 1
+incremental = false

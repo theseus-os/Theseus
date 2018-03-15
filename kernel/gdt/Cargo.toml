@@ -1,0 +1,33 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "gdt"
+description = "GDT (Global Descriptor Table) support (x86 only) for Theseus"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+bit_field = "0.7.0"
+bitflags = "1.0.0"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.0"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.tss]
+path = "../tss"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

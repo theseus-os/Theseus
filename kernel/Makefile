@@ -1,43 +1,60 @@
-### This Makefile builds the specified subdirectories within this kernel directory.
-### It offers the "all" and "clean" targets only
-SHELL := /bin/bash
+### This Makefile builds only the nano_core object files (as a static library ".a" file), 
+### consisting of the nano_core's Rust crate modules and its assembly boot files.
+### It does not build an OS .iso image or anything runnable in a simulator like QEMU.
+
+## defines all config options for building any kernel crate
+## NOTE: most of the variables used below are defined in Config.mk
+include Config.mk  
+
+## this is the output path of the xargo command, not our choice.
+## The name of the lib (lib_____.a) is defined by the target above.
+cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
+
+nano_core-src := nano_core/src
+nano_core-obj := $(KERNEL_BUILD_DIR)/nano_core-$(ARCH).bin
+
+linker_script := $(nano_core-src)/boot/arch_$(ARCH)/linker_higher_half.ld
+assembly_source_files := $(wildcard $(nano_core-src)/boot/arch_$(ARCH)/*.asm)
+assembly_object_files := $(patsubst $(nano_core-src)/boot/arch_$(ARCH)/%.asm, \
+	$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
-KERNEL_BUILD_DIR ?= $(shell pwd)/build
-export  # export this to Makefiles in subdirectories
+.PHONY: all clean cargo doc
 
-# get all the subdirectories for making
-SUBDIRS := $(wildcard */.)
-# except for the build directory
-SUBDIRS := $(filter-out build/., $(SUBDIRS))
-# build the nano_core separately
-SUBDIRS := $(filter-out nano_core/., $(SUBDIRS))
+all: $(nano_core-obj)
+
+clean:
+	cargo clean
+	rm -rf ./build
 
 
-.PHONY: all clean $(SUBDIRS) nano_core
-.DEFAULT_GOAL := all 
 
-## Loops over all subdirectories (except the build dir) and runs make <cmd> in it
-## Note that while this does build the nano_core, the nano_core's build file does not
-## copy any built object files into the kernel build dir, whereas the other modules do.
-$(SUBDIRS): 
-## If a directory has a Makefile, then we call it to build it as an individual module. 
-	@if [ -f $@/Makefile ]; then \
-		$(MAKE) -C $@ $(MAKECMDGOALS);  \
-	fi;
+cargo: 
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
 
 
-## Build the nano_core separately, which is faster if done either at the beginning or end
-## because of how xargo works: https://github.com/japaric/xargo/issues/86
-nano_core:
-	$(MAKE) -C nano_core $(MAKECMDGOALS)
+$(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
+	@mkdir -p $(KERNEL_BUILD_DIR)
+	ld -n -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)
+	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  /d;/WEAK   /d' > $(KERNEL_BUILD_DIR)/nano_core.sym   # removes LOCAL and WEAK symbols from the ELF file
+	@for objfile in ./target/$(TARGET)/${BUILD_MODE}/deps/*.o ; do \
+		cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/\1.o/p'` ; \
+	done
+
+# compile assembly files
+$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm
+	@mkdir -p $(shell dirname $@)
+	@nasm -felf64 $< -o $@
 
 
-## simply runs make all in all subdirs
-all: nano_core $(SUBDIRS)
-
-
-## simply runs make clean in all subdirs, then removes the kernel build dir
-clean: nano_core $(SUBDIRS)
-	rm -rf $(KERNEL_BUILD_DIR)
+## Builds Theseus's documentation.
+## The "doc" directory is excluded from the workspace so it is not accidentally built as code, even though it contains the top-level docs.
+## Instead, each file in the "doc" directory, including main lib.rs file, is temporarily moved to the top-level kernel workspace directory
+## so that when compiled with rustdoc, all of the workspace's subcrates show up nicely in the sidebar.
+doc:
+	@cargo doc --no-deps
+	@cp -f doc/src/lib.rs __doc.rs
+	@rustdoc --output target/doc --crate-name Theseus __doc.rs
+## TODO: FIXME: build all other .rs files in the "doc" crate... do we give them the same "Theseus" crate name?
+	@rm -f __doc.rs
 
