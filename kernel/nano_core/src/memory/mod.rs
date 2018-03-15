@@ -356,7 +356,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         // optimization: we reserve memory from areas below the end of the kernel's physical address,
         // which includes addresses beneath 1 MB
         if area.end_address() < kernel_phys_end {
-            debug!("  skipping region before kernel_phys_end");
+            debug!("--> skipping region before kernel_phys_end");
             continue;
         }
         let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
@@ -368,8 +368,8 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
             acpi: 0, 
         };
 
-        info!("  region established: start={:#x}, length={:#x}", available[avail_index].base_addr, available[avail_index].length);
-        print_early!("  region established: start={:#x}, length={:#x}\n", available[avail_index].base_addr, available[avail_index].length);
+        info!("--> memory region established: start={:#x}, length={:#x}", available[avail_index].base_addr, available[avail_index].length);
+        print_early!("--> memory region established: start={:#x}, length={:#x}\n", available[avail_index].base_addr, available[avail_index].length);
         avail_index += 1;
     }
 
@@ -440,7 +440,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
 /// Loads the specified kernel crate into memory, allowing it to be invoked.  
 /// Returns a Result containing the number of symbols that were added to the system map
 /// as a result of loading this crate.
-pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo) -> Result<usize, &'static str> {
+pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) -> Result<usize, &'static str> {
     debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
@@ -484,12 +484,12 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                         parse_nano_core_symbols(temp_module_mapping, size)
                     }
                     else {
-                        parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table)
+                        parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log)
                     }
                 });
 
                 info!("loaded new crate: {}", new_crate.crate_name);
-                Ok(metadata::add_crate(new_crate))
+                Ok(metadata::add_crate(new_crate, log))
 
                 // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
             }
