@@ -154,7 +154,12 @@ fn test_driver(_: Option<u64>) {
 
 
 fn test_framebuffer(_: Option<u64>) {
-    draw_pixel!();    
+    draw_line!(0, 0, 640, 480, 0xe4cf8e);  
+    draw_square!(310, 225, 200, 100, 0xeea5d1); 
+
+    loop{
+        draw_pixel!(500, 320, 0xe4cf8e);
+    }       
 }
 
 
