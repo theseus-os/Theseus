@@ -26,8 +26,10 @@ use kernel_config::memory::KERNEL_OFFSET;
 use state_store::{SSCached, get_state, insert_state};
 
 const VGA_BUFFER_ADDR: usize = 0xa0000;
-pub const FRAME_BUFFER_WIDTH:usize = 800*3;
-pub const FRAME_BUFFER_HEIGHT:usize = 600;
+
+//Size of VESA mode 0x4112
+pub const FRAME_BUFFER_WIDTH:usize = 640*3;
+pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 
 pub static FRAME_DRAWER: Mutex<Drawer> = {
@@ -80,9 +82,9 @@ impl Drawer {
     pub fn draw_pixel(&mut self) {
         for i in 0..300 {
             let a = 85;
-            self.buffer().chars[640*3*240+320*3 + i*3].write(0x66);
-            self.buffer().chars[640*3*240+320*3 + i*3+1].write(0xab);
-            self.buffer().chars[640*3*240+320*3 + i*3+2].write(0x20);
+            self.buffer().chars[240][320*3 + i*3].write(0x66);
+            self.buffer().chars[240][320*3 + i*3+1].write(0xab);
+            self.buffer().chars[240][320*3 + i*3+2].write(0x20);
         }
 
         unsafe{
@@ -112,7 +114,7 @@ impl Drawer {
 
 
 struct Buffer {
-    chars: [Volatile<u8>; FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT]
+    chars: [[Volatile<u8>; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
 }
 
 
