@@ -30,8 +30,6 @@ const BUFFER_HEIGHT: usize = 25;
 /// default width of the VGA window
 const BUFFER_WIDTH: usize = 80;
 
-
-
 lazy_static! {
     static ref VGA_WRITER: SSCached<Mutex<VgaWriter>> = {
         let vga_writer = VgaWriter {

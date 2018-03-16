@@ -24,6 +24,9 @@ path = "../state_store"
 default-features = false
 version = "0.3.7"
 
+# [dependencies.nano_core]
+# path = "../nano_core"
+
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

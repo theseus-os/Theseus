@@ -392,7 +392,6 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         paging::init(frame_allocator_mutex, &boot_info)
     );
     // HERE: heap is initialized! Can now use alloc types.
-
     debug!("Done with paging::init()!, active_table: {:?}", active_table);
     print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
 
