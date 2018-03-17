@@ -372,7 +372,7 @@ impl Keycode {
             Keycode::P => Some('p'),
             Keycode::LeftBracket => Some('['),
             Keycode::RightBracket => Some(']'),
-            Keycode::Enter => Some(char::from(13)), 
+            Keycode::Enter => Some('\n'), 
             Keycode::A => Some('a'),
             Keycode::S => Some('s'),
             Keycode::D => Some('d'),

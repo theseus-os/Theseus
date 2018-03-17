@@ -43,7 +43,7 @@ pub fn init_early_exceptions() {
 
 /// interrupt 0x00
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
+    println_early!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
     loop {}
 }
 
@@ -63,7 +63,7 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
     }
     
     // if vaddr is 0, then it's a regular NMI    
-    println_unsafe!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
+    println_early!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
     
@@ -73,14 +73,14 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
 
 /// interrupt 0x03
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
+    println_early!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 }
 
 /// interrupt 0x06
 pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
+    println_early!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
     loop {}
@@ -89,7 +89,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 /// interrupt 0x07
 /// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_unsafe!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
+    println_early!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 
@@ -110,7 +110,7 @@ pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut Excepti
 
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
-    println_unsafe!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+    println_early!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}",
              control_regs::cr2(),
              error_code,
@@ -119,7 +119,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
 }
 
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_unsafe!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    println_early!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
     loop {}
 }
 
@@ -128,7 +128,7 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 /// this shouldn't really ever happen, but I added the handler anyway
 /// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_unsafe!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
+    println_early!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",
              error_code,
              stack_frame);
@@ -138,7 +138,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
 
 
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_unsafe!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
+    println_early!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
                                   {:#b}\n{:#?}",
              error_code,
              stack_frame);
