@@ -25,6 +25,9 @@ static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
     // assert_has_not_been_called!("keyboard init was called more than once!");
     
+    // set keyboard to scancode set 1
+
+
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });

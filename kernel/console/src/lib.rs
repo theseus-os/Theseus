@@ -10,11 +10,17 @@ extern crate dfqueue;
 
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
-use spin::Once;
+use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
+use core::sync::atomic::Ordering;
+use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 // use core::sync::atomic::Ordering;
 // use rtc;
 
+
+lazy_static! {
+    static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
+}
 
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
@@ -125,14 +131,15 @@ pub fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static
 
         match event_data {
             &ConsoleEvent::ExitEvent => {
-                try!(vga_buffer::print_str("\nSmoothly exiting console main loop.\n").map_err(|_| "print_str failed"));
+                use core::fmt::Write;
+                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 handle_key_event(input_event.key_event);
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                try!(vga_buffer::print_string(&output_event.text).map_err(|_| "print_string failed"));
+                CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default());
             }
         }
         event.mark_completed();
@@ -150,34 +157,83 @@ fn handle_key_event(keyevent: KeyEvent) {
         panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
     }
 
-    // only print ascii values on a key press down
+
+    // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
     if keyevent.action != KeyAction::Pressed {
         return; 
     }
 
-    // if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-    //     debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
-    //             ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-    //             rtc::get_rtc_ticks().ok(),
-    //             unsafe{::interrupts::SPURIOUS_COUNT},
-    //             ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
-    //     return; 
-    // }
+    if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
+        // use core::fmt::Write;
+        // use core::ops::DerefMut;
+        let s = format!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
+            ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+            rtc::get_rtc_ticks().ok(),
+            unsafe{::interrupts::SPURIOUS_COUNT},
+            ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed)
+        );
+
+        CONSOLE_VGA_BUFFER.lock().write_string_with_color(&s, ColorCode::default());
+        
+        // debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
+        //         ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+        //         rtc::get_rtc_ticks().ok(),
+        //         unsafe{::interrupts::SPURIOUS_COUNT},
+        //         ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
+        return; 
+    }
 
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
 
 
-    let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
-    match ascii {
+    // home, end, page up, page down, up arrow, down arrow for the console
+    if keyevent.keycode == Keycode::Home {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
+        return;
+    }
+    if keyevent.keycode == Keycode::End {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
+        return;
+    }
+    if keyevent.keycode == Keycode::PageUp {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
+        return;
+    }
+    if keyevent.keycode == Keycode::PageDown {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
+        return;
+    }
+    if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
+        return;
+    }
+    if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
+        return;
+    }
+
+
+    match keyevent.keycode.to_ascii(keyevent.modifiers) {
         Some(c) => { 
-            // we echo key presses directly to the console without needing to queue an event
-            // vga_buffer::print_args(format_args!("{}", c)); // probably a better way to do this...
-            use alloc::string::ToString;
-            vga_buffer::print_string(&c.to_string()).unwrap();
+            // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
+            use alloc::string::ToString;
+            CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
     }
 }
+
+
+
+
+// this doesn't line up as shown here because of the escaped backslashes,
+// but it lines up properly when printed :)
+const WELCOME_STRING: &'static str = "\n\n
+ _____ _                              
+|_   _| |__   ___  ___  ___ _   _ ___ 
+  | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
+  | | | | | |  __/\\__ \\  __/ |_| \\__ \\
+  |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";

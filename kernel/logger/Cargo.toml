@@ -4,12 +4,7 @@ name = "logger"
 version = "0.1.0"
 
 [dependencies]
-
-[dependencies.irq_safety]
-path = "../../libs/irq_safety"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+spin = "0.4.5"
 
 [dependencies.serial_port]
 path = "../serial_port"
@@ -17,9 +12,6 @@ path = "../serial_port"
 [dependencies.log]
 default-features = false
 version = "0.3.7"
-
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 
 
 [lib]
