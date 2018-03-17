@@ -65,7 +65,7 @@ impl fmt::Write for RawVgaBuffer {
 static EARLY_VGA_WRITER: Mutex<RawVgaBuffer> = Mutex::new(
     RawVgaBuffer {
         column_position: 0,
-        buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_PHYSICAL_ADDR + KERNEL_OFFSET) as *mut _) },
+        buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) as *mut _) },
     }
 );
 

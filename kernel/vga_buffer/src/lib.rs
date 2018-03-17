@@ -10,7 +10,7 @@ extern crate volatile;
 extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 
 use core::ptr::Unique;
 use core::cmp::min;
@@ -24,8 +24,7 @@ use alloc::Vec;
 use kernel_config::memory::KERNEL_OFFSET;
 
 /// defined by x86's physical memory maps
-const VGA_BUFFER_PHYSICAL_ADDR: usize = 0xb8000;
-const VGA_BUFFER_VIRTUAL_ADDR: usize = KERNEL_OFFSET + VGA_BUFFER_PHYSICAL_ADDR;
+const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 
 /// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
@@ -118,7 +117,11 @@ impl VgaBuffer {
         }
 
         // refresh the VGA text display if the changes would be visible on screen
-        if self.display_scroll_end {
+        // i.e., if the end of the vga buffer is visible
+        let last_line = self.lines.len() - 1;;
+        if  self.display_scroll_end || 
+            (last_line >= self.display_line && last_line <= (self.display_line + BUFFER_HEIGHT))
+        {
             self.display(DisplayPosition::End);
         }
         
@@ -165,28 +168,37 @@ impl VgaBuffer {
     pub fn display(&mut self, position: DisplayPosition) {
         // trace!("VgaBuffer::display(): position {:?}", position);
         let (start, end) = match position {
-            DisplayPosition::Start    => {
+            DisplayPosition::Start => {
                 self.display_scroll_end = false;
                 self.display_line = 0;
                 (0, BUFFER_HEIGHT)
             }
-            DisplayPosition::Up(u)    => {
+            DisplayPosition::Up(u) => {
+                if self.display_scroll_end {
+                    // handle the case when it was previously at the end, but then scrolled up
+                    self.display_line = self.display_line.saturating_sub(BUFFER_HEIGHT);
+                }
                 self.display_scroll_end = false;
                 self.display_line = self.display_line.saturating_sub(u);
                 (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
-            DisplayPosition::Down(d)  => {
-                self.display_line = self.display_line.saturating_add(d);
-                if self.display_line >= self.lines.len() {
-                    self.display_scroll_end = true;
-                    self.display_line = self.lines.len() - 1;
+            DisplayPosition::Down(d) => {
+                if self.display_scroll_end {
+                    // do nothing if we're already locked to the end
+                }
+                else {
+                    self.display_line = self.display_line.saturating_add(d);
+                    if self.display_line + BUFFER_HEIGHT >= self.lines.len() {
+                        self.display_scroll_end = true;
+                        self.display_line = self.lines.len() - 1;
+                    }
                 }
                 (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
-            DisplayPosition::Same     => {
+            DisplayPosition::Same => {
                 (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
-            DisplayPosition::End      => {
+            DisplayPosition::End => {
                 self.display_scroll_end = true;
                 self.display_line = self.lines.len() - 1;
                 (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
