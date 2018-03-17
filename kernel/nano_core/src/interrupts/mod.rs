@@ -384,20 +384,12 @@ static mut EXTENDED_SCANCODE: bool = false;
 
 /// 0x21
 extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // unsafe {
-    //     let mut status = ::x86_64::instructions::port::inb(0x64);
-    //     while status & 0x01 == 0 {
-    //         // trace!("keyboard_handler: waiting for kbd status bit, status: {:#X}", status);
-    //         status = ::x86_64::instructions::port::inb(0x64);
-    //         // eoi(Some(PIC_MASTER_OFFSET + 0x1));
-    //     }
-    // }
 
     // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
     let scan_code: u8 = { 
         KEYBOARD.lock().read()
     };
-	trace!("Keyboard interrupt: raw scan_code {:#X}", scan_code);
+	// trace!("Keyboard interrupt: raw scan_code {:#X}", scan_code);
     
     let extended = unsafe { EXTENDED_SCANCODE };
    

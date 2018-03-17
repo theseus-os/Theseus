@@ -96,7 +96,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -110,7 +110,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
 fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -131,7 +131,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     // }
 
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         while i > 0 {
             unsafe { asm!(""); }
             i -= 1;
@@ -180,7 +180,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     trace!("state_store initialized.");
     
     // parse the nano_core ELF object to load its symbols into our metadata
-    if false {
+    if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_new_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi).unwrap();
         // debug!("Symbol map after __k_nano_core: {}", mod_mgmt::metadata::dump_symbol_map());
@@ -271,7 +271,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }  
 
     // create some extra tasks to test context switching
-    if false {
+    if true {
         spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
         spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
         spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 

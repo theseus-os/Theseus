@@ -10,19 +10,15 @@ spin = "0.4.5"
 version = "0.2.3"
 features = ["const_fn"]
 
-# [dependencies.lazy_static]
-# features = ["spin_no_std"]
-# version = "0.2.1"
-
 [dependencies.serial_port]
 path = "../serial_port"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
+# [dependencies.log]
+# default-features = false
+# version = "0.3.7"
 
 
 [lib]
