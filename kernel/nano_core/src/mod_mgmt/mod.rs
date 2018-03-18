@@ -287,8 +287,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             // we still want to use this current section's actual name and flags!
             let (sec_name, sec_flags) = match sec.get_name(&elf_file) {
                 Ok(name) => (name, sec.flags()),
-                _ => {
-                    error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}", shndx, sec);
+                Err(e) => {
+                    error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, e);
                     return Err("couldn't get section name");
                 }
             };
@@ -500,9 +500,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
             else {
                 // some special sections are fine to ignore
-                if  sec_name.starts_with(".note") ||   // ignore GNU note sections
-                    sec_name.starts_with(".gcc")  ||   // ignore gcc special sections for now
-                    sec_name == ".text"                // ignore the header .text section (with no content)
+                if  sec_name.starts_with(".note")   ||   // ignore GNU note sections
+                    sec_name.starts_with(".gcc")    ||   // ignore gcc special sections for now
+                    sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
+                    sec_name == ".text"                  // ignore the header .text section (with no content)
                 {
                     continue;    
                 }
@@ -534,9 +535,13 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             use xmas_elf::symbol_table::Entry;
             if log { trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info()); }
 
-            // currently not using eh_frame sections
+            // currently not using eh_frame, gcc, note, and debug sections
             if let Ok(name) = sec.get_name(&elf_file) {
-                if name.contains("eh_frame") {
+                if  name.starts_with(".rela.eh_frame")   || 
+                    name.starts_with(".rela.note")   ||   // ignore GNU note sections
+                    name.starts_with(".rela.gcc")    ||   // ignore gcc special sections for now
+                    name.starts_with(".rela.debug")       // ignore debug special sections for now
+                {
                     continue;
                 }
             }
@@ -716,8 +721,8 @@ pub fn parse_nano_core_symbols(mapped_pages: MappedPages, size: usize) -> Result
         }
 
         
-        // find a symbol table entry
-        if line.contains("GLOBAL DEFAULT") {
+        // find a symbol table entry, either "GLOBAL DEFAULT" or "GLOBAL HIDDEN"
+        if line.contains("GLOBAL ") {
             // we need the following items from a symbol table entry:
             // * Value (address),  column 1
             // * Size,             column 2

@@ -68,7 +68,7 @@ extern crate atomic_linked_list;
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
-pub mod reexports; // stupid shit to get around compiler_builtins symbol visibility being hidden
+mod reexports; // stupid shit to get around compiler_builtins symbol visibility being hidden
 extern crate console; 
 extern crate serial_port;
 extern crate logger;

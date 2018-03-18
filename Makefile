@@ -121,7 +121,6 @@ bochs: $(iso)
 
 
 check_usb:
-	@echo -e  'RUST_FEATURES = $(RUST_FEATURES)'
 ifneq (,$(findstring sd, $(usb)))
 ifeq ("$(wildcard /dev/$(usb))", "")
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"

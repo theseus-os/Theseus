@@ -9,12 +9,22 @@ PWD := $(shell pwd)
 
 KERNEL_BUILD_DIR ?= ${PWD}/../build
 CFG_DIR ?= ${PWD}/../../cfg
+
+
+## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.
+RUSTFLAGS += --emit=obj
+## enable debug info even for release builds
+RUSTFLAGS += -C debuginfo=2
+## using a large code model 
 RUSTFLAGS += -C code-model=large
+## promote unused must-use types (like Result) to an error
 RUSTFLAGS += -D unused-must-use
-# RUSTFLAGS += -C link-arg=-Wl,--export-all-symbols
+
+RUSTFLAGS += -C link-args='-Wl,-version-script=version.ld'
+
 
 BUILD_MODE := debug
-#BUILD_MODE := release
+# BUILD_MODE := release
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which is "debug" by default
@@ -54,7 +64,7 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(KERNEL_BUILD_DIR)
 	# @ld -n --gc-sections $(KEEP_SYMBOLS) --print-gc-sections -Map=/tmp/nano_core.map -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj) 2> /tmp/nano_core_gc_sections.txt
 	ld -n -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)
-	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  DEFAULT/d;/GLOBAL HIDDEN/d' > $(KERNEL_BUILD_DIR)/nano_core.sym 
+	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  /d;/WEAK   /d' > $(KERNEL_BUILD_DIR)/nano_core.sym   # removes LOCAL and WEAK symbols from the ELF file
 
 
 # compile assembly files
