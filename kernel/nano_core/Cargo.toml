@@ -87,9 +87,6 @@ path = "../keyboard"
 
 
 
-[profile.release]
-debug = true
-
 [features]
 mirror_serial = []
 apic_timer_fixed = []
