@@ -82,6 +82,7 @@ mod syscall;
 mod mod_mgmt;
 mod start;
 
+#[macro_use] mod baseband_proc; 
 // TODO FIXME: add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
@@ -91,6 +92,7 @@ use task::{spawn_kthread, spawn_userspace};
 use alloc::String;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+use baseband_proc::bb_proc::process_data;
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -151,6 +153,14 @@ fn test_driver(_: Option<u64>) {
 
 }
 
+fn test_bb_proc(_: Option<u64>) {
+    println!("TESTING BB_PROC!!");
+
+    loop {
+        process_data();
+        schedule!();
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
@@ -271,6 +281,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     if true {
         spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
+    } 
+
+    if true {
+        spawn_kthread(test_bb_proc, None, "bb_proc_test_thread").unwrap();
     }  
 
     // create some extra tasks to test context switching

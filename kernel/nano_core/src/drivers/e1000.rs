@@ -8,6 +8,8 @@ use core::ops::DerefMut;
 use drivers::pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 use spin::Once; 
 use kernel_config::memory::PAGE_SIZE;
+use baseband_proc::bb_proc::FIFO_RAW_PILOTS;
+use baseband_proc::packet_types::{PilotPacketBytes, PILOT_LENGTH_BYTES,MAX_ETH_PAYLOAD};
 
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -121,12 +123,15 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_SIZE_RX_DESC:       usize = 16;
 const E1000_SIZE_TX_DESC:       usize = 16;
 
-const E1000_SIZE_RX_BUFFER:     usize = 8192;
+const E1000_SIZE_RX_BUFFER:     usize = 2048;
 const E1000_SIZE_TX_BUFFER:     usize = 256;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
+
+static mut PILOT: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
+static mut PILOT_ITER:          usize = 0;
 
 /// struct to represent receive descriptors
 #[repr(C,packed)]
@@ -640,7 +645,7 @@ impl Nic{
                 self.write_command(REG_RXDESCHEAD, 0);//head pointer for reeive descriptor buffer, points to 16B
                 self.write_command(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32);//Tail pointer for receive descriptor buffer, point to 16B
                 self.rx_cur = 0;
-                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_8192);
+                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_2048);
                 //self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
                 Ok(())
 
@@ -784,13 +789,13 @@ impl Nic{
         /// Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                }
+                } */
 
                 // Print packets
                 /* while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
@@ -812,7 +817,41 @@ impl Nic{
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
 
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                } */ 
+                } */
+
+                //preliminary pilot packets processing
+
+                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
+                        
+                        let length = self.rx_descs[self.rx_cur as usize].length;
+                        let packet = self.rx_buf_addr[self.rx_cur as usize] as *const u8;
+                        for i in 14..length { //14 to remove header
+                                unsafe{
+                                        PILOT.buffer[PILOT_ITER] = *packet.offset(i as isize);
+                                        PILOT_ITER += 1;
+                                }
+                        }
+
+                        //when the last part of the packet is recived, push it into the fifo for processing
+                        if (length as usize) < MAX_ETH_PAYLOAD {
+                                let mut pilot_new: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
+                                unsafe{
+                                        PILOT_ITER = 0;
+                                        
+                                        for i in 0..PILOT_LENGTH_BYTES  {
+                                                pilot_new.buffer[i] = PILOT.buffer[i];
+                                        }
+                                }
+                                let mut fifo = FIFO_RAW_PILOTS.lock();
+                                fifo.push(pilot_new);
+                        }
+
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+                        self.write_command(REG_RXDESCTAIL, old_cur );
+                } 
 
                 
         }  
