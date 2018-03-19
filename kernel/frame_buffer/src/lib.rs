@@ -120,10 +120,10 @@ impl Drawer {
         if x >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return
         }
-        self.buffer().chars[y][x*3].write((color & 255) as u8);
-        self.buffer().chars[y][x*3 + 1].write((color >> 8 & 255) as u8);
-        self.buffer().chars[y][x*3 + 2].write((color >> 16 & 255) as u8); 
-      
+        self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
+        self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
+        self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
+    
     }
 
     pub fn draw_points(&mut self, points:Vec<Point>){
@@ -166,15 +166,13 @@ impl Drawer {
         let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT };       
+            else { FRAME_BUFFER_HEIGHT };  
 
         for x in start_x..end_x{
             for y in start_y..end_y{
-                draw_pixel(x, y, color);
-                //points.push(Point{x:x, y:y, color:color});
+               draw_pixel(x, y, color);
             }
         } 
-       // self.draw_points(points);
     }
 
 
@@ -196,7 +194,8 @@ impl Drawer {
 
 
 struct Buffer {
-    chars: [[Volatile<u8>; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
+    chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
 }
 
 
