@@ -5,11 +5,10 @@ version = "0.1.0"
 
 [dependencies]
 spin = "0.4.5"
-volatile = "0.1.0"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "0.2.1"
+[dependencies.volatile]
+version = "0.2.3"
+features = ["const_fn"]
 
 [dependencies.serial_port]
 path = "../serial_port"
@@ -17,12 +16,9 @@ path = "../serial_port"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.state_store]
-path = "../state_store"
-
-
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+# [dependencies.log]
+# default-features = false
+# version = "0.3.7"
 
 
 [lib]

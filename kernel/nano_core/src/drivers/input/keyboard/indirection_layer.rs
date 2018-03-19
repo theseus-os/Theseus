@@ -20,6 +20,9 @@ static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
     assert_has_not_been_called!("keyboard init was called more than once!");
     
+    // set keyboard to scancode set 1
+
+
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });
@@ -53,7 +56,7 @@ impl KeyEvent {
 
 #[derive(Debug)]
 pub enum KeyboardInputError {
-    UnknownScancode,
+    UnknownScancode(u8),
     EventQueueNotReady,
 }
 
@@ -62,7 +65,7 @@ pub enum KeyboardInputError {
 
 /// returns Ok(()) if everything was handled properly.
 /// returns KeyboardInputError 
-pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
+pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), KeyboardInputError> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
    
@@ -110,8 +113,7 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
                 }
 
                 _ => { 
-                    warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
-                    Err(KeyboardInputError::UnknownScancode) 
+                    Err(KeyboardInputError::UnknownScancode(scan_code)) 
                 }
             }
         }

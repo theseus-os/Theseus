@@ -599,7 +599,7 @@ pub unsafe fn stack_trace() {
     let mut rbp: usize;
     asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
 
-    // println_unsafe!("TRACE: {:>016X}", rbp);
+    // println_early!("TRACE: {:>016X}", rbp);
     error!("STACK TRACE: {:>016X}", rbp);
     //Maximum 64 frames
     let active_table = ActivePageTable::new(get_current_p4());
@@ -608,21 +608,21 @@ pub unsafe fn stack_trace() {
             if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
                 let rip = *(rip_rbp as *const usize);
                 if rip == 0 {
-                    // println_unsafe!(" {:>016X}: EMPTY RETURN", rbp);
+                    // println_early!(" {:>016X}: EMPTY RETURN", rbp);
                     error!(" {:>016X}: EMPTY RETURN", rbp);
                     break;
                 }
-                // println_unsafe!("  {:>016X}: {:>016X}", rbp, rip);
+                // println_early!("  {:>016X}: {:>016X}", rbp, rip);
                 error!("  {:>016X}: {:>016X}", rbp, rip);
                 rbp = *(rbp as *const usize);
                 // symbol_trace(rip);
             } else {
-                // println_unsafe!("  {:>016X}: GUARD PAGE", rbp);
+                // println_early!("  {:>016X}: GUARD PAGE", rbp);
                 error!("  {:>016X}: GUARD PAGE", rbp);
                 break;
             }
         } else {
-            // println_unsafe!("  {:>016X}: RBP OVERFLOW", rbp);
+            // println_early!("  {:>016X}: RBP OVERFLOW", rbp);
             error!("  {:>016X}: RBP OVERFLOW", rbp);
         }
     }

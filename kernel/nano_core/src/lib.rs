@@ -31,7 +31,7 @@
 // ----- EXTERNAL CRATES BELOW --------
 // ------------------------------------
 extern crate rlibc; // basic memset/memcpy libc functions
-extern crate volatile;
+// extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
 #[macro_use] extern crate bitflags;
@@ -98,7 +98,7 @@ use baseband_proc::bb_proc::process_data;
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -112,7 +112,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
 fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -133,7 +133,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     // }
 
     loop {
-        let mut i: usize = 10000000; // usize::max_value();
+        let mut i: usize = 50000000; // usize::max_value();
         while i > 0 {
             unsafe { asm!(""); }
             i -= 1;
@@ -187,12 +187,8 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    if cfg!(feature = "mirror_serial") {
-         // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        unsafe{  logger::enable_vga(); }
-    }
     trace!("state_store initialized.");
-
+    
     // parse the nano_core ELF object to load its symbols into our metadata
     if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -239,6 +235,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // initialize the kernel console
     let console_queue_producer = console::init().unwrap();
 
+
     // initialize the rest of our drivers
     drivers::init(console_queue_producer).unwrap();
 
@@ -276,10 +273,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 
-    println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
 
-    if true {
+    if false {
         spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
     } 
 
@@ -389,8 +386,8 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
     error!("    {}", fmt);
     unsafe { memory::stack_trace(); }
 
-    println_unsafe!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    println_unsafe!("    {}", fmt);
+    println_early!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
+    println_early!("    {}", fmt);
 
 
     loop {}
@@ -405,7 +402,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    println_unsafe!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    println_early!("\n\nin rust_eh_unwind_resume, unimplemented!");
     loop {}
 }
 
@@ -415,7 +412,7 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[cfg(not(target_os = "windows"))]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
+    println_early!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 

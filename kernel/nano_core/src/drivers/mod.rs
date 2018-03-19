@@ -9,7 +9,6 @@ pub mod test_nic_driver;
 
 use dfqueue::DFQueueProducer;
 use console::ConsoleEvent;
-use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
 //use drivers::{e1000,e1000e};
 
@@ -17,7 +16,6 @@ use memory::{MemoryManagementInfo, PageTable};
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
     assert_has_not_been_called!("drivers::early_init was called more than once!");
-    vga_buffer::show_splash_screen();
     
     // destructure the kernel's MMI so we can access its page table and vmas
     let &mut MemoryManagementInfo { 
