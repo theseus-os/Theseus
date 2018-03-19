@@ -32,6 +32,7 @@ features = ["elf64", "goblin"]
 default-features = false
 version = "0.3.7"
 
+
 [dependencies.heap_irq_safe]
 path = "../../libs/heap_irq_safe"
 
@@ -54,6 +55,8 @@ version = "0.1.1"
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
+
+
 
 [dependencies.kernel_config]
 path = "../kernel_config"

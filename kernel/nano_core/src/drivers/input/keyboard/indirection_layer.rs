@@ -74,13 +74,16 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
         x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
         x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { modifiers.shift = true }
 
+
         // trigger caps lock on press only
         x if x == Keycode::CapsLock as u8 => { modifiers.caps_lock ^= true }
 
         x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
         x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { modifiers.alt = false }
-        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { modifiers.shift = false }
+        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { modifiers.shift = false } 
 
+        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { modifiers.shift = false } 
+                
         _ => { } // do nothing
     }
 
@@ -97,6 +100,7 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
                 };
 
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
+
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
                     if let Some(producer) = CONSOLE_PRODUCER.try() {
@@ -109,9 +113,13 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), KeyboardInputError> {
                     }
                 }
 
-                _ => { 
-                    warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
-                    Err(KeyboardInputError::UnknownScancode) 
+                _ => {
+                    if scan_code == 0xe0 {
+                        Ok(()) //ignore 0xe0 prefix
+                    } else {
+                        warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
+                        Err(KeyboardInputError::UnknownScancode)
+                    } 
                 }
             }
         }

@@ -18,7 +18,6 @@ extern crate kernel_config;
 #[macro_use] extern crate log;
 
 use core::ptr::Unique;
-use core::fmt;
 use spin::Mutex;
 use volatile::Volatile;
 use alloc::string::String;
@@ -117,7 +116,7 @@ pub struct Drawer {
 
 impl Drawer {
     pub fn draw_pixel(&mut self, x:usize, y:usize, color:usize){
-        if x >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
+        if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return
         }
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
@@ -134,7 +133,7 @@ impl Drawer {
     }
 
     pub fn check_in_range(&mut self, x:usize, y:usize) -> bool {
-        x < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
+        x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
     pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
@@ -167,12 +166,16 @@ impl Drawer {
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
             else { FRAME_BUFFER_HEIGHT };  
+        let mut points = Vec::new();
 
         for x in start_x..end_x{
             for y in start_y..end_y{
-               draw_pixel(x, y, color);
+                points.push(Point{x:x as usize, y:y as usize, color:color});
+              // draw_pixel(x, y, color);
             }
-        } 
+        }
+        self.draw_points(points);
+
     }
 
 
