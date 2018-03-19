@@ -199,7 +199,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     };
 
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
-    // which are text (present | exec), rodata (present | noexec), data (present | writable)
+    // which are text (present | exec), rodata (present | noexec), data/bss (present | writable)
     let (text_bytecount, rodata_bytecount, data_bytecount): (usize, usize, usize) = {
         let (mut text, mut rodata, mut data) = (0, 0, 0);
         for sec in elf_file.section_iter() {
@@ -213,6 +213,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
                 let align = sec.align() as usize;
                 let addend = round_up_power_of_two(size, align);
+                if log { info!("section {:?} needs {:#X}({}) bytes", sec.get_name(&elf_file), addend, addend); }
 
                 // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
                 let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
@@ -280,18 +281,20 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     for (shndx, sec) in elf_file.section_iter().enumerate() {
         // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
         let sec_typ = sec.get_type();
-        // look for .text, .rodata, .data, and .bss sections
+        // look for PROGBITS (.text, .rodata, .data) and NOBITS (.bss) sections
         if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
 
             // even if we're using the next section's data (for a zero-sized section),
             // we still want to use this current section's actual name and flags!
-            let (sec_name, sec_flags) = match sec.get_name(&elf_file) {
-                Ok(name) => (name, sec.flags()),
-                Err(e) => {
-                    error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, e);
+            let sec_flags = sec.flags();
+            let sec_name = match sec.get_name(&elf_file) {
+                Ok(name) => name,
+                Err(_e) => {
+                    error!("parse_elf_kernel_crate: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
                     return Err("couldn't get section name");
                 }
             };
+            
 
             let sec = if sec.size() == 0 {
                 // This is a very rare case of a zero-sized section. 
@@ -508,7 +511,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                     continue;    
                 }
 
-                error!("unhandled PROGBITS/NOBITS section [{}] {}", shndx, sec_name);
+                error!("unhandled PROGBITS/NOBITS section [{}], name: {}, sec: {:?}", shndx, sec_name, sec);
                 continue;
             }
 
@@ -561,21 +564,65 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         let dest_offset = r.get_offset() as usize;
                         let dest_ptr: usize = target_sec.virt_addr() + dest_offset;
                         let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
-                        let source_sec_shndx: usize = source_sec_entry.shndx() as usize; 
-                        let source_sec_name = try!(source_sec_entry.get_name(&elf_file));
-                        if log { trace!("             relevant section {:?} -- {:?}", source_sec_name, source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize).and_then(|s| s.get_name(&elf_file))); }
-                        let source_sec: Arc<LoadedSection> = try!(
-                            loaded_sections.get(&source_sec_shndx).cloned().or_else(|| { 
-                                // the source section was not in this object file, so check our list of loaded external crates 
-                                // do a quick search for the symbol's demangled name in the kernel's symbol map
-                                let demangled = demangle_symbol(source_sec_name);
-                                metadata::get_symbol(demangled.full).upgrade()
-                            })
-                            .ok_or_else(|| {
-                                error!("Could not resolve source section for symbol relocation for symtab[{}] {:?}", source_sec_shndx, source_sec_name);
-                                "Could not resolve source section for symbol relocation"
-                            })
-                        );
+                        let source_sec_shndx: u16 = source_sec_entry.shndx(); 
+                        if log { 
+                            let source_sec_header = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
+                                                                    .and_then(|s| s.get_name(&elf_file));
+                            trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header);
+                            // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                            //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                            //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                            //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                        }
+
+                        use xmas_elf::sections::{SHN_UNDEF, SHN_LORESERVE, SHN_LOPROC, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_XINDEX, SHN_HIRESERVE};
+
+                        let source_sec: Result<Arc<LoadedSection>, &'static str> = match source_sec_shndx {
+                            SHN_LORESERVE | SHN_LOPROC | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_XINDEX | SHN_HIRESERVE => {
+                                error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
+                                Err("Unsupported source section shndx")
+                            }
+                            SHN_ABS  => {
+                                error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
+                                Err("Unsupported source section shndx SHN_ABS!!")
+                            }
+                            // match anything else, i.e., a valid source section shndx
+                            shndx => {
+                                // first, we try to get the relevant section based on its shndx only
+                                let loaded_sec = if shndx == SHN_UNDEF { None } else { loaded_sections.get(&(shndx as usize)) };
+                                match loaded_sec {
+                                    Some(sec) => Ok(sec.clone()), // yay, we found the source_sec 
+                                    None => { 
+                                        // second, if we couldn't get the section based on its shndx, it means that the source section wasn't in this module.
+                                        // Thus, we *have* to to get the source section's name and check our list of loaded external crates to see if it's there.
+                                        // At this point, there's no other way to search for the source section besides its name
+                                        match source_sec_entry.get_name(&elf_file) {
+                                            Ok(source_sec_name) => {
+                                                // search for the symbol's demangled name in the kernel's symbol map
+                                                let demangled = demangle_symbol(source_sec_name);
+                                                match metadata::get_symbol(demangled.full).upgrade() {
+                                                    Some(sec) => Ok(sec), 
+                                                    None => {
+                                                        // if we couldn't get the source section based on its shndx, nor based on its name, then that's an error
+                                                        let source_sec_header = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
+                                                                                                .and_then(|s| s.get_name(&elf_file));
+                                                        error!("Could not resolve source section for symbol relocation for symtab[{}] name={:?} header={:?}", 
+                                                                shndx, source_sec_name, source_sec_header);
+                                                        Err("Could not resolve source section for symbol relocation")
+                                                    }
+                                                }
+                                            }
+                                            Err(_e) => {
+                                                error!("Couldn't get source section [{}]'s name when necessary for non-local relocation entry", shndx);
+                                                Err("Couldn't get source section's name when necessary for non-local relocation entry")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        };
+
+                        let source_sec = try!(source_sec);
                         
                         
 
@@ -611,9 +658,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                                     *(dest_ptr as *mut u64) = source_val as u64;
                                 }
                             }
-                            R_X86_64_GOTPCREL => { 
-                                unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
-                            }
+                            // R_X86_64_GOTPCREL => { 
+                            //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
+                            // }
                             _ => {
                                 error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", r);
                                 return Err("found unsupported relocation type");
@@ -635,7 +682,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
-    let mut all_pages: Vec<MappedPages> = Vec::with_capacity(3); // max 3, for text, rodata, data
+    let mut all_pages: Vec<MappedPages> = Vec::with_capacity(3); // max 3, for text, rodata, data/bss
     if let Ok(tp) = text_pages { 
         try!(active_table.remap(&tp, EntryFlags::PRESENT)); // present and not noexec
         all_pages.push(tp);

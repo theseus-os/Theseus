@@ -373,13 +373,35 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         avail_index += 1;
     }
 
-    // init the frame allocator
-    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    occupied[0] = PhysicalMemoryArea::new(0, 0x10_0000, 1, 0); // reserve addresses under 1 MB
-    occupied[1] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end-kernel_phys_start, 1, 0); // the kernel boot image is already in use
-    occupied[2] = PhysicalMemoryArea::new(boot_info.start_address() - KERNEL_OFFSET, boot_info.end_address()-boot_info.start_address(), 1, 0); // preserve bootloader info (optional)
+    // calculate the bounds of physical memory that is occupied by modules we've loaded 
+    // (we can reclaim this later after the module is loaded, but not until then)
+    let (modules_start, modules_end) = {
+        let mut mod_min = usize::max_value();
+        let mut mod_max = 0;
+        use core::cmp::{max, min};
 
-    let fa = try!( AreaFrameAllocator::new(available, avail_index, occupied, 3));
+        for m in boot_info.module_tags() {
+            mod_min = min(mod_min, m.start_address() as usize);
+            mod_max = max(mod_max, m.end_address() as usize);
+        }
+        (mod_min, mod_max)
+    };
+    print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
+
+    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
+    let mut occup_index = 0;
+    occupied[occup_index] = PhysicalMemoryArea::new(0, 0x10_0000, 1, 0); // reserve addresses under 1 MB
+    occup_index += 1;
+    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end-kernel_phys_start, 1, 0); // the kernel boot image is already in use
+    occup_index += 1;
+    occupied[occup_index] = PhysicalMemoryArea::new(boot_info.start_address() - KERNEL_OFFSET, boot_info.end_address()-boot_info.start_address(), 1, 0); // preserve bootloader info
+    occup_index += 1;
+    occupied[occup_index] = PhysicalMemoryArea::new(modules_start, modules_end - modules_start, 1, 0); // preserve all modules
+    occup_index += 1;
+
+
+    // init the frame allocator with the available memory sections and the occupied memory sections
+    let fa = try!( AreaFrameAllocator::new(available, avail_index, occupied, occup_index));
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new( fa ) 
     });
@@ -410,7 +432,10 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         }
         modules
     });   
-    print_early!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try().unwrap());
+    // print_early!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try().unwrap());
+    
+    // TODO FIXME: add occupied areas to the AreaFrameAllocator that mark all module's physical memory as occupied!!
+
 
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
@@ -513,7 +538,7 @@ pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
 /// returns the `ModuleArea` corresponding to the given module name.
 pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
     debug!("get_module(): looking for module {}", name);
-    debug!("get_module(): modules: {:?}", MODULE_AREAS.try().unwrap());
+    // debug!("get_module(): modules: {:?}", MODULE_AREAS.try().unwrap());
     MODULE_AREAS.try().and_then(|modules| modules.iter().filter(|&m| m.name == name).next())
 }
 
