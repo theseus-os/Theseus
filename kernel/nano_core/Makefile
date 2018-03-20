@@ -2,48 +2,20 @@
 ### consisting of the nano_core's Rust crate modules and its assembly boot files.
 ### It does not build an OS .iso image or anything runnable in a simulator like QEMU.
 
-.DEFAULT_GOAL := all
-SHELL := /bin/bash
-
-PWD := $(shell pwd)
-
-KERNEL_BUILD_DIR ?= ${PWD}/../build
-CFG_DIR ?= ${PWD}/../../cfg
-
-
-## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.
-RUSTFLAGS += --emit=obj
-## enable debug info even for release builds
-RUSTFLAGS += -C debuginfo=2
-## using a large code model 
-RUSTFLAGS += -C code-model=large
-## promote unused must-use types (like Result) to an error
-RUSTFLAGS += -D unused-must-use
-
-RUSTFLAGS += -C link-args='-Wl,-version-script=version.ld'
-
-
-BUILD_MODE := debug
-# BUILD_MODE := release
-ifeq ($(BUILD_MODE), release)
-	XARGO_RELEASE_ARG := --release
-endif  ## otherwise, nothing, which is "debug" by default
-
-arch ?= x86_64
-
-## this should not point directly to the .json target spec file, but it should have the same name.
-TARGET ?= $(arch)-theseus
+## defines all config options for building any kernel crate
+## NOTE: most of the variables used below are defined in Config.mk
+include ../Config.mk  
 
 ## this is the output path of the xargo command, not our choice.
 ## The name of the lib (lib_____.a) is defined by the target above.
 cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 
-nano_core-obj := build/nano_core-$(arch).bin
+nano_core-obj := build/nano_core-$(ARCH).bin
 
-linker_script := src/arch/arch_$(arch)/boot/linker_higher_half.ld
-assembly_source_files := $(wildcard src/arch/arch_$(arch)/boot/*.asm)
-assembly_object_files := $(patsubst src/arch/arch_$(arch)/boot/%.asm, \
-	build/arch/$(arch)/%.o, $(assembly_source_files))
+linker_script := src/arch/arch_$(ARCH)/boot/linker_higher_half.ld
+assembly_source_files := $(wildcard src/arch/arch_$(ARCH)/boot/*.asm)
+assembly_object_files := $(patsubst src/arch/arch_$(ARCH)/boot/%.asm, \
+	build/arch/$(ARCH)/%.o, $(assembly_source_files))
 
 
 .PHONY: all clean cargo
@@ -68,6 +40,6 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 
 
 # compile assembly files
-build/arch/$(arch)/%.o: src/arch/arch_$(arch)/boot/%.asm
+build/arch/$(ARCH)/%.o: src/arch/arch_$(ARCH)/boot/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
