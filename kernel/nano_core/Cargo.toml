@@ -79,11 +79,8 @@ path = "../rtc"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.console]
-path = "../console"
-
-[dependencies.keyboard]
-path = "../keyboard"
+[dependencies.console_types]
+path = "../console_types"
 
 
 

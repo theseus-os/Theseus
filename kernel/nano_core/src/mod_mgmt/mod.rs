@@ -213,7 +213,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
                 let align = sec.align() as usize;
                 let addend = round_up_power_of_two(size, align);
-                if log { info!("section {:?} needs {:#X}({}) bytes", sec.get_name(&elf_file), addend, addend); }
 
                 // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
                 let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
@@ -575,14 +574,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                             //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                         }
 
-                        use xmas_elf::sections::{SHN_UNDEF, SHN_LORESERVE, SHN_LOPROC, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_XINDEX, SHN_HIRESERVE};
+                        use xmas_elf::sections::{SHN_UNDEF, SHN_LORESERVE, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_HIRESERVE};
 
                         let source_sec: Result<Arc<LoadedSection>, &'static str> = match source_sec_shndx {
-                            SHN_LORESERVE | SHN_LOPROC | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_XINDEX | SHN_HIRESERVE => {
+                            SHN_LORESERVE | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_HIRESERVE => {
                                 error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
                                 Err("Unsupported source section shndx")
                             }
-                            SHN_ABS  => {
+                            SHN_ABS => {
                                 error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
                                 Err("Unsupported source section shndx SHN_ABS!!")
                             }
@@ -769,7 +768,7 @@ pub fn parse_nano_core_symbols(mapped_pages: MappedPages, size: usize) -> Result
 
         
         // find a symbol table entry, either "GLOBAL DEFAULT" or "GLOBAL HIDDEN"
-        if line.contains("GLOBAL ") {
+        if line.contains(" GLOBAL ") {
             // we need the following items from a symbol table entry:
             // * Value (address),  column 1
             // * Size,             column 2
@@ -802,7 +801,7 @@ pub fn parse_nano_core_symbols(mapped_pages: MappedPages, size: usize) -> Result
             }
 
             let demangled = demangle_symbol(name_mangled);
-            // debug!("parse_nano_core_symbols(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name_mangled, demangled.full, sec_vaddr, sec_size);
+            // debug!("parse_nano_core_symbols(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {:?}", name_mangled, demangled.full, sec_vaddr, sec_size, sec_ndx);
 
 
             let new_section = {

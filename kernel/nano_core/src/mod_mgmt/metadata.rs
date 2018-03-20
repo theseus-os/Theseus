@@ -109,7 +109,7 @@ impl LoadedSection {
     pub fn key(&self) -> Option<String> {
         match self {
             &LoadedSection::Text(ref text) => Some(text.abs_symbol.clone()),
-            &LoadedSection::Rodata(ref _rodata) => None,
+            &LoadedSection::Rodata(ref rodata) => Some(rodata.abs_symbol.clone()),
             &LoadedSection::Data(ref data) => Some(data.abs_symbol.clone()),
         }
     }

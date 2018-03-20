@@ -6,7 +6,12 @@ extern crate vga_buffer;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
-// #[macro_use] extern crate log;
+extern crate nano_core;
+
+// temporary, should remove this once we fix crate system
+extern crate console_types; 
+pub use console_types::{ConsoleEvent, ConsoleInputEvent, ConsoleOutputEvent};
+
 
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
@@ -32,88 +37,26 @@ pub fn print_to_console(s: String) -> Result<(), &'static str> {
     Ok(())
 }
 
-#[derive(Debug)]
-pub enum ConsoleEvent {
-    InputEvent(ConsoleInputEvent),
-    OutputEvent(ConsoleOutputEvent),
-    ExitEvent,
-}
-
-impl ConsoleEvent {
-    pub fn new_input_event(kev: KeyEvent) -> ConsoleEvent {
-        ConsoleEvent::InputEvent(ConsoleInputEvent::new(kev))
-    }
-
-    pub fn new_output_event<S>(s: S) -> ConsoleEvent where S: Into<String> {
-        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()))
-    }
-}
-
-/// use this to deliver input events (such as keyboard input) to the console.
-#[derive(Debug)]
-pub struct ConsoleInputEvent {
-    key_event: KeyEvent,
-}
-
-impl ConsoleInputEvent {
-    pub fn new(kev: KeyEvent) -> ConsoleInputEvent {
-        ConsoleInputEvent {
-            key_event: kev,
-        }
-    }
-}
 
 
-
-/// use this to queue up a formatted string that should be printed to the console. 
-#[derive(Debug)]
-pub struct ConsoleOutputEvent {
-    text: String,
-}
-
-impl ConsoleOutputEvent {
-    pub fn new(s: String) -> ConsoleOutputEvent {
-        ConsoleOutputEvent {
-            text: s,
-        }
-    }
-}
-
-
-// /// the console owns and creates the event queue, and returns a producer reference to the queue.
-// pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
-//     assert_has_not_been_called!("console_init was called more than once!");
-
-//     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
-//     let console_consumer = console_dfq.into_consumer();
-//     let returned_producer = console_consumer.obtain_producer();
-//     PRINT_PRODUCER.call_once(|| {
-//         console_consumer.obtain_producer()
-//     });
-
-//     println!("Console says hello!\n");
-    
-//     try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
-//     Ok(returned_producer)
-// }
-
-
-/// the console owns and creates the event queue, and returns the queue consumer
-pub fn init() -> Result<DFQueueConsumer<ConsoleEvent>, &'static str> {
+/// the console owns and creates the event queue, and returns a producer reference to the queue.
+pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
     let console_consumer = console_dfq.into_consumer();
-
+    let returned_producer = console_consumer.obtain_producer();
     PRINT_PRODUCER.call_once(|| {
         console_consumer.obtain_producer()
     });
 
     try!(print_to_console(String::from("Console says hello!\n")));
+    use nano_core::spawn_kthread;
 
-    Ok(console_consumer)
+    try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
+    Ok(returned_producer)
 }
 
 
-/// the main console event-handling loop, runs on its own thread. 
+/// the main console event-handling loop, should be run on its own thread. 
 /// This is the only thread that is allowed to touch the vga buffer!
 /// ## Returns
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.

@@ -68,8 +68,8 @@ extern crate atomic_linked_list;
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
 // ------------------------------------
-mod reexports; // stupid shit to get around compiler_builtins symbol visibility being hidden
-extern crate console; 
+pub mod reexports;
+extern crate console_types; // a temporary way to use console types 
 extern crate serial_port;
 extern crate logger;
 extern crate state_store;
@@ -137,7 +137,8 @@ pub use keycodes_ascii::*;
 use alloc::String;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-
+use dfqueue::DFQueueProducer;
+use console_types::ConsoleEvent;
 
 
 
@@ -284,9 +285,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _one   = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
         let _two   = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _three = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
-        // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_keyboard {}: ========================\n{}", 
-        //         _one, _two, _three, mod_mgmt::metadata::dump_symbol_map());
+        let _three = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _four  = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _five  = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, true).unwrap();
+        // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
+        //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }
 
 
@@ -326,13 +329,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
-    // TODO: this should be moved back into the console once we export functions from the nano_core
-    //       such that other crates depend on the nano_core itself, rather than the nano_core depending on other crates
     let console_queue_producer = {
-        let console_consumer = console::init().expect("Could not init console!");
-        let producer = console_consumer.obtain_producer();
-        spawn_kthread(console::main_loop, console_consumer, "console_loop").expect("Couldn't create console thread!");
-        producer
+        let section = ::mod_mgmt::metadata::get_symbol("console::init").upgrade().expect("failed to get console::init() symbol!");
+        let init_func: fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        let console_producer = init_func().expect("console::init() failed!");
+        console_producer
     };
 
     
