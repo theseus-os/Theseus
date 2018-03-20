@@ -287,7 +287,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let _two   = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
         let _three = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
         let _four  = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _five  = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, true).unwrap();
+        let _five  = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
         //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }
