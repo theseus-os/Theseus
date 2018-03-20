@@ -30,6 +30,16 @@ const VGA_BUFFER_ADDR: usize = 0xa0000;
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
+pub static mut frame_buffer_direction:Direction = Direction::Right;
+
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
+}
 
 pub static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
@@ -81,6 +91,19 @@ macro_rules! draw_square {
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
     unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
+}
+
+#[macro_export]
+macro_rules! set_direction {
+    ($direction:expr) => ({
+        $crate::draw_square($direction);
+    });
+}
+
+
+#[doc(hidden)]
+pub fn set_direction(direction:Direction) {
+    unsafe { frame_buffer_direction = direction; }
 }
 
 /*#[macro_export]

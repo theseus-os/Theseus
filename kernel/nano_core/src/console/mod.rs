@@ -1,5 +1,6 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
+use frame_buffer;
 use alloc::string::String;
 use core::sync::atomic::Ordering;
 use spin::Once;
@@ -184,6 +185,15 @@ fn handle_key_event(keyevent: KeyEvent) {
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
 
+    //Deal with direction keycode
+    match keyevent.keycode {
+        Keycode::Left => {frame_buffer::set_direction(frame_buffer::Direction::Left);}
+        Keycode::Right => {frame_buffer::set_direction(frame_buffer::Direction::Right);}
+        Keycode::Up => {frame_buffer::set_direction(frame_buffer::Direction::Up);}
+        Keycode::Down => {frame_buffer::set_direction(frame_buffer::Direction::Down);}
+        _ => {}
+    }
+   
 
     let ascii = keyevent.keycode.to_ascii(keyevent.modifiers);
     match ascii {
