@@ -111,7 +111,7 @@ impl AreaFrameAllocator {
             VectorArray::Array((len, ref arr)) => {
                 arr.iter().take(len)
                     .filter(|area| {
-                        let address = area.base_addr + area.length - 1;
+                        let address = area.base_addr + area.size_in_bytes - 1;
                         area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
                     })
                     .min_by_key(|area| area.base_addr).cloned()
@@ -119,7 +119,7 @@ impl AreaFrameAllocator {
             VectorArray::Vector(ref v) => {
                 v.iter()
                     .filter(|area| {
-                        let address = area.base_addr + area.length - 1;
+                        let address = area.base_addr + area.size_in_bytes - 1;
                         area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
                     })
                     .min_by_key(|area| area.base_addr).cloned()
@@ -144,7 +144,7 @@ impl AreaFrameAllocator {
             VectorArray::Array((len, ref arr)) => {
                 for area in arr.iter().take(len) {
                     let start = Frame::containing_address(area.base_addr);
-                    let end = Frame::containing_address(area.base_addr + area.length);
+                    let end = Frame::containing_address(area.base_addr + area.size_in_bytes);
                     if self.next_free_frame >= start && self.next_free_frame <= end {
                         self.next_free_frame = end + 1; 
                         trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
@@ -155,7 +155,7 @@ impl AreaFrameAllocator {
             VectorArray::Vector(ref v) => {
                 for area in v.iter() {
                     let start = Frame::containing_address(area.base_addr);
-                    let end = Frame::containing_address(area.base_addr + area.length);
+                    let end = Frame::containing_address(area.base_addr + area.size_in_bytes);
                     if self.next_free_frame >= start && self.next_free_frame <= end {
                         self.next_free_frame = end + 1; 
                         trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
@@ -213,7 +213,7 @@ impl FrameAllocator for AreaFrameAllocator {
 
             // the last frame of the current area
             let current_area_last_frame = {
-                let address = area.base_addr + area.length - 1;
+                let address = area.base_addr + area.size_in_bytes - 1;
                 Frame::containing_address(address as usize)
             };
 

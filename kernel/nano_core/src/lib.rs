@@ -387,7 +387,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }  
 
     // create some extra tasks to test context switching
-    if true {
+    if false {
         spawn_kthread(test_loop_1, None, String::from("test_loop_1")).unwrap();
         spawn_kthread(test_loop_2, None, String::from("test_loop_2")).unwrap(); 
         spawn_kthread(test_loop_3, None, String::from("test_loop_3")).unwrap(); 
