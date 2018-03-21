@@ -103,12 +103,12 @@ macro_rules! print {
         if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
             let vaddr = section.virt_addr();
             let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
-            if let Err(e) = print_func(s) {
-                error!("print_to_console() in print!() macro failed, error: {}", e);
+            if let Err(e) = print_func(s.clone()) {
+                error!("print_to_console() in print!() macro failed, error: {}  Printing: {}", e, s);
             }
         }
         else {
-            error!("getting console::print_to_console symbol failed in print!() macro!");
+            error!("No \"console::print_to_console\" symbol in print!() macro! Printing: {}", s);
         }
     });
 }
@@ -139,13 +139,14 @@ use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
+use irq_safety::{enable_interrupts, interrupts_enabled};
 
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_1!");
     loop {
-        let mut i: usize = 50000000; // usize::max_value();
+        let mut i: usize = 100000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -159,7 +160,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
 fn test_loop_2(_: Option<u64>) -> Option<u64> {
     debug!("Entered test_loop_2!");
     loop {
-        let mut i: usize = 50000000; // usize::max_value();
+        let mut i: usize = 100000000; // usize::max_value();
         unsafe { asm!(""); }
         while i > 0 {
             i -= 1;
@@ -180,7 +181,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     // }
 
     loop {
-        let mut i: usize = 50000000; // usize::max_value();
+        let mut i: usize = 100000000; // usize::max_value();
         while i > 0 {
             unsafe { asm!(""); }
             i -= 1;
@@ -238,7 +239,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     // parse our two main crates, the nano_core (the code we're already running), and the libcore (Rust no_std lib),
     // both which satisfy dependencies that many other crates have. 
-    {
+    if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
@@ -336,10 +337,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         console_producer
     };
 
-    
+
     // initialize the rest of our drivers
     drivers::init(console_queue_producer).unwrap();
-
+    
 
     // boot up the other cores (APs)
     {
@@ -374,18 +375,18 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    interrupts::enable_interrupts();
+    println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    enable_interrupts();
 
     if false {
-        spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
+        spawn_kthread(test_driver, None, String::from("driver_test_thread")).unwrap();
     }  
 
     // create some extra tasks to test context switching
     if true {
-        spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
-        spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
-        spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
+        spawn_kthread(test_loop_1, None, String::from("test_loop_1")).unwrap();
+        spawn_kthread(test_loop_2, None, String::from("test_loop_2")).unwrap(); 
+        spawn_kthread(test_loop_3, None, String::from("test_loop_3")).unwrap(); 
     }
 
 	
@@ -421,10 +422,10 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         spawn_userspace(module, None).unwrap();
     }
 
-    interrupts::enable_interrupts();
-    debug!("rust_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts::interrupts_enabled());
+    enable_interrupts();
+    debug!("rust_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
-    assert!(interrupts::interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
+    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
         schedule!();

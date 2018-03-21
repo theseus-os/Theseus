@@ -1,7 +1,7 @@
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
-use irq_safety::RwLockIrqSafe;
+use irq_safety::{RwLockIrqSafe, interrupts_enabled};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 use super::{Task, get_my_current_task};
@@ -12,7 +12,7 @@ use super::{Task, get_my_current_task};
 ///
 /// Interrupts MUST be disabled before this function runs. 
 pub unsafe fn schedule() -> bool {
-    assert!(::interrupts::interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
+    assert!(interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("schedule [0]: current_taskid={}", current_taskid);
@@ -76,7 +76,7 @@ macro_rules! schedule {
     () => (    
         {
             unsafe {
-                $crate::interrupts::disable_interrupts();
+                $crate::irq_safety::disable_interrupts();
                 $crate::task::scheduler::schedule();
             }
         }

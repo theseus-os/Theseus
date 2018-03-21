@@ -6,6 +6,7 @@ use task;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use interrupts::apic::{LocalApic, get_lapics};
 use spin::RwLock;
+use irq_safety::{enable_interrupts, interrupts_enabled};
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -59,9 +60,9 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     get_lapics().insert(apic_id, RwLock::new(lapic));
 
 
-    interrupts::enable_interrupts();
+    enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 
-           if interrupts::interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
+           if interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
     );
 
     loop { 

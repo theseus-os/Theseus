@@ -1,6 +1,7 @@
 use spin::Mutex;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
+use alloc::btree_map::Entry; 
 use memory::{VirtualAddress, MappedPages};
 
 lazy_static! {
@@ -43,17 +44,40 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
             let new_sec_size = sec.size();
 
             if let Some(key) = sec.key() {
-                let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
-                // as of now we don't expect/support replacing a symbol (section) in the system map
-                if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
-                    if old_sec.size() == new_sec_size {
-                        if log_replacements { info!("Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
+                // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
+                // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
+                let entry = locked_kmap.entry(key.clone());
+                match entry {
+                    Entry::Occupied(old_val) => {
+                        if let Some(old_sec) = old_val.get().upgrade() {
+                            if old_sec.size() == new_sec_size {
+                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", crate_name, key); }
+                            }
+                            else {
+                                warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
+                                    crate_name, old_sec.size(), new_sec_size, key);
+                            }
+                        }
                     }
-                    else {
-                        warn!("Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
-                               crate_name, old_sec.size(), new_sec_size, key);
+                    Entry::Vacant(new) => {
+                        new.insert(Arc::downgrade(sec));
                     }
                 }
+
+                
+                // BELOW: the old way that just blindly replaced the old symbol with the new
+                // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
+                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", crate_name, key, sec.virt_addr());
+                // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
+                //     if old_sec.size() == new_sec_size {
+                //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
+                //     }
+                //     else {
+                //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
+                //                crate_name, old_sec.size(), new_sec_size, key);
+                //     }
+                // }
+
                 count += 1;
                 // debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);
             }

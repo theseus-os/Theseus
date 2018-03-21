@@ -19,8 +19,8 @@ path = "../../libs/keycodes_ascii"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.console]
-path = "../console"
+[dependencies.console_types]
+path = "../console_types"
 
 # [dependencies.lazy_static]
 # features = ["spin_no_std"]
