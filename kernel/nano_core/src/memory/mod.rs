@@ -125,15 +125,15 @@ impl MemoryManagementInfo {
 #[repr(C)]
 pub struct PhysicalMemoryArea {
     pub base_addr: usize,
-    pub length: usize,
+    pub size_in_bytes: usize,
     pub typ: u32,
     pub acpi: u32
 }
 impl PhysicalMemoryArea {
-    pub fn new(addr: usize, len: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
+    pub fn new(paddr: usize, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
         PhysicalMemoryArea {
-            base_addr: addr,
-            length: len,
+            base_addr: paddr,
+            size_in_bytes: size_in_bytes,
             typ: typ,
             acpi: acpi,
         }
@@ -363,13 +363,13 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
 
         available[avail_index] = PhysicalMemoryArea {
             base_addr: start_paddr,
-            length: area.end_address() - start_paddr,
+            size_in_bytes: area.end_address() - start_paddr,
             typ: 1, 
             acpi: 0, 
         };
 
-        info!("--> memory region established: start={:#x}, length={:#x}", available[avail_index].base_addr, available[avail_index].length);
-        print_early!("--> memory region established: start={:#x}, length={:#x}\n", available[avail_index].base_addr, available[avail_index].length);
+        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}", available[avail_index].base_addr, available[avail_index].size_in_bytes);
+        print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
         avail_index += 1;
     }
 
