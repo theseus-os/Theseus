@@ -1,6 +1,7 @@
 use drivers::input::keyboard::KeyEvent;
 use vga_buffer;
 use frame_buffer;
+use window_manager;
 use alloc::string::String;
 use core::sync::atomic::Ordering;
 use spin::Once;
@@ -191,6 +192,8 @@ fn handle_key_event(keyevent: KeyEvent) {
         Keycode::Right => {frame_buffer::set_direction(frame_buffer::Direction::Right);}
         Keycode::Up => {frame_buffer::set_direction(frame_buffer::Direction::Up);}
         Keycode::Down => {frame_buffer::set_direction(frame_buffer::Direction::Down);}
+
+        Keycode::Tab => {window_switch!();}
         _ => {}
     }
    

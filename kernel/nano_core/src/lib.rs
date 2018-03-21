@@ -67,7 +67,9 @@ extern crate serial_port;
 extern crate logger;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
-#[macro_use] extern crate frame_buffer; 
+#[macro_use] extern crate frame_buffer;
+#[macro_use] extern crate window_manager;
+ 
 extern crate test_lib;
 extern crate rtc;
 
@@ -154,11 +156,14 @@ fn test_driver(_: Option<u64>) {
 
 
 fn test_framebuffer(_: Option<u64>) {
-
     let mut i=0;
     let mut x=0;
     let mut y=0;
-    draw_square!(x, y, 20, 20, 0xe4cf8e);
+
+    let window = window_manager::get_window_obj(20,20,200,150);
+
+
+   /* draw_square!(x, y, 20, 20, 0xe4cf8e);
     unsafe { 
         loop{
 
@@ -187,7 +192,15 @@ fn test_framebuffer(_: Option<u64>) {
                 _ => {}
             }
         }       
-    }
+    }*/
+}
+
+fn test_window(_: Option<u64>) {
+    let mut i=0;
+    let mut x=0;
+    let mut y=0;
+
+    let window = window_manager::get_window_obj(250,150,300,200);
 }
 
 
@@ -314,6 +327,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
     if true {
         spawn_kthread(test_framebuffer, None, "framebuffer_test_thread").unwrap();
+        spawn_kthread(test_window, None, "window_test_thread").unwrap();
     } 
 
     // create some extra tasks to test context switching
