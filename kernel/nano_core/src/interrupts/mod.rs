@@ -34,7 +34,6 @@ pub mod tsc;
 
 
 // re-expose these functions from within this interrupt module
-pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
 pub use self::exceptions::init_early_exceptions;
 pub use self::pic::PIC_MASTER_OFFSET;
 

@@ -1,9 +1,9 @@
 
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
 use alloc::Vec;
 use alloc::string::String;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, compiler_fence};
 use arch::{pause, Context};
 use alloc::boxed::Box;
 use core::fmt;
@@ -381,11 +381,12 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 /// Spawns a new kernel task with the same address space as the current task. 
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
 /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
-pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: &str)
+#[inline(never)]
+pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String)
         -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     let mut new_task = Task::new();
-    new_task.set_name(String::from(thread_name));
+    new_task.set_name(thread_name);
 
     // the new kernel thread uses the same kernel address space
     new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("spawn_kthread(): KERNEL_MMI was not initialized!!")) );
@@ -428,7 +429,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
     let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
-        error!("kthread_spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+        error!("spawn_kthread(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     try!(scheduler::add_task_to_runqueue(task_ref.clone()));
@@ -442,7 +443,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     use memory::*;
-    debug!("spawn_userspace [0]: Interrupts enabled: {}", ::interrupts::interrupts_enabled());
+    debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
     new_task.set_name(String::from(name.unwrap_or(module.name().clone())));
@@ -466,7 +467,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
         }
     
         new_task.kstack = Some(kstack);
-        // unlike kthread_spawn, we don't need to place any arguments at the bottom of the stack,
+        // unlike spawn_kthread, we don't need to place any arguments at the bottom of the stack,
         // because we can just utilize the task's userspace entry point member
 
 
@@ -653,14 +654,17 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
         Box::from_raw(kthread_call_val.arg)
     };
     let func: fn(arg: A) -> R = kthread_call_val.func;
-    // debug!("kthread_wrapper [0.1]: arg {:?}", *arg as A);
+    let arg: A = *arg; 
+    // debug!("kthread_wrapper [0.1]: arg {:?}", arg);
     // debug!("kthread_wrapper [0.2]: func {:?}", func);
 
-    ::interrupts::enable_interrupts();
-    info!("about to call kthread func, interrupts are {}", ::interrupts::interrupts_enabled());
+    enable_interrupts();
+    compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
+    info!("kthread_wrapper(): about to call kthread func {:?} with arg {:?}, interrupts are {}", func, arg, interrupts_enabled());
+    assert!(interrupts_enabled(), "FATAL ERROR: kthread_wrapper(): interrupts did not get enabled properly!");
 
     // actually invoke the function spawned in this kernel thread
-    let exit_status = func(*arg);
+    let exit_status = func(arg);
 
     debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
 

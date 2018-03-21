@@ -3,14 +3,14 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate console;
+extern crate console_types;
 #[macro_use] extern crate log;
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
 use dfqueue::DFQueueProducer;
-use console::ConsoleEvent;
+use console_types::ConsoleEvent;
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/

@@ -3,14 +3,15 @@
 
 extern crate keycodes_ascii;
 extern crate vga_buffer;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
+#[macro_use] extern crate log;
 extern crate nano_core;
 
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
-pub use console_types::{ConsoleEvent, ConsoleInputEvent, ConsoleOutputEvent};
+use console_types::{ConsoleEvent, ConsoleOutputEvent};
 
 
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
@@ -28,7 +29,6 @@ pub fn print_to_console(s: String) -> Result<(), &'static str> {
 }
 
 
-
 /// the console owns and creates the event queue, and returns a producer reference to the queue.
 pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
@@ -38,16 +38,24 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
         console_consumer.obtain_producer()
     });
 
-    try!(print_to_console(String::from("Console says hello!\n")));
     use nano_core::spawn_kthread;
 
-    try!(spawn_kthread(main_loop, console_consumer, "console_loop"));
+    if true {
+        // vga_buffer::print_str("console::init() trying to spawn_kthread...\n").unwrap();
+        info!("console::init() trying to spawn_kthread...");
+        try!(spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
+        // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
+        info!("console::init(): successfully spawned kthread!");
+    }
+    else {
+        vga_buffer::print_str("console::init(): skipping spawn_kthread to test.\n").unwrap();
+    }
+    try!(print_to_console(String::from("Console says hello!\n")));
     Ok(returned_producer)
 }
 
 
 /// the main console event-handling loop, should be run on its own thread. 
-/// This is the only thread that is allowed to touch the vga buffer!
 /// ## Returns
 /// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
 pub fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
@@ -60,6 +68,8 @@ pub fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static
         }
 
         let event = event.unwrap();
+        // info!("console_loop: got event {:?}", event);
+        // vga_buffer::print_string(&format!("console_loop: got event {:?}\n", event)).unwrap();
         let event_data = event.deref(); // event.deref() is the equivalent of   &*event
 
         match event_data {
