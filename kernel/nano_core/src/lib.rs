@@ -161,7 +161,13 @@ fn test_framebuffer(_: Option<u64>) {
     let width=200;
     let height=150;
     let color = 0xe4cf8e;
-    let window = window_manager::get_window_obj(x,y,width + 2,height + 2).unwrap();
+    let rs = window_manager::get_window_obj(x,y,width + 2,height + 2);
+    if rs.is_err() {
+        trace!("{}", rs.err().unwrap());
+        return;
+    }
+
+    let window = rs.unwrap();
 
 unsafe{
            
@@ -243,10 +249,16 @@ fn test_window(_: Option<u64>) {
     let height=200;
     let mut x=width/2;
     let mut y=height/2;
-    let color = 0xe4cf8e;
-    let window = window_manager::get_window_obj(300,200,width + 2,height + 2).unwrap();
-unsafe{
-           
+    let color = 0xa71368;
+    let rs = window_manager::get_window_obj(300,200,width + 2,height + 2);
+    if rs.is_err() {
+        trace!("{}", rs.err().unwrap());
+        return;
+    }
+
+    let window = rs.unwrap();
+
+unsafe{           
     use keycodes_ascii::Keycode;
     (*window).draw_pixel(x, y, color);
 
