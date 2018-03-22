@@ -242,7 +242,11 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         try!(Fadt::init(active_table));
         
         // HPET is optional
-        if let Err(_) = Hpet::init(active_table) {
+        if let Ok(hpet) = Hpet::init(active_table) {
+            let mut hpet_t = ACPI_TABLE.hpet.write();
+            *hpet_t = Some(hpet);
+        }
+        else {
             warn!("This machine has no HPET, skipping HPET init.");
         }
 

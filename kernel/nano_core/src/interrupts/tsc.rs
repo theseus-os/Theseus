@@ -1,4 +1,5 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
+use interrupts::pit_clock;
 
 static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
 
@@ -40,6 +41,20 @@ impl TscTicks {
     pub const fn default() -> TscTicks {
         TscTicks(0)
     }
+}
+
+
+/// Initializes the TSC, which only 
+pub fn init() -> Result<(), &'static str> {
+    let start = tsc_ticks();
+    try!(pit_clock::pit_wait(10000)); // wait 10000 us (10 ms)
+    let end = tsc_ticks(); 
+
+    let diff = try!(end.sub(&start).ok_or("couldn't subtract end-start TSC tick values"));
+    let tsc_freq = diff.into() * 100; // multiplied by 100 because we measured a 10ms interval
+    info!("TSC frequency calculated by PIT is: {}", tsc_freq);
+    set_tsc_frequency(tsc_freq);
+    Ok(())
 }
 
 
