@@ -156,34 +156,54 @@ fn test_driver(_: Option<u64>) {
 
 
 fn test_framebuffer(_: Option<u64>) {
-    let mut i=0;
-    let mut x=0;
-    let mut y=0;
+    let mut x=20;
+    let mut y=20;
+    let width=200;
+    let height=150;
 
-    let window = window_manager::get_window_obj(20,20,200,150);
+    let window = window_manager::get_window_obj(x,y,width,height).unwrap();
+    //window.print();
+unsafe{
 
+    /*if (window.is_err()){
+        return;
+    }
+    
+    let window = window.unwrap();
+    window.print();*/
+    (*window).print();
+           
+    use keycodes_ascii::Keycode;
+    draw_square!(x, y, 20, 20, 0xe4cf8e);
 
-   /* draw_square!(x, y, 20, 20, 0xe4cf8e);
+    let mut direction = Keycode::Right;
     unsafe { 
         loop{
-
-            match frame_buffer::frame_buffer_direction{
-                frame_buffer::Direction::Right => {
+            let window = *window;
+            let keycode = window.get_key_code();
+           
+            if(keycode.is_some()){
+                direction = keycode.unwrap();
+                window.print();
+                window_manager::print_all();
+            }
+            match direction {
+                Keycode::Right => {
                     draw_line!(x, y, x, (y+20)%480, 0x000000);
                     draw_line!((20+x)%640, y, (20+x)%640, (y+20)%480, 0xe4cf8e);
                     x = (x + 1)%640;
                 }
-                frame_buffer::Direction::Left => {                
+                Keycode::Left => {                
                     draw_line!((x+19)%640, y, (x+19)%640, (y+20)%480, 0x000000);
                     x = (x + 640 -1)%640;
                     draw_line!(x, y, x, (y+20)%480, 0xe4cf8e);                            
                 }
-                frame_buffer::Direction::Up => {                
+                Keycode::Up => {                
                     draw_line!(x, (y+19)%480, (x+20)%640, (y+19)%480, 0x000000);
                     y = (y + 480 -1)%480;
                     draw_line!(x, y, (x+20)%640, y, 0xe4cf8e);                            
                 }
-                frame_buffer::Direction::Down => {                
+                Keycode::Down => {                
                     draw_line!(x, y, (x+20)%640, y, 0x000000);
                     draw_line!(x, (y+20)%480, (20+x)%640, (y+20)%480, 0xe4cf8e);
                     y = (y + 1)%480;                         
@@ -192,7 +212,8 @@ fn test_framebuffer(_: Option<u64>) {
                 _ => {}
             }
         }       
-    }*/
+    }
+}
 }
 
 fn test_window(_: Option<u64>) {

@@ -188,11 +188,9 @@ fn handle_key_event(keyevent: KeyEvent) {
 
     //Deal with direction keycode
     match keyevent.keycode {
-        Keycode::Left => {frame_buffer::set_direction(frame_buffer::Direction::Left);}
-        Keycode::Right => {frame_buffer::set_direction(frame_buffer::Direction::Right);}
-        Keycode::Up => {frame_buffer::set_direction(frame_buffer::Direction::Up);}
-        Keycode::Down => {frame_buffer::set_direction(frame_buffer::Direction::Down);}
-
+        Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            window_manager::put_key_code(keyevent.keycode).unwrap();
+        }
         Keycode::Tab => {window_switch!();}
         _ => {}
     }
