@@ -160,8 +160,8 @@ fn test_framebuffer(_: Option<u64>) {
     let mut y=20;
     let width=200;
     let height=150;
-
-    let window = window_manager::get_window_obj(x,y,width,height).unwrap();
+    let color = 0xe4cf8e;
+    let window = window_manager::get_window_obj(x,y,width + 2,height + 2).unwrap();
     //window.print();
 unsafe{
 
@@ -171,10 +171,9 @@ unsafe{
     
     let window = window.unwrap();
     window.print();*/
-    (*window).print();
            
     use keycodes_ascii::Keycode;
-    draw_square!(x, y, 20, 20, 0xe4cf8e);
+    (*window).draw_square(x, y, 20, 20, 0xe4cf8e);
 
     let mut direction = Keycode::Right;
     unsafe { 
@@ -184,29 +183,58 @@ unsafe{
            
             if(keycode.is_some()){
                 direction = keycode.unwrap();
-                window.print();
-                window_manager::print_all();
             }
             match direction {
                 Keycode::Right => {
-                    draw_line!(x, y, x, (y+20)%480, 0x000000);
-                    draw_line!((20+x)%640, y, (20+x)%640, (y+20)%480, 0xe4cf8e);
-                    x = (x + 1)%640;
+                    if((y+20) < height) {
+                        window.draw_line(x, y, x, y+20, 0x000000);
+                        window.draw_line((20+x)%width, y, (20+x)%width, y+20, 0xe4cf8e);
+                    } else {
+                        window.draw_line(x, y, x, height, 0x000000);
+                        window.draw_line(x, 0, x, (y+20)%height, 0x000000);
+                        window.draw_line((20+x)%width, y, (20+x)%width, height, 0xe4cf8e);
+                        window.draw_line((20+x)%width, 0, (20+x)%width, (y+20)%height, 0xe4cf8e);                        
+                    }
+                    x = (x + 1)%width;
                 }
-                Keycode::Left => {                
-                    draw_line!((x+19)%640, y, (x+19)%640, (y+20)%480, 0x000000);
-                    x = (x + 640 -1)%640;
-                    draw_line!(x, y, x, (y+20)%480, 0xe4cf8e);                            
+                Keycode::Left => { 
+                    if((y+20) < height) {               
+                        window.draw_line((x+19)%width, y, (x+19)%width, y+20, 0x000000);
+                        x = (x + width -1)%width;
+                        window.draw_line(x, y, x, y+20, 0xe4cf8e);
+                    } else {
+                        window.draw_line((x+19)%width, y, (x+19)%width, height, 0x000000);
+                        window.draw_line((x+19)%width, 0, (x+19)%width, (y+20)%height, 0x000000);
+                        x = (x + width -1)%width;
+                        window.draw_line(x, y, x, height, 0xe4cf8e);    
+                        window.draw_line(x, 0, x, (y+20)%height, 0xe4cf8e);    
+                    }                            
                 }
-                Keycode::Up => {                
-                    draw_line!(x, (y+19)%480, (x+20)%640, (y+19)%480, 0x000000);
-                    y = (y + 480 -1)%480;
-                    draw_line!(x, y, (x+20)%640, y, 0xe4cf8e);                            
+                Keycode::Up => {
+                    if (x+20<width)  {             
+                        window.draw_line(x, (y+19)%height, x+20, (y+19)%height, 0x000000);
+                        y = (y + height -1)%height;
+                        window.draw_line(x, y, x+20, y, 0xe4cf8e);                            
+                    } else {
+                        window.draw_line(x, (y+19)%height, width, (y+19)%height, 0x000000);
+                        window.draw_line(0, (y+19)%height, (x+20)%width, (y+19)%height, 0x000000);
+                        y = (y + height -1)%height;
+                        window.draw_line(x, y, width, y, 0xe4cf8e);                            
+                        window.draw_line(0, y, (x+20)%width, y, 0xe4cf8e);                            
+                    }
                 }
-                Keycode::Down => {                
-                    draw_line!(x, y, (x+20)%640, y, 0x000000);
-                    draw_line!(x, (y+20)%480, (20+x)%640, (y+20)%480, 0xe4cf8e);
-                    y = (y + 1)%480;                         
+                Keycode::Down => {    
+                    if (x+20<width) {      
+                        window.draw_line(x, y, (x+20)%width, y, 0x000000);
+                        window.draw_line(x, (y+20)%height, (20+x)%width, (y+20)%height, 0xe4cf8e);
+                        y = (y + 1)%height;
+                    } else {
+                        window.draw_line(x, y, width, y, 0x000000);
+                        window.draw_line(0, y, (x+20)%width, y, 0x000000);
+                        window.draw_line(x, (y+20)%height, width, (y+20)%height, 0xe4cf8e);
+                        window.draw_line(0, (y+20)%height, (20+x)%width, (y+20)%height, 0xe4cf8e);
+                        y = (y + 1)%height;
+                    }                         
                 }
                 
                 _ => {}
@@ -217,11 +245,92 @@ unsafe{
 }
 
 fn test_window(_: Option<u64>) {
-    let mut i=0;
-    let mut x=0;
-    let mut y=0;
+    let mut x=250;
+    let mut y=150;
+    let width=300;
+    let height=200;
+    let color = 0xe4cf8e;
+    let window = window_manager::get_window_obj(x,y,width + 2,height + 2).unwrap();
+    //window.print();
+unsafe{
 
-    let window = window_manager::get_window_obj(250,150,300,200);
+    /*if (window.is_err()){
+        return;
+    }
+    
+    let window = window.unwrap();
+    window.print();*/
+           
+    use keycodes_ascii::Keycode;
+    (*window).draw_square(x, y, 20, 20, 0xe4cf8e);
+
+    let mut direction = Keycode::Right;
+    unsafe { 
+        loop{
+            let window = *window;
+            let keycode = window.get_key_code();
+           
+            if(keycode.is_some()){
+                direction = keycode.unwrap();
+            }
+            match direction {
+                Keycode::Right => {
+                    if((y+20) < height) {
+                        window.draw_line(x, y, x, y+20, 0x000000);
+                        window.draw_line((20+x)%width, y, (20+x)%width, y+20, 0xe4cf8e);
+                    } else {
+                        window.draw_line(x, y, x, height, 0x000000);
+                        window.draw_line(x, 0, x, (y+20)%height, 0x000000);
+                        window.draw_line((20+x)%width, y, (20+x)%width, height, 0xe4cf8e);
+                        window.draw_line((20+x)%width, 0, (20+x)%width, (y+20)%height, 0xe4cf8e);                        
+                    }
+                    x = (x + 1)%width;
+                }
+                Keycode::Left => { 
+                    if((y+20) < height) {               
+                        window.draw_line((x+19)%width, y, (x+19)%width, y+20, 0x000000);
+                        x = (x + width -1)%width;
+                        window.draw_line(x, y, x, y+20, 0xe4cf8e);
+                    } else {
+                        window.draw_line((x+19)%width, y, (x+19)%width, height, 0x000000);
+                        window.draw_line((x+19)%width, 0, (x+19)%width, (y+20)%height, 0x000000);
+                        x = (x + width -1)%width;
+                        window.draw_line(x, y, x, height, 0xe4cf8e);    
+                        window.draw_line(x, 0, x, (y+20)%height, 0xe4cf8e);    
+                    }                            
+                }
+                Keycode::Up => {
+                    if (x+20<width)  {             
+                        window.draw_line(x, (y+19)%height, x+20, (y+19)%height, 0x000000);
+                        y = (y + height -1)%height;
+                        window.draw_line(x, y, x+20, y, 0xe4cf8e);                            
+                    } else {
+                        window.draw_line(x, (y+19)%height, width, (y+19)%height, 0x000000);
+                        window.draw_line(0, (y+19)%height, (x+20)%width, (y+19)%height, 0x000000);
+                        y = (y + height -1)%height;
+                        window.draw_line(x, y, width, y, 0xe4cf8e);                            
+                        window.draw_line(0, y, (x+20)%width, y, 0xe4cf8e);                            
+                    }
+                }
+                Keycode::Down => {    
+                    if (x+20<width) {      
+                        window.draw_line(x, y, (x+20)%width, y, 0x000000);
+                        window.draw_line(x, (y+20)%height, (20+x)%width, (y+20)%height, 0xe4cf8e);
+                        y = (y + 1)%height;
+                    } else {
+                        window.draw_line(x, y, width, y, 0x000000);
+                        window.draw_line(0, y, (x+20)%width, y, 0x000000);
+                        window.draw_line(x, (y+20)%height, width, (y+20)%height, 0xe4cf8e);
+                        window.draw_line(0, (y+20)%height, (20+x)%width, (y+20)%height, 0xe4cf8e);
+                        y = (y + 1)%height;
+                    }                         
+                }
+                
+                _ => {}
+            }
+        }       
+    }
+}
 }
 
 
