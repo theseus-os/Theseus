@@ -213,16 +213,18 @@ pub fn nano_core_public_func(val: u8) {
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 	// start the kernel with interrupts disabled
-	unsafe { ::x86_64::instructions::interrupts::disable(); }
+	irq_safety::disable_interrupts();
 	
     // first, bring up the logger so we can debug
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
-    
-    // nano_core_public_func(0); // just seeing if this keeps it in the binary
 
     // initialize basic exception handlers
     interrupts::init_early_exceptions();
+
+    // calculate TSC period and initialize it
+    interrupts::tsc::init().expect("couldn't init TSC timer");
+
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };

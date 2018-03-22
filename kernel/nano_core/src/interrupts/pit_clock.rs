@@ -91,29 +91,4 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
 pub fn handle_timer_interrupt() {
     let ticks = PIT_TICKS.fetch_add(1, Ordering::Acquire);
     trace!("PIT timer interrupt, ticks: {}", ticks);
-
-    // everything below here is just used for TSC calibration
-    use interrupts::tsc::{TscTicks, set_tsc_frequency, tsc_ticks};
-    static mut START_TSC: TscTicks = TscTicks::default();
-    
-    if ticks == 250 {
-        // SAFE: just accessing variables used for timing calc, no bad effects.
-        unsafe {
-            START_TSC = tsc_ticks(); 
-        }
-    }
-
-    if ticks == 500 {
-        use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ;
-        let end_tsc = tsc_ticks(); 
-        // SAFE: just accessing variables used for timing calc, no bad effects.
-        if let Some(diff) = unsafe { end_tsc.sub(&START_TSC) } {
-            let tsc_freq = diff.into() * (CONFIG_PIT_FREQUENCY_HZ as u64 / 250); // multiplied by 4 because we're just measuring a 250ms interval
-            info!("TSC frequency calculated by PIT is: {}", tsc_freq);
-            set_tsc_frequency(tsc_freq);
-        }
-        else {
-            error!("Unable to calculate TSC frequency using PIT!");
-        }
-    }
 }
