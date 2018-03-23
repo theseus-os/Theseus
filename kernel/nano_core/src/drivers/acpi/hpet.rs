@@ -3,7 +3,7 @@ use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
 use kernel_config::memory::address_page_offset;
 
-use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, Page, VirtualAddress, EntryFlags};
+use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
 
 use super::sdt::Sdt;
 use super::{find_sdt, load_table, get_sdt_signature};
@@ -38,7 +38,7 @@ impl Hpet {
         let hpet_inner = try!( 
             if hpet_sdt.len() == 1 {
                 load_table(get_sdt_signature(hpet_sdt[0]));
-                HpetInner::new(hpet_sdt[0], active_table)
+                HpetInner::new(hpet_sdt[0])
             } else {
                 Err("unable to find HPET SDT")
             }
@@ -127,7 +127,7 @@ pub struct HpetInner {
 }
 
 impl HpetInner {
-    pub fn new(sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<HpetInner, &'static str> {
+    pub fn new(sdt: &'static Sdt) -> Result<HpetInner, &'static str> {
         if &sdt.signature == b"HPET" && sdt.length as usize >= mem::size_of::<HpetInner>() {
             let hi = unsafe { 
                 ptr::read((sdt as *const Sdt) as *const HpetInner) 

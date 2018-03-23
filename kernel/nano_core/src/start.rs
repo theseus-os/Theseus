@@ -3,6 +3,7 @@ use memory::{VirtualAddress, get_kernel_mmi_ref};
 use interrupts;
 use syscall;
 use task;
+use task::scheduler::schedule;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use interrupts::apic::{LocalApic, get_lapics};
 use spin::RwLock;
@@ -66,7 +67,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     );
 
     loop { 
-        schedule!();
+        schedule();
         ::arch::pause();
     }
 }

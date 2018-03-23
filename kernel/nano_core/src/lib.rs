@@ -120,7 +120,7 @@ macro_rules! print {
 
 #[macro_use] mod drivers;  
 mod arch;
-#[macro_use] mod task;
+mod task;
 mod dbus;
 mod memory;
 mod interrupts;
@@ -140,6 +140,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use irq_safety::{enable_interrupts, interrupts_enabled};
+use task::scheduler::schedule;
 
 
 
@@ -152,7 +153,7 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
             i -= 1;
         }
         print!("1");
-        schedule!();
+        schedule();
     }
 }
 
@@ -166,7 +167,7 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
             i -= 1;
         }
         print!("2");
-        schedule!();
+        schedule();
     }
 }
 
@@ -191,7 +192,7 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
             // }
         }
         print!("3");
-        schedule!();
+        schedule();
     }
 }
 
@@ -430,7 +431,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
-        schedule!();
+        schedule();
         arch::pause();
     }
 
