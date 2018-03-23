@@ -120,7 +120,7 @@ macro_rules! print {
 
 #[macro_use] mod drivers;  
 mod arch;
-mod task;
+pub mod task;
 mod dbus;
 mod memory;
 mod interrupts;
