@@ -16,9 +16,6 @@ use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, Memo
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use atomic_linked_list::atomic_map::AtomicMap;
 
-pub mod scheduler;
-
-
 
 /// The id of the currently executing `Task`, per-core.
 lazy_static! {
@@ -46,8 +43,12 @@ lazy_static! {
 pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
-    CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));               
-    scheduler::init_runqueue(apic_id);
+    CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
+
+    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::init_runqueue").upgrade().ok_or("failed to get scheduler::init_runqueue symbol!"));
+    let init_runqueue_func: fn(u8) = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    init_runqueue_func(apic_id);
+    
     init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
                 .map( |t| t.clone())
 }
@@ -371,7 +372,10 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         error!("init_idle_task(): Fatal Error: TASKLIST already contained a task with the same id {} as idle_task_ap{}!", idle_task_id, apic_id);
         return Err("TASKLIST already contained a task with the new idle_task's ID");
     }
-    try!(scheduler::add_task_to_specific_runqueue(apic_id, task_ref.clone()));
+
+    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_specific_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_specific_runqueue symbol!"));
+    let add_task_to_specific_runqueue_func: fn(u8, Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    try!(add_task_to_specific_runqueue_func(apic_id, task_ref.clone()));
 
     Ok(task_ref)
 }
@@ -432,7 +436,10 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
         error!("spawn_kthread(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
         return Err("TASKLIST already contained a task with the new task's ID");
     }
-    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    
+    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_runqueue symbol!"));
+    let add_task_to_runqueue_func: fn(Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    try!(add_task_to_runqueue_func(task_ref.clone()));
 
     Ok(task_ref)
 }
@@ -604,7 +611,10 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
         error!("spawn_userspace(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
         return Err("TASKLIST already contained a task with the new task's ID");
     }
-    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    
+    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_runqueue symbol!"));
+    let add_task_to_runqueue_func: fn(Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    try!(add_task_to_runqueue_func(task_ref.clone()));
 
     Ok(task_ref)
 }
@@ -673,7 +683,9 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
                              .write().set_runstate(RunState::EXITED);
     }
 
-    scheduler::schedule();
+    let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+    let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    schedule_func();
 
     // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")

@@ -123,7 +123,7 @@ mod arch;
 pub mod task;
 mod dbus;
 mod memory;
-mod interrupts;
+pub mod interrupts;
 mod syscall;
 mod mod_mgmt;
 mod start;
@@ -131,8 +131,7 @@ mod start;
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
-pub use task::{spawn_kthread, spawn_userspace};
-pub use keycodes_ascii::*;
+
 
 use alloc::String;
 use core::fmt;
@@ -141,7 +140,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use irq_safety::{enable_interrupts, interrupts_enabled};
-use task::scheduler::schedule;
+use task::{spawn_kthread, spawn_userspace};
 
 
 
@@ -154,7 +153,10 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
             i -= 1;
         }
         print!("1");
-        schedule();
+
+        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        schedule_func();
     }
 }
 
@@ -168,7 +170,10 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
             i -= 1;
         }
         print!("2");
-        schedule();
+        
+        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        schedule_func();
     }
 }
 
@@ -193,7 +198,10 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
             // }
         }
         print!("3");
-        schedule();
+        
+        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        schedule_func();
     }
 }
 
@@ -303,6 +311,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
         let _three    = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
         let _four     = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
         let _five     = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _sched    = memory::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, true).unwrap();
         // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
         //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }
@@ -443,7 +452,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in rust_main()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
-        schedule();
+        
+        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        schedule_func();
+        
         arch::pause();
     }
 

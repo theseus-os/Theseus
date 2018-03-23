@@ -20,7 +20,7 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use nano_core::spawn_kthread;
+use nano_core::task::spawn_kthread;
 
 
 

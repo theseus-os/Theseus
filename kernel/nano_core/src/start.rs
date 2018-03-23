@@ -3,7 +3,6 @@ use memory::{VirtualAddress, get_kernel_mmi_ref};
 use interrupts;
 use syscall;
 use task;
-use task::scheduler::schedule;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use interrupts::apic::{LocalApic, get_lapics};
 use spin::RwLock;
@@ -67,7 +66,10 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     );
 
     loop { 
-        schedule();
+        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        schedule_func();
+
         ::arch::pause();
     }
 }
