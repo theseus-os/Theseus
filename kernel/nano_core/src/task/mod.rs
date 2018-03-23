@@ -3,13 +3,16 @@ use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enab
 use alloc::Vec;
 use alloc::string::String;
 use alloc::arc::Arc;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, compiler_fence};
-use arch::{pause, Context};
 use alloc::boxed::Box;
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, compiler_fence};
 use core::fmt;
 use core::mem;
 use core::ops::DerefMut;
-use memory::{get_kernel_mmi_ref, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress};
+
+
+use interrupts::tss_set_rsp0;
+use arch::{pause, Context};
+use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use atomic_linked_list::atomic_map::AtomicMap;
 
@@ -226,7 +229,6 @@ impl Task {
         // change the privilege stack (RSP0) in the TSS
         // TODO: skip this when switching to kernel threads, i.e., when next is not a userspace task
         {
-            use interrupts::tss_set_rsp0;
             let next_kstack = next.kstack.as_ref().expect("context_switch(): error: next task's kstack was None!");
             let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
@@ -241,8 +243,6 @@ impl Task {
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
-            use memory::{PageTable};
-
             let prev_mmi = self.mmi.as_ref().expect("context_switch: couldn't get prev task's MMI!");
             let next_mmi = next.mmi.as_ref().expect("context_switch: couldn't get next task's MMI!");
             
@@ -442,7 +442,6 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 /// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
 pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
-    use memory::*;
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
