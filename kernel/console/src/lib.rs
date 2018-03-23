@@ -20,8 +20,8 @@ use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
 use core::sync::atomic::Ordering;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-// use core::sync::atomic::Ordering;
-// use rtc;
+use nano_core::task::spawn_kthread;
+
 
 
 lazy_static! {

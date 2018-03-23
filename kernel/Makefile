@@ -18,7 +18,8 @@ export  # export this to Makefiles in subdirectories
 ## We now manually define the list of subdirectories that we wish to build
 SUBDIRS := console_types \
 		   keyboard \
-		   console
+		   console \
+		   scheduler
 
 
 .PHONY: all clean $(SUBDIRS) nano_core

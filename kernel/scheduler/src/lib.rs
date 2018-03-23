@@ -1,10 +1,22 @@
+#![no_std]
+#![feature(alloc)]
+
+extern crate alloc;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate irq_safety;
+extern crate atomic_linked_list;
+extern crate nano_core;
+
+
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
+use nano_core::task::{Task, get_my_current_task};
+use nano_core::interrupts::apic::get_my_apic_id;
 
-use super::{Task, get_my_current_task};
 
 /// This function performs a context switch.
 ///
@@ -19,7 +31,7 @@ pub fn schedule() -> bool {
     let current_task: *mut Task;
     let next_task: *mut Task; 
 
-    let apic_id = match ::interrupts::apic::get_my_apic_id() {
+    let apic_id = match get_my_apic_id() {
         Some(id) => id,
         _ => {
             error!("Couldn't get apic_id in schedule()");
@@ -155,7 +167,13 @@ pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'
 /// returns None if there is no schedule-able task
 fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
-    let mut runqueue_locked = try_opt!(RUNQUEUES.get(&apic_id)).write();
+    let mut runqueue_locked = match RUNQUEUES.get(&apic_id) {
+        Some(rq) => rq.write(),
+        _ => { 
+            return None;
+        }
+    };
+    
     let mut index_chosen: Option<usize> = None;
 
     for (i, task) in runqueue_locked.iter().enumerate() {

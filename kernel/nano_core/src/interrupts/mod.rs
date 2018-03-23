@@ -20,7 +20,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
-use task::scheduler::schedule;
 
 use drivers::e1000;
 
@@ -447,7 +446,9 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     eoi(None); // None, because it cannot possibly be a PIC interrupt
     // we must acknowledge the interrupt first before handling it because we context switch here, which doesn't return
     
-    schedule();
+    let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+    let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+    schedule_func();
 }
 
 /// 0x2B
