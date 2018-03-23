@@ -25,6 +25,9 @@ static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
     // assert_has_not_been_called!("keyboard init was called more than once!");
     
+    // set keyboard to scancode set 1
+
+
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });
@@ -34,7 +37,7 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
 
 /// returns Ok(()) if everything was handled properly.
 /// Otherwise, returns an error string.
-pub fn handle_keyboard_input(scan_code: u8) -> Result<(), &'static str> {
+pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
    

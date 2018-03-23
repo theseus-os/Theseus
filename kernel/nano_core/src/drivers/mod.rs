@@ -14,7 +14,6 @@ use drivers::e1000::init_nic;
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
     assert_has_not_been_called!("drivers::early_init was called more than once!");
-    vga_buffer::show_splash_screen();
     
     // destructure the kernel's MMI so we can access its page table and vmas
     let &mut MemoryManagementInfo { 
@@ -60,7 +59,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         debug!("Found pci device: {:?}", dev);
     }
 
-    try!(init_nic());
+    // try!(init_nic());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

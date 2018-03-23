@@ -35,7 +35,7 @@ extern crate compiler_builtins;
 // ----- EXTERNAL CRATES BELOW --------
 // ------------------------------------
 extern crate rlibc; // basic memset/memcpy libc functions
-extern crate volatile;
+// extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
 #[macro_use] extern crate bitflags;
@@ -135,6 +135,7 @@ pub use task::{spawn_kthread, spawn_userspace};
 pub use keycodes_ascii::*;
 
 use alloc::String;
+use core::fmt;
 use drivers::{pci, test_nic_driver};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
@@ -209,20 +210,28 @@ pub fn nano_core_public_func(val: u8) {
 }
 
 
+/// the callback use in the logger crate for mirroring log functions to the console
+fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
+    println!("{} {}", prefix, args);
+}
+
+
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
 	// start the kernel with interrupts disabled
-	unsafe { ::x86_64::instructions::interrupts::disable(); }
+	irq_safety::disable_interrupts();
 	
     // first, bring up the logger so we can debug
     logger::init().expect("WTF: couldn't init logger.");
     trace!("Logger initialized.");
     
-    // nano_core_public_func(0); // just seeing if this keeps it in the binary
-
     // initialize basic exception handlers
     interrupts::init_early_exceptions();
+
+    // calculate TSC period and initialize it
+    interrupts::tsc::init().expect("couldn't init TSC timer");
+
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
@@ -237,7 +246,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     state_store::init();
     if cfg!(feature = "mirror_serial") {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        unsafe{  logger::enable_vga(); }
+        logger::mirror_to_vga(mirror_to_vga_cb);
     }
     trace!("state_store initialized.");
 
@@ -288,11 +297,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // relies on keycodes_ascii library
     if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _one   = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _two   = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _three = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _four  = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _five  = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _one      = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _two      = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _three    = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _four     = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _five     = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
         //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }
@@ -342,6 +351,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     };
 
 
+
     // initialize the rest of our drivers
     drivers::init(console_queue_producer).unwrap();
     
@@ -379,7 +389,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     }
 
 
-    println_unsafe!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     enable_interrupts();
 
     if false {
@@ -459,8 +469,8 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
     error!("    {}", fmt);
     unsafe { memory::stack_trace(); }
 
-    println_unsafe!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    println_unsafe!("    {}", fmt);
+    println_early!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
+    println_early!("    {}", fmt);
 
 
     loop {}
@@ -475,7 +485,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    println_unsafe!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    println_early!("\n\nin rust_eh_unwind_resume, unimplemented!");
     loop {}
 }
 
@@ -485,7 +495,7 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[cfg(not(target_os = "windows"))]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_unsafe!("\n\nin _Unwind_Resume, unimplemented!");
+    println_early!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 
