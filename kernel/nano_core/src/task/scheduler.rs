@@ -1,17 +1,16 @@
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
-use irq_safety::{RwLockIrqSafe, interrupts_enabled};
+use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 use super::{Task, get_my_current_task};
 
 /// This function performs a context switch.
-/// This is unsafe because we have to maintain references to the current and next tasks
-/// beyond the duration of their task locks and the singular task_list lock.
 ///
 /// Interrupts MUST be disabled before this function runs. 
-pub unsafe fn schedule() -> bool {
+pub fn schedule() -> bool {
+    disable_interrupts();
     assert!(interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
@@ -53,8 +52,7 @@ pub unsafe fn schedule() -> bool {
     }
 
     // we want mutable references to mutable tasks
-    let curr: &mut Task = &mut (*current_task); // as &mut Task; 
-    let next: &mut Task = &mut (*next_task); // as &mut Task; 
+    let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
 
     // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 
@@ -64,23 +62,6 @@ pub unsafe fn schedule() -> bool {
     // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
 
     true
-}
-
-
-/// invokes the scheduler to pick a new task, but first disables interrupts. 
-/// Interrupts will NOT be re-enabled after scheduling, so this is safe to call from within an interrupt handler.
-/// This also allows us to perform a context switch directly to another task, if we wish... which we never do as of now.
-/// The current thread may be picked again, it doesn't affect the current thread's runnability.
-#[macro_export]
-macro_rules! schedule {
-    () => (    
-        {
-            unsafe {
-                $crate::irq_safety::disable_interrupts();
-                $crate::task::scheduler::schedule();
-            }
-        }
-    )
 }
 
 

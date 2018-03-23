@@ -13,7 +13,7 @@ use memory::{get_kernel_mmi_ref, MappedPages, Stack, ModuleArea, MemoryManagemen
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use atomic_linked_list::atomic_map::AtomicMap;
 
-#[macro_use] pub mod scheduler;
+pub mod scheduler;
 
 
 
@@ -674,7 +674,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
                              .write().set_runstate(RunState::EXITED);
     }
 
-    schedule!();
+    scheduler::schedule();
 
     // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")

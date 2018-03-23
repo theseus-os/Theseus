@@ -7,7 +7,6 @@ pub mod test_nic_driver;
 
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
-use vga_buffer;
 use memory::{MemoryManagementInfo, PageTable};
 use drivers::e1000::init_nic;
 
