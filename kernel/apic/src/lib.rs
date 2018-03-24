@@ -1,13 +1,44 @@
+#![no_std]
+#![feature(alloc)]
+
+#![allow(dead_code)]
+
+extern crate alloc;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate irq_safety;
+extern crate atomic_linked_list;
+extern crate memory;
+extern crate spin;
+extern crate kernel_config;
+extern crate x86;
+extern crate x86_64;
+extern crate pit_clock;
+extern crate atomic;
+
+
+use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use spin::{RwLock, Once};
 use x86::current::cpuid::CpuId;
 use x86::shared::msr::*;
-use core::ops::DerefMut;
+use irq_safety::hold_interrupts;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use atomic::Atomic;
+use pit_clock::pit_wait;
 
+
+pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum InterruptChip {
+    APIC,
+    X2APIC,
+    PIC,
+}
 
 
 lazy_static! {
@@ -106,8 +137,6 @@ impl LapicIpiDestination {
 /// initially maps the base APIC MMIO register frames so that we can know which LAPIC (processor core) we are,
 /// and because it only needs to be done once -- not every time we bring up a new AP core
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-    assert_has_not_been_called!("Error: tried to call apic::init() more than once!");
-
     let x2 = has_x2apic();
     let phys_addr = unsafe { rdmsr(IA32_APIC_BASE) };
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
@@ -228,7 +257,7 @@ impl LocalApic {
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
         info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
-            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::APIC, ::atomic::Ordering::Release);
+            INTERRUPT_CHIP.store(InterruptChip::APIC, Ordering::Release);
         }
 
 
@@ -266,7 +295,7 @@ impl LocalApic {
         debug!("in enable_x2apic 2: new apic_base: {:#X}", rdmsr(IA32_APIC_BASE));
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
         if is_bsp {
-            ::interrupts::INTERRUPT_CHIP.store(::interrupts::InterruptChip::X2APIC, ::atomic::Ordering::Release);
+            INTERRUPT_CHIP.store(InterruptChip::X2APIC, Ordering::Release);
         }
 
         // init x2APIC to a clean state, just as in enable_apic() above 
@@ -301,7 +330,7 @@ impl LocalApic {
         self.write_reg(APIC_REG_INIT_COUNT, INITIAL_COUNT); // set counter to max value
 
         // wait or the given period using the PIT clock
-        super::pit_clock::pit_wait(microseconds).unwrap();
+        pit_wait(microseconds).unwrap();
 
         self.write_reg(APIC_REG_LVT_TIMER, APIC_DISABLE); // stop apic timer
         let after = self.read_reg(APIC_REG_CURRENT_COUNT);
@@ -319,7 +348,7 @@ impl LocalApic {
         wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT); // set counter to max value
 
         // wait or the given period using the PIT clock
-        super::pit_clock::pit_wait(microseconds).unwrap();
+        pit_wait(microseconds).unwrap();
 
         wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64); // stop apic timer
         let after = rdmsr(IA32_X2APIC_CUR_COUNT);
@@ -359,19 +388,17 @@ impl LocalApic {
         };
         trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
 
-        debug!("in init_timer_x2apic start");
-        debug!("in init_timer_x2apic 2"); wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
+        wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
         
         // map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for
         wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64); 
         wrmsr(IA32_X2APIC_INIT_COUNT, x2apic_period); 
 
-        debug!("in init_timer_x2apic 5"); wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
-        debug!("in init_timer_x2apic 6"); wrmsr(IA32_X2APIC_ESR, 0);
+        wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
+        wrmsr(IA32_X2APIC_ESR, 0);
 
         // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-        debug!("in init_timer_x2apic 7"); wrmsr(IA32_X2APIC_DIV_CONF, 3);
-        debug!("in init_timer_x2apic end");
+        wrmsr(IA32_X2APIC_DIV_CONF, 3);
     }
 
     unsafe fn read_reg(&self, reg: u32) -> u32 {
@@ -492,11 +519,11 @@ impl LocalApic {
         
         // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
         // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
-        let _held_ints = ::irq_safety::hold_interrupts(); 
+        let _held_ints = hold_interrupts(); 
 
         // acquire lock
         while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
-            ::arch::pause();
+            // ::arch::pause();
         }
 
         TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
@@ -509,7 +536,7 @@ impl LocalApic {
         // wait for all other cores to handle this IPI
         // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
         while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0  { 
-            ::arch::pause();
+            // ::arch::pause();
         }
     
         // clear TLB shootdown data
@@ -654,8 +681,6 @@ pub fn handle_tlb_shootdown_ipi() {
 
     // trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
 
-    use x86_64::instructions::tlb;
-    tlb::flush(::x86_64::VirtualAddress(vaddr));
-
+    x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
     TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }

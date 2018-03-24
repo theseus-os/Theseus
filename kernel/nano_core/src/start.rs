@@ -4,9 +4,11 @@ use interrupts;
 use syscall;
 use task;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use interrupts::apic::{LocalApic, get_lapics};
+use apic::{LocalApic, get_lapics};
 use spin::RwLock;
 use irq_safety::{enable_interrupts, interrupts_enabled};
+use apic::get_my_apic_id;
+
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -53,8 +55,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     let lapic = LocalApic::new(processor_id, apic_id, false, nmi_lint, nmi_flags)
                       .expect("kstart_ap(): failed to create LocalApic");
     
-    if interrupts::apic::get_my_apic_id() != Some(apic_id) {
-        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, interrupts::apic::get_my_apic_id());
+    if get_my_apic_id() != Some(apic_id) {
+        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
     }
 
     get_lapics().insert(apic_id, RwLock::new(lapic));

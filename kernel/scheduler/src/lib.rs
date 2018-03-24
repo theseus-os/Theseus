@@ -6,6 +6,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate atomic_linked_list;
+extern crate apic;
 extern crate nano_core;
 
 
@@ -15,7 +16,7 @@ use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
 use nano_core::task::{Task, get_my_current_task};
-use nano_core::interrupts::apic::get_my_apic_id;
+use apic::get_my_apic_id;
 
 
 /// This function performs a context switch.

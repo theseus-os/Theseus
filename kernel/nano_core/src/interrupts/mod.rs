@@ -17,17 +17,17 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_RTC_FREQUENCY_HZ};
 use x86_64::structures::gdt::SegmentSelector;
 use rtc;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
+use apic;
+use apic::{INTERRUPT_CHIP, InterruptChip};
+use pit_clock;
 
 use drivers::e1000;
 
 
 mod exceptions;
 mod gdt;
-pub mod pit_clock; // TODO: shouldn't be pub
-pub mod apic;
 pub mod ioapic;
 mod pic;
 pub mod tsc;
@@ -68,14 +68,7 @@ lazy_static! {
     static ref GDT: AtomicMap<u8, gdt::Gdt> = AtomicMap::new();
 }
 
-pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum InterruptChip {
-    APIC,
-    X2APIC,
-    PIC,
-}
 
 pub enum AvailableSegmentSelector {
     KernelCode,

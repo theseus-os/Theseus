@@ -1,5 +1,5 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
-use interrupts::pit_clock;
+use pit_clock;
 
 static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
 

@@ -85,6 +85,12 @@ path = "../console_types"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.apic]
+path = "../apic"
+
 
 [features]
 mirror_serial = []
