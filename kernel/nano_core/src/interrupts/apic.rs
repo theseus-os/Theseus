@@ -10,17 +10,6 @@ use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 
 
 
-/// The IRQ number used for IPIs
-pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
-/// The virtual address used for TLB shootdown IPIs
-pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(0); 
-/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0); 
-/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
-pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
-
-
-
 lazy_static! {
     static ref LOCAL_APICS: AtomicMap<u8, RwLock<LocalApic>> = AtomicMap::new();
 }
@@ -635,8 +624,32 @@ impl LocalApic {
 }
 
 
+
+
+/// The IRQ number used for IPIs
+pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
+/// The virtual address used for TLB shootdown IPIs
+pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(0); 
+/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0); 
+/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
+pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
+
+
+/// Broadcasts TLB shootdown IPI to all other AP cores.
+/// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
+/// which will invoke it as needed (on remap/unmap operations).
+pub fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
+    if let Some(my_lapic) = get_my_apic() {
+        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
+        my_lapic.write().send_tlb_shootdown_ipi(vaddr);
+    }
+}
+
+
 /// Handles a TLB shootdown ipi by flushing the VirtualAddress 
 /// currently stored in TLB_SHOOTDOWN_IPI_VIRT_ADDR.
+/// DO not invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(vaddr: VirtualAddress) {
     // let apic_id = get_my_apic_id().unwrap_or(0xFF);
     // trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);

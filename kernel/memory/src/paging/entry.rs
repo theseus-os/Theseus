@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::Frame;
+use super::super::Frame;
 use multiboot2;
 use xmas_elf;
 

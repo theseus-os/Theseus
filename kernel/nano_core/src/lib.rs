@@ -64,6 +64,7 @@ extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate dfqueue; // decoupled, fault-tolerant queue
 extern crate atomic_linked_list;
+extern crate memory; // the virtual memory subsystem 
 
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
@@ -122,7 +123,6 @@ macro_rules! print {
 mod arch;
 pub mod task;
 mod dbus;
-mod memory;
 pub mod interrupts;
 mod syscall;
 mod mod_mgmt;
@@ -248,7 +248,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
-    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info).unwrap(); // consumes boot_info
+    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, interrupts::apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
 
 
     // now that we have a heap, we can create basic things like state_store
@@ -263,9 +263,9 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // both which satisfy dependencies that many other crates have. 
     if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = memory::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _num_nano_core_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
-        let _num_libcore_syms = memory::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
     }
 
@@ -275,11 +275,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     if false {
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap(); // stupid lexical lifetimes...
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
-        memory::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_test_server").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_server: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_test_client").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_client: {}", mod_mgmt::metadata::dump_symbol_map());
-        memory::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_test_lib").unwrap(), &mut *kernel_mmi_locked, false).unwrap();
         // debug!("Symbol map after __k_test_lib: {}", mod_mgmt::metadata::dump_symbol_map());
 
         // now let's try to invoke the test_server function we just loaded
@@ -306,12 +306,12 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // relies on keycodes_ascii library
     if true {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _one      = memory::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _two      = memory::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _three    = memory::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _four     = memory::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _five     = memory::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _sched    = memory::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, true).unwrap();
+        let _one      = mod_mgmt::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _two      = mod_mgmt::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _three    = mod_mgmt::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _four     = mod_mgmt::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _five     = mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _sched    = mod_mgmt::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, true).unwrap();
         // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
         //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }

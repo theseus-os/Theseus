@@ -7,13 +7,13 @@ use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
-use memory::{VirtualMemoryArea, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
 use goblin::elf::reloc::*;
 use kernel_config::memory::PAGE_SIZE;
 use util::round_up_power_of_two;
 
 pub mod metadata;
-use self::metadata::*;
+use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, LoadedSection};
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
@@ -79,6 +79,75 @@ pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(
     let entry_point = elf_file.header.pt2.entry_point() as VirtualAddress;
 
     Ok((prog_sects, entry_point))
+}
+
+
+
+
+
+
+/// Loads the specified kernel crate into memory, allowing it to be invoked.  
+/// Returns a Result containing the number of symbols that were added to the system map
+/// as a result of loading this crate.
+pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) -> Result<usize, &'static str> {
+    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
+    use kernel_config::memory::address_is_page_aligned;
+    if !address_is_page_aligned(module.start_address()) {
+        error!("module {} is not page aligned!", module.name());
+        return Err("module was not page aligned");
+    } 
+
+    // first we need to map the module memory region into our address space, 
+    // so we can then parse the module as an ELF file in the kernel.
+    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+    {
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+        } = kernel_mmi;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let (size, flags) = if module.name() == "__k_nano_core" {
+                    // + 1 to add space for appending a null character to the end of the symbol file string
+                    // WRITABLE because we need to write that null character
+                    (module.size() + 1, EntryFlags::PRESENT | EntryFlags::WRITABLE)
+                } else {
+                    // when reading an actual ELF object file, we only read from it
+                    (module.size(), EntryFlags::PRESENT)
+                };
+                let temp_module_mapping = {
+                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
+                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+                    try!( active_table.map_allocated_pages_to(
+                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                        flags, frame_allocator.deref_mut())
+                    )
+                };
+
+                let new_crate = try!( {
+                    // the nano_core requires special handling because it has already been loaded,
+                    // we just need to parse its symbols and add them to the symbol table & crate metadata lists
+                    if module.name() == "__k_nano_core" {
+                        parse_nano_core_symbols(temp_module_mapping, size)
+                    }
+                    else {
+                        parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log)
+                    }
+                });
+
+                info!("loaded new crate: {}", new_crate.crate_name);
+                Ok(metadata::add_crate(new_crate, log))
+
+                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+            }
+            _ => {
+                error!("load_kernel_crate(): error getting kernel's active page table to map module.");
+                Err("couldn't get kernel's active page table")
+            }
+        }
+    }
 }
 
 

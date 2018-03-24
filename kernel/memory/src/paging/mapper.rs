@@ -7,11 +7,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use x86_64;
-use super::super::*; //{VirtualAddress, PhysicalAddress, Page, ENTRIES_PER_PAGE_TABLE};
-use super::table::{self, Table, Level4};
-use memory::{Frame, FrameAllocator, AllocatedPages};
 use core::ptr::Unique;
+use core::ops::DerefMut;
+use x86_64;
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
+use paging::{PageIter, get_current_p4, ActivePageTable};
+use paging::entry::EntryFlags;
+use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 
 pub struct Mapper {
@@ -22,7 +24,7 @@ pub struct Mapper {
 impl Mapper {
     pub unsafe fn new() -> Mapper {
         Mapper { 
-            p4: Unique::new_unchecked(table::P4),
+            p4: Unique::new_unchecked(P4),
             target_p4: get_current_p4(),
         }
     }
@@ -214,6 +216,11 @@ impl Mapper {
     pub fn remap(&mut self, pages: &MappedPages, new_flags: EntryFlags) -> Result<(), &'static str> {
         use x86_64::instructions::tlb;
 
+        let broadcast_tlb_shootdown = try!(
+            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
+            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
+        );
+
         for page in pages.pages.clone() {
 
             let p1 = try!(self.p4_mut()
@@ -238,6 +245,11 @@ impl Mapper {
     fn unmap<A>(&mut self, pages: PageIter, _allocator: &mut A) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
+        let broadcast_tlb_shootdown = try!(
+            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
+            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
+        );
+
         for page in pages {
 
             use x86_64::instructions::tlb;
@@ -265,18 +277,6 @@ impl Mapper {
         }
 
         Ok(())
-    }
-}
-
-
-
-/// broadcasts TLB shootdown IPI
-fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
-    
-    use interrupts::apic::get_my_apic;
-    if let Some(my_lapic) = get_my_apic() {
-        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
-        my_lapic.write().send_tlb_shootdown_ipi(vaddr);
     }
 }
 

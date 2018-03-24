@@ -1,6 +1,6 @@
-use memory::paging::*;
-use memory::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
-use memory::Mapper;
+use super::paging::*;
+use super::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
+use super::Mapper;
 
 pub struct StackAllocator {
     pub range: PageIter,
@@ -26,12 +26,9 @@ impl StackAllocator {
     /// Reserves an unmapped guard page to catch stack overflows. 
     /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
-    pub fn alloc_stack<FA>(&mut self, 
-                           active_table: &mut Mapper,
-                           frame_allocator: &mut FA,
-                           size_in_pages: usize)
-                           -> Option<(Stack, VirtualMemoryArea)> 
-                           where FA: FrameAllocator {
+    pub fn alloc_stack<FA>(&mut self, active_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
+            -> Option<(Stack, VirtualMemoryArea)> where FA: FrameAllocator 
+    {
         if size_in_pages == 0 {
             return None; /* a zero sized stack maikes no sense */
         }
@@ -60,9 +57,13 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                let stack_pages = try_opt!(active_table.map_pages(
-                    Page::range_inclusive(start, end), flags, frame_allocator).ok()
-                );
+                let stack_pages = match active_table.map_pages(Page::range_inclusive(start, end), flags, frame_allocator) {
+                    Ok(pages) => pages,
+                    Err(e) => {
+                        error!("alloc_stack(): couldn't map_pages for the new Stack, error: {}", e);
+                        return None;
+                    }
+                };
 
                 let stack_vma = VirtualMemoryArea::new(
                     start.start_address(),

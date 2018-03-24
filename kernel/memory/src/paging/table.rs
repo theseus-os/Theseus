@@ -7,9 +7,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::paging::entry::*;
+use super::entry::{Entry, EntryFlags};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
-use memory::FrameAllocator;
+use super::super::FrameAllocator;
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 

@@ -1,12 +1,27 @@
-// Copyright 2016 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
+//! This crate implements the virtual memory subsystem for Theseus,
+//! which is fairly robust and provides a unification between 
+//! arbitrarily mapped sections of memory and Rust's lifetime system. 
+//! Originally based on Phil Opp's blog_os. 
 
+#![no_std]
+#![feature(alloc)]
+#![feature(asm)]
+#![feature(unique)]
+
+
+extern crate spin;
+extern crate multiboot2;
+extern crate alloc;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate irq_safety;
+extern crate kernel_config;
+extern crate atomic_linked_list;
+extern crate xmas_elf;
+extern crate x86_64;
+#[macro_use] extern crate bitflags;
+extern crate heap_irq_safe;
+#[macro_use] extern crate once; // for assert_has_not_been_called!()
 
 mod area_frame_allocator;
 mod paging;
@@ -25,8 +40,6 @@ use core::ops::DerefMut;
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use mod_mgmt::{parse_elf_kernel_crate, parse_nano_core_symbols};
-use mod_mgmt::metadata;
 
 
 pub type PhysicalAddress = usize;
@@ -305,6 +318,8 @@ impl VirtualMemoryArea {
 
 
 
+static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(VirtualAddress)> = Once::new();
+
 
 
 
@@ -314,12 +329,14 @@ impl VirtualMemoryArea {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> {
+pub fn init(boot_info: BootInformation, tlb_shootdown_cb: fn(VirtualAddress)) -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> {
     assert_has_not_been_called!("memory::init must be called only once");
     debug!("memory::init() at top!");
     let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
     debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
     
+    BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| tlb_shootdown_cb); // for use in remap/unmap
+
     let memory_map_tag = try!(boot_info.memory_map_tag().ok_or("Memory map tag not found"));
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("Elf sections tag not found"));
 
@@ -369,7 +386,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         };
 
         info!("--> memory region established: start={:#x}, size_in_bytes={:#x}", available[avail_index].base_addr, available[avail_index].size_in_bytes);
-        print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
+        // print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
         avail_index += 1;
     }
 
@@ -386,7 +403,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
         }
         (mod_min, mod_max)
     };
-    print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
+    // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
@@ -416,7 +433,7 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
     // HERE: heap is initialized! Can now use alloc types.
 
     debug!("Done with paging::init()!, active_table: {:?}", active_table);
-    print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
+    // print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
 
     MODULE_AREAS.call_once( || {
         // parse the list of multiboot modules 
@@ -427,7 +444,8 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
                 mod_end_paddr:   m.end_address().clone(), 
                 name:            String::from(m.name()),
             };
-            print_early!("ModuleArea: {:?}\n", mod_area);
+            // print_early!("ModuleArea: {:?}\n", mod_area);
+            info!("ModuleArea: {:?}", mod_area);
             modules.push(mod_area);
         }
         modules
@@ -458,73 +476,6 @@ pub fn init(boot_info: BootInformation) -> Result<(Arc<MutexIrqSafe<MemoryManage
     });
 
     Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
-
-}
-
-
-/// Loads the specified kernel crate into memory, allowing it to be invoked.  
-/// Returns a Result containing the number of symbols that were added to the system map
-/// as a result of loading this crate.
-pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) -> Result<usize, &'static str> {
-    debug!("load_kernel_crate: trying to load \"{}\" kernel module", module.name());
-    use kernel_config::memory::address_is_page_aligned;
-    if !address_is_page_aligned(module.start_address()) {
-        error!("module {} is not page aligned!", module.name());
-        return Err("module was not page aligned");
-    } 
-
-    // first we need to map the module memory region into our address space, 
-    // so we can then parse the module as an ELF file in the kernel.
-    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-    {
-        // destructure the kernel's MMI so we can access its page table and vmas
-        let &mut MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-        } = kernel_mmi;
-
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let (size, flags) = if module.name() == "__k_nano_core" {
-                    // + 1 to add space for appending a null character to the end of the symbol file string
-                    // WRITABLE because we need to write that null character
-                    (module.size() + 1, EntryFlags::PRESENT | EntryFlags::WRITABLE)
-                } else {
-                    // when reading an actual ELF object file, we only read from it
-                    (module.size(), EntryFlags::PRESENT)
-                };
-                let temp_module_mapping = {
-                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
-                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
-                    try!( active_table.map_allocated_pages_to(
-                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
-                        flags, frame_allocator.deref_mut())
-                    )
-                };
-
-                let new_crate = try!( {
-                    // the nano_core requires special handling because it has already been loaded,
-                    // we just need to parse its symbols and add them to the symbol table & crate metadata lists
-                    if module.name() == "__k_nano_core" {
-                        parse_nano_core_symbols(temp_module_mapping, size)
-                    }
-                    else {
-                        parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log)
-                    }
-                });
-
-                info!("loaded new crate: {}", new_crate.crate_name);
-                Ok(metadata::add_crate(new_crate, log))
-
-                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-            }
-            _ => {
-                error!("load_kernel_crate(): error getting kernel's active page table to map module.");
-                Err("couldn't get kernel's active page table")
-            }
-        }
-    }
-
 }
 
 
