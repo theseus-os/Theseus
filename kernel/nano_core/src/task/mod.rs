@@ -15,6 +15,7 @@ use arch::{pause, Context};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use atomic_linked_list::atomic_map::AtomicMap;
+use apic::get_my_apic_id;
 
 
 /// The id of the currently executing `Task`, per-core.
@@ -27,7 +28,7 @@ pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
 }
 /// Get the id of the currently running Task on this current task
 pub fn get_my_current_task_id() -> Option<usize> {
-    ::interrupts::apic::get_my_apic_id().and_then(|id| {
+    get_my_apic_id().and_then(|id| {
         get_current_task_id(id)
     })
 }

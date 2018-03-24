@@ -65,6 +65,8 @@ extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crat
 extern crate dfqueue; // decoupled, fault-tolerant queue
 extern crate atomic_linked_list;
 extern crate memory; // the virtual memory subsystem 
+extern crate pit_clock;
+extern crate apic; 
 
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
@@ -141,7 +143,6 @@ use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use irq_safety::{enable_interrupts, interrupts_enabled};
 use task::{spawn_kthread, spawn_userspace};
-
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -248,7 +249,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // debug!("end of multiboot2 info");
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this returns a MMI struct with the page table, stack allocator, and VMA list for the kernel's address space (idle_task_ap0)
-    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, interrupts::apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
+    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
 
 
     // now that we have a heap, we can create basic things like state_store
@@ -349,7 +350,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
   
     // create the initial `Task`, i.e., task_zero
-    let bsp_apic_id = interrupts::apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
+    let bsp_apic_id = apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
     task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
@@ -372,7 +373,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
                         .expect("Error handling AP cores");
         
         info!("Finished handling and booting up all {} AP cores.", ap_count);
-        assert!(interrupts::apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
+        assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
     }
 
 
@@ -477,7 +478,7 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    let apic_id = interrupts::apic::get_my_apic_id().unwrap_or(0xFF);
+    let apic_id = apic::get_my_apic_id().unwrap_or(0xFF);
 
     error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     error!("    {}", fmt);

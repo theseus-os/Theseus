@@ -1,5 +1,13 @@
-/// Handles the Programmable Interval Timer (PIT) system clock,
-/// which allows us to configure the frequency of timer interrupts.
+//! Support for the Programmable Interval Timer (PIT) system clock,
+//! which enables and configures the frequency of simple timer interrupts
+//! and basic timer-based one-shot wait period.
+
+#![no_std]
+
+extern crate spin;
+#[macro_use] extern crate log;
+extern crate port_io;
+extern crate x86_64;
 
 use port_io::Port;
 use spin::Mutex;
@@ -39,7 +47,6 @@ pub fn init(freq_hertz: u32) {
     unsafe {
         use x86_64::instructions::port::inb;
         PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
-        // PIT_COMMAND.lock().write(0x34); // some other mode that we don't want
 
         // must write the low byte and then the high byte
         PIT_CHANNEL_0.lock().write(divisor as u8);
@@ -87,7 +94,8 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
 
 
 
-/// this occurs on every PIT timer tick
+/// this occurs on every PIT timer tick.
+/// Called by the PIT's interrupt handler
 pub fn handle_timer_interrupt() {
     let ticks = PIT_TICKS.fetch_add(1, Ordering::Acquire);
     trace!("PIT timer interrupt, ticks: {}", ticks);

@@ -1,4 +1,6 @@
 use x86_64::structures::idt::{ExceptionStackFrame, PageFaultErrorCode};
+use core::sync::atomic::Ordering;
+use apic;
 
 use super::IDT;
 
@@ -51,9 +53,6 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 
 /// interrupt 0x02
 pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
-    use core::sync::atomic::Ordering;
-    use super::apic;
-
     // currently we're using NMIs to send TLB shootdown IPIs
     let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
     if vaddr != 0 {

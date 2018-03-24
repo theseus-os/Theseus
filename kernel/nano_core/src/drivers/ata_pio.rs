@@ -1,7 +1,7 @@
 use port_io::Port;
 use spin::{Once, Mutex}; 
 use core::sync::atomic::{Ordering};
-use interrupts::pit_clock;
+use pit_clock;
 
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
 

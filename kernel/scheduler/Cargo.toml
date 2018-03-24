@@ -22,6 +22,9 @@ version = "0.1.1"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
+[dependencies.apic]
+path= "../apic"
+
 [dependencies.nano_core]
 path = "../nano_core"
 

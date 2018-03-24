@@ -3,21 +3,19 @@ use core::intrinsics::{atomic_load, atomic_store};
 use core::ops::DerefMut;
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use interrupts::ioapic;
-use interrupts::apic::{LocalApic, has_x2apic, get_my_apic_id, is_bsp, get_bsp_id};
+use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use spin::RwLock;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
 use irq_safety::MutexIrqSafe;
+use pit_clock;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 
-// use core::intrinsics::{atomic_load, atomic_store};
 use core::sync::atomic::Ordering;
 
-// use device::local_apic::LOCAL_APIC;
-// use interrupt;
 use start::{kstart_ap, AP_READY_FLAG};
 
 
@@ -109,7 +107,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 
 
 fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
-    let all_lapics = ::interrupts::apic::get_lapics();
+    let all_lapics = get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
     let mut ioapic_locked = ioapic::get_ioapic();
@@ -238,10 +236,10 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         }
     }
 
-    let all_lapics = ::interrupts::apic::get_lapics();
+    let all_lapics = get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
-    debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic {}.", me, ::interrupts::apic::has_x2apic());
+    debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic {}.", me, has_x2apic());
     
     // we checked the src_ptr and mapped the dest_ptr earlier
     let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
@@ -311,11 +309,11 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
 
     // wait for all cores to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
-    let mut count = ::interrupts::apic::get_lapics().iter().count();
+    let mut count = get_lapics().iter().count();
     while count < ap_count + 1 {
         trace!("BSP-known count: {}", count);
         ::arch::pause();
-        count = ::interrupts::apic::get_lapics().iter().count();
+        count = get_lapics().iter().count();
     }
     
     Ok(ap_count)  
@@ -401,7 +399,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     }
 
     debug!("waiting 10 ms...");
-    ::interrupts::pit_clock::pit_wait(10000).expect("bring_up_ap(): failed to pit_wait 10 ms");
+    pit_clock::pit_wait(10000).expect("bring_up_ap(): failed to pit_wait 10 ms");
     debug!("done waiting.");
 
     // // Send DEASSERT INIT IPI
@@ -438,8 +436,8 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
         bsp_lapic.set_icr(icr);
     }
 
-    ::interrupts::pit_clock::pit_wait(300).expect("bring_up_ap(): failed to pit_wait 300 us");
-    ::interrupts::pit_clock::pit_wait(200).expect("bring_up_ap(): failed to pit_wait 200 us");
+    pit_clock::pit_wait(300).expect("bring_up_ap(): failed to pit_wait 300 us");
+    pit_clock::pit_wait(200).expect("bring_up_ap(): failed to pit_wait 200 us");
 
     bsp_lapic.clear_error();
     let esr = bsp_lapic.error();
