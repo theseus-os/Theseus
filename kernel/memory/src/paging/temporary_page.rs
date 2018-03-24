@@ -7,9 +7,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::*; //{Page, ActivePageTable, VirtualAddress};
+use {VirtualAddress, FrameIter};
+use paging::{ActivePageTable, MappedPages};
 use super::table::{Table, Level1};
-use memory::{Frame, FrameAllocator};
+use super::{Page, Frame, FrameAllocator};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 

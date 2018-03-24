@@ -1,4 +1,5 @@
 use spin::Mutex;
+use irq_safety::MutexIrqSafe;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use alloc::btree_map::Entry; 
@@ -15,7 +16,10 @@ lazy_static! {
     /// A flat map of all symbols currently loaded into the kernel. 
     /// Maps a fully-qualified kernel symbol name (String) to the corresponding `LoadedSection`. 
     /// Symbols declared as "no_mangle" will appear in the root namespace with no crate prefixex, as expected.
-    static ref SYSTEM_MAP: Mutex<BTreeMap<String, Weak<LoadedSection>>> = Mutex::new(BTreeMap::new());
+    /// Currently we use a MutexIrqSafe because the metadata can be queried via `get_symbol` from an interrupt context.
+    /// Later, when the nano_core is fully minimalized, we should be able to remove this. 
+    /// TODO FIXME: change this MutexIrqSafe back to a regular Mutex once we stop using `get_symbol` in IRQ contexts. 
+    static ref SYSTEM_MAP: MutexIrqSafe<BTreeMap<String, Weak<LoadedSection>>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
 

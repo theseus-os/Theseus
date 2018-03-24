@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use memory::{Frame, FrameAllocator, FrameIter, PhysicalMemoryArea};
+use super::{Frame, FrameAllocator, FrameIter, PhysicalMemoryArea};
 use alloc::Vec;
 use kernel_config::memory::PAGE_SIZE;
 

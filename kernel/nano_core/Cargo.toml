@@ -82,6 +82,8 @@ path = "../../libs/atomic_linked_list"
 [dependencies.console_types]
 path = "../console_types"
 
+[dependencies.memory]
+path = "../memory"
 
 
 [features]

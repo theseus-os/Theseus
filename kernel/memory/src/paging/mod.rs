@@ -369,7 +369,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                                                    .ok_or("Couldn't get boot_info physical address")
     );
     let boot_info_size = boot_info.total_size();
-    print_early!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
+    // print_early!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
+    //         boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
+    // );
+    info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
             boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
     );
 

@@ -3,7 +3,7 @@
 //! The minimum unit of allocation is a single page. 
 
 use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
-use memory::{VirtualAddress, Page, PageIter};
+use super::{VirtualAddress, Page, PageIter};
 use spin::Mutex;
 use alloc::LinkedList;
 
