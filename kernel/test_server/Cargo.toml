@@ -1,8 +1,0 @@
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "test_server"
-version = "0.1.0"
-
-
-[lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
