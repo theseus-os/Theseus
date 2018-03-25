@@ -1,33 +1,15 @@
-use interrupts::{AvailableSegmentSelector, get_segment_selector};
+#![no_std]
+#![feature(asm)]
 
-/// Must match the order of registers popped in boot.asm:task_switch
-#[derive(Default, Debug)]
-#[repr(C, packed)]
-pub struct Context {
-    r15: usize, 
-    r14: usize,
-    r13: usize,
-    r12: usize,
-    rbp: usize,
-    rbx: usize,
-    rip: usize,
-}
+// #[macro_use] extern crate log;
+extern crate gdt;
 
-impl Context {
-    pub fn new(rip: usize) -> Context {
-        Context {
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
-            rbp: 0,
-            rbx: 0,
-            rip: rip,
-        }
-    }
-}
+use gdt::{AvailableSegmentSelector, get_segment_selector};
 
 
+/// Transitions the currently-running Task from kernel space to userspace.
+/// Thus, it should be called from a userspace-ready task wrapper, i.e., `userspace_wrapper()`. 
+/// Unsafe because both the stack_ptr and the function_ptr must be valid!
 pub unsafe fn jump_to_userspace(stack_ptr: usize, function_ptr: usize) {
     
     // Steps to jumping to userspace:
@@ -72,8 +54,6 @@ pub unsafe fn jump_to_userspace(stack_ptr: usize, function_ptr: usize) {
     // final step, use iret instruction to jump to Ring 3
     asm!("iretq" : : : "memory" : "intel", "volatile");
 }
-
-
 
 
 

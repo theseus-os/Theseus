@@ -1,54 +1,41 @@
+#![no_std]
+#![feature(alloc)]
 
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
-use alloc::Vec;
-use alloc::string::String;
-use alloc::arc::Arc;
-use alloc::boxed::Box;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, compiler_fence};
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate log;
+extern crate irq_safety;
+extern crate atomic_linked_list;
+extern crate memory;
+extern crate kernel_config;
+extern crate task;
+extern crate scheduler;
+extern crate mod_mgmt;
+extern crate arch;
+
 use core::fmt;
 use core::mem;
 use core::ops::DerefMut;
+use core::sync::atomic::{Ordering, AtomicBool, compiler_fence};
+use alloc::{Vec, String};
+use alloc::arc::Arc;
+use alloc::boxed::Box;
 
 
-use interrupts::tss_set_rsp0;
-use arch::{pause, Context};
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use atomic_linked_list::atomic_map::AtomicMap;
-use apic::get_my_apic_id;
+use task::{Task, get_my_current_task, RunState, TASKLIST, CONTEXT_SWITCH_LOCKS, CURRENT_TASKS};
 
 
-/// The id of the currently executing `Task`, per-core.
-lazy_static! {
-    static ref CURRENT_TASKS: AtomicMap<u8, usize> = AtomicMap::new();
-}
-/// Get the id of the currently running Task on a specific core
-pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
-    CURRENT_TASKS.get(&apic_id).cloned()
-}
-/// Get the id of the currently running Task on this current task
-pub fn get_my_current_task_id() -> Option<usize> {
-    get_my_apic_id().and_then(|id| {
-        get_current_task_id(id)
-    })
-}
-
-
-/// Used to ensure that context switches are done atomically on each core
-lazy_static! {
-    static ref CONTEXT_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
-}
-
-
-
+/// Initializes tasking for the given AP core, including creating a runqueue for it
+/// and creating its initial idle task for that core. 
 pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-            -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
+            -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> 
+{
     CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
 
-    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::init_runqueue").upgrade().ok_or("failed to get scheduler::init_runqueue symbol!"));
-    let init_runqueue_func: fn(u8) = unsafe { ::core::mem::transmute(section.virt_addr()) };
-    init_runqueue_func(apic_id);
+    scheduler::init_runqueue(apic_id);
     
     init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
                 .map( |t| t.clone())
@@ -345,7 +332,7 @@ pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
 /// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
-pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
                       -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
@@ -377,11 +364,55 @@ pub fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         return Err("TASKLIST already contained a task with the new idle_task's ID");
     }
 
-    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_specific_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_specific_runqueue symbol!"));
-    let add_task_to_specific_runqueue_func: fn(u8, Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
-    try!(add_task_to_specific_runqueue_func(apic_id, task_ref.clone()));
+    try!(scheduler::add_task_to_specific_runqueue(apic_id, task_ref.clone()));
 
     Ok(task_ref)
+}
+
+
+
+/// Must match the order of registers popped in the nano_core's boot/boot.asm:task_switch
+#[derive(Default, Debug)]
+#[repr(C, packed)]
+pub struct Context {
+    r15: usize, 
+    r14: usize,
+    r13: usize,
+    r12: usize,
+    rbp: usize,
+    rbx: usize,
+    rip: usize,
+}
+
+impl Context {
+    pub fn new(rip: usize) -> Context {
+        Context {
+            r15: 0,
+            r14: 0,
+            r13: 0,
+            r12: 0,
+            rbp: 0,
+            rbx: 0,
+            rip: rip,
+        }
+    }
+}
+
+
+#[derive(Debug)]
+struct KthreadCall<A, R> {
+    /// comes from Box::into_raw(Box<A>)
+    pub arg: *mut A,
+    pub func: fn(arg: A) -> R,
+}
+
+impl<A, R> KthreadCall<A, R> {
+    fn new(a: A, f: fn(arg: A) -> R) -> KthreadCall<A, R> {
+        KthreadCall {
+            arg: Box::into_raw(Box::new(a)),
+            func: f,
+        }
+    }
 }
 
 
@@ -441,9 +472,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
-    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_runqueue symbol!"));
-    let add_task_to_runqueue_func: fn(Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
-    try!(add_task_to_runqueue_func(task_ref.clone()));
+    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
 
     Ok(task_ref)
 }
@@ -529,7 +558,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
                                   EntryFlags::PRESENT, allocator.deref_mut())
                         )
                     };
-                    use mod_mgmt;
+
                     try!(mod_mgmt::parse_elf_executable(temp_module_mapping.start_address() as VirtualAddress, module.size()))
                     
                     // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
@@ -616,9 +645,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
-    let section = try!(::mod_mgmt::metadata::get_symbol("scheduler::add_task_to_runqueue").upgrade().ok_or("failed to get scheduler::add_task_to_runqueue symbol!"));
-    let add_task_to_runqueue_func: fn(Arc<RwLockIrqSafe<Task>>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
-    try!(add_task_to_runqueue_func(task_ref.clone()));
+    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
 
     Ok(task_ref)
 }
@@ -687,9 +714,7 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
                              .write().set_runstate(RunState::EXITED);
     }
 
-    let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-    let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-    schedule_func();
+    scheduler::schedule();
 
     // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")
@@ -715,7 +740,7 @@ fn userspace_wrapper() -> ! {
 
     // SAFE: just jumping to userspace 
     unsafe {
-        ::arch::jump_to_userspace(ustack_top, entry_func);
+        arch::jump_to_userspace(ustack_top, entry_func);
     }
 
 

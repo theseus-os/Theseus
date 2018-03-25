@@ -1,0 +1,17 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "arch"
+description = "Architecture-specific definitions for Theseus. Currently only has a few small functions for x86_64."
+version = "0.1.0"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.gdt]
+path = "../gdt"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

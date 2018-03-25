@@ -11,7 +11,7 @@
 
 
 use core::sync::atomic::{Ordering, compiler_fence};
-use interrupts::{AvailableSegmentSelector, get_segment_selector};
+use gdt::{AvailableSegmentSelector, get_segment_selector};
 use util::c_str::{c_char, CStr, CString};
 use apic::get_my_apic_id;
 

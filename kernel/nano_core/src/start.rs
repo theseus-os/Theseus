@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use interrupts;
 use syscall;
-use task;
+use spawn;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics};
 use spin::RwLock;
@@ -33,7 +33,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: kernel_mmi ref was None");
     let (double_fault_stack, privilege_stack, syscall_stack) = { 
-
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
@@ -46,7 +45,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     syscall::init(syscall_stack.top_usable());
 
-    task::init_ap(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
+    spawn::init(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
