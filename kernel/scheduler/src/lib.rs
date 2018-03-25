@@ -7,7 +7,7 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate apic;
-extern crate nano_core;
+extern crate task;
 
 
 use core::ops::DerefMut;
@@ -15,7 +15,7 @@ use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
-use nano_core::task::{Task, get_my_current_task};
+use task::{Task, get_my_current_task};
 use apic::get_my_apic_id;
 
 
@@ -94,6 +94,7 @@ pub fn init_runqueue(which_core: u8) {
     trace!("Created runqueue for core {}", which_core);
     RUNQUEUES.insert(which_core, RwLockIrqSafe::new(RunQueue::new()));
 }
+
 
 /// Adds a `Task` reference to the given core's runqueue
 pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {

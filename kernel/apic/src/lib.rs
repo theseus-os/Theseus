@@ -522,9 +522,8 @@ impl LocalApic {
         let _held_ints = hold_interrupts(); 
 
         // acquire lock
-        while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) {
-            // ::arch::pause();
-        }
+        // TODO: add timeout!!
+        while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) { }
 
         TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
         TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core 
@@ -536,9 +535,7 @@ impl LocalApic {
         // wait for all other cores to handle this IPI
         // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
         // TODO: add timeout!!
-        while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0  { 
-            // ::arch::pause();
-        }
+        while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0 { }
     
         // clear TLB shootdown data
         TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(0, Ordering::Release);

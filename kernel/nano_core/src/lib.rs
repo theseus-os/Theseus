@@ -38,18 +38,13 @@ extern crate rlibc; // basic memset/memcpy libc functions
 // extern crate volatile;
 extern crate spin; // core spinlocks 
 extern crate multiboot2;
-#[macro_use] extern crate bitflags;
 extern crate x86;
 extern crate x86_64;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
-extern crate bit_field;
 #[macro_use] extern crate lazy_static; // for lazy static initialization
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 extern crate atomic;
-extern crate xmas_elf;
-extern crate rustc_demangle;
-extern crate goblin;
 
 
 // ------------------------------------
@@ -64,9 +59,7 @@ extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate dfqueue; // decoupled, fault-tolerant queue
 extern crate atomic_linked_list;
-extern crate memory; // the virtual memory subsystem 
-extern crate pit_clock;
-extern crate apic; 
+
 
 // ------------------------------------
 // -------  THESEUS MODULES   ---------
@@ -77,8 +70,16 @@ extern crate serial_port;
 extern crate logger;
 extern crate state_store;
 #[macro_use] extern crate vga_buffer; 
-
 extern crate rtc;
+extern crate memory; // the virtual memory subsystem 
+extern crate task;
+extern crate pit_clock;
+extern crate apic; 
+extern crate mod_mgmt;
+extern crate tss;
+extern crate gdt;
+extern crate arch; 
+extern crate spawn;
 
 
 
@@ -122,12 +123,9 @@ macro_rules! print {
 
 
 #[macro_use] mod drivers;  
-mod arch;
-pub mod task;
 mod dbus;
 pub mod interrupts;
 mod syscall;
-mod mod_mgmt;
 mod start;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -142,7 +140,6 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use irq_safety::{enable_interrupts, interrupts_enabled};
-use task::{spawn_kthread, spawn_userspace};
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -351,7 +348,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
   
     // create the initial `Task`, i.e., task_zero
     let bsp_apic_id = apic::get_bsp_id().expect("rust_main(): Coudln't get BSP's apic_id!");
-    task::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
+    spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, get_bsp_stack_bottom(), get_bsp_stack_top()).unwrap();
 
     // initialize the kernel console
     let console_queue_producer = {
@@ -404,14 +401,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     enable_interrupts();
 
     if false {
-        spawn_kthread(test_driver, None, String::from("driver_test_thread")).unwrap();
+        spawn::spawn_kthread(test_driver, None, String::from("driver_test_thread")).unwrap();
     }  
 
     // create some extra tasks to test context switching
     if false {
-        spawn_kthread(test_loop_1, None, String::from("test_loop_1")).unwrap();
-        spawn_kthread(test_loop_2, None, String::from("test_loop_2")).unwrap(); 
-        spawn_kthread(test_loop_3, None, String::from("test_loop_3")).unwrap(); 
+        spawn::spawn_kthread(test_loop_1, None, String::from("test_loop_1")).unwrap();
+        spawn::spawn_kthread(test_loop_2, None, String::from("test_loop_2")).unwrap(); 
+        spawn::spawn_kthread(test_loop_3, None, String::from("test_loop_3")).unwrap(); 
     }
 
 	
@@ -421,14 +418,14 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some(String::from("test_program_1"))).unwrap();
+        spawn::spawn_userspace(module, Some(String::from("test_program_1"))).unwrap();
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
+        spawn::spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -436,7 +433,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a system call module");
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
-        spawn_userspace(module, None).unwrap();
+        spawn::spawn_userspace(module, None).unwrap();
     }
 
     // a second duplicate syscall test user task
@@ -444,7 +441,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     {
         debug!("trying out a receive system call module");
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
-        spawn_userspace(module, None).unwrap();
+        spawn::spawn_userspace(module, None).unwrap();
     }
 
     enable_interrupts();
@@ -551,6 +548,14 @@ fn get_bsp_stack_top() -> usize {
         &initial_bsp_stack_top as *const _ as usize
     }
 }
+
+
+// /// TODO FIXME:  simple temporary wrapper for spawn_kthread in the task crate.
+// ///              should be removed once the Captain crate is up and running
+// #[inline(never)]
+// pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String)
+//         -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
+
 
 
 

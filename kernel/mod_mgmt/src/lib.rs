@@ -1,16 +1,34 @@
-use xmas_elf;
-use xmas_elf::ElfFile;
-use xmas_elf::sections::{SectionHeader, SectionData, ShType};
-use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+#![no_std]
+#![feature(alloc)]
+
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate spin;
+extern crate irq_safety;
+extern crate xmas_elf;
+extern crate memory;
+extern crate kernel_config;
+extern crate goblin;
+extern crate util;
+extern crate rustc_demangle;
+
+
 use core::slice;
 use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
-use memory::{FRAME_ALLOCATOR, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+
+use xmas_elf::ElfFile;
+use xmas_elf::sections::{SectionHeader, SectionData, ShType};
+use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
-use kernel_config::memory::PAGE_SIZE;
+
 use util::round_up_power_of_two;
+use kernel_config::memory::PAGE_SIZE;
+use memory::{FRAME_ALLOCATOR, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+
 
 pub mod metadata;
 use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, LoadedSection};

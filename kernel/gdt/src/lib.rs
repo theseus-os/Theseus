@@ -1,8 +1,139 @@
+#![no_std]
+
+#[macro_use] extern crate lazy_static;
+// #[macro_use] extern crate log;
+#[macro_use] extern crate bitflags;
+extern crate bit_field;
+extern crate atomic_linked_list;
+extern crate x86_64;
+extern crate spin;
+extern crate tss;
+extern crate memory;
+
+use atomic_linked_list::atomic_map::AtomicMap;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::PrivilegeLevel;
+use spin::Once;
+use memory::VirtualAddress;
 
 
+/// The GDT list, one per core, indexed by a key of apic_id
+lazy_static! {
+    static ref GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
+}
+
+
+static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
+static KERNEL_DATA_SELECTOR:  Once<SegmentSelector> = Once::new();
+static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
+static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
+static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
+
+
+/// The GDT SegmentSelectors available in Theseus.
+/// Use this type with `get_segment_selector()`. 
+pub enum AvailableSegmentSelector {
+    KernelCode,
+    KernelData,
+    UserCode32,
+    UserData32,
+    UserCode64,
+    UserData64,
+    Tss,
+}
+
+/// Stupid hack because SegmentSelector is not Cloneable/Copyable
+pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
+    let seg: &SegmentSelector = match selector {
+        AvailableSegmentSelector::KernelCode => {
+            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::KernelData => {
+            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::UserCode32 => {
+            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::UserData32 => {
+            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::UserCode64 => {
+            USER_CODE_64_SELECTOR.try().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::UserData64 => {
+            USER_DATA_64_SELECTOR.try().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
+        }
+        AvailableSegmentSelector::Tss => {
+            TSS_SELECTOR.try().expect("TSS_SELECTOR wasn't yet inited!")
+        }
+    };
+
+    SegmentSelector::new(seg.index(), seg.rpl())
+}
+
+
+/// Creates a new GDT, sets up the TSS with the given double fault stack
+/// and privilege stack, and then loads that new GDT & TSS.
+pub fn create_tss_gdt(apic_id: u8, 
+                  double_fault_stack_top_unusable: VirtualAddress, 
+                  privilege_stack_top_unusable: VirtualAddress) {
+    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
+    use x86_64::instructions::tables::load_tss;
+    use x86_64::PrivilegeLevel;
+
+    
+    let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+
+    // set up this AP's GDT
+    {
+        let mut gdt = Gdt::new();
+
+        // the following order of segments must be preserved: 
+        // 0) null descriptor 
+        // 1) kernel cs
+        // 2) kernel ds
+        // 3) user cs 32
+        // 4) user ds 32
+        // 5) user cs 64
+        // 6) user ds 64
+        // 7-8) tss
+        // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
+
+        let kernel_cs = gdt.add_entry(Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
+        KERNEL_CODE_SELECTOR.call_once(|| kernel_cs);
+        let kernel_ds = gdt.add_entry(Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
+        KERNEL_DATA_SELECTOR.call_once(|| kernel_ds);
+        let user_cs_32 = gdt.add_entry(Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_32_SELECTOR.call_once(|| user_cs_32);
+        let user_ds_32 = gdt.add_entry(Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_32_SELECTOR.call_once(|| user_ds_32);
+        let user_cs_64 = gdt.add_entry(Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
+        USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
+        let user_ds_64 = gdt.add_entry(Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
+        USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
+        use core::ops::Deref;
+        let tss_segment = gdt.add_entry(Descriptor::tss_segment(tss_ref.lock().deref()), PrivilegeLevel::Ring0);
+        TSS_SELECTOR.call_once(|| tss_segment);
+        
+        GDT.insert(apic_id, gdt);
+        let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
+        gdt_ref.load();
+        // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
+    }
+
+    unsafe {
+        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
+        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
+        
+        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
+    }
+}
+
+/// The Global Descriptor Table, as specified by the x86_64 architecture.
 pub struct Gdt {
     table: [u64; 10],  // max size is 8192 entries, but we don't need that many.
     next_free: usize,

@@ -30,8 +30,8 @@ version = "0.1.0"
 [dependencies.console_types]
 path = "../console_types"
 
-[dependencies.nano_core]
-path = "../nano_core"
+[dependencies.spawn]
+path = "../spawn"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

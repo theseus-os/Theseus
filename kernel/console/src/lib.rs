@@ -8,7 +8,7 @@ extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate nano_core;
+extern crate spawn;
 
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
@@ -20,7 +20,6 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use nano_core::task::spawn_kthread;
 
 
 
@@ -49,7 +48,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 
     // vga_buffer::print_str("console::init() trying to spawn_kthread...\n").unwrap();
     info!("console::init() trying to spawn_kthread...");
-    try!(spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
+    try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
 

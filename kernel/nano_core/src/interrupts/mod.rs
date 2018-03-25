@@ -14,20 +14,19 @@ use spin::{Mutex, Once};
 use port_io::Port;
 use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ, CONFIG_RTC_FREQUENCY_HZ};
-use x86_64::structures::gdt::SegmentSelector;
 use rtc;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 use apic;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pit_clock;
+use tss;
+use gdt;
 
 use drivers::e1000;
 
 
 mod exceptions;
-mod gdt;
 pub mod ioapic;
 mod pic;
 pub mod tsc;
@@ -37,17 +36,7 @@ pub mod tsc;
 pub use self::exceptions::init_early_exceptions;
 pub use self::pic::PIC_MASTER_OFFSET;
 
-/// The index of the double fault stack in a TaskStateSegment (TSS)
-const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
-
-static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
-static KERNEL_DATA_SELECTOR:  Once<SegmentSelector> = Once::new();
-static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
-static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
-static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
-static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
-static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
 /// The single system-wide IDT
@@ -58,75 +47,6 @@ pub static IDT: LockedIdt = LockedIdt::new();
 static PIC: Once<pic::ChainedPics> = Once::new();
 /// The Keyboard data port, port 0x60.
 static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
-
-/// The TSS list, one per core, indexed by a key of apic_id
-lazy_static! {
-    static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
-}
-/// The GDT list, one per core, indexed by a key of apic_id
-lazy_static! {
-    static ref GDT: AtomicMap<u8, gdt::Gdt> = AtomicMap::new();
-}
-
-
-
-pub enum AvailableSegmentSelector {
-    KernelCode,
-    KernelData,
-    UserCode32,
-    UserData32,
-    UserCode64,
-    UserData64,
-    Tss,
-}
-
-
-/// Stupid hack because SegmentSelector is not Cloneable/Copyable
-pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
-    let seg: &SegmentSelector = match selector {
-        AvailableSegmentSelector::KernelCode => {
-            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::KernelData => {
-            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserCode32 => {
-            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserCode64 => {
-            USER_CODE_64_SELECTOR.try().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.try().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::Tss => {
-            TSS_SELECTOR.try().expect("TSS_SELECTOR wasn't yet inited!")
-        }
-    };
-
-    SegmentSelector::new(seg.index(), seg.rpl())
-}
-
-
-
-
-/// Sets the current core's TSS privilege stack 0 (RSP0) entry, which points to the stack that 
-/// the x86_64 hardware automatically switches to when transitioning from Ring 3 -> Ring 0.
-/// Should be set to an address within the current userspace task's kernel stack.
-/// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
-pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
-    let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
-    let mut tss_entry = try!(TSS.get(&my_apic_id).ok_or_else(|| {
-        error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
-        "No TSS for the current core's apid id" 
-    })).lock();
-    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
-    // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
-    Ok(())
-}
 
 
 
@@ -139,14 +59,14 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
-    create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // here, we just need to set up special stacks for exceptions, others have already been set up
     {
         let mut idt = IDT.lock(); // withholds interrupts
         unsafe {
             idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
-                .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
+                .set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16); // use a special stack for the DF handler
         }
         // we can load the newer, better page fault handler now that virtual memory has been set up
         idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
@@ -174,7 +94,7 @@ pub fn init_ap(apic_id: u8,
                privilege_stack_top_unusable: VirtualAddress)
                -> Result<(), &'static str> {
     info!("Setting up TSS & GDT for AP {}", apic_id);
-    create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
 
     info!("trying to load IDT for AP {}...", apic_id);
@@ -183,74 +103,6 @@ pub fn init_ap(apic_id: u8,
     Ok(())
 }
 
-
-fn create_tss_gdt(apic_id: u8, 
-                  double_fault_stack_top_unusable: VirtualAddress, 
-                  privilege_stack_top_unusable: VirtualAddress) {
-    use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
-    use x86_64::instructions::tables::load_tss;
-    use x86_64::PrivilegeLevel;
-
-    // set up TSS and get pointer to it    
-    let tss_ref = {
-        let mut tss = TaskStateSegment::new();
-        // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-        tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable);
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable);
-
-        // insert into TSS list
-        TSS.insert(apic_id, Mutex::new(tss));
-        let tss_ref = TSS.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
-        // debug!("Created TSS for apic {}, TSS: {:?}", apic_id, tss_ref);
-        tss_ref
-    };
-    
-
-    // set up this AP's GDT
-    {
-        let mut gdt = gdt::Gdt::new();
-
-        // the following order of segments must be preserved: 
-        // 0) null descriptor 
-        // 1) kernel cs
-        // 2) kernel ds
-        // 3) user cs 32
-        // 4) user ds 32
-        // 5) user cs 64
-        // 6) user ds 64
-        // 7-8) tss
-        // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
-
-        let kernel_cs = gdt.add_entry(gdt::Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
-        KERNEL_CODE_SELECTOR.call_once(|| kernel_cs);
-        let kernel_ds = gdt.add_entry(gdt::Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
-        KERNEL_DATA_SELECTOR.call_once(|| kernel_ds);
-        let user_cs_32 = gdt.add_entry(gdt::Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
-        USER_CODE_32_SELECTOR.call_once(|| user_cs_32);
-        let user_ds_32 = gdt.add_entry(gdt::Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
-        USER_DATA_32_SELECTOR.call_once(|| user_ds_32);
-        let user_cs_64 = gdt.add_entry(gdt::Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
-        USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
-        let user_ds_64 = gdt.add_entry(gdt::Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
-        USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
-        use core::ops::Deref;
-        let tss = gdt.add_entry(gdt::Descriptor::tss_segment(tss_ref.lock().deref()), PrivilegeLevel::Ring0);
-        TSS_SELECTOR.call_once(|| tss);
-        
-        GDT.insert(apic_id, gdt);
-        let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
-        gdt_ref.load();
-        // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
-    }
-
-    unsafe {
-        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
-        load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
-        
-        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary
-    }
-}
 
 pub fn init_handlers_apic() {
     // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
@@ -440,7 +292,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
     // info!("COM1 serial handler");
 
     unsafe {
-        ::x86_64::instructions::port::inb(0x3F8); // read serial port value
+        x86_64::instructions::port::inb(0x3F8); // read serial port value
     }
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
@@ -452,7 +304,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
     // info!("APIX 0x26 IRQ handler");
 
     // unsafe {
-    //     ::x86_64::instructions::port::inb(0x3F8); // read serial port value
+    //     x86_64::instructions::port::inb(0x3F8); // read serial port value
     // }
 
     eoi(Some(PIC_MASTER_OFFSET + 0x6));

@@ -12,10 +12,10 @@ cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 
 nano_core-obj := build/nano_core-$(ARCH).bin
 
-linker_script := src/arch/arch_$(ARCH)/boot/linker_higher_half.ld
-assembly_source_files := $(wildcard src/arch/arch_$(ARCH)/boot/*.asm)
-assembly_object_files := $(patsubst src/arch/arch_$(ARCH)/boot/%.asm, \
-	build/arch/$(ARCH)/%.o, $(assembly_source_files))
+linker_script := src/boot/arch_$(ARCH)/linker_higher_half.ld
+assembly_source_files := $(wildcard src/boot/arch_$(ARCH)/*.asm)
+assembly_object_files := $(patsubst src/boot/arch_$(ARCH)/%.asm, \
+	build/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
 .PHONY: all clean cargo
@@ -40,6 +40,6 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 
 
 # compile assembly files
-build/arch/$(ARCH)/%.o: src/arch/arch_$(ARCH)/boot/%.asm
+build/boot/$(ARCH)/%.o: src/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@

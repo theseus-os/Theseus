@@ -4,8 +4,6 @@ name = "nano_core"
 version = "0.1.0"
 
 [dependencies]
-bit_field = "0.7.0"
-bitflags = "1.0"
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
 multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
 once = "0.3.2"
@@ -23,10 +21,6 @@ rustc-demangle = "0.1.5"
 # this is needed for our odd approach of loading the libcore ELF file at runtime
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins", features = ["c"] }
 
-[dependencies.goblin]  ## for linker relocation typedefs
-version = "0.0.13"
-default-features = false
-features = ["elf64", "goblin"]
 
 [dependencies.log]
 default-features = false
@@ -90,6 +84,24 @@ path = "../pit_clock"
 
 [dependencies.apic]
 path = "../apic"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.tss]
+path = "../tss"
+
+[dependencies.gdt]
+path = "../gdt"
+
+[dependencies.arch]
+path = "../arch"
 
 
 [features]
