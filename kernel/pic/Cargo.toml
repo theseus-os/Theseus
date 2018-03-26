@@ -1,0 +1,24 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "pic"
+description = "PIC (Programmable Interrupt Controller), support for a legacy device that isn't used much"
+version = "0.1.0"
+
+[dependencies]
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+[dependencies.memory]
+path = "../memory"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

@@ -2,7 +2,7 @@ use core::mem;
 use core::intrinsics::{atomic_load, atomic_store};
 use core::ops::DerefMut;
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
-use interrupts::ioapic;
+use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use spin::RwLock;
@@ -124,7 +124,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
                     let mut bsp_lapic = try!(LocalApic::new(lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
                     let bsp_id = bsp_lapic.id();
 
-                    use interrupts::PIC_MASTER_OFFSET;
+                    use pic::PIC_MASTER_OFFSET;
                     // set the BSP to receive regular PIC interrupts routed through the IoApic
                     ioapic_ref.set_irq(0x0, bsp_id, PIC_MASTER_OFFSET + 0x0);
                     ioapic_ref.set_irq(0x1, bsp_id, PIC_MASTER_OFFSET + 0x1); // keyboard interrupt 0x1 -> 0x21 in IDT
@@ -165,7 +165,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
             MadtEntry::IntSrcOverride(int_src) => {
                 assert!(int_src.gsi <= (u8::max_value() as u32), "Unsupported: gsi value is larger than size of u8: {:?}", int_src);
                 // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                use interrupts::PIC_MASTER_OFFSET;
+                use pic::PIC_MASTER_OFFSET;
                 ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
             } 
             _ => { }

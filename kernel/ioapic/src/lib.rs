@@ -1,6 +1,13 @@
+#![no_std]
+
+#[macro_use] extern crate log;
+extern crate spin;
+extern crate memory;
+
+
+use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
 use spin::{Mutex, MutexGuard, Once};
-use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 
 static IOAPIC: Once<Mutex<IoApic>> = Once::new();

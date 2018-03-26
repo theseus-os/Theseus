@@ -1,5 +1,4 @@
-// modified from the toyos pic8259_simple crate
-
+//! (modified from the toyos pic8259_simple crate)
 //! Support for the 8259 Programmable Interrupt Controller, which handles
 //! basic I/O interrupts.  In multicore mode, we would apparently need to
 //! replace this with an APIC interface.
@@ -21,9 +20,13 @@
 //! different base interrupts, because DOS used interrupt 0x21 for system
 //! calls.
 
+#![no_std]
+
+extern crate port_io;
+extern crate x86_64;
 
 use core::fmt;
-use port_io;
+
 
 pub const PIC_MASTER_OFFSET: u8 = 0x20;
 
@@ -118,8 +121,6 @@ impl ChainedPics {
     /// because even if we don't use them (and disable them for APIC instead),
     /// we still need to remap them to avoid a spurious interrupt clashing with an exception.
     pub fn init(master_mask: u8, slave_mask: u8) -> ChainedPics {
-        assert_has_not_been_called!("ChainedPics::initialize was called twice!!");
-
         let mut cpic = ChainedPics {
             pics: [
                 Pic {

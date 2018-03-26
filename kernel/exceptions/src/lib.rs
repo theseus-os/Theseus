@@ -1,13 +1,19 @@
-use x86_64::structures::idt::{ExceptionStackFrame, PageFaultErrorCode};
+#![no_std]
+#![feature(abi_x86_interrupt)]
+
+#[macro_use] extern crate log;
+#[macro_use] extern crate vga_buffer;
+extern crate x86_64;
+extern crate apic;
+
+
 use core::sync::atomic::Ordering;
-use apic;
-
-use super::IDT;
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 
 
-pub fn init_early_exceptions() {
+pub fn init_early_exceptions(early_idt: &'static LockedIdt) {
     { 
-        let mut idt = IDT.lock(); // withholds interrupts
+        let mut idt = early_idt.lock(); // withholds interrupts
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
@@ -36,8 +42,8 @@ pub fn init_early_exceptions() {
         // reserved: 0x1f
     }
 
-    IDT.load();
-    info!("loaded early IDT with exception handlers only.");
+    early_idt.load();
+    info!("loaded early IDT with basic exception handlers only.");
 }
 
 
@@ -45,7 +51,7 @@ pub fn init_early_exceptions() {
 
 /// interrupt 0x00
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_early!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
+    println_raw!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
     loop {}
 }
 
@@ -62,7 +68,7 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
     }
     
     // if vaddr is 0, then it's a regular NMI    
-    println_early!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
+    println_raw!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
     
@@ -72,14 +78,14 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
 
 /// interrupt 0x03
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_early!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
+    println_raw!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 }
 
 /// interrupt 0x06
 pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_early!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
+    println_raw!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
     loop {}
@@ -88,7 +94,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 /// interrupt 0x07
 /// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_early!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
+    println_raw!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 
@@ -109,7 +115,7 @@ pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut Excepti
 
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
-    println_early!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+    println_raw!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}",
              control_regs::cr2(),
              error_code,
@@ -118,7 +124,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
 }
 
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_early!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    println_raw!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
     loop {}
 }
 
@@ -127,7 +133,7 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 /// this shouldn't really ever happen, but I added the handler anyway
 /// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_early!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
+    println_raw!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",
              error_code,
              stack_frame);
@@ -137,7 +143,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
 
 
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_early!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
+    println_raw!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
                                   {:#b}\n{:#?}",
              error_code,
              stack_frame);
