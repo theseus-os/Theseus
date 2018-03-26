@@ -1,4 +1,12 @@
-use drivers::e1000::E1000_NIC;
+use super::E1000_NIC;
+
+
+
+pub fn test_nic_driver(_: Option<u64>) {
+    debug!("TESTING e1000 NIC DRIVER!!");
+    dhcp_request_packet();
+}
+
 
 #[repr(C,packed)]
 pub struct arp_packet{

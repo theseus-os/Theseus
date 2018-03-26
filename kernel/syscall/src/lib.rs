@@ -20,6 +20,7 @@ extern crate apic;
 extern crate alloc;
 extern crate x86_64;
 extern crate task;
+extern crate dbus;
 
 use core::sync::atomic::{Ordering, compiler_fence};
 use util::c_str::{c_char, CStr, CString};
@@ -28,48 +29,47 @@ use apic::get_my_apic_id;
 
 
 
-// #[no_mangle]
 fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64, arg6: u64) -> u64{
     trace!("syscall_dispatcher: num={} arg1={} arg2={} arg3={} arg4={} arg5={} arg6={}",
             syscall_number, arg1, arg2, arg3, arg4, arg5, arg6);
     let mut result = 0;
 
     match syscall_number{
-        // 1 => {
+        1 => {
 
 
-        //     // we use CStr instead of CString to indicate a borrowed &str that we do not own
-        //     // (userspace owns it)
-        //     let src_cstr:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
-        //     let dest_cstr: &CStr = unsafe { CStr::from_ptr(arg2 as *const c_char) };
-        //     let msg_cstr:  &CStr = unsafe { CStr::from_ptr(arg3 as *const c_char) };
-        //     trace!("Send message {} from {} to {}", msg_cstr, src_cstr, dest_cstr);
+            // we use CStr instead of CString to indicate a borrowed &str that we do not own
+            // (userspace owns it)
+            let src_cstr:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
+            let dest_cstr: &CStr = unsafe { CStr::from_ptr(arg2 as *const c_char) };
+            let msg_cstr:  &CStr = unsafe { CStr::from_ptr(arg3 as *const c_char) };
+            trace!("Send message {} from {} to {}", msg_cstr, src_cstr, dest_cstr);
 
-        //     // NOTE from Kevin: Wenqiu, do you need to create so many Strings? They are slow and require allocation.
-        //     // For example, in syssend, do you need an owned String (CString), or does a &str work (CStr)?
-        //     //let src  =  src_cstr.to_string_lossy().into_owned();
-        //     //let dest = dest_cstr.to_string_lossy().into_owned();
-        //     //let msg  =  msg_cstr.to_string_lossy().into_owned();
+            // NOTE from Kevin: Wenqiu, do you need to create so many Strings? They are slow and require allocation.
+            // For example, in syssend, do you need an owned String (CString), or does a &str work (CStr)?
+            //let src  =  src_cstr.to_string_lossy().into_owned();
+            //let dest = dest_cstr.to_string_lossy().into_owned();
+            //let msg  =  msg_cstr.to_string_lossy().into_owned();
 
-        //     use dbus::syssend;
-        //     syssend(src_cstr, dest_cstr, msg_cstr); // Kevin note: don't use macros here, they serve no purpose
-        // },
-        // 2 =>{
+            use dbus::syssend;
+            syssend(src_cstr, dest_cstr, msg_cstr); // Kevin note: don't use macros here, they serve no purpose
+        },
+        2 =>{
 
-        //     let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
-        //     use dbus::sysrecv;
+            let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
+            use dbus::sysrecv;
 
-        //     let msg:&str = &(sysrecv(conn_name));
-        //     result = CString::new(msg).unwrap().as_ptr() as u64;
-        //     //let mut i = 1;
-        //     /*result = 0;
-        //     for b in msg.as_bytes(){
-        //         result = result + i*(b.clone() as u64);
-        //         i = i* 0x100;
-        //     }*/
+            let msg: &str = &(sysrecv(conn_name));
+            result = CString::new(msg).unwrap().as_ptr() as u64;
+            //let mut i = 1;
+            /*result = 0;
+            for b in msg.as_bytes(){
+                result = result + i*(b.clone() as u64);
+                i = i* 0x100;
+            }*/
 
-        //     trace!("Receive message {}", msg);
-        // }, 
+            trace!("Receive message {}", msg);
+        }, 
           
         _ => error!("Unknown/unhandled syscall number {}", syscall_number),
     }

@@ -1,7 +1,17 @@
-use port_io::Port;
-use spin::{Once, Mutex}; 
+#![no_std]
+
+#![allow(dead_code)] //  to suppress warnings for unused functions/methods
+#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+
+#[macro_use] extern crate log;
+extern crate spin;
+extern crate port_io;
+extern crate pit_clock;
+
+
 use core::sync::atomic::{Ordering};
-use pit_clock;
+use spin::{Once, Mutex}; 
+use port_io::Port;
 
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
 
@@ -433,9 +443,64 @@ impl<'a> ::core::fmt::Debug for RawString<'a>
 }
 
 
+
+
+
+
+// CODE FOR TESTING ATA DMA
 /*
+let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
+    
+    let ref bus_zero = bus_array[0];
+    let ref slot_zero = bus_zero.connected_devices[0]; 
+    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
+    println!("{:?}", bus_zero);
+    // pci::allocate_mem();
+    let data = ata_pio::pio_read(0xE0,0).unwrap();
+    
+    println!("ATA PIO read data: ==========================");
+    for sh in data.iter() {
+        print!("{:#x} ", sh);
+    }
+    println!("=============================================");
+    
+    let paddr = pci::read_from_disk(0xE0,0).unwrap() as usize;
+
+    // TO CHECK PHYSICAL MEMORY:
+    //  In QEMU, press Ctrl + Alt + 2
+    //  xp/x 0x2b5000   
+    //        ^^ substitute the frame_start value
+    // xp means "print physical memory",   /x means format as hex
 
 
+
+    let vaddr: usize = {
+        let mut curr_task = get_my_current_task().unwrap().write();
+        let curr_mmi = curr_task.mmi.as_ref().unwrap();
+        let mut curr_mmi_locked = curr_mmi.lock();
+        use memory::*;
+        let vaddr = curr_mmi_locked.map_dma_memory(paddr, 512, PRESENT | WRITABLE);
+        println!("\n========== VMAs after DMA ============");
+        for vma in curr_mmi_locked.vmas.iter() {
+            println!("    vma: {:?}", vma);
+        }
+        println!("=====================================");
+        vaddr
+    };
+    let dataptr = vaddr as *const u16;
+    let dma_data = unsafe { collections::slice::from_raw_parts(dataptr, 256) };
+    println!("======================DMA read data phys_addr: {:#x}: ==========================", paddr);
+    for i in 0..256 {
+        print!("{:#x} ", dma_data[i]);
+    }
+    println!("\n========================================================");
+*/
+
+
+
+
+
+/*
 ///read from disk at address input, drive = 0xE0 for master drive, 0xF0 for slave drive, should only be accessed by dma_read in pci.rs
 pub fn dma_read(drive:u8, lba:u32)->Result<u16,u16>{
 	let mut chosen_drive = &AtaIdentifyData{..Default::default()};

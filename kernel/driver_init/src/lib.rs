@@ -1,20 +1,24 @@
-pub mod ata_pio;
-pub mod pci;
-pub mod acpi;
-pub mod e1000;
-pub mod test_nic_driver;
+#![no_std]
+
+#[macro_use] extern crate log;
+extern crate console_types;
+extern crate ata_pio;
+extern crate e1000;
+extern crate memory;
+extern crate dfqueue; 
+extern crate apic;
+extern crate acpi;
+extern crate keyboard;
+extern crate pci;
 
 
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use memory::{MemoryManagementInfo, PageTable};
-use drivers::e1000::init_nic;
-use apic;
+
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
-    assert_has_not_been_called!("drivers::early_init was called more than once!");
-    
     // destructure the kernel's MMI so we can access its page table and vmas
     let &mut MemoryManagementInfo { 
         page_table: ref mut kernel_page_table, 
@@ -42,24 +46,13 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
-    assert_has_not_been_called!("drivers::init was called more than once!");
-    
-    // call keyboard::init(console_producer)
-    if let Some(section) = ::mod_mgmt::metadata::get_symbol("keyboard::init").upgrade() {
-        let keyboard_init_func: fn(DFQueueProducer<ConsoleEvent>) = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        keyboard_init_func(console_producer);
-    }
-    else {
-        return Err("getting keyboard::init symbol failed!");
-    }
-
-
+    keyboard::init(console_producer);
     
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
     }
 
-    // try!(init_nic());
+    try!(e1000::init_nic());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

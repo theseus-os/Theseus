@@ -1,22 +1,23 @@
 use core::mem;
-use core::intrinsics::{atomic_load, atomic_store};
 use core::ops::DerefMut;
+use core::sync::atomic::Ordering;
+use core::ptr::{read_volatile, write_volatile};
+use alloc::boxed::Box;
+use alloc::arc::Arc;
+use spin::RwLock;
+use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
-use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
-use spin::RwLock;
-use alloc::boxed::Box;
-use alloc::arc::Arc;
 use irq_safety::MutexIrqSafe;
 use pit_clock;
+use arch;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 
-use core::sync::atomic::Ordering;
 
-use start::{kstart_ap, AP_READY_FLAG};
+use ap_start::{kstart_ap, AP_READY_FLAG};
 
 
 
@@ -32,7 +33,6 @@ pub struct Madt {
 
 impl Madt {
     pub fn init(active_table: &mut ActivePageTable) -> Result<MadtIter, &'static str> {
-        assert_has_not_been_called!("Madt::init() was called more than once! It should only be called by the bootstrap processor (bsp).");
         
         if !is_bsp() {
             error!("You can only call Madt::init() from the bootstrap processor (bsp), not other cores!");
@@ -177,11 +177,16 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
 
 
-/// Starts up and sets up AP cores based on the given APIIC system table (`madt_iter`)
-pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>) -> Result<usize, &'static str> {
+/// Starts up and sets up AP cores based on the given APIC system table (`madt_iter`).
+/// Arguments: 
+/// * madt_iter: An iterator over the entries in the MADT APIC table
+/// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
+/// * ap_start_realmode_begin: the starting virtual address of where the ap_start realmode code is.
+/// * ap_start_realmode_end: the ending virtual address of where the ap_start realmode code is.
+pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+                       ap_start_realmode_begin: usize, ap_start_realmode_end: usize) -> Result<usize, &'static str> {
     // SAFE: just getting const values from boot assembly code
-    debug!("ap_start_realmode code start: {:#x}, end: {:#x}", ::get_ap_start_realmode(), ::get_ap_start_realmode_end());
-    let ap_startup_size_in_bytes = ::get_ap_start_realmode_end() - ::get_ap_start_realmode();
+    let ap_startup_size_in_bytes = ap_start_realmode_end - ap_start_realmode_begin;
 
     let active_table_phys_addr: PhysicalAddress;
     let trampoline_mapped_pages: MappedPages; // must be held throughout APs being booted up
@@ -199,7 +204,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         match kernel_page_table {
             &mut PageTable::Active(ref mut active_table) => {
                 // first, double check that the ap_start_realmode address is mapped and valid
-                try!(active_table.translate(::get_ap_start_realmode()).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address"));
+                try!(active_table.translate(ap_start_realmode_begin).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address"));
 
                 // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
                 // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
@@ -242,7 +247,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     debug!("Handling APIC (lapic Madt) tables, me: {}, x2apic {}.", me, has_x2apic());
     
     // we checked the src_ptr and mapped the dest_ptr earlier
-    let src_ptr = ::get_ap_start_realmode() as VirtualAddress as *const u8;
+    let src_ptr = ap_start_realmode_begin as VirtualAddress as *const u8;
     let dest_ptr = ap_startup_mapped_pages.start_address() as *mut u8; // we mapped this above
     debug!("copying ap_startup code to AP_STARTUP, {} bytes", ap_startup_size_in_bytes);
     use core::ptr::copy_nonoverlapping; // just like memcpy
@@ -312,7 +317,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     let mut count = get_lapics().iter().count();
     while count < ap_count + 1 {
         trace!("BSP-known count: {}", count);
-        ::arch::pause();
+        arch::pause();
         count = get_lapics().iter().count();
     }
     
@@ -363,15 +368,15 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     let ap_nmi_flags     = unsafe { ap_ready.offset(8) };
 
     // Set the ap_ready to 0, volatile
-    unsafe { atomic_store(ap_ready,         0) };
-    unsafe { atomic_store(ap_processor_id,  new_lapic.processor as u64) };
-    unsafe { atomic_store(ap_apic_id,       new_lapic.apic_id as u64) };
-    unsafe { atomic_store(ap_page_table,    active_table_paddr as u64) };
-    unsafe { atomic_store(ap_stack_start,   ap_stack.bottom() as u64) };
-    unsafe { atomic_store(ap_stack_end,     ap_stack.top_unusable() as u64) };
-    unsafe { atomic_store(ap_code,          kstart_ap as u64) };
-    unsafe { atomic_store(ap_nmi_lint,      nmi_lint as u64) };
-    unsafe { atomic_store(ap_nmi_flags,     nmi_flags as u64) };
+    unsafe { write_volatile(ap_ready,         0) };
+    unsafe { write_volatile(ap_processor_id,  new_lapic.processor as u64) };
+    unsafe { write_volatile(ap_apic_id,       new_lapic.apic_id as u64) };
+    unsafe { write_volatile(ap_page_table,    active_table_paddr as u64) };
+    unsafe { write_volatile(ap_stack_start,   ap_stack.bottom() as u64) };
+    unsafe { write_volatile(ap_stack_end,     ap_stack.top_unusable() as u64) };
+    unsafe { write_volatile(ap_code,          kstart_ap as u64) };
+    unsafe { write_volatile(ap_nmi_lint,      nmi_lint as u64) };
+    unsafe { write_volatile(ap_nmi_flags,     nmi_flags as u64) };
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
@@ -446,24 +451,15 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
 
     // Wait for trampoline ready
     debug!(" Wait...");
-    while unsafe { atomic_load(ap_ready) } == 0 {
-        ::arch::pause();
+    while unsafe { read_volatile(ap_ready) } == 0 {
+        arch::pause();
     }
     debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
-        ::arch::pause();
+        arch::pause();
     }
     info!(" AP {} is in Rust code. Ready!", new_apic_id);
 
-}
-
-/// super shitty approximation, busy wait to wait a random bit of time.
-/// probably closer to a whole second than just 10ms
-fn wait10ms() {
-    let mut i = 10000000; 
-    while i > 0 {
-        i -= 1;
-    }
 }
 
 /// MADT Local APIC

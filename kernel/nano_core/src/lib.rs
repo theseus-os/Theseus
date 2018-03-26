@@ -5,24 +5,17 @@
 // except according to those terms.
 
 
-
-#![feature(lang_items)]
-#![feature(const_fn, unique)]
-#![feature(alloc)]
-#![feature(asm)]
-#![feature(naked_functions)]
-#![feature(abi_x86_interrupt)]
-#![feature(compiler_fences)]
-#![feature(iterator_step_by)]
-#![feature(core_intrinsics)]
-#![feature(conservative_impl_trait)]
-#![feature(used)]
-#![feature(i128_type)]
 #![no_std]
 
+#![feature(lang_items)]
+#![feature(alloc)]
+#![feature(asm)]
+#![feature(used)]
+#![feature(i128_type)]
 
-#![allow(dead_code)] //  to suppress warnings for unused functions/methods
-#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+
+// #![allow(dead_code)] //  to suppress warnings for unused functions/methods
+// #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 
 
 // this is needed for our odd approach of loading the libcore ELF file at runtime
@@ -40,9 +33,7 @@ extern crate spin; // core spinlocks
 extern crate multiboot2;
 extern crate x86;
 extern crate x86_64;
-#[macro_use] extern crate once; // for assert_has_not_been_called!()
-#[macro_use] extern crate lazy_static; // for lazy static initialization
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate atomic;
 
@@ -54,7 +45,7 @@ extern crate atomic;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate keycodes_ascii; // for keyboard scancode translation
-#[macro_use] extern crate util;
+extern crate util;
 extern crate port_io; // for port_io, replaces external crate "cpu_io"
 extern crate heap_irq_safe; // our wrapper around the linked_list_allocator crate
 extern crate dfqueue; // decoupled, fault-tolerant queue
@@ -86,6 +77,10 @@ extern crate pic;
 extern crate tsc;
 extern crate syscall;
 extern crate interrupts;
+extern crate acpi;
+extern crate ap_start;
+extern crate driver_init;
+extern crate e1000;
 
 
 
@@ -124,14 +119,6 @@ macro_rules! print {
 }
 
 
-
-
-
-
-#[macro_use] mod drivers;  
-// mod dbus;
-mod start;
-
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
 // Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
@@ -139,7 +126,7 @@ mod start;
 
 use alloc::String;
 use core::fmt;
-use drivers::{pci, test_nic_driver};
+use e1000::test_nic_driver::test_nic_driver;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
@@ -208,11 +195,6 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
     }
 }
 
-pub fn test_driver(_: Option<u64>) {
-    println!("TESTING DRIVER!!");
-    test_nic_driver::dhcp_request_packet();
-
-}
 
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
@@ -294,7 +276,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // madt_iter must stay in scope until after all AP booting is finished so it's not prematurely dropped
     let madt_iter = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        drivers::early_init(&mut kernel_mmi).expect("Failed to get MADT (APIC) table iterator!")
+        driver_init::early_init(&mut kernel_mmi).expect("Failed to get MADT (APIC) table iterator!")
     };
 
 
@@ -310,7 +292,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     // the three stacks we allocated above are never dropped because they stay in scope in this function,
     // but IMO that's not a great design, and they should probably be stored by the interrupt module and the syscall module instead.
     interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
-                    .expect("failed to initialize interrupts!");
+                .expect("failed to initialize interrupts!");
 
 
     // init other featureful (non-exception) interrupt handlers
@@ -335,13 +317,13 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 
 
     // initialize the rest of our drivers
-    drivers::init(console_queue_producer).unwrap();
+    driver_init::init(console_queue_producer).unwrap();
     
 
     // boot up the other cores (APs)
     {
-        let ap_count = drivers::acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone())
-                        .expect("Error handling AP cores");
+        let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), get_ap_start_realmode_begin(), get_ap_start_realmode_end())
+                       .expect("Error handling AP cores");
         
         info!("Finished handling and booting up all {} AP cores.", ap_count);
         assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
@@ -375,7 +357,7 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     enable_interrupts();
 
     if false {
-        spawn::spawn_kthread(test_driver, None, String::from("driver_test_thread")).unwrap();
+        spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
     }  
 
     // create some extra tasks to test context switching
@@ -498,16 +480,16 @@ extern {
 
 use kernel_config::memory::KERNEL_OFFSET;
 /// Returns the starting virtual address of where the ap_start realmode code is.
-fn get_ap_start_realmode() -> usize {
+fn get_ap_start_realmode_begin() -> usize {
     let addr = unsafe { &ap_start_realmode as *const _ as usize };
-    debug!("ap_start_realmode addr: {:#x}", addr);
+    // debug!("ap_start_realmode addr: {:#x}", addr);
     addr + KERNEL_OFFSET
 }
 
 /// Returns the ending virtual address of where the ap_start realmode code is.
 fn get_ap_start_realmode_end() -> usize {
     let addr = unsafe { &ap_start_realmode_end as *const _ as usize };
-    debug!("ap_start_realmode_end addr: {:#x}", addr);
+    // debug!("ap_start_realmode_end addr: {:#x}", addr);
     addr + KERNEL_OFFSET
 } 
 
@@ -530,54 +512,3 @@ fn get_bsp_stack_top() -> usize {
 // pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String)
 //         -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
-
-
-
-// CODE FOR TESTING ATA DMA
-/*
-let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
-    
-    let ref bus_zero = bus_array[0];
-    let ref slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class - {:#x}, subclass - {:#x}", slot_zero.device_id, slot_zero.class, slot_zero.subclass);
-    println!("{:?}", bus_zero);
-    // pci::allocate_mem();
-    let data = ata_pio::pio_read(0xE0,0).unwrap();
-    
-    println!("ATA PIO read data: ==========================");
-    for sh in data.iter() {
-        print!("{:#x} ", sh);
-    }
-    println!("=============================================");
-    
-    let paddr = pci::read_from_disk(0xE0,0).unwrap() as usize;
-
-    // TO CHECK PHYSICAL MEMORY:
-    //  In QEMU, press Ctrl + Alt + 2
-    //  xp/x 0x2b5000   
-    //        ^^ substitute the frame_start value
-    // xp means "print physical memory",   /x means format as hex
-
-
-
-    let vaddr: usize = {
-        let mut curr_task = get_my_current_task().unwrap().write();
-        let curr_mmi = curr_task.mmi.as_ref().unwrap();
-        let mut curr_mmi_locked = curr_mmi.lock();
-        use memory::*;
-        let vaddr = curr_mmi_locked.map_dma_memory(paddr, 512, PRESENT | WRITABLE);
-        println!("\n========== VMAs after DMA ============");
-        for vma in curr_mmi_locked.vmas.iter() {
-            println!("    vma: {:?}", vma);
-        }
-        println!("=====================================");
-        vaddr
-    };
-    let dataptr = vaddr as *const u16;
-    let dma_data = unsafe { collections::slice::from_raw_parts(dataptr, 256) };
-    println!("======================DMA read data phys_addr: {:#x}: ==========================", paddr);
-    for i in 0..256 {
-        print!("{:#x} ", dma_data[i]);
-    }
-    println!("\n========================================================");
-*/

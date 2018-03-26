@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "syscall"
-description = "Initializes the system call support, and provides basic handling and dispatching of syscalls in Theseus"
+name = "e1000"
+description = "Support for the e1000 NIC and driver"
 version = "0.1.0"
 
 [dependencies]
@@ -14,21 +14,24 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 default-features = false
 version = "0.3.7"
 
-[dependencies.util]
-path = "../../libs/util"
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
 
-[dependencies.gdt]
-path = "../gdt"
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory]
+path = "../memory"
 
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.dbus]
-path = "../dbus"
-
+[dependencies.pci]
+path = "../pci"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
