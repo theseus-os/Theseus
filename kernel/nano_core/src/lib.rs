@@ -80,6 +80,12 @@ extern crate tss;
 extern crate gdt;
 extern crate arch; 
 extern crate spawn;
+extern crate exceptions;
+extern crate ioapic;
+extern crate pic;
+extern crate tsc;
+extern crate syscall;
+extern crate interrupts;
 
 
 
@@ -123,9 +129,7 @@ macro_rules! print {
 
 
 #[macro_use] mod drivers;  
-mod dbus;
-pub mod interrupts;
-mod syscall;
+// mod dbus;
 mod start;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -139,6 +143,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use irq_safety::{enable_interrupts, interrupts_enabled};
+use x86_64::structures::idt::LockedIdt;
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -216,6 +221,13 @@ pub fn nano_core_public_func(val: u8) {
 }
 
 
+/// the callback use in the logger crate for mirroring log functions to the console
+fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
+    println!("{} {}", prefix, args);
+}
+
+static EARLY_IDT: LockedIdt = LockedIdt::new();
+
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
 	
@@ -227,10 +239,11 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     trace!("Logger initialized.");
 
     // initialize basic exception handlers
-    interrupts::init_early_exceptions();
+    exceptions::init_early_exceptions(&EARLY_IDT);
 
     // calculate TSC period and initialize it
-    interrupts::tsc::init().expect("couldn't init TSC timer");
+    // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
+    let _tsc_freq = tsc::get_tsc_frequency(); 
 
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
@@ -436,8 +449,8 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
     error!("    {}", fmt);
     unsafe { memory::stack_trace(); }
 
-    println_early!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    println_early!("    {}", fmt);
+    println_raw!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
+    println_raw!("    {}", fmt);
 
 
     loop {}
@@ -452,7 +465,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    println_early!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    println_raw!("\n\nin rust_eh_unwind_resume, unimplemented!");
     loop {}
 }
 
@@ -462,7 +475,7 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[cfg(not(target_os = "windows"))]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_early!("\n\nin _Unwind_Resume, unimplemented!");
+    println_raw!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 

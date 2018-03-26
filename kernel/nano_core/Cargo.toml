@@ -70,6 +70,7 @@ path = "../vga_buffer"
 [dependencies.rtc]
 path = "../rtc"
 
+
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
@@ -94,6 +95,9 @@ path = "../task"
 [dependencies.spawn]
 path = "../spawn"
 
+[dependencies.interrupts]
+path = "../interrupts"
+
 [dependencies.tss]
 path = "../tss"
 
@@ -102,6 +106,21 @@ path = "../gdt"
 
 [dependencies.arch]
 path = "../arch"
+
+[dependencies.exceptions]
+path = "../exceptions"
+
+[dependencies.ioapic]
+path = "../ioapic"
+
+[dependencies.pic]
+path = "../pic"
+
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.syscall]
+path = "../syscall"
 
 
 [features]
