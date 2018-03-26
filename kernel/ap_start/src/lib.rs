@@ -1,13 +1,23 @@
+#![no_std]
+
+#[macro_use] extern crate log;
+extern crate spin;
+extern crate irq_safety;
+extern crate memory;
+extern crate interrupts;
+extern crate syscall;
+extern crate spawn;
+extern crate scheduler;
+extern crate kernel_config;
+extern crate apic;
+extern crate arch;
+
 use core::sync::atomic::{AtomicBool, Ordering};
-use memory::{VirtualAddress, get_kernel_mmi_ref};
-use interrupts;
-use syscall;
-use spawn;
-use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use apic::{LocalApic, get_lapics};
 use spin::RwLock;
 use irq_safety::{enable_interrupts, interrupts_enabled};
-use apic::get_my_apic_id;
+use memory::{VirtualAddress, get_kernel_mmi_ref};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+use apic::{LocalApic, get_lapics, get_my_apic_id};
 
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -63,14 +73,11 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     enable_interrupts();
     info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 
-           if interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
+        if interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
     );
 
     loop { 
-        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        schedule_func();
-
-        ::arch::pause();
+        scheduler::schedule();
+        arch::pause();
     }
 }

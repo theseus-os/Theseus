@@ -1,14 +1,13 @@
 #![no_std]
 #![feature(const_fn)]
 #![feature(alloc)]
-#![feature(drop_types_in_const)]
 
 #[cfg(test)] 
 #[macro_use] extern crate std;
 
 
 extern crate alloc;
-#[macro_use] extern crate lazy_static; // for lazy static initialization
+// #[macro_use] extern crate lazy_static; // for lazy static initialization
 extern crate spin;
 extern crate atomic_linked_list; 
 // #[macro_use] extern crate mopa;

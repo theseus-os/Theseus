@@ -122,6 +122,19 @@ path = "../tsc"
 [dependencies.syscall]
 path = "../syscall"
 
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.ap_start]
+path = "../ap_start"
+
+[dependencies.driver_init]
+path = "../driver_init"
+
+[dependencies.e1000]
+path = "../e1000"
+
+
 
 [features]
 mirror_serial = []

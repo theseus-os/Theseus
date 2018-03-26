@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory"
-description = "The virtual memory subsystem, which is statically linked into the nano_core (not dynamically loaded)."
+description = "The virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]

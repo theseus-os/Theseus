@@ -1,14 +1,45 @@
-//! Code to parse the ACPI tables, borrowed from Redox. 
+//! Code to parse the ACPI tables, based off of Redox. 
+#![no_std]
+#![feature(alloc)]
+#![feature(const_fn)]
+
+#![allow(dead_code)] //  to suppress warnings for unused functions/methods
+#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+
+
+#[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate alloc;
+extern crate irq_safety; 
+extern crate spin;
+extern crate memory;
+extern crate kernel_config;
+extern crate ioapic;
+extern crate pit_clock;
+extern crate ap_start;
+extern crate pic; 
+extern crate apic;
+extern crate arch;
+
+
+macro_rules! try_opt {
+    ($e:expr) =>(
+        match $e {
+            Some(v) => v,
+            None => return None,
+        }
+    )
+}
+
+
 
 use alloc::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-// use syscall::io::{Io, Pio};
 
 use spin::{Mutex, RwLock};
 
-// use stop::kstop;
 
 use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use kernel_config::memory::{PAGE_SIZE, address_page_offset};
@@ -26,14 +57,14 @@ pub use self::rsdp::RSDP;
 
 // use self::aml::{parse_aml_table, AmlError, AmlValue};
 
-pub mod hpet;
 // mod dmar;
+// mod aml;
+pub mod hpet;
 mod fadt;
 pub mod madt;
 mod rsdt;
 mod sdt;
 mod xsdt;
-// mod aml;
 mod rxsdt;
 mod rsdp;
 

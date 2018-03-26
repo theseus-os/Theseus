@@ -1,13 +1,18 @@
+#![no_std]
+#![feature(alloc)]
+
+#[macro_use] extern crate log;
+extern crate alloc;
+extern crate spin;
+extern crate irq_safety;
+extern crate util;
 
 use alloc::string::String;
 use alloc::{BTreeMap, VecDeque};
-use irq_safety::{RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard};
-use core::ops::DerefMut;
-use spin::{Once, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use irq_safety::{RwLockIrqSafe};
+use spin::{Once, RwLock};
 use alloc::arc::Arc;
-use util::c_str::{c_char, CStr};
-
-
+use util::c_str::{CStr};
 
 
 #[derive(Clone)]
@@ -46,21 +51,21 @@ pub struct BusConnection {
 
 
 impl BusConnection {
-    fn new(busName:&String) -> BusConnection {
+    fn new(bus_name: &String) -> BusConnection {
         BusConnection {
-            name:String::clone(busName),
-            refcount:1,
-            outgoing:RwLock::new(VecDeque::new()),
-            incoming:RwLock::new(VecDeque::new()),
-            outnum:0,
-            innum:0,
+            name: String::clone(bus_name),
+            refcount: 1,
+            outgoing: RwLock::new(VecDeque::new()),
+            incoming: RwLock::new(VecDeque::new()),
+            outnum: 0,
+            innum: 0,
         }
     }
 
-    pub fn send(&mut self, buf:&BusMessage) {
+    pub fn send(&mut self, buf: &BusMessage) {
         let message = BusMessage::clone(buf);
         self.outgoing.write().push_front(message);
-        self.outnum+=1;
+        self.outnum += 1;
     }
 
     pub fn receive(&mut self) -> Option<BusMessage> {
@@ -85,13 +90,13 @@ impl BusConnectionTable {
 
     pub fn get_connection(&mut self, name:String) ->  Option<&Arc<RwLock<BusConnection>>> {
         //let mut conn:&mut BusConnection;
-        let connectionName = String::clone(&name);
+        let connection_name = String::clone(&name);
         if !self.table.contains_key(&name){
             let connection = BusConnection::new(&name);
             self.table.insert(name, Arc::new(RwLock::new(connection)));
             self.count+=1;
         }
-        return self.table.get(&connectionName);
+        return self.table.get(&connection_name);
     }
 
     pub fn match_msg(&self, name:&String){
@@ -102,14 +107,14 @@ impl BusConnectionTable {
         if msg_obj.is_some(){
             let msg = msg_obj.expect("Fail to get the message");
             let dest_obj = self.table.get(&msg.dest);
-            if(dest_obj.is_some()){
+            if dest_obj.is_some() {
                 let mut destination = dest_obj.expect("Fail to get the destination connection").write();
                 destination.incoming.write().push_front(msg);
                 destination.innum += 1;
-                println!("Send the message successfully!");
+                info!("Send the message successfully!");
             } else {
                 source.outgoing.write().push_front(msg);
-                println!("Destination connection does not exist!");
+                info!("Destination connection does not exist!");
             }
             source.outnum -= 1;
         }
@@ -153,19 +158,17 @@ pub fn syssend(src:&CStr, dest:&CStr, msg:&CStr) {
 
 pub fn sysrecv(name:&CStr) -> String{
     let sname = name.to_string_lossy().into_owned();;;
-    unsafe{
-        trace!("Get the connection {}", &sname);
-        let mut table = get_connection_table().write();
-        let mut connection = table.get_connection(sname)
-            .expect("Fail to create the bus connection").write();
-  
-        let obj = connection.receive();
-        if(obj.is_some()){
-            trace!("Get the result!");
-            return obj.unwrap().data;
-        } else {
-            trace!("No message!");
-            return String::from("");
-        }
+    trace!("Get the connection {}", &sname);
+    let mut table = get_connection_table().write();
+    let mut connection = table.get_connection(sname)
+        .expect("Fail to create the bus connection").write();
+
+    let obj = connection.receive();
+    if obj.is_some() {
+        trace!("Get the result!");
+        return obj.unwrap().data;
+    } else {
+        trace!("No message!");
+        return String::from("");
     }
 }

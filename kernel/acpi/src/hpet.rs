@@ -26,9 +26,9 @@ const fn timer_fsb_interrupt_rout_reg(timer_number: u8) -> usize {
 
 
 pub struct Hpet {
-    inner: HpetInner,
+    _inner: HpetInner,
     virt_addr: VirtualAddress,
-    page: MappedPages,
+    _page: MappedPages,
 }
 
 impl Hpet {
@@ -47,9 +47,9 @@ impl Hpet {
         let (hpet_page, vaddr) = try!(hpet_inner.base_address.map_hpet(active_table));
         debug!("HPET: vaddr: {:#X}, hpet_num: {:#X}, HpetInner {:?}", vaddr, hpet_inner.hpet_number, hpet_inner);
         let mut hpet = Hpet {
-            inner: hpet_inner,
+            _inner: hpet_inner,
             virt_addr: vaddr,
-            page: hpet_page,
+            _page: hpet_page,
         };
 
         hpet.enable_counter(true);

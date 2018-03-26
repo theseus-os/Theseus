@@ -1,7 +1,18 @@
+#![no_std]
+#![feature(alloc)]
+#![feature(conservative_impl_trait)]
+
+#![allow(dead_code)]
+
+#[macro_use] extern crate log;
+extern crate alloc;
+extern crate spin;
+extern crate port_io;
+
+use core::fmt;
+use alloc::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
-use alloc::Vec;
-use core::fmt;
 
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
