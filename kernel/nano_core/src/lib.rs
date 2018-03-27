@@ -59,7 +59,7 @@ static EARLY_IDT: LockedIdt = LockedIdt::new();
 /// * Initializes the state_store module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
 #[no_mangle]
-pub extern "C" fn nano_core_main(multiboot_information_virtual_address: usize) {
+pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
 	
 	// start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();

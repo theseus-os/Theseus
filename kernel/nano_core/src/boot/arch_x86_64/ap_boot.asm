@@ -192,7 +192,7 @@ start_high_ap:
 ; 	; Give rust the higher half address to the multiboot2 information structure
 ; 	add rdi, KERNEL_OFFSET
 	
-; 	call nano_core_main
+; 	call nano_core_start
 
 ; 	; rust main returned, print `OS returned!`
 

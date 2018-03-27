@@ -37,5 +37,9 @@ path = "../memory"
 path = "../kernel_config"
 
 
+[features]
+apic_timer_fixed = []
+
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
