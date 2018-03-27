@@ -108,12 +108,11 @@ debug: $(iso)
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
-### TODO: add more symbol files besides nano_core once they're split from nano_core
 
 
 
 ### builds and runs Theseus in Bochs
-bochs : export RUST_FEATURES = --features "apic_timer_fixed"
+bochs : export FEATURES_apic = --features "apic_timer_fixed"
 bochs: $(iso) 
 	#@qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -138,7 +137,7 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export RUST_FEATURES = --features "mirror_serial"
+boot : export FEATURES_nano_core = --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)

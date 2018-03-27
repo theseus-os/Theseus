@@ -21,8 +21,8 @@ clean:
 ## Builds the crate, and then copies all object files to its own module-specific subdirectory in the kernel build directory
 cargo: 
 	@mkdir -p $(KERNEL_BUILD_DIR)/${MODULE_NAME}
-#RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) ${RUST_FEATURES} --target $(TARGET)
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) --target $(TARGET)
+	echo "MODULE_NAME: $(MODULE_NAME), FEATURES: $(FEATURES_$(MODULE_NAME))"
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) $(FEATURES_$(MODULE_NAME)) --target $(TARGET)
 	@for objfile in ./target/$(TARGET)/${BUILD_MODE}/deps/*.o ; do \
 		cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/${MODULE_NAME}/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/\1.o/p'` ; \
 	done
