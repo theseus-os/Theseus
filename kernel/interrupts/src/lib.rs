@@ -9,6 +9,9 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
+#![allow(dead_code)]
+
+
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 extern crate x86_64;
