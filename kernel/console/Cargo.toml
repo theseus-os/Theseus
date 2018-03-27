@@ -4,6 +4,9 @@ name = "console"
 description = "A console (terminal emulator) implementation"
 version = "0.1.0"
 
+workspace = "../"
+
+
 [dependencies]
 spin = "0.4.5"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }

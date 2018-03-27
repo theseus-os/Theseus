@@ -3,13 +3,16 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
 version = "0.1.0"
 
+[workspace]
+members = ["console"]
+
 [dependencies]
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
-multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
+multiboot2 = { path = "../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
 once = "0.3.2"
 rlibc = "1.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+x86_64 = { path = "../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 # this is needed for our odd approach of loading the libcore ELF file at runtime
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins", features = ["c"] }
@@ -20,34 +23,34 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.kernel_config]
-path = "../kernel_config"
+path = "kernel_config"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+path = "../libs/irq_safety"
 
 [dependencies.vga_buffer]
-path = "../vga_buffer"
+path = "vga_buffer"
 
 [dependencies.logger]
-path = "../logger"
+path = "logger"
 
 [dependencies.state_store]
-path = "../state_store"
+path = "state_store"
 
 [dependencies.memory]
-path = "../memory"
+path = "memory"
 
 [dependencies.mod_mgmt]
-path = "../mod_mgmt"
+path = "mod_mgmt"
 
 [dependencies.apic]
-path = "../apic"
+path = "apic"
 
 [dependencies.exceptions]
-path = "../exceptions"
+path = "exceptions"
 
 [dependencies.captain]
-path = "../captain"
+path = "captain"
 
 
 
@@ -62,5 +65,5 @@ mirror_serial = []
 # we choose rlib instead of dylib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
 # meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it
 # Furthermore we cannot build it as a dylib instead of rlib because he custom x86_64-theseus target triple doesn't support it (really, Xargo doesn't support it)
-crate-type = ["staticlib", "rlib"]  
+crate-type = ["staticlib"]  
 
