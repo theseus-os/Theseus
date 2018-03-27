@@ -37,7 +37,7 @@ start:
 	; The multiboot2 specification requires the bootloader to load a pointer
 	; to the multiboot2 information structure in the `ebx` register. Here we
 	; mov it to `edi` so that rust can take it as a register. Because of this
-	; we cannot clobber the edi register in any code before rust_main
+	; we cannot clobber the edi register in any code before nano_core_main
 	mov edi, ebx
 
 	call check_multiboot
@@ -244,7 +244,7 @@ long_mode_start:
 	jmp rax
 
 section .text
-extern rust_main
+extern nano_core_main
 extern eputs
 extern puts
 
@@ -284,7 +284,7 @@ start_high:
 	; Give rust the higher half address to the multiboot2 information structure
 	add rdi, KERNEL_OFFSET
 	
-	call rust_main
+	call nano_core_main
 
 	; rust main returned, print `OS returned!`
 	mov rdi, strings.os_return

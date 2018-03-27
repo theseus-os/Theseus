@@ -1,0 +1,70 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "captain"
+description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
+version = "0.1.0"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+version = "0.1.1"
+# features = ["const_fn"]  #if we need them later
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.logger]
+path = "../logger"
+
+[dependencies.console_types]
+path = "../console_types"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.exceptions]
+path = "../exceptions"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.arch]
+path = "../arch"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.syscall]
+path = "../syscall"
+
+[dependencies.interrupts]
+path = "../interrupts"
+
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.driver_init]
+path = "../driver_init"
+
+[dependencies.e1000]
+path = "../e1000"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think
