@@ -10,12 +10,12 @@ include Config.mk
 ## The name of the lib (lib_____.a) is defined by the target above.
 cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 
-nano_core-obj := build/nano_core-$(ARCH).bin
+nano_core-obj := $(KERNEL_BUILD_DIR)/nano_core-$(ARCH).bin
 
 linker_script := src/boot/arch_$(ARCH)/linker_higher_half.ld
 assembly_source_files := $(wildcard src/boot/arch_$(ARCH)/*.asm)
 assembly_object_files := $(patsubst src/boot/arch_$(ARCH)/%.asm, \
-	build/boot/$(ARCH)/%.o, $(assembly_source_files))
+	$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
 .PHONY: all clean cargo
@@ -28,7 +28,7 @@ clean:
 
 
 cargo: 
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) ${FEATURES_nano_core} --target $(TARGET)  ## target arg must be a target name, not the file path.
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) $(RUST_FEATURES) --target $(TARGET)  ## target arg must be a target name, not the file path.
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
@@ -40,6 +40,6 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	done
 
 # compile assembly files
-build/boot/$(ARCH)/%.o: src/boot/arch_$(ARCH)/%.asm
+$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: src/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@

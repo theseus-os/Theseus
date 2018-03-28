@@ -19,7 +19,7 @@ extern crate alloc;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
-
+// #[macro_use] extern crate vga_buffer;
 
 extern crate console_types; // a temporary way to use console types 
 extern crate logger;
@@ -29,11 +29,15 @@ extern crate mod_mgmt;
 extern crate arch; 
 extern crate spawn;
 extern crate tsc;
+extern crate task; 
 extern crate syscall;
 extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+
+extern crate scheduler;
+extern crate console;
 
 
 
@@ -58,16 +62,20 @@ macro_rules! print {
             Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
         }
         
-        if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-            let vaddr = section.virt_addr();
-            let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
-            if let Err(e) = print_func(s.clone()) {
-                error!("print_to_console() in print!() macro failed, error: {}  Printing: {}", e, s);
-            }
-        }
-        else {
-            error!("No \"console::print_to_console\" symbol in print!() macro! Printing: {}", s);
-        }
+        let _ = console::print_to_console(s);
+        // if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
+        //     let vaddr = section.virt_addr();
+        //     let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        //     if let Err(e) = print_func(s.clone()) {
+        //         println_raw!("{}", s);            
+        //         // error!("print_to_console() in print!() macro failed, error: {}  Printing: {}", e, s);
+        //     }
+        // }
+        // else {
+        //     // if console crate hasn't been loaded yet, write to the raw VGA buffer instead
+        //     println_raw!("{}", s);
+        //     // error!("No \"console::print_to_console\" symbol in print!() macro! Printing: {}", s);
+        // }
     });
 }
 
@@ -79,12 +87,13 @@ macro_rules! print {
 use alloc::arc::Arc;
 use alloc::{String, Vec};
 use core::fmt;
-use memory::{MemoryManagementInfo, MappedPages};
+use memory::{MemoryManagementInfo, MappedPages, VirtualAddress};
 use e1000::test_nic_driver::test_nic_driver;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
-use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
+use task::Task;
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
 
 
 fn test_loop_1(_: Option<u64>) -> Option<u64> {
@@ -97,9 +106,10 @@ fn test_loop_1(_: Option<u64>) -> Option<u64> {
         }
         print!("1");
 
-        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        schedule_func();
+        scheduler::schedule();
+        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        // schedule_func();
     }
 }
 
@@ -114,9 +124,10 @@ fn test_loop_2(_: Option<u64>) -> Option<u64> {
         }
         print!("2");
         
-        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        schedule_func();
+        scheduler::schedule();
+        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        // schedule_func();
     }
 }
 
@@ -142,9 +153,10 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
         }
         print!("3");
         
-        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        schedule_func();
+        scheduler::schedule();
+        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        // schedule_func();
     }
 }
 
@@ -167,32 +179,98 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             ap_start_realmode_begin: usize, ap_start_realmode_end: usize) 
 {
 	
+    #[cfg(feature = "loadable")]
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_util").unwrap(), &mut kernel_mmi, true).unwrap();        
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_atomic").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_port_io").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_serial_port").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_irq_safety").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_bit_field").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_x86_64").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pit_clock").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_tsc").unwrap(), &mut kernel_mmi, true).unwrap();
+    }
+
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
-    let _tsc_freq = tsc::get_tsc_frequency();
+    let _tsc_freq = {
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("tsc::get_tsc_frequency").upgrade().expect("tsc::get_tsc_frequency").virt_addr();
+            let func: fn() -> Result<u64, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func()
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            tsc::get_tsc_frequency()
+        }   
+    };
 
 
     // parse our other loadable modules and their dependencies
-    if true {
+    #[cfg(feature = "loadable")]
+    {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _one      = mod_mgmt::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
         let _two      = mod_mgmt::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
         let _three    = mod_mgmt::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
         let _four     = mod_mgmt::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
         let _five     = mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _sched    = mod_mgmt::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, true).unwrap();
+        let _sched    = mod_mgmt::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
         //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
     }
 
 
+    // load dependencies for driver_init crate
+    #[cfg(feature = "loadable")]
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_spin").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pci").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_ioapic").unwrap(), &mut kernel_mmi, true).unwrap();
+        
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_raw_cpuid").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_x86").unwrap(), &mut kernel_mmi, true).unwrap();
+ 
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_apic").unwrap(), &mut kernel_mmi, true).unwrap();
+    
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_tss").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_gdt").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_arch").unwrap(), &mut kernel_mmi, true).unwrap(); 
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pic").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts").unwrap(), &mut kernel_mmi, true).unwrap();
 
-    // now we initialize ACPI/APIC barebones stuff.
-    // madt_iter must stay in scope until after all AP booting is finished so it's not prematurely dropped
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_task").unwrap(), &mut kernel_mmi, true).unwrap(); 
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_spawn").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_dbus").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_syscall").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_ap_start").unwrap(), &mut kernel_mmi, true).unwrap();
+
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init").unwrap(), &mut kernel_mmi, true).unwrap();
+    }
+
+
+    // now we initialize early driver stuff, like APIC/ACPI
     let madt_iter = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        driver_init::early_init(&mut kernel_mmi).expect("Failed to get MADT (APIC) table iterator!")
-    };
+
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("driver_init::early_init").upgrade().expect("driver_init::early_init").virt_addr();
+            let func: fn(&mut memory::MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(&mut kernel_mmi)
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            driver_init::early_init(&mut kernel_mmi)
+        }
+    }.expect("Failed to get MADT (APIC) table iterator!");
 
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
@@ -204,35 +282,99 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack")
         )
     };
-    // the three stacks we allocated above are never dropped because they stay in scope in this function,
-    // but IMO that's not a great design, and they should probably be stored by the interrupt module and the syscall module instead.
-    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())
-                .expect("failed to initialize interrupts!");
 
+    #[cfg(feature = "loadable")]
+    {
+        let vaddr = mod_mgmt::metadata::get_symbol("interrupts::init").upgrade().expect("interrupts::init").virt_addr();
+        let func: fn(usize, usize) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        func(double_fault_stack.top_unusable(), privilege_stack.top_unusable()).expect("failed to initialize interrupts!");
+    } 
+    #[cfg(not(feature = "loadable"))] 
+    {
+        interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable()).expect("failed to initialize interrupts!");
+    }
+    
 
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
-    interrupts::init_handlers_apic();
+    #[cfg(feature = "loadable")] 
+    {
+        let vaddr = mod_mgmt::metadata::get_symbol("interrupts::init_handlers_apic").upgrade().expect("interrupts::init_handlers_apic").virt_addr();
+        let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
+        func();
+    } 
+    #[cfg(not(feature = "loadable"))]
+    {
+        interrupts::init_handlers_apic();
+    }
 
-    syscall::init(syscall_stack.top_usable());
+    // initialize the syscall subsystem
+    #[cfg(feature = "loadable")]
+    {
+        let vaddr = mod_mgmt::metadata::get_symbol("syscall::init").upgrade().expect("syscall::init").virt_addr();
+        let func: fn(usize) = unsafe { ::core::mem::transmute(vaddr) };
+        func(syscall_stack.top_usable());
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        syscall::init(syscall_stack.top_usable());
+    }
 
-  
+    // get BSP's apic id
+    let bsp_apic_id = {
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("apic::get_bsp_id").upgrade().expect("apic::get_bsp_id").virt_addr();
+            let func: fn() -> Option<u8> = unsafe { ::core::mem::transmute(vaddr) };
+            func().expect("captain::init(): Coudln't get BSP's apic_id!")
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            apic::get_bsp_id().expect("captain::init(): Coudln't get BSP's apic_id!")
+        }
+    };
+    
+    
     // create the initial `Task`, i.e., task_zero
-    let bsp_apic_id = apic::get_bsp_id().expect("nano_core_main(): Coudln't get BSP's apic_id!");
-    spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top).unwrap();
+    #[cfg(feature = "loadable")] 
+    {
+        let vaddr = mod_mgmt::metadata::get_symbol("spawn::init").upgrade().expect("spawn::init").virt_addr();
+        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        func(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top).unwrap();
+    } 
+    #[cfg(not(feature = "loadable"))]
+    {
+        spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top).unwrap();
+    }
+
 
     // initialize the kernel console
     let console_queue_producer = {
-        let section = ::mod_mgmt::metadata::get_symbol("console::init").upgrade().expect("failed to get console::init() symbol!");
-        let init_func: fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        let console_producer = init_func().expect("console::init() failed!");
-        console_producer
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("console::init").upgrade().expect("console::init").virt_addr();
+            let func: fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func().expect("console::init() failed!")
+        } 
+        #[cfg(not(feature = "loadable"))]
+        {
+            console::init().expect("console::init() failed!")
+        }
     };
 
 
 
     // initialize the rest of our drivers
-    driver_init::init(console_queue_producer).unwrap();
+    #[cfg(feature = "loadable")]
+    {
+        let vaddr = mod_mgmt::metadata::get_symbol("driver_init::init").upgrade().expect("driver_init::init").virt_addr();
+        let func: fn(DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        func(console_queue_producer).unwrap();
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        driver_init::init(console_queue_producer).unwrap();
+    }
     
 
     // boot up the other cores (APs)
@@ -316,15 +458,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     enable_interrupts();
-    debug!("nano_core_main(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
+    debug!("captain::init(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
-    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in nano_core_main()");
+    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in captain::init()");
     loop { 
         // TODO: exit this loop cleanly upon a shutdown signal
         
-        let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        schedule_func();
+        scheduler::schedule();
+        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
+        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
+        // schedule_func();
         
         arch::pause();
     }

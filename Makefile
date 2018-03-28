@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 arch ?= x86_64
 target ?= $(arch)-theseus
-nano_core := kernel/nano_core/build/nano_core-$(arch).bin
+nano_core := kernel/build/nano_core-$(arch).bin
 iso := build/theseus-$(arch).iso
 grub_cfg := cfg/grub.cfg
 
@@ -88,7 +88,13 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
+
+loadable : export RUST_FEATURES = --features "loadable"
+loadable: run
+
+
 ### builds and runs Theseus in QEMU
+# run : export RUST_FEATURES = --features "mirror_serial"
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -108,7 +114,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-bochs : export FEATURES_apic = --features "apic_timer_fixed"
+bochs : export RUST_FEATURES = --features "apic_timer_fixed"
 bochs: $(iso) 
 	#@qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -133,7 +139,7 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export FEATURES_nano_core = --features "mirror_serial"
+boot : export RUST_FEATURES = --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)

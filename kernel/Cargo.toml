@@ -4,7 +4,6 @@ name = "nano_core"
 version = "0.1.0"
 
 [workspace]
-members = ["console"]
 
 [dependencies]
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
@@ -53,9 +52,15 @@ path = "exceptions"
 path = "captain"
 
 
+### below: Extra dependencies to make sure things are built
+[dependencies.console]
+path = "console"
+
 
 [features]
+loadable = [ "captain/loadable" ]
 mirror_serial = []
+apic_timer_fixed = [ "apic/apic_timer_fixed" ]
 
 
 [lib]
