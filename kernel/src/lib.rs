@@ -71,25 +71,27 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
 
-
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
 
-
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
-    if cfg!(feature = "mirror_serial") {
+    trace!("state_store initialized.");
+    
+    
+    #[cfg(feature = "mirror_serial")]
+    {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(captain::mirror_to_vga_cb);
     }
-    trace!("state_store initialized.");
 
     // parse our two main crates, the nano_core (the code we're already running), and the libcore (Rust no_std lib),
     // both which satisfy dependencies that many other crates have. 
-    if true {
+    #[cfg(feature = "loadable")] 
+    {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_nano_core_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());

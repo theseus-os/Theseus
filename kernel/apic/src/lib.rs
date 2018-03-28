@@ -360,6 +360,7 @@ impl LocalApic {
     unsafe fn init_timer(&mut self) {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.");
         let apic_period = if cfg!(feature = "apic_timer_fixed") {
+            info!("apic_timer_fixed config: overriding APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do apic periods right
         } else {
             self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
@@ -382,6 +383,7 @@ impl LocalApic {
     unsafe fn init_timer_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
         let x2apic_period = if cfg!(feature = "apic_timer_fixed") {
+            info!("apic_timer_fixed config: overriding X2APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do x2apic periods right
         } else {
             self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)

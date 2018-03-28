@@ -155,8 +155,10 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                     }
                 });
 
-                info!("loaded new crate: {}", new_crate.crate_name);
-                Ok(metadata::add_crate(new_crate, log))
+
+                let new_syms = metadata::add_crate(new_crate, log);
+                info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
+                Ok(new_syms)
 
                 // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
             }

@@ -26,6 +26,9 @@ path = "../kernel_config"
 [dependencies.logger]
 path = "../logger"
 
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
 [dependencies.console_types]
 path = "../console_types"
 
@@ -65,6 +68,18 @@ path = "../driver_init"
 [dependencies.e1000]
 path = "../e1000"
 
+[dependencies.console]
+path = "../console"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.scheduler]
+path = "../scheduler"
+
+
+[features]
+loadable = []
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
