@@ -52,7 +52,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         debug!("Found pci device: {:?}", dev);
     }
 
-    if false {
+    if true {
         try!(e1000::init_nic());
     }
 
