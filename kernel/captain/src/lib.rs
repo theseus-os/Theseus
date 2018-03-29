@@ -355,9 +355,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     enable_interrupts();
 
 
-    if false {
-        use e1000::test_nic_driver::test_nic_driver;
-        spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
+    if true {
+        // #[cfg(feature = "loadable")]
+        // {
+        //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().expect("e1000::test_nic_driver::test_nic_driver").virt_addr();
+        //     let func: fn(Option<u64>) = unsafe { ::core::mem::transmute(vaddr) };
+        //     spawn::spawn_kthread(func, None, String::from("test_nic_driver")).unwrap();
+        // }
+        #[cfg(not(feature = "loadable"))]
+        {
+            use e1000::test_nic_driver::test_nic_driver;
+            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
+        }
     }  
 
 
