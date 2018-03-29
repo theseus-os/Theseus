@@ -4,7 +4,6 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 extern crate x86_64;
-extern crate apic;
 
 
 use core::sync::atomic::Ordering;
@@ -49,7 +48,7 @@ pub fn init_early_exceptions(early_idt: &'static LockedIdt) {
 
 
 
-/// interrupt 0x00
+/// exception 0x00
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
     loop {}
@@ -57,7 +56,7 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 
 
 
-/// interrupt 0x02
+/// exception 0x02
 pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     // currently we're using NMIs to send TLB shootdown IPIs
     let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
@@ -76,14 +75,14 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
 }
 
 
-/// interrupt 0x03
+/// exception 0x03
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);
 }
 
-/// interrupt 0x06
+/// exception 0x06
 pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
@@ -91,7 +90,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
     loop {}
 }
 
-/// interrupt 0x07
+/// exception 0x07
 /// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
@@ -131,7 +130,7 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 
 
 /// this shouldn't really ever happen, but I added the handler anyway
-/// because I noticed the interrupt 0xb happening when other interrupts weren't properly handled
+/// because I noticed the exception 0xb happening when other interrupts weren't properly handled
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_raw!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}",

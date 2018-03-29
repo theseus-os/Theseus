@@ -1,12 +1,12 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "apic"
-description = "APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic, xapic, and x2apic"
+description = "APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic"
 version = "0.1.0"
 
 [dependencies]
 spin = "0.4.5"
-x86 = "0.8.1"
+raw-cpuid = "3.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 atomic = { version = "0.3.4", features = ["nightly"]}

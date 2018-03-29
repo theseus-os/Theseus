@@ -19,14 +19,13 @@ extern crate alloc;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
-// #[macro_use] extern crate vga_buffer;
+#[macro_use] extern crate vga_buffer;
 
 extern crate console_types; // a temporary way to use console types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
 extern crate mod_mgmt;
-extern crate arch; 
 extern crate spawn;
 extern crate tsc;
 extern crate task; 
@@ -62,20 +61,22 @@ macro_rules! print {
             Err(e) => error!("Writing to String in print!() macro failed, error: {}", e),
         }
         
-        let _ = console::print_to_console(s);
-        // if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-        //     let vaddr = section.virt_addr();
-        //     let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
-        //     if let Err(e) = print_func(s.clone()) {
-        //         println_raw!("{}", s);            
-        //         // error!("print_to_console() in print!() macro failed, error: {}  Printing: {}", e, s);
-        //     }
-        // }
-        // else {
-        //     // if console crate hasn't been loaded yet, write to the raw VGA buffer instead
-        //     println_raw!("{}", s);
-        //     // error!("No \"console::print_to_console\" symbol in print!() macro! Printing: {}", s);
-        // }
+        #[cfg(feature = "loadable")] {
+            if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
+                let vaddr = section.virt_addr();
+                let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+                let _ = print_func(s.clone());
+            }
+            else {
+                // if console crate hasn't been loaded yet, write to the raw VGA buffer instead
+                println_raw!("Couldn't get \"console::print_to_console\" symbol! Tried to print: {}", s);
+                // error!("No \"console::print_to_console\" symbol in print!() macro! Printing: {}", s);
+            }
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            let _ = console::print_to_console(s);
+        } 
     });
 }
 
@@ -87,78 +88,17 @@ macro_rules! print {
 use alloc::arc::Arc;
 use alloc::{String, Vec};
 use core::fmt;
-use memory::{MemoryManagementInfo, MappedPages, VirtualAddress};
-use e1000::test_nic_driver::test_nic_driver;
+use core::sync::atomic::spin_loop_hint;
+use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use dfqueue::DFQueueProducer;
-use console_types::ConsoleEvent;
-use task::Task;
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
 
-
-fn test_loop_1(_: Option<u64>) -> Option<u64> {
-    debug!("Entered test_loop_1!");
-    loop {
-        let mut i: usize = 100000000; // usize::max_value();
-        unsafe { asm!(""); }
-        while i > 0 {
-            i -= 1;
-        }
-        print!("1");
-
-        scheduler::schedule();
-        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        // schedule_func();
-    }
-}
-
-
-fn test_loop_2(_: Option<u64>) -> Option<u64> {
-    debug!("Entered test_loop_2!");
-    loop {
-        let mut i: usize = 100000000; // usize::max_value();
-        unsafe { asm!(""); }
-        while i > 0 {
-            i -= 1;
-        }
-        print!("2");
-        
-        scheduler::schedule();
-        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        // schedule_func();
-    }
-}
-
-
-fn test_loop_3(_: Option<u64>) -> Option<u64> {
-    debug!("Entered test_loop_3!");
-    
-    // {
-    //     use memory::{PhysicalMemoryArea, FRAME_ALLOCATOR};
-    //     let test_area = PhysicalMemoryArea::new(0xFFF7000, 0x10000, 1, 3);
-    //     FRAME_ALLOCATOR.try().unwrap().lock().add_area(test_area, false).unwrap();
-    // }
-
-    loop {
-        let mut i: usize = 100000000; // usize::max_value();
-        while i > 0 {
-            unsafe { asm!(""); }
-            i -= 1;
-            // if i % 3 == 0 {
-            //     debug!("GOT FRAME: {:?}",  memory::allocate_frame()); // TODO REMOVE
-            //     debug!("GOT FRAMES: {:?}", memory::allocate_frames(20)); // TODO REMOVE
-            // }
-        }
-        print!("3");
-        
-        scheduler::schedule();
-        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        // schedule_func();
-    }
-}
+#[cfg(feature = "loadable")] use task::Task;
+#[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
+#[cfg(feature = "loadable")] use console_types::ConsoleEvent;
+#[cfg(feature = "loadable")] use dfqueue::DFQueueProducer;
+#[cfg(feature = "loadable")] use irq_safety::RwLockIrqSafe;
+#[cfg(feature = "loadable")] use acpi::madt::MadtIter;
 
 
 
@@ -182,16 +122,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(feature = "loadable")]
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_util").unwrap(), &mut kernel_mmi, true).unwrap();        
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_atomic").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_port_io").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_serial_port").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_irq_safety").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_bit_field").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_x86_64").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_pit_clock").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_tsc").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_util").unwrap(), &mut kernel_mmi, false).unwrap();        
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_atomic").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_port_io").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_serial_port").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_irq_safety").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_bit_field").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_log").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_x86_64").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pit_clock").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_tsc").unwrap(), &mut kernel_mmi, false).unwrap();
     }
 
     // calculate TSC period and initialize it
@@ -210,49 +150,41 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     };
 
 
-    // parse our other loadable modules and their dependencies
+    // load the rest of our crate dependencies
     #[cfg(feature = "loadable")]
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _two      = mod_mgmt::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _three    = mod_mgmt::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _four     = mod_mgmt::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _five     = mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
-        let _sched    = mod_mgmt::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, false).unwrap();
-        // debug!("========================== Symbol map after __k_log {}, __k_keycodes_ascii {}, __k_console_types {}, __k_keyboard {}, __k_console {}: ========================\n{}", 
-        //         _one, _two, _three, _four, _five, mod_mgmt::metadata::dump_symbol_map());
-    }
 
-
-    // load dependencies for driver_init crate
-    #[cfg(feature = "loadable")]
-    {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_spin").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_pci").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_ioapic").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_keycodes_ascii").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_console_types").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_keyboard").unwrap(), &mut kernel_mmi, false).unwrap();
         
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_raw_cpuid").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_x86").unwrap(), &mut kernel_mmi, true).unwrap();
- 
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_apic").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_spin").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pci").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_ioapic").unwrap(), &mut kernel_mmi, false).unwrap();
+        
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_raw_cpuid").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_apic").unwrap(), &mut kernel_mmi, false).unwrap();
     
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_tss").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_gdt").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_arch").unwrap(), &mut kernel_mmi, true).unwrap(); 
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_pic").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_tss").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_gdt").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_pic").unwrap(), &mut kernel_mmi, false).unwrap();
 
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_task").unwrap(), &mut kernel_mmi, true).unwrap(); 
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_spawn").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_dbus").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_syscall").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_ap_start").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_task").unwrap(), &mut kernel_mmi, false).unwrap(); 
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_scheduler").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_spawn").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
+        
 
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000").unwrap(), &mut kernel_mmi, true).unwrap();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init").unwrap(), &mut kernel_mmi, true).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_dbus").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_syscall").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_ap_start").unwrap(), &mut kernel_mmi, false).unwrap();
+
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init").unwrap(), &mut kernel_mmi, false).unwrap();
     }
 
 
@@ -263,7 +195,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(feature = "loadable")]
         {
             let vaddr = mod_mgmt::metadata::get_symbol("driver_init::early_init").upgrade().expect("driver_init::early_init").virt_addr();
-            let func: fn(&mut memory::MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let func: fn(&mut memory::MemoryManagementInfo) -> Result<MadtIter, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
             func(&mut kernel_mmi)
         }
         #[cfg(not(feature = "loadable"))]
@@ -378,13 +310,22 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     
 
     // boot up the other cores (APs)
-    {
-        let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)
-                       .expect("Error handling AP cores");
-        
-        info!("Finished handling and booting up all {} AP cores.", ap_count);
-        assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
-    }
+    let ap_count = {
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("acpi::madt::handle_ap_cores").upgrade().expect("acpi::madt::handle_ap_cores").virt_addr();
+            let func: fn(MadtIter, Arc<MutexIrqSafe<MemoryManagementInfo>>, usize, usize) -> Result<usize, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)
+                .expect("Error handling AP cores")
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)
+                .expect("Error handling AP cores")
+        }
+    };
+    info!("Finished handling and booting up all {} AP cores.", ap_count);
+    // assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
@@ -413,32 +354,46 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     enable_interrupts();
 
+
     if false {
+        use e1000::test_nic_driver::test_nic_driver;
         spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
     }  
 
-    // create some extra tasks to test context switching
-    if false {
-        spawn::spawn_kthread(test_loop_1, None, String::from("test_loop_1")).unwrap();
-        spawn::spawn_kthread(test_loop_2, None, String::from("test_loop_2")).unwrap(); 
-        spawn::spawn_kthread(test_loop_3, None, String::from("test_loop_3")).unwrap(); 
-    }
 
-	
-    
     // create and jump to the first userspace thread
     if true
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn::spawn_userspace(module, Some(String::from("test_program_1"))).unwrap();
+        
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().expect("spawn::spawn_userspace").virt_addr();
+            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(module, Some(String::from("test_program_1"))).unwrap();
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_userspace(module, Some(String::from("test_program_1"))).unwrap();
+        }
     }
 
     if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
-        spawn::spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
+        
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().expect("spawn::spawn_userspace").virt_addr();
+            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(module, Some(String::from("test_program_2"))).unwrap();
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
+        }
     }
 
     // create and jump to a userspace thread that tests syscalls
@@ -446,7 +401,17 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         debug!("trying out a system call module");
         let module = memory::get_module("syscall_send").expect("Error: no module named 'syscall_send' found!");
-        spawn::spawn_userspace(module, None).unwrap();
+        
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().expect("spawn::spawn_userspace").virt_addr();
+            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(module, None).unwrap();
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_userspace(module, None).unwrap();
+        }
     }
 
     // a second duplicate syscall test user task
@@ -454,22 +419,40 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         debug!("trying out a receive system call module");
         let module = memory::get_module("syscall_receive").expect("Error: no module named 'syscall_receive' found!");
-        spawn::spawn_userspace(module, None).unwrap();
+        
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().expect("spawn::spawn_userspace").virt_addr();
+            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            func(module, None).unwrap();
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_userspace(module, None).unwrap();
+        }
     }
 
     enable_interrupts();
     debug!("captain::init(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
+    
     assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in captain::init()");
     loop { 
+        
+        #[cfg(feature = "loadable")]
+        {
+            let vaddr = mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("scheduler::schedule").virt_addr();
+            let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
+            func();
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            scheduler::schedule();
+        }
+        
+        
+        spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
-        
-        scheduler::schedule();
-        // let section = ::mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("failed to get scheduler::schedule symbol!");
-        // let schedule_func: fn() -> bool = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        // schedule_func();
-        
-        arch::pause();
     }
 
 

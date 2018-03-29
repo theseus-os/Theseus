@@ -12,7 +12,7 @@ extern crate apic;
 
 
 use core::fmt;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use alloc::String;
 use alloc::arc::Arc;
 
@@ -164,18 +164,6 @@ impl Task {
         self.runstate == RunState::RUNNABLE
     }
 
-    // TODO: implement this
-    /*
-    fn clone_task(&self, new_id: TaskId) -> Task {
-        Task {
-            id: task_id,
-            runstate: RunState::INITING,
-            arch_state: self.arch_state.clone(),
-            name: format!("task{}", task_id),
-            kstack: None,
-        }
-    }
-    */
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
@@ -193,7 +181,9 @@ impl Task {
         
         // acquire this core's context switch lock
         // TODO: add timeout
-        while my_context_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) { }
+        while my_context_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) {
+            spin_loop_hint();
+        }
 
         // debug!("context_switch [1], testing runstates.");
         if next.runstate != RunState::RUNNABLE {

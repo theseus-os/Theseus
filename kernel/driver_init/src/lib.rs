@@ -52,7 +52,9 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         debug!("Found pci device: {:?}", dev);
     }
 
-    try!(e1000::init_nic());
+    if false {
+        try!(e1000::init_nic());
+    }
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

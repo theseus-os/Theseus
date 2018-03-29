@@ -36,9 +36,6 @@ path = "../kernel_config"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.arch]
-path = "../arch"
-
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
