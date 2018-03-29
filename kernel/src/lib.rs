@@ -6,7 +6,7 @@
 
 
 #![no_std]
-
+#![feature(alloc)]
 #![feature(lang_items)]
 #![feature(i128_type)]
 #![feature(used)]
@@ -17,6 +17,7 @@
 extern crate compiler_builtins;
 
 
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate multiboot2;
@@ -97,11 +98,27 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
         let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
+        let _num_captain_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_captain").unwrap(), &mut kernel_mmi, true).unwrap();
     }
 
 
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
+    #[cfg(feature = "loadable")]
+    {
+        use memory::{MappedPages, MemoryManagementInfo};
+        use alloc::arc::Arc;
+        use alloc::Vec;
+        use irq_safety::MutexIrqSafe;
+
+        let vaddr = mod_mgmt::metadata::get_symbol("captain::init").upgrade().expect("captain::init").virt_addr();
+        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) = unsafe { ::core::mem::transmute(vaddr) };
+        func(kernel_mmi_ref, identity_mapped_pages, 
+             get_bsp_stack_bottom(), get_bsp_stack_top(),
+             get_ap_start_realmode_begin(), get_ap_start_realmode_end()
+        );
+    }
+    #[cfg(not(feature = "loadable"))]
     captain::init(kernel_mmi_ref, identity_mapped_pages, 
                   get_bsp_stack_bottom(), get_bsp_stack_top(),
                   get_ap_start_realmode_begin(), get_ap_start_realmode_end()
