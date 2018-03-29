@@ -364,6 +364,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
     const RODATA_PREFIX: &'static str = ".rodata.";
     const DATA_PREFIX:   &'static str = ".data.";
     const BSS_PREFIX:    &'static str = ".bss.";
+    const RELRO_PREFIX:  &'static str = "rel.ro.";
 
 
     for (shndx, sec) in elf_file.section_iter().enumerate() {
@@ -417,6 +418,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             } else {
                 match sec.get_data(&elf_file) {
                     Ok(SectionData::Undefined(sec_data)) => sec_data,
+                    Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
                     _ => {
                         error!("parse_elf_kernel_crate(): Couldn't get data (expected \"Undefined\" data) for section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
                         return Err("couldn't get sec_data in .text, .data, or .rodata section");
@@ -509,6 +511,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
             else if sec_name.starts_with(DATA_PREFIX) {
                 if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
+                    let name = if name.starts_with(RELRO_PREFIX) {
+                        let relro_name = try!(name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
+                        // warn!("relro data sec {:?} -> {:?}", name, relro_name);
+                        relro_name
+                    }
+                    else {
+                        name
+                    };
                     let demangled = demangle_symbol(name);
                     if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
@@ -654,9 +664,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                         let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
                         let source_sec_shndx: u16 = source_sec_entry.shndx(); 
                         if log { 
-                            let source_sec_header = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
+                            let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
                                                                     .and_then(|s| s.get_name(&elf_file));
-                            trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header);
+                            trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
                             // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
                             //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
                             //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
@@ -686,6 +696,16 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                                         // At this point, there's no other way to search for the source section besides its name
                                         match source_sec_entry.get_name(&elf_file) {
                                             Ok(source_sec_name) => {
+                                                const DATARELRO: &'static str = ".data.rel.ro.";
+                                                let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                                                    let relro_name = try!(source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
+                                                    // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
+                                                    relro_name
+                                                }
+                                                else {
+                                                    source_sec_name
+                                                };
+
                                                 // search for the symbol's demangled name in the kernel's symbol map
                                                 let demangled = demangle_symbol(source_sec_name);
                                                 match metadata::get_symbol(demangled.full).upgrade() {

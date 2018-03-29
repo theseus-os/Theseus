@@ -30,9 +30,6 @@ path = "../ioapic"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.arch]
-path = "../arch"
-
 [dependencies.pit_clock]
 path = "../pit_clock"
 

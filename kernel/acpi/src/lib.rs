@@ -19,7 +19,6 @@ extern crate pit_clock;
 extern crate ap_start;
 extern crate pic; 
 extern crate apic;
-extern crate arch;
 
 
 macro_rules! try_opt {

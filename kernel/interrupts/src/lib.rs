@@ -68,7 +68,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
         
         idt.divide_by_zero.set_handler_fn(exceptions::divide_by_zero_handler);
         // missing: 0x01 debug exception
-        idt.non_maskable_interrupt.set_handler_fn(exceptions::nmi_handler);
+        idt.non_maskable_interrupt.set_handler_fn(nmi_handler); // use our local NMI handler, not the default one in exceptions
         idt.breakpoint.set_handler_fn(exceptions::breakpoint_handler);
         // missing: 0x04 overflow exception
         // missing: 0x05 bound range exceeded exception
@@ -558,3 +558,22 @@ extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
     eoi(None);
 }
 
+
+
+
+extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
+    // currently we're using NMIs to send TLB shootdown IPIs
+    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
+    if vaddr != 0 {
+        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+        apic::handle_tlb_shootdown_ipi(vaddr);
+        return;
+    }
+    
+    // if vaddr is 0, then it's a regular NMI    
+    println_raw!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
+             stack_frame.instruction_pointer,
+             stack_frame);
+    
+    loop { }
+}

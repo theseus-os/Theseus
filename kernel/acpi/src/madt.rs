@@ -11,14 +11,13 @@ use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
 use irq_safety::MutexIrqSafe;
 use pit_clock;
-use arch;
 
 use super::sdt::Sdt;
 use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 
 
+use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
-
 
 
 
@@ -178,6 +177,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 
 
 /// Starts up and sets up AP cores based on the given APIC system table (`madt_iter`).
+/// 
 /// Arguments: 
 /// * madt_iter: An iterator over the entries in the MADT APIC table
 /// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
@@ -317,7 +317,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     let mut count = get_lapics().iter().count();
     while count < ap_count + 1 {
         trace!("BSP-known count: {}", count);
-        arch::pause();
+        spin_loop_hint();
         count = get_lapics().iter().count();
     }
     
@@ -452,11 +452,11 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
     // Wait for trampoline ready
     debug!(" Wait...");
     while unsafe { read_volatile(ap_ready) } == 0 {
-        arch::pause();
+        spin_loop_hint();
     }
     debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
-        arch::pause();
+        spin_loop_hint();
     }
     info!(" AP {} is in Rust code. Ready!", new_apic_id);
 

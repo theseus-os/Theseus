@@ -11,7 +11,7 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate spin;
 extern crate kernel_config;
-extern crate x86;
+extern crate raw_cpuid;
 extern crate x86_64;
 extern crate pit_clock;
 extern crate atomic;
@@ -19,10 +19,10 @@ extern crate atomic;
 
 use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
 use spin::{RwLock, Once};
-use x86::current::cpuid::CpuId;
-use x86::shared::msr::*;
+use raw_cpuid::CpuId;
+use x86_64::registers::msr::*;
 use irq_safety::hold_interrupts;
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
@@ -58,16 +58,14 @@ pub fn get_bsp_id() -> Option<u8> {
 /// Returns true if the currently executing processor core is the bootstrap processor, 
 /// i.e., the first procesor to run 
 pub fn is_bsp() -> bool {
-    unsafe { 
-        rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
-    }
+    rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
 }
 
 /// Returns true if the machine has support for x2apic
 pub fn has_x2apic() -> bool {
     static IS_X2APIC: Once<bool> = Once::new(); // caches the result
     let res: &bool = IS_X2APIC.call_once( || {
-        CpuId::new().get_feature_info().unwrap().has_x2apic()
+        CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
     });
     *res // because call_once returns a reference to the cached IS_X2APIC value
 }
@@ -83,7 +81,7 @@ pub fn get_my_apic_id() -> Option<u8> {
     if has_x2apic() {
         // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
-        let x2_id = unsafe { rdmsr(IA32_X2APIC_APICID) as u32 };
+        let x2_id = rdmsr(IA32_X2APIC_APICID) as u32;
         // debug!("get_my_apic_id(): read msr, got {}", x2_id);
         Some(x2_id as u8)
     } else {
@@ -138,7 +136,7 @@ impl LapicIpiDestination {
 /// and because it only needs to be done once -- not every time we bring up a new AP core
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
-    let phys_addr = unsafe { rdmsr(IA32_APIC_BASE) };
+    let phys_addr = rdmsr(IA32_APIC_BASE);
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
     
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
@@ -284,15 +282,13 @@ impl LocalApic {
         self.write_reg(APIC_REG_SIR, APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE); 
     }
 
+
     unsafe fn enable_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use enable_x2apic(), it should use enable_apic() instead.");
         
-        debug!("in enable_x2apic");
         // globally enable the x2apic, which includes also setting the xapic enable bit
         let bsp_bit = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP; // need to preserve this when we set other bits in the APIC_BASE reg
-        debug!("in enable_x2apic 1: bsp_bit: {:#X}", bsp_bit);
         wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | bsp_bit | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE);
-        debug!("in enable_x2apic 2: new apic_base: {:#X}", rdmsr(IA32_APIC_BASE));
         let is_bsp = bsp_bit == IA32_APIC_BASE_MSR_IS_BSP;
         if is_bsp {
             INTERRUPT_CHIP.store(InterruptChip::X2APIC, Ordering::Release);
@@ -302,24 +298,22 @@ impl LocalApic {
         // Note: in x2apic, there is not DFR reg because only cluster mode is enabled; there is no flat logical mode
         // Note: in x2apic, the IA32_X2APIC_LDR is read-only.
         let ldr = rdmsr(IA32_X2APIC_LDR);
-        debug!("in enable_x2apic 0.1");
         let cluster_id = (ldr >> 16) & 0xFFFF; // highest 16 bits
         let logical_id = ldr & 0xFFFF; // lowest 16 bits
         info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}", self.id(), self.version(), cluster_id, logical_id, is_bsp);
         // NOTE: we're not yet using logical or cluster mode APIC addressing, but rather only physical APIC addressing
         
-        debug!("in enable_x2apic 0.2"); wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64);
-        debug!("in enable_x2apic 0.3"); wrmsr(IA32_X2APIC_LVT_PMI, APIC_NMI as u64);
-        debug!("in enable_x2apic 0.4"); wrmsr(IA32_X2APIC_LVT_LINT0, APIC_DISABLE as u64);
-        debug!("in enable_x2apic 0.5"); wrmsr(IA32_X2APIC_LVT_LINT1, APIC_DISABLE as u64);
-        debug!("in enable_x2apic 0.6"); wrmsr(IA32_X2APIC_TPR, 0);
+        wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64);
+        wrmsr(IA32_X2APIC_LVT_PMI, APIC_NMI as u64);
+        wrmsr(IA32_X2APIC_LVT_LINT0, APIC_DISABLE as u64);
+        wrmsr(IA32_X2APIC_LVT_LINT1, APIC_DISABLE as u64);
+        wrmsr(IA32_X2APIC_TPR, 0);
         
         
         // set bit 8 to start receiving interrupts (still need to "sti")
         wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE) as u64); 
-        debug!("in enable_x2apic end");
-        info!("x2LAPIC ID {:#x}  is_bsp: {}", self.id(), is_bsp);
     }
+
 
     /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
     unsafe fn calibrate_apic_timer(&mut self, microseconds: u32) -> u32 {
@@ -415,7 +409,7 @@ impl LocalApic {
 
     pub fn id(&self) -> u8 {
         let id: u8 = if has_x2apic() {
-            unsafe { rdmsr(IA32_X2APIC_APICID) as u32 as u8 }
+            rdmsr(IA32_X2APIC_APICID) as u32 as u8
         } else {
             let raw = unsafe { self.read_reg(APIC_REG_LAPIC_ID) };
             (raw >> 24) as u8
@@ -426,7 +420,7 @@ impl LocalApic {
 
     pub fn version(&self) -> u32 {
         if has_x2apic() {
-            unsafe { (rdmsr(IA32_X2APIC_VERSION) & 0xFFFF_FFFF) as u32 }
+            (rdmsr(IA32_X2APIC_VERSION) & 0xFFFF_FFFF) as u32
         } else {
             unsafe { self.read_reg(APIC_REG_LAPIC_VERSION) }
         }
@@ -434,7 +428,7 @@ impl LocalApic {
 
     pub fn error(&self) -> u32 {
         let raw = if has_x2apic() {
-            unsafe { (rdmsr(IA32_X2APIC_ESR) & 0xFFFF_FFFF) as u32 }
+            (rdmsr(IA32_X2APIC_ESR) & 0xFFFF_FFFF) as u32
         } else {
             unsafe { self.read_reg(APIC_REG_ERROR_STATUS) }
         };
@@ -451,7 +445,7 @@ impl LocalApic {
 
     pub fn icr(&self) -> u64 {
         if has_x2apic() {
-            unsafe { rdmsr(IA32_X2APIC_ICR) }
+            rdmsr(IA32_X2APIC_ICR)
         } else {
             unsafe {
                 (self.read_reg(APIC_REG_ICR_HIGH) as u64) << 32 | self.read_reg(APIC_REG_ICR_LOW) as u64
@@ -525,7 +519,9 @@ impl LocalApic {
 
         // acquire lock
         // TODO: add timeout!!
-        while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) { }
+        while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) { 
+            spin_loop_hint();
+        }
 
         TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
         TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core 
@@ -537,7 +533,9 @@ impl LocalApic {
         // wait for all other cores to handle this IPI
         // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
         // TODO: add timeout!!
-        while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0 { }
+        while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0 { 
+            spin_loop_hint();
+        }
     
         // clear TLB shootdown data
         TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(0, Ordering::Release);
@@ -590,20 +588,20 @@ impl LocalApic {
 
 
     pub fn get_isr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
-        unsafe {
-            if has_x2apic() {
-                ( 
-                    rdmsr(IA32_X2APIC_ISR0) as u32, 
-                    rdmsr(IA32_X2APIC_ISR1) as u32,
-                    rdmsr(IA32_X2APIC_ISR2) as u32, 
-                    rdmsr(IA32_X2APIC_ISR3) as u32,
-                    rdmsr(IA32_X2APIC_ISR4) as u32,
-                    rdmsr(IA32_X2APIC_ISR5) as u32,
-                    rdmsr(IA32_X2APIC_ISR6) as u32,
-                    rdmsr(IA32_X2APIC_ISR7) as u32,
-                )
-            }
-            else {
+        if has_x2apic() {
+            ( 
+                rdmsr(IA32_X2APIC_ISR0) as u32, 
+                rdmsr(IA32_X2APIC_ISR1) as u32,
+                rdmsr(IA32_X2APIC_ISR2) as u32, 
+                rdmsr(IA32_X2APIC_ISR3) as u32,
+                rdmsr(IA32_X2APIC_ISR4) as u32,
+                rdmsr(IA32_X2APIC_ISR5) as u32,
+                rdmsr(IA32_X2APIC_ISR6) as u32,
+                rdmsr(IA32_X2APIC_ISR7) as u32,
+            )
+        }
+        else {
+            unsafe {
                 (
                     self.read_reg(APIC_REG_ISR + 0x00),
                     self.read_reg(APIC_REG_ISR + 0x10),

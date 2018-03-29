@@ -10,9 +10,8 @@ extern crate spawn;
 extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
-extern crate arch;
 
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
 use spin::RwLock;
 use irq_safety::{enable_interrupts, interrupts_enabled};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
@@ -78,6 +77,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     loop { 
         scheduler::schedule();
-        arch::pause();
+        spin_loop_hint();
     }
 }

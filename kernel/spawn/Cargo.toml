@@ -5,7 +5,6 @@ description = "Functions and wrappers for spawning new Tasks, both kernel thread
 version = "0.1.0"
 
 [dependencies]
-x86 = "0.8.1"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 atomic = { version = "0.3.4", features = ["nightly"]}
@@ -41,8 +40,8 @@ path = "../tss"
 [dependencies.task]
 path = "../task"
 
-[dependencies.arch]
-path = "../arch"
+[dependencies.gdt]
+path = "../gdt"
 
 [dependencies.scheduler]
 path = "../scheduler"

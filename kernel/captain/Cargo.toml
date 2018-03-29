@@ -44,9 +44,6 @@ path = "../exceptions"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.arch]
-path = "../arch"
-
 [dependencies.spawn]
 path = "../spawn"
 
