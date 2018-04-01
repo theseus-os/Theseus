@@ -1,5 +1,3 @@
-
-
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
@@ -148,7 +146,6 @@ impl WindowAllocator{
     pub fn print(&self) {
 
         for allocated_window in self.allocated.iter(){
-           trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", allocated_window.x, 
                 allocated_window.y, allocated_window.width, allocated_window.height, 
                 allocated_window.active, allocated_window.consumer.is_none());
 
