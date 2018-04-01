@@ -62,7 +62,7 @@ macro_rules! window_switch {
     });
 }
 
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Window_Obj>, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<*const Window_Obj, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
@@ -84,7 +84,7 @@ pub fn print_all() {
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result< Arc<Window_Obj>, &'static str>{
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result< *const Window_Obj, &'static str>{
         if (width < 2 || height < 2){
             return Err("Window size must be greater than 2");
         }
@@ -118,7 +118,7 @@ impl WindowAllocator{
             window.draw_border();
             self.allocated.push_back(window);
 
-            let reference = Arc::new(self.allocated.back().unwrap()); 
+            let reference = self.allocated.back().unwrap(); 
 
             
             Ok(reference)
