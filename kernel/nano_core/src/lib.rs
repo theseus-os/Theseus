@@ -167,7 +167,8 @@ fn test_framebuffer(_: Option<u64>) {
         return;
     }
 
-    let window = rs.ok().unwrap();
+    let window_mutex = rs.ok().unwrap();
+    let window = window_mutex.lock();
 
 unsafe{
            
@@ -256,7 +257,8 @@ fn test_window(_: Option<u64>) {
         return;
     }
 
-    let window = rs.ok().unwrap();
+    let window_mutex = rs.ok().unwrap();
+    let window = window_mutex.lock();
 
 unsafe{           
     use keycodes_ascii::Keycode;

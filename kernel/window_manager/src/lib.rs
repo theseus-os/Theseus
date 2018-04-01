@@ -14,7 +14,7 @@ extern crate keycodes_ascii;
 #[macro_use] extern crate log;
 
 
-use spin::Once;
+use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
 use alloc::{Vec, LinkedList};
 use core::ops::{DerefMut, Deref};
@@ -32,15 +32,19 @@ static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 pub struct WindowAllocator {
-    allocated: LinkedList<Window_Obj>, //The last one is active
+    allocated: LinkedList<Arc<Mutex<Window_Obj>>>, //The last one is active
 }
 
 
 pub fn window_switch(){
+
     let allocator = WINDOW_ALLOCATOR.try();
-    if allocator.is_some(){    
+
+    if allocator.is_some(){
+        unsafe{ allocator.unwrap().force_unlock(); }
         allocator.unwrap().lock().deref_mut().switch();
     }
+
     let consumer = KEY_CODE_CONSUMER.try();
     if(consumer.is_none()){
         return
@@ -53,6 +57,7 @@ pub fn window_switch(){
         event.unwrap().mark_completed();
         event = consumer.peek();
     }
+
 }
 
 #[macro_export]
@@ -62,7 +67,7 @@ macro_rules! window_switch {
     });
 }
 
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<*const Window_Obj, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<Window_Obj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
@@ -84,7 +89,7 @@ pub fn print_all() {
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result< *const Window_Obj, &'static str>{
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<Window_Obj>>, &'static str>{
         if (width < 2 || height < 2){
             return Err("Window size must be greater than 2");
         }
@@ -99,8 +104,9 @@ impl WindowAllocator{
             //window.resize(x,y,width,height);
             let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
             let mut overlapped = false;
-            for allocated_window in self.allocated.iter(){
-                if window.is_overlapped(allocated_window) {
+            for item in self.allocated.iter(){
+                let allocated_window = item.lock();
+                if window.is_overlapped(&(*allocated_window)) {
                     overlapped = true;
                     break;
                 }
@@ -109,49 +115,52 @@ impl WindowAllocator{
                 trace!("Request area is already allocated");
                 return Err("Request area is already allocated");
             }
-            for mut allocated_window in  self.allocated.iter_mut(){
-                allocated_window.active(false);
+            for item in  self.allocated.iter_mut(){
+                let mut allocated_window = item.lock();
+                (*allocated_window).active(false);
             }
             //window.fill(0xffffff);
 
             window.consumer = Some(consumer);
             window.draw_border();
-            self.allocated.push_back(window);
+            self.allocated.push_back(Arc::new(Mutex::new(window)));
 
-            let reference = self.allocated.back().unwrap(); 
-
+            let reference = self.allocated.back().unwrap().clone(); 
             
             Ok(reference)
         }
     }
 
     pub fn switch(&mut self){
-
         let mut flag = false;
-        for window in self.allocated.iter_mut(){
+        for item in self.allocated.iter_mut(){
+            unsafe{ item.force_unlock();}
+            let mut window = item.lock();
             if flag {
-                window.active(true);
+                (*window).active(true);
                 flag = false;
             } else if window.active {
-                window.active(false);
+                (*window).active(false);
                 flag = true;
             }
         }
         if (flag) {
-            let window = self.allocated.front_mut().unwrap();
-            window.active(true);
+            let item = self.allocated.front_mut().unwrap();
+            unsafe{ item.force_unlock();}
+            let mut window = item.lock();
+            (*window).active(true);
         }
     }
 
     pub fn print(&self) {
 
-        for allocated_window in self.allocated.iter(){
+    /*    for allocated_window in self.allocated.iter(){
            trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", allocated_window.x, 
                 allocated_window.y, allocated_window.width, allocated_window.height, 
                 allocated_window.active, allocated_window.consumer.is_none());
 
         }
-       
+     */  
     }
 
 }
