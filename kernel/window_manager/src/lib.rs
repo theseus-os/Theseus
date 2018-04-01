@@ -20,7 +20,7 @@ use alloc::{Vec, LinkedList};
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
-use alloc::arc::Arc;
+use alloc::arc::{Arc, Weak};
 
 
 
@@ -67,7 +67,7 @@ macro_rules! window_switch {
     });
 }
 
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<Window_Obj>>, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<Window_Obj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
@@ -89,7 +89,7 @@ pub fn print_all() {
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<Window_Obj>>, &'static str>{
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<Window_Obj>>, &'static str>{
         if (width < 2 || height < 2){
             return Err("Window size must be greater than 2");
         }
@@ -125,7 +125,7 @@ impl WindowAllocator{
             window.draw_border();
             self.allocated.push_back(Arc::new(Mutex::new(window)));
 
-            let reference = self.allocated.back().unwrap().clone(); 
+            let reference = Arc::downgrade(self.allocated.back().unwrap()); 
             
             Ok(reference)
         }

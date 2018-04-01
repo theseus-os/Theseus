@@ -167,10 +167,9 @@ fn test_framebuffer(_: Option<u64>) {
         return;
     }
 
-    let window_mutex = rs.ok().unwrap();
+    let window_mutex = rs.ok().unwrap().upgrade().unwrap();
     let window = window_mutex.lock();
 
-unsafe{
            
     use keycodes_ascii::Keycode;
     (*window).draw_square(x, y, 20, 20, 0xe4cf8e);
@@ -241,7 +240,7 @@ unsafe{
             }
         }       
     }
-}
+
 }
 
 fn test_window(_: Option<u64>) {
@@ -257,10 +256,9 @@ fn test_window(_: Option<u64>) {
         return;
     }
 
-    let window_mutex = rs.ok().unwrap();
+    let window_mutex = rs.ok().unwrap().upgrade().unwrap();
     let window = window_mutex.lock();
 
-unsafe{           
     use keycodes_ascii::Keycode;
     (*window).draw_pixel(x, y, color);
 
@@ -292,7 +290,6 @@ unsafe{
         }
     }       
 
-}
 }
 
 
