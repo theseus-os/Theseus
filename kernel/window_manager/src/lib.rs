@@ -62,7 +62,7 @@ macro_rules! window_switch {
     });
 }
 
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<*const Window_Obj, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Window_Obj>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
@@ -84,7 +84,7 @@ pub fn print_all() {
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result< *const Window_Obj, &'static str>{
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result< Arc<Window_Obj>, &'static str>{
         if (width < 2 || height < 2){
             return Err("Window size must be greater than 2");
         }
@@ -118,7 +118,7 @@ impl WindowAllocator{
             window.draw_border();
             self.allocated.push_back(window);
 
-            let reference = self.allocated.back().unwrap() as *const Window_Obj; 
+            let reference = Arc::new(self.allocated.back().unwrap()); 
 
             
             Ok(reference)
@@ -146,6 +146,7 @@ impl WindowAllocator{
     pub fn print(&self) {
 
         for allocated_window in self.allocated.iter(){
+           trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", allocated_window.x, 
                 allocated_window.y, allocated_window.width, allocated_window.height, 
                 allocated_window.active, allocated_window.consumer.is_none());
 
@@ -239,7 +240,6 @@ impl Window_Obj{
     }
 
     pub fn draw_pixel(&self, x:usize, y:usize, color:usize){
-        self.print();
         if x >= self.width - 2 || y >= self.height - 2 {
             return;
         }
@@ -257,7 +257,6 @@ impl Window_Obj{
     }
 
     pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:usize){
-        self.print();
         if x + width > self.width - 2
             || y + height > self.height - 2 {
             return;
