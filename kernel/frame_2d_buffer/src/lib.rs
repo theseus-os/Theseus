@@ -11,13 +11,11 @@
 extern crate spin;
 
 extern crate volatile;
+extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-
-
 
 use core::ptr::Unique;
 use spin::Mutex;
@@ -47,7 +45,6 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
-        depth: [[core::usize::MAX;FRAME_BUFFER_WIDTH/3];FRAME_BUFFER_HEIGHT],
     })
 };
 
@@ -63,9 +60,9 @@ macro_rules! draw_pixel {
 
 
 #[doc(hidden)]
-pub fn draw_pixel(x:usize, y:usize, z:usize, color:usize) {
+pub fn draw_pixel(x:usize, y:usize, color:usize) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_pixel(x, y, z, color)
+    FRAME_DRAWER.lock().draw_pixel(x, y, color)
 }
 
 #[macro_export]
@@ -128,7 +125,6 @@ pub fn init_frame_buffer(virtual_address:usize) {
 pub struct Point {
     pub x: usize,
     pub y: usize,
-    pub z: usize,
     pub color: usize,
 }
 
@@ -136,23 +132,16 @@ pub struct Point {
 
 pub struct Drawer {
     start_address: usize,
-    buffer: Unique<Buffer>,
-    depth : [[usize; FRAME_BUFFER_WIDTH/3]; FRAME_BUFFER_HEIGHT], 
+    buffer: Unique<Buffer> ,
 }
 
 
 
 impl Drawer {
-    pub fn draw_pixel(&mut self, x:usize, y:usize, z:usize, color:usize){
+    pub fn draw_pixel(&mut self, x:usize, y:usize, color:usize){
         if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return
         }
-        if z > self.depth[y][x] {
-            return
-        }
-
-        self.depth[y][x] = z;
-
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
         self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
         self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
@@ -161,7 +150,7 @@ impl Drawer {
 
     pub fn draw_points(&mut self, points:Vec<Point>){
         for p in points{
-            draw_pixel(p.x, p.y, p.z, p.color);
+            draw_pixel(p.x, p.y, p.color);
         }
       
     }
@@ -179,7 +168,7 @@ impl Drawer {
             for x in start_x..end_x {
                 y = ((x-start_x)*height/width+start_y);
                 if(self.check_in_range(x as usize,y as usize)){
-                    points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                    points.push(Point{x:x as usize, y:y as usize, color:color});
                 }
             }
         }
@@ -188,7 +177,7 @@ impl Drawer {
             for y in start_y..end_y {
                 x = (y-start_y)*width/height+start_x;
                 if(self.check_in_range(x as usize,y as usize)){
-                    points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                    points.push(Point{x:x as usize, y:y as usize, color:color});
                 }            
             }
         }
@@ -204,7 +193,7 @@ impl Drawer {
 
         for x in start_x..end_x{
             for y in start_y..end_y{
-                points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                points.push(Point{x:x as usize, y:y as usize, color:color});
               // draw_pixel(x, y, color);
             }
         }

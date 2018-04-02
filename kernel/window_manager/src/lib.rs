@@ -253,7 +253,7 @@ impl Window_Obj{
         if x >= self.width - 2 || y >= self.height - 2 {
             return;
         }
-        frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, color);
+        frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, 0, color);
     }
 
     pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize){
