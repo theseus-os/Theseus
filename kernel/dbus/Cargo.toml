@@ -1,0 +1,23 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "dbus"
+description = "Simple dbus-like IPC support for Theseus"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.util]
+path = "../../libs/util"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

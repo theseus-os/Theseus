@@ -1,0 +1,37 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "keyboard"
+description = "The keyboard driver"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.console_types]
+path = "../console_types"
+
+# [dependencies.lazy_static]
+# features = ["spin_no_std"]
+# version = "0.2.1"
+
+# [dependencies.kernel_config]
+# path = "../kernel_config"
+
+# [dependencies.state_store]
+# path = "../state_store"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

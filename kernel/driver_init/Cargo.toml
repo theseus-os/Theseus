@@ -1,0 +1,43 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "driver_init"
+description = "Code for handling the sequence required to initializing each driver"
+version = "0.1.0"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+
+[dependencies.console_types]
+path = "../console_types"
+
+[dependencies.ata_pio]
+path = "../ata_pio"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.e1000]
+path = "../e1000"
+
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.pci]
+path = "../pci"
+
+[dependencies.keyboard]
+path = "../keyboard"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

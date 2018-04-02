@@ -23,6 +23,7 @@ use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
 
 
+pub mod test_window_manager;
 
 
 static WINDOW_ALLOCATOR: Once<MutexIrqSafe<WindowAllocator>> = Once::new();

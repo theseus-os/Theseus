@@ -1,0 +1,44 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "acpi"
+description = "ACPI (Advanced Configuration and Power Interface) support for Theseus"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.ioapic]
+path = "../ioapic"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.pic]
+path = "../pic"
+
+[dependencies.ap_start]
+path = "../ap_start"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

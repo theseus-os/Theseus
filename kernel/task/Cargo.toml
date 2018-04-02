@@ -1,0 +1,39 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "task"
+description = "Task types and structure definitions"
+version = "0.1.0"
+
+[dependencies]
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+atomic = { version = "0.3.4", features = ["nightly"]}
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+version = "0.1.1"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.tss]
+path = "../tss"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.apic]
+path = "../apic"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

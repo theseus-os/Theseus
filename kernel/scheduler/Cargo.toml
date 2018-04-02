@@ -1,0 +1,32 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "scheduler"
+description = "The scheduler and runqueue management"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+version = "0.1.1"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.apic]
+path= "../apic"
+
+[dependencies.task]
+path = "../task"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

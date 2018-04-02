@@ -1,0 +1,45 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "apic"
+description = "APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+raw-cpuid = "3.0.0"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+atomic = { version = "0.3.4", features = ["nightly"]}
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+version = "0.1.1"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+
+[features]
+apic_timer_fixed = []
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

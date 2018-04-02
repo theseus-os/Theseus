@@ -1,0 +1,11 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "console_types"
+description = "A temporary way to move the console typedefs out of the console crate"
+version = "0.1.0"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

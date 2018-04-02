@@ -1,0 +1,53 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "spawn"
+description = "Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes."
+version = "0.1.0"
+
+[dependencies]
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+atomic = { version = "0.3.4", features = ["nightly"]}
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+version = "0.1.1"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.tss]
+path = "../tss"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.gdt]
+path = "../gdt"
+
+[dependencies.scheduler]
+path = "../scheduler"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

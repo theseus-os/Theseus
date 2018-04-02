@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 arch ?= x86_64
 target ?= $(arch)-theseus
-nano_core := kernel/nano_core/build/nano_core-$(arch).bin
+nano_core := kernel/build/nano_core-$(arch).bin
 iso := build/theseus-$(arch).iso
 grub_cfg := cfg/grub.cfg
 
@@ -88,7 +88,13 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
+
+loadable : export RUST_FEATURES = --features "loadable"
+loadable: run
+
+
 ### builds and runs Theseus in QEMU
+# run : export RUST_FEATURES = --features "mirror_serial"
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -104,7 +110,6 @@ debug: $(iso)
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
-### TODO: add more symbol files besides nano_core once they're split from nano_core
 
 
 
@@ -117,7 +122,6 @@ bochs: $(iso)
 
 
 check_usb:
-	@echo -e  'RUST_FEATURES = $(RUST_FEATURES)'
 ifneq (,$(findstring sd, $(usb)))
 ifeq ("$(wildcard /dev/$(usb))", "")
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
@@ -159,6 +163,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@for f in `find ./kernel/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
 	done
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(target)/lib/core-*.o $(grub-isofiles)/modules/__k_libcore.o
 ### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
