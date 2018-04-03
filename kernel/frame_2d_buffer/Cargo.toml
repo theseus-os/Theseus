@@ -25,7 +25,8 @@ path = "../state_store"
 default-features = false
 version = "0.3.7"
 
-
+[dependencies.memory]
+path = "../memory"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

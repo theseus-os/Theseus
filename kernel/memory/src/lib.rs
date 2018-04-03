@@ -22,7 +22,6 @@ extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
-#[macro_use] extern crate frame_buffer;
 
 mod area_frame_allocator;
 mod paging;

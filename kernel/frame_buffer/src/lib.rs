@@ -12,19 +12,24 @@ extern crate spin;
 
 extern crate volatile;
 extern crate serial_port;
-extern crate kernel_config;
+extern crate memory;
+extern crate irq_safety;
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-
 
 
 use core::ptr::Unique;
 use spin::Mutex;
 use volatile::Volatile;
 use alloc::string::String;
-use kernel_config::memory::KERNEL_OFFSET;
 use alloc::vec::Vec;
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PageTable, PhysicalAddress, 
+    EntryFlags, allocate_pages_by_bytes, allocate_pages, MappedPages, MemoryManagementInfo,
+    get_kernel_mmi_ref};
+use irq_safety::MutexIrqSafe;
+use core::ops::DerefMut;
+
 
 const VGA_BUFFER_ADDR: usize = 0xa0000;
 
@@ -33,6 +38,57 @@ pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 pub static mut frame_buffer_direction:Direction = Direction::Right;
+
+pub static mut frame_buffer_pages:Option<MappedPages> = None;
+
+
+pub fn init() -> Result<(), &'static str > {
+
+    //Wenqiu Allocate VESA frame buffer
+    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+
+    // get a reference to the kernel's memory mapping information
+    let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+    //let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!"));
+    let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+
+    // destructure the kernel's MMI so we can access its page table
+    let MemoryManagementInfo { 
+        page_table: ref mut kernel_page_table, 
+    ..  // don't need to access other stuff in kernel_mmi
+    } = *kernel_mmi_locked;
+    
+    match kernel_page_table {
+        &mut PageTable::Active(ref mut active_table) => {
+            let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).unwrap();
+            let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            let allocator_mutex = FRAME_ALLOCATOR.try();
+            if allocator_mutex.is_none(){
+                return Err("framebuffer::init() Couldn't get frame allocator");
+            } 
+
+            FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
+            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
+                pages, 
+                Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
+                vesa_display_flags, 
+                allocator.deref_mut())
+            );
+
+            unsafe { frame_buffer_pages = Some(mapped_frame_buffer); }
+
+            Ok(())
+        }
+        _ => { 
+            return Err("framebuffer::init() Couldn't get kernel's active_table");
+        }
+    }           
+
+    //TODO:add try here        
+    
+}
 
 
 #[derive(Debug, PartialEq, Clone, Copy)]

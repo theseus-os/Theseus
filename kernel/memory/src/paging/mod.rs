@@ -18,8 +18,6 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
-use frame_buffer::{FRAME_BUFFER_HEIGHT, FRAME_BUFFER_WIDTH, FRAME_DRAWER};
-
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
 use super::*;
@@ -32,7 +30,6 @@ use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_S
 
 //Define frame buffer_pages as a static variable. It has the longest life time and will not be unmapped.
 //TODO: move it to the the Drawer instance.
-pub static mut frame_buffer_pages:Option<MappedPages> = None;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
@@ -359,6 +356,7 @@ impl fmt::Debug for TempModule {
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
     -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
+
     // bootstrap an active_table from the currently-loaded page table
     let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
 
@@ -609,26 +607,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let mut higher_half: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half.push(heap_mapped_pages);
     let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
-
-
-    //Wenqiu Allocate VESA frame buffer
-    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
-    //TODO:add try here        
-    let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).unwrap();
-    let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-    let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
-
-    FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-    let mut allocator = allocator_mutex.lock();
-    let mapped_frame_buffer = try!(new_active_table.map_allocated_pages_to(
-        pages, 
-        Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
-        vesa_display_flags, 
-        allocator.deref_mut())
-    );
-
-    unsafe { frame_buffer_pages = Some(mapped_frame_buffer); }
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok((new_active_table, kernel_vmas, higher_half, identity))
