@@ -50,13 +50,12 @@ pub fn init() -> Result<(), &'static str > {
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-    //let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!"));
     let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
     // destructure the kernel's MMI so we can access its page table
     let MemoryManagementInfo { 
         page_table: ref mut kernel_page_table, 
-    ..  // don't need to access other stuff in kernel_mmi
+        .. // don't need to access other stuff in kernel_mmi
     } = *kernel_mmi_locked;
     
     match kernel_page_table {
@@ -84,10 +83,7 @@ pub fn init() -> Result<(), &'static str > {
         _ => { 
             return Err("framebuffer::init() Couldn't get kernel's active_table");
         }
-    }           
-
-    //TODO:add try here        
-    
+    }
 }
 
 

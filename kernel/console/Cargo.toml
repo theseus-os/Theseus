@@ -24,6 +24,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.window_manager]
+path = "../window_manager"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"

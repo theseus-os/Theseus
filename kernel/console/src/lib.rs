@@ -8,6 +8,7 @@ extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+#[macro_use] extern crate window_manager;
 extern crate spawn;
 
 // temporary, should remove this once we fix crate system
@@ -20,6 +21,7 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+
 
 
 
@@ -95,7 +97,6 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
 
 
 fn handle_key_event(keyevent: KeyEvent) {
-
     // Ctrl+D or Ctrl+Alt+Del kills the OS
     if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
             keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
@@ -157,7 +158,16 @@ fn handle_key_event(keyevent: KeyEvent) {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
         return;
     }
-
+    
+    //Pass TAB event to window manager
+    //Window manager consumes direction key input
+    match keyevent.keycode {
+         Keycode::Tab => {window_switch!();}
+         Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            window_manager::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
         Some(c) => { 
@@ -169,6 +179,9 @@ fn handle_key_event(keyevent: KeyEvent) {
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
     }
+
+    //Pass direction keycode to window manager
+
 }
 
 
