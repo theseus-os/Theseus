@@ -7,7 +7,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate kernel_config;
@@ -26,6 +26,8 @@ use irq_safety::MutexIrqSafe;
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
+
+use alloc::slice;
 
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -806,6 +808,55 @@ impl Nic{
 
                 
         }  
+
+        //Nisal
+        pub fn receive_single_packet2(&mut self)-> (*mut u8, usize)  { 
+                debug!("inside receive packet");
+                //if (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0 {
+                        debug!("inside receive packet - inside if");
+                        let length = self.rx_descs[self.rx_cur as usize].length as usize;
+                        let mut packet = self.rx_buf_addr[self.rx_cur as usize] as *mut u8;
+                        //print packet of length bytes
+                        debug!("Packet {}: ", self.rx_cur);
+                        debug!("length =  {}: ", length);
+                        
+                        let mut buffer = vec![0;length as usize];
+                
+                        for i in 0..length as usize {
+                                let points_at = unsafe{ *packet.offset(i as isize ) };
+                                buffer[i] = points_at;
+                                //debug!("{}",points_at);
+                                //debug!("{:x}",points_at);
+                        }  
+                        debug!("message=  {:?}: ", buffer);   
+                        unsafe {debug!("HAAKO {:?}", slice::from_raw_parts_mut(packet, length));}
+                        debug!("done "); 
+               
+                        
+
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+
+                        self.write_command(REG_RXDESCTAIL, old_cur );
+                        (packet, length)
+                // } 
+                // else {
+                //        Err(Error::Exhausted)
+                // }
+
+                
+        } 
+        //check if a packet is there
+        pub fn has_packet_arrived(&mut self) -> bool{
+                (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0
+        }
+
+        //check if a packet is there
+        pub fn has_packet_sent(&mut self) -> bool{
+                (self.tx_descs[self.tx_cur as usize].status & 0xF) != 0 
+        }
+
 
 
         /// Poll for recieved messages

@@ -34,6 +34,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate network;
 
 extern crate scheduler;
 extern crate console;
@@ -185,6 +186,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init").unwrap(), &mut kernel_mmi, false).unwrap();
+
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_network_init").unwrap(), &mut kernel_mmi, false).unwrap();
     }
 
 
@@ -368,6 +371,22 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
         }
     }  
+
+    //Nisal network testing
+    if true {
+        // #[cfg(feature = "loadable")]
+        // {
+        //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().expect("e1000::test_nic_driver::test_nic_driver").virt_addr();
+        //     let func: fn(Option<u64>) = unsafe { ::core::mem::transmute(vaddr) };
+        //     spawn::spawn_kthread(func, None, String::from("test_nic_driver")).unwrap();
+        // }
+        #[cfg(not(feature = "loadable"))]
+        {
+            use network::server::test_server;
+            spawn::spawn_kthread(test_server, None, String::from("test_server")).unwrap();
+        }
+    }  
+
 
 
     // create and jump to the first userspace thread
