@@ -26,14 +26,14 @@ use alloc::arc::{Arc, Weak};
 pub mod test_drawer;
 
 
-static WINDOW_ALLOCATOR: Once<MutexIrqSafe<GraphDrawer>> = Once::new();
+static GraphDrawer: Once<MutexIrqSafe<GraphDrawer>> = Once::new();
 
 static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Keycode>> = Once::new();
 static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 pub struct GraphDrawer {
-    allocated: LinkedList<Arc<Mutex<Graph>>>, //The last one is active
+    graphlist: Mutex<Vec<GraphObj>>, //The last one is active
 }
 
 pub struct Point{
@@ -67,4 +67,53 @@ pub enum Graph {
     Line(Line),
     Square(Square),
     Circle(Circle),
+}
+
+pub struct GraphObj{
+    graph: Graph,
+    depth: usize,
+    color: usize,
+}
+
+impl GraphObj {
+    fn draw(&self) {
+        match self.graph {
+            Graph::Point(ref point) => {
+                frame_buffer::draw_pixel(point.x, point.y, self.depth, self.color);
+            },
+
+            _ => {
+
+            },  
+        }
+    }
+}
+
+pub fn draw_graph (graph: Graph, depth:usize, color:usize) -> Result<(), &'static str>{
+    let drawer: &MutexIrqSafe<GraphDrawer> = GraphDrawer.call_once(|| {
+        MutexIrqSafe::new(GraphDrawer{graphlist:Mutex::new(Vec::new())})
+    });
+
+    let graph_obj = GraphObj{graph:graph, depth:depth, color:color};
+    drawer.lock().deref_mut().add(graph_obj)
+}
+
+impl GraphDrawer {
+    fn add (&mut self, graph_obj: GraphObj) -> Result<(), &'static str> {
+        let mut list = self.graphlist.lock();
+        let mut list = list.deref_mut();
+        let mut index = list.len();
+        graph_obj.draw();
+        for i in 0..list.len() {
+            let item = list.get(i).unwrap();
+            if item.depth >= graph_obj.depth{
+                index = i;
+                break;
+            }
+        }
+        list.insert(index, graph_obj);
+       
+        Ok(())
+    }
+
 }

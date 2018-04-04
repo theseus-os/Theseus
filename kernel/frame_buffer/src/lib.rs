@@ -103,6 +103,9 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
     })
 };
 
+
+
+
 #[macro_export]
 macro_rules! draw_pixel {
     ($x:expr, $y:expr, $color:expr) => ({
@@ -199,6 +202,8 @@ impl Drawer {
         if z > self.depth[y][x] {
             return
         }
+
+        trace!("x:{}, y:{}, z:{} color:{}", x, y, z, color);
 
         self.depth[y][x] = z;
 
