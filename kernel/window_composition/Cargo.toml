@@ -1,6 +1,0 @@
-[package]
-name = "window_composition"
-version = "0.1.0"
-authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
-
-[dependencies]
