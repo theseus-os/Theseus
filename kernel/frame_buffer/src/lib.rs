@@ -103,9 +103,6 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
     })
 };
 
-
-
-
 #[macro_export]
 macro_rules! draw_pixel {
     ($x:expr, $y:expr, $color:expr) => ({
