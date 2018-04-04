@@ -1,0 +1,24 @@
+[package]
+authors = ["Nisal Menuka <nisalmenuka@gmail.com>"]
+name = "network"
+description = "Network stack in theseus"
+version = "0.1.0"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.smoltcp]
+path = "../../libs/smoltcp"
+default-features = false
+features = ["log","alloc"]
+
+
+[dependencies.e1000]
+path = "../e1000"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think
