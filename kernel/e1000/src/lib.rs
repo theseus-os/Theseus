@@ -939,7 +939,8 @@ pub fn e1000_handler () {
         else if (status & 0x80 ) == 0x80 //receiver timer interrupt
         {
                 debug!("Interrupt: RXT");
-                e1000_nc.handle_receive();
+                //nisal        
+                //e1000_nc.handle_receive();
         }
         else{
                 debug!("Unhandled interrupt!");

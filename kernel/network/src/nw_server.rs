@@ -39,7 +39,6 @@ fn tx_empty() -> bool {
 }
 
 fn tx_setup(buf: *const u8, length: usize) {
-    debug!("@@@@@@@@@@ inside tx_Setup");
     /* platform-specific code to send a buffer with a packet */
     unsafe {debug!("SeNDINg {:?}", slice::from_raw_parts(buf, length));}
     let addr: usize = buf as usize;
@@ -59,7 +58,6 @@ impl Device for EthernetDevice {
     fn mtu(&self) -> usize { 1536 }
 
     fn receive(&mut self) -> Result<Self::RxBuffer, Error> {
-        debug!("@@@@@@@@@@ calling receive");
         if rx_full() {
             let index = self.rx_next;
             self.rx_next = (self.rx_next + 1) % RX_BUFFERS.len();
@@ -74,7 +72,6 @@ impl Device for EthernetDevice {
     }
 
     fn transmit(&mut self, length: usize) -> Result<Self::TxBuffer, Error> {
-        debug!("@@@@@@@@@@ calling transmit");
         // if tx_empty() {
         //     Ok(TxBuffer {
         //         buffer: vec![0; length],
