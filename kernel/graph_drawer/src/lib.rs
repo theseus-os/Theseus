@@ -22,7 +22,6 @@ use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
 
-
 pub mod test_drawer;
 
 
@@ -56,17 +55,11 @@ pub struct Square{
     fill:bool,
 }
 
-pub struct Circle {
-    center_x:usize,
-    center_y:usize,
-    radius:usize, 
-}
 
 pub enum Graph {
     Point(Point),
     Line(Line),
     Square(Square),
-    Circle(Circle),
 }
 
 pub struct GraphObj{
@@ -82,10 +75,26 @@ impl GraphObj {
                 frame_buffer::draw_pixel(point.x, point.y, self.depth, self.color);
             },
 
+            Graph::Line(ref line) => {
+                frame_buffer::draw_line(line.start_x, line.start_y, line.end_x, line.end_y, self.depth, self.color);
+            },
+
+            Graph::Square(ref square) => {
+                if square.fill {
+                    frame_buffer::draw_square(square.x, square.y, square.width, square.height, self.depth, self.color);
+                } else {
+                    frame_buffer::draw_line(square.x, square.y, square.x + square.width, square.y, self.depth, self.color);
+                    frame_buffer::draw_line(square.x + square.width, square.y, square.x + square.width, square.y + square.height, self.depth, self.color);
+                    frame_buffer::draw_line(square.x + square.width, square.y + square.height, square.x, square.y + square.height, self.depth, self.color);
+                    frame_buffer::draw_line(square.x, square.y + square.height, square.x, square.y, self.depth, self.color);
+                }
+            },
+
             _ => {
 
             },  
         }
+        
     }
 }
 

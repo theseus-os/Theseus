@@ -263,7 +263,7 @@ impl Window_Obj{
             || end_y > self.height - 2 {
             return;
         }
-        frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, end_x + self.x + 1, end_y + self.y + 1, color);
+        frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, end_x + self.x + 1, end_y + self.y + 1, 0, color);
     }
 
     pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:usize){
@@ -271,7 +271,7 @@ impl Window_Obj{
             || y + height > self.height - 2 {
             return;
         }
-        frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, color);
+        frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, color);
     }
 }
 

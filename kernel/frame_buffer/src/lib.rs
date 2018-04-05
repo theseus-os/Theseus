@@ -109,7 +109,7 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
 #[macro_export]
 macro_rules! draw_pixel {
     ($x:expr, $y:expr, $color:expr) => ({
-        $crate::draw_pixel($x, $y, $color);
+        $crate::draw_pixel($x, $y, 0, $color);
     });
 }
 
@@ -123,29 +123,29 @@ pub fn draw_pixel(x:usize, y:usize, z:usize, color:usize) {
 #[macro_export]
 macro_rules! draw_line {
     ($start_x:expr, $start_y:expr, $end_x:expr, $end_y:expr, $color:expr) => ({
-        $crate::draw_line($start_x, $start_y, $end_x, $end_y, $color);
+        $crate::draw_line($start_x, $start_y, $end_x, $end_y, 0, $color);
     });
 }
 
 
 #[doc(hidden)]
-pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
+pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:usize, color:usize) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
+    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, z, color)
 }
 
 #[macro_export]
 macro_rules! draw_square {
     ($start_x:expr, $start_y:expr, $width:expr, $height:expr, $color:expr) => ({
-        $crate::draw_square($start_x, $start_y, $width, $height, $color);
+        $crate::draw_square($start_x, $start_y, $width, $height, 0, $color);
     });
 }
 
 
 #[doc(hidden)]
-pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
+pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, z:usize, color:usize) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
+    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color)
 }
 
 #[macro_export]
@@ -203,8 +203,6 @@ impl Drawer {
             return
         }
 
-        trace!("x:{}, y:{}, z:{} color:{}", x, y, z, color);
-
         self.depth[y][x] = z;
 
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
@@ -224,32 +222,40 @@ impl Drawer {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
-    pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
+    pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, z:usize, color:usize){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         let mut points = Vec::new();
+       
+        let mut s;
+        let mut e;
         if width.abs() > height.abs() {
             let mut y;
-            for x in start_x..end_x {
+            s = core::cmp::min(start_x, end_x);
+            e = core::cmp::max(start_x, end_x);
+            for x in s..e {
                 y = ((x-start_x)*height/width+start_y);
                 if(self.check_in_range(x as usize,y as usize)){
-                    points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                    points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
                 }
             }
-        }
-        else {
+        } else {
             let mut x;
-            for y in start_y..end_y {
+            s = core::cmp::min(start_y, end_y);
+            e = core::cmp::max(start_y, end_y);
+
+            for y in s..e {
                 x = (y-start_y)*width/height+start_x;
+
                 if(self.check_in_range(x as usize,y as usize)){
-                    points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                    points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
                 }            
             }
         }
         self.draw_points(points);
     }
 
-    pub fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
+    pub fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:usize, color:usize){
         let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -258,7 +264,7 @@ impl Drawer {
 
         for x in start_x..end_x{
             for y in start_y..end_y{
-                points.push(Point{x:x as usize, y:y as usize, z:0, color:color});
+                points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
               // draw_pixel(x, y, color);
             }
         }
