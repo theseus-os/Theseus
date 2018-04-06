@@ -223,6 +223,14 @@ pub fn init() {
 
             },
 
+            &Keycode::Tab => {
+                let drawer: &MutexIrqSafe<GraphDrawer> = GraphDrawer.call_once(|| {
+                     MutexIrqSafe::new(GraphDrawer{graphlist:Mutex::new(Vec::new()), active:0})
+                });
+                drawer.lock().deref_mut().switch();
+
+            },
+
             _ => {
 
             },
