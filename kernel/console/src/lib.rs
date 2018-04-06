@@ -9,6 +9,8 @@ extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 #[macro_use] extern crate window_manager;
+extern crate graph_drawer;
+
 extern crate spawn;
 
 // temporary, should remove this once we fix crate system
@@ -168,6 +170,15 @@ fn handle_key_event(keyevent: KeyEvent) {
          }
          _ => {}
     }
+
+    //Pass Delete event and direction key event to 3d drawer application
+    match keyevent.keycode {
+         Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            graph_drawer::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }
+
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
         Some(c) => { 

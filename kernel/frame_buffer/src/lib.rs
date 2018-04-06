@@ -37,7 +37,6 @@ const VGA_BUFFER_ADDR: usize = 0xa0000;
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
-pub static mut frame_buffer_direction:Direction = Direction::Right;
 
 pub static mut frame_buffer_pages:Option<MappedPages> = None;
 
@@ -87,14 +86,6 @@ pub fn init() -> Result<(), &'static str > {
 }
 
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Direction {
-    Left,
-    Right,
-    Up,
-    Down,
-}
-
 pub static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
@@ -115,51 +106,44 @@ macro_rules! draw_pixel {
 
 
 #[doc(hidden)]
-pub fn draw_pixel(x:usize, y:usize, z:usize, color:usize) {
+pub fn draw_pixel(x:usize, y:usize, z:usize, color:usize, show:bool) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_pixel(x, y, z, color)
+    FRAME_DRAWER.lock().draw_pixel(x, y, z, color, show)
 }
 
 #[macro_export]
 macro_rules! draw_line {
     ($start_x:expr, $start_y:expr, $end_x:expr, $end_y:expr, $color:expr) => ({
-        $crate::draw_line($start_x, $start_y, $end_x, $end_y, 0, $color);
+        $crate::draw_line($start_x, $start_y, $end_x, $end_y, 0, $color, true);
     });
 }
 
 
 #[doc(hidden)]
-pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:usize, color:usize) {
+pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:usize, 
+    color:usize, show:bool) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, z, color)
+    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, 
+        end_y as i32, z, color, show)
 }
 
 #[macro_export]
 macro_rules! draw_square {
     ($start_x:expr, $start_y:expr, $width:expr, $height:expr, $color:expr) => ({
-        $crate::draw_square($start_x, $start_y, $width, $height, 0, $color);
+        $crate::draw_square($start_x, $start_y, $width, $height, 0, $color, true);
     });
 }
 
 
 #[doc(hidden)]
-pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, z:usize, color:usize) {
+pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, z:usize,
+     color:usize, show:bool) {
     unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color)
-}
-
-#[macro_export]
-macro_rules! set_direction {
-    ($direction:expr) => ({
-        $crate::draw_square($direction);
-    });
+    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color, show)
 }
 
 
-#[doc(hidden)]
-pub fn set_direction(direction:Direction) {
-    unsafe { frame_buffer_direction = direction; }
-}
+
 
 /*#[macro_export]
  macro_rules! init_frame_buffer {
@@ -193,17 +177,18 @@ pub struct Drawer {
 }
 
 
-
+//If z-depth is less than 0, clean this point with the color
 impl Drawer {
-    pub fn draw_pixel(&mut self, x:usize, y:usize, z:usize, color:usize){
+    pub fn draw_pixel(&mut self, x:usize, y:usize, z:usize, color:usize, show:bool){
         if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return
         }
+        
         if z > self.depth[y][x] {
             return
         }
 
-        self.depth[y][x] = z;
+        self.depth[y][x] = if show {z} else {core::usize::MAX};
 
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
         self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
@@ -211,9 +196,9 @@ impl Drawer {
     
     }
 
-    pub fn draw_points(&mut self, points:Vec<Point>){
+    pub fn draw_points(&mut self, points:Vec<Point>, show:bool){
         for p in points{
-            draw_pixel(p.x, p.y, p.z, p.color);
+            self.draw_pixel(p.x, p.y, p.z, p.color,show);
         }
       
     }
@@ -222,7 +207,8 @@ impl Drawer {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
-    pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, z:usize, color:usize){
+    pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, 
+        z:usize, color:usize, show:bool){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         let mut points = Vec::new();
@@ -252,10 +238,11 @@ impl Drawer {
                 }            
             }
         }
-        self.draw_points(points);
+        self.draw_points(points, show);
     }
 
-    pub fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:usize, color:usize){
+    pub fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, 
+        height:usize, z:usize, color:usize, show:bool){
         let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -268,7 +255,7 @@ impl Drawer {
               // draw_pixel(x, y, color);
             }
         }
-        self.draw_points(points);
+        self.draw_points(points, show);
 
     }
 
