@@ -24,7 +24,6 @@ use alloc::arc::{Arc, Weak};
 
 pub mod test_drawer;
 
-const BACKGROUD_COLOR:usize = 0x000000;
 
 static GraphDrawer: Once<MutexIrqSafe<GraphDrawer>> = Once::new();
 
@@ -43,11 +42,89 @@ pub struct Point{
     y:usize,
 }
 
+impl Point {
+    fn mov(&mut self, keycode:&Keycode){
+        match keycode {
+            &Keycode::Left => {
+                if self.x == 0 {
+                    return
+                }
+                self.x = self.x - 1;
+            },
+            &Keycode::Right => {
+                if self.x == frame_buffer::FRAME_BUFFER_WIDTH - 1 {
+                    return
+                }
+                self.x = self.x + 1;
+            },
+            &Keycode::Up => {
+                if self.y == 0 {
+                    return
+                }
+                self.y = self.y - 1;
+            },
+            &Keycode::Down => {
+                if self.y == frame_buffer::FRAME_BUFFER_HEIGHT - 1 {
+                    return
+                }
+                self.y = self.y + 1;
+            },
+
+            _ => {
+
+            },
+        }
+        
+    }
+}
+
 pub struct Line{
     start_x:usize,
     start_y:usize,
     end_x:usize,
     end_y:usize,    
+}
+
+impl Line {
+     fn mov(&mut self, keycode:&Keycode){
+        match keycode {
+            &Keycode::Left => {
+                if self.start_x == 0 || self.end_x == 0 {
+                    return
+                }
+                self.start_x = self.start_x - 1;
+                self.end_x = self.end_x - 1;
+            },
+            &Keycode::Right => {
+                if self.start_x == frame_buffer::FRAME_BUFFER_WIDTH - 1 
+                    || self.end_x == frame_buffer::FRAME_BUFFER_WIDTH - 1 {
+                    return
+                }
+                self.start_x = self.start_x + 1;
+                self.end_x = self.end_x + 1;
+            },
+            &Keycode::Up => {
+                if self.start_y == 0 || self.end_y == 0 {
+                    return
+                }
+                self.start_y = self.start_y - 1;
+                self.end_y = self.end_y - 1;
+            },
+            &Keycode::Down => {
+                if self.start_y == frame_buffer::FRAME_BUFFER_HEIGHT - 1 
+                    || self.end_y == frame_buffer::FRAME_BUFFER_HEIGHT - 1 {
+                    return
+                }
+                self.start_y = self.start_y + 1;
+                self.end_y = self.end_y + 1;
+            },
+
+            _ => {
+
+            },
+        }
+        
+    }
 }
 
 pub struct Square{
@@ -58,12 +135,63 @@ pub struct Square{
     fill:bool,
 }
 
+impl Square {
+    fn mov(&mut self, keycode:&Keycode){
+        match keycode {
+            &Keycode::Left => {
+                if self.x == 0 {
+                    return
+                }
+                self.x = self.x - 1;
+            },
+            &Keycode::Right => {
+                if self.x + self.width == frame_buffer::FRAME_BUFFER_WIDTH {
+                    return
+                }
+                self.x = self.x + 1;
+            },
+            &Keycode::Up => {
+                if self.y == 0 {
+                    return
+                }
+                self.y = self.y - 1;
+            },
+            &Keycode::Down => {
+                if self.y + self.height == frame_buffer::FRAME_BUFFER_HEIGHT {
+                    return
+                }
+                self.y = self.y + 1;
+            },
+
+            _ => {
+
+            },
+        }
+        
+    }
+}
 
 pub enum Graph {
     Point(Point),
     Line(Line),
     Square(Square),
 }
+
+trait Move {
+    fn mov(&mut self, keycode:&Keycode);
+}
+
+impl Move for Graph {
+    fn mov(&mut self, keycode:&Keycode) {
+        match self {
+            &mut Graph::Point(ref mut point) => { point.mov(keycode); },
+            &mut Graph::Line(ref mut line) => { line.mov(keycode); },
+            &mut Graph::Square(ref mut square) => { square.mov(keycode); },
+            _ => {},
+        }
+    }
+}
+
 
 pub struct GraphObj{
     graph: Graph,
@@ -87,8 +215,8 @@ impl GraphObj {
                     frame_buffer::draw_square(square.x, square.y, square.width, square.height, self.depth, self.color,show);
                 } else {
                     frame_buffer::draw_line(square.x, square.y, square.x + square.width, square.y, self.depth, self.color,show);
-                    frame_buffer::draw_line(square.x + square.width, square.y, square.x + square.width, square.y + square.height, self.depth, self.color,show);
-                    frame_buffer::draw_line(square.x + square.width, square.y + square.height, square.x, square.y + square.height, self.depth, self.color,show);
+                    frame_buffer::draw_line(square.x + square.width - 1, square.y, square.x + square.width - 1, square.y + square.height, self.depth, self.color,show);
+                    frame_buffer::draw_line(square.x + square.width, square.y + square.height - 1, square.x, square.y + square.height - 1, self.depth, self.color,show);
                     frame_buffer::draw_line(square.x, square.y + square.height, square.x, square.y, self.depth, self.color, show);
                 }
             },
@@ -104,9 +232,43 @@ impl GraphObj {
         self.display(true);
     }
 
-    fn clear(&mut self){
-        self.color = BACKGROUD_COLOR;
+    fn clear(&self){
+        //self.color = BACKGROUD_COLOR;
         self.display(false);
+    }
+
+    fn mov(&mut self, keycode:&Keycode){
+
+        match self.graph {
+            Graph::Square(ref mut square) => {
+                match keycode {
+                    &Keycode::Left|&Keycode::Right => {
+                        frame_buffer::draw_line(square.x + square.width - 1, square.y, 
+                            square.x + square.width - 1, square.y+square.height, self.depth, self.color, false);
+                        frame_buffer::draw_line(square.x, square.y, 
+                            square.x, square.y + square.height, self.depth, self.color, false);
+                    },
+
+                    &Keycode::Up|&Keycode::Down => {
+                        frame_buffer::draw_line(square.x, square.y + square.height - 1, 
+                            square.x + square.width, square.y + square.height - 1, self.depth, self.color, false);
+                        frame_buffer::draw_line(square.x, square.y, 
+                            square.x + square.width, square.y, self.depth, self.color, false);
+                    },
+
+                    _ => {
+
+                    },
+                }
+            },
+
+            _ => {
+                self.clear();
+            },
+        }
+
+        self.graph.mov(keycode);
+
     }
 }
 
@@ -144,6 +306,11 @@ impl GraphDrawer {
         }
         let length = self.graphlist.lock().len();
         self.active = (((self.active+1) as usize) %length) as i32;
+
+        let list = self.graphlist.lock();
+        let graph = list.deref().get(self.active as usize).unwrap();
+        graph.clear();
+        graph.draw();
     }
 
     fn delete_active (&mut self){
@@ -163,6 +330,22 @@ impl GraphDrawer {
             if self.active == list.len() as i32{
                 self.active = 0;
             }
+        }
+        self.redraw(depth);
+    }
+
+    fn move_active (&mut self, keycode:&Keycode){
+        if self.active < 0 {
+            return;
+        }
+        let depth;
+        {
+            let mut list = self.graphlist.lock();
+            let mut list = list.deref_mut();
+            let mut graph = list.remove(self.active as usize);
+            depth = graph.depth;
+            graph.mov(keycode);
+            list.insert(self.active as usize, graph);
         }
         self.redraw(depth);
     }
@@ -216,19 +399,31 @@ pub fn init() {
 
         match keycode {
             &Keycode::Delete => {
-                let drawer: &MutexIrqSafe<GraphDrawer> = GraphDrawer.call_once(|| {
-                     MutexIrqSafe::new(GraphDrawer{graphlist:Mutex::new(Vec::new()), active:0})
-                });
-                drawer.lock().deref_mut().delete_active();
-
+                let drawer = GraphDrawer.try();
+                if drawer.is_none() {
+                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
+                    return;
+                }
+                drawer.unwrap().lock().deref_mut().delete_active();
             },
 
             &Keycode::Tab => {
-                let drawer: &MutexIrqSafe<GraphDrawer> = GraphDrawer.call_once(|| {
-                     MutexIrqSafe::new(GraphDrawer{graphlist:Mutex::new(Vec::new()), active:0})
-                });
-                drawer.lock().deref_mut().switch();
+                let drawer = GraphDrawer.try();
+                if drawer.is_none() {
+                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
+                    return;
+                }
+                drawer.unwrap().lock().deref_mut().switch();
 
+            },
+
+            &Keycode::Left|&Keycode::Right|&Keycode::Up|&Keycode::Down => {
+                let drawer = GraphDrawer.try();
+                if drawer.is_none() {
+                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
+                    return;
+                }
+                drawer.unwrap().lock().deref_mut().move_active(keycode);
             },
 
             _ => {

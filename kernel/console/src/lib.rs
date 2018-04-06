@@ -163,13 +163,13 @@ fn handle_key_event(keyevent: KeyEvent) {
     
     //Pass TAB event to window manager
     //Window manager consumes direction key input
-    match keyevent.keycode {
+    /*match keyevent.keycode {
          Keycode::Tab => {window_switch!();}
          Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
             window_manager::put_key_code(keyevent.keycode).unwrap();
          }
          _ => {}
-    }
+    }*/
 
     //Pass Delete event and direction key event to 3d drawer application
     match keyevent.keycode {

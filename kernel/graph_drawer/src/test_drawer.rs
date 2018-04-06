@@ -20,7 +20,7 @@ pub fn test_draw(_: Option<u64>) {
     draw_graph(square, 19, 0x3768FF).unwrap();
 
     let line = Graph::Line(Line{start_x:20, start_y:50, end_x:500, end_y:50});
-    draw_graph(line, 19, 0x00FF00).unwrap();
+    draw_graph(line, 30, 0x00FF00).unwrap();
 
     let line = Graph::Line(Line{start_x:20, start_y:300, end_x:300, end_y:50});
     draw_graph(line, 19, 0x0000FF).unwrap();

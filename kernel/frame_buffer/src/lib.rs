@@ -32,6 +32,8 @@ use core::ops::DerefMut;
 
 
 const VGA_BUFFER_ADDR: usize = 0xa0000;
+const BACKGROUD_COLOR:usize = 0x000000;
+
 
 //Size of VESA mode 0x4112
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
@@ -189,6 +191,7 @@ impl Drawer {
         }
 
         self.depth[y][x] = if show {z} else {core::usize::MAX};
+        let color = if show {color} else {BACKGROUD_COLOR};
 
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
         self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
