@@ -27,8 +27,8 @@ path = "../vga_buffer"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.graph_drawer]
-path = "../graph_drawer"
+#[dependencies.graph_drawer]
+#path = "../graph_drawer"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"

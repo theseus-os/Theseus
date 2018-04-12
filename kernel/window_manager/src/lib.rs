@@ -12,6 +12,8 @@ extern crate dfqueue;
 extern crate keycodes_ascii;
 #[macro_use] extern crate frame_buffer;
 #[macro_use] extern crate log;
+extern crate acpi;
+
 
 
 use spin::{Once, Mutex};
@@ -21,6 +23,12 @@ use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
+use acpi::ACPI_TABLE;
+
+
+static STATISTIC: Once<Mutex<Vec<u64>>> = Once::new();
+pub static mut starting_time:u64 = 0;
+static mut counter:usize = 0;
 
 
 pub mod test_window_manager;
@@ -58,6 +66,8 @@ pub fn window_switch(){
         event.unwrap().mark_completed();
         event = consumer.peek();
     }
+
+    calculate_time_statistic();
 
 }
 
@@ -253,8 +263,9 @@ impl Window_Obj{
         if x >= self.width - 2 || y >= self.height - 2 {
             return;
         }
-        frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, 0, color, true);
-    }
+        //frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, 0, color, true);
+        frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, color);
+        }
 
     pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize){
         if start_x > self.width - 2
@@ -263,8 +274,10 @@ impl Window_Obj{
             || end_y > self.height - 2 {
             return;
         }
-        frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, 
-            end_x + self.x + 1, end_y + self.y + 1, 0, color, true);
+//        frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, 
+ //           end_x + self.x + 1, end_y + self.y + 1, 0, color, true);
+          frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, 
+            end_x + self.x + 1, end_y + self.y + 1, color);
     }
 
     pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:usize){
@@ -272,8 +285,9 @@ impl Window_Obj{
             || y + height > self.height - 2 {
             return;
         }
-        frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, 
-            color, true);
+        //frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, color, true);
+        frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 
+            color);
     }
 }
 
@@ -294,4 +308,44 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
     
     producer.unwrap().enqueue(keycode);
     Ok(())
+}
+
+
+
+
+//Test functions for performance evaluation
+pub fn set_time_start(){
+    let hpet = ACPI_TABLE.hpet.read();
+    unsafe { starting_time = (*hpet).as_ref().unwrap().get_counter(); }   
+}
+
+pub fn calculate_time_statistic() {
+    let statistic = STATISTIC.call_once(|| {
+        Mutex::new(Vec::new())
+    });
+
+  unsafe{
+    if starting_time == 0 {
+        debug!("test_window_managers::calculate: No starting time!");
+        return;
+    }
+
+    let hpet = ACPI_TABLE.hpet.read();
+    let end_time = (*hpet).as_ref().unwrap().get_counter();  
+
+   
+    let mut queue = statistic.lock();
+    queue.push(end_time - starting_time);
+
+    starting_time = 0;
+
+    counter  = counter+1;
+
+    if counter == 10 {
+        for i in 0..queue.len(){
+            trace!("Time\t{}", queue.pop().unwrap());
+        }
+        counter = 0;
+    }
+  }
 }

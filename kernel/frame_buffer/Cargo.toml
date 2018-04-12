@@ -15,6 +15,8 @@ version = "0.2.1"
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
 
 [dependencies.state_store]
 path = "../state_store"
@@ -25,12 +27,6 @@ version = "0.3.7"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.irq_safety]
-path = "../../libs/irq_safety"
-version = "0.1.1"
-
-
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

@@ -1,4 +1,8 @@
+
 use super::{get_window_obj};
+use alloc::vec::Vec;
+use spin::{Once, Mutex};
+
 
 pub fn test_cursor(_: Option<u64>) {
     let mut x=20;
@@ -135,3 +139,4 @@ pub fn test_draw(_: Option<u64>) {
     }       
 
 }
+

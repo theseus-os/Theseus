@@ -34,7 +34,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
-extern crate graph_drawer;
+extern crate window_manager;
 
 extern crate scheduler;
 extern crate console;
@@ -376,12 +376,21 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if true {
         #[cfg(not(feature = "loadable"))]
         {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_nic_driver")).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_nic_driver")).unwrap();
+
+        }
+    }
+    /*if false {
+        #[cfg(not(feature = "loadable"))]
+        {
             use graph_drawer::test_drawer;
             spawn::spawn_kthread(test_drawer::test_cursor, None, String::from("test_nic_driver")).unwrap();
             spawn::spawn_kthread(test_drawer::test_draw, None, String::from("test_nic_driver")).unwrap();
 
         }
-    }  
+    } */ 
 
     // create and jump to the first userspace thread
     if true
