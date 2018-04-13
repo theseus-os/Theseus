@@ -382,8 +382,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         // }
         #[cfg(not(feature = "loadable"))]
         {
-            use network::server::test_server;
-            spawn::spawn_kthread(test_server, None, String::from("test_server")).unwrap();
+            // use network::server::test_server;
+            // spawn::spawn_kthread(test_server, None, String::from("test_server")).unwrap();
+
         }
     }  
 

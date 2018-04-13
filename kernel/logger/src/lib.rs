@@ -8,7 +8,9 @@ use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLeve
 use core::fmt;
 use spin::Once;
 
-static LOG_LEVEL: LogLevel = LogLevel::Trace;
+//Nisal
+static LOG_LEVEL: LogLevel = LogLevel::Debug;
+//static LOG_LEVEL: LogLevel = LogLevel::Error;
 
 static MIRROR_VGA_FUNC: Once<fn(LogColor, &'static str, fmt::Arguments)> = Once::new();
 

@@ -19,6 +19,17 @@ features = ["log","alloc"]
 [dependencies.e1000]
 path = "../e1000"
 
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

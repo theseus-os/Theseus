@@ -18,9 +18,8 @@ KERNEL_BUILD_DIR ?= ${PWD}/build
 ## specifies where the configuration files are kept, like target json files
 # CFG_DIR ?= ${PWD}/../../cfg
 CFG_DIR ?= ${PWD}/../cfg
-
-BUILD_MODE := debug
-# BUILD_MODE := release
+#BUILD_MODE := debug
+BUILD_MODE := release
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which is "debug" by defaul
