@@ -8,9 +8,13 @@
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
 extern crate e1000;
+extern crate tsc;
 
+#[macro_use] extern crate lazy_static;
 
+extern crate irq_safety;
 
 pub mod server;
 pub mod nw_server;
+//pub mod server2;
 

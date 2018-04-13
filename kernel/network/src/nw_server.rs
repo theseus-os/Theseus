@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use smoltcp::Error;
 use smoltcp::phy::Device;
 use e1000::E1000_NIC;
+use tsc::{tsc_ticks, TscTicks} ;
 
 const TX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
 const RX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
@@ -21,7 +22,10 @@ fn rx_setup() -> (*mut u8, usize) {
     // let len:usize;
     // let (mut buf2,mut len) =  e1000_nc.receive_single_packet2();
     // length = &mut len;
+    let start = tsc_ticks().to_ns().unwrap();
     let mut e1000_nc = E1000_NIC.lock();
+    let end = tsc_ticks().to_ns().unwrap();
+    debug!("time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
     e1000_nc.receive_single_packet2()
 }
 // fn rx_setup() -> (*mut u8, usize) {
@@ -40,7 +44,7 @@ fn tx_empty() -> bool {
 
 fn tx_setup(buf: *const u8, length: usize) {
     /* platform-specific code to send a buffer with a packet */
-    unsafe {debug!("SeNDINg {:?}", slice::from_raw_parts(buf, length));}
+    //unsafe {debug!("SeNDINg {:?}", slice::from_raw_parts(buf, length));}
     let addr: usize = buf as usize;
     let mut e1000_nc = E1000_NIC.lock();
     let _result = e1000_nc.send_packet(addr, length as u16);
@@ -81,12 +85,12 @@ impl Device for EthernetDevice {
         //     Err(Error::Exhausted)
         // }
 
-        debug!("length: {}", length );
-        debug!("address {:?}", TX_BUFFERS[self.tx_next] );
+        //debug!("length: {}", length );
+        //debug!("address {:?}", TX_BUFFERS[self.tx_next] );
         if tx_empty() {
             let index = self.tx_next;
             self.tx_next = (self.tx_next + 1) % TX_BUFFERS.len();
-            debug!("length: {}", length);
+            //debug!("length: {}", length);
             // Ok(EthernetTxBuffer(unsafe {
 
             //     //debug!("$$$$ transmit {:?}", slice::from_raw_parts_mut(TX_BUFFERS[index], length));
@@ -118,53 +122,9 @@ impl AsMut<[u8]> for TxBuffer {
 impl Drop for TxBuffer {
 
     fn drop(&mut self) { 
-        trace!("**** BUFFER TX SETUP - {:?}", self.buffer);
+        //trace!("**** BUFFER TX SETUP - {:?}", self.buffer);
         tx_setup(self.buffer.as_ptr(), self.buffer.len()) 
     }
 
 }
 
-
-//pub struct EthernetTxBuffer(&'static mut [u8]);
-//pub struct EthernetTxBuffer(& mut [u8]);
-
-// impl AsRef<[u8]> for EthernetTxBuffer {
-//     fn as_ref(&self) -> &[u8] { self.0 }
-// }
-
-// impl AsMut<[u8]> for EthernetTxBuffer {
-//     fn as_mut(&mut self) -> &mut [u8] { self.0 }
-// }
-
-// impl Drop for EthernetTxBuffer {
-//     fn drop(&mut self) { tx_setup(self.0.as_ptr(), self.0.len()) }
-// }
-
-/*
-// #[doc(hidden)]
-pub struct TxBuffer<'a> {
-    buffer: &'a mut [u8],
-    //length: usize
-}
-
-impl<'a> AsRef<[u8]> for TxBuffer<'a> {
-    fn as_ref(&self) -> &[u8] { self.buffer.as_ref() }
-}
-
-impl<'a> AsMut<[u8]> for TxBuffer<'a> {
-    fn as_mut(&mut self) -> &mut [u8] { self.buffer.as_mut() }
-}
-
-impl<'a> Drop for TxBuffer<'a> {
-
-    fn drop(&mut self) { tx_setup(self.buffer.as_ptr(), self.buffer.len()) }
-
-}*/
-
-// pub fn array_from_vec(packet: &[u8]) -> [u8;1536]{
-//         let mut a = [0;1536];
-//         for i in 0..packet.len(){
-//                 a[i]   = packet[i];
-//         }
-//         a
-// }
