@@ -786,6 +786,7 @@ impl Nic{
 
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
+                /*start of the original code segment */
                 // debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
                 // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                 // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
@@ -795,6 +796,10 @@ impl Nic{
                 // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
                 // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
                 // debug!("Waiting for packet to send!");
+
+
+                /*end of the original code segment */
+
 
 
                 //debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
