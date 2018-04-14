@@ -7,8 +7,8 @@ use smoltcp::phy::Device;
 use e1000::E1000E_NIC;
 use tsc::{tsc_ticks, TscTicks} ;
 
-const TX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
-const RX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
+//const TX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
+//const RX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
 
 
 fn rx_full() -> bool {
@@ -67,8 +67,8 @@ impl Device for EthernetDevice {
 
     fn receive(&mut self) -> Result<Self::RxBuffer, Error> {
         if rx_full() {
-            let index = self.rx_next;
-            self.rx_next = (self.rx_next + 1) % RX_BUFFERS.len();
+            //let index = self.rx_next;
+            //self.rx_next = (self.rx_next + 1) % RX_BUFFERS.len();
             
             let (buf, length) = rx_setup();
             Ok(unsafe {
@@ -93,7 +93,7 @@ impl Device for EthernetDevice {
         //debug!("address {:?}", TX_BUFFERS[self.tx_next] );
         if tx_empty() {
             let index = self.tx_next;
-            self.tx_next = (self.tx_next + 1) % TX_BUFFERS.len();
+            //self.tx_next = (self.tx_next + 1) % TX_BUFFERS.len();
             //debug!("length: {}", length);
             // Ok(EthernetTxBuffer(unsafe {
 
