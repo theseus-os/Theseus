@@ -12,7 +12,8 @@ use std::time::Instant;
 use std::os::unix::io::AsRawFd;*/
 //extern crate collections;
 
-use e1000::{E1000_NIC};
+//use e1000::{E1000_NIC};
+use e1000::{E1000E_NIC};
 use nw_server::{EthernetDevice};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
@@ -116,25 +117,25 @@ pub fn test_server(_: Option<u64>) {
         }
 
         //tcp:6969: respond "yo dawg"
-        // {
-        //     let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
-        //     if !socket.is_open() {
-        //         socket.listen(6969).unwrap();
-        //     }
+        {
+            let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
+            if !socket.is_open() {
+                socket.listen(6969).unwrap();
+            }
 
-        //     if socket.can_send() {
-        //         //let data = b"yo dawg\n";
-        //         let mut data = socket.recv(128).unwrap().to_owned();
-        //         debug!("tcp:6969 send data: {:?}",
-        //                str::from_utf8(data.as_ref()).unwrap());
-        //         //socket.send_slice(data).unwrap();
-        //         socket.send_slice(&data[..]).unwrap();
-        //         debug!("tcp:6969 close");
-        //         socket.close();
-        //     }
-        // }
+            if socket.can_send() {
+                //let data = b"yo dawg\n";
+                let mut data = socket.recv(128).unwrap().to_owned();
+                debug!("tcp:6969 send data: {:?}",
+                       str::from_utf8(data.as_ref()).unwrap());
+                //socket.send_slice(data).unwrap();
+                socket.send_slice(&data[..]).unwrap();
+                debug!("tcp:6969 close");
+                socket.close();
+            }
+        }
 
-        //         // tcp:6970: echo with reverse
+                //tcp:6970: echo with reverse
         // {
         //     let socket: &mut TcpSocket = sockets.get_mut(tcp2_handle).as_socket();
         //     if !socket.is_open() {
