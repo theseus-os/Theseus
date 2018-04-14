@@ -58,7 +58,7 @@ QEMU_FLAGS += -smp 4
 
 ## basic networking with a standard e1000 ethernet card
 #QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
-#QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
+#QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:1f:c6:9c:89:4c -net user,vlan=1 -net dump,file=netdump.pcap
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
 
 QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no  #-netdev user,id=network0
@@ -166,7 +166,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
-	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
+	@grub-mkrescue -o $(iso) $(grub-isofiles) 
 	
 
 

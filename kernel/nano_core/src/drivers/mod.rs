@@ -52,9 +52,9 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
     }
     /* while 1==1
     {} */
-
-    try!(e1000::init_nic_e1000());
-    //try!(e1000e::init_nic_e1000e());
+    debug!("IN DRIVERS INIT");
+    //try!(e1000::init_nic());
+    try!(e1000e::init_nic());
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

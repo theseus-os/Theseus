@@ -22,7 +22,7 @@ use atomic::{Atomic};
 use atomic_linked_list::atomic_map::AtomicMap;
 use memory::VirtualAddress;
 
-use drivers::e1000;
+use drivers::{e1000,e1000e};
 
 
 mod exceptions;
@@ -329,8 +329,8 @@ pub fn init_handlers_pic() {
 
         idt[0x29].set_handler_fn(irq_0x29_handler); 
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
-        //idt[0x2B].set_handler_fn(irq_0x2B_handler);
-        idt[0x2B].set_handler_fn(nic_handler); 
+        idt[0x2B].set_handler_fn(irq_0x2B_handler);
+        //idt[0x2B].set_handler_fn(nic_handler); 
         idt[0x2C].set_handler_fn(irq_0x2C_handler); 
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
@@ -463,7 +463,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
-    e1000::e1000_handler();
+    e1000e::e1000e_handler();
 	eoi(Some(0x2B));
 }
 

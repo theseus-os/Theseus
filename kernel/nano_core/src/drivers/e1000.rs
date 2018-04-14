@@ -2,23 +2,17 @@ use pci::PciDevice;
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter, PhysicalMemoryArea};
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
 use drivers::pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 use spin::Once; 
 use kernel_config::memory::PAGE_SIZE;
-use baseband_proc::bb_proc::FIFO_RAW_PILOTS;
-use baseband_proc::packet_types::{PilotPacketBytes, PILOT_LENGTH_BYTES,MAX_ETH_PAYLOAD};
+//use baseband_proc::bb_proc::FIFO_RAW_PILOTS;
+//use baseband_proc::packet_types::{PilotPacketBytes, PILOT_LENGTH_BYTES,MAX_ETH_PAYLOAD};
 
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
-const E1000_I219_LM_1:          u16 = 0x156F;  // Device ID for Intel I219
-const E1000_I219_LM_2:          u16 = 0x15B7;  // Device ID for Intel I219
-const E1000_I219_LM_3:          u16 = 0x15D7;  // Device ID for Intel I219
-const E1000_I219_LM_4:          u16 = 0x15E3;  // Device ID for Intel I219
-const E1000_I219_LM_5:          u16 = 0x15B9;  // Device ID for Intel I219
 const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
@@ -130,8 +124,8 @@ const E1000_SIZE_TX_BUFFER:     usize = 256;
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
 
-static mut PILOT: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
-static mut PILOT_ITER:          usize = 0;
+//static mut PILOT: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
+//static mut PILOT_ITER:          usize = 0;
 
 /// struct to represent receive descriptors
 #[repr(C,packed)]
@@ -297,6 +291,15 @@ impl Nic{
                 } = *kernel_mmi_locked;
 
                 let no_pages: usize = mem_size as usize/PAGE_SIZE; //4K pages
+
+                // inform the frame allocator that the physical frames where the PCI config space for the nic exists
+                // is now off-limits and should not be touched
+                {
+                        let nic_area = PhysicalMemoryArea::new(self.mem_base as usize, mem_size as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
+                        try!(
+                                try!(FRAME_ALLOCATOR.try().ok_or("e1000: Couldn't get FRAME ALLOCATOR")).lock().add_area(nic_area, false)
+                        );
+                }
 
                 //allocate required no of pages
                 //let pages_nic = allocate_pages(no_pages).expect("e1000::mem_map(): couldn't allocated virtual page!");
@@ -789,13 +792,13 @@ impl Nic{
         /// Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                } */
+                }
 
                 // Print packets
                 /* while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
@@ -821,7 +824,7 @@ impl Nic{
 
                 //preliminary pilot packets processing
 
-                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         
                         let length = self.rx_descs[self.rx_cur as usize].length;
@@ -851,7 +854,7 @@ impl Nic{
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
                         self.write_command(REG_RXDESCTAIL, old_cur );
-                } 
+                }  */
 
                 
         }  
@@ -894,7 +897,7 @@ lazy_static! {
 }
 
 /// initialize the nic
-pub fn init_nic_e1000() -> Result<(), &'static str>{
+pub fn init_nic() -> Result<(), &'static str>{
 
         let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
         debug!("e1000 Device found: {:?}", pci_dev);

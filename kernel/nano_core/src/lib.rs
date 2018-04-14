@@ -47,7 +47,6 @@ extern crate xmas_elf;
 extern crate rustc_demangle;
 extern crate goblin;
 
-
 // ------------------------------------
 // ------ OUR OWN CRATES BELOW --------
 // ----------  LIBRARIES   ------------
@@ -90,7 +89,7 @@ mod start;
 
 use task::{spawn_kthread, spawn_userspace};
 use alloc::String;
-use drivers::{pci, test_nic_driver};
+use drivers::{pci, test_nic_driver,e1000e};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use baseband_proc::bb_proc::process_data;
 
@@ -149,8 +148,12 @@ fn test_loop_3(_: Option<u64>) -> Option<u64> {
 
 fn test_driver(_: Option<u64>) {
     println!("TESTING DRIVER!!");
-    test_nic_driver::dhcp_request_packet();
-
+    //test_nic_driver::dhcp_request_packet();
+    test_nic_driver::dhcp_request_packet_e1000e();
+    loop {
+        e1000e::rx_poll();
+        schedule!();
+    }
 }
 
 fn test_bb_proc(_: Option<u64>) {
@@ -276,16 +279,15 @@ pub extern "C" fn rust_main(multiboot_information_virtual_address: usize) {
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     interrupts::enable_interrupts();
 
-    if false {
-        spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
-    } 
-
     if true {
+        spawn_kthread(test_driver, None, "driver_test_thread").unwrap();
+    }
+    /* if true {
         spawn_kthread(test_bb_proc, None, "bb_proc_test_thread").unwrap();
-    }  
+    }  */ 
 
     // create some extra tasks to test context switching
-    if true {
+    if false {
         spawn_kthread(test_loop_1, None, "test_loop_1").unwrap();
         spawn_kthread(test_loop_2, None, "test_loop_2").unwrap(); 
         spawn_kthread(test_loop_3, None, "test_loop_3").unwrap(); 
