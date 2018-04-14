@@ -3,7 +3,8 @@ use alloc::slice;
 use alloc::vec::Vec;
 use smoltcp::Error;
 use smoltcp::phy::Device;
-use e1000::E1000_NIC;
+//use e1000::E1000_NIC;
+use e1000::E1000E_NIC;
 use tsc::{tsc_ticks, TscTicks} ;
 
 const TX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
@@ -12,7 +13,8 @@ const RX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
 
 fn rx_full() -> bool {
     /* platform-specific code to check if an incoming packet has arrived */
-    let mut e1000_nc = E1000_NIC.lock();
+    //let mut e1000_nc = E1000_NIC.lock();
+    let mut e1000_nc = E1000E_NIC.lock();
     e1000_nc .has_packet_arrived()
 }
 
@@ -23,7 +25,8 @@ fn rx_setup() -> (*mut u8, usize) {
     // let (mut buf2,mut len) =  e1000_nc.receive_single_packet2();
     // length = &mut len;
     let start = tsc_ticks().to_ns().unwrap();
-    let mut e1000_nc = E1000_NIC.lock();
+    //let mut e1000_nc = E1000_NIC.lock();
+    let mut e1000_nc = E1000E_NIC.lock();
     let end = tsc_ticks().to_ns().unwrap();
     debug!("time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
     e1000_nc.receive_single_packet2()
@@ -46,7 +49,8 @@ fn tx_setup(buf: *const u8, length: usize) {
     /* platform-specific code to send a buffer with a packet */
     //unsafe {debug!("SeNDINg {:?}", slice::from_raw_parts(buf, length));}
     let addr: usize = buf as usize;
-    let mut e1000_nc = E1000_NIC.lock();
+    //let mut e1000_nc = E1000_NIC.lock();
+    let mut e1000_nc = E1000E_NIC.lock();
     let _result = e1000_nc.send_packet(addr, length as u16);
 }
 

@@ -11,6 +11,7 @@ extern crate memory;
 extern crate pci; 
 extern crate tsc;
 
+
 pub mod test_nic_driver;
 
 // use pci::PciDevice;
@@ -24,6 +25,18 @@ pub mod test_nic_driver;
 // use pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 // use spin::Once; 
 // use kernel_config::memory::PAGE_SIZE;
+
+use pci::PciDevice;
+use alloc::Vec;
+use irq_safety::MutexIrqSafe;
+use tsc::{tsc_ticks, TscTicks} ;
+
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter,PhysicalMemoryArea};
+use core::ptr::{read_volatile, write_volatile};
+use core::ops::DerefMut;
+use pci::{pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
+use spin::Once; 
+use kernel_config::memory::PAGE_SIZE;
 
 static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
 static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -146,6 +159,11 @@ const E1000_SIZE_TX_BUFFER:     usize = 256;
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
+
+
+//unsafe - to measure time
+static mut start: u64 = 0;
+static mut end: u64 = 0;
 
 /// struct to represent receive descriptors
 #[repr(C,packed)]
@@ -574,14 +592,14 @@ impl Nic{
         /// clear multicast registers
         pub fn clear_multicast (&self) {
                 for i in 0..128{
-		        self.write_command(REG_MTA + (i * 4), 0);
+                        self.write_command(REG_MTA + (i * 4), 0);
                 }
         }
 
         /// clear statistic registers
         pub fn clear_statistics (&self) {
                 for i in 0..64{
-		        self.write_command(REG_CRCERRS + (i * 4), 0);
+                        self.write_command(REG_CRCERRS + (i * 4), 0);
                 }
         }      
 
@@ -768,22 +786,37 @@ impl Nic{
 
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-                debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                // debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                // self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
+                // debug!("Waiting for packet to send!");
+
+
+                //debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                // self.read_command(REG_TXDESCHEAD);
+                // self.read_command(REG_TXDESCTAIL);
                 self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
-                debug!("Waiting for packet to send!");
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                //self.read_command(REG_TXDESCHEAD);
+                //self.read_command(REG_TXDESCTAIL);
+                // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
+                // debug!("Waiting for packet to send!");
                 
 
                 while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
                         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
                 }  //bit 0 should be set when done
-                debug!("Packet is sent!");  
+                //debug!("Packet is sent!");  
                 Ok(())
         }        
         
@@ -813,7 +846,7 @@ impl Nic{
         /// Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                debug!("packet received");
+                //debug!("packet received");
                 while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
                         debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
@@ -846,6 +879,64 @@ impl Nic{
 
                 
         }  
+
+        pub fn receive_single_packet2(&mut self)-> (*mut u8, usize)  { 
+                //debug!("inside receive packet");
+                unsafe {start = tsc_ticks().to_ns().unwrap();}
+                //debug!("r - {} ns", tmp);
+
+
+
+
+                //if (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0 {
+                        //debug!("inside receive packet - inside if");
+                        //let start = tsc_ticks().to_ns().unwrap();
+                        let length = self.rx_descs[self.rx_cur as usize].length as usize;
+                        let mut packet = self.rx_buf_addr[self.rx_cur as usize] as *mut u8;
+                        //print packet of length bytes
+                        //debug!("Packet {}: ", self.rx_cur);
+                        //debug!("length =  {}: ", length);
+                        
+                        let mut buffer = vec![0;length as usize];
+                
+                        for i in 0..length as usize {
+                                let points_at = unsafe{ *packet.offset(i as isize ) };
+                                buffer[i] = points_at;
+                                //debug!("{}",points_at);
+                                //debug!("{:x}",points_at);
+                        }  
+                        //debug!("message=  {:?}: ", buffer);   
+                        //unsafe {debug!("HAAKO {:?}", slice::from_raw_parts_mut(packet, length));}
+                        //debug!("done "); 
+               
+                        
+
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+
+                        self.write_command(REG_RXDESCTAIL, old_cur );
+                        //let end = tsc_ticks().to_ns().unwrap();
+                        //debug!("inside receive packet = {} ns {} us", end-start, (end-start)/1000);
+
+                        (packet, length)
+                // } 
+                // else {
+                //        Err(Error::Exhausted)
+                // }
+
+                
+        } 
+        //check if a packet is there
+        pub fn has_packet_arrived(&mut self) -> bool{
+                (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0
+        }
+
+        //check if a packet is there
+        pub fn has_packet_sent(&mut self) -> bool{
+                (self.tx_descs[self.tx_cur as usize].status & 0xF) != 0 
+        }
+
 
 
         /// Poll for recieved messages
@@ -892,8 +983,8 @@ lazy_static! {
 /// initialize the nic
 pub fn init_nic() -> Result<(), &'static str>{
         debug!("In init E1000E");
-        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_I219_LM_2);
-        //let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_82579LM);
+        //let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_I219_LM_2);
+        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_82579LM);
         debug!("E1000E Device found: {:?}", pci_dev);
         let e1000e_pci = try!(pci_dev.ok_or("Unable to find e1000e device!"));
 
