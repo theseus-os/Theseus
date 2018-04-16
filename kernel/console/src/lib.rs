@@ -166,7 +166,9 @@ fn handle_key_event(keyevent: KeyEvent) {
     match keyevent.keycode {
          Keycode::Tab => {
              window_manager::set_time_start();
-             window_switch!();
+             loop{
+                 window_switch!();
+             }
          }
          Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
             window_manager::put_key_code(keyevent.keycode).unwrap();

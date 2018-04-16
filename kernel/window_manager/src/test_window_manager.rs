@@ -2,7 +2,10 @@
 use super::{get_window_obj};
 use alloc::vec::Vec;
 use spin::{Once, Mutex};
+use frame_buffer;
+use frame_buffer_3d;
 
+use acpi::ACPI_TABLE;  
 
 pub fn test_cursor(_: Option<u64>) {
     let mut x=20;
@@ -139,4 +142,40 @@ pub fn test_draw(_: Option<u64>) {
     }       
 
 }
+
+/*pub fn test_performance(_: Option<u64>) {
+    
+for lop in 1..20 {
+    let hpet = ACPI_TABLE.hpet.read();
+    let starting_time = (*hpet).as_ref().unwrap().get_counter();
+    for i in 1..100 {
+        frame_buffer::draw_square(20, 30, 200, 300, 0x354615);
+        frame_buffer::draw_square(20, 30, 200, 300, 0xFFFFFF);
+
+    }
+    let end_time = (*hpet).as_ref().unwrap().get_counter();
+    trace!("Time: {}", end_time - starting_time);
+} 
+}*/
+
+
+pub fn test_performance(_: Option<u64>) {
+    
+for lop in 1..20 {
+    let hpet = ACPI_TABLE.hpet.read();
+    let starting_time = (*hpet).as_ref().unwrap().get_counter();
+    let mut color = 0x342513;
+    for i in 1..100 {
+        for x in 20..200{
+            for y in 30..300{
+                        frame_buffer::draw_pixel(x, y, color);
+            }
+        }
+        color = color + 20;
+    }
+    let end_time = (*hpet).as_ref().unwrap().get_counter();
+    trace!("Time: {}", end_time - starting_time);
+} 
+}
+
 

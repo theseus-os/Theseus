@@ -31,6 +31,8 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate frame_buffer;
+extern crate frame_buffer_3d;
+
 extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
@@ -81,6 +83,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     //init frame_buffer
     frame_buffer::init().unwrap();
+    frame_buffer_3d::init().unwrap();
+
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");

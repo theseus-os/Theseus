@@ -11,6 +11,8 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
 #[macro_use] extern crate frame_buffer;
+#[macro_use] extern crate frame_buffer_3d;
+
 #[macro_use] extern crate log;
 extern crate acpi;
 
@@ -229,14 +231,14 @@ impl Window_Obj{
     fn draw_border(&self){
         let mut color = 0x343c37;
         if self.active { color = 0xffffff; }
-        draw_line!(self.x, self.y, self.x+self.width, self.y, color);
-        draw_line!(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
-        draw_line!(self.x, self.y+1, self.x, self.y+self.height-1, color);
-        draw_line!(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
+        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
+        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 
     fn fill(&self, color:usize){
-        draw_square!(self.x+1, self.y+1, self.width-2, self.height-2, color);
+        frame_buffer::draw_square(self.x+1, self.y+1, self.width-2, self.height-2, color);
     }
 
     pub fn print (&self){
@@ -341,7 +343,7 @@ pub fn calculate_time_statistic() {
 
     counter  = counter+1;
 
-    if counter == 10 {
+    if counter == 1000 {
         for i in 0..queue.len(){
             trace!("Time\t{}", queue.pop().unwrap());
         }

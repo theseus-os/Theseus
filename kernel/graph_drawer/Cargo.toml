@@ -39,6 +39,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.frame_buffer_3d]
+path = "../frame_buffer_3d"
+
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

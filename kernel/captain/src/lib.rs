@@ -177,6 +177,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_frame_buffer").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_frame_buffer_3d").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_window_manager").unwrap(), &mut kernel_mmi, false).unwrap(); 
         mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
         
@@ -373,13 +374,22 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }  
 
     //test window manager
-    if true {
+    if false {
         #[cfg(not(feature = "loadable"))]
         {
             use window_manager::test_window_manager;
             spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_nic_driver")).unwrap();
             spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_nic_driver")).unwrap();
 
+        }
+    }
+
+     //test window manager
+    if true {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_performance, None, String::from("test_nic_driver")).unwrap();
         }
     }
     /*if false {

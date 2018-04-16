@@ -1,5 +1,5 @@
 //! The frame buffer for display on the screen
-
+//Framebuffer in 2D mode
 
 #![no_std]
 #![feature(alloc)]
