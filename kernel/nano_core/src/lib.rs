@@ -54,11 +54,17 @@ use x86_64::structures::idt::LockedIdt;
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
-/// The Rust entry point for Theseus, which does the following:
-/// * Bootstraps the OS, including basic exception handlers and logging
-/// * Sets up basic virtual memory
-/// * Initializes the state_store module
+/// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
+///
+/// This is called from assembly code entry point for Theseus, found in `src/boot/arch_x86_64/boot.asm`.
+///
+/// This function does the following things: 
+///
+/// * Bootstraps the OS, including [logging](../logger.html) and basic [exception handlers](../exceptions.init_early_exceptions.html)
+/// * Sets up basic [virtual memory](../memory.init.html)
+/// * Initializes the [state_store](../state_store.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
+///
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
 	

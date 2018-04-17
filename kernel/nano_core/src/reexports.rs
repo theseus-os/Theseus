@@ -3,7 +3,7 @@
 
 
 /// currently the compiler_builtins crate hasn't yet implemented this,
-/// see: https://github.com/rust-lang-nursery/compiler-builtins/issues/216 
+/// see: <https://github.com/rust-lang-nursery/compiler-builtins/issues/216>
 #[no_mangle]
 pub fn __floatundisf(_a: i64) -> f32 {
     unimplemented!();
