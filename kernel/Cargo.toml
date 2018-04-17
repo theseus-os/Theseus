@@ -1,74 +1,13 @@
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "nano_core"
-version = "0.1.0"
-
 [workspace]
 
-[dependencies]
-# multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
-multiboot2 = { path = "../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
-once = "0.3.2"
-rlibc = "1.0.0"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-# this is needed for our odd approach of loading the libcore ELF file at runtime
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins", features = ["c"] }
-
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.kernel_config]
-path = "kernel_config"
-
-[dependencies.irq_safety]
-path = "../libs/irq_safety"
-
-[dependencies.vga_buffer]
-path = "vga_buffer"
-
-[dependencies.logger]
-path = "logger"
-
-[dependencies.state_store]
-path = "state_store"
-
-[dependencies.memory]
-path = "memory"
-
-[dependencies.mod_mgmt]
-path = "mod_mgmt"
-
-[dependencies.apic]
-path = "apic"
-
-[dependencies.exceptions]
-path = "exceptions"
-
-[dependencies.captain]
-path = "captain"
-
-
-### below: Extra dependencies to make sure things are built
-[dependencies.console]
-path = "console"
-
+## We don't really need this "members" element, but to use the features of a crate
+## we must include that crates as a member.
+members = [
+	"nano_core",
+]
 
 [features]
-loadable = [ "captain/loadable" ]
-mirror_serial = []
+loadable = [ "nano_core/loadable", "captain/loadable" ]
+mirror_serial = [ "nano_core/mirror_serial" ]
 apic_timer_fixed = [ "apic/apic_timer_fixed" ]
-
-
-[lib]
-# This builds the nano_core as two types of libraries:
-# 1) staticlib: required to build a self-contained, fully-linked .a file that we can boot into.
-# 2) rlib: to build a partial object file that other crates can include and use without including the full nano_core code in their object file.
-# we choose rlib instead of dylib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
-# meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it
-# Furthermore we cannot build it as a dylib instead of rlib because he custom x86_64-theseus target triple doesn't support it (really, Xargo doesn't support it)
-crate-type = ["staticlib"]  
-

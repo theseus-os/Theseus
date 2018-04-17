@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all clean run debug iso userspace cargo gdb
+.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
 
 
 arch ?= x86_64
@@ -29,7 +29,7 @@ RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.24.0-nightly (5a2465e2b 2017-12-06)
 RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-12-07
 RUSTC_OUTPUT=$(shell rustc --version)
 
-test_rustc: 	
+check_rustc: 	
 ifneq (${BYPASS_RUSTC_CHECK}, yes)
 ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
 	@echo -e "\nError: your rustc version does not match our supported compiler version."
@@ -44,6 +44,31 @@ else
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
 endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
 endif ## BYPASS_RUSTC_CHECK
+
+
+
+###################################################################################################
+### For ensuring that the host computer has the proper version of xargo
+###################################################################################################
+
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.10
+XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
+
+check_xargo: 	
+ifneq (${BYPASS_XARGO_CHECK}, yes)
+ifneq (xargo ${XARGO_CURRENT_SUPPORTED_VERSION}, ${XARGO_OUTPUT})
+	@echo -e "\nError: your xargo version does not match our supported xargo version."
+	@echo -e "To install the proper version of xargo, run the following commands:\n"
+	@echo -e "   cargo uninstall xargo"
+	@echo -e "   cargo install --vers $(XARGO_CURRENT_SUPPORTED_VERSION) xargo"
+	@echo -e "   make clean\n"
+	@echo -e "Then you can retry building!\n"
+	@exit 1
+else
+	@echo -e '\nFound proper xargo version, proceeding with build...\n'
+endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
+endif ## BYPASS_XARGO_CHECK
+
 
 
 ###################################################################################################
@@ -179,10 +204,27 @@ userspace:
 
 
 ### this builds all kernel components
-kernel: test_rustc
+kernel: check_rustc check_xargo
 	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
 
+
+
+doc:
+	@rm -rf build/doc
+	@mkdir -p build
+	@$(MAKE) -C kernel doc
+	@cp -rf kernel/target/doc ./build/
+	@echo -e "\n\nDocumentation is now available in the build/doc directory."
+	@echo -e "You run 'make view-doc' to view it, or just open build/doc/index.html."
+
+docs: doc
+
+
+view-doc: doc
+	@xdg-open ./build/doc/index.html &
+
+view-docs: view-doc
 
 
 clean:
@@ -208,6 +250,8 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "  doc:"
+	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "\nThe following options are available for QEMU:"
 	@echo -e "  int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
