@@ -153,8 +153,8 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_SIZE_RX_DESC:       usize = 16;
 const E1000_SIZE_TX_DESC:       usize = 16;
 
-const E1000_SIZE_RX_BUFFER:     usize = 256;
-const E1000_SIZE_TX_BUFFER:     usize = 256;
+const E1000_SIZE_RX_BUFFER:     usize = 2048;
+const E1000_SIZE_TX_BUFFER:     usize = 2048;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -684,7 +684,7 @@ impl Nic{
                 self.write_command(REG_RXDESCTAIL, (E1000_NUM_RX_DESC-1) as u32);//Tail pointer for receive descriptor buffer, point to 16B
                 self.rx_cur = 0;
                 //self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_8192);
-                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_BSIZE_256);
+                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_BSIZE_2048);
                 Ok(())
 
         }               
@@ -767,7 +767,7 @@ impl Nic{
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
-                //debug!("Value of tx descriptor address_translated: {:x}",ptr);
+                debug!("inside send packet");
                 /* let t_ptr = translate_v2p(p_data);
                 let ptr;
                 match t_ptr{
@@ -787,41 +787,55 @@ impl Nic{
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
                 /*start of the original code segment */
-                // debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                // self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
-                // debug!("Waiting for packet to send!");
-
+/*                 debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+                debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
+                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
+                debug!("Waiting for packet to send!");
+ */
 
                 /*end of the original code segment */
 
 
 
-                //debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                // self.read_command(REG_TXDESCHEAD);
-                // self.read_command(REG_TXDESCTAIL);
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                ///debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                //debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
                 //self.read_command(REG_TXDESCHEAD);
                 //self.read_command(REG_TXDESCTAIL);
+                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+                //debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
+               // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                //self.read_command(REG_TXDESCHEAD);
+                self.read_command(REG_TXDESCTAIL);
+                self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+                // self.read_command(REG_TXDESCTAIL);
+
                 // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
                 // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
                 // debug!("Waiting for packet to send!");
                 
 
-                while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
+                /* while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
                         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-                }  //bit 0 should be set when done
-                //debug!("Packet is sent!");  
+                }  //bit 0 should be set when done */
+                debug!("Packet is sent!");  
+
+                unsafe{  end = tsc_ticks().to_ns().unwrap();}
+                unsafe{  debug!("total time packet stayed in theseus = {} ns {} us", end-start, (end-start)/1000);}
                 Ok(())
         }        
         
@@ -886,7 +900,7 @@ impl Nic{
         }  
 
         pub fn receive_single_packet2(&mut self)-> (*mut u8, usize)  { 
-                //debug!("inside receive packet");
+                debug!("inside receive packet");
                 unsafe {start = tsc_ticks().to_ns().unwrap();}
                 //debug!("r - {} ns", tmp);
 
@@ -923,6 +937,7 @@ impl Nic{
                         self.write_command(REG_RXDESCTAIL, old_cur );
                         //let end = tsc_ticks().to_ns().unwrap();
                         //debug!("inside receive packet = {} ns {} us", end-start, (end-start)/1000);
+                        debug!("receive done "); 
 
                         (packet, length)
                 // } 
@@ -988,8 +1003,9 @@ lazy_static! {
 /// initialize the nic
 pub fn init_nic() -> Result<(), &'static str>{
         debug!("In init E1000E");
-        //let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_I219_LM_2);
-        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_82579LM);
+        //let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_I219_LM_2); //qemu not working
+        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV); //qemu working
+        //let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_82579LM); //x220
         debug!("E1000E Device found: {:?}", pci_dev);
         let e1000e_pci = try!(pci_dev.ok_or("Unable to find e1000e device!"));
 
