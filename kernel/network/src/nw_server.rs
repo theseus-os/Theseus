@@ -20,15 +20,12 @@ fn rx_full() -> bool {
 
 fn rx_setup() -> (*mut u8, usize) {
     /* platform-specific code to receive a packet into a buffer */
-    // let mut e1000_nc = E1000_NIC.lock();
-    // let len:usize;
-    // let (mut buf2,mut len) =  e1000_nc.receive_single_packet2();
-    // length = &mut len;
+
     let start = tsc_ticks().to_ns().unwrap();
     //let mut e1000_nc = E1000_NIC.lock();
     let mut e1000_nc = E1000E_NIC.lock();
     let end = tsc_ticks().to_ns().unwrap();
-    debug!("time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
+    //debug!("time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
     e1000_nc.receive_single_packet2()
 }
 // fn rx_setup() -> (*mut u8, usize) {
