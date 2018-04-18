@@ -34,33 +34,6 @@ use core::str::FromStr;
 use irq_safety::MutexIrqSafe;
 
 
-const UDP_DEBUGGING:bool = true;
-
-
-
-lazy_static! {
-    pub static ref DEBUG_MESSAGE:MutexIrqSafe<server_send> = MutexIrqSafe::new(server_send{is_ready:false, msg:String::from_str("init").unwrap()});
-}
-pub struct server_send{
-    is_ready:bool,
-    msg:String, 
-    
-}
-
-impl server_send{
-
-    pub fn reset(&mut self){
-        self.is_ready = false;
-        self.msg = String::from_str("").unwrap();
-    }
-    pub fn set(&mut self, message:String){
-        if self.is_ready == false {
-            self.is_ready = true;
-            self.msg = message;
-        }
-
-    }
-}
 
 //global variable
 //static mut ss:Option<SocketSet> = None;
@@ -153,17 +126,8 @@ pub fn test_server(_: Option<u64>) {
                 //debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
                 //print!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
 
-/*                 if UDP_DEBUGGING == true{
-                    let mut debug_msg = DEBUG_MESSAGE.lock();
-                    debug_msg.set(String::from_str("testing\n").unwrap());
-                    if debug_msg.is_ready == true {
-                        let mut data = debug_msg.msg.to_owned();
-                        
-                        socket.send_slice(&data[..].as_bytes(), endpoint).unwrap();
-                    }
-                }  */
+
             }
-            //debug!("1");
 
             
         }
