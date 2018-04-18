@@ -118,12 +118,12 @@ odebug:
 
 
 
-loadable : export RUST_FEATURES = --features "loadable"
+# loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "loadable" --manifest-path "captain/Cargo.toml" --features "loadable"
+loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "loadable"
 loadable: run
 
 
 ### builds and runs Theseus in QEMU
-# run : export RUST_FEATURES = --features "mirror_serial"
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -143,7 +143,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-bochs : export RUST_FEATURES = --features "apic_timer_fixed"
+bochs : export RUST_FEATURES = --features "apic/apic_timer_fixed"
 bochs: $(iso) 
 	#@qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -168,7 +168,9 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export RUST_FEATURES = --features "mirror_serial"
+## TODO FIXME: add -Z package-features. see this: https://internals.rust-lang.org/t/help-us-test-the-breaking-bug-fix-to-cargo-features/7317 
+## TODO FIXME: should do this.....   run : export RUST_FEATURES = --package "nano_core" --features "mirror_serial"
+boot : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
