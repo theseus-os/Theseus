@@ -374,7 +374,7 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
 /// Must match the order of registers popped in the nano_core's boot/boot.asm:task_switch
-#[derive(Default, Debug)]
+#[derive(Default)]
 #[repr(C, packed)]
 pub struct Context {
     r15: usize, 
@@ -445,7 +445,6 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
     unsafe {
         *new_context_ptr = Context::new(kthread_wrapper::<A, R> as usize);
         new_task.saved_sp = new_context_ptr as usize; 
-        debug!("spawn_kthread(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
     }
 
     // set up the kthread stuff
@@ -504,7 +503,6 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
             // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
             *new_context_ptr = Context::new(userspace_wrapper as usize);
             new_task.saved_sp = new_context_ptr as usize; 
-            debug!("spawn_userspace(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
         }
     
         new_task.kstack = Some(kstack);

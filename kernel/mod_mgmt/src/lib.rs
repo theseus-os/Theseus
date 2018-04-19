@@ -383,7 +383,17 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                     return Err("couldn't get section name");
                 }
             };
+
             
+            // some special sections are fine to ignore
+            if  sec_name.starts_with(".note")   ||   // ignore GNU note sections
+                sec_name.starts_with(".gcc")    ||   // ignore gcc special sections for now
+                sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
+                sec_name == ".text"                  // ignore the header .text section (with no content)
+            {
+                continue;    
+            }            
+
 
             let sec = if sec.size() == 0 {
                 // This is a very rare case of a zero-sized section. 
@@ -392,7 +402,17 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
                 // Thus, we need to use the *current* section's name with the *next* section's (the next section's) information,
                 // i.e., its  size, alignment, and actual data
                 match elf_file.section_header((shndx + 1) as u16) { // get the next section
-                    Ok(sec_hdr) => sec_hdr,
+                    Ok(sec_hdr) => {
+                        // The next section must have the same offset as the current zero-sized one
+                        if sec_hdr.offset() == sec.offset() {
+                            // if it does, we can use it in place of the current section
+                            sec_hdr
+                        }
+                        else {
+                            // if it does not, we should NOT use it in place of the current section
+                            sec
+                        }
+                    }
                     _ => {
                         error!("parse_elf_kernel_crate(): Couldn't get next section for zero-sized section {}", shndx);
                         return Err("couldn't get next section for a zero-sized section");
@@ -407,18 +427,26 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-            let sec_data  = if sec_name.starts_with(BSS_PREFIX) { // .bss section must have Empty data
-                match sec.get_data(&elf_file) {
-                    Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
-                    _ => {
-                        error!("parse_elf_kernel_crate(): .bss section [{}] {} had data that wasn't Empty. {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                        return Err(".bss section had data that wasn't Empty");
-                    }
-                }
+
+            // if the final choice of section is a .bss section, we need to create a proper-length slice of all zeros as its data
+            // TODO: FIXME: only do this for .bss sections, otherwise it's very wasteful
+            let bss_zero_vec = vec![0; sec_size];
+
+
+            let sec_data  = if sec_name.starts_with(BSS_PREFIX) { // .bss section should have Empty data
+                &[0] // .bss data should always be zero, but it doesn't matter since we don't use it anyway
+
+                // match sec.get_data(&elf_file) {
+                //     Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
+                //     _ => {
+                //         error!("parse_elf_kernel_crate(): .bss section [{}] {} had data that wasn't Empty. {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                //         return Err(".bss section had data that wasn't Empty");
+                //     }
+                // }
             } else {
                 match sec.get_data(&elf_file) {
                     Ok(SectionData::Undefined(sec_data)) => sec_data,
-                    Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
+                    Ok(SectionData::Empty) => &bss_zero_vec, // an empty slice of the proper size
                     _ => {
                         error!("parse_elf_kernel_crate(): Couldn't get data (expected \"Undefined\" data) for section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
                         return Err("couldn't get sec_data in .text, .data, or .rodata section");
@@ -600,15 +628,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
             }
 
             else {
-                // some special sections are fine to ignore
-                if  sec_name.starts_with(".note")   ||   // ignore GNU note sections
-                    sec_name.starts_with(".gcc")    ||   // ignore gcc special sections for now
-                    sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
-                    sec_name == ".text"                  // ignore the header .text section (with no content)
-                {
-                    continue;    
-                }
-
                 error!("unhandled PROGBITS/NOBITS section [{}], name: {}, sec: {:?}", shndx, sec_name, sec);
                 continue;
             }

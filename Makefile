@@ -25,8 +25,10 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.24.0-nightly (5a2465e2b 2017-12-06)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-12-07
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.27.0-nightly (7360d6dd6 2018-04-15)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-04-16
+#RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.24.0-nightly (5a2465e2b 2017-12-06)
+#RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-12-07
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -118,8 +120,10 @@ odebug:
 
 
 
+### Currently, loadable module mode requires release build mode
 # loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "loadable" --manifest-path "captain/Cargo.toml" --features "loadable"
 loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "loadable"
+loadable : export BUILD_MODE = release
 loadable: run
 
 
@@ -143,7 +147,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-bochs : export RUST_FEATURES = --features "apic/apic_timer_fixed"
+bochs : export RUST_FEATURES = --manifest-path "apic/Cargo.toml" --features "apic_timer_fixed"
 bochs: $(iso) 
 	#@qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
