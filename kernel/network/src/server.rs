@@ -144,7 +144,7 @@ pub fn test_server(_: Option<u64>) {
                 //let data2 = b"yo dawg\n";
 
                 //important
-                //socket.send_slice(&data[..], endpoint).unwrap();
+                socket.send_slice(&data[..], endpoint).unwrap();
                 
                 
                 
