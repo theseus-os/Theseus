@@ -19,7 +19,11 @@ extern crate alloc;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
+
+#[cfg(feature = "loadable")]
 #[macro_use] extern crate vga_buffer;
+#[cfg(not(feature = "loadable"))]
+extern crate vga_buffer;
 
 extern crate console_types; // a temporary way to use console types 
 extern crate logger;

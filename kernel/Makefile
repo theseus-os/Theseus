@@ -28,8 +28,9 @@ clean:
 	rm -rf ./build
 
 
+
 cargo: 
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build --all $(XARGO_RELEASE_ARG) $(RUST_FEATURES)  --target $(TARGET)  ## target arg must be a target name, not the file path.
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
