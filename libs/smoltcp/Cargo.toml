@@ -1,0 +1,44 @@
+[package]
+name = "smoltcp"
+version = "0.3.0"
+authors = ["whitequark <whitequark@whitequark.org>"]
+description = "A TCP/IP stack designed for bare-metal, real-time systems without a heap."
+documentation = "https://docs.rs/smoltcp/"
+homepage = "https://github.com/m-labs/smoltcp"
+repository = "https://github.com/m-labs/smoltcp.git"
+readme = "README.md"
+keywords = ["ip", "tcp", "udp", "ethernet", "network"]
+categories = ["embedded"]
+license = "0BSD"
+
+[dependencies]
+byteorder = { version = "1.0", default-features = false }
+#managed = { path = "../smoltcp/libs/rust-managed", version = "0.3.0", default-features = false, features = ["alloc"] }
+managed = { path = "libs/rust-managed", version = "0.3.0", default-features = false, features = ["alloc"]}
+log = { version = "0.3", default-features = false, optional = true }
+libc = { version = "0.2.18", optional = true }
+
+[dev-dependencies]
+log = "0.3"
+env_logger = "0.4"
+getopts = "0.2"
+
+[features]
+std = ["managed/std", "libc"]
+alloc = ["managed/alloc"]
+collections = ["managed/collections"]
+
+#collections = ["collections"]
+#alloc = ["alloc"]
+#std = ["std", "libc"]
+verbose = []
+default = ["std", "log", "verbose"]
+
+[[example]]
+name = "tcpdump"
+
+[[example]]
+name = "server"
+
+[[example]]
+name = "client"
