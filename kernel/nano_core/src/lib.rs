@@ -11,10 +11,6 @@
 #![feature(used)]
 
 
-// this is needed for our odd approach of loading the libcore ELF file at runtime
-// #![feature(compiler_builtins_lib)]
-// extern crate compiler_builtins;
-
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -33,9 +29,6 @@ extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
 extern crate captain;
-
-
-pub mod reexports;
 
 
 
