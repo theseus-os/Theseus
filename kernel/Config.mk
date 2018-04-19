@@ -38,3 +38,9 @@ RUSTFLAGS += -C code-model=large
 ## promote unused must-use types (like Result) to an error
 RUSTFLAGS += -D unused-must-use
 
+
+## new rustc feature that lets you specify features for specific packages in a workspace
+## Sadly, this doesn't work with cargo build --all, nor with multiple features for multiple crates
+# PACKAGE_FEATURES := -Z package-features
+
+
