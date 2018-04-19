@@ -8,13 +8,12 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(lang_items)]
-#![feature(i128_type)]
 #![feature(used)]
 
 
 // this is needed for our odd approach of loading the libcore ELF file at runtime
-#![feature(compiler_builtins_lib)]
-extern crate compiler_builtins;
+// #![feature(compiler_builtins_lib)]
+// extern crate compiler_builtins;
 
 
 extern crate alloc;

@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(alloc)]
-#![feature(conservative_impl_trait)]
 
 #![allow(dead_code)]
 
