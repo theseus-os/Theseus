@@ -226,7 +226,7 @@ impl ActivePageTable {
         let backup = get_current_p4();
 
         // map temporary_page to current p4 table
-        let p4_table = temporary_page.map_table_frame(backup.clone(), self);
+        let p4_table = try!(temporary_page.map_table_frame(backup.clone(), self));
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
@@ -299,9 +299,9 @@ impl InactivePageTable {
     pub fn new(frame: Frame,
                active_table: &mut ActivePageTable,
                mut temporary_page: TemporaryPage)
-               -> InactivePageTable {
+               -> Result<InactivePageTable, &'static str> {
         {
-            let table = temporary_page.map_table_frame(frame.clone(), active_table);
+            let table = try!(temporary_page.map_table_frame(frame.clone(), active_table));
             table.zero();
 
             table[RECURSIVE_P4_INDEX].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
@@ -312,7 +312,9 @@ impl InactivePageTable {
             table.copy_entry_from_table(active_table.p4(), KERNEL_STACK_P4_INDEX);
         }
 
-        InactivePageTable { p4_frame: frame }
+        Ok(
+            InactivePageTable { p4_frame: frame }
+        )
 
         // temporary_page is auto unmapped here 
         // temporary_page.unmap(active_table);
@@ -385,7 +387,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         )
     };
     let mut new_table: InactivePageTable = {
-        InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1))
+        try!(InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1)))
     };
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
