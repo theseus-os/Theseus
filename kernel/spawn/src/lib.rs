@@ -522,12 +522,15 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
                 // get frame allocator reference
                 let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
 
+                // frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
                 let (frame, temp_frames1, temp_frames2) = {
                     let mut allocator = allocator_mutex.lock();
+                    // a quick closure to allocate one frame
+                    let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
                     (
-                        try!(allocator.allocate_frame().ok_or("couldn't allocate frame")),
-                        [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()],
-                        [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()]
+                        try!(alloc_frame()),
+                        (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
+                        (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
                     )
                 };
 

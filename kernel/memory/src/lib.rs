@@ -510,6 +510,11 @@ pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
 
 
 
+/// A `Frame` is a chunk of **physical** memory, similar to how a `Page` is a chunk of **virtual** memory. 
+/// Frames do not implement Clone or Copy because they cannot be safely duplicated 
+/// (you cannot simply "copy" a region of physical memory...).
+/// A `Frame` is the sole owner of the region of physical memory that it covers, 
+/// i.e., there will never be two `Frame` objects that point to the same physical memory chunk. 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     number: usize,
