@@ -379,12 +379,15 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
     );
 
+    // frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
     let (frame, temp_frames1, temp_frames2) = {
-        let mut allocator = allocator_mutex.lock(); 
+        let mut allocator = allocator_mutex.lock();
+        // a quick closure to allocate one frame
+        let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
         (
-            try!(allocator.allocate_frame().ok_or("couldn't allocate frame")),
-            [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()],
-            [allocator.allocate_frame(), allocator.allocate_frame(), allocator.allocate_frame()]
+            try!(alloc_frame()),
+            (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
+            (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
         )
     };
     let mut new_table: InactivePageTable = {

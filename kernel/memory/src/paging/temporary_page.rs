@@ -14,13 +14,24 @@ use super::{Page, Frame, FrameAllocator};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 
+/// A Page that can be temporarily mapped to the recursive page table frame,
+/// used for purposes of editing the page tables themselves. 
+/// 
+/// See how recursive paging works: <https://wiki.osdev.org/Page_Tables#Recursive_mapping>
 pub struct TemporaryPage {
     mapped_page: Option<MappedPages>,
     allocator: TinyAllocator,
 }
 
 impl TemporaryPage {
-    pub fn new(three_frames: [Option<Frame>; 3]) -> TemporaryPage {
+    /// Creates a new `TemporaryPage` but does not yet map it to the recursive paging entry. 
+    /// 
+    /// # Arguments 
+    /// 
+    /// * `three_frames`: the three frames needed for the allocator contained within this `TemporaryPage`. 
+    ///   To complete the recursive mapping to this temporary page, we may need to allocate at most 3 frames (for P1, P2, P3 table levels). 
+    ///  
+    pub fn new(three_frames: (Frame, Frame, Frame)) -> TemporaryPage {
         TemporaryPage {
             mapped_page: None,
             allocator: TinyAllocator::new(three_frames),
@@ -63,8 +74,9 @@ impl TemporaryPage {
 struct TinyAllocator([Option<Frame>; 3]);
 
 impl TinyAllocator {
-    fn new(three_frames: [Option<Frame>; 3]) -> TinyAllocator {
-        TinyAllocator(three_frames)
+    fn new(three_frames: (Frame, Frame, Frame)) -> TinyAllocator {
+        let (f1, f2, f3) = three_frames;
+        TinyAllocator( [Some(f1), Some(f2), Some(f3)] )
     }
 }
 
