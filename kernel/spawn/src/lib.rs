@@ -246,7 +246,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
 
                 // now that we have the kernel's active table, we need a new inactive table for the userspace Task
                 let mut new_inactive_table: InactivePageTable = {
-                    InactivePageTable::new(frame, active_table, TemporaryPage::new(temp_frames1))
+                    try!(InactivePageTable::new(frame, active_table, TemporaryPage::new(temp_frames1)))
                 };
 
                 // create a new stack allocator for this userspace process
