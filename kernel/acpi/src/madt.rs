@@ -179,13 +179,14 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
 /// Starts up and sets up AP cores based on the given APIC system table (`madt_iter`).
 /// 
 /// Arguments: 
+/// 
 /// * madt_iter: An iterator over the entries in the MADT APIC table
 /// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
 /// * ap_start_realmode_begin: the starting virtual address of where the ap_start realmode code is.
 /// * ap_start_realmode_end: the ending virtual address of where the ap_start realmode code is.
+/// 
 pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                        ap_start_realmode_begin: usize, ap_start_realmode_end: usize) -> Result<usize, &'static str> {
-    // SAFE: just getting const values from boot assembly code
     let ap_startup_size_in_bytes = ap_start_realmode_end - ap_start_realmode_begin;
 
     let active_table_phys_addr: PhysicalAddress;
