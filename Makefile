@@ -213,6 +213,7 @@ kernel: check_rustc check_xargo
 	@$(MAKE) -C kernel all
 
 
+DOC_ROOT := build/doc/Theseus/index.html
 
 doc:
 	@rm -rf build/doc
@@ -220,13 +221,15 @@ doc:
 	@$(MAKE) -C kernel doc
 	@cp -rf kernel/target/doc ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You run 'make view-doc' to view it, or just open build/doc/index.html."
+	@echo -e "You run 'make view-doc' to view it, or just open $(DOC_ROOT)"
 
 docs: doc
 
 
+## Opens the documentation root in the system's default browser. 
+## the "powershell" command is used on Windows Subsystem for Linux
 view-doc: doc
-	@xdg-open ./build/doc/index.html &
+	@xdg-open build/doc/index.html > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
 
 view-docs: view-doc
 
@@ -256,6 +259,8 @@ help:
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
 	@echo -e "  doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
+	@echo -e "  view-doc:"
+	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
 	@echo -e "\nThe following options are available for QEMU:"
 	@echo -e "  int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
