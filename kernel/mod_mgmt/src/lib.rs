@@ -26,7 +26,6 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use kernel_config::memory::PAGE_SIZE;
 use memory::{FRAME_ALLOCATOR, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
 
 
@@ -214,25 +213,23 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_name: &String, active_table: &mut ActivePageTable, log: bool)
+pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, module_name: &String, active_table: &mut ActivePageTable, log: bool)
     -> Result<LoadedCrate, &'static str>
 {
     // all kernel module crate names must start with "__k_"
     const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
 
-    let start_addr = mapped_pages.start_address() as usize as *const u8;
-    debug!("Parsing Elf kernel crate: {:?}, start_addr {:#x}, size {:#x}({})", module_name, start_addr as usize, size, size);
-    if start_addr.is_null() {
-        error!("parse_elf_kernel_crate(): start_addr is null!");
-        return Err("start_addr for parse_elf_kernel_crate is null!");
-    }
-    if !module_name.starts_with("__k_") {
+    if !module_name.starts_with(KERNEL_MODULE_NAME_PREFIX) {
         error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {}.", module_name, KERNEL_MODULE_NAME_PREFIX);
         return Err("module_name didn't start with __k_");
     }
 
+    debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
+
     // SAFE: checked for null
-    let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
+    let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
+    
+    // unsafe { slice::from_raw_parts(start_addr, size) };
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
 
@@ -339,7 +336,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 
             // Right now we're just simply copying small sections to the new memory,
             // so we have to map those pages to real (randomly chosen) frames first. 
-            // because we're copying bytes to the newly allocated pages, we need to make them writeable too, 
+            // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
             // and then change the page permissions (by using remap) later. 
             active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
         };
@@ -843,137 +840,139 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size: usize, module_nam
 pub fn parse_nano_core_symbols(mapped_pages: MappedPages, size: usize) -> Result<LoadedCrate, &'static str> {
     use util::c_str::CStr;
 
-    let start_addr = mapped_pages.start_address() as usize as *const u8;
-    debug!("Parsing nano_core symbols: start_addr {:#x}, size {:#x}({}), MappedPages: {:?}", start_addr as usize, size, size, mapped_pages);
-    if size > (mapped_pages.size_in_pages() * PAGE_SIZE) {
-        error!("parse_nano_core_symbols(): size {:#X}({}) exceeds the bounds of the given MappedPages: {:?}", size, size, mapped_pages);
-        return Err("parse_nano_core_symbols(): size exceeds the bounds of the given MappedPages!");
-    }
-
-    // SAFE: checked for size bounds
-    let bytes = unsafe { 
-        *((start_addr as usize + size - 1) as *mut u8) = 0u8; // put null byte at the end
-        slice::from_raw_parts(start_addr, size)
-    };
-    let symbol_cstr = try!( CStr::from_bytes_with_nul(bytes).map_err(|e| {
-        error!("parse_nano_core_symbols(): error casting memory to CStr: {:?}", e);
-        "FromBytesWithNulError occurred when casting nano_core symbol memory to CStr"
-    }));
-    let symbol_str = try!(symbol_cstr.to_str().map_err(|e| {
-        error!("parse_nano_core_symbols(): error with CStr::to_str(): {:?}", e);
-        "Utf8Error occurred when parsing nano_core symbols CStr"
-    }));
-
-    // debug!("========================= NANO_CORE SYMBOL STRING ========================\n{}", symbol_str);
+    // debug!("Parsing nano_core symbols: size {:#x}({}), MappedPages: {:?}", size, size, mapped_pages);
 
     let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+    
+    {
+        // ensure that there's a null byte at the end
+        let null_byte: &mut u8 = try!(mapped_pages.as_type_mut(size - 1));
+        *null_byte = 0u8;
+    }
 
-    let mut text_shndx:   Option<usize> = None;
-    let mut data_shndx:   Option<usize> = None;
-    let mut rodata_shndx: Option<usize> = None;
-    let mut bss_shndx:    Option<usize> = None;
+    // scoped to drop the borrow on mapped_pages through `bytes`
+    {
+        let bytes = try!(mapped_pages.as_slice_mut(0, size));
+        let symbol_cstr = try!( CStr::from_bytes_with_nul(bytes).map_err(|e| {
+            error!("parse_nano_core_symbols(): error casting memory to CStr: {:?}", e);
+            "FromBytesWithNulError occurred when casting nano_core symbol memory to CStr"
+        }));
+        let symbol_str = try!(symbol_cstr.to_str().map_err(|e| {
+            error!("parse_nano_core_symbols(): error with CStr::to_str(): {:?}", e);
+            "Utf8Error occurred when parsing nano_core symbols CStr"
+        }));
 
-    for (_line_num, line) in symbol_str.lines().enumerate() {
-        let line = line.trim();
-        // skip empty lines
-        if line.is_empty() { continue; }
+        // debug!("========================= NANO_CORE SYMBOL STRING ========================\n{}", symbol_str);
 
-        // debug!("Looking at line: {:?}", line);
 
-        // find the .text, .data, .rodata, and .bss section indices
-        if line.contains(".text") && line.contains("PROGBITS") {
-            text_shndx = get_section_index(line);
-        }
-        else if line.contains(".data") && line.contains("PROGBITS") {
-            data_shndx = get_section_index(line);
-        }
-        else if line.contains(".rodata") && line.contains("PROGBITS") {
-            rodata_shndx = get_section_index(line);
-        }
-        else if line.contains(".bss") && line.contains("NOBITS") {
-            bss_shndx = get_section_index(line);
-        }
+        let mut text_shndx:   Option<usize> = None;
+        let mut data_shndx:   Option<usize> = None;
+        let mut rodata_shndx: Option<usize> = None;
+        let mut bss_shndx:    Option<usize> = None;
 
-        
-        // find a symbol table entry, either "GLOBAL DEFAULT" or "GLOBAL HIDDEN"
-        if line.contains(" GLOBAL ") {
-            // we need the following items from a symbol table entry:
-            // * Value (address),  column 1
-            // * Size,             column 2
-            // * Ndx,              column 6
-            // * Name (mangled),   column 7
-            let mut tokens   = line.split_whitespace();
-            let _num         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 0"));
-            let sec_vaddr    = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 1"));
-            let sec_size     = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 2"));
-            let _typ         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 3"));
-            let _bind        = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 4"));
-            let _vis         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 5"));
-            let sec_ndx      = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 6"));
-            let name_mangled = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 7"));
+        for (_line_num, line) in symbol_str.lines().enumerate() {
+            let line = line.trim();
+            // skip empty lines
+            if line.is_empty() { continue; }
+
+            // debug!("Looking at line: {:?}", line);
+
+            // find the .text, .data, .rodata, and .bss section indices
+            if line.contains(".text") && line.contains("PROGBITS") {
+                text_shndx = get_section_index(line);
+            }
+            else if line.contains(".data") && line.contains("PROGBITS") {
+                data_shndx = get_section_index(line);
+            }
+            else if line.contains(".rodata") && line.contains("PROGBITS") {
+                rodata_shndx = get_section_index(line);
+            }
+            else if line.contains(".bss") && line.contains("NOBITS") {
+                bss_shndx = get_section_index(line);
+            }
 
             
-            let sec_vaddr = try!(usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
-                error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num, e, line);
-                "parse_nano_core_symbols(): couldn't parse virtual address Value"
-            })); 
-            let sec_size  = try!(usize::from_str_radix(sec_size, 10).map_err(|e| {
-                error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num, e, line);
-                "parse_nano_core_symbols(): couldn't parse size"
-            })); 
-            // while vaddr and size are required, ndx isn't. If ndx is not a number (like "ABS"), then we just skip that entry. 
-            let sec_ndx   = usize::from_str_radix(sec_ndx, 10).ok(); 
-            if sec_ndx.is_none() {
-                // trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num, line);
-                continue;
-            }
+            // find a symbol table entry, either "GLOBAL DEFAULT" or "GLOBAL HIDDEN"
+            if line.contains(" GLOBAL ") {
+                // we need the following items from a symbol table entry:
+                // * Value (address),  column 1
+                // * Size,             column 2
+                // * Ndx,              column 6
+                // * Name (mangled),   column 7
+                let mut tokens   = line.split_whitespace();
+                let _num         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 0"));
+                let sec_vaddr    = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 1"));
+                let sec_size     = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 2"));
+                let _typ         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 3"));
+                let _bind        = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 4"));
+                let _vis         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 5"));
+                let sec_ndx      = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 6"));
+                let name_mangled = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 7"));
 
-            let demangled = demangle_symbol(name_mangled);
-            // debug!("parse_nano_core_symbols(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {:?}", name_mangled, demangled.full, sec_vaddr, sec_size, sec_ndx);
-
-
-            let new_section = {
-                if sec_ndx == text_shndx {
-                    Some(LoadedSection::Text(TextSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
-                        virt_addr: sec_vaddr,
-                        size: sec_size,
-                        global: true,
-                    }))
+                
+                let sec_vaddr = try!(usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
+                    error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num, e, line);
+                    "parse_nano_core_symbols(): couldn't parse virtual address Value"
+                })); 
+                let sec_size  = try!(usize::from_str_radix(sec_size, 10).map_err(|e| {
+                    error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num, e, line);
+                    "parse_nano_core_symbols(): couldn't parse size"
+                })); 
+                // while vaddr and size are required, ndx isn't. If ndx is not a number (like "ABS"), then we just skip that entry. 
+                let sec_ndx   = usize::from_str_radix(sec_ndx, 10).ok(); 
+                if sec_ndx.is_none() {
+                    // trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num, line);
+                    continue;
                 }
-                else if sec_ndx == rodata_shndx {
-                    Some(LoadedSection::Rodata(RodataSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
-                        virt_addr: sec_vaddr,
-                        size: sec_size,
-                        global: true,
-                    }))
-                }
-                else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
-                    Some(LoadedSection::Data(DataSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
-                        virt_addr: sec_vaddr,
-                        size: sec_size,
-                        global: true,
-                    }))
-                }
-                else {
-                    None
-                }
-            };
 
-            if let Some(sec) = new_section {
-                sections.push(Arc::new(sec));
-            }
-        }  
+                let demangled = demangle_symbol(name_mangled);
+                // debug!("parse_nano_core_symbols(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {:?}", name_mangled, demangled.full, sec_vaddr, sec_size, sec_ndx);
 
-    }
+
+                let new_section = {
+                    if sec_ndx == text_shndx {
+                        Some(LoadedSection::Text(TextSection{
+                            // symbol: demangled.symbol,
+                            abs_symbol: demangled.full,
+                            hash: demangled.hash,
+                            virt_addr: sec_vaddr,
+                            size: sec_size,
+                            global: true,
+                        }))
+                    }
+                    else if sec_ndx == rodata_shndx {
+                        Some(LoadedSection::Rodata(RodataSection{
+                            // symbol: demangled.symbol,
+                            abs_symbol: demangled.full,
+                            hash: demangled.hash,
+                            virt_addr: sec_vaddr,
+                            size: sec_size,
+                            global: true,
+                        }))
+                    }
+                    else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
+                        Some(LoadedSection::Data(DataSection{
+                            // symbol: demangled.symbol,
+                            abs_symbol: demangled.full,
+                            hash: demangled.hash,
+                            virt_addr: sec_vaddr,
+                            size: sec_size,
+                            global: true,
+                        }))
+                    }
+                    else {
+                        None
+                    }
+                };
+
+                if let Some(sec) = new_section {
+                    sections.push(Arc::new(sec));
+                }
+            }  
+
+        }
+
+    } // drops the borrow of `bytes` (and mapped_pages)
 
     Ok(LoadedCrate {
         crate_name: String::from("nano_core"), 

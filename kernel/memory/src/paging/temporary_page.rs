@@ -24,11 +24,11 @@ pub struct TemporaryPage {
 }
 
 impl TemporaryPage {
-    /// Creates a new `TemporaryPage` but does not yet map it to the recursive paging entry. 
+    /// Creates a new [`TemporaryPage`] but does not yet map it to the recursive paging entry. 
+    /// You must call [`map_table_frame()`](#method.map_table_frame) to do that. 
     /// 
     /// # Arguments 
-    /// 
-    /// * `three_frames`: the three frames needed for the allocator contained within this `TemporaryPage`. 
+    /// * `three_frames`: the three [`Frame`]s needed for the allocator contained within this [`TemporaryPage`]. 
     ///   To complete the recursive mapping to this temporary page, we may need to allocate at most 3 frames (for P1, P2, P3 table levels). 
     ///  
     pub fn new(three_frames: (Frame, Frame, Frame)) -> TemporaryPage {
@@ -41,6 +41,11 @@ impl TemporaryPage {
 
     /// Maps the temporary page to the given page table frame in the active table.
     /// Returns a reference to the now mapped table.
+    /// # Arguments
+    /// 
+    /// * `frame`: the [`Frame`] containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].     
+    /// * `active_table`: the currently active [`ActivePageTable`]. 
+    /// 
     pub fn map_table_frame(&mut self, frame: Frame, active_table: &mut ActivePageTable) -> Result<&mut Table<Level1>, &'static str>
     {
         use super::entry::EntryFlags;
@@ -55,20 +60,16 @@ impl TemporaryPage {
             page -= 1;
         }
         
-        let mapped_page = try!(active_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator));
-        let vaddr = mapped_page.start_address();
-        self.mapped_page = Some(mapped_page);
-
-        unsafe { 
-            Ok( &mut *(vaddr as *mut Table<Level1>) )
-        }
+        self.mapped_page = Some( 
+            try!(active_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
+        );
+        
+        let table: &mut Table<Level1> = try!( 
+            try!(self.mapped_page.as_ref().ok_or("mapped page error"))
+            .as_type_mut(0)  // no offset
+        );
+        Ok(table)
     }
-
-    // this is no longer needed now that we use the MappedPages type for auto-unmapping 
-    // /// Unmaps the temporary page in the active table.
-    // pub fn unmap(&mut self, active_table: &mut ActivePageTable) {
-    //     active_table.unmap(self.mapped_page, &mut self.allocator)
-    // }
 }
 
 struct TinyAllocator([Option<Frame>; 3]);

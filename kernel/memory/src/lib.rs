@@ -8,7 +8,7 @@
 #![feature(asm)]
 #![feature(unique)]
 #![feature(ptr_internals)]
-
+#![feature(core_intrinsics)]
 
 extern crate spin;
 extern crate multiboot2;
@@ -501,6 +501,8 @@ pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
 /// (you cannot simply "copy" a region of physical memory...).
 /// A `Frame` is the sole owner of the region of physical memory that it covers, 
 /// i.e., there will never be two `Frame` objects that point to the same physical memory chunk. 
+/// 
+/// **Note**: DO NOT implement Copy or Clone for this type.
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     number: usize,
@@ -545,7 +547,7 @@ impl Add<usize> for Frame {
     type Output = Frame;
 
     fn add(self, rhs: usize) -> Frame {
-        assert!(self.number < MAX_PAGE_NUMBER, "Frame addition error, cannot go above MAX_PAGE_NUMBER 0x000FFFFFFFFFFFFF!");
+        assert!(self.number < MAX_PAGE_NUMBER, "Frame addition error, cannot go above MAX_PAGE_NUMBER 0x000F_FFFF_FFFF_FFFF!");
         Frame { number: self.number + rhs }
     }
 }
