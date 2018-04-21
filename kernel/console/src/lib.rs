@@ -30,6 +30,7 @@ lazy_static! {
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 
+/// Queues up the given `String` to be printed out to the console.
 pub fn print_to_console(s: String) -> Result<(), &'static str> {
     let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s));
     try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
@@ -37,7 +38,9 @@ pub fn print_to_console(s: String) -> Result<(), &'static str> {
 }
 
 
-/// the console owns and creates the event queue, and returns a producer reference to the queue.
+/// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
+/// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
+/// This allows other modules to push console events onto the queue. 
 pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let console_dfq: DFQueue<ConsoleEvent> = DFQueue::new();
     let console_consumer = console_dfq.into_consumer();
@@ -46,10 +49,8 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
         console_consumer.obtain_producer()
     });
 
-    // vga_buffer::print_str("console::init() trying to spawn_kthread...\n").unwrap();
     info!("console::init() trying to spawn_kthread...");
     try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
-    // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
 
     try!(print_to_console(String::from(WELCOME_STRING)));
@@ -61,40 +62,40 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 
 /// the main console event-handling loop, runs on its own thread. 
 /// This is the only thread that is allowed to touch the vga buffer!
-/// ## Returns
-/// true if the thread was smoothly exited intentionally, false if forced to exit due to an error.
+/// It's an infinite loop, but will return if forced to exit because of an error. 
 fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
     use core::ops::Deref;
 
     loop { 
-        let event = consumer.peek();
-        if event.is_none() {
-            continue; 
-        }
+        let event = match consumer.peek() {
+            Some(ev) => ev,
+            _ => { continue; }
+        };
 
-        let event = event.unwrap();
-        let event_data = event.deref(); // event.deref() is the equivalent of   &*event
-
-        match event_data {
+        match event.deref() {
             &ConsoleEvent::ExitEvent => {
                 use core::fmt::Write;
-                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
+                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n")
+                    .map_err(|_| "fmt::Error in VgaBuffer's write_str()")
+                );
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
-                handle_key_event(input_event.key_event);
+                try!(handle_key_event(input_event.key_event));
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default());
+                try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default())
+                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+                );
             }
         }
-        event.mark_completed();
 
+        event.mark_completed();
     }
 }
 
 
-fn handle_key_event(keyevent: KeyEvent) {
+fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
 
     // Ctrl+D or Ctrl+Alt+Del kills the OS
     if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
@@ -105,7 +106,7 @@ fn handle_key_event(keyevent: KeyEvent) {
 
     // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
     if keyevent.action != KeyAction::Pressed {
-        return; 
+        return Ok(()); 
     }
 
     // if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
@@ -135,27 +136,27 @@ fn handle_key_event(keyevent: KeyEvent) {
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::End {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::PageUp {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::PageDown {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
-        return;
+        return Ok(());
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
-        return;
+        return Ok(());
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
-        return;
+        return Ok(());
     }
 
 
@@ -164,11 +165,15 @@ fn handle_key_event(keyevent: KeyEvent) {
             // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
             use alloc::string::ToString;
-            CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
+            try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default())
+                .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+            );
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
     }
+
+    Ok(())
 }
 
 
