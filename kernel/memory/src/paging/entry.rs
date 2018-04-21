@@ -67,6 +67,12 @@ bitflags! {
 }
 
 impl EntryFlags {
+    /// Returns true if this flags object has the `WRITABLE` bit set.
+    pub fn is_writable(&self) -> bool {
+        self.intersects(EntryFlags::WRITABLE)
+    }
+
+
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
 

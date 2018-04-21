@@ -9,6 +9,8 @@
 
 use core::ptr::Unique;
 use core::ops::DerefMut;
+use core::mem;
+use core::slice;
 use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageIter, get_current_p4, ActivePageTable};
@@ -109,6 +111,7 @@ impl Mapper {
             page_table_p4: self.target_p4.clone(),
             pages: pages,
             allocated: None,
+            flags: flags,
         })
     }
 
@@ -145,6 +148,7 @@ impl Mapper {
             page_table_p4: self.target_p4.clone(),
             pages: pages,
             allocated: None,
+            flags: flags,
         })
     }
 
@@ -303,6 +307,8 @@ pub struct MappedPages {
     /// If None, then it was pre-reserved without allocation and doesn't need to be "freed",
     /// but rather just unmapped.
     allocated: Option<AllocatedPages>,
+    // The EntryFlags that define the page permissions of this mapping
+    flags: EntryFlags,
 }
 
 impl MappedPages {
@@ -311,22 +317,193 @@ impl MappedPages {
 		self.pages.start_address()
 	}
 
+    /// Returns the size of this mapping in number of [`Page`]s.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
         self.pages.end.number - self.pages.start.number + 1 
     }
 
+    /// Returns the size of this mapping in number of bytes.
+    pub fn size_in_bytes(&self) -> usize {
+        self.size_in_pages() * PAGE_SIZE
+    }
+
 
     /// Constructs a MappedPages object from an already existing mapping.
     /// Useful for creating idle task Stacks, for example. 
-    pub fn from_existing(already_mapped_pages: PageIter) -> MappedPages {
+    /// TODO FIXME: remove this ability, it's dangerous!!
+    pub fn from_existing(already_mapped_pages: PageIter, flags: EntryFlags) -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
             pages: already_mapped_pages,
             allocated: None,
+            flags: flags,
         }
     }
+
+
+    /// Reinterprets this `MappedPages`'s underyling memory region as a struct of the given type,
+    /// i.e., overlays a struct on top of this mapped memory region. 
+    /// 
+    /// # Arguments
+    /// `offset`: the offset into the memory region at which the struct is located (where it should start).
+    /// 
+    /// Returns a reference to the new struct (`&T`) that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
+    /// This ensures safety by guaranteeing that the returned struct reference 
+    /// cannot be used after this `MappedPages` object is dropped and unmapped.
+    pub fn as_type<T>(&self, offset: usize) -> Result<&T, &'static str> {
+        let size = mem::size_of::<T>();
+        debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                // SAFE: just for debugging
+                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                size, offset, self.size_in_bytes()
+        );
+
+        // check that size of the type T fits within the size of the mapping
+        let end = offset + size;
+        if end > self.size_in_bytes() {
+            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    size, offset, self.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        let t: &mut T = unsafe {
+            mem::transmute(self.pages.start_address() + offset)
+        };
+
+        Ok(t)
+    }
+
+
+    /// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.
+    /// 
+    /// Thus, it checks to make sure that the underlying mapping is writable.
+    pub fn as_type_mut<T>(&self, offset: usize) -> Result<&mut T, &'static str> {
+        let size = mem::size_of::<T>();
+        debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                // SAFE: just for debugging
+                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                size, offset, self.size_in_bytes()
+        );
+
+        // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
+        if !self.flags.is_writable() {
+            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    size, offset, self.flags
+            );
+            return Err("as_type_mut(): MappedPages were not writable");
+        }
+        
+        // check that size of type T fits within the size of the mapping
+        let end = offset + size;
+        if end > self.size_in_bytes() {
+            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    size, offset, self.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        let t: &mut T = unsafe {
+            mem::transmute(self.pages.start_address() + offset)
+        };
+
+        Ok(t)
+    }
+
+
+    /// Reinterprets this `MappedPages`'s underyling memory region as a slice of any type.
+    /// 
+    /// # Arguments
+    /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
+    /// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. 
+    ///   Thus, the slice will go from `offset` to `offset` + (sizeof(`T`) * `length`).
+    /// 
+    /// Returns a reference to the new slice that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
+    /// This ensures safety by guaranteeing that the returned slice 
+    /// cannot be used after this `MappedPages` object is dropped and unmapped.
+    /// 
+    /// Note: it'd be great to merge this into [`as_type()`][#method.as_type], but I cannot figure out how to 
+    ///       specify the length of a slice in its static type definition notation, e.g., `&[u8; size]`.
+    pub fn as_slice<T>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
+        let size_in_bytes = mem::size_of::<T>() * length;
+        debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
+                // SAFE: just for debugging
+                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
+        );
+        
+        // check that size of slice fits within the size of the mapping
+        let end = byte_offset + (length * mem::size_of::<T>());
+        if end > self.size_in_bytes() {
+            error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+            );
+            return Err("requested slice length and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        let slc: &[T] = unsafe {
+            slice::from_raw_parts((self.pages.start_address() + byte_offset) as *const T, length)
+        };
+
+        Ok(slc)
+    }
+
+
+    /// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. 
+    /// 
+    /// Thus, it checks to make sure that the underlying mapping is writable.
+    pub fn as_slice_mut<T>(&self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
+        let size_in_bytes = mem::size_of::<T>() * length;
+        debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
+                // SAFE: just for debugging
+                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
+        );
+        
+        // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
+        if !self.flags.is_writable() {
+            error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?}",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    length, size_in_bytes, byte_offset, self.flags
+            );
+            return Err("as_slice_mut(): MappedPages were not writable");
+        }
+
+        // check that size of slice fits within the size of the mapping
+        let end = byte_offset + (length * mem::size_of::<T>());
+        if end > self.size_in_bytes() {
+            error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+            );
+            return Err("requested slice length and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        let slc: &mut [T] = unsafe {
+            slice::from_raw_parts_mut((self.pages.start_address() + byte_offset) as *mut T, length)
+        };
+
+        Ok(slc)
+    }
 }
+
 
 impl Drop for MappedPages {
     fn drop(&mut self) {

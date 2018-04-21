@@ -348,7 +348,10 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         Stack::new( 
             stack_top, 
             stack_bottom, 
-            MappedPages::from_existing(Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom)),
+            MappedPages::from_existing(
+                Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom),
+                EntryFlags::WRITABLE | EntryFlags::PRESENT
+            ),
         )
     );
     debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
