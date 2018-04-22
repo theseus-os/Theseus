@@ -1,5 +1,5 @@
 [package]
-name = "window_manager"
+name = "frame_buffer_3d"
 version = "0.1.0"
 authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
 
@@ -15,8 +15,6 @@ version = "0.2.1"
 [dependencies.serial_port]
 path = "../serial_port"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
 
 [dependencies.state_store]
 path = "../state_store"
@@ -25,28 +23,14 @@ path = "../state_store"
 default-features = false
 version = "0.3.7"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.irq_safety]
 path = "../../libs/irq_safety"
 version = "0.1.1"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
-[dependencies.frame_buffer]
-path = "../frame_buffer"
-
-[dependencies.frame_buffer_3d]
-path = "../frame_buffer_3d"
-
-[dependencies.frame_buffer_text]
-path = "../frame_buffer_text"
-
-[dependencies.acpi]
-path = "../acpi"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

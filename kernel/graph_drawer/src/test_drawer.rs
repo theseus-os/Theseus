@@ -32,3 +32,9 @@ pub fn test_draw(_: Option<u64>) {
     super::init();
 
 }
+
+pub fn test_text(_: Option<u64>) {
+
+   
+
+}

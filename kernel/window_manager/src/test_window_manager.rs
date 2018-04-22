@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use spin::{Once, Mutex};
 use frame_buffer;
 use frame_buffer_3d;
+use frame_buffer_text;
 
 use acpi::ACPI_TABLE;  
 
@@ -161,21 +162,44 @@ for lop in 1..20 {
 
 pub fn test_performance(_: Option<u64>) {
     
-for lop in 1..20 {
-    let hpet = ACPI_TABLE.hpet.read();
-    let starting_time = (*hpet).as_ref().unwrap().get_counter();
-    let mut color = 0x342513;
-    for i in 1..100 {
-        for x in 20..200{
-            for y in 30..300{
-                        frame_buffer::draw_pixel(x, y, color);
+    for lop in 0..50 {
+        let hpet = ACPI_TABLE.hpet.read();
+        let starting_time = (*hpet).as_ref().unwrap().get_counter();
+        let mut color = 0x342513;
+        for i in 0..100 {
+            for x in 20..300{
+                for y in 30..300{
+                            frame_buffer::draw_pixel(x, y, color);
+                }
             }
+            color = color + 20;
         }
-        color = color + 20;
-    }
-    let end_time = (*hpet).as_ref().unwrap().get_counter();
-    trace!("Time: {}", end_time - starting_time);
-} 
+        let end_time = (*hpet).as_ref().unwrap().get_counter();
+        trace!("Time: {}", end_time - starting_time);
+    } 
+
+    for lop in 0..50 {
+        let hpet = ACPI_TABLE.hpet.read();
+        let starting_time = (*hpet).as_ref().unwrap().get_counter();
+        let mut color = 0x342513;
+        for i in 1..100 {
+            for x in 20..200{
+                for y in 30..300{
+                            frame_buffer_3d::draw_pixel(x, y, color);
+                }
+            }
+            color = color + 20;
+        }
+        let end_time = (*hpet).as_ref().unwrap().get_counter();
+        trace!("Time: {}", end_time - starting_time);
+    } 
+
+}
+
+pub fn test_text(_: Option<u64>) {
+    
+    frame_buffer_text::print();
+
 }
 
 

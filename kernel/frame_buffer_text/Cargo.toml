@@ -1,0 +1,8 @@
+[package]
+name = "frame_buffer_text"
+version = "0.1.0"
+authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
+
+[dependencies]
+[dependencies.frame_buffer]
+path = "../frame_buffer"

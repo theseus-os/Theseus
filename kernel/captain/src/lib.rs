@@ -359,7 +359,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     enable_interrupts();
 
 
-    if true {
+    if false {
         // #[cfg(feature = "loadable")]
         // {
         //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().expect("e1000::test_nic_driver::test_nic_driver").virt_addr();
@@ -389,7 +389,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use window_manager::test_window_manager;
-            spawn::spawn_kthread(test_window_manager::test_performance, None, String::from("test_nic_driver")).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_text, None, String::from("test_nic_driver")).unwrap();
         }
     }
     /*if false {
@@ -403,7 +403,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     } */ 
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
@@ -420,7 +420,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
