@@ -278,7 +278,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
                         )
                     };
 
-                    try!(mod_mgmt::parse_elf_executable(temp_module_mapping.start_address() as VirtualAddress, module.size()))
+                    try!(mod_mgmt::parse_elf_executable(temp_module_mapping, module.size()))
                     
                     // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
                 };

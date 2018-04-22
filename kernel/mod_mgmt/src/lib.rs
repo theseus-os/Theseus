@@ -14,7 +14,6 @@ extern crate util;
 extern crate rustc_demangle;
 
 
-use core::slice;
 use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
@@ -46,17 +45,12 @@ pub struct ElfProgramSegment {
 }
 
 
-/// parses an elf executable file as a slice of bytes starting at the given `start_addr`,
-/// which must be a VirtualAddress currently mapped into the kernel's address space.
-pub fn parse_elf_executable(start_addr: VirtualAddress, size: usize) -> Result<(Vec<ElfProgramSegment>, VirtualAddress), &'static str> {
-    debug!("Parsing Elf executable: start_addr {:#x}, size {:#x}({})", start_addr, size, size);
-    let start_addr = start_addr as *const u8;
-    if start_addr.is_null() {
-        return Err("start_addr was null!");
-    }
+/// Parses an elf executable file as a slice of bytes starting at the given `MappedPages` mapping.
+/// Consumes the given `MappedPages`, which automatically unmaps it at the end of this function. 
+pub fn parse_elf_executable(mapped_pages: MappedPages, size_in_bytes: usize) -> Result<(Vec<ElfProgramSegment>, VirtualAddress), &'static str> {
+    debug!("Parsing Elf executable: mapped_pages {:?}, size_in_bytes {:#x}({})", mapped_pages, size_in_bytes, size_in_bytes);
 
-    // SAFE: checked for null
-    let byte_slice = unsafe { slice::from_raw_parts(start_addr, size) };
+    let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
     let elf_file = try!(ElfFile::new(byte_slice));
     // debug!("Elf File: {:?}", elf_file);
 
@@ -226,10 +220,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
 
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
-    // SAFE: checked for null
     let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
-    
-    // unsafe { slice::from_raw_parts(start_addr, size) };
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
 
@@ -461,15 +452,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
 
                     if let Ok(ref tp) = text_pages {
-                        let dest_addr = tp.start_address() + text_offset;
-                        if log { trace!("       dest_addr: {:#X}, text_pages: {:#X} text_offset: {:#X}", dest_addr, tp.start_address(), text_offset); }
-                        
                         // here: we're ready to copy the text section to the proper address
-                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                        let dest: &mut [u8] = unsafe {
-                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                        };
-                        dest.copy_from_slice(sec_data);
+                        let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
+                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                        if log { trace!("       dest_addr: {:#X}, text_offset: {:#X}", dest_addr, text_offset); }
+                        dest_slice.copy_from_slice(sec_data);
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Text(TextSection{
@@ -501,15 +488,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
 
                     if let Ok(ref rp) = rodata_pages {
-                        let dest_addr = rp.start_address() + rodata_offset;
-                        if log { trace!("       dest_addr: {:#X}, rodata_pages: {:#X} rodata_offset: {:#X}", dest_addr, rp.start_address(), rodata_offset); }
-                        
                         // here: we're ready to copy the rodata section to the proper address
-                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                        let dest: &mut [u8] = unsafe {
-                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                        };
-                        dest.copy_from_slice(sec_data);
+                        let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
+                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                        if log { trace!("       dest_addr: {:#X}, rodata_offset: {:#X}", dest_addr, rodata_offset); }
+                        dest_slice.copy_from_slice(sec_data);
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Rodata(RodataSection{
@@ -538,7 +521,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                 if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
                     let name = if name.starts_with(RELRO_PREFIX) {
                         let relro_name = try!(name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
-                        // warn!("relro data sec {:?} -> {:?}", name, relro_name);
                         relro_name
                     }
                     else {
@@ -549,15 +531,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
                     
                     if let Ok(ref dp) = data_pages {
-                        let dest_addr = dp.start_address() + data_offset;
-                        if log { trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", dest_addr, dp.start_address(), data_offset); }
-
                         // here: we're ready to copy the data/bss section to the proper address
-                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                        let dest: &mut [u8] = unsafe {
-                            slice::from_raw_parts_mut(dest_addr as *mut u8, sec_size) 
-                        };
-                        dest.copy_from_slice(sec_data);
+                        let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
+                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                        if log { trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); }
+                        dest_slice.copy_from_slice(sec_data);
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Data(DataSection{
@@ -590,15 +568,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let Ok(ref dp) = data_pages { 
-                        let dest_addr = dp.start_address() + data_offset;
-                        if log { trace!("       dest_addr: {:#X}, data_pages: {:#X} data_offset: {:#X}", dest_addr, dp.start_address(), data_offset); }
-
+                    if let Ok(ref dp) = data_pages {
                         // here: we're ready to fill the bss section with zeroes at the proper address
-                        // SAFE: we have allocated the pages containing section_vaddr and mapped them above
-                        unsafe {
-                            ::core::intrinsics::write_bytes(dest_addr as *mut u8, 0, sec_size);
-                        }
+                        let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
+                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                        if log { trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); }
+                        for b in dest_slice {
+                            *b = 0;
+                        };
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Data(DataSection{
