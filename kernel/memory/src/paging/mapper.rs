@@ -288,7 +288,10 @@ impl Mapper {
 
 
 
-/// Represents a mapped range of virtual addresses, specified in pages. 
+/// Represents a mapped range of virtual addresses, specified in pages.
+/// The underlying pages that are mapped are guaranteed to be continguous in virtual memory (not physical),
+/// and one `MappedPages` object can only have a single range of contiguous pages, not multiple disjoint ranges.
+/// 
 /// This object also represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be unmapped, and if they were allocated, then also de-allocated. 
 /// Thus, it ensures memory safety by guaranteeing that this object must be held 
@@ -372,7 +375,7 @@ impl MappedPages {
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &mut T = unsafe {
+        let t: &T = unsafe {
             mem::transmute(self.pages.start_address() + offset)
         };
 
