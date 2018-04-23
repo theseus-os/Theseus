@@ -316,9 +316,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
 
     // create a closure here to allocate N contiguous virtual memory pages
     // and map them to random frames as writable, returns Result<MappedPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Result<MappedPages, &'static str>,
-                                                 Result<MappedPages, &'static str>, 
-                                                 Result<MappedPages, &'static str>) = {
+    let (text_pages, rodata_pages, data_pages): (Option<MappedPages>, Option<MappedPages>, Option<MappedPages>) = {
         use memory::FRAME_ALLOCATOR;
         let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
 
@@ -334,9 +332,9 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
 
         // we must allocate these pages separately because they will have different flags later
         (
-            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount)   } else { Err("no text sections present")   }, 
-            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount) } else { Err("no rodata sections present") }, 
-            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount)   } else { Err("no data sections present")   }
+            if text_bytecount   > 0 { Some(try!(allocate_pages_closure(text_bytecount)))   } else { None }, 
+            if rodata_bytecount > 0 { Some(try!(allocate_pages_closure(rodata_bytecount))) } else { None }, 
+            if data_bytecount   > 0 { Some(try!(allocate_pages_closure(data_bytecount)))   } else { None }
         )
     };
 
@@ -451,7 +449,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     if log { trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
 
-                    if let Ok(ref tp) = text_pages {
+                    if let Some(ref tp) = text_pages {
                         // here: we're ready to copy the text section to the proper address
                         let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
                         let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
@@ -464,6 +462,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                                 abs_symbol: demangled.full,
                                 hash: demangled.hash,
                                 virt_addr: dest_addr,
+                                // mapped_page_ref: &text_pages,
+                                // mapped_page_offset: text_offset,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
                             }))
@@ -487,7 +487,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     if log { trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
 
-                    if let Ok(ref rp) = rodata_pages {
+                    if let Some(ref rp) = rodata_pages {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
                         let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
@@ -530,7 +530,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
                     
-                    if let Ok(ref dp) = data_pages {
+                    if let Some(ref dp) = data_pages {
                         // here: we're ready to copy the data/bss section to the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                         let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
@@ -568,7 +568,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
                     assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let Ok(ref dp) = data_pages {
+                    if let Some(ref dp) = data_pages {
                         // here: we're ready to fill the bss section with zeroes at the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                         let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
@@ -783,18 +783,14 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
 
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
-    let mut all_pages: Vec<MappedPages> = Vec::with_capacity(3); // max 3, for text, rodata, data/bss
-    if let Ok(tp) = text_pages { 
-        try!(active_table.remap(&tp, EntryFlags::PRESENT)); // present and not noexec
-        all_pages.push(tp);
+    if let Some(ref tp) = text_pages { 
+        try!(active_table.remap(tp, EntryFlags::PRESENT)); // present and executable (not no_execute)
     }
-    if let Ok(rp) = rodata_pages { 
-        try!(active_table.remap(&rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
-        all_pages.push(rp);
+    if let Some(ref rp) = rodata_pages { 
+        try!(active_table.remap(rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
     }
-    if let Ok(dp) = data_pages { 
-        try!(active_table.remap(&dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
-        all_pages.push(dp);
+    if let Some(ref dp) = data_pages { 
+        try!(active_table.remap(dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
     }
     
     // extract just the sections from the section map
@@ -803,9 +799,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, size_in_bytes: usize, m
 
 
     Ok(LoadedCrate {
-        crate_name: String::from(module_name.get(kernel_module_name_prefix_end..).unwrap()), 
-        sections: values,
-        mapped_pages: all_pages,
+        crate_name:   String::from(module_name.get(kernel_module_name_prefix_end..).unwrap()), 
+        sections:     values,
+        text_pages:   text_pages,
+        rodata_pages: rodata_pages,
+        data_pages:   data_pages,
     })
 
 }
@@ -954,7 +952,11 @@ pub fn parse_nano_core_symbols(mapped_pages: MappedPages, size: usize) -> Result
     Ok(LoadedCrate {
         crate_name: String::from("nano_core"), 
         sections: sections,
-        mapped_pages: vec![mapped_pages],
+        // TODO FIXME: split this into text/rodata/data pages
+        text_pages: None,
+        rodata_pages: None,
+        data_pages: None,
+        // mapped_pages: vec![mapped_pages],
     })
 
 }

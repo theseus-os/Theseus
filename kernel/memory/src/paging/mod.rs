@@ -356,6 +356,8 @@ impl fmt::Debug for TempModule {
 ///  * the kernel's list of higher-half MappedPages, which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
 /// Otherwise, it returns a str error message. 
+/// 
+/// Note: this was previously called remap_the_kernel.
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
     -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
