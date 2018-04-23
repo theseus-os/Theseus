@@ -105,9 +105,20 @@ pub fn get_symbol<S: Into<String>>(symbol: S) -> Weak<LoadedSection> {
 
 #[derive(Debug)]
 pub struct LoadedCrate {
+    /// The name of this crate
     pub crate_name: String,
+    /// The list of all sections in this crate.
     pub sections: Vec<Arc<LoadedSection>>,
-    pub mapped_pages: Vec<MappedPages>,
+    /// The `MappedPages` that include the text sections for this crate,
+    /// i.e., sections that are readable and executable.
+    pub text_pages: Option<MappedPages>,
+    /// The `MappedPages` that include the rodata sections for this crate.
+    /// i.e., sections that are read-only, not writable nor executable.
+    pub rodata_pages: Option<MappedPages>,
+    /// The `MappedPages` that include the data and bss sections for this crate.
+    /// i.e., sections that are readable and writable but not executable.
+    pub data_pages: Option<MappedPages>,
+
     // crate_dependencies: Vec<LoadedCrate>,
 }
 
@@ -175,6 +186,10 @@ pub struct TextSection {
     pub hash: Option<String>,
     /// The virtual address of where this text section is loaded
     pub virt_addr: VirtualAddress,
+    // /// A reference to the `MappedPages` object that covers this section
+    // mapped_page_ref: &MappedPages,
+    // /// The offset into the `MappedPages` where this section starts
+    // mapped_page_offset: usize,
     /// The size in bytes of this section
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)

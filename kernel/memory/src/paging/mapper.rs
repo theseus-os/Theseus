@@ -357,11 +357,13 @@ impl MappedPages {
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
     pub fn as_type<T>(&self, offset: usize) -> Result<&T, &'static str> {
         let size = mem::size_of::<T>();
-        debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
+        if false {
+            debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
                 // SAFE: just for debugging
                 unsafe { ::core::intrinsics::type_name::<T>() }, 
                 size, offset, self.size_in_bytes()
-        );
+            );
+        }
 
         // check that size of the type T fits within the size of the mapping
         let end = offset + size;
@@ -388,11 +390,13 @@ impl MappedPages {
     /// Thus, it checks to make sure that the underlying mapping is writable.
     pub fn as_type_mut<T>(&self, offset: usize) -> Result<&mut T, &'static str> {
         let size = mem::size_of::<T>();
-        debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
+        if false {
+            debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
                 // SAFE: just for debugging
                 unsafe { ::core::intrinsics::type_name::<T>() }, 
                 size, offset, self.size_in_bytes()
-        );
+            );
+        }
 
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
@@ -440,11 +444,13 @@ impl MappedPages {
     ///       specify the length of a slice in its static type definition notation, e.g., `&[u8; size]`.
     pub fn as_slice<T>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
-        debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
+        if false {
+            debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
                 // SAFE: just for debugging
                 unsafe { ::core::intrinsics::type_name::<T>() }, 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
-        );
+            );
+        }
         
         // check that size of slice fits within the size of the mapping
         let end = byte_offset + (length * mem::size_of::<T>());
@@ -471,11 +477,13 @@ impl MappedPages {
     /// Thus, it checks to make sure that the underlying mapping is writable.
     pub fn as_slice_mut<T>(&self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
-        debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
+        if false {
+            debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
                 // SAFE: just for debugging
                 unsafe { ::core::intrinsics::type_name::<T>() }, 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
-        );
+            );
+        }
         
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
