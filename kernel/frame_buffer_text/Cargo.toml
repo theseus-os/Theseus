@@ -6,3 +6,7 @@ authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
 [dependencies]
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
