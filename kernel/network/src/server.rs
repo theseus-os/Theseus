@@ -78,7 +78,7 @@ pub fn test_server(_: Option<u64>) {
 
     let host_addrs = [IpAddress::v4(192, 168, 69, 100)];
 
-    let mut client_endpoint:Option<IpEndpoint>;
+    let mut client_endpoint:Option<IpEndpoint> = None;
 
      loop {
 
@@ -106,6 +106,7 @@ pub fn test_server(_: Option<u64>) {
                     let test_string = String::from("test");
 
                     if s.as_str() == test_string {
+                        client_endpoint = Some(endpoint.to_owned());
                         debug!("+++++++++++++++++++");
                     }
 
@@ -124,10 +125,26 @@ pub fn test_server(_: Option<u64>) {
             };
             if let Some((data, endpoint)) = tuple {
                 //let data2 = b"yo dawg\n";
+                // if let Some(x) = client_endpoint{
+                //     socket.send_slice(&data[..], x).unwrap();
+                // }
+
                 socket.send_slice(&data[..], endpoint).unwrap();
                 let end = tsc_ticks().to_ns().unwrap();
                 debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
+                debug!("enpoint {}", endpoint);
+
                 //print!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
+            }
+
+
+
+            if let Some(endpoint) = client_endpoint{
+                let mut data = b"testing\n";
+                debug!("enpoint {}", endpoint);
+                socket.send_slice(data, endpoint).expect("sending failed");
+                client_endpoint = None;
+
             }
 
             
