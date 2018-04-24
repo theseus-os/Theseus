@@ -78,6 +78,8 @@ pub fn test_server(_: Option<u64>) {
 
     let host_addrs = [IpAddress::v4(192, 168, 69, 100)];
 
+    let mut client_endpoint:Option<IpEndpoint>;
+
      loop {
 
         {         
@@ -99,6 +101,20 @@ pub fn test_server(_: Option<u64>) {
                     // debug!("udp:6969 recv data: {:?} from {}",
                     //        str::from_utf8(data.as_ref()).unwrap(), endpoint);
                     let mut data2 = data.to_owned();
+                    let mut s = String::from_utf8(data2.to_owned()).unwrap();
+                    s.pop();
+                    let test_string = String::from("test");
+
+                    if s.as_str() == test_string {
+                        debug!("+++++++++++++++++++");
+                    }
+
+                    // match s.as_str()  {
+                    //     "test"  => debug!{"String TEST!!!"},
+                    //     "abcdefg"  => debug!{"String OTHER!!!"},
+                    //     _       => debug!{"Something else"},
+                    // }
+
 
                     Some((data2, endpoint))
                 }
@@ -113,27 +129,29 @@ pub fn test_server(_: Option<u64>) {
                 debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
                 //print!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
             }
+
+            
             
         }
 
         //tcp:6969: respond "yo dawg"
-        {
-            let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
-            if !socket.is_open() {
-                socket.listen(6969).unwrap();
-            }
+        // {
+        //     let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
+        //     if !socket.is_open() {
+        //         socket.listen(6969).unwrap();
+        //     }
 
-            if socket.can_send() {
-                //let data = b"yo dawg\n";
-                let mut data = socket.recv(128).unwrap().to_owned();
-                debug!("tcp:6969 send data: {:?}",
-                       str::from_utf8(data.as_ref()).unwrap());
-                //socket.send_slice(data).unwrap();
-                socket.send_slice(&data[..]).unwrap();
-                debug!("tcp:6969 close");
-                socket.close();
-            }
-        }
+        //     if socket.can_send() {
+        //         //let data = b"yo dawg\n";
+        //         let mut data = socket.recv(128).unwrap().to_owned();
+        //         debug!("tcp:6969 send data: {:?}",
+        //                str::from_utf8(data.as_ref()).unwrap());
+        //         //socket.send_slice(data).unwrap();
+        //         socket.send_slice(&data[..]).unwrap();
+        //         debug!("tcp:6969 close");
+        //         socket.close();
+        //     }
+        // }
 
                 //tcp:6970: echo with reverse
         // {
