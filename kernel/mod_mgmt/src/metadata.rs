@@ -163,14 +163,28 @@ impl LoadedSection {
             &LoadedSection::Data(ref data) => data.global,
         }
     }
-
-    pub fn parent(&self) -> &String {
+    pub fn mapped_pages_offset(&self) -> usize {
         match self {
-            &LoadedSection::Text(ref text) => &text.parent_crate,
-            &LoadedSection::Rodata(ref rodata) => &rodata.parent_crate,
-            &LoadedSection::Data(ref data) => &data.parent_crate,
+            &LoadedSection::Text(ref text) => text.mapped_pages_offset,
+            &LoadedSection::Rodata(ref rodata) => rodata.mapped_pages_offset,
+            &LoadedSection::Data(ref data) => data.mapped_pages_offset,
         }
     }
+    pub fn mapped_pages(&self) -> Option<Arc<MappedPages>> {
+        match self {
+            &LoadedSection::Text(ref text) => text.mapped_pages.upgrade(),
+            &LoadedSection::Rodata(ref rodata) => rodata.mapped_pages.upgrade(),
+            &LoadedSection::Data(ref data) => data.mapped_pages.upgrade(),
+        }
+    }
+
+    // pub fn parent(&self) -> &String {
+    //     match self {
+    //         &LoadedSection::Text(ref text) => &text.parent_crate,
+    //         &LoadedSection::Rodata(ref rodata) => &rodata.parent_crate,
+    //         &LoadedSection::Data(ref data) => &data.parent_crate,
+    //     }
+    // }
 }
 
 

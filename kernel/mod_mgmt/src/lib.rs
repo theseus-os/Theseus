@@ -447,7 +447,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
                     if log { trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
-                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
+                    if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
+                        error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
+                        return Err(".text section had wrong flags!");
+                    }
+                        
 
                     if let Some(ref tp) = text_pages {
                         // here: we're ready to copy the text section to the proper address
@@ -486,7 +490,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
                     if log { trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
-                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+                    if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
+                        error!(".rodata section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
+                        return Err(".rodata section had wrong flags!");
+                    }
 
                     if let Some(ref rp) = rodata_pages {
                         // here: we're ready to copy the rodata section to the proper address
@@ -532,7 +539,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     };
                     let demangled = demangle_symbol(name);
                     if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
-                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
+                    if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
+                        error!(".data section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
+                        return Err(".data section had wrong flags!");
+                    }
                     
                     if let Some(ref dp) = data_pages {
                         // here: we're ready to copy the data/bss section to the proper address
@@ -572,7 +582,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                 if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
                     if log { trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
-                    assert!(sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
+                    if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
+                        error!(".bss section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
+                        return Err(".bss section had wrong flags!");
+                    }
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
                     if let Some(ref dp) = data_pages {
@@ -658,16 +671,19 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             // check if this Rela sections has a valid target section (one that we've already loaded)
             if let Some(target_sec) = loaded_sections.get(&(sec.info() as usize)) {
                 if let Ok(Rela64(rela_arr)) = sec.get_data(&elf_file) {
-                    for r in rela_arr {
-                        if log { trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", r.get_offset(), r.get_addend(), r.get_symbol_table_index(), r.get_type()); }
+                    for rela_entry in rela_arr {
+                        if log { 
+                            trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                                    rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
+                        }
 
-                        // common to all relocations: calculate the relocation destination and get the source section
-                        let dest_offset = r.get_offset() as usize;
-                        let dest_ptr: usize = target_sec.virt_addr() + dest_offset;
-                        let source_sec_entry: &Entry = &symtab[r.get_symbol_table_index() as usize];
+                        // common to all relocations for this target section: calculate the relocation destination and get the source section
+                        let dest_offset = target_sec.mapped_pages_offset() + rela_entry.get_offset() as usize;
+                        let dest_mapped_pages = try!(target_sec.mapped_pages().ok_or("couldn't get MappedPages reference for target_sec's relocation"));
+                        let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                         let source_sec_shndx: u16 = source_sec_entry.shndx(); 
                         if log { 
-                            let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
+                            let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
                                                                     .and_then(|s| s.get_name(&elf_file));
                             trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
                             // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
@@ -680,11 +696,11 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         let source_sec: Result<Arc<LoadedSection>, &'static str> = match source_sec_shndx {
                             SHN_LORESERVE | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_HIRESERVE => {
-                                error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
+                                error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
                                 Err("Unsupported source section shndx")
                             }
                             SHN_ABS => {
-                                error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, r.get_symbol_table_index());
+                                error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
                                 Err("Unsupported source section shndx SHN_ABS!!")
                             }
                             // match anything else, i.e., a valid source section shndx
@@ -715,7 +731,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                                     Some(sec) => Ok(sec), 
                                                     None => {
                                                         // if we couldn't get the source section based on its shndx, nor based on its name, then that's an error
-                                                        let source_sec_header = source_sec_entry.get_section_header(&elf_file, r.get_symbol_table_index() as usize)
+                                                        let source_sec_header = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
                                                                                                 .and_then(|s| s.get_name(&elf_file));
                                                         error!("Could not resolve source section for symbol relocation for symtab[{}] name={:?} header={:?}", 
                                                                 shndx, source_sec_name, source_sec_header);
@@ -734,46 +750,54 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         };
 
                         let source_sec = try!(source_sec);
-                        
-                        
+                        // let source_mapped_pages = try!(target_sec.mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation"));
+                        // trace!("source_sec mp {:?}, virt_addr: {:#X}, offset {:#X}", source_mapped_pages, source_mapped_pages.start_address(), source_sec.mapped_pages_offset());
+                        // let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(source_sec.mapped_pages_offset())) as *const _ as usize;
+                        // // let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(0)) as *const _ as usize;
+                        // if source_vaddr != source_sec.virt_addr() {
+                        //     error!("Source_sec vaddr {:#X} was not equal to virt_addr {:#X} for source_sec {:?}", source_vaddr, source_sec.virt_addr(), source_sec);
+                        // } 
 
                         // There is a great, succint table of relocation types here
                         // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
-                        match r.get_type() {
+                        match rela_entry.get_type() {
                             R_X86_64_32 => {
-                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
+                                let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
+                                let dest_ptr = dest_ref as *mut _ as usize;
+                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                unsafe {
-                                    *(dest_ptr as *mut u32) = source_val as u32; 
-                                }
+                                
+                                *dest_ref = source_val as u32;
                             }
                             R_X86_64_64 => {
-                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize);
+                                let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
+                                let dest_ptr = dest_ref as *mut _ as usize;
+                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                unsafe {
-                                    *(dest_ptr as *mut u64) = source_val as u64;
-                                }
+                                
+                                *dest_ref = source_val as u64;
                             }
                             R_X86_64_PC32 => {
-                                // trace!("                 dest_ptr: {:#X}, source_sec_vaddr: {:#X}, addend: {:#X}", dest_ptr, source_sec.virt_addr(), r.get_addend());
-                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize).wrapping_sub(dest_ptr);
+                                let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
+                                let dest_ptr = dest_ref as *mut _ as usize;
+                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                unsafe {
-                                    *(dest_ptr as *mut u32) = source_val as u32;
-                                }
+
+                                *dest_ref = source_val as u32;
                             }
                             R_X86_64_PC64 => {
-                                let source_val = source_sec.virt_addr().wrapping_add(r.get_addend() as usize).wrapping_sub(dest_ptr);
+                                let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
+                                let dest_ptr = dest_ref as *mut _ as usize;
+                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                unsafe {
-                                    *(dest_ptr as *mut u64) = source_val as u64;
-                                }
+
+                                *dest_ref = source_val as u64;
                             }
                             // R_X86_64_GOTPCREL => { 
                             //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
                             // }
                             _ => {
-                                error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", r);
+                                error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", rela_entry);
                                 return Err("found unsupported relocation type");
                             }
                         }   
