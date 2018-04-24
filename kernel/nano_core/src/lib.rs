@@ -75,7 +75,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
+        memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -93,11 +94,20 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(feature = "loadable")] 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_nano_core").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _num_nano_core_syms = mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
         let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         let _num_captain_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_captain").unwrap(), &mut kernel_mmi, false).unwrap();
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        // if we don't put the text/rodata/data_mapped_pages into a nano_kernel metadata crate, 
+        // then we need to save those pages in the kernel's MMI struct to prevent them from being dropped
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        kernel_mmi.extra_mapped_pages.push(text_mapped_pages);
+        kernel_mmi.extra_mapped_pages.push(rodata_mapped_pages);
+        kernel_mmi.extra_mapped_pages.push(data_mapped_pages);
     }
 
 

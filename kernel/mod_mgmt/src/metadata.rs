@@ -1,3 +1,8 @@
+//! This metadata module contains metadata about all other modules/crates loaded in Theseus.
+//! 
+//! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
+//! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
+
 use spin::Mutex;
 use irq_safety::MutexIrqSafe;
 use alloc::{Vec, String, BTreeMap};
@@ -42,7 +47,6 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
     let mut count = 0;
     // add all the global symbols to the system map
     {
-        let crate_name = new_crate.crate_name.clone();
         let mut locked_kmap = SYSTEM_MAP.lock();
         for sec in new_crate.sections.iter().filter(|s| s.is_global()) {
             let new_sec_size = sec.size();
@@ -55,11 +59,11 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
                     Entry::Occupied(old_val) => {
                         if let Some(old_sec) = old_val.get().upgrade() {
                             if old_sec.size() == new_sec_size {
-                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", crate_name, key); }
+                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate.crate_name, key); }
                             }
                             else {
                                 warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                    crate_name, old_sec.size(), new_sec_size, key);
+                                    new_crate.crate_name, old_sec.size(), new_sec_size, key);
                             }
                         }
                     }
@@ -71,14 +75,14 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
                 
                 // BELOW: the old way that just blindly replaced the old symbol with the new
                 // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
-                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", crate_name, key, sec.virt_addr());
+                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate.crate_name, key, sec.virt_addr());
                 // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
                 //     if old_sec.size() == new_sec_size {
                 //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
                 //     }
                 //     else {
                 //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
-                //                crate_name, old_sec.size(), new_sec_size, key);
+                //                new_crate.crate_name, old_sec.size(), new_sec_size, key);
                 //     }
                 // }
 
@@ -111,13 +115,13 @@ pub struct LoadedCrate {
     pub sections: Vec<Arc<LoadedSection>>,
     /// The `MappedPages` that include the text sections for this crate,
     /// i.e., sections that are readable and executable.
-    pub text_pages: Option<MappedPages>,
+    pub text_pages: Option<Arc<MappedPages>>,
     /// The `MappedPages` that include the rodata sections for this crate.
     /// i.e., sections that are read-only, not writable nor executable.
-    pub rodata_pages: Option<MappedPages>,
+    pub rodata_pages: Option<Arc<MappedPages>>,
     /// The `MappedPages` that include the data and bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
-    pub data_pages: Option<MappedPages>,
+    pub data_pages: Option<Arc<MappedPages>>,
 
     // crate_dependencies: Vec<LoadedCrate>,
 }
@@ -159,13 +163,14 @@ impl LoadedSection {
             &LoadedSection::Data(ref data) => data.global,
         }
     }
-    // pub fn set_global(&mut self, is_global: bool) {
-    //     match self {
-    //         &mut LoadedSection::Text(ref mut text) => text.global = is_global,
-    //         &mut LoadedSection::Rodata(ref mut rodata) => rodata.global = is_global,
-    //         &mut LoadedSection::Data(ref mut data) => data.global = is_global,
-    //     }
-    // }
+
+    pub fn parent(&self) -> &String {
+        match self {
+            &LoadedSection::Text(ref text) => &text.parent_crate,
+            &LoadedSection::Rodata(ref rodata) => &rodata.parent_crate,
+            &LoadedSection::Data(ref data) => &data.parent_crate,
+        }
+    }
 }
 
 
@@ -186,14 +191,16 @@ pub struct TextSection {
     pub hash: Option<String>,
     /// The virtual address of where this text section is loaded
     pub virt_addr: VirtualAddress,
-    // /// A reference to the `MappedPages` object that covers this section
-    // mapped_page_ref: &MappedPages,
-    // /// The offset into the `MappedPages` where this section starts
-    // mapped_page_offset: usize,
+    /// A reference to the `MappedPages` object that covers this section
+    pub mapped_pages: Weak<MappedPages>,
+    /// The offset into the `MappedPages` where this section starts
+    pub mapped_pages_offset: usize,
     /// The size in bytes of this section
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
+    /// The name of the `LoadedCrate` object that contains/owns this section
+    pub parent_crate: String,
 }
 
 
@@ -213,10 +220,16 @@ pub struct RodataSection {
     pub hash: Option<String>,
     /// The virtual address of where this section is loaded
     pub virt_addr: VirtualAddress,
+    /// A reference to the `MappedPages` object that covers this section
+    pub mapped_pages: Weak<MappedPages>,
+    /// The offset into the `MappedPages` where this section starts
+    pub mapped_pages_offset: usize,
     /// The size in bytes of this section
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
+    /// The name of the `LoadedCrate` object that contains/owns this section
+    pub parent_crate: String,
 }
 
 
@@ -236,8 +249,14 @@ pub struct DataSection {
     pub hash: Option<String>,
     /// The virtual address of where this section is loaded
     pub virt_addr: VirtualAddress,
+    /// A reference to the `MappedPages` object that covers this section
+    pub mapped_pages: Weak<MappedPages>,
+    /// The offset into the `MappedPages` where this section starts
+    pub mapped_pages_offset: usize,
     /// The size in bytes of this section
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
+    /// The name of the `LoadedCrate` object that contains/owns this section
+    pub parent_crate: String,
 }
