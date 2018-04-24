@@ -196,38 +196,36 @@ pub fn test_performance(_: Option<u64>) {
 
 }
 
-pub fn test_text(_: Option<u64>) {
-    
-    frame_buffer_text::print('a', 4, 7, 0xDF3546);
-    frame_buffer_text::print(' ', 4, 8, 0xDF3546);
-    frame_buffer_text::print('s', 4, 9, 0xDF3546);
-    frame_buffer_text::print('e', 4, 10, 0xDF3546);
-    frame_buffer_text::print('c', 4, 11, 0xDF3546);
-    frame_buffer_text::print('r', 4, 12, 0xDF3546);
-    frame_buffer_text::print('e', 4, 13, 0xDF3546);
-    frame_buffer_text::print('t', 4, 14, 0xDF3546);
-    frame_buffer_text::print(' ', 4, 15, 0xDF3546);
-    frame_buffer_text::print('m', 4, 16, 0xDF3546);
-    frame_buffer_text::print('a', 4, 17, 0xDF3546);
-    frame_buffer_text::print('k', 4, 18, 0xDF3546);
-    frame_buffer_text::print('e', 4, 19, 0xDF3546);
-    frame_buffer_text::print('s', 4, 20, 0xDF3546);
-    frame_buffer_text::print(' ', 4, 21, 0xDF3546);
-    frame_buffer_text::print('a', 4, 22, 0xDF3546);
-    frame_buffer_text::print(' ', 4, 23, 0xDF3546);
-    frame_buffer_text::print('w', 4, 24, 0xDF3546);
-    frame_buffer_text::print('o', 4, 25, 0xDF3546);
-    frame_buffer_text::print('m', 4, 26, 0xDF3546);
-    frame_buffer_text::print('a', 4, 27, 0xDF3546);
-    frame_buffer_text::print('n', 4, 28, 0xDF3546);
-    frame_buffer_text::print(' ', 4, 29, 0xDF3546);
-    frame_buffer_text::print('w', 4, 30, 0xDF3546);
-    frame_buffer_text::print('o', 4, 31, 0xDF3546);
-    frame_buffer_text::print('m', 4, 32, 0xDF3546);
-    frame_buffer_text::print('a', 4, 33, 0xDF3546);
-    frame_buffer_text::print('n', 4, 34, 0xDF3546);
+pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
+    use frame_buffer_text::CONSOLE_FRAME_TEXT_BUFFER;
+    use core::fmt::Write;
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret makes a woman woman\nZero is start\n").map_err(|_| "error in VgaBuffer's write_str()"));
 
     
+
+
+    Ok(())
 
 }
 
