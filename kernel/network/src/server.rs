@@ -1,18 +1,4 @@
 
-// extern crate log;
-// extern crate env_logger;
-// extern crate getopts;
-//extern crate smoltcp;
-
-//mod utils;
-
-/*use std::str;
-use std::fmt::Write;
-use std::time::Instant;
-use std::os::unix::io::AsRawFd;*/
-//extern crate collections;
-
-//use e1000::{E1000_NIC};
 use e1000::{E1000E_NIC};
 use nw_server::{EthernetDevice};
 use alloc::vec::Vec;
@@ -20,9 +6,6 @@ use alloc::boxed::Box;
 use alloc::*;
 use alloc::borrow::{ToOwned};
 use tsc::{tsc_ticks, TscTicks} ;
-
-
-
 use smoltcp::Error;
 use smoltcp::wire::{EthernetAddress, IpAddress};
 use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
@@ -30,10 +13,11 @@ use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem};
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
+use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use spin::{Once, Mutex};
 
 
-//global variable
-//static mut ss:Option<SocketSet> = None;
+static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
 
 
 pub fn test_server(_: Option<u64>) {
@@ -80,6 +64,17 @@ pub fn test_server(_: Option<u64>) {
 
     let mut client_endpoint:Option<IpEndpoint> = None;
 
+
+
+    //code to initialize the DFQ
+    let udpserver_dfq: DFQueue<String> = DFQueue::new();
+    let udpserver_consumer = udpserver_dfq.into_consumer();
+    let udpserver_producer = udpserver_consumer.obtain_producer();
+
+    UDP_TEST_SERVER.call_once(|| {
+       udpserver_consumer.obtain_producer()
+    });
+
      loop {
 
         {         
@@ -98,23 +93,23 @@ pub fn test_server(_: Option<u64>) {
 
             let tuple = match socket.recv() {
                 Ok((data, endpoint)) => {
-                    // debug!("udp:6969 recv data: {:?} from {}",
-                    //        str::from_utf8(data.as_ref()).unwrap(), endpoint);
+                    debug!("received packet");
                     let mut data2 = data.to_owned();
                     let mut s = String::from_utf8(data2.to_owned()).unwrap();
-                    s.pop();
-                    let test_string = String::from("test");
+
+                    //removing the newline
+
+                    //s.pop();
+                    let test_string = String::from("test\n");
 
                     if s.as_str() == test_string {
                         client_endpoint = Some(endpoint.to_owned());
                         debug!("+++++++++++++++++++");
                     }
+                    //client_endpoint = Some(endpoint.to_owned());
+                    udpserver_producer.enqueue(s);
 
-                    // match s.as_str()  {
-                    //     "test"  => debug!{"String TEST!!!"},
-                    //     "abcdefg"  => debug!{"String OTHER!!!"},
-                    //     _       => debug!{"Something else"},
-                    // }
+                    debug!("Endpoint {:?}", endpoint);
 
 
                     Some((data2, endpoint))
@@ -123,27 +118,22 @@ pub fn test_server(_: Option<u64>) {
                     None
                 }
             };
-            if let Some((data, endpoint)) = tuple {
-                //let data2 = b"yo dawg\n";
-                // if let Some(x) = client_endpoint{
-                //     socket.send_slice(&data[..], x).unwrap();
-                // }
-
-                socket.send_slice(&data[..], endpoint).unwrap();
-                let end = tsc_ticks().to_ns().unwrap();
-                debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
-                debug!("enpoint {}", endpoint);
-
-                //print!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
-            }
-
-
 
             if let Some(endpoint) = client_endpoint{
-                let mut data = b"testing\n";
-                debug!("enpoint {}", endpoint);
-                socket.send_slice(data, endpoint).expect("sending failed");
-                client_endpoint = None;
+                //let mut data = b"testing\n";
+                use core::ops::Deref;
+                let element = udpserver_consumer.peek();
+                if !element.is_none() {
+                    let element = element.unwrap();
+                    let data = element.deref(); // event.deref() is the equivalent of   &*event     \
+                    debug!("sending packet");
+                    debug!("data {:?}", data);
+
+                    socket.send_slice(data.as_bytes(), endpoint).expect("sending failed");
+                    element.mark_completed();
+                    //client_endpoint = None;                     
+                }
+
 
             }
 
@@ -151,73 +141,11 @@ pub fn test_server(_: Option<u64>) {
             
         }
 
-        //tcp:6969: respond "yo dawg"
-        // {
-        //     let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
-        //     if !socket.is_open() {
-        //         socket.listen(6969).unwrap();
-        //     }
 
-        //     if socket.can_send() {
-        //         //let data = b"yo dawg\n";
-        //         let mut data = socket.recv(128).unwrap().to_owned();
-        //         debug!("tcp:6969 send data: {:?}",
-        //                str::from_utf8(data.as_ref()).unwrap());
-        //         //socket.send_slice(data).unwrap();
-        //         socket.send_slice(&data[..]).unwrap();
-        //         debug!("tcp:6969 close");
-        //         socket.close();
-        //     }
-        // }
-
-                //tcp:6970: echo with reverse
-        // {
-        //     let socket: &mut TcpSocket = sockets.get_mut(tcp2_handle).as_socket();
-        //     if !socket.is_open() {
-        //         socket.listen(6970).unwrap()
-        //     }
-
-        //     if socket.is_active() && !tcp_6970_active {
-        //         debug!("tcp:6970 connected");
-        //     } else if !socket.is_active() && tcp_6970_active {
-        //         debug!("tcp:6970 disconnected");
-        //     }
-        //     tcp_6970_active = socket.is_active();
-
-        //     if socket.may_recv() {
-        //         let data = {
-        //             let mut data = socket.recv(128).unwrap().to_owned();
-        //             if data.len() > 0 {
-        //                 debug!("tcp:6970 recv data: {:?}",
-        //                        str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-        //                 // data = data.split(|&b| b == b'\n').collect::<Vec<_>>().concat();
-        //                 // data.reverse();
-        //                 // data.extend(b"\n");
-        //             }
-        //             data
-        //         };
-        //         if socket.can_send() && data.len() > 0 {
-        //             debug!("tcp:6970 send data: {:?}",
-        //                    str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-        //             socket.send_slice(&data[..]).unwrap();
-        //         }
-        //     } else if socket.may_send() {
-        //         debug!("tcp:6970 close");
-        //         socket.close();
-        //     }
-        // }
 
         let timestamp_ms = timestamp_ms + 1;
         let start = tsc_ticks().to_ns().unwrap();
 
-        //  match iface.poll(&mut sockets, timestamp_ms) {
-        //     Ok(()) | Err(Error::Exhausted) => {
-        //         let end = tsc_ticks().to_ns().unwrap();
-        //         debug!("Poll time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
-
-        //     },
-        //     Err(e) => debug!("poll error: {}", e)
-        // }
 
         match iface.poll(&mut sockets, timestamp_ms) {
             Ok(()) | Err(Error::Exhausted) => (),

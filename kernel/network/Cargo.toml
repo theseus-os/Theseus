@@ -37,3 +37,8 @@ crate-type = ["rlib"] # "lib" does the same thing I think
 
 [dependencies]
 spin = "0.4.5"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+

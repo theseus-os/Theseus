@@ -900,7 +900,7 @@ impl Nic{
         }  
 
         pub fn receive_single_packet2(&mut self)-> (*mut u8, usize)  { 
-                debug!("inside receive packet");
+                //debug!("inside receive packet");
                 unsafe {start = tsc_ticks().to_ns().unwrap();}
                 //debug!("r - {} ns", tmp);
 
@@ -937,7 +937,7 @@ impl Nic{
                         self.write_command(REG_RXDESCTAIL, old_cur );
                         //let end = tsc_ticks().to_ns().unwrap();
                         //debug!("inside receive packet = {} ns {} us", end-start, (end-start)/1000);
-                        debug!("receive done "); 
+                        debug!("receive done - From e1000"); 
 
                         (packet, length)
                 // } 

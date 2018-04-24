@@ -10,6 +10,7 @@ extern crate smoltcp;
 extern crate e1000;
 extern crate tsc;
 extern crate spin;
+extern crate dfqueue;
 
 #[macro_use] extern crate lazy_static;
 
