@@ -60,9 +60,15 @@ pub fn test_server(_: Option<u64>) {
 
 
 
-    let host_addrs = [IpAddress::v4(192, 168, 69, 100)];
+    let host_addrs = IpAddress::v4(192, 168, 69, 100);
+
+    let destination = IpEndpoint{
+        addr:host_addrs,
+        port: 5901,
+    };
 
     let mut client_endpoint:Option<IpEndpoint> = None;
+    let client_endpoint = Some(destination);
 
 
 
@@ -103,7 +109,7 @@ pub fn test_server(_: Option<u64>) {
                     let test_string = String::from("test\n");
 
                     if s.as_str() == test_string {
-                        client_endpoint = Some(endpoint.to_owned());
+                        //client_endpoint = Some(endpoint.to_owned());
                         debug!("+++++++++++++++++++");
                     }
                     //client_endpoint = Some(endpoint.to_owned());
