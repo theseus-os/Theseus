@@ -30,37 +30,7 @@ use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem};
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
-use core::str::FromStr;
-use irq_safety::MutexIrqSafe;
 
-
-const UDP_DEBUGGING:bool = true;
-
-
-
-lazy_static! {
-    pub static ref DEBUG_MESSAGE:MutexIrqSafe<server_send> = MutexIrqSafe::new(server_send{is_ready:false, msg:String::from_str("init").unwrap()});
-}
-pub struct server_send{
-    is_ready:bool,
-    msg:String, 
-    
-}
-
-impl server_send{
-
-    pub fn reset(&mut self){
-        self.is_ready = false;
-        self.msg = String::from_str("").unwrap();
-    }
-    pub fn set(&mut self, message:String){
-        if self.is_ready == false {
-            self.is_ready = true;
-            self.msg = message;
-        }
-
-    }
-}
 
 //global variable
 //static mut ss:Option<SocketSet> = None;
@@ -107,7 +77,6 @@ pub fn test_server(_: Option<u64>) {
 
 
     let host_addrs = [IpAddress::v4(192, 168, 69, 100)];
-    let mut save_endpoint:IpEndpoint;
 
      loop {
 
@@ -120,7 +89,7 @@ pub fn test_server(_: Option<u64>) {
                 socket.bind(6969)
             }
 
-            //let start = tsc_ticks().to_ns().unwrap();
+            let start = tsc_ticks().to_ns().unwrap();
 
             
 
@@ -131,9 +100,6 @@ pub fn test_server(_: Option<u64>) {
                     //        str::from_utf8(data.as_ref()).unwrap(), endpoint);
                     let mut data2 = data.to_owned();
 
-
-
-
                     Some((data2, endpoint))
                 }
                 Err(_) => {
@@ -142,50 +108,32 @@ pub fn test_server(_: Option<u64>) {
             };
             if let Some((data, endpoint)) = tuple {
                 //let data2 = b"yo dawg\n";
-
-                //important
                 socket.send_slice(&data[..], endpoint).unwrap();
-                
-                
-                
-                
-                //let end = tsc_ticks().to_ns().unwrap();
-                //debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
+                let end = tsc_ticks().to_ns().unwrap();
+                debug!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
                 //print!("Server time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
-
-/*                 if UDP_DEBUGGING == true{
-                    let mut debug_msg = DEBUG_MESSAGE.lock();
-                    debug_msg.set(String::from_str("testing\n").unwrap());
-                    if debug_msg.is_ready == true {
-                        let mut data = debug_msg.msg.to_owned();
-                        
-                        socket.send_slice(&data[..].as_bytes(), endpoint).unwrap();
-                    }
-                }  */
             }
-            //debug!("1");
-
             
         }
 
         //tcp:6969: respond "yo dawg"
-        // {
-        //     let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
-        //     if !socket.is_open() {
-        //         socket.listen(6969).unwrap();
-        //     }
+        {
+            let socket: &mut TcpSocket = sockets.get_mut(tcp1_handle).as_socket();
+            if !socket.is_open() {
+                socket.listen(6969).unwrap();
+            }
 
-        //     if socket.can_send() {
-        //         //let data = b"yo dawg\n";
-        //         let mut data = socket.recv(128).unwrap().to_owned();
-        //         debug!("tcp:6969 send data: {:?}",
-        //                str::from_utf8(data.as_ref()).unwrap());
-        //         //socket.send_slice(data).unwrap();
-        //         socket.send_slice(&data[..]).unwrap();
-        //         debug!("tcp:6969 close");
-        //         socket.close();
-        //     }
-        // }
+            if socket.can_send() {
+                //let data = b"yo dawg\n";
+                let mut data = socket.recv(128).unwrap().to_owned();
+                debug!("tcp:6969 send data: {:?}",
+                       str::from_utf8(data.as_ref()).unwrap());
+                //socket.send_slice(data).unwrap();
+                socket.send_slice(&data[..]).unwrap();
+                debug!("tcp:6969 close");
+                socket.close();
+            }
+        }
 
                 //tcp:6970: echo with reverse
         // {
@@ -236,15 +184,10 @@ pub fn test_server(_: Option<u64>) {
         //     Err(e) => debug!("poll error: {}", e)
         // }
 
-
-
         match iface.poll(&mut sockets, timestamp_ms) {
             Ok(()) | Err(Error::Exhausted) => (),
             Err(e) => debug!("poll error: {}", e)
         }
-
-
-
         
 
         
