@@ -352,15 +352,20 @@ impl fmt::Debug for TempModule {
 
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
+/// 
 ///  * The kernel's new ActivePageTable,
 ///  * the kernel's list of VirtualMemoryAreas,
-///  * the kernel's list of higher-half MappedPages, which should be kept forever,
+///  * the kernels' text section MappedPages,
+///  * the kernels' rodata section MappedPages,
+///  * the kernels' data section MappedPages,
+///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
+///
 /// Otherwise, it returns a str error message. 
 /// 
 /// Note: this was previously called remap_the_kernel.
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
-    -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
     // bootstrap an active_table from the currently-loaded page table
     let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
@@ -398,38 +403,55 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
+    let mut text_mapped_pages: Option<MappedPages> = None;
+    let mut rodata_mapped_pages: Option<MappedPages> = None;
+    let mut data_mapped_pages: Option<MappedPages> = None;
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
     // consumes and auto unmaps temporary page
     try!( active_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
+        
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
         // (they were initialized in InactivePageTable::new())
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
+
+        let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
+        let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
+        let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
+        let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
+        let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
+        let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
+
+        let mut text_flags:       Option<EntryFlags> = None;
+        let mut rodata_flags:     Option<EntryFlags> = None;
+        let mut data_flags:       Option<EntryFlags> = None;
+
+
         // scoped to release the frame allocator lock
         {
             let mut allocator = allocator_mutex.lock(); 
-    
+
             let mut index = 0;    
             // map the allocated kernel text sections
             for section in elf_sections_tag.sections() {
+                
+                // skip sections that don't need to be loaded into memory
                 if section.size() == 0 
                     || !section.is_allocated() 
+                    || section.name().starts_with(".gcc")
+                    || section.name().starts_with(".eh_frame")
                     || section.name().starts_with(".debug") 
                 {
-                    // skip sections that don't need to be loaded into memory
                     continue;
                 }
                 
                 debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
 
                 if !address_is_page_aligned(section.start_address() as usize) {
-                    if section.name().starts_with(".eh_frame") {
-                        continue; // just skip eh_frame for now
-                    }
                     error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
                     return Err("Kernel ELF Section was not page-aligned");
                 }
@@ -452,28 +474,51 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     start_virt_addr += KERNEL_OFFSET;
                 }
 
-                // a dumb hack to get the VMA name to be &'static str, since there's only a few possible section names and we know them a priori
+                let end_virt_addr = start_virt_addr + section.size() as VirtualAddress;
+                let end_phys_addr = start_phys_addr + section.size() as PhysicalAddress;
+
+
+                // the linker script (linker_higher_half.ld) defines the following order of sections:
+                //     .init (start) then .text (end)
+                //     .data (start) then .bss (end)
+                //     .rodata (start and end)
+                // Those are the only sections we care about.
                 let static_str_name = match section.name() {
-                    ".init"              =>  "nano_core .init",
-                    ".text"              =>  "nano_core .text",
-                    ".data"              =>  "nano_core .data",
-                    ".bss"               =>  "nano_core .bss",
-                    ".rodata"            =>  "nano_core .rodata",
-                    ".gcc_except_table"  =>  "nano_core .gcc_except_table",
-                    _                    =>  "nano_core misc section",
+                    ".init" => {
+                        text_start = Some((start_virt_addr, start_phys_addr));
+                        "nano_core .init"
+                    } 
+                    ".text" => {
+                        text_end = Some((end_virt_addr, end_phys_addr));
+                        text_flags = Some(flags);
+                        "nano_core .text"
+                    }
+                    ".rodata" => {
+                        rodata_start = Some((start_virt_addr, start_phys_addr));
+                        rodata_end   = Some((end_virt_addr, end_phys_addr));
+                        rodata_flags = Some(flags);
+                        "nano_core .rodata"
+                    }
+                    ".data" => {
+                        data_start = Some((start_virt_addr, start_phys_addr));
+                        data_flags = Some(flags);
+                        "nano_core .data"
+                    }
+                    ".bss" => {
+                        data_end = Some((end_virt_addr, end_phys_addr));
+                        "nano_core .bss"
+                    }
+                    _ =>  {
+                        error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
+                                section.name(), section.start_address(), section.size());
+                        return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
+                    }
                 };
                 vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, static_str_name);
-                
-                // map the whole range of frames in this section
-                higher_half_mapped_pages[index] = Some(try!( mapper.map_frames(
-                    Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
-                    Page::containing_address(start_virt_addr), 
-                    flags, allocator.deref_mut())
-                ));
-                debug!("     mapped kernel section: {} at addr: {:?}", section.name(), vmas[index]);
+                debug!("     mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
 
 
-                // also, to allows the APs to boot up, we identity map the kernel sections too
+                // to allow the APs to boot up, we identity map the kernel sections too.
                 // (lower half virtual addresses mapped to same lower half physical addresses)
                 // we will unmap these later before we start booting to userspace processes
                 identity_mapped_pages[index] = Some(try!( mapper.map_frames(
@@ -483,30 +528,43 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 ));
                 debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, section.size());
 
-                index += 1;
-            }
+                index += 1;      
+
+            } // end of section iterator
+
+
+            let (text_start_virt,    text_start_phys)    = try!(text_start  .ok_or("Couldn't find start of .text section"));
+            let (_text_end_virt,     text_end_phys)      = try!(text_end    .ok_or("Couldn't find end of .text section"));
+            let (rodata_start_virt,  rodata_start_phys)  = try!(rodata_start.ok_or("Couldn't find start of .rodata section"));
+            let (_rodata_end_virt,   rodata_end_phys)    = try!(rodata_end  .ok_or("Couldn't find end of .rodata section"));
+            let (data_start_virt,    data_start_phys)    = try!(data_start  .ok_or("Couldn't find start of .data section"));
+            let (_data_end_virt,     data_end_phys)      = try!(data_end    .ok_or("Couldn't find start of .data section"));
+
+            let text_flags    = try!(text_flags  .ok_or("Couldn't find .text section flags"));
+            let rodata_flags  = try!(rodata_flags.ok_or("Couldn't find .rodata section flags"));
+            let data_flags    = try!(data_flags  .ok_or("Couldn't find .data section flags"));
+
+
+            // now we map the 5 main sections into 3 groups according to flags
+            text_mapped_pages = Some( try!( mapper.map_frames(
+                Frame::range_inclusive_addr(text_start_phys, text_end_phys - text_start_phys), 
+                Page::containing_address(text_start_virt), 
+                text_flags, allocator.deref_mut())
+            ));
+            rodata_mapped_pages = Some( try!( mapper.map_frames(
+                Frame::range_inclusive_addr(rodata_start_phys, rodata_end_phys - rodata_start_phys), 
+                Page::containing_address(rodata_start_virt), 
+                rodata_flags, allocator.deref_mut())
+            ));
+            data_mapped_pages = Some( try!( mapper.map_frames(
+                Frame::range_inclusive_addr(data_start_phys, data_end_phys - data_start_phys),
+                Page::containing_address(data_start_virt), 
+                data_flags, allocator.deref_mut())
+            ));
+
 
             const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
-
-            // // now that we've mapped all the sections above 0x10_0000 (1 MiB), 
-            // // we need to map everything under 0x10_0000 so we can access the bootloader (multiboot) info
-            // // here we map physical address from 0x0 to VGA buffer start (0xb8000)
-            // higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-            //     Frame::range_inclusive_addr(0, VGA_DISPLAY_PHYS_START - 0), 
-            //     Page::containing_address(0 + KERNEL_OFFSET), 
-            //     EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-            // ));
-            // vmas[index] = VirtualMemoryArea::new(0 + KERNEL_OFFSET, VGA_DISPLAY_PHYS_START - 0, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel Low BIOS Memory");
-            // debug!("mapped bootloader info at addr: {:?}", vmas[index]);
-            // // also do an identity mapping for APs that need it while booting
-            // identity_mapped_pages[index] = Some( try!( mapper.map_frames(| EntryFlags::GLOBAL
-            //     Frame::range_inclusive_addr(0, VGA_DISPLAY_PHYS_START - 0), 
-            //     Page::containing_address(0), 
-            //     EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-            // ));
-            // index += 1;
-
 
             // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
             // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
@@ -527,25 +585,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 vga_display_flags, allocator.deref_mut())
             ));
             index += 1;
-
-
-            // // here we map the rest of the multiboot bootloader memory, 
-            // // from the physical address of the VGA buffer end (0xc0000) to 0x10_0000 (1 MiB)
-            // higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-            //     Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_END, 0x10_0000 - VGA_DISPLAY_PHYS_END), 
-            //     Page::containing_address(VGA_DISPLAY_PHYS_END + KERNEL_OFFSET), 
-            //     EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-            // ));
-            // vmas[index] = VirtualMemoryArea::new(VGA_DISPLAY_PHYS_END + KERNEL_OFFSET, 0x10_0000 - VGA_DISPLAY_PHYS_END, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel Low BIOS Memory");
-            // debug!("mapped bootloader info at addr: {:?}", vmas[index]);
-            // // also do an identity mapping for APs that need it while booting
-            // identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-            //     Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_END, 0x10_0000 - VGA_DISPLAY_PHYS_END), 
-            //     Page::containing_address(VGA_DISPLAY_PHYS_END), 
-            //     EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-            // ));
-            // index += 1;
-
+            
 
             // map the multiboot boot_info at the same address it previously was, so we can continue to access boot_info 
             let boot_info_pages  = Page::range_inclusive_addr(boot_info_start_vaddr, boot_info_size);
@@ -577,6 +617,12 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         Ok(()) // mapping closure completed successfully
 
     })); // TemporaryPage is dropped here
+
+
+    let text_mapped_pages   = try!(text_mapped_pages  .ok_or("Couldn't map .text section"));
+    let rodata_mapped_pages = try!(rodata_mapped_pages.ok_or("Couldn't map .rodata section"));
+    let data_mapped_pages   = try!(data_mapped_pages  .ok_or("Couldn't map .data section"));
+
 
     debug!("switching to new page table {:?}", new_table);
     let mut new_active_table = active_table.switch(&PageTable::Inactive(new_table));
@@ -612,7 +658,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
-    Ok((new_active_table, kernel_vmas, higher_half, identity))
+    Ok((new_active_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
 }
 
 

@@ -288,9 +288,8 @@ impl Mapper {
 
 
 
-/// Represents a mapped range of virtual addresses, specified in pages.
-/// The underlying pages that are mapped are guaranteed to be continguous in virtual memory (not physical),
-/// and one `MappedPages` object can only have a single range of contiguous pages, not multiple disjoint ranges.
+/// Represents a contiguous range of virtual memory pages that are currently mapped. 
+/// A `MappedPages` object can only have a single range of contiguous pages, not multiple disjoint ranges.
 /// 
 /// This object also represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be unmapped, and if they were allocated, then also de-allocated. 
@@ -329,6 +328,23 @@ impl MappedPages {
     /// Returns the size of this mapping in number of bytes.
     pub fn size_in_bytes(&self) -> usize {
         self.size_in_pages() * PAGE_SIZE
+    }
+
+    /// Returns the offset of a given virtual address into this mapping, 
+    /// if contained within this mapping. 
+    /// If not, returns None. 
+    ///  
+    /// # Examples
+    /// If a `MappedPages` covered addresses `0x2000` to `0x4000`, then calling
+    /// `mapped_pages.offset_of(0x3500)` would return `Some(0x1500)`.
+    pub fn offset_of(&self, vaddr: VirtualAddress) -> Option<usize> {
+        let start = self.pages.start_address();
+        if (vaddr >= start) && (vaddr <= start + self.size_in_bytes()) {
+            Some(vaddr - start)
+        }
+        else {
+            None
+        }
     }
 
 
