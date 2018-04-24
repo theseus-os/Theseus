@@ -21,21 +21,10 @@ use smoltcp::wire::{IpProtocol, IpEndpoint};
 use smoltcp::phy::Device;
 use irq_safety::MutexIrqSafe;
 use core::str::FromStr;
-/* 
-lazy_static! {
-        pub static ref SERVER: MutexIrqSafe<Server<'static, EthernetDevice>> = MutexIrqSafe::new(Server{
-              sockets  : SocketSet::new(vec![]),
-              //udp_handle: None,
-              iface : None,
-              //tcp_6970_active: false        
-        });
 
-        // pub static ref SERVER: Server = Server<T>{
-        //     iface : None,
-        //  };
-} */
 
-lazy_static! {
+
+/* lazy_static! {
     pub static ref SERVER:server_send = server_send{is_ready:false, string:String::from_str("").unwrap()};
 }
 pub struct server_send{
@@ -55,7 +44,7 @@ impl server_send{
         self.string = msg;
     }
 }
-
+ */
 
 
 pub struct Server_send{
@@ -64,7 +53,43 @@ pub struct Server_send{
     
 }
 
-/*
+
+// lazy_static! {
+//         pub static ref SERVER: MutexIrqSafe<Server<'static, EthernetDevice>> = MutexIrqSafe::new(Server{
+//               sockets  : SocketSet::new(vec![]),
+
+//             //   iface      : EthernetInterface::new(  
+//             //         Box::new(EthernetDevice{
+//             //             tx_next: 0,
+//             //             rx_next: 0,
+//             //         }),
+//             //         Box::new(SliceArpCache::new(vec![Default::default(); 8])) as Box<ArpCache>,
+//             //         EthernetAddress([0x00, 0x0b, 0x82, 0x01, 0xfc, 0x42]), 
+//             //         [IpAddress::v4(192, 168, 69, 1)]),    
+//         });
+
+//         // pub static ref SERVER: Server = Server<T>{
+//         //     iface : None,
+//         //  };
+// } 
+
+ pub static SERVER: MutexIrqSafe<Server<'static, EthernetDevice>> = MutexIrqSafe::new(Server{
+              sockets  : SocketSet::new(vec![]),
+              udp_handle: None,
+              iface:None,
+
+            //   iface      : EthernetInterface::new(  
+            //         Box::new(EthernetDevice{
+            //             tx_next: 0,
+            //             rx_next: 0,
+            //         }),
+            //         Box::new(SliceArpCache::new(vec![Default::default(); 8])) as Box<ArpCache>,
+            //         EthernetAddress([0x00, 0x0b, 0x82, 0x01, 0xfc, 0x42]), 
+            //         [IpAddress::v4(192, 168, 69, 1)]),    
+        });
+
+
+
 pub fn server_init(){
     let mut server_nw = SERVER.lock();
     server_nw.init();
@@ -73,8 +98,8 @@ pub fn server_init(){
 pub struct Server<'a, T: Device + 'static> {
     sockets:SocketSet <'static, 'static, 'static>,
     udp_handle:Option<SocketHandle>,
-    //iface : EthernetInterface<'static, 'static, 'static, T>,
-    iface : EthernetInterface<'a, 'a, 'a, T>,
+    //iface : EthernetInterface<'static, 'a, 'static, T>,
+    iface : Option<EthernetInterface<'a, 'a, 'a, T>>,
 
     //tcp_6970_active:bool, 
 }
@@ -154,7 +179,7 @@ impl<'a, T: Device + 'static> Server<'a, T> {
             
         }
 }
-*/
+
 
 pub fn test_server2(_: Option<u64>) {
 
