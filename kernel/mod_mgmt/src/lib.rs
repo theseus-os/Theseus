@@ -750,13 +750,8 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         };
 
                         let source_sec = try!(source_sec);
-                        // let source_mapped_pages = try!(target_sec.mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation"));
-                        // trace!("source_sec mp {:?}, virt_addr: {:#X}, offset {:#X}", source_mapped_pages, source_mapped_pages.start_address(), source_sec.mapped_pages_offset());
-                        // let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(source_sec.mapped_pages_offset())) as *const _ as usize;
-                        // // let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(0)) as *const _ as usize;
-                        // if source_vaddr != source_sec.virt_addr() {
-                        //     error!("Source_sec vaddr {:#X} was not equal to virt_addr {:#X} for source_sec {:?}", source_vaddr, source_sec.virt_addr(), source_sec);
-                        // } 
+                        let source_mapped_pages = try!(source_sec.mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation"));
+                        let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(source_sec.mapped_pages_offset())) as *const _ as usize;
 
                         // There is a great, succint table of relocation types here
                         // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
@@ -764,7 +759,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             R_X86_64_32 => {
                                 let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
                                 let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize);
+                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 
                                 *dest_ref = source_val as u32;
@@ -772,7 +767,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             R_X86_64_64 => {
                                 let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
                                 let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize);
+                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
                                 
                                 *dest_ref = source_val as u64;
@@ -780,7 +775,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             R_X86_64_PC32 => {
                                 let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
                                 let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
+                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
 
                                 *dest_ref = source_val as u32;
@@ -788,7 +783,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             R_X86_64_PC64 => {
                                 let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
                                 let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_sec.virt_addr().wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
+                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
                                 if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
 
                                 *dest_ref = source_val as u64;
