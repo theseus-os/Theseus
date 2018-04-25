@@ -96,7 +96,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let _num_nano_core_syms = mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false).unwrap();
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
-        let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_libcore").unwrap(), &mut kernel_mmi, false).unwrap();
+        let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_core").unwrap(), &mut kernel_mmi, false).unwrap();
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         let _num_captain_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_captain").unwrap(), &mut kernel_mmi, false).unwrap();
     }

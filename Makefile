@@ -192,7 +192,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@for f in `find ./kernel/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
 	done
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(target)/lib/core-*.o $(grub-isofiles)/modules/__k_libcore.o
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(target)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 ### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
