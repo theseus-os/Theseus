@@ -49,8 +49,8 @@ static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
-/// it invokes the `shutdown()` function upon an error.
-macro_rules! shutdown {
+/// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
+macro_rules! try_exit {
     ($expr:expr) => (match $expr {
         Ok(val) => val,
         Err(err_msg) => {
@@ -61,7 +61,7 @@ macro_rules! shutdown {
 }
 
 
-
+/// Shuts down Theseus and prints the given string.
 fn shutdown(msg: &'static str) -> ! {
     warn!("Theseus is shutting down, msg: {}", msg);
 
@@ -82,6 +82,7 @@ fn shutdown(msg: &'static str) -> ! {
 /// * Initializes the [state_store](../state_store.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
 ///
+/// If a failure occurs and is propagated back up to this function, the OS is shut down.
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
 	
@@ -89,20 +90,22 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 	irq_safety::disable_interrupts();
 	
     // first, bring up the logger so we can debug
-    shutdown!(logger::init().map_err(|_| "couldn't init logger!"));
+    try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
     trace!("Logger initialized.");
 
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
 
-    // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
-    debug!("multiboot_information_vaddr: {:#X}", multiboot_information_virtual_address);
+    // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
+    if !memory::Page::is_valid_address(multiboot_information_virtual_address) {
+        try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
+    }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
-        shutdown!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+        try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -120,17 +123,17 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(feature = "loadable")] 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = shutdown!(mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
+        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
         
-        let _num_libcore_syms = shutdown!(mod_mgmt::load_kernel_crate(
-            shutdown!(memory::get_module("__k_core").ok_or("couldn't find __k_core module")), 
+        let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(
+            try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module")), 
             &mut kernel_mmi, false)
         );
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
-        let _num_captain_syms = shutdown!(mod_mgmt::load_kernel_crate(
-            shutdown!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module")), 
+        let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(
+            try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module")), 
             &mut kernel_mmi, false)
         );
     }
@@ -154,9 +157,15 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use alloc::Vec;
         use irq_safety::MutexIrqSafe;
 
-        let vaddr = shutdown!(mod_mgmt::metadata::get_symbol("captain::init").upgrade().ok_or("no symbol: captain::init")).virt_addr();
-        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
-        shutdown!(
+        let section = try_exit!(mod_mgmt::metadata::get_symbol("captain::init").upgrade().ok_or("no symbol: captain::init"));
+        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
+        let mut space = 0;
+        let func: &CaptainInitFunc = try_exit!( 
+            try_exit!(section.mapped_pages().ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
+            .as_func(section.mapped_pages_offset(), &mut space) 
+        );
+
+        try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, 
                 get_bsp_stack_bottom(), get_bsp_stack_top(),
                 get_ap_start_realmode_begin(), get_ap_start_realmode_end()
@@ -165,7 +174,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     }
     #[cfg(not(feature = "loadable"))]
     {
-        shutdown!(
+        try_exit!(
             captain::init(kernel_mmi_ref, identity_mapped_pages, 
                 get_bsp_stack_bottom(), get_bsp_stack_top(),
                 get_ap_start_realmode_begin(), get_ap_start_realmode_end()
@@ -175,7 +184,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
 
     // the captain shouldn't return ...
-    shutdown!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
+    try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
 }
 
 
@@ -198,7 +207,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 
     error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     error!("    {}", fmt);
-    unsafe { memory::stack_trace(); }
+    memory::stack_trace();
 
     println_raw!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
     println_raw!("    {}", fmt);

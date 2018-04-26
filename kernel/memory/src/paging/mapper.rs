@@ -24,10 +24,12 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub unsafe fn new() -> Mapper {
-        Mapper { 
-            p4: Unique::new_unchecked(P4),
-            target_p4: get_current_p4(),
+    pub fn new() -> Mapper {
+        unsafe {
+            Mapper { 
+                p4: Unique::new_unchecked(P4),
+                target_p4: get_current_p4(),
+            }
         }
     }
 

@@ -111,6 +111,9 @@ pub struct Task {
     /// Whether or not this task is pinned to a certain core
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
+    /// Whether this Task is an idle task, the task that runs by default when no other task is running.
+    /// There exists one idle task per core.
+    pub is_an_idle_task: bool,
 }
 
 impl fmt::Debug for Task {
@@ -142,6 +145,7 @@ impl Task {
             mmi: None,
             new_userspace_entry_addr: None,
             pinned_core: None,
+            is_an_idle_task: false,
         }
     }
 
@@ -162,6 +166,10 @@ impl Task {
 
     pub fn is_runnable(&self) -> bool {
         self.runstate == RunState::RUNNABLE
+    }
+
+    pub fn is_an_idle_task(&self) -> bool {
+        self.is_an_idle_task
     }
 
 

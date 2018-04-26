@@ -110,7 +110,7 @@ use core::fmt;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, enable_interrupts};
 
 #[cfg(feature = "loadable")] use task::Task;
 #[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
@@ -159,8 +159,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let _tsc_freq = {
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("tsc::get_tsc_frequency").upgrade().ok_or("no symbol: tsc::get_tsc_frequency")?.virt_addr();
-            let func: fn() -> Result<u64, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("tsc::get_tsc_frequency").upgrade().ok_or("no symbol: tsc::get_tsc_frequency")?;
+            let mut space = 0;
+            let func: & fn() -> Result<u64, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"tsc::get_tsc_frequency\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func()?
         }
         #[cfg(not(feature = "loadable"))]
@@ -168,6 +172,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             tsc::get_tsc_frequency()?
         }   
     };
+    // info!("TSC frequency calculated: {}", _tsc_freq);
 
 
     // load the rest of our crate dependencies
@@ -214,9 +219,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("driver_init::early_init").upgrade().ok_or("no symbol: driver_init::early_init")?.virt_addr();
-            let func: fn(&mut memory::MemoryManagementInfo) -> Result<MadtIter, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("driver_init::early_init").upgrade().ok_or("no symbol: driver_init::early_init")?;
+            let mut space = 0;
+            let func: & fn(&mut memory::MemoryManagementInfo) -> Result<MadtIter, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"driver_init::early_init\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(&mut kernel_mmi)?
+
+            // let vaddr = mod_mgmt::metadata::get_symbol("driver_init::early_init").upgrade().ok_or("no symbol: driver_init::early_init")?.virt_addr();
+            // let func: fn(&mut memory::MemoryManagementInfo) -> Result<MadtIter, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
         }
         #[cfg(not(feature = "loadable"))]
         {
@@ -237,8 +249,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     #[cfg(feature = "loadable")]
     {
-        let vaddr = mod_mgmt::metadata::get_symbol("interrupts::init").upgrade().ok_or("no symbol: interrupts::init")?.virt_addr();
-        let func: fn(usize, usize) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        let section = mod_mgmt::metadata::get_symbol("interrupts::init").upgrade().ok_or("no symbol: interrupts::init")?;
+        let mut space = 0;
+        let func: & fn(usize, usize) -> Result<(), &'static str> =
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"interrupts::init\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     } 
     #[cfg(not(feature = "loadable"))] 
@@ -251,8 +267,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // interrupts::init_handlers_pic();
     #[cfg(feature = "loadable")] 
     {
-        let vaddr = mod_mgmt::metadata::get_symbol("interrupts::init_handlers_apic").upgrade().ok_or("no symbol: interrupts::init_handlers_apic")?.virt_addr();
-        let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
+        let section = mod_mgmt::metadata::get_symbol("interrupts::init_handlers_apic").upgrade().ok_or("no symbol: interrupts::init_handlers_apic")?;
+        let mut space = 0;
+        let func: & fn() = 
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"interrupts::init_handlers_apic\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func();
     } 
     #[cfg(not(feature = "loadable"))]
@@ -263,8 +283,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the syscall subsystem
     #[cfg(feature = "loadable")]
     {
-        let vaddr = mod_mgmt::metadata::get_symbol("syscall::init").upgrade().ok_or("no symbol: syscall::init")?.virt_addr();
-        let func: fn(usize) = unsafe { ::core::mem::transmute(vaddr) };
+        let section = mod_mgmt::metadata::get_symbol("syscall::init").upgrade().ok_or("no symbol: syscall::init")?;
+        let mut space = 0;
+        let func: & fn(usize) = 
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"syscall::init\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func(syscall_stack.top_usable());
     }
     #[cfg(not(feature = "loadable"))]
@@ -276,8 +300,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let bsp_apic_id = {
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("apic::get_bsp_id").upgrade().ok_or("no symbol: apic::get_bsp_id")?.virt_addr();
-            let func: fn() -> Option<u8> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("apic::get_bsp_id").upgrade().ok_or("no symbol: apic::get_bsp_id")?;
+            let mut space = 0;
+            let func: & fn() -> Option<u8> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"apic::get_bsp_id\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func().ok_or("captain::init(): Coudln't get BSP's apic_id!")?
         }
         #[cfg(not(feature = "loadable"))]
@@ -369,10 +397,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    enable_interrupts();
-
-
     if true {
         // #[cfg(feature = "loadable")]
         // {
@@ -383,7 +407,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use e1000::test_nic_driver::test_nic_driver;
-            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"))?;
+            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
         }
     }  
 
@@ -459,30 +483,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    enable_interrupts();
-    debug!("captain::init(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
+    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    enable_interrupts();
+
+    // the below should never run unless there are no other tasks available to run on the BSP core
     
-    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in captain::init()");
     loop { 
-        
-        #[cfg(feature = "loadable")]
-        {
-            let vaddr = mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().ok_or("no symbol: scheduler::schedule")?.virt_addr();
-            let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
-            func();
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            scheduler::schedule();
-        }
-        
-        
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
 
-
-    // cleanup here
-    // logger::shutdown().ok_or("WTF: failed to shutdown logger... oh well.");
 }

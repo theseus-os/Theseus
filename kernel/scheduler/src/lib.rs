@@ -13,7 +13,7 @@ extern crate task;
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
-use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
+use irq_safety::{RwLockIrqSafe, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{Task, get_my_current_task};
 use apic::get_my_apic_id;
@@ -21,10 +21,9 @@ use apic::get_my_apic_id;
 
 /// This function performs a context switch.
 ///
-/// Interrupts MUST be disabled before this function runs. 
+/// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
     disable_interrupts();
-    assert!(interrupts_enabled() == false, "Invoked schedule() with interrupts enabled!");
 
     // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("schedule [0]: current_taskid={}", current_taskid);
@@ -176,18 +175,20 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         }
     };
     
+    let mut idle_task_index: Option<usize> = None;
     let mut index_chosen: Option<usize> = None;
 
     for (i, task) in runqueue_locked.iter().enumerate() {
         let t = task.read();
 
-        // must be runnable
-        if !t.is_runnable() {
+        // we skip the idle task, and only choose it if no other tasks are runnable
+        if t.is_an_idle_task() {
+            idle_task_index = Some(i);
             continue;
         }
 
-        // must not be running
-        if t.is_running() {
+        // must be runnable
+        if !t.is_runnable() {
             continue;
         }
 
@@ -206,7 +207,8 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         break; 
     }
 
-    if let Some(index) = index_chosen {
+    // idle task is a backup iff no other task has been chosen
+    if let Some(index) = index_chosen.or(idle_task_index) {
         let chosen_task: TaskRef = runqueue_locked.remove(index).unwrap();
         runqueue_locked.push_back(chosen_task.clone()); 
         Some(chosen_task)
