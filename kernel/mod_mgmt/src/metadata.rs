@@ -8,7 +8,7 @@ use irq_safety::MutexIrqSafe;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use alloc::btree_map::Entry; 
-use memory::{VirtualAddress, MappedPages};
+use memory::MappedPages;
 
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
@@ -135,13 +135,6 @@ pub enum LoadedSection{
     Data(DataSection),
 }
 impl LoadedSection {
-    pub fn virt_addr(&self) -> VirtualAddress {
-        match self {
-            &LoadedSection::Text(ref text) => text.virt_addr,
-            &LoadedSection::Rodata(ref rodata) => rodata.virt_addr,
-            &LoadedSection::Data(ref data) => data.virt_addr,
-        }
-    }
     pub fn size(&self) -> usize {
         match self {
             &LoadedSection::Text(ref text) => text.size,
@@ -203,8 +196,6 @@ pub struct TextSection {
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,
-    /// The virtual address of where this text section is loaded
-    pub virt_addr: VirtualAddress,
     /// A reference to the `MappedPages` object that covers this section
     pub mapped_pages: Weak<MappedPages>,
     /// The offset into the `MappedPages` where this section starts
@@ -232,8 +223,6 @@ pub struct RodataSection {
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,
-    /// The virtual address of where this section is loaded
-    pub virt_addr: VirtualAddress,
     /// A reference to the `MappedPages` object that covers this section
     pub mapped_pages: Weak<MappedPages>,
     /// The offset into the `MappedPages` where this section starts
@@ -261,8 +250,6 @@ pub struct DataSection {
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,
-    /// The virtual address of where this section is loaded
-    pub virt_addr: VirtualAddress,
     /// A reference to the `MappedPages` object that covers this section
     pub mapped_pages: Weak<MappedPages>,
     /// The offset into the `MappedPages` where this section starts
