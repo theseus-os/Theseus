@@ -544,22 +544,36 @@ impl MappedPages {
     /// otherwise there would be a lifetime issue and a guaranteed page fault. 
     /// So, the `space` arg is a hack to ensure lifetimes; we don't care about the actual value of `space`, as the value will be overwritten,
     /// and it doesn't matter both before and after the call to this `as_func()`.
-    pub fn as_func<'a, T>(&self, offset: usize, space: &'a mut usize) -> Result<&'a T, &'static str> {
-        let size = mem::size_of::<T>();
+    /// 
+    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
+    /// 
+    /// # Examples
+    /// Here's how you might call this function:
+    /// ```
+    /// type PrintFuncSignature = fn(&str) -> Result<(), &'static str>;
+    /// let mut space = 0; // this must persist throughout the print_func being called
+    /// let print_func: &PrintFuncSignature = mapped_pages.as_func(func_offset, &mut space).unwrap();
+    /// print_func("hi");
+    /// ```
+    /// Because Rust has lexical lifetimes, the `space` variable must have a lifetime at least as long as the  `print_func` variable,
+    /// meaning that `space` must still be in scope in order for `print_func` to be invoked.
+    /// 
+    pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
+        let size = mem::size_of::<F>();
         if true {
-            debug!("MappedPages::as_func(): requested type {} with size {} at offset {}, MappedPages size {}!",
+            debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
                 // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                unsafe { ::core::intrinsics::type_name::<F>() }, 
                 size, offset, self.size_in_bytes()
             );
         }
 
-        // check that size of the type T fits within the size of the mapping
+        // check that size of the type F fits within the size of the mapping
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
                     // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    unsafe { ::core::intrinsics::type_name::<F>() }, 
                     size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
@@ -568,7 +582,7 @@ impl MappedPages {
         *space = self.pages.start_address() + offset; 
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &'a T = unsafe {
+        let t: &'a F = unsafe {
             mem::transmute(space)
         };
 

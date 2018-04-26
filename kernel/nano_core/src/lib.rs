@@ -47,6 +47,30 @@ use x86_64::structures::idt::LockedIdt;
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
+
+/// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
+/// it invokes the `shutdown()` function upon an error.
+macro_rules! shutdown {
+    ($expr:expr) => (match $expr {
+        Ok(val) => val,
+        Err(err_msg) => {
+            $crate::shutdown(err_msg);
+        }
+    });
+    ($expr:expr,) => (try!($expr));
+}
+
+
+
+fn shutdown(msg: &'static str) -> ! {
+    warn!("Theseus is shutting down, msg: {}", msg);
+
+    // TODO: handle shutdowns properly with ACPI commands
+    panic!(msg);
+}
+
+
+
 /// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
 ///
 /// This is called from assembly code entry point for Theseus, found in `src/boot/arch_x86_64/boot.asm`.
@@ -65,18 +89,20 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 	irq_safety::disable_interrupts();
 	
     // first, bring up the logger so we can debug
-    logger::init().expect("WTF: couldn't init logger.");
+    shutdown!(logger::init().map_err(|_| "couldn't init logger!"));
     trace!("Logger initialized.");
-    
+
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
+    debug!("multiboot_information_vaddr: {:#X}", multiboot_information_virtual_address);
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
+    // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
-        memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
+        shutdown!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
@@ -94,11 +120,19 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(feature = "loadable")] 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false).unwrap();
+        let _num_nano_core_syms = shutdown!(mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
-        let _num_libcore_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_core").unwrap(), &mut kernel_mmi, false).unwrap();
+        
+        let _num_libcore_syms = shutdown!(mod_mgmt::load_kernel_crate(
+            shutdown!(memory::get_module("__k_core").ok_or("couldn't find __k_core module")), 
+            &mut kernel_mmi, false)
+        );
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
-        let _num_captain_syms = mod_mgmt::load_kernel_crate(memory::get_module("__k_captain").unwrap(), &mut kernel_mmi, false).unwrap();
+        
+        let _num_captain_syms = shutdown!(mod_mgmt::load_kernel_crate(
+            shutdown!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module")), 
+            &mut kernel_mmi, false)
+        );
     }
     #[cfg(not(feature = "loadable"))]
     {
@@ -120,19 +154,32 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use alloc::Vec;
         use irq_safety::MutexIrqSafe;
 
-        let vaddr = mod_mgmt::metadata::get_symbol("captain::init").upgrade().expect("captain::init").virt_addr();
-        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) = unsafe { ::core::mem::transmute(vaddr) };
-        func(kernel_mmi_ref, identity_mapped_pages, 
-             get_bsp_stack_bottom(), get_bsp_stack_top(),
-             get_ap_start_realmode_begin(), get_ap_start_realmode_end()
+        let vaddr = shutdown!(mod_mgmt::metadata::get_symbol("captain::init").upgrade().ok_or("no symbol: captain::init")).virt_addr();
+        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        shutdown!(
+            func(kernel_mmi_ref, identity_mapped_pages, 
+                get_bsp_stack_bottom(), get_bsp_stack_top(),
+                get_ap_start_realmode_begin(), get_ap_start_realmode_end()
+            )
         );
     }
     #[cfg(not(feature = "loadable"))]
-    captain::init(kernel_mmi_ref, identity_mapped_pages, 
-                  get_bsp_stack_bottom(), get_bsp_stack_top(),
-                  get_ap_start_realmode_begin(), get_ap_start_realmode_end()
-    );
+    {
+        shutdown!(
+            captain::init(kernel_mmi_ref, identity_mapped_pages, 
+                get_bsp_stack_bottom(), get_bsp_stack_top(),
+                get_ap_start_realmode_begin(), get_ap_start_realmode_end()
+            )
+        );
+    }
+
+
+    // the captain shouldn't return ...
+    shutdown!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
 }
+
+
+
 
 
 #[cfg(not(test))]
