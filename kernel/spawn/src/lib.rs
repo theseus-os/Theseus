@@ -135,8 +135,16 @@ impl<A, R> KthreadCall<A, R> {
 /// Spawns a new kernel task with the same address space as the current task. 
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
 /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// 
+/// # Arguments
+/// 
+/// * `func`: the function that will be invoked in the new task (TODO FIXME make this a FnMut closure, which also accepts a regular fn)    
+/// * `arg`: the argument to the function `func`
+/// * `thread_name`: the String name of the new task
+/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
+/// 
 #[inline(never)]
-pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String)
+pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String, pin_on_core: Option<u8>)
         -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     let mut new_task = Task::new();
@@ -186,7 +194,12 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
-    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    if let Some(core) = pin_on_core {
+        try!(scheduler::add_task_to_specific_runqueue(core, task_ref.clone()));
+    }
+    else {
+        try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    }
 
     Ok(task_ref)
 }
