@@ -378,7 +378,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use e1000::test_nic_driver::test_nic_driver;
-            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
+            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None).unwrap();
         }
     }  
 
