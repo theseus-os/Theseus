@@ -44,10 +44,14 @@ impl fmt::Debug for Page {
 }
 
 impl Page {
+    /// Returns true if the given `VirtualAddress` is canonical, i.e., within the valid range.
+    pub fn is_valid_address(address: VirtualAddress) -> bool {
+        address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000
+    }
+
 	/// returns the first virtual address as the start of this Page
     pub fn containing_address(address: VirtualAddress) -> Page {
-        assert!(address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000,
-                "Page::containing_address(): invalid address: 0x{:x}", address);
+        assert!(Page::is_valid_address(address), "Page::containing_address(): invalid address: 0x{:x}", address);
         Page { number: address / PAGE_SIZE }
     }
 
@@ -676,6 +680,12 @@ pub unsafe fn stack_trace() {
     let active_table = ActivePageTable::new(get_current_p4());
     for _frame in 0..64 {
         if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
+            if Page::is_valid_address(rbp) && Page::is_valid_address(rip_rbp) {
+                // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
+                error!(" {:>016X}: INVALID_ADDRESS", rbp);
+                break;
+            }
+            
             if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
                 let rip = *(rip_rbp as *const usize);
                 if rip == 0 {
