@@ -290,8 +290,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // create the initial `Task`, i.e., task_zero
     #[cfg(feature = "loadable")] 
     {
-        let vaddr = mod_mgmt::metadata::get_symbol("spawn::init").upgrade().ok_or("no symbol: spawn::init")?.virt_addr();
-        let func: fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        let section = mod_mgmt::metadata::get_symbol("spawn::init").upgrade().ok_or("no symbol: spawn::init")?;
+        let mut space = 0;
+        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"spawn::init\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
     } 
     #[cfg(not(feature = "loadable"))]
@@ -304,8 +308,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let console_queue_producer = {
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("console::init").upgrade().ok_or("no symbol: console::init")?.virt_addr();
-            let func: fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("console::init").upgrade().ok_or("no symbol: console::init")?;
+            let mut space = 0;
+            let func: & fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> =
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"console::init\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func()?
         } 
         #[cfg(not(feature = "loadable"))]
@@ -319,8 +327,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     #[cfg(feature = "loadable")]
     {
-        let vaddr = mod_mgmt::metadata::get_symbol("driver_init::init").upgrade().ok_or("no symbol: driver_init::init")?.virt_addr();
-        let func: fn(DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+        let section = mod_mgmt::metadata::get_symbol("driver_init::init").upgrade().ok_or("no symbol: driver_init::init")?;
+        let mut space = 0;
+        let func: & fn(DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str> =
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"driver_init::init\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func(console_queue_producer)?;
     }
     #[cfg(not(feature = "loadable"))]
@@ -333,8 +345,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let ap_count = {
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("acpi::madt::handle_ap_cores").upgrade().ok_or("no symbol: acpi::madt::handle_ap_cores")?.virt_addr();
-            let func: fn(MadtIter, Arc<MutexIrqSafe<MemoryManagementInfo>>, usize, usize) -> Result<usize, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("acpi::madt::handle_ap_cores").upgrade().ok_or("no symbol: acpi::madt::handle_ap_cores")?;
+            let mut space = 0;
+            let func: & fn(MadtIter, Arc<MutexIrqSafe<MemoryManagementInfo>>, usize, usize) -> Result<usize, &'static str> =
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"acpi::madt::handle_ap_cores\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?
         }
         #[cfg(not(feature = "loadable"))]
@@ -370,10 +386,15 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
     if true {
+        // NOTE: haven't yet figured out how to invoke generic functions yet, like spawn_kthread
         // #[cfg(feature = "loadable")]
         // {
-        //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().ok_or("e1000::test_nic_driver::test_nic_driver").virt_addr();
-        //     let func: fn(Option<u64>) = unsafe { ::core::mem::transmute(vaddr) };
+        //     let section = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().ok_or("no symbol: e1000::test_nic_driver::test_nic_driver")?;
+        //     let mut space = 0;
+        //     let func: & fn(Option<u64>) =
+        //         section.mapped_pages()
+        //         .ok_or("Couldn't get section's mapped_pages for \"e1000::test_nic_driver::test_nic_driver\"")?
+        //         .as_func(section.mapped_pages_offset(), &mut space)?; 
         //     spawn::spawn_kthread(func, None, String::from("test_nic_driver"))?;
         // }
         #[cfg(not(feature = "loadable"))]
@@ -392,8 +413,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: symbol spawn::spawn_userspace")?.virt_addr();
-            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, Some(String::from("test_program_1")))?;
         }
         #[cfg(not(feature = "loadable"))]
@@ -409,8 +434,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?.virt_addr();
-            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, Some(String::from("test_program_2")))?;
         }
         #[cfg(not(feature = "loadable"))]
@@ -427,8 +456,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?.virt_addr();
-            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
         #[cfg(not(feature = "loadable"))]
@@ -445,8 +478,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
         #[cfg(feature = "loadable")]
         {
-            let vaddr = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?.virt_addr();
-            let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
         #[cfg(not(feature = "loadable"))]
