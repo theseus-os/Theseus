@@ -10,6 +10,7 @@
 #![feature(alloc)]
 #![feature(asm)]
 #![feature(used)]
+#![feature(core_intrinsics)]
 
 
 extern crate alloc;
@@ -67,41 +68,16 @@ macro_rules! print {
         
         #[cfg(feature = "loadable")] {
             if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-                let vaddr = section.virt_addr();
                 type PrintFuncSignature = fn(String) -> Result<(), &'static str>;
-                let print_func_orig: PrintFuncSignature = unsafe { ::core::mem::transmute(vaddr) };
-                let _ = print_func_orig(s.clone());
-                // let print_func: fn(String) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(vaddr) };
-
-
-                // section.mapped_pages().and_then(|mp| {
-                //     mp.as_type::<PrintFuncSignature>(section.mapped_pages_offset()).and_then(|print_func| {
-                //         (*print_func)(s.clone())
-                //     }).ok()
-                // }).expect("Couldn't call print_func in print!() macro");
-
                 
-                // if let Some(mp) = section.mapped_pages() {
-                //     match mp.as_type::<PrintFuncSignature>(section.mapped_pages_offset()) {
-                //         Ok(print_func) => {
-                //             debug!("vaddr: {:#X}, print_func_orig: {:#X}, print_func: {:#X}, *print_func {:?}", 
-                //                     vaddr, 
-                //                     &print_func_orig as *const _ as usize, 
-                //                     print_func as *const _ as usize, 
-                //                     *print_func
-                //             );
-                //             assert_eq!(print_func_orig, *print_func, "print_funcs weren't equal");
-                //             assert_eq!(vaddr, print_func as *const PrintFuncSignature as usize, "print!() macro's print_func didn't equal vaddr");
-                //             let _ = print_func(s.clone());
-                //         }
-                //         _ => {
-                //             error!("Couldn't get print_func in print!() macro");
-                //         }
-                //     }
-                // }
-                // else {
-                //     error!("couldn't get section's mapped_pages in print!() macro");
-                // }
+                if let Some(mp) = section.mapped_pages() {
+                    let mut space = 0; // this must persist throughout the print_func being called
+                    let print_func: &PrintFuncSignature = mp.as_func(section.mapped_pages_offset(), &mut space).unwrap();
+                    let _ = print_func(s.clone());
+                }
+                else {
+                    error!("couldn't get section's mapped_pages in print!() macro");
+                }
                 
             }
             else {

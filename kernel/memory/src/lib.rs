@@ -9,6 +9,7 @@
 #![feature(unique)]
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
+#![feature(unboxed_closures)]
 
 extern crate spin;
 extern crate multiboot2;

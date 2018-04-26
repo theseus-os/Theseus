@@ -384,7 +384,7 @@ impl MappedPages {
         // check that size of the type T fits within the size of the mapping
         let end = offset + size;
         if end > self.size_in_bytes() {
-            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+            error!("MappedPages::as_type(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
                     // SAFE: just for debugging
                     unsafe { ::core::intrinsics::type_name::<T>() }, 
                     size, offset, self.size_in_bytes()
@@ -528,6 +528,51 @@ impl MappedPages {
         };
 
         Ok(slc)
+    }
+
+
+    /// TODO FIXME finish this.
+    /// 
+    /// TODO FIXME: best case would be to have an integrated function that checks with the mod_mgmt crate 
+    /// to see if the size of the function can fit (not just the size of the function POINTER, which will basically always fit)
+    /// within the bounds of this `MappedPages` object;
+    /// this integrated function would be based on the given string name of the function, like "task::this::foo",
+    /// and would invoke this as_func() function directly.
+    /// 
+    /// We have to accept space for the function pointer to exist, because it cannot live in this function's stack. 
+    /// It has to live in stack of the function that invokes the actual returned function reference,
+    /// otherwise there would be a lifetime issue and a guaranteed page fault. 
+    /// So, the `space` arg is a hack to ensure lifetimes; we don't care about the actual value of `space`, as the value will be overwritten,
+    /// and it doesn't matter both before and after the call to this `as_func()`.
+    pub fn as_func<'a, T>(&self, offset: usize, space: &'a mut usize) -> Result<&'a T, &'static str> {
+        let size = mem::size_of::<T>();
+        if true {
+            debug!("MappedPages::as_func(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                // SAFE: just for debugging
+                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                size, offset, self.size_in_bytes()
+            );
+        }
+
+        // check that size of the type T fits within the size of the mapping
+        let end = offset + size;
+        if end > self.size_in_bytes() {
+            error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                    // SAFE: just for debugging
+                    unsafe { ::core::intrinsics::type_name::<T>() }, 
+                    size, offset, self.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        *space = self.pages.start_address() + offset; 
+
+        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        let t: &'a T = unsafe {
+            mem::transmute(space)
+        };
+
+        Ok(t)
     }
 }
 
