@@ -30,6 +30,9 @@ path = "../memory"
 path = "../../libs/irq_safety"
 version = "0.1.1"
 
+[dependencies.acpi]
+path = "../acpi"
+
 
 
 # [build]

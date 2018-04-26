@@ -17,6 +17,8 @@ extern crate irq_safety;
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate acpi;
+
 
 
 use core::ptr::Unique;
@@ -42,6 +44,15 @@ pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 pub static mut frame_buffer_pages:Option<MappedPages> = None;
 
+#[macro_export]
+macro_rules! try_opt_err {
+    ($e:expr, $s:expr) =>(
+        match $e {
+            Some(v) => v,
+            None => return Err($s),
+        }
+    )
+}
 
 pub fn init() -> Result<(), &'static str > {
 
@@ -61,7 +72,7 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).unwrap();
+            let pages = try_opt_err!(allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE), "frame_buffer_3d::init() couldn't allocate pages.");
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
             if allocator_mutex.is_none(){

@@ -288,7 +288,7 @@ impl GraphDrawer {
         let mut index = list.len();
         graph_obj.draw();
         for i in 0..list.len() {
-            let item = list.get(i).unwrap();
+            let item = try_opt_err!(list.get(i), "GraphDrawer couldn't get a graph");
             if item.depth >= graph_obj.depth{
                 index = i;
                 break;
@@ -308,7 +308,7 @@ impl GraphDrawer {
         self.active = (((self.active+1) as usize) %length) as i32;
 
         let list = self.graphlist.lock();
-        let graph = list.deref().get(self.active as usize).unwrap();
+        let graph = try_opt_err!(list.deref().get(self.active as usize), "Couldn't switch to current window");
         graph.clear();
         graph.draw();
     }
@@ -357,7 +357,7 @@ impl GraphDrawer {
 
         let mut list = self.graphlist.lock();
         for i in (0..list.len()).rev(){
-            let graph = list.deref_mut().get(i).unwrap();
+            let graph = try_opt_err!(list.deref_mut().get(i), "GraphDrawer.redraw() couldn't get a graph");
             if graph.depth < depth {
                 break;
             }
@@ -369,61 +369,44 @@ impl GraphDrawer {
 pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
     let consumer = KEY_CODE_CONSUMER.try();
-    if consumer.is_none(){
-        return Err("No active consumer");
-    }
+
     let producer = KEY_CODE_PRODUCER.call_once(|| {
-        consumer.unwrap().obtain_producer()
+        try_opt_err!(consumer,"No active consumer").obtain_producer()
     });
 
     let producer = KEY_CODE_PRODUCER.try();
-    if(producer.is_none()){
-        return Err("Couldn't init key code producer");
-    }
     
-    producer.unwrap().enqueue(keycode);
+    try_opt_err!(producer, "Couldn't init key code producer").enqueue(keycode);
+    
     Ok(())
 }
 
 //TODO: create a new thread to do this
-pub fn init() {
+pub fn init() -> Result<(), &'static str>{
     loop{
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
         let event = consumer.peek();
         if event.is_none() {
             continue; 
         }   
-        let event = event.unwrap();
+        let event = try_opt_err!(event, "graph_drawer::init() fail to read a key input event");
         event.mark_completed();
         let keycode = event.deref(); // event.deref() is the equivalent of   &*event
+        
+        let drawer = GraphDrawer.try();
+        let drawer = try_opt_err!(drawer, "graph_drawer::init() Couldn't get GraphDrawer").lock().deref_mut()
 
         match keycode {
             &Keycode::Delete => {
-                let drawer = GraphDrawer.try();
-                if drawer.is_none() {
-                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
-                    return;
-                }
-                drawer.unwrap().lock().deref_mut().delete_active();
+               drawer.delete_active();
             },
 
             &Keycode::Tab => {
-                let drawer = GraphDrawer.try();
-                if drawer.is_none() {
-                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
-                    return;
-                }
-                drawer.unwrap().lock().deref_mut().switch();
-
+                drawer.switch();
             },
 
             &Keycode::Left|&Keycode::Right|&Keycode::Up|&Keycode::Down => {
-                let drawer = GraphDrawer.try();
-                if drawer.is_none() {
-                    debug!("graph_drawer::init() Couldn't get GraphDrawer");
-                    return;
-                }
-                drawer.unwrap().lock().deref_mut().move_active(keycode);
+                drawer.move_active(keycode);
             },
 
             _ => {

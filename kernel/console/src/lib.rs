@@ -165,7 +165,7 @@ fn handle_key_event(keyevent: KeyEvent) {
     //Window manager consumes dir();ection key input
     match keyevent.keycode {
          Keycode::Tab => {
-             window_manager::set_time_start();
+             //window_manager::set_time_start();
              loop{
                  window_switch!();
              }

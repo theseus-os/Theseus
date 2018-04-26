@@ -15,6 +15,8 @@ extern crate keycodes_ascii;
 #[macro_use] extern crate frame_buffer_text;
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate util;
+
 extern crate acpi;
 
 
@@ -48,30 +50,23 @@ pub struct WindowAllocator {
 }
 
 
-pub fn window_switch(){
+pub fn window_switch() -> Option<&'static str>{
 
-    let allocator = WINDOW_ALLOCATOR.try();
+    let allocator = try_opt!(WINDOW_ALLOCATOR.try());
+    unsafe { allocator.force_unlock(); }
+    allocator.lock().deref_mut().switch();
 
-    if allocator.is_some(){
-        unsafe{ allocator.unwrap().force_unlock(); }
-        allocator.unwrap().lock().deref_mut().switch();
-    }
 
-    let consumer = KEY_CODE_CONSUMER.try();
-    if(consumer.is_none()){
-        return
-    }
+    let consumer = try_opt!(KEY_CODE_CONSUMER.try());
 
     //Clear all key events before switch
-    let consumer = consumer.unwrap();
     let mut event = consumer.peek();
     while(event.is_some()){
-        event.unwrap().mark_completed();
+        try_opt!(event).mark_completed();
         event = consumer.peek();
     }
 
-    calculate_time_statistic();
-
+    Some("End")
 }
 
 #[macro_export]
@@ -139,7 +134,7 @@ impl WindowAllocator{
             window.draw_border();
             self.allocated.push_back(Arc::new(Mutex::new(window)));
 
-            let reference = Arc::downgrade(self.allocated.back().unwrap()); 
+            let reference = Arc::downgrade(try_opt_err!(self.allocated.back(), "WindowAllocator fails to get new window reference")); 
             
             Ok(reference)
         }
@@ -317,7 +312,7 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
 
 //Test functions for performance evaluation
-pub fn set_time_start(){
+/*pub fn set_time_start(){
     let hpet = ACPI_TABLE.hpet.read();
     unsafe { starting_time = (*hpet).as_ref().unwrap().get_counter(); }   
 }
@@ -351,4 +346,4 @@ pub fn calculate_time_statistic() {
         counter = 0;
     }
   }
-}
+}*/

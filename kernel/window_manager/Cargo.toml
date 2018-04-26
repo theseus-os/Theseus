@@ -48,6 +48,9 @@ path = "../frame_buffer_text"
 [dependencies.acpi]
 path = "../acpi"
 
+[dependencies.util]
+path = "../../libs/util"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

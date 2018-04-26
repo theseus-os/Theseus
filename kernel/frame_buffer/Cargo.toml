@@ -28,6 +28,9 @@ version = "0.3.7"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.util]
+path = "../../libs/util"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

@@ -15,8 +15,8 @@ extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
-
 #[macro_use] extern crate log;
+#[macro_use] extern crate util;
 
 use core::ptr::Unique;
 use spin::Mutex;
@@ -39,6 +39,16 @@ pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 pub static mut frame_buffer_pages:Option<MappedPages> = None;
 
+#[macro_export]
+macro_rules! try_opt_err {
+    ($e:expr, $s:expr) =>(
+        match $e {
+            Some(v) => v,
+            None => return Err($s),
+        }
+    )
+}
+
 pub fn init() -> Result<(), &'static str > {
 
     //Wenqiu Allocate VESA frame buffer
@@ -57,7 +67,7 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).unwrap();
+            let pages = try_opt_err!(allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE), "framebuffer::init() couldn't allocate pages.");
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
             if allocator_mutex.is_none(){
