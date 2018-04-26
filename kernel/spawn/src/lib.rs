@@ -46,6 +46,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
+/// 
 /// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
 fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
@@ -53,6 +54,7 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     let mut idle_task = Task::new();
     idle_task.name = format!("idle_task_ap{}", apic_id);
+    idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::RUNNABLE;
     idle_task.running_on_cpu = apic_id as isize; 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core

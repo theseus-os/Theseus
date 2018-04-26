@@ -355,10 +355,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    enable_interrupts();
-
-
     if true {
         // #[cfg(feature = "loadable")]
         // {
@@ -445,30 +441,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    enable_interrupts();
-    debug!("captain::init(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
+    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    enable_interrupts();
+
+    // the below should never run unless there are no other tasks available to run on the BSP core
     
-    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in captain::init()");
     loop { 
-        
-        #[cfg(feature = "loadable")]
-        {
-            let vaddr = mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("scheduler::schedule").virt_addr();
-            let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
-            func();
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            scheduler::schedule();
-        }
-        
-        
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
 
-
-    // cleanup here
-    // logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 }
