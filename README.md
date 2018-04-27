@@ -4,7 +4,8 @@ Theseus is a new runtime-composable OS that tackles the problem of *state spill*
 
 We have designed and built Theseus from scratch using Rust to completely rethink state management in an OS, with the intention of avoiding state spill or mitigating its effects to the fullest extent possible. 
 
-The design of Theseus's components and subsystems is frequently inspired by RESTful architectures used across the Web, so there are also references to its previous name `restful_OS` throughout the repository. 
+More details are provided in Theseus's [documentation](#Documentation).
+
 
 
 ## Building Theseus
@@ -19,35 +20,35 @@ Currently, we support building and running Theseus on the following host OSes:
 
 Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html).
 Or, basically just run this command and follow the instructions:   
-`$ curl https://sh.rustup.rs -sSf | sh`
+`curl https://sh.rustup.rs -sSf | sh`
 
 Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with:   
-`$ rustup default nightly`
+`rustup default nightly`
 
 Since we're cross compiling for a custom target triple (the Theseus platform), we need to install the Rust source code:   
-`$ rustup component add rust-src`
+`rustup component add rust-src`
 
 We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
-`$ cargo install xargo`
+`cargo install --vers 0.3.10 xargo`
 
 
 ### Finishing the build
 You will need to install the following packages:  
-`$ sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
+`sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
 
 If you're on Windows using WSL, you'll need to do the following:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
   * Set an X display, by running `export DISPLAY=:0`. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with `echo "export DISPLAY=:0" >> ~/.bashrc`.
   * If you get this error: `Could not initialize SDL(No available video device) - exiting`, then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
 
-When you first check out the project, don't forget to checkout all the submodule repositories too:
-`$ git submodule update --init --recursive`
+When you first check out the project, don't forget to checkout all the submodule repositories too:    
+`git submodule update --init --recursive`
 
 To build and run Theseus in QEMU, simply run:   
-`$ make run`
+`make run`
 
 To run it again without rebuilding the whole project:   
-`$ make orun`
+`make orun`
 
 Run `make help` to see other make tarets. 
 
@@ -64,10 +65,13 @@ To exit Theseus in QEMU, press `Ctrl+Alt`, which releases your keyboard focus fr
 
 To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`.    
 
-#### KVM Support
+
+~~#### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
-To install KVM, run the following command:  `sudo apt-get install kvm`.  
-If you have KVM installed, it will automatically be enabled by our Makefile.
+To install KVM, run the following command:    
+`sudo apt-get install kvm`.  
+If you have KVM installed, it will automatically be enabled by our Makefile.~~    
+(Note: KVM support is currently disabled, as it causes problems.)
 
 
 
@@ -75,16 +79,25 @@ If you have KVM installed, it will automatically be enabled by our Makefile.
 GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
 
 First, install the following packages:  
-`$ sudo apt-get install texinfo flex bison python-dev ncurses-dev`
+`sudo apt-get install texinfo flex bison python-dev ncurses-dev`
 
 Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:  
-`$ curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh`  
+`curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh`  
 
 After that, you should have a `rust-os-gdb` directory that contains the `gdb` executables and scripts. 
 
 Then, simply run `make debug` to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.   
 To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
 Try setting a breakpoint at the kernel's entry function using `b rust_main` or at a specific file/line, e.g., `b scheduler.rs:40`.
+
+
+## Documentation
+Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
+To do so, simply run:     
+`make doc`
+
+To view the documentation in a browser on your local machine, run:     
+`make view-doc`
 
 
 ## IDE Setup  

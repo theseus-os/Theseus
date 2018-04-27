@@ -46,6 +46,7 @@ pub mod reexports;
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
 #[used]
+#[doc(hidden)]
 pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
 }
@@ -57,11 +58,17 @@ use x86_64::structures::idt::LockedIdt;
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
-/// The Rust entry point for Theseus, which does the following:
-/// * Bootstraps the OS, including basic exception handlers and logging
-/// * Sets up basic virtual memory
-/// * Initializes the state_store module
+/// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
+///
+/// This is called from assembly code entry point for Theseus, found in `src/boot/arch_x86_64/boot.asm`.
+///
+/// This function does the following things: 
+///
+/// * Bootstraps the OS, including [logging](../logger.html) and basic [exception handlers](../exceptions.init_early_exceptions.html)
+/// * Sets up basic [virtual memory](../memory.init.html)
+/// * Initializes the [state_store](../state_store.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
+///
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
 	
@@ -136,12 +143,14 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
 #[no_mangle]
+#[doc(hidden)]
 pub extern "C" fn eh_personality() {}
 
 
 #[cfg(not(test))]
 #[lang = "panic_fmt"]
 #[no_mangle]
+#[doc(hidden)]
 pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
     let apic_id = apic::get_my_apic_id().unwrap_or(0xFF);
 
@@ -162,6 +171,7 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[lang = "eh_unwind_resume"]
 #[no_mangle]
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
+#[doc(hidden)]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
     println_raw!("\n\nin rust_eh_unwind_resume, unimplemented!");
@@ -172,6 +182,7 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[allow(non_snake_case)]
 #[no_mangle]
 #[cfg(not(target_os = "windows"))]
+#[doc(hidden)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
     println_raw!("\n\nin _Unwind_Resume, unimplemented!");

@@ -10,15 +10,16 @@ include Config.mk
 ## The name of the lib (lib_____.a) is defined by the target above.
 cargo-obj := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 
+nano_core-src := nano_core/src
 nano_core-obj := $(KERNEL_BUILD_DIR)/nano_core-$(ARCH).bin
 
-linker_script := src/boot/arch_$(ARCH)/linker_higher_half.ld
-assembly_source_files := $(wildcard src/boot/arch_$(ARCH)/*.asm)
-assembly_object_files := $(patsubst src/boot/arch_$(ARCH)/%.asm, \
+linker_script := $(nano_core-src)/boot/arch_$(ARCH)/linker_higher_half.ld
+assembly_source_files := $(wildcard $(nano_core-src)/boot/arch_$(ARCH)/*.asm)
+assembly_object_files := $(patsubst $(nano_core-src)/boot/arch_$(ARCH)/%.asm, \
 	$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
-.PHONY: all clean cargo
+.PHONY: all clean cargo doc
 
 all: $(nano_core-obj)
 
@@ -28,7 +29,7 @@ clean:
 
 
 cargo: 
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(XARGO_RELEASE_ARG) $(RUST_FEATURES) --target $(TARGET)  ## target arg must be a target name, not the file path.
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build --all $(XARGO_RELEASE_ARG) $(RUST_FEATURES)  --target $(TARGET)  ## target arg must be a target name, not the file path.
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
@@ -40,6 +41,14 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	done
 
 # compile assembly files
-$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: src/boot/arch_$(ARCH)/%.asm
+$(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
+
+
+## Builds Theseus's documentation
+doc:
+	@cargo doc --no-deps
+	@rustdoc --output target/doc --crate-name Theseus doc.rs
+	@ln -f -s ./Theseus/index.html target/doc/index.html
+
