@@ -137,23 +137,21 @@ pub fn server_init(_: Option<u64>) {
 
 
 
-//! Sample test program that can be used from the connected machine to receive the udpo packets
-//! use std::net::UdpSocket;
-//! use std::str;
-//! 
-//! fn main() {  
-//! 	let socket = UdpSocket::bind("192.168.69.100:5901").expect("couldn't bind to address");
-//! 	let s = b"abcdef";
-//! 	let mut i = 0;
-//! 	while i < 20 {
-//! 		let mut buf = [0; 100];
-//! 		let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
-//! 		let filled_buf = &mut buf[..number_of_bytes];
-//! 
-//! 		let s = str::from_utf8(filled_buf);
-//! 
-//! 		println!("{:?}",s );
-//! 		i = i +1;
-//! 
-//! 	}
-//! }
+// Sample test program that can be used from the connected machine to receive the udpo packets
+// use std::net::UdpSocket;
+// use std::str;
+// 
+// fn main() {  
+// 	let socket = UdpSocket::bind("192.168.69.100:5901").expect("couldn't bind to address");
+// 	let mut i = 0;
+// 	while i < 20 {
+// 		let mut buf = [0; 1000];
+// 		let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
+// 		let filled_buf = &mut buf[..number_of_bytes];
+// 		let s = str::from_utf8(filled_buf);
+// 
+// 		println!("{:?}",s );
+// 		i = i +1;
+// 	}
+// }
+// 
