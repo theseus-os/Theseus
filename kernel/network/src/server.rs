@@ -1,33 +1,40 @@
 
-use e1000::{E1000E_NIC};
-use nw_server::{EthernetDevice};
+
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-use alloc::*;
+use alloc::string::String;
 use alloc::borrow::{ToOwned};
-use tsc::{tsc_ticks, TscTicks} ;
-use smoltcp::Error;
-use smoltcp::wire::{EthernetAddress, IpAddress};
-use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
-use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem};
-use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
-use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
-use smoltcp::wire::{IpProtocol, IpEndpoint};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spin::{Once, Mutex};
 use core::fmt;
+use smoltcp::Error;
+use smoltcp::wire::{EthernetAddress, IpAddress};
+use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
+use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem}; 
+use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
+use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
+use smoltcp::wire::{IpProtocol, IpEndpoint};
+use e1000::{E1000E_NIC};
+use e1000_to_smoltcp_interface::{EthernetDevice};
 
 
+
+/// Static instance of the DFQueueProducer for the UDP_TEST_SERVER
+/// When enquedued here, message will be sent to 
+/// IP address 192.168.69.100
+/// Port 5901
 pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
-//pub static UDP_TEST_SERVER: Once<DFQueueProducer<fmt::Arguments>> = Once::new();
 
 
-pub fn test_server(_: Option<u64>) {
+/// Initializing the test_server, should be called from the captain
+pub fn server_init(_: Option<u64>) {
 
+    // For UDP
     let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 64])]);
     let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 128])]);
     let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
     
+    // For TCP - not implemented on the server
     let tcp1_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
     let tcp1_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
     let tcp1_socket = TcpSocket::new(tcp1_rx_buffer, tcp1_tx_buffer);
@@ -46,7 +53,7 @@ pub fn test_server(_: Option<u64>) {
 
     let mut tcp_6970_active = false;
 
-    // let device = EInterface::new();
+
     let device = EthernetDevice{
         tx_next: 0,
         rx_next: 0,
@@ -61,9 +68,8 @@ pub fn test_server(_: Option<u64>) {
     let mut timestamp_ms = 0;
 
 
-
+    // target address and port - forwarded udp packets will be sent to this
     let host_addrs = IpAddress::v4(192, 168, 69, 100);
-
     let destination = IpEndpoint{
         addr:host_addrs,
         port: 5901,
@@ -71,8 +77,6 @@ pub fn test_server(_: Option<u64>) {
 
     let mut client_endpoint:Option<IpEndpoint> = None;
     let client_endpoint = Some(destination);
-
-
 
     //code to initialize the DFQ
     let udpserver_dfq: DFQueue<String> = DFQueue::new();
@@ -83,43 +87,23 @@ pub fn test_server(_: Option<u64>) {
        udpserver_consumer.obtain_producer()
     });
 
-     loop {
+    // Main loop for the server
+    loop {
 
         {         
-            //print!("UDP\n");
-
-            
+            /// UDP       
             let socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
             if socket.endpoint().is_unspecified() {
                 socket.bind(6969)
             }
 
-            let start = tsc_ticks().to_ns().unwrap();
-
-            
-
-
+            // Receiving packets
             let tuple = match socket.recv() {
                 Ok((data, endpoint)) => {
-                    debug!("received packet");
                     let mut data2 = data.to_owned();
                     let mut s = String::from_utf8(data2.to_owned()).unwrap();
-
-                    //removing the newline
-
-                    //s.pop();
-                    let test_string = String::from("test\n");
-
-                    if s.as_str() == test_string {
-                        //client_endpoint = Some(endpoint.to_owned());
-                        debug!("+++++++++++++++++++");
-                    }
-                    //client_endpoint = Some(endpoint.to_owned());
-                    udpserver_producer.enqueue(s);
-
-                    //debug!("Endpoint {:?}", endpoint);
-
-
+                    //echoing the received udp msg
+                    udpserver_producer.enqueue(s);                   
                     Some((data2, endpoint))
                 }
                 Err(_) => {
@@ -127,8 +111,8 @@ pub fn test_server(_: Option<u64>) {
                 }
             };
 
+            // Sending packets
             if let Some(endpoint) = client_endpoint{
-                //let mut data = b"testing\n";
                 use core::ops::Deref;
                 let element = udpserver_consumer.peek();
                 if !element.is_none() {
@@ -139,69 +123,37 @@ pub fn test_server(_: Option<u64>) {
                     element.mark_completed();
                     //client_endpoint = None;                     
                 }
-
-
-            }
-
-            
-            
+            }                  
         }
 
-
-
+        // polling the ethernet interface
         let timestamp_ms = timestamp_ms + 1;
-        let start = tsc_ticks().to_ns().unwrap();
-
-
         match iface.poll(&mut sockets, timestamp_ms) {
             Ok(()) | Err(Error::Exhausted) => (),
             Err(e) => debug!("poll error: {}", e)
-        }
-        
-
-        
-    }
-    
-
-}
-
-
-
-use core::fmt::{Write};
-
-/// An empty type for using the serial port with fmt::Write
-pub struct StringArgument<'a> {
-    pub buf: &'a mut [u8],
-    pub length: usize,
-}
-
-impl<'a> StringArgument<'a> {
-    pub fn new(buf: &'a mut [u8]) -> Self {
-       StringArgument {
-            buf: buf,
-            length: 0,
-        }
-    }
-
-    pub fn write_fmt(&mut self, args: fmt::Arguments) -> ::core::fmt::Result {
-        // /let mut serial = SERIAL_PORT.lock();
-        self.write_fmt(args)
-    }
-
-    /// Write a str reference to the serial port.
-    pub fn write_str(&mut self,s: &str) -> ::core::fmt::Result {
-        //let mut serial = SERIAL_PORT.lock();
-        self.write_str(s)
-    }
-
-}
-impl<'a> fmt::Write for StringArgument <'a> {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        self.buf.clone_from_slice(s.as_bytes());
-        self.length = s.as_bytes().len();
-        Ok(())
+        }      
     }
 }
 
 
- 
+
+//! Sample test program that can be used from the connected machine to receive the udpo packets
+//! use std::net::UdpSocket;
+//! use std::str;
+//! 
+//! fn main() {  
+//! 	let socket = UdpSocket::bind("192.168.69.100:5901").expect("couldn't bind to address");
+//! 	let s = b"abcdef";
+//! 	let mut i = 0;
+//! 	while i < 20 {
+//! 		let mut buf = [0; 100];
+//! 		let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
+//! 		let filled_buf = &mut buf[..number_of_bytes];
+//! 
+//! 		let s = str::from_utf8(filled_buf);
+//! 
+//! 		println!("{:?}",s );
+//! 		i = i +1;
+//! 
+//! 	}
+//! }

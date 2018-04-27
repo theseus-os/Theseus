@@ -767,15 +767,6 @@ impl Nic{
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
-                //debug!("inside send packet");
-                /* let t_ptr = translate_v2p(p_data);
-                let ptr;
-                match t_ptr{
-                        Some(_x) => ptr = t_ptr.unwrap(),
-                        None => return Err("e1000:send_packet Couldn't translate address for tx buffer"),
-                } */ 
-                //let ptr = (translate_v2p(p_data)).unwrap();
-
                 let ptr = try!(translate_v2p(p_data));
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
@@ -786,56 +777,33 @@ impl Nic{
 
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-                /*start of the original code segment */
-/*                 debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
-                debug!("Waiting for packet to send!");
- */
 
-                /*end of the original code segment */
+                // Original code from Ramla's code, removed to improve the performance
 
-
-
-                ///debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                //debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                //self.read_command(REG_TXDESCHEAD);
-                //self.read_command(REG_TXDESCTAIL);
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                //debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
-               // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                //self.read_command(REG_TXDESCHEAD);
-                self.read_command(REG_TXDESCTAIL);
-                self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-                // self.read_command(REG_TXDESCTAIL);
-
+                // debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                // self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
+                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
                 // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
                 // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
                 // debug!("Waiting for packet to send!");
+ 
+
+                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+                // below to commands are inserted to prevent some timing issues in the ethernet driver - hardware bugs
+                self.read_command(REG_TXDESCTAIL);
+                self.read_command(REG_TXDESCTAIL);
+
+                // Original code from Ramla's code, removed to improve the performance
+
+                // while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
+                //         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                //         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
+                // }  //bit 0 should be set when done 
+                // debug!("Packet is sent!");  
                 
-
-                /* while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
-                        //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                        //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-                }  //bit 0 should be set when done */
-                //debug!("Packet is sent!");  
-
-                //unsafe{  end = tsc_ticks().to_ns().unwrap();}
-                //unsafe{  debug!("total time packet stayed in theseus = {} ns {} us", end-start, (end-start)/1000);}
                 Ok(())
         }        
         
@@ -899,60 +867,31 @@ impl Nic{
                 
         }  
 
+        /// receive packet function that is used from the server
         pub fn receive_packet(&mut self)-> (*mut u8, usize)  { 
-                //debug!("inside receive packet");
-                unsafe {start = tsc_ticks().to_ns().unwrap();}
-                //debug!("r - {} ns", tmp);
 
-
-
-
-                //if (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0 {
-                        //debug!("inside receive packet - inside if");
-                        //let start = tsc_ticks().to_ns().unwrap();
-                        let length = self.rx_descs[self.rx_cur as usize].length as usize;
-                        let mut packet = self.rx_buf_addr[self.rx_cur as usize] as *mut u8;
-                        //print packet of length bytes
-                        //debug!("Packet {}: ", self.rx_cur);
-                        //debug!("length =  {}: ", length);
-                        
-                        let mut buffer = vec![0;length as usize];
+                let length = self.rx_descs[self.rx_cur as usize].length as usize;
+                let mut packet = self.rx_buf_addr[self.rx_cur as usize] as *mut u8;                 
+                let mut buffer = vec![0;length as usize];
+        
+                for i in 0..length as usize {
+                        let points_at = unsafe{ *packet.offset(i as isize ) };
+                        buffer[i] = points_at;
+                }  
                 
-                        for i in 0..length as usize {
-                                let points_at = unsafe{ *packet.offset(i as isize ) };
-                                buffer[i] = points_at;
-                                //debug!("{}",points_at);
-                                //debug!("{:x}",points_at);
-                        }  
-                        //debug!("message=  {:?}: ", buffer);   
-                        //unsafe {debug!("HAAKO {:?}", slice::from_raw_parts_mut(packet, length));}
-                        //debug!("done "); 
-               
-                        
-
-                        self.rx_descs[self.rx_cur as usize].status = 0;
-                        let old_cur = self.rx_cur as u32;
-                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-
-                        self.write_command(REG_RXDESCTAIL, old_cur );
-                        //let end = tsc_ticks().to_ns().unwrap();
-                        //debug!("inside receive packet = {} ns {} us", end-start, (end-start)/1000);
-                        //debug!("receive done - From e1000"); 
-
-                        (packet, length)
-                // } 
-                // else {
-                //        Err(Error::Exhausted)
-                // }
-
+                self.rx_descs[self.rx_cur as usize].status = 0;
+                let old_cur = self.rx_cur as u32;
+                self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+                self.write_command(REG_RXDESCTAIL, old_cur );
+                (packet, length)
                 
         } 
-        //check if a packet is there
+        /// check if a packet has arrived
         pub fn has_packet_arrived(&mut self) -> bool{
                 (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0
         }
 
-        //check if a packet is there
+        /// check if a packet is sent
         pub fn has_packet_sent(&mut self) -> bool{
                 (self.tx_descs[self.tx_cur as usize].status & 0xF) != 0 
         }

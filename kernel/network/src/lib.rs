@@ -8,15 +8,11 @@
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
 extern crate e1000;
-extern crate tsc;
 extern crate spin;
 extern crate dfqueue;
 
-#[macro_use] extern crate lazy_static;
-
-extern crate irq_safety;
 
 pub mod server;
-pub mod nw_server;
-//pub mod server2;
+pub mod e1000_to_smoltcp_interface;
+
 
