@@ -79,7 +79,11 @@ pub fn init() -> Result<(), &'static str > {
                 return Err("framebuffer::init() Couldn't get frame allocator");
             } 
 
-            FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            if err.is_err(){
+                debug!("Fail to init frame buffer");
+                return err;
+            }
             let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
             let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
@@ -120,12 +124,10 @@ macro_rules! draw_pixel {
 
 #[doc(hidden)]
 pub fn draw_pixel(x:usize, y:usize, color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_pixel(x, y, 0, color, true)
 }
 
 pub fn draw_pixel_3d(x:usize, y:usize, z:usize, color:usize, show:bool) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_pixel(x, y, z, color, show)
 }
 
@@ -139,7 +141,6 @@ macro_rules! draw_line {
 #[doc(hidden)]
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize,
     color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, 
         end_y as i32, 0, color, true)
 }
@@ -147,7 +148,6 @@ pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize,
 #[doc(hidden)]
 pub fn draw_line_3d(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:usize, 
     color:usize, show:bool) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, 
         end_y as i32, z, color, show)
 }
@@ -163,14 +163,12 @@ macro_rules! draw_square {
 #[doc(hidden)]
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize,
      color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, 0, color, true)
 }
 
 #[doc(hidden)]
 pub fn draw_square_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:usize,
      color:usize, show:bool) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color, show)
 }
 
@@ -297,14 +295,14 @@ impl Drawer {
         unsafe { self.buffer.as_mut() }
     } 
 
-    pub fn init_frame_buffer(&mut self, virtual_address:usize) {
+    pub fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if(self.start_address == 0){
-            unsafe {
-                self.start_address = virtual_address;
-                self.buffer = Unique::new_unchecked((virtual_address) as *mut _); 
-            }
+            self.start_address = virtual_address;
+            self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Error in init frame buffer"); 
             trace!("Set frame buffer address {:#x}", virtual_address);
         }
+
+        Ok(())
     }  
 }
 

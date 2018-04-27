@@ -53,7 +53,7 @@ pub struct WindowAllocator {
 pub fn window_switch() -> Option<&'static str>{
 
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    unsafe { allocator.force_unlock(); }
+//    unsafe { allocator.force_unlock(); }
     allocator.lock().deref_mut().switch();
 
 
@@ -143,7 +143,7 @@ impl WindowAllocator{
     pub fn switch(&mut self) -> Option<&'static str>{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
-            unsafe{ item.force_unlock();}
+//            unsafe{ item.force_unlock();}
             let mut window = item.lock();
             if flag {
                 (*window).active(true);
@@ -155,7 +155,7 @@ impl WindowAllocator{
         }
         if (flag) {
             let item = try_opt!(self.allocated.front_mut());
-            unsafe{ item.force_unlock();}
+ //           unsafe{ item.force_unlock();}
             let mut window = item.lock();
             (*window).active(true);
         }

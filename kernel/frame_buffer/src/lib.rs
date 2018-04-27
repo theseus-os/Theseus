@@ -37,7 +37,7 @@ const VGA_BUFFER_ADDR: usize = 0xa0000;
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
-pub static mut frame_buffer_pages:Option<MappedPages> = None;
+pub static frame_buffer_pages:Mutex<Option<MappedPages>> = Mutex::new(None);
 
 #[macro_export]
 macro_rules! try_opt_err {
@@ -74,8 +74,12 @@ pub fn init() -> Result<(), &'static str > {
                 return Err("framebuffer::init() Couldn't get frame allocator");
             } 
 
-            FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-            let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
+            let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            if err.is_err() {
+                debug!("Fail to init frame buffer");
+                return err;
+            }
+            let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
             let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
                 Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
@@ -83,7 +87,8 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            unsafe { frame_buffer_pages = Some(mapped_frame_buffer); }
+            let mut pages = frame_buffer_pages.lock();
+            *pages = Some(mapped_frame_buffer);
 
             Ok(())
         }
@@ -114,8 +119,7 @@ macro_rules! draw_pixel {
 
 #[doc(hidden)]
 pub fn draw_pixel(x:usize, y:usize, color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
-    FRAME_DRAWER.lock().draw_pixel(x, y, color)
+    FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
 
 #[macro_export]
@@ -128,7 +132,6 @@ macro_rules! draw_line {
 
 #[doc(hidden)]
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
@@ -142,7 +145,6 @@ macro_rules! draw_square {
 
 #[doc(hidden)]
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
-    unsafe{ FRAME_DRAWER.force_unlock();}
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
@@ -187,14 +189,15 @@ pub struct Drawer {
 
 
 impl Drawer {
-    pub fn draw_pixel(&mut self, x:usize, y:usize, color:usize){
+    pub fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
         if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
-            return
+            return Some("pixel is ont of bound");
         }
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
         self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
         self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
     
+        Some("End")
     }
 
     pub fn draw_points(&mut self, points:Vec<Point>){
@@ -252,17 +255,17 @@ impl Drawer {
 
 
     fn buffer(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
+         unsafe { self.buffer.as_mut() }
     } 
 
-    pub fn init_frame_buffer(&mut self, virtual_address:usize) {
+    pub fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if(self.start_address == 0){
-            unsafe {
-                self.start_address = virtual_address;
-                self.buffer = Unique::new_unchecked((virtual_address) as *mut _); 
-            }
+            self.start_address = virtual_address;
+            self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
             trace!("Set frame buffer address {:#x}", virtual_address);
         }
+
+        Ok(())
     }  
 }
 
