@@ -767,7 +767,7 @@ impl Nic{
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
-                debug!("inside send packet");
+                //debug!("inside send packet");
                 /* let t_ptr = translate_v2p(p_data);
                 let ptr;
                 match t_ptr{
@@ -832,10 +832,10 @@ impl Nic{
                         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
                 }  //bit 0 should be set when done */
-                debug!("Packet is sent!");  
+                //debug!("Packet is sent!");  
 
-                unsafe{  end = tsc_ticks().to_ns().unwrap();}
-                unsafe{  debug!("total time packet stayed in theseus = {} ns {} us", end-start, (end-start)/1000);}
+                //unsafe{  end = tsc_ticks().to_ns().unwrap();}
+                //unsafe{  debug!("total time packet stayed in theseus = {} ns {} us", end-start, (end-start)/1000);}
                 Ok(())
         }        
         
@@ -899,7 +899,7 @@ impl Nic{
                 
         }  
 
-        pub fn receive_single_packet2(&mut self)-> (*mut u8, usize)  { 
+        pub fn receive_packet(&mut self)-> (*mut u8, usize)  { 
                 //debug!("inside receive packet");
                 unsafe {start = tsc_ticks().to_ns().unwrap();}
                 //debug!("r - {} ns", tmp);
@@ -937,7 +937,7 @@ impl Nic{
                         self.write_command(REG_RXDESCTAIL, old_cur );
                         //let end = tsc_ticks().to_ns().unwrap();
                         //debug!("inside receive packet = {} ns {} us", end-start, (end-start)/1000);
-                        debug!("receive done - From e1000"); 
+                        //debug!("receive done - From e1000"); 
 
                         (packet, length)
                 // } 

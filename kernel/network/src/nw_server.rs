@@ -7,8 +7,6 @@ use smoltcp::phy::Device;
 use e1000::E1000E_NIC;
 use tsc::{tsc_ticks, TscTicks} ;
 
-//const TX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
-//const RX_BUFFERS: [*mut u8; 2] = [0x0 as *mut u8, 0x0 as *mut u8];
 
 
 fn rx_full() -> bool {
@@ -26,7 +24,7 @@ fn rx_setup() -> (*mut u8, usize) {
     let mut e1000_nc = E1000E_NIC.lock();
     let end = tsc_ticks().to_ns().unwrap();
     //debug!("time taken for send and receive = {} ns {} us", end-start, (end-start)/1000);
-    e1000_nc.receive_single_packet2()
+    e1000_nc.receive_packet()
 }
 // fn rx_setup() -> (*mut u8, usize) {
 //     let mut e1000_nc = E1000_NIC.lock();

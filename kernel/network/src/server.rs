@@ -15,9 +15,11 @@ use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spin::{Once, Mutex};
+use core::fmt;
 
 
-static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
+pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
+//pub static UDP_TEST_SERVER: Once<DFQueueProducer<fmt::Arguments>> = Once::new();
 
 
 pub fn test_server(_: Option<u64>) {
@@ -115,7 +117,7 @@ pub fn test_server(_: Option<u64>) {
                     //client_endpoint = Some(endpoint.to_owned());
                     udpserver_producer.enqueue(s);
 
-                    debug!("Endpoint {:?}", endpoint);
+                    //debug!("Endpoint {:?}", endpoint);
 
 
                     Some((data2, endpoint))
@@ -132,8 +134,6 @@ pub fn test_server(_: Option<u64>) {
                 if !element.is_none() {
                     let element = element.unwrap();
                     let data = element.deref(); // event.deref() is the equivalent of   &*event     \
-                    debug!("sending packet");
-                    debug!("data {:?}", data);
 
                     socket.send_slice(data.as_bytes(), endpoint).expect("sending failed");
                     element.mark_completed();
@@ -166,3 +166,42 @@ pub fn test_server(_: Option<u64>) {
 }
 
 
+
+use core::fmt::{Write};
+
+/// An empty type for using the serial port with fmt::Write
+pub struct StringArgument<'a> {
+    pub buf: &'a mut [u8],
+    pub length: usize,
+}
+
+impl<'a> StringArgument<'a> {
+    pub fn new(buf: &'a mut [u8]) -> Self {
+       StringArgument {
+            buf: buf,
+            length: 0,
+        }
+    }
+
+    pub fn write_fmt(&mut self, args: fmt::Arguments) -> ::core::fmt::Result {
+        // /let mut serial = SERIAL_PORT.lock();
+        self.write_fmt(args)
+    }
+
+    /// Write a str reference to the serial port.
+    pub fn write_str(&mut self,s: &str) -> ::core::fmt::Result {
+        //let mut serial = SERIAL_PORT.lock();
+        self.write_str(s)
+    }
+
+}
+impl<'a> fmt::Write for StringArgument <'a> {
+    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+        self.buf.clone_from_slice(s.as_bytes());
+        self.length = s.as_bytes().len();
+        Ok(())
+    }
+}
+
+
+ 

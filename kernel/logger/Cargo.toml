@@ -13,6 +13,11 @@ path = "../serial_port"
 default-features = false
 version = "0.3.7"
 
+[dependencies.network]
+path = "../network"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
+
+

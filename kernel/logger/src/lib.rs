@@ -1,18 +1,26 @@
 #![no_std]
+#![feature(alloc)]
 
 extern crate serial_port;
 extern crate log;
 extern crate spin;
+extern crate network;
+#[macro_use] extern crate alloc;
 
 use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 use core::fmt;
 use spin::Once;
+use network::server::{UDP_TEST_SERVER, StringArgument};
+use alloc::*;
+use alloc::string::ToString;
+
 
 //Nisal
 static LOG_LEVEL: LogLevel = LogLevel::Debug;
 //static LOG_LEVEL: LogLevel = LogLevel::Error;
 
 static MIRROR_VGA_FUNC: Once<fn(LogColor, &'static str, fmt::Arguments)> = Once::new();
+
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
@@ -70,10 +78,29 @@ impl ::log::Log for Logger {
             use serial_port;
             let _ = serial_port::write_fmt_log(color.as_terminal_string(), prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
 
+
+            
+            if let Some(producer) = UDP_TEST_SERVER.try(){
+                /* let x = record.args().clone();
+                let mut buf = [0 as u8; 100];
+                let temp = StringArgument::new(&mut buf);
+                write!(temp,"{}", x).expect("cannot write argument in to a buffer");
+                producer.enqueue(str::from_utf8(&buf[0..temp.length])); */
+                let x = record.args().clone();
+                let s = format!("{}", x);
+                producer.enqueue(s[0..10].to_string());
+                
+
+            }
+            
             
             if let Some(func) = MIRROR_VGA_FUNC.try() {
                 func(color, prefix, record.args().clone());
+                
             }
+            
+
+            
         }
     }
 }
