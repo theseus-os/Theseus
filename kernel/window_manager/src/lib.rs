@@ -109,38 +109,38 @@ impl WindowAllocator{
 
         //new_window = ||{Window_Obj{x:x,y:y,width:width,height:height,active:true}};
         let mut window:Window_Obj = Window_Obj{x:x,y:y,width:width,height:height,active:true, consumer:None};
-        unsafe{ 
-            //window.resize(x,y,width,height);
-            let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
-            let mut overlapped = false;
-            for item in self.allocated.iter(){
-                let allocated_window = item.lock();
-                if window.is_overlapped(&(*allocated_window)) {
-                    overlapped = true;
-                    break;
-                }
-            }
-            if overlapped  {
-                trace!("Request area is already allocated");
-                return Err("Request area is already allocated");
-            }
-            for item in  self.allocated.iter_mut(){
-                let mut allocated_window = item.lock();
-                (*allocated_window).active(false);
-            }
-            //window.fill(0xffffff);
 
-            window.consumer = Some(consumer);
-            window.draw_border();
-            self.allocated.push_back(Arc::new(Mutex::new(window)));
-
-            let reference = Arc::downgrade(try_opt_err!(self.allocated.back(), "WindowAllocator fails to get new window reference")); 
-            
-            Ok(reference)
+        //window.resize(x,y,width,height);
+        let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
+        let mut overlapped = false;
+        for item in self.allocated.iter(){
+            let allocated_window = item.lock();
+            if window.is_overlapped(&(*allocated_window)) {
+                overlapped = true;
+                break;
+            }
         }
+        if overlapped  {
+            trace!("Request area is already allocated");
+            return Err("Request area is already allocated");
+        }
+        for item in  self.allocated.iter_mut(){
+            let mut allocated_window = item.lock();
+            (*allocated_window).active(false);
+        }
+        //window.fill(0xffffff);
+
+        window.consumer = Some(consumer);
+        window.draw_border();
+        self.allocated.push_back(Arc::new(Mutex::new(window)));
+
+        let reference = Arc::downgrade(try_opt_err!(self.allocated.back(), "WindowAllocator fails to get new window reference")); 
+        
+        Ok(reference)
+    
     }
 
-    pub fn switch(&mut self){
+    pub fn switch(&mut self) -> Option<&'static str>{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
             unsafe{ item.force_unlock();}
@@ -154,11 +154,13 @@ impl WindowAllocator{
             }
         }
         if (flag) {
-            let item = self.allocated.front_mut().unwrap();
+            let item = try_opt!(self.allocated.front_mut());
             unsafe{ item.force_unlock();}
             let mut window = item.lock();
             (*window).active(true);
         }
+
+        Some("End")
     }
 
     pub fn print(&self) {
@@ -244,12 +246,8 @@ impl Window_Obj{
     pub fn get_key_code(&self) -> Option<Keycode> {
         if (self.consumer.is_some()) {
 
-            let event = self.consumer.unwrap().peek();
-            if event.is_none() {
-                return None; 
-            }   
-
-            let event = event.unwrap();
+            let event_opt = try_opt!(self.consumer).peek();
+            let event = try_opt!(event_opt);
             let event_data = event.deref().clone(); // event.deref() is the equivalent of   &*event
             event.mark_completed();
             return Some(event_data);
@@ -291,20 +289,15 @@ impl Window_Obj{
 
 pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
-    let consumer = KEY_CODE_CONSUMER.try();
-    if consumer.is_none(){
-        return Err("No active window");
-    }
+    let consumer = try_opt_err!(KEY_CODE_CONSUMER.try(), "No active window");
+
     let producer = KEY_CODE_PRODUCER.call_once(|| {
-        consumer.unwrap().obtain_producer()
+        consumer.obtain_producer()
     });
 
-    let producer = KEY_CODE_PRODUCER.try();
-    if(producer.is_none()){
-        return Err("Couldn't init key code producer");
-    }
+    let producer = try_opt_err!(KEY_CODE_PRODUCER.try(), "Couldn't init key code producer");
     
-    producer.unwrap().enqueue(keycode);
+    producer.enqueue(keycode);
     Ok(())
 }
 
