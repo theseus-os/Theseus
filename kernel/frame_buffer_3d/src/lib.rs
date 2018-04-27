@@ -5,7 +5,7 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
-#![feature(unique)]
+#![feature(ptr_internals)]
 #![feature(asm)]
 
 extern crate spin;

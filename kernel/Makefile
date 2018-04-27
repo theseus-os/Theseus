@@ -28,8 +28,9 @@ clean:
 	rm -rf ./build
 
 
+
 cargo: 
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build --all $(XARGO_RELEASE_ARG) $(RUST_FEATURES)  --target $(TARGET)  ## target arg must be a target name, not the file path.
+	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
@@ -46,9 +47,15 @@ $(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm
 	@nasm -felf64 $< -o $@
 
 
-## Builds Theseus's documentation
+## Builds Theseus's documentation.
+## The "doc" directory is excluded from the workspace so it is not accidentally built as code, even though it contains the top-level docs.
+## Instead, each file in the "doc" directory, including main lib.rs file, is temporarily moved to the top-level kernel workspace directory
+## so that when compiled with rustdoc, all of the workspace's subcrates show up nicely in the sidebar.
 doc:
 	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name Theseus doc.rs
+	@cp -f doc/src/lib.rs __doc.rs
+	@rustdoc --output target/doc --crate-name Theseus __doc.rs
+## TODO: FIXME: build all other .rs files in the "doc" crate... do we give them the same "Theseus" crate name?
+	@rm -f __doc.rs
 	@ln -f -s ./Theseus/index.html target/doc/index.html
 

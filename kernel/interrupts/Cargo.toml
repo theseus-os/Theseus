@@ -17,10 +17,10 @@ version = "0.3.7"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "0.2.1"
+version = "1.0"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 version = "0.1.1"
 
 

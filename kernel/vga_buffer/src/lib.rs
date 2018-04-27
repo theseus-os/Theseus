@@ -4,6 +4,7 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
+#![feature(ptr_internals)]
 
 extern crate spin;
 extern crate volatile;

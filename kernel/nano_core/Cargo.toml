@@ -12,8 +12,6 @@ rlibc = "1.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-# this is needed for our odd approach of loading the libcore ELF file at runtime
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins", features = ["c"] }
 
 
 [dependencies.log]
@@ -24,7 +22,7 @@ version = "0.3.7"
 path = "../kernel_config"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"

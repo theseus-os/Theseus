@@ -13,7 +13,7 @@ extern crate apic;
 
 use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
 use spin::RwLock;
-use irq_safety::{enable_interrupts, interrupts_enabled};
+use irq_safety::{enable_interrupts};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics, get_my_apic_id};
@@ -70,10 +70,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     get_lapics().insert(apic_id, RwLock::new(lapic));
 
 
+    info!("Entering idle_task loop on AP {} ...", apic_id);
     enable_interrupts();
-    info!("Entering idle_task loop on AP {} with interrupts {}", apic_id, 
-        if interrupts_enabled() { "enabled" } else { "DISABLED!!! ERROR!" }
-    );
 
     loop { 
         scheduler::schedule();

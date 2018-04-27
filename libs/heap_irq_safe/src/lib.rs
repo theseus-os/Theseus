@@ -22,7 +22,9 @@ extern crate irq_safety;
 extern crate spin;
 
 use core::ops::Deref;
-use alloc::allocator::{Alloc, Layout, AllocErr};
+use core::ptr::NonNull;
+use core::alloc::Opaque;
+use alloc::allocator::{Alloc, GlobalAlloc, Layout, AllocErr};
 use linked_list_allocator::Heap;
 use irq_safety::MutexIrqSafe; 
 
@@ -58,12 +60,33 @@ impl Deref for IrqSafeHeap {
     }
 }
 
-unsafe impl<'a> Alloc for &'a IrqSafeHeap {
-    unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
+
+unsafe impl Alloc for IrqSafeHeap {
+    unsafe fn alloc(&mut self, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
         self.0.lock().allocate_first_fit(layout)
     }
 
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
+    unsafe fn dealloc(&mut self, ptr: NonNull<Opaque>, layout: Layout) {
         self.0.lock().deallocate(ptr, layout)
+    }
+
+    fn oom(&mut self) -> ! {
+        panic!("Out of heap memory!");
+    }
+}
+
+unsafe impl GlobalAlloc for IrqSafeHeap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
+        self.0.lock().allocate_first_fit(layout).ok().map_or(0 as *mut Opaque, |allocation| {
+            allocation.as_ptr()
+        })
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
+        self.0.lock().deallocate(NonNull::new_unchecked(ptr), layout)
+    }
+
+    fn oom(&self) -> ! {
+        panic!("Out of memory");
     }
 }
