@@ -4,6 +4,7 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
+#![feature(ptr_internals)]
 
 extern crate spin;
 extern crate volatile;
@@ -30,7 +31,6 @@ const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 const BUFFER_HEIGHT: usize = 25;
 /// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
-
 
 // #[macro_export] pub mod raw;
 pub mod raw;

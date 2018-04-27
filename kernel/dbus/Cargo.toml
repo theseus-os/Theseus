@@ -16,7 +16,7 @@ version = "0.3.7"
 path = "../../libs/util"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 
 
 [lib]

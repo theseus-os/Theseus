@@ -12,7 +12,7 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 version = "0.1.1"
 # features = ["const_fn"]  #if we need them later
 
@@ -28,6 +28,18 @@ path = "../logger"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
+[dependencies.frame_buffer_3d]
+path = "../frame_buffer_3d"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+#[dependencies.graph_drawer]
+#path = "../graph_drawer"
 
 [dependencies.console_types]
 path = "../console_types"

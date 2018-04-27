@@ -13,12 +13,10 @@ mod table;
 mod temporary_page;
 mod mapper;
 
-
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
-
 
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
@@ -30,8 +28,8 @@ use x86_64::instructions::tlb;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
-
-
+//Define frame buffer_pages as a static variable. It has the longest life time and will not be unmapped.
+//TODO: move it to the the Drawer instance.
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
@@ -358,6 +356,7 @@ impl fmt::Debug for TempModule {
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
     -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
+
     // bootstrap an active_table from the currently-loaded page table
     let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
 
@@ -479,7 +478,8 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 index += 1;
             }
 
-            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+            //In graphic mode, frame buffer physical address starts from 0xa0000
+            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xA_0000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
 
             // // now that we've mapped all the sections above 0x10_0000 (1 MiB), 
@@ -503,7 +503,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
             // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
-            let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
+
+            //Wenqiu: In text mode, map the frame buffer starts from 0xa0000
+            let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;            
+            
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
@@ -520,7 +523,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 vga_display_flags, allocator.deref_mut())
             ));
             index += 1;
-
 
             // // here we map the rest of the multiboot bootloader memory, 
             // // from the physical address of the VGA buffer end (0xc0000) to 0x10_0000 (1 MiB)
@@ -565,6 +567,8 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..(index + 1)]);
 
+
+
         } // unlocks the frame allocator 
 
         Ok(()) // mapping closure completed successfully
@@ -606,6 +610,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
     // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
     Ok((new_active_table, kernel_vmas, higher_half, identity))
+    
 }
 
 

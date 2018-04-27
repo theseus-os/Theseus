@@ -7,15 +7,15 @@ version = "0.1.0"
 [dependencies]
 spin = "0.4.5"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-rustc-demangle = "0.1.5" 
+rustc-demangle = "0.1.7" 
 
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "0.2.1"
+version = "1.0"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 version = "0.1.1"
 
 [dependencies.goblin]  ## for linker relocation typedefs

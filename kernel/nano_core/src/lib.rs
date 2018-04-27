@@ -8,13 +8,8 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(lang_items)]
-#![feature(i128_type)]
 #![feature(used)]
 
-
-// this is needed for our odd approach of loading the libcore ELF file at runtime
-#![feature(compiler_builtins_lib)]
-extern crate compiler_builtins;
 
 
 extern crate alloc;
@@ -29,14 +24,14 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 #[macro_use] extern crate vga_buffer; 
 extern crate logger;
 extern crate state_store;
-extern crate memory; // the virtual memory subsystem 
+extern crate memory; // the virtual memory subsystem
+extern crate frame_buffer;
+extern crate frame_buffer_3d;
+
 extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
 extern crate captain;
-
-
-pub mod reexports;
 
 
 
@@ -84,6 +79,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
+
+    //init frame_buffer
+    frame_buffer::init().unwrap();
+    frame_buffer_3d::init().unwrap();
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();

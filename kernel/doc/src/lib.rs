@@ -16,7 +16,7 @@
 //! 1. Bootstraps the OS after the bootloade is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
 //! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
-//! 4. That's it! The `nano_core` gives complete control to the `captain` and takes no other action.
+//! 4. That's it! Once the `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn't ever need to change the `nano_core` ... **ever**. That's because the `nano_core` doesn't contain any specific program logic, it just sets up an initial environment so that other things can run.
 //! If you want to change how the OS starts up and initializes, you should change the code in the `captain` instead.
@@ -75,9 +75,12 @@
 //! The only special action it takes is to build the `nano_core` separately and fully link it against the architecture-specific assembly code in `nano_core/boot` into a static binary.    
 //! 
 //! ### Debug vs. Release mode
-//! There is a special file `kernel/Config.mk` that contains configuration options used in the `kernel/Makefile`. 
-//! Among other things that are well-documented in that file, this lets you switch between Rust's **debug** and **release** modes by setting the `BUILD_MODE` variable.     
-//! As with most languages, **release** mode in Rust is *way* faster, but takes much longer to compile and is difficult to debug. Unless you're evaluauting the performance of Theseus, it's best to stick with **debug** mode.
+//! Theseus can be built in a variety of modes, but offers two presets: **debug** and **release** build modes.
+//! By default, Theseus is built in debug mode (cargo's "dev" profile) for easy development. To build in release mode, set the `BUILD_MODE` environment variable when running `make`, like so:    
+//! `make run BUILD_MODE=release`    
+//! 
+//! There is a special file `kernel/Config.mk` that contains the build mode options as well as other configuration options used in the kernel Makefile. 
+//! As with most languages, release mode in Rust is *way* faster, but it does take longer to compile and can be difficult to attach a debugger.
 //! 
 
 
@@ -88,6 +91,7 @@
 //! To enable this, use the `make loadable` command to enable the `loadable` feature, which does the following:
 //!
 //! * Builds each crate into its own separate object file, which are not all linked together like in other OSes.
+//! * Enables release mode in order to make each module file smaller and faster to load, i.e., sets `BUILD_MODE=release`.
 //! * Copies each crate's object file into the top-level build directory's module subdirectory (`build/grub-isofiles/modules`) such that each module is a separate object file in the final .iso image. 
 //!   That allows the running instance of Theseus to see all the modules currently available just by asking the bootloader (without needing a filesystem), and to load them individually.
 //! * Sets the `loadable` config option, which as seen in the `nano_core` and `captain` code, will enable the `#![cfg(loadable)]` code blocks that load each crate. 

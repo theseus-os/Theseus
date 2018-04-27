@@ -8,6 +8,9 @@ extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+#[macro_use] extern crate window_manager;
+//extern crate graph_drawer;
+
 extern crate spawn;
 
 // temporary, should remove this once we fix crate system
@@ -20,6 +23,7 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+
 
 
 
@@ -48,7 +52,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 
     // vga_buffer::print_str("console::init() trying to spawn_kthread...\n").unwrap();
     info!("console::init() trying to spawn_kthread...");
-    try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
+    try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop"), None));
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
 
@@ -95,7 +99,6 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
 
 
 fn handle_key_event(keyevent: KeyEvent) {
-
     // Ctrl+D or Ctrl+Alt+Del kills the OS
     if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
             keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
@@ -157,6 +160,29 @@ fn handle_key_event(keyevent: KeyEvent) {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
         return;
     }
+    
+    //Pass TAB event to window manager
+    //Window manager consumes dir();ection key input
+    match keyevent.keycode {
+         Keycode::Tab => {
+             //window_manager::set_time_start();
+             loop{
+                 window_switch!();
+             }
+         }
+         Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            window_manager::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }
+
+    //Pass Delete event and direction key event to 3d drawer application
+    /*match keyevent.keycode {
+         Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            graph_drawer::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }*/
 
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
@@ -169,6 +195,9 @@ fn handle_key_event(keyevent: KeyEvent) {
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
     }
+
+    //Pass direction keycode to window manager
+
 }
 
 

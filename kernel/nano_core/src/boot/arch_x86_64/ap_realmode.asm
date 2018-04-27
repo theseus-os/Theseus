@@ -1,5 +1,5 @@
 section .init.realmodetext16 progbits alloc exec nowrite
-bits 16 ; we're in real mode, that's how APs boot up
+bits 16 ; we're in , that's how APs boot up
 
 
 global ap_start_realmode
@@ -36,6 +36,60 @@ ap_start_realmode:
     int 0x10
     mov al, "T"
     int 0x10
+
+
+
+   
+    ; set graphic mode
+    mov ax, 0x4f02
+    mov bx, 0x4112
+    int 0x10
+
+
+    push ds
+    push es
+    mov ax,0x1103
+    mov  bh,6
+    int 0x10
+    push es
+    pop ds
+    pop es
+    mov si,bp
+    mov cx,256*16/4
+    rep movsd
+    pop ds
+
+    ;test code to find lfb address
+    ;mov ax, 0xb
+    ;mov es, ax
+    ;mov ax, 0x8000
+    ;mov di, ax
+    ;mov ax, 0x4f01
+    ;mov cx, 0x4112    
+    ;int 0x10
+
+    ;mov ax, [es:di+0x2b]
+
+    ;mov ah, 0x00
+    ;cmp ax, 0x00fd
+    ;je next
+    ;mov ah, 0x13
+    ;next:
+
+    ;mov al, ah
+    ;mov ah, 0x00
+    ;int 0x10
+
+
+;Character, return true state
+
+
+    
+
+
+
+
+
 
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
     ; since this code will be forcibly loaded by GRUB multiboot above 1MB, and we're in 16-bit real mode,
@@ -124,6 +178,7 @@ prot_mode:
     mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
+    
  
     jmp 0x08:ap_start_protected_mode
     

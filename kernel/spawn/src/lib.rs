@@ -46,6 +46,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 
 /// initialize an idle task, of which there is one per processor core/AP/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
+/// 
 /// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
 fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
@@ -53,6 +54,7 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     let mut idle_task = Task::new();
     idle_task.name = format!("idle_task_ap{}", apic_id);
+    idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::RUNNABLE;
     idle_task.running_on_cpu = apic_id as isize; 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
@@ -87,7 +89,7 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
 /// Must match the order of registers popped in the nano_core's boot/boot.asm:task_switch
-#[derive(Default, Debug)]
+#[derive(Default)]
 #[repr(C, packed)]
 pub struct Context {
     r15: usize, 
@@ -135,8 +137,16 @@ impl<A, R> KthreadCall<A, R> {
 /// Spawns a new kernel task with the same address space as the current task. 
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
 /// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// 
+/// # Arguments
+/// 
+/// * `func`: the function that will be invoked in the new task (TODO FIXME make this a FnMut closure, which also accepts a regular fn)    
+/// * `arg`: the argument to the function `func`
+/// * `thread_name`: the String name of the new task
+/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
+/// 
 #[inline(never)]
-pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String)
+pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String, pin_on_core: Option<u8>)
         -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
 
     let mut new_task = Task::new();
@@ -158,7 +168,6 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
     unsafe {
         *new_context_ptr = Context::new(kthread_wrapper::<A, R> as usize);
         new_task.saved_sp = new_context_ptr as usize; 
-        debug!("spawn_kthread(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
     }
 
     // set up the kthread stuff
@@ -187,7 +196,12 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
-    try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    if let Some(core) = pin_on_core {
+        try!(scheduler::add_task_to_specific_runqueue(core, task_ref.clone()));
+    }
+    else {
+        try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+    }
 
     Ok(task_ref)
 }
@@ -217,7 +231,6 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
             // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
             *new_context_ptr = Context::new(userspace_wrapper as usize);
             new_task.saved_sp = new_context_ptr as usize; 
-            debug!("spawn_userspace(): new_context: {:#X} --> {:?}", new_context_ptr as usize, *new_context_ptr);
         }
     
         new_task.kstack = Some(kstack);

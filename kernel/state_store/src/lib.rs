@@ -112,6 +112,7 @@ impl<S: Any> SSCached<S> {
 	/// If not, the current internal Weak reference is None, so we try to reaquire it.
 	/// If it cannot be reacquired, there is currently not a system-wide state of type `S`,
 	/// so we return None.  
+	#[allow(unreachable_code)]
 	pub fn get(&self) -> Option<Arc<S>> {
 		// this is the VERY common case, simply loading the cached weak pointer and upgrading it
 		// SAFE: because we're the only ones able to access this AtomicPtr

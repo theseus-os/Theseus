@@ -19,7 +19,11 @@ extern crate alloc;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
+
+#[cfg(feature = "loadable")]
 #[macro_use] extern crate vga_buffer;
+#[cfg(not(feature = "loadable"))]
+extern crate vga_buffer;
 
 extern crate console_types; // a temporary way to use console types 
 extern crate logger;
@@ -34,6 +38,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate window_manager;
 
 extern crate scheduler;
 extern crate console;
@@ -175,6 +180,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_spawn").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_frame_buffer").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_frame_buffer_3d").unwrap(), &mut kernel_mmi, false).unwrap();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_window_manager").unwrap(), &mut kernel_mmi, false).unwrap(); 
         mod_mgmt::load_kernel_crate(memory::get_module("__k_console").unwrap(), &mut kernel_mmi, false).unwrap();
         
 
@@ -351,11 +359,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    enable_interrupts();
-
-
-    if true {
+    if false {
         // #[cfg(feature = "loadable")]
         // {
         //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().expect("e1000::test_nic_driver::test_nic_driver").virt_addr();
@@ -365,13 +369,41 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use e1000::test_nic_driver::test_nic_driver;
-            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver")).unwrap();
+            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None).unwrap();
         }
     }  
 
+    //test window manager
+    if false {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_nic_driver"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_nic_driver"), None).unwrap();
+
+        }
+    }
+
+     //test window manager
+    if true {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_text, None, String::from("test_nic_driver"), None).unwrap();
+        }
+    }
+    /*if false {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use graph_drawer::test_drawer;
+            spawn::spawn_kthread(test_drawer::test_cursor, None, String::from("test_nic_driver")).unwrap();
+            spawn::spawn_kthread(test_drawer::test_draw, None, String::from("test_nic_driver")).unwrap();
+
+        }
+    } */ 
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
@@ -388,7 +420,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
@@ -404,6 +436,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             spawn::spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
         }
     }
+
+   
 
     // create and jump to a userspace thread that tests syscalls
     if false
@@ -441,30 +475,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    enable_interrupts();
-    debug!("captain::init(): entering Task 0's idle loop: interrupts enabled: {}", interrupts_enabled());
 
+    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    enable_interrupts();
+
+    // the below should never run unless there are no other tasks available to run on the BSP core
     
-    assert!(interrupts_enabled(), "logical error: interrupts were disabled when entering the idle loop in captain::init()");
     loop { 
-        
-        #[cfg(feature = "loadable")]
-        {
-            let vaddr = mod_mgmt::metadata::get_symbol("scheduler::schedule").upgrade().expect("scheduler::schedule").virt_addr();
-            let func: fn() = unsafe { ::core::mem::transmute(vaddr) };
-            func();
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            scheduler::schedule();
-        }
-        
-        
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
 
-
-    // cleanup here
-    // logger::shutdown().expect("WTF: failed to shutdown logger... oh well.");
 }

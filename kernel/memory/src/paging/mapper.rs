@@ -117,7 +117,6 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-
         let pages_count = pages.clone().count();
         let frames_count = frames.clone().count();
         if pages_count != frames_count {
@@ -139,13 +138,18 @@ impl Mapper {
             } 
 
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+
+
         }
+
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
             pages: pages,
             allocated: None,
         })
+
+
     }
 
 
@@ -191,6 +195,7 @@ impl Mapper {
         where A: FrameAllocator
     {
         let mut ret = self.internal_map_to(allocated_pages.pages.clone(), frames, flags, allocator);
+
         if let Ok(ref mut r) = ret {
             r.allocated = Some(allocated_pages);
         }

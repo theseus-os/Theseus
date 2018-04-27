@@ -7,6 +7,7 @@
 #![feature(alloc)]
 #![feature(asm)]
 #![feature(unique)]
+#![feature(ptr_internals)]
 
 
 extern crate spin;
@@ -431,7 +432,6 @@ pub fn init(boot_info: BootInformation, tlb_shootdown_cb: fn(VirtualAddress)) ->
         paging::init(frame_allocator_mutex, &boot_info)
     );
     // HERE: heap is initialized! Can now use alloc types.
-
     debug!("Done with paging::init()!, active_table: {:?}", active_table);
     // print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
 
