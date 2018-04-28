@@ -80,12 +80,14 @@ impl ::log::Log for Logger {
             if let Some(producer) = UDP_TEST_SERVER.try(){
                 let s = format!("{}", record.args().clone());
                 let mut len: usize;
-                if s.len() > 128 {
-                    len = 128;
-                }
-                else {
-                    len = s.len();
-                }
+                // if s.len() > 128 {
+                //     len = 128;
+                // }
+                // else {
+                //     len = s.len();
+                // }
+                
+                len = s.len();
                 producer.enqueue(s[0..len].to_string());           
 
             }
