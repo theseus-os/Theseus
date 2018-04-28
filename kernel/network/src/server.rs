@@ -149,11 +149,15 @@ pub fn server_init(_: Option<u64>) {
 // 	while i < 20 {
 // 		let mut buf = [0; 1000];
 // 		let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
-// 		let filled_buf = &mut buf[..number_of_bytes];
-// 		let s = str::from_utf8(filled_buf);
-// 
-// 		println!("{:?}",s );
-// 		i = i +1;
+//		let filled_buf = &mut buf[..number_of_bytes];
+//
+//		let mut s = str::from_utf8(filled_buf);
+//		match s {
+//        	Result::Ok(s1) => println!("{}",s1),
+//           Result::Err(err) => (),
+//        }
+//
+//		i = i +1;
 // 	}
 // }
 // 
