@@ -48,7 +48,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 
     // vga_buffer::print_str("console::init() trying to spawn_kthread...\n").unwrap();
     info!("console::init() trying to spawn_kthread...");
-    try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop")));
+    try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop"), None));
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
 
