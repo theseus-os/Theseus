@@ -1,129 +1,156 @@
 use core::{mem, ptr};
 use core::ops::DerefMut;
-use core::ptr::{read_volatile, write_volatile};
+use volatile::{Volatile, ReadOnly};
 use kernel_config::memory::address_page_offset;
 
-use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags};
+use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
 
 use super::sdt::Sdt;
 use super::{find_sdt, load_table, get_sdt_signature};
 
 
-const GENERAL_CAPABILITIES_ID_REG:    usize = 0x0;
-const GENERAL_CONFIG_REG:             usize = 0x10;
-const GENERAL_INTERRUPT_STATUS_REG:   usize = 0x20;
-const MAIN_COUNTER_VALUE_REG:         usize = 0xF0;
-const fn timer_config_reg(timer_number: u8) -> usize {
-    0x100 + (0x20 * timer_number as usize)
-}
-const fn timer_comparator_reg(timer_number: u8) -> usize {
-    0x108 + (0x20 * timer_number as usize)
-}
-const fn timer_fsb_interrupt_rout_reg(timer_number: u8) -> usize {
-    0x110 + (0x20 * timer_number as usize)
-}
-
-
-
+/// A structure that offers access to HPET through its I/O registers, 
+/// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
+#[repr(packed)]
 pub struct Hpet {
-    _inner: HpetInner,
-    virt_addr: VirtualAddress,
-    _page: MappedPages,
+    /// The General Capabilities and ID Register, at offset 0x0.
+    pub general_capabilities_and_id: ReadOnly<u64>,
+    _padding0:                       u64,
+    /// The General Configuration Register, at offset 0x10.
+    pub general_configuration:       Volatile<u64>,
+    _padding1:                       u64,
+    /// The General Interrupt Status Register, at offset 0x20.
+    pub general_interrupt_status:    Volatile<u64>,
+    _padding2:                       [u64; (0xF0 - 0x28) / 8], // 25 u64s
+    /// The Main Counter Value Register, at offset 0xF0.
+    pub main_counter_value:          Volatile<u64>,
+    _padding3:                       u64,
+    /// The timers (comparators) available for separate.
+    /// There is a minimum of 3 timers and a maximum of 32 in an HPET-enabled system.
+    /// Call [`num_timers`](#method.num_timers) to get the actual number of HPET timers.
+    pub timers:                      [HpetTimer; 32],
 }
 
 impl Hpet {
-    /// Finds and initializes the HPET, and enables its main counter.
-    pub fn init(active_table: &mut ActivePageTable) -> Result<Hpet, &'static str> {
-        let hpet_sdt = find_sdt("HPET");
-        let hpet_inner = try!( 
-            if hpet_sdt.len() == 1 {
-                load_table(get_sdt_signature(hpet_sdt[0]));
-                HpetInner::new(hpet_sdt[0])
-            } else {
-                Err("unable to find HPET SDT")
-            }
-        );
-
-        let (hpet_page, vaddr) = try!(hpet_inner.base_address.map_hpet(active_table));
-        debug!("HPET: vaddr: {:#X}, hpet_num: {:#X}, HpetInner {:?}", vaddr, hpet_inner.hpet_number, hpet_inner);
-        let mut hpet = Hpet {
-            _inner: hpet_inner,
-            virt_addr: vaddr,
-            _page: hpet_page,
-        };
-
-        hpet.enable_counter(true);
-
-        debug!("HPET period: {}, counter val: {}, num timers: {}", 
-                hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers()
-        );
-
-        Ok(hpet)
-    }
-
     /// Returns the HPET's main counter value
     pub fn get_counter(&self) -> u64 {
-        unsafe { self.read_u64(MAIN_COUNTER_VALUE_REG) }
+        self.main_counter_value.read()
     }
 
     /// Turns on or off the main counter
     pub fn enable_counter(&mut self, enable: bool) {
-        unsafe { 
-            let old_val = self.read_u64(GENERAL_CONFIG_REG);
-            let flag = if enable { 0x1 } else { 0x0 };
-            self.write_u64(GENERAL_CONFIG_REG, old_val | flag); 
+        if enable {
+            // set bit 0
+            self.general_configuration.update(|old_val_ref| *old_val_ref |= 0x1);
         }
+        else {
+            // clear bit 0
+            self.general_configuration.update(|old_val_ref| *old_val_ref &= !0x1);
+        }
+            
     }
 
     /// Must not be zero, must be less or equal to 0x05F5E100 (100 nanoseconds)
     pub fn counter_period_femtoseconds(&self) -> u32 {
-        let caps = self.general_capabilities_register();
+        let caps = self.general_capabilities_and_id.read();
         let period = caps >> 32;
         period as u32
     }
 
     pub fn vendor_id(&self) -> u16 {
-        let caps = self.general_capabilities_register();
+        let caps = self.general_capabilities_and_id.read();
         let id = caps >> 16;
         id as u16
     }
 
     pub fn num_timers(&self) -> u8 {
-        let caps = self.general_capabilities_register();
+        let caps = self.general_capabilities_and_id.read();
         // only bits [12:8] matter
         let count = (caps >> 8) & 0b11111; // only 5 bits matter
         // that gives us the number of timers minus one, so add one back to it
         (count + 1) as u8
     }
+}
 
-    fn general_capabilities_register(&self) -> u64 {
-        unsafe { self.read_u64(GENERAL_CAPABILITIES_ID_REG) }
-    }
 
-    unsafe fn read_u64(&self, offset: usize) -> u64 {
-        read_volatile((self.virt_addr as usize + offset) as *const u64)
-    }
+/// A structure that wraps HPET I/O register for each timer comparator, 
+/// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
+/// There are between 3 and 32 of these in an HPET-enabled system.
+#[repr(packed)]
+pub struct HpetTimer {
+    /// This timer's Configuration and Capability register.
+    pub configuration_and_capability: Volatile<u64>,
+    /// This timer's Comparator Value register.
+    pub comparator_value:             Volatile<u64>,
+    /// This timer's FSB Interrupt Route register.
+    /// Some info here: <https://wiki.osdev.org/HPET#FSB_mapping>
+    pub fsb_interrupt_route:          Volatile<u64>,
+    _padding:                         u64,
+}
 
-    unsafe fn write_u64(&mut self, offset: usize, value: u64) {
-        write_volatile((self.virt_addr as usize + offset) as *mut u64, value);
+
+pub struct HpetMappedPages {
+    mapped_pages: MappedPages, 
+    offset: usize,
+}
+impl HpetMappedPages {
+    pub fn as_hpet<'a>(&'a self) -> Result<&'a mut Hpet, &'static str> {
+        let hpet: &'a mut Hpet = self.mapped_pages.as_type_mut(self.offset)?;
+        Ok(hpet)
     }
 }
 
 
+/// Finds and initializes the HPET, and enables its main counter.
+/// Returns a mutable reference to the `Hpet` struct
+pub fn init(active_table: &mut ActivePageTable) -> Result<HpetMappedPages, &'static str> {
+    let hpet_sdt = find_sdt("HPET");
+    let hpet_inner = try!( 
+        if hpet_sdt.len() == 1 {
+            load_table(get_sdt_signature(hpet_sdt[0]));
+            HpetInner::new(hpet_sdt[0])
+        } else {
+            Err("unable to find HPET SDT")
+        }
+    );
+
+    let phys_addr = hpet_inner.gen_addr_struct.address as PhysicalAddress;
+    let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
+    let frame = Frame::range_inclusive_addr(phys_addr, 1);  // 1 byte long, we just want 1 page
+    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
+    let hpet_page = try!(active_table.map_allocated_pages_to(page, frame, 
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
+    );
+
+    let hpet_mp = HpetMappedPages {
+        mapped_pages: hpet_page,
+        offset: address_page_offset(phys_addr),
+    };
+
+    // get an HPET instance here just to initially enable the main counter
+    {
+        let hpet = hpet_mp.as_hpet()?;
+        hpet.enable_counter(true);
+        debug!("Initialized HPET, period: {}, counter val: {}, num timers: {}, vendor_id: {}", 
+            hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers(), hpet.vendor_id()
+        );
+    }
+
+    Ok(hpet_mp)
+}
+
+
 #[repr(packed)]
-#[derive(Debug)]
-pub struct HpetInner {
-    pub header: Sdt,
+struct HpetInner {
+    header: Sdt,
 
-    pub hw_rev_id: u8,
-    pub comparator_descriptor: u8,
-    pub pci_vendor_id: u16,
-
-    pub base_address: GenericAddressStructure,
-
-    pub hpet_number: u8,
-    pub min_periodic_clk_tick: u16,
-    pub oem_attribute: u8
+    hw_rev_id: u8,
+    comparator_descriptor: u8,
+    pci_vendor_id: u16,
+    gen_addr_struct: GenericAddressStructure,
+    hpet_number: u8,
+    min_periodic_clk_tick: u16,
+    oem_attribute: u8
 }
 
 impl HpetInner {
@@ -142,24 +169,12 @@ impl HpetInner {
 #[repr(packed)]
 #[derive(Debug)]
 // #[derive(Clone, Copy, Default)]
-pub struct GenericAddressStructure {
+struct GenericAddressStructure {
     _address_space: u8,
     _bit_width: u8,
     _bit_offset: u8,
     _access_size: u8,
-    pub address: u64,
+    /// We only care about this field, the physical address of the structure.
+    address: u64,
 }
 
-impl GenericAddressStructure {
-    /// Returns a tuple of (HPET MappedPages, virt_addr).
-    fn map_hpet(&self, active_table: &mut ActivePageTable) -> Result<(MappedPages, usize), &'static str> {
-        let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
-        let frame = Frame::range_inclusive_addr(self.address as PhysicalAddress, 1); // 1 byte long, we just want 1 page
-        let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
-        let hpet_page = try!(active_table.map_allocated_pages_to(page, frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
-        );
-        let vaddr = hpet_page.start_address() + address_page_offset(self.address as usize);
-        Ok((hpet_page, vaddr))
-    }
-}

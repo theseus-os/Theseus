@@ -517,12 +517,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
 
-    // the below should never run unless there are no other tasks available to run on the BSP core
+    // NOTE: do not put any code below this point, as it should never run
+    // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
     
     loop { 
         spin_loop_hint();

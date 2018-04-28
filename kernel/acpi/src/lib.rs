@@ -10,6 +10,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
+extern crate volatile;
 extern crate irq_safety; 
 extern crate spin;
 extern crate memory;
@@ -36,13 +37,12 @@ use alloc::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-
-use spin::{Mutex, RwLock};
+use core::ops::DerefMut;
+use spin::{Mutex, RwLock, Once};
 
 
 use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use kernel_config::memory::{PAGE_SIZE, address_page_offset};
-use core::ops::DerefMut;
 
 // pub use self::dmar::Dmar;
 pub use self::fadt::Fadt;
@@ -50,10 +50,10 @@ pub use self::madt::Madt;
 pub use self::rsdt::Rsdt;
 pub use self::sdt::Sdt;
 pub use self::xsdt::Xsdt;
-pub use self::hpet::Hpet;
 pub use self::rxsdt::Rxsdt;
 pub use self::rsdp::RSDP;
 
+use self::hpet::{Hpet, HpetMappedPages};
 // use self::aml::{parse_aml_table, AmlError, AmlValue};
 
 // mod dmar;
@@ -76,17 +76,21 @@ const AP_STARTUP: PhysicalAddress = 0x10000;
 const TRAMPOLINE: PhysicalAddress = AP_STARTUP - PAGE_SIZE;
 
 
+static HPET_MAPPED_PAGES: Once<HpetMappedPages> = Once::new();
+pub static HPET: RwLock<Option<&'static mut hpet::Hpet>> = RwLock::new(None);
+
+
+/// The larger container that holds all data structure obtained from the ACPI table, 
+/// such as HPET, FADT, etc. 
 pub struct Acpi {
     pub fadt: RwLock<Option<Fadt>>,
     // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
-    pub hpet: RwLock<Option<Hpet>>,
     pub next_ctx: RwLock<u64>,
 }
 
 pub static ACPI_TABLE: Acpi = Acpi {
     fadt: RwLock::new(None),
     // namespace: RwLock::new(None),
-    hpet: RwLock::new(None),
     next_ctx: RwLock::new(0),
 };
 
@@ -272,9 +276,8 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         try!(Fadt::init(active_table));
         
         // HPET is optional
-        if let Ok(hpet) = Hpet::init(active_table) {
-            let mut hpet_t = ACPI_TABLE.hpet.write();
-            *hpet_t = Some(hpet);
+        if let Ok(hpet_mp) = hpet::init(active_table) {
+            HPET_MAPPED_PAGES.call_once(|| hpet_mp); // save HPET MappedPages statically
         }
         else {
             warn!("This machine has no HPET, skipping HPET init.");
@@ -295,6 +298,28 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         Err("could not find RSDP")
     }
 }
+
+
+/// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
+/// because it is not guaranteed that HPET exists or has been initialized.
+/// TODO: cache this value, if possible, rather than re-generating it every time from its MappedPages type.
+/// # Examples
+/// If you only need to read from the HPET, use `get_hpet().as_ref()` like so:
+/// ```
+/// let hpet_counter: Option<u64> = acpi::get_hpet().as_ref().map(|hpet| hpet.get_counter());
+/// ```
+/// If you need to write to the HPET, use `get_hpet().as_mut()` like so:
+/// ```
+/// if let Some(mut hpet) = acpi::get_hpet().as_mut() {
+///     hpet.enable_counter(false); // disable HPET counter
+/// }
+/// ```
+pub fn get_hpet() -> Option<&'static mut Hpet> {
+    HPET_MAPPED_PAGES.try().and_then(|hpet_mp| {
+        hpet_mp.as_hpet().ok()
+    })
+}
+
 
 // pub fn set_global_s_state(state: u8) {
 //     if state == 5 {
