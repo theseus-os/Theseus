@@ -8,7 +8,7 @@ extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-#[macro_use] extern crate window_manager;
+extern crate window_manager;
 //extern crate graph_drawer;
 
 extern crate spawn;
@@ -167,7 +167,7 @@ fn handle_key_event(keyevent: KeyEvent) {
          Keycode::Tab => {
              //window_manager::set_time_start();
              loop{
-                 window_switch!();
+                 window_manager::window_switch();
              }
          }
          Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {

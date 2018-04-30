@@ -6,7 +6,7 @@
 #![feature(unique)]
 #![feature(asm)]
 
-#[macro_use] extern crate frame_buffer;
+extern crate frame_buffer;
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
 extern crate alloc;
@@ -498,26 +498,26 @@ impl FrameTextBuffer {
             start
         };
         let end = min(end, self.lines.len());       // ending line must be within the bounds of the buffer (exclusive)
-        let num_lines = end - start;
+        //let num_lines = end - start;
         
         // trace!("   adjusted start {}, end {}, num_lines {}", start, end, num_lines);
 
         // use volatile memory to ensure the writes happen every time
-        use core::ptr::write_volatile;
+        //use core::ptr::write_volatile;
         // write the lines that we *can* get from the buffer
         for (i, line) in (start .. end).enumerate() {
             printline(i, self.lines[line]);
         }
 
         // fill the rest of the space, if any, with blank lines
-            if num_lines < WINDOW_LINES {
+        /*    if num_lines < WINDOW_LINES {
             for i in num_lines .. WINDOW_LINES {
                 //trace!(self.lines[line]);
 
                 //  write_volatile(addr, BLANK_LINE);
             }
             }
-
+        */
 
         // // here, we do the actual writing of the VGA memory
         // unsafe {

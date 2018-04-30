@@ -10,9 +10,10 @@ extern crate irq_safety;
 extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
-#[macro_use] extern crate frame_buffer;
+extern crate frame_buffer;
 #[macro_use] extern crate frame_buffer_3d;
-#[macro_use] extern crate frame_buffer_text;
+extern crate frame_buffer_text;
+
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate util;
@@ -23,17 +24,16 @@ extern crate acpi;
 
 use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
-use alloc::{Vec, LinkedList};
+use alloc::{LinkedList};
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
-use acpi::ACPI_TABLE;
+//use acpi::ACPI_TABLE;
 
 
-static STATISTIC: Once<Mutex<Vec<u64>>> = Once::new();
-pub static mut starting_time:u64 = 0;
-static mut counter:usize = 0;
+pub static mut STARTING_TIME:u64 = 0;
+//static mut COUNTER:usize = 0; //For performance evaluation
 
 
 pub mod test_window_manager;
@@ -46,7 +46,7 @@ static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 pub struct WindowAllocator {
-    allocated: LinkedList<Arc<Mutex<Window_Obj>>>, //The last one is active
+    allocated: LinkedList<Arc<Mutex<WindowObj>>>, //The last one is active
 }
 
 
@@ -61,7 +61,7 @@ pub fn window_switch() -> Option<&'static str>{
 
     //Clear all key events before switch
     let mut event = consumer.peek();
-    while(event.is_some()){
+    while event.is_some() {
         try_opt!(event).mark_completed();
         event = consumer.peek();
     }
@@ -69,14 +69,7 @@ pub fn window_switch() -> Option<&'static str>{
     Some("End")
 }
 
-#[macro_export]
-macro_rules! window_switch {
-    () => ({
-        $crate::window_switch();
-    });
-}
-
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<Window_Obj>>, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
@@ -98,22 +91,22 @@ pub fn print_all() {
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<Window_Obj>>, &'static str>{
-        if (width < 2 || height < 2){
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
+        if width < 2 || height < 2 {
             return Err("Window size must be greater than 2");
         }
-        if(x + width >= frame_buffer::FRAME_BUFFER_WIDTH
-       || y + height >= frame_buffer::FRAME_BUFFER_HEIGHT){
+        if x + width >= frame_buffer::FRAME_BUFFER_WIDTH
+       || y + height >= frame_buffer::FRAME_BUFFER_HEIGHT {
             return Err("Requested area extends the screen size");
         }
 
-        //new_window = ||{Window_Obj{x:x,y:y,width:width,height:height,active:true}};
-        let mut window:Window_Obj = Window_Obj{x:x,y:y,width:width,height:height,active:true, consumer:None};
+        //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
+        let mut window:WindowObj = WindowObj{x:x,y:y,width:width,height:height,active:true, consumer:None};
 
         //window.resize(x,y,width,height);
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
         let mut overlapped = false;
-        for item in self.allocated.iter(){
+        for item in self.allocated.iter() {
             let allocated_window = item.lock();
             if window.is_overlapped(&(*allocated_window)) {
                 overlapped = true;
@@ -153,7 +146,7 @@ impl WindowAllocator{
                 flag = true;
             }
         }
-        if (flag) {
+        if flag {
             let item = try_opt!(self.allocated.front_mut());
  //           unsafe{ item.force_unlock();}
             let mut window = item.lock();
@@ -177,7 +170,7 @@ impl WindowAllocator{
 }
 
 #[derive(Copy, Clone)]
-pub struct Window_Obj {
+pub struct WindowObj {
     x: usize,
     y:usize,
     width:usize,
@@ -188,8 +181,8 @@ pub struct Window_Obj {
 }
 
 
-impl Window_Obj{
-    pub fn is_overlapped(&self, window:&Window_Obj) -> bool {
+impl WindowObj{
+    pub fn is_overlapped(&self, window:&WindowObj) -> bool {
         if self.check_in_area(window.x, window.y)
             {return true;}
         if self.check_in_area(window.x, window.y+window.height)
@@ -214,11 +207,11 @@ impl Window_Obj{
 
     fn active(&mut self, active:bool){
         self.active = active;
-        if (active && self.consumer.is_none()) {
+        if active && self.consumer.is_none() {
             let consumer = KEY_CODE_CONSUMER.try();
             self.consumer = consumer;
         }
-        if(!active && self.consumer.is_some()){
+        if !active && self.consumer.is_some(){
             
             self.consumer = None;
         }
@@ -235,16 +228,12 @@ impl Window_Obj{
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 
-    fn fill(&self, color:usize){
-        frame_buffer::draw_square(self.x+1, self.y+1, self.width-2, self.height-2, color);
-    }
-
     pub fn print (&self){
         trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", self.x, self.y, self.width, self.height, self.active, self.consumer.is_none());    
     }
 
     pub fn get_key_code(&self) -> Option<Keycode> {
-        if (self.consumer.is_some()) {
+        if self.consumer.is_some() {
 
             let event_opt = try_opt!(self.consumer).peek();
             let event = try_opt!(event_opt);
@@ -294,8 +283,6 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
     let producer = KEY_CODE_PRODUCER.call_once(|| {
         consumer.obtain_producer()
     });
-
-    let producer = try_opt_err!(KEY_CODE_PRODUCER.try(), "Couldn't init key code producer");
     
     producer.enqueue(keycode);
     Ok(())
@@ -307,7 +294,7 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 //Test functions for performance evaluation
 /*pub fn set_time_start(){
     let hpet = ACPI_TABLE.hpet.read();
-    unsafe { starting_time = (*hpet).as_ref().unwrap().get_counter(); }   
+    unsafe { STARTING_TIME = (*hpet).as_ref().unwrap().get_counter(); }   
 }
 
 pub fn calculate_time_statistic() {
@@ -316,7 +303,7 @@ pub fn calculate_time_statistic() {
     });
 
   unsafe{
-    if starting_time == 0 {
+    if STARTING_TIME == 0 {
         debug!("test_window_managers::calculate: No starting time!");
         return;
     }
@@ -326,17 +313,17 @@ pub fn calculate_time_statistic() {
 
    
     let mut queue = statistic.lock();
-    queue.push(end_time - starting_time);
+    queue.push(end_time - STARTING_TIME);
 
-    starting_time = 0;
+    STARTING_TIME = 0;
 
-    counter  = counter+1;
+    COUNTER  = COUNTER+1;
 
-    if counter == 1000 {
+    if COUNTER == 1000 {
         for i in 0..queue.len(){
             trace!("Time\t{}", queue.pop().unwrap());
         }
-        counter = 0;
+        COUNTER = 0;
     }
   }
 }*/

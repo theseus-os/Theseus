@@ -16,16 +16,13 @@ extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
 #[macro_use] extern crate log;
-#[macro_use] extern crate util;
+extern crate util;
 
 use core::ptr::Unique;
 use spin::Mutex;
-use volatile::Volatile;
-use alloc::string::String;
-use kernel_config::memory::KERNEL_OFFSET;
 use alloc::vec::Vec;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PageTable, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, allocate_pages, MappedPages, MemoryManagementInfo,
+use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
+    EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 
@@ -37,7 +34,7 @@ const VGA_BUFFER_ADDR: usize = 0xa0000;
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
-pub static frame_buffer_pages:Mutex<Option<MappedPages>> = Mutex::new(None);
+pub static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
 #[macro_export]
 macro_rules! try_opt_err {
@@ -87,7 +84,7 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            let mut pages = frame_buffer_pages.lock();
+            let mut pages = FRAME_BUFFER_PAGES.lock();
             *pages = Some(mapped_frame_buffer);
 
             Ok(())
@@ -218,8 +215,8 @@ impl Drawer {
         if width.abs() > height.abs() {
             let mut y;
             for x in start_x..end_x {
-                y = ((x-start_x)*height/width+start_y);
-                if(self.check_in_range(x as usize,y as usize)){
+                y = (x-start_x)*height/width+start_y;
+                if self.check_in_range(x as usize,y as usize) {
                     points.push(Point{x:x as usize, y:y as usize, color:color});
                 }
             }
@@ -228,7 +225,7 @@ impl Drawer {
             let mut x;
             for y in start_y..end_y {
                 x = (y-start_y)*width/height+start_x;
-                if(self.check_in_range(x as usize,y as usize)){
+                if self.check_in_range(x as usize,y as usize) {
                     points.push(Point{x:x as usize, y:y as usize, color:color});
                 }            
             }
@@ -259,7 +256,7 @@ impl Drawer {
     } 
 
     pub fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
-        if(self.start_address == 0){
+        if self.start_address == 0 {
             self.start_address = virtual_address;
             self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
             trace!("Set frame buffer address {:#x}", virtual_address);
