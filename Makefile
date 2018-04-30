@@ -233,7 +233,7 @@ docs: doc
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
 view-doc: doc
-	@xdg-open build/doc/index.html > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
 
 view-docs: view-doc
 

@@ -57,5 +57,4 @@ doc:
 	@rustdoc --output target/doc --crate-name Theseus __doc.rs
 ## TODO: FIXME: build all other .rs files in the "doc" crate... do we give them the same "Theseus" crate name?
 	@rm -f __doc.rs
-	@ln -f -s ./Theseus/index.html target/doc/index.html
 
