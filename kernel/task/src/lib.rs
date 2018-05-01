@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(alloc)]
+#![feature(asm, naked_functions)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -21,12 +22,6 @@ use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
-
-
-extern {
-    /// This is defined in the nano_core's boot/boot.asm
-    fn task_switch(ptr_to_prev_sp: *mut usize, next_sp_value: usize);
-}
 
 
 /// The id of the currently executing `Task`, per-core.
@@ -280,7 +275,15 @@ impl Task {
 
         unsafe {
             // debug!("context_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-            task_switch(&mut self.saved_sp as *mut usize, next.saved_sp);
+            
+            // because task_switch must be a naked function, we cannot directly pass it parameters
+            // instead, we must pass our 2 parameters in RDI and RSI respectively
+            asm!("mov rdi, $0; \
+                  mov rsi, $1;" 
+                : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                : "memory" : "intel", "volatile"
+            );
+            task_switch();
         }
 
     }
@@ -290,4 +293,34 @@ impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{{{}}}", self.name, self.id)
     }
+}
+
+
+
+#[allow(private_no_mangle_fns)]
+#[naked]
+#[no_mangle]
+/// Performs the actual context switch from prev to next task.
+/// First argument  (rdi): mutable pointer to the previous task's stack pointer
+/// Second argument (rsi): the value of the next task's stack pointer
+unsafe fn task_switch() {
+    asm!("
+        push rbx; \
+        push rbp; \
+        push r12; \
+        push r13; \
+        push r14; \
+        push r15; \
+        \
+        mov [rdi], rsp; \
+        mov rsp, rsi; \
+        \
+        pop r15; \
+        pop r14; \
+        pop r13; \
+        pop r12; \
+        pop rbp; \
+        pop rbx;"
+        : : : "memory" : "intel", "volatile"
+    );
 }
