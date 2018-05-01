@@ -1,2 +1,5 @@
 [target.x86_64-theseus.dependencies]
-core = {}
+alloc = {}
+
+[target.x86_64-theseus-sse.dependencies]
+alloc = {}

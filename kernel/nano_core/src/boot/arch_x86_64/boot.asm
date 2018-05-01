@@ -196,7 +196,9 @@ check_long_mode:
 	mov al, "2"
 	jmp _error
 
+
 ; Check for SSE and enable it. Throw error 'a' if unsupported
+global set_up_SSE
 set_up_SSE:
 	mov eax, 0x1
 	cpuid

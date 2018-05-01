@@ -123,7 +123,7 @@ pub fn init_ap(apic_id: u8,
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
 
-    info!("trying to load IDT for AP {}...", apic_id);
+    // info!("trying to load IDT for AP {}...", apic_id);
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
     Ok(())

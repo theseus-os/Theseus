@@ -88,9 +88,9 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
 
-/// Must match the order of registers popped in the nano_core's boot/boot.asm:task_switch
-#[derive(Default)]
+#[cfg(not(target_feature = "sse2"))]
 #[repr(C, packed)]
+/// Must match the order of registers popped in the [`task`](../task/index.html) crate's `task_switch`
 pub struct Context {
     r15: usize, 
     r14: usize,
@@ -101,6 +101,7 @@ pub struct Context {
     rip: usize,
 }
 
+#[cfg(not(target_feature = "sse2"))]
 impl Context {
     pub fn new(rip: usize) -> Context {
         Context {
@@ -114,6 +115,70 @@ impl Context {
         }
     }
 }
+
+
+#[cfg(target_feature = "sse2")]
+#[repr(C, packed)]
+/// Must match the order of registers popped in the [`task`](../task/index.html) crate's `task_switch`
+pub struct Context {
+    xmm15: u128,
+    xmm14: u128,   
+    xmm13: u128,   
+    xmm12: u128,   
+    xmm11: u128,   
+    xmm10: u128,   
+    xmm9:  u128,   
+    xmm8:  u128,   
+    xmm7:  u128,   
+    xmm6:  u128,   
+    xmm5:  u128,   
+    xmm4:  u128,   
+    xmm3:  u128,   
+    xmm2:  u128,   
+    xmm1:  u128,   
+    xmm0:  u128, 
+
+    r15: usize, 
+    r14: usize,
+    r13: usize,
+    r12: usize,
+    rbp: usize,
+    rbx: usize,
+    rip: usize,
+}
+
+#[cfg(target_feature = "sse2")]
+impl Context {
+    pub fn new(rip: usize) -> Context {
+        Context {
+            xmm15: 0,
+            xmm14: 0,   
+            xmm13: 0,   
+            xmm12: 0,   
+            xmm11: 0,   
+            xmm10: 0,   
+            xmm9:  0,   
+            xmm8:  0,   
+            xmm7:  0,   
+            xmm6:  0,   
+            xmm5:  0,   
+            xmm4:  0,   
+            xmm3:  0,   
+            xmm2:  0,   
+            xmm1:  0,   
+            xmm0:  0,   
+
+            r15: 0,
+            r14: 0,
+            r13: 0,
+            r12: 0,
+            rbp: 0,
+            rbx: 0,
+            rip: rip,
+        }
+    }
+}
+
 
 
 #[derive(Debug)]
