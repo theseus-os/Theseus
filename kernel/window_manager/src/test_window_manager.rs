@@ -26,7 +26,7 @@ pub fn test_cursor(_: Option<u64>) -> Option<&'static str> {
     let mut direction;
 
     loop{
-        let window = *window;
+        let window = &(*window);
         let keycode = window.get_key_code();
         direction = try_opt!(keycode);
         
@@ -110,7 +110,7 @@ pub fn test_draw(_: Option<u64>) -> Option<&'static str>{
 
     let mut direction;
     loop{
-        let window = *window;
+        let window = &(*window);
         let keycode = window.get_key_code();
         
         direction = try_opt!(keycode);
@@ -181,12 +181,9 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
 pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
     use frame_buffer_text::CONSOLE_FRAME_TEXT_BUFFER;
     use core::fmt::Write;
-    for i in 0..15 {
-        trace!("Print to console {}", i);
-        try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("This is the first sentence\nEnter an enter\n").map_err(|_| "error in FrameBuffer's write_str()"));
-        try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("A secret is a secret\nZero is start\n").map_err(|_| "error in FrameBuffer's write_str()"));
-        try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("I am Theseus\nThe end\n").map_err(|_| "error in FrameBuffer's write_str()"));
-    }
+
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("This is the first line\nThis is the second line\n").map_err(|_| "error in FrameBuffer's write_str()"));
+    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Start Theseus...\nThe end\n").map_err(|_| "error in FrameBuffer's write_str()"));
     Ok(())
 
 }

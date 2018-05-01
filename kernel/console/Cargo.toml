@@ -14,15 +14,11 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
-
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+[dependencies.frame_buffer_text]
+path = "../frame_buffer_text"
 
 [dependencies.window_manager]
 path = "../window_manager"

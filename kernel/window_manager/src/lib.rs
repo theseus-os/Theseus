@@ -32,7 +32,7 @@ use alloc::arc::{Arc, Weak};
 //use acpi::ACPI_TABLE;
 
 
-static mut STARTING_TIME:u64 = 0;
+//static mut STARTING_TIME:u64 = 0;
 //static mut COUNTER:usize = 0; //For performance evaluation
 
 /// A test mod of window manager
@@ -160,7 +160,6 @@ impl WindowAllocator{
 
 }
 
-#[derive(Copy, Clone)]
 /// a window object
 pub struct WindowObj {
     /// the upper left x-coordinate of the window

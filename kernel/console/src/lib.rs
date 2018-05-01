@@ -2,11 +2,10 @@
 #![feature(alloc)]
 
 extern crate keycodes_ascii;
-extern crate vga_buffer;
+extern crate frame_buffer_text;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate window_manager;
 extern crate spawn;
@@ -16,17 +15,12 @@ extern crate console_types;
 use console_types::{ConsoleEvent, ConsoleOutputEvent};
 
 
-use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
+use frame_buffer_text::{CONSOLE_FRAME_TEXT_BUFFER, DisplayPosition};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
-use spin::{Once, Mutex};
+use spin::{Once};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
-
-
-lazy_static! {
-    static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
-}
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
@@ -79,14 +73,14 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
         match event_data {
             &ConsoleEvent::ExitEvent => {
                 use core::fmt::Write;
-                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
+                try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 handle_key_event(input_event.key_event);
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default());
+                CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&output_event.text, 0x90ee90);
             }
         }
         event.mark_completed();
@@ -135,27 +129,27 @@ fn handle_key_event(keyevent: KeyEvent) {
 
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Start);
         return;
     }
     if keyevent.keycode == Keycode::End {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::End);
         return;
     }
     if keyevent.keycode == Keycode::PageUp {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(20));
         return;
     }
     if keyevent.keycode == Keycode::PageDown {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(20));
         return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(1));
         return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(1));
         return;
     }
     
@@ -188,7 +182,7 @@ fn handle_key_event(keyevent: KeyEvent) {
             // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
             use alloc::string::ToString;
-            CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
+            CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&c.to_string(), 0x90ee90);
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 

@@ -295,7 +295,7 @@ lazy_static! {
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
-enum DisplayPosition {
+pub enum DisplayPosition {
     /// Move the display to the very top of the VgaBuffer
     Start,
     /// Refresh the display without scrolling it
@@ -390,7 +390,7 @@ impl FrameTextBuffer {
     }
 
 
-    fn write_string_with_color(&mut self, s: &String, color: usize) {
+    pub fn write_string_with_color(&mut self, s: &String, color: usize) {
         self.write_str_with_color(s.as_str(), color);
     }
 
@@ -413,7 +413,7 @@ impl FrameTextBuffer {
 
 
     /// Displays this VgaBuffer at the given string offset by flushing it to the screen.
-    fn display(&mut self, position: DisplayPosition) {
+    pub fn display(&mut self, position: DisplayPosition) {
         // trace!("VgaBuffer::display(): position {:?}", position);
         let (start, end) = match position {
             DisplayPosition::Start => {

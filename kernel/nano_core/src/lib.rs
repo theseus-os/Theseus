@@ -42,6 +42,8 @@ pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
 }
 
+
+
 use x86_64::structures::idt::LockedIdt;
 
 static EARLY_IDT: LockedIdt = LockedIdt::new();
@@ -49,13 +51,13 @@ static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 /// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
 ///
-/// This is called from assembly code entry point for Theseus, found in `src/boot/arch_x86_64/boot.asm`.
+/// This is called from assembly code entry point for Theseus, found in `nano_core/src/boot/arch_x86_64/boot.asm`.
 ///
 /// This function does the following things: 
 ///
-/// * Bootstraps the OS, including [logging](../logger.html) and basic [exception handlers](../exceptions.init_early_exceptions.html)
-/// * Sets up basic [virtual memory](../memory.init.html)
-/// * Initializes the [state_store](../state_store.html) module
+/// * Bootstraps the OS, including [logging](../logger/index.html) and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
+/// * Sets up basic [virtual memory](../memory/fn.init.html)
+/// * Initializes the [state_store](../state_store/index.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
 ///
 #[no_mangle]
@@ -78,8 +80,18 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init(boot_info, apic::broadcast_tlb_shootdown).unwrap(); // consumes boot_info
 
     //init frame_buffer
-    frame_buffer::init().is_ok();
-    frame_buffer_3d::init().is_ok();
+    let rs = frame_buffer::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
+    let rs = frame_buffer_3d::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();

@@ -300,6 +300,7 @@ impl fmt::Display for Task {
 #[allow(private_no_mangle_fns)]
 #[naked]
 #[no_mangle]
+#[inline(never)]
 /// Performs the actual context switch from prev to next task.
 /// First argument  (rdi): mutable pointer to the previous task's stack pointer
 /// Second argument (rsi): the value of the next task's stack pointer

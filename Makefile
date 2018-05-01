@@ -234,23 +234,6 @@ view-doc: doc
 view-docs: view-doc
 
 
-doc:
-	@rm -rf build/doc
-	@mkdir -p build
-	@$(MAKE) -C kernel doc
-	@cp -rf kernel/target/doc ./build/
-	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You run 'make view-doc' to view it, or just open build/doc/index.html."
-
-docs: doc
-
-
-view-doc: doc
-	@xdg-open ./build/doc/index.html &
-
-view-docs: view-doc
-
-
 clean:
 	@rm -rf build
 	@$(MAKE) -C kernel clean
