@@ -7,10 +7,10 @@ SHELL := /bin/bash
 .PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
 
 
-arch ?= x86_64
-target ?= $(arch)-theseus
-nano_core := kernel/build/nano_core-$(arch).bin
-iso := build/theseus-$(arch).iso
+ARCH ?= x86_64
+TARGET ?= $(ARCH)-theseus
+nano_core := kernel/build/nano_core-$(ARCH).bin
+iso := build/theseus-$(ARCH).iso
 grub_cfg := cfg/grub.cfg
 
 ifeq ($(bypass),yes)

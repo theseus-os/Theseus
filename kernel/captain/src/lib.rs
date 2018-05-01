@@ -12,7 +12,6 @@
 #![feature(used)]
 #![feature(core_intrinsics)]
 
-
 extern crate alloc;
 #[macro_use] extern crate log;
 
@@ -43,7 +42,8 @@ extern crate e1000;
 extern crate scheduler;
 extern crate console;
 
-
+#[cfg(target_feature = "sse2")]
+extern crate simd_test;
 
 // temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
 /// calls print!() with an extra "\n" at the end. 
@@ -110,7 +110,7 @@ use core::fmt;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, enable_interrupts};
 
 #[cfg(feature = "loadable")] use task::Task;
 #[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
@@ -486,10 +486,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
-        #[cfg(not(feature = "loadable"))]
+    #[cfg(not(feature = "loadable"))]
         {
             spawn::spawn_userspace(module, None)?;
         }
+    }
+
+    #[cfg(target_feature = "sse2")]
+    {
+        spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
+        
     }
 
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
@@ -517,10 +525,4 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         // TODO: exit this loop cleanly upon a shutdown signal
     }
 
-<<<<<<< HEAD
-
-    // cleanup here
-    // logger::shutdown().ok_or("WTF: failed to shutdown logger... oh well.");
-=======
->>>>>>> Our dumb scheduler no longer schedules in idle_tasks if any other tasks are availalbe on a given core.
 }
