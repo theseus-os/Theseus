@@ -37,9 +37,6 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
-
-
-   
     ; set graphic mode
     mov ax, 0x4f02
     mov bx, 0x4112
@@ -168,8 +165,7 @@ prot_mode:
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
     
-    jmp 0x08:ap_start_protected_mode
-    
+    jmp 0x08:ap_start_protected_mode  
 
 halt:
     jmp halt

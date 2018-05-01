@@ -394,7 +394,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     // create and jump to the first userspace thread
-    if false
+    if true
     {
         debug!("trying to jump to userspace");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
@@ -411,7 +411,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    if false
+    if true
     {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("test_program").expect("Error: no userspace modules named 'test_program' found!");
@@ -427,8 +427,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             spawn::spawn_userspace(module, Some(String::from("test_program_2"))).unwrap();
         }
     }
-
-   
 
     // create and jump to a userspace thread that tests syscalls
     if false
