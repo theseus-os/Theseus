@@ -5,7 +5,6 @@ use super::{ACPI_TABLE, SDT_POINTERS, get_sdt, find_sdt, get_sdt_signature, load
 
 use memory::ActivePageTable;
 
-
 #[repr(packed)]
 #[derive(Debug)]
 pub struct Fadt {

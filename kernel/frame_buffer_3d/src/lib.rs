@@ -106,17 +106,6 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
     })
 };
 
-
-
-
-/*#[macro_export]
-macro_rules! draw_pixel {
-    ($x:expr, $y:expr, $color:expr) => ({
-        $crate::draw_pixel($x, $y, 0, $color);
-    });
-}*/
-
-
 #[doc(hidden)]
 pub fn draw_pixel(x:usize, y:usize, color:usize) {
     FRAME_DRAWER.lock().draw_pixel(x, y, 0, color, true)
@@ -124,13 +113,6 @@ pub fn draw_pixel(x:usize, y:usize, color:usize) {
 
 pub fn draw_pixel_3d(x:usize, y:usize, z:usize, color:usize, show:bool) {
     FRAME_DRAWER.lock().draw_pixel(x, y, z, color, show)
-}
-
-#[macro_export]
-macro_rules! draw_line {
-    ($start_x:expr, $start_y:expr, $end_x:expr, $end_y:expr, $color:expr) => ({
-        $crate::draw_line($start_x, $start_y, $end_x, $end_y, 0, $color, true);
-    });
 }
 
 #[doc(hidden)]
@@ -147,14 +129,6 @@ pub fn draw_line_3d(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:us
         end_y as i32, z, color, show)
 }
 
-/*#[macro_export]
-macro_rules! draw_square {
-    ($start_x:expr, $start_y:expr, $width:expr, $height:expr, $color:expr) => ({
-        $crate::draw_square($start_x, $start_y, $width, $height, 0, $color, true);
-    });
-}*/
-
-
 #[doc(hidden)]
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize,
      color:usize) {
@@ -166,25 +140,6 @@ pub fn draw_square_3d(start_x:usize, start_y:usize, width:usize, height:usize, z
      color:usize, show:bool) {
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color, show)
 }
-
-
-
-
-/*#[macro_export]
- macro_rules! init_frame_buffer {
-     ($v_add:expr) => (
-         {
-             $crate::init_frame_buffer($v_add);
-         }
-     )
- }
-
-
-#[doc(hidden)]
-pub fn init_frame_buffer(virtual_address:usize) {
-    FRAME_DRAWER.lock().init_frame_buffer(virtual_address);
-}
-*/
 
 pub struct Point {
     pub x: usize,

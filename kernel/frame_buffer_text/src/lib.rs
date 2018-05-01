@@ -293,43 +293,6 @@ lazy_static! {
     pub static ref CONSOLE_FRAME_TEXT_BUFFER: Mutex<FrameTextBuffer> = Mutex::new(FrameTextBuffer::new());
 }
 
-/*//! The vga buffer that implements basic printing in VGA text mode.
-
-#![no_std]
-#![feature(alloc)]
-#![feature(const_fn)]
-#![feature(unique)]
-
-extern crate spin;
-extern crate volatile;
-extern crate alloc;
-extern crate serial_port;
-extern crate kernel_config;
-// #[macro_use] extern crate log;
-
-use core::ptr::Unique;
-use core::cmp::min;
-use core::fmt;
-// use core::slice;
-use core::mem;
-use spin::Mutex;
-use volatile::Volatile;
-use alloc::string::String;
-use alloc::Vec;
-use kernel_config::memory::KERNEL_OFFSET;
-
-/// defined by x86's physical memory maps
-const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
-
-/// height of the VGA text window
-const BUFFER_HEIGHT: usize = 25;
-/// width of the VGA text window
-const BUFFER_WIDTH: usize = 80;
-
-// #[macro_export] pub mod raw;
-pub mod raw;
-*/
-
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
 pub enum DisplayPosition {

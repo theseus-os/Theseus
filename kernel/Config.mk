@@ -22,8 +22,8 @@ CFG_DIR ?= ${PWD}/../cfg
 
 ## Build modes:  debug is default (dev mode), release is release with full optimizations.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
-# BUILD_MODE ?= debug
-BUILD_MODE ?= release
+BUILD_MODE ?= debug
+# BUILD_MODE ?= release
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which means "debug" by default

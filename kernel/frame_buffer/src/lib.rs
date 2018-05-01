@@ -105,70 +105,20 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
 
 
 
-
-#[macro_export]
-macro_rules! draw_pixel {
-    ($x:expr, $y:expr, $color:expr) => ({
-        $crate::draw_pixel($x, $y, $color);
-    });
-}
-
-
 #[doc(hidden)]
 pub fn draw_pixel(x:usize, y:usize, color:usize) {
     FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
-
-#[macro_export]
-macro_rules! draw_line {
-    ($start_x:expr, $start_y:expr, $end_x:expr, $end_y:expr, $color:expr) => ({
-        $crate::draw_line($start_x, $start_y, $end_x, $end_y, $color);
-    });
-}
-
 
 #[doc(hidden)]
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
-#[macro_export]
-macro_rules! draw_square {
-    ($start_x:expr, $start_y:expr, $width:expr, $height:expr, $color:expr) => ({
-        $crate::draw_square($start_x, $start_y, $width, $height, $color);
-    });
-}
-
-
 #[doc(hidden)]
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
-
-#[macro_export]
-macro_rules! set_direction {
-    ($direction:expr) => ({
-        $crate::draw_square($direction);
-    });
-}
-
-
-
-/*#[macro_export]
- macro_rules! init_frame_buffer {
-     ($v_add:expr) => (
-         {
-             $crate::init_frame_buffer($v_add);
-         }
-     )
- }
-
-
-#[doc(hidden)]
-pub fn init_frame_buffer(virtual_address:usize) {
-    FRAME_DRAWER.lock().init_frame_buffer(virtual_address);
-}
-*/
 
 pub struct Point {
     pub x: usize,

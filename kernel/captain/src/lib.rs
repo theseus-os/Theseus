@@ -359,7 +359,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    if false {
+    if true {
         // #[cfg(feature = "loadable")]
         // {
         //     let vaddr = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().expect("e1000::test_nic_driver::test_nic_driver").virt_addr();
@@ -378,8 +378,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use window_manager::test_window_manager;
-            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_nic_driver"), None).unwrap();
-            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_nic_driver"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
 
         }
     }
@@ -389,18 +389,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use window_manager::test_window_manager;
-            spawn::spawn_kthread(test_window_manager::test_text, None, String::from("test_nic_driver"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_text, None, String::from("test_text"), None).unwrap();
         }
     }
-    /*if false {
-        #[cfg(not(feature = "loadable"))]
-        {
-            use graph_drawer::test_drawer;
-            spawn::spawn_kthread(test_drawer::test_cursor, None, String::from("test_nic_driver")).unwrap();
-            spawn::spawn_kthread(test_drawer::test_draw, None, String::from("test_nic_driver")).unwrap();
-
-        }
-    } */ 
 
     // create and jump to the first userspace thread
     if false

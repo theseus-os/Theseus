@@ -36,6 +36,5 @@ path = "../kernel_config"
 [dependencies.heap_irq_safe]
 path = "../../libs/heap_irq_safe"
 
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

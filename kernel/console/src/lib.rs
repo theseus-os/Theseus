@@ -9,7 +9,6 @@ extern crate dfqueue;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate window_manager;
-//extern crate graph_drawer;
 
 extern crate spawn;
 
