@@ -1,3 +1,5 @@
+//! This crate is an application to draw graphs on the screen
+
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
@@ -24,7 +26,6 @@ use alloc::arc::{Arc, Weak};
 
 pub mod test_drawer;
 
-
 static GraphDrawer: Once<MutexIrqSafe<GraphDrawer>> = Once::new();
 
 static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Keycode>> = Once::new();
@@ -32,13 +33,16 @@ static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 
-pub struct GraphDrawer {
+struct GraphDrawer {
     graphlist: Mutex<Vec<GraphObj>>,
     active:i32,
 }
 
+/// A point for display on the screen
 pub struct Point{
+    /// x-coordinate of the point
     x:usize,
+    /// y-coordinate of the point
     y:usize,
 }
 
@@ -78,10 +82,15 @@ impl Point {
     }
 }
 
+/// A line for display on the screen
 pub struct Line{
+    /// x-coordinate of the start point
     start_x:usize,
+    /// y-coordinate of the start point
     start_y:usize,
+    /// x-coordinate of the end point
     end_x:usize,
+    /// y-coordinate of the end point
     end_y:usize,    
 }
 
@@ -127,11 +136,17 @@ impl Line {
     }
 }
 
+///A square for display on the screen
 pub struct Square{
+    ///x-coordinate of the upper left point
     x:usize,
+    ///y-coordinate of the upper left point
     y:usize,
+    ///the height of the square
     height:usize,
+    ///the width of the square
     width:usize,
+    ///whether the square is filled with its color
     fill:bool,
 }
 
@@ -171,6 +186,7 @@ impl Square {
     }
 }
 
+/// A graph enum including point, line and square
 pub enum Graph {
     Point(Point),
     Line(Line),
@@ -192,15 +208,19 @@ impl Move for Graph {
     }
 }
 
-
+/// An graph object for display on the screen
 pub struct GraphObj{
+    /// the primitive graph
     graph: Graph,
+    /// the z-coordinate of the graph
     depth: usize,
+    /// the color of the graph
     color: usize,
 }
 
 impl GraphObj {
-    fn display(&self, show:bool) {
+    /// draw a graph object
+    pub fn display(&self, show:bool) {
         match self.graph {
             Graph::Point(ref point) => {
                 frame_buffer::draw_pixel(point.x, point.y, self.depth, self.color, show);
@@ -272,6 +292,7 @@ impl GraphObj {
     }
 }
 
+/// draw a primitive graph with its depth and color
 pub fn draw_graph (graph: Graph, depth:usize, color:usize) -> Result<(), &'static str>{
     let drawer: &MutexIrqSafe<GraphDrawer> = GraphDrawer.call_once(|| {
         MutexIrqSafe::new(GraphDrawer{graphlist:Mutex::new(Vec::new()), active:-1})
@@ -366,6 +387,7 @@ impl GraphDrawer {
     }
 }
 
+/// Add key event to the drawer application
 pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
     let consumer = KEY_CODE_CONSUMER.try();
@@ -381,7 +403,7 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
     Ok(())
 }
 
-//TODO: create a new thread to do this
+/// init the drawer to deal with key inputs
 pub fn init() -> Result<(), &'static str>{
     loop{
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());

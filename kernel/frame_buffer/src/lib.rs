@@ -1,5 +1,4 @@
-//! The frame buffer for display on the screen
-//Framebuffer in 2D mode
+//! This crate is a frame buffer for display on the screen in 2D mode
 
 #![no_std]
 #![feature(alloc)]
@@ -31,11 +30,16 @@ use core::ops::DerefMut;
 const VGA_BUFFER_ADDR: usize = 0xa0000;
 
 //Size of VESA mode 0x4112
+
+///The width of the screen
 pub const FRAME_BUFFER_WIDTH:usize = 640*3;
+
+///The height of the screen
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
-pub static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
+static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
+/// try to unwrap an option. return error result if fails. 
 #[macro_export]
 macro_rules! try_opt_err {
     ($e:expr, $s:expr) =>(
@@ -46,9 +50,10 @@ macro_rules! try_opt_err {
     )
 }
 
+/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
 
-    //Wenqiu Allocate VESA frame buffer
+    //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
 
@@ -95,8 +100,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-
-pub static FRAME_DRAWER: Mutex<Drawer> = {
+static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
@@ -104,39 +108,34 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
 };
 
 
-
-#[doc(hidden)]
+/// draw a pixel with coordinates and color
 pub fn draw_pixel(x:usize, y:usize, color:usize) {
     FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
 
-#[doc(hidden)]
+/// draw a line with start and end coordinates and color
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
-#[doc(hidden)]
+/// draw a line with upper left coordinates, width, height and color
 pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub struct Point {
+struct Point {
     pub x: usize,
     pub y: usize,
     pub color: usize,
 }
 
-
-
-pub struct Drawer {
+struct Drawer {
     start_address: usize,
     buffer: Unique<Buffer> ,
 }
 
-
-
 impl Drawer {
-    pub fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
+    fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
         if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return Some("pixel is ont of bound");
         }
@@ -147,18 +146,18 @@ impl Drawer {
         Some("End")
     }
 
-    pub fn draw_points(&mut self, points:Vec<Point>){
+    fn draw_points(&mut self, points:Vec<Point>){
         for p in points{
             draw_pixel(p.x, p.y, p.color);
         }
       
     }
 
-    pub fn check_in_range(&mut self, x:usize, y:usize) -> bool {
+    fn check_in_range(&mut self, x:usize, y:usize) -> bool {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
-    pub fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
+    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         let mut points = Vec::new();
@@ -183,7 +182,7 @@ impl Drawer {
         self.draw_points(points);
     }
 
-    pub fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
+    fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
         let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -205,7 +204,7 @@ impl Drawer {
          unsafe { self.buffer.as_mut() }
     } 
 
-    pub fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
+    fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
             self.start_address = virtual_address;
             self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
@@ -215,8 +214,6 @@ impl Drawer {
         Ok(())
     }  
 }
-
-
 
 struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],

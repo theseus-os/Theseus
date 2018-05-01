@@ -32,10 +32,10 @@ use alloc::arc::{Arc, Weak};
 //use acpi::ACPI_TABLE;
 
 
-pub static mut STARTING_TIME:u64 = 0;
+static mut STARTING_TIME:u64 = 0;
 //static mut COUNTER:usize = 0; //For performance evaluation
 
-
+/// A test mod of window manager
 pub mod test_window_manager;
 
 
@@ -45,11 +45,11 @@ static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Keycode>> = Once::new();
 static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
-pub struct WindowAllocator {
+struct WindowAllocator {
     allocated: LinkedList<Arc<Mutex<WindowObj>>>, //The last one is active
 }
 
-
+/// switch the active window
 pub fn window_switch() -> Option<&'static str>{
 
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
@@ -69,6 +69,7 @@ pub fn window_switch() -> Option<&'static str>{
     Some("End")
 }
 
+/// new a window object and return it
 pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
@@ -79,6 +80,7 @@ pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result
     allocator.lock().deref_mut().allocate(x,y,width,height)
 }
 
+/*
 pub fn print_all() {
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
@@ -87,11 +89,11 @@ pub fn print_all() {
 
 
     allocator.lock().deref_mut().print();
-}
+}*/
 
 
 impl WindowAllocator{
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
+    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
         if width < 2 || height < 2 {
             return Err("Window size must be greater than 2");
         }
@@ -133,7 +135,7 @@ impl WindowAllocator{
     
     }
 
-    pub fn switch(&mut self) -> Option<&'static str>{
+    fn switch(&mut self) -> Option<&'static str>{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
 //            unsafe{ item.force_unlock();}
@@ -156,33 +158,28 @@ impl WindowAllocator{
         Some("End")
     }
 
-    pub fn print(&self) {
-
-    /*    for allocated_window in self.allocated.iter(){
-           trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", allocated_window.x, 
-                allocated_window.y, allocated_window.width, allocated_window.height, 
-                allocated_window.active, allocated_window.consumer.is_none());
-
-        }
-     */  
-    }
-
 }
 
 #[derive(Copy, Clone)]
+/// a window object
 pub struct WindowObj {
+    /// the upper left x-coordinate of the window
     x: usize,
+    /// the upper left y-coordinate of the window
     y:usize,
+    /// the width of the window
     width:usize,
+    /// the height of the window
     height:usize,
+    /// whether the window is active
     active:bool,
-
+    /// a consumer of key input events
     consumer: Option<&'static DFQueueConsumer<Keycode>>,
 }
 
 
 impl WindowObj{
-    pub fn is_overlapped(&self, window:&WindowObj) -> bool {
+    fn is_overlapped(&self, window:&WindowObj) -> bool {
         if self.check_in_area(window.x, window.y)
             {return true;}
         if self.check_in_area(window.x, window.y+window.height)
@@ -198,6 +195,7 @@ impl WindowObj{
         return x>= self.x && x <= self.x+self.width && y>=self.y && y<=self.y+self.height;
     }
 
+    /// adjust the size of a window
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize){
         self.x = x;
         self.y = y;
@@ -228,11 +226,7 @@ impl WindowObj{
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 
-    pub fn print (&self){
-        trace!("x: {}, y:{}, w:{}, h:{}, active: {}, consumer: {}", self.x, self.y, self.width, self.height, self.active, self.consumer.is_none());    
-    }
-
-    pub fn get_key_code(&self) -> Option<Keycode> {
+    fn get_key_code(&self) -> Option<Keycode> {
         if self.consumer.is_some() {
 
             let event_opt = try_opt!(self.consumer).peek();
@@ -244,6 +238,7 @@ impl WindowObj{
         None
     }
 
+    /// draw a pixel in a window
     pub fn draw_pixel(&self, x:usize, y:usize, color:usize){
         if x >= self.width - 2 || y >= self.height - 2 {
             return;
@@ -252,6 +247,7 @@ impl WindowObj{
         frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, color);
         }
 
+    /// draw a line in a window
     pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize){
         if start_x > self.width - 2
             || start_y > self.height - 2
@@ -265,6 +261,7 @@ impl WindowObj{
             end_x + self.x + 1, end_y + self.y + 1, color);
     }
 
+    /// draw a square in a window
     pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:usize){
         if x + width > self.width - 2
             || y + height > self.height - 2 {
@@ -276,6 +273,7 @@ impl WindowObj{
     }
 }
 
+/// put key input events in the producer of window manager
 pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
     let consumer = try_opt_err!(KEY_CODE_CONSUMER.try(), "No active window");

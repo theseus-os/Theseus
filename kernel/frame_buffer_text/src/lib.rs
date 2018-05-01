@@ -19,8 +19,6 @@ use core::fmt;
 use core::cmp::min;
 use spin::Mutex;
 
-
-
 const CHARACTER_WIDTH:usize = 9;
 const CHARACTER_HEIGHT:usize = 16;
 const WINDOW_COLUMNS:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
@@ -290,12 +288,14 @@ const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
 
 
 lazy_static! {
+    /// An instance of FrameBufferText for writing to the console.
+    /// try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Hello world!\n").map_err(|_| "error in FrameBuffer's write_str()")); 
     pub static ref CONSOLE_FRAME_TEXT_BUFFER: Mutex<FrameTextBuffer> = Mutex::new(FrameTextBuffer::new());
 }
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
-pub enum DisplayPosition {
+enum DisplayPosition {
     /// Move the display to the very top of the VgaBuffer
     Start,
     /// Refresh the display without scrolling it
@@ -314,7 +314,7 @@ type Line = [ScreenChar; WINDOW_COLUMNS];
 const BLANK_LINE: Line = [ScreenChar::new(' ', 0); WINDOW_COLUMNS];
 
 
-/// An instance of a VGA text buffer which can be displayed to the screen.
+/// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
     /// the index of the line that is currently being displayed
     display_line: usize,
@@ -328,12 +328,12 @@ pub struct FrameTextBuffer {
 
 impl FrameTextBuffer {
     /// Create a new VgaBuffer.
-    pub fn new() -> FrameTextBuffer {
+    fn new() -> FrameTextBuffer {
         FrameTextBuffer::with_capacity(1000)
     }
 
     // Create a new VgaBuffer with the given capacity, specified in number of lines. 
-    pub fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
+    fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
         let first_line = BLANK_LINE;
         let mut lines = Vec::with_capacity(num_initial_lines);
         lines.push(first_line);
@@ -347,7 +347,7 @@ impl FrameTextBuffer {
     }
     
 
-    pub fn write_str_with_color(&mut self, s: &str, color: usize) {
+    fn write_str_with_color(&mut self, s: &str, color: usize) {
         for byte in s.chars() {
             match byte {
                 // handle new line
@@ -390,7 +390,7 @@ impl FrameTextBuffer {
     }
 
 
-    pub fn write_string_with_color(&mut self, s: &String, color: usize) {
+    fn write_string_with_color(&mut self, s: &String, color: usize) {
         self.write_str_with_color(s.as_str(), color);
     }
 
@@ -413,7 +413,7 @@ impl FrameTextBuffer {
 
 
     /// Displays this VgaBuffer at the given string offset by flushing it to the screen.
-    pub fn display(&mut self, position: DisplayPosition) {
+    fn display(&mut self, position: DisplayPosition) {
         // trace!("VgaBuffer::display(): position {:?}", position);
         let (start, end) = match position {
             DisplayPosition::Start => {
@@ -513,13 +513,13 @@ impl fmt::Write for FrameTextBuffer {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct ScreenChar {
+struct ScreenChar {
     ascii_character: char,
     color_code: usize,
 }
 
 impl ScreenChar {
-    pub const fn new(ascii: char, color: usize) -> ScreenChar {
+    const fn new(ascii: char, color: usize) -> ScreenChar {
         ScreenChar {
             ascii_character: ascii,
             color_code: color,
@@ -527,13 +527,13 @@ impl ScreenChar {
     }
 }
 
-pub fn printline(line_num:usize, line:Line){
+fn printline(line_num:usize, line:Line){
     for i in 0..WINDOW_COLUMNS{
         printchar(line[i].ascii_character, line_num, i, line[i].color_code);
     }
 }
 
-pub fn printchar(character:char, line:usize, col:usize, color:usize){
+fn printchar(character:char, line:usize, col:usize, color:usize){
     if col >= WINDOW_COLUMNS {
         debug!("frame_buffer_text::print(): The col is out of bound");
         return
