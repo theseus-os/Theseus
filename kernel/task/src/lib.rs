@@ -24,18 +24,18 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 
 
-/// The id of the currently executing `Task`, per-core.
 lazy_static! {
+    /// The id of the currently executing `Task`, per-core.
     pub static ref CURRENT_TASKS: AtomicMap<u8, usize> = AtomicMap::new();
 }
 
-/// Used to ensure that context switches are done atomically on each core
 lazy_static! {
+    /// Used to ensure that context switches are done atomically on each core
     pub static ref CONTEXT_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
 }
 
-/// The list of all Tasks in the system.
 lazy_static! {
+    /// The list of all Tasks in the system.
     pub static ref TASKLIST: AtomicMap<usize, Arc<RwLockIrqSafe<Task>>> = AtomicMap::new();
 }
 

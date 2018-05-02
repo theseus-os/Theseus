@@ -18,8 +18,8 @@ use spin::Once;
 use memory::VirtualAddress;
 
 
-/// The GDT list, one per core, indexed by a key of apic_id
 lazy_static! {
+    /// The GDT list, one per core, indexed by a key of apic_id
     static ref GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
 }
 

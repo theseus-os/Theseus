@@ -6,6 +6,7 @@
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+extern crate volatile;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -20,6 +21,7 @@ extern crate atomic;
 use core::ops::DerefMut;
 use core::ptr::{read_volatile, write_volatile};
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
+use volatile::{Volatile, ReadOnly, WriteOnly};
 use spin::{RwLock, Once};
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
@@ -106,15 +108,21 @@ pub fn get_my_apic() -> Option<&'static RwLock<LocalApic>> {
 }
 
 
-/// The possible destination shorthand values for IPI ICR. 
+/// The possible destination shorthand values for IPI ICR.
+/// 
 /// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
 pub enum LapicIpiDestination {
+    /// Send IPI to a specific APIC 
     One(u8),
+    /// Send IPI to my own (the current) APIC  
     Me,
+    /// Send IPI to all APICs, including myself
     All,
+    /// Send IPI to all APICs except for myself
     AllButMe,
 }
 impl LapicIpiDestination {
+    /// Convert the enum to a bitmask value to be used in the interrupt command register
     pub fn as_icr_value(&self) -> u64 {
         match self {
             &LapicIpiDestination::One(apic_id) => { 
@@ -138,10 +146,8 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
     let phys_addr = rdmsr(IA32_APIC_BASE);
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
-    
+
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
-    // IMO, x2apic is better because it's easier to write a 64-bit value directly into an MSR instead of 
-    // writing 2 separate 32-bit values into adjacent 32-bit APIC memory-mapped I/O registers.
     if !has_x2apic() {
         let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
         let frames = Frame::range_inclusive(Frame::containing_address(phys_addr as PhysicalAddress), 
@@ -197,14 +203,93 @@ const APIC_REG_CURRENT_COUNT          : u32 =  0x390;
 const APIC_REG_TIMER_DIVIDE           : u32 =  0x3E0;
 
 
+/// A structure that offers access to APIC/xAPIC through its I/O registers.
+#[repr(packed)]
+pub struct ApicRegisters {
+    _padding0:                        [u32; 8],
+    pub lapic_id:                     Volatile<u32>,         // 0x20
+    _padding1:                        [u32; 3],
+    pub lapic_version:                ReadOnly<u32>,         // 0x30
+    _padding2:                        [u32; 3 + 4*4],
+    pub task_priority:                Volatile<u32>,         // 0x80
+    _padding3:                        [u32; 3],
+    pub arbitration_priority:         ReadOnly<u32>,         // 0x90
+    _padding4:                        [u32; 3],
+    pub processor_priority:           ReadOnly<u32>,         // 0xA0
+    _padding5:                        [u32; 3],
+    pub eoi:                          WriteOnly<u32>,        // 0xB0
+    _padding6:                        [u32; 3],
+    pub remote_read:                  ReadOnly<u32>,         // 0xC0
+    _padding7:                        [u32; 3],
+    pub logical_destination:          Volatile<u32>,         // 0xD0
+    _padding8:                        [u32; 3],
+    pub destination_format:           Volatile<u32>,         // 0xE0
+    _padding9:                        [u32; 3],
+    pub spurious_interrupt_vector:    Volatile<u32>,         // 0xF0
+    _padding10:                       [u32; 3],
+    pub in_service_registers:         RegisterArray,         // 0x100
+    pub trigger_mode_registers:       RegisterArray,         // 0x180
+    pub interrupt_request_registers:  RegisterArray,         // 0x200
+    pub error_status:                 ReadOnly<u32>,         // 0x280
+    _padding11:                       [u32; 3 + 6*4],        
+    pub lvt_cmci:                     Volatile<u32>,         // 0x2F0
+    _padding12:                       [u32; 3],  
+    pub interrupt_command_low:        Volatile<u32>,         // 0x300
+    _padding13:                       [u32; 3],
+    pub interrupt_command_high:       Volatile<u32>,         // 0x310
+    _padding14:                       [u32; 3],
+    pub lvt_timer:                    Volatile<u32>,         // 0x320
+    _padding15:                       [u32; 3],
+    pub lvt_thermal:                  Volatile<u32>,         // 0x330
+    _padding16:                       [u32; 3],
+    pub lvt_perf_monitor:             Volatile<u32>,         // 0x340
+    _padding17:                       [u32; 3],
+    pub lvt_lint0:                    Volatile<u32>,         // 0x350
+    _padding18:                       [u32; 3],
+    pub lvt_lint1:                    Volatile<u32>,         // 0x360
+    _padding19:                       [u32; 3],
+    pub lvt_error:                    Volatile<u32>,         // 0x370
+    _padding20:                       [u32; 3],
+    pub timer_initial_count:          Volatile<u32>,         // 0x380
+    _padding21:                       [u32; 3],
+    pub timer_current_count:          ReadOnly<u32>,         // 0x390
+    _padding22:                       [u32; 3 + 4*4],
+    pub timer_divide:                 Volatile<u32>,         // 0x3E0
+    _padding23:                       [u32; 3 + 1*4],
+    // ends at 0x400
+}
 
-/// Local APIC
+
+pub struct RegisterArray {
+    reg0:                             ReadOnly<u32>,
+    _padding0:                        [u32; 3],
+    reg1:                             ReadOnly<u32>,
+    _padding1:                        [u32; 3],
+    reg2:                             ReadOnly<u32>,
+    _padding2:                        [u32; 3],
+    reg3:                             ReadOnly<u32>,
+    _padding3:                        [u32; 3],
+    reg4:                             ReadOnly<u32>,
+    _padding4:                        [u32; 3],
+    reg5:                             ReadOnly<u32>,
+    _padding5:                        [u32; 3],
+    reg6:                             ReadOnly<u32>,
+    _padding6:                        [u32; 3],
+    reg7:                             ReadOnly<u32>,
+    _padding7:                        [u32; 3],
+}
+
+
+/// This structure represents a single APIC in the system, there is one per core. 
 #[derive(Debug)]
 pub struct LocalApic {
     /// Only exists for xapic, should be None for x2apic systems.
     pub virt_addr: Option<VirtualAddress>,
+    /// The processor id of this APIC.
     pub processor: u8,
+    /// The APIC system id of this APIC.
     pub apic_id: u8,
+    /// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).
     pub is_bsp: bool,
 }
 
