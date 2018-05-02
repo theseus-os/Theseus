@@ -24,7 +24,9 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 #[macro_use] extern crate vga_buffer; 
 extern crate logger;
 extern crate state_store;
-extern crate memory; // the virtual memory subsystem 
+extern crate memory; // the virtual memory subsystem
+extern crate frame_buffer;
+extern crate frame_buffer_3d;
 extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
@@ -103,6 +105,20 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         shutdown!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+
+    //init frame_buffer
+    let rs = frame_buffer::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
+    let rs = frame_buffer_3d::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();

@@ -84,9 +84,13 @@ pub fn handle_keyboard_input(scan_code: u8) -> Result<(), &'static str> {
                     }
                 }
 
-                _ => { 
-                    warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
-                    Err("unknown keyboard scancode") 
+                _ => {
+                    if scan_code == 0xe0 {
+                        Ok(()) //ignore 0xe0 prefix
+                    } else { 
+                        warn!("handle_keyboard_input(): Unknown keycode: {:?}", keycode);
+                        Err("unknown keyboard scancode") 
+                    }
                 }
             }
         }

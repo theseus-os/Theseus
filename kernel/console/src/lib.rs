@@ -7,6 +7,7 @@ extern crate vga_buffer;
 extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate log;
+extern crate window_manager;
 extern crate spawn;
 
 // temporary, should remove this once we fix crate system
@@ -21,15 +22,16 @@ use core::sync::atomic::Ordering;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
-
-
 lazy_static! {
-    static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
+    /// An instance of FrameBufferText for writing to the console.
+    /// try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Hello world!\n").map_err(|_| "error in FrameBuffer's write_str()")); 
+    pub static ref CONSOLE_FRAME_TEXT_BUFFER: Mutex<FrameTextBuffer> = Mutex::new(FrameTextBuffer::new());
 }
 
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
+const FONT_COLOR:usize = 0x90ee90;
 
 /// Queues up the given `String` to be printed out to the console.
 pub fn print_to_console(s: String) -> Result<(), &'static str> {
@@ -77,18 +79,14 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
                 use core::fmt::Write;
-                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n")
-                    .map_err(|_| "fmt::Error in VgaBuffer's write_str()")
-                );
+                try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 try!(handle_key_event(input_event.key_event));
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default())
-                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
-                );
+                CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&output_event.text, FONT_COLOR);
             }
         }
 
@@ -138,29 +136,52 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
 
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Start);
+        return;
     }
     if keyevent.keycode == Keycode::End {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::End);
+        return;
     }
     if keyevent.keycode == Keycode::PageUp {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(20));
+        return;
     }
     if keyevent.keycode == Keycode::PageDown {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(20));
+        return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(1));
+        return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
-        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
-        return Ok(());
+        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(1));
+        return;
     }
+    
+    //Pass TAB event to window manager
+    //Window manager consumes dir();ection key input
+    match keyevent.keycode {
+         Keycode::Tab => {
+             //window_manager::set_time_start();
+             loop{
+                 window_manager::window_switch();
+             }
+         }
+         Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            window_manager::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }
+
+    //Pass Delete event and direction key event to 3d drawer application
+    /*match keyevent.keycode {
+         Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            graph_drawer::put_key_code(keyevent.keycode).unwrap();
+         }
+         _ => {}
+    }*/
 
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
@@ -168,9 +189,7 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
             // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
             use alloc::string::ToString;
-            try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default())
-                .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
-            );
+            CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&c.to_string(), FONT_COLOR);
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
