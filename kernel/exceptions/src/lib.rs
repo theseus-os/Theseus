@@ -142,7 +142,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
 
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_raw!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
-                                  {:#b}\n{:#?}",
+                                  {:#X}\n{:#?}",
              error_code,
              stack_frame);
 

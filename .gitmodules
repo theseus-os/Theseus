@@ -13,3 +13,9 @@
 	path = libs/multiboot2-elf64
 	url = https://github.com/kevinaboos/multiboot2-elf64.git
 	branch = master
+[submodule "libs/owning-ref-rs"]
+	path = libs/owning-ref-rs
+	url = https://github.com/kevinaboos/owning-ref-rs.git
+[submodule "libs/stable_deref_trait"]
+	path = libs/stable_deref_trait
+	url = https://github.com/kevinaboos/stable_deref_trait.git

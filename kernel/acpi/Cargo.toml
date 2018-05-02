@@ -8,6 +8,12 @@ version = "0.1.0"
 spin = "0.4.5"
 volatile = "0.2.4"
 
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"

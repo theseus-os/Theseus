@@ -289,7 +289,8 @@ pub struct LocalApic {
     pub processor: u8,
     /// The APIC system id of this APIC.
     pub apic_id: u8,
-    /// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).
+    /// Whether 
+    /// this `LocalApic` is the bootstrap processor (the first processor to boot up).
     pub is_bsp: bool,
 }
 
