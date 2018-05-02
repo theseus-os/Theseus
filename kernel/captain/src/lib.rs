@@ -37,6 +37,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate window_manager;
 
 extern crate scheduler;
 extern crate console;
@@ -369,6 +370,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }  
 
+    //test window manager
+    if false {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
+
+        }
+    }
 
     // create and jump to the first userspace thread
     if true
