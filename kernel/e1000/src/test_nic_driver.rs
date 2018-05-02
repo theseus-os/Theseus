@@ -1,7 +1,4 @@
-//use super::E1000_NIC;
 use super::E1000E_NIC;
-
-
 
 pub fn test_nic_driver(_: Option<u64>) {
     debug!("TESTING e1000 NIC DRIVER!!");
@@ -44,7 +41,6 @@ pub struct arp_packet{
 //QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 
 pub fn dhcp_request_packet(){
-    //let mut e1000_nc = E1000_NIC.lock();
     let mut e1000_nc = E1000E_NIC.lock();
     let packet:[u8;314] = [0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x0b,0x82,0x01,0xfc,0x42,0x08,0x00,0x45,0x00,
                                0x01,0x2c,0xa8,0x36,0x00,0x00,0xfa,0x11,0x17,0x8b,0x00,0x00,0x00,0x00,0xff,0xff,

@@ -190,8 +190,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000").unwrap(), &mut kernel_mmi, false).unwrap();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init").unwrap(), &mut kernel_mmi, false).unwrap();
-
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_network_init").unwrap(), &mut kernel_mmi, false).unwrap();
     }
 
 
@@ -342,7 +340,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         #[cfg(not(feature = "loadable"))]
         {
             use network::server::server_init;
-            spawn::spawn_kthread(server_init, None, String::from("test_server"), None).unwrap();
+            spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
 
         }
     }  
@@ -369,8 +367,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             _ => { }
         }
     }
-
-
 
 
     if true {

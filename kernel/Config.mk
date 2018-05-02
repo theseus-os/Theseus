@@ -25,7 +25,7 @@ CFG_DIR ?= ${PWD}/../cfg
 BUILD_MODE ?= debug
 # BUILD_MODE ?= release
 ifeq ($(BUILD_MODE), release)
-	XARGO_RELEASE_ARG := --releasegit 
+	XARGO_RELEASE_ARG := --release
 endif  ## otherwise, nothing, which means "debug" by default
 
 
