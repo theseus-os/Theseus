@@ -12,7 +12,6 @@ extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate frame_buffer;
 #[macro_use] extern crate frame_buffer_3d;
-extern crate frame_buffer_text;
 
 
 #[macro_use] extern crate log;

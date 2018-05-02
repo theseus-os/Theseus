@@ -178,7 +178,7 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
 
 }
 
-pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
+/*pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
     use frame_buffer_text::CONSOLE_FRAME_TEXT_BUFFER;
     use core::fmt::Write;
 
@@ -187,5 +187,5 @@ pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
     Ok(())
 
 }
-
+*/
 

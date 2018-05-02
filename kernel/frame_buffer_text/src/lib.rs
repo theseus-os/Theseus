@@ -287,12 +287,6 @@ const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
 ];
 
 
-lazy_static! {
-    /// An instance of FrameBufferText for writing to the console.
-    /// try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Hello world!\n").map_err(|_| "error in FrameBuffer's write_str()")); 
-    pub static ref CONSOLE_FRAME_TEXT_BUFFER: Mutex<FrameTextBuffer> = Mutex::new(FrameTextBuffer::new());
-}
-
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
 pub enum DisplayPosition {
@@ -328,7 +322,7 @@ pub struct FrameTextBuffer {
 
 impl FrameTextBuffer {
     /// Create a new VgaBuffer.
-    fn new() -> FrameTextBuffer {
+    pub fn new() -> FrameTextBuffer {
         FrameTextBuffer::with_capacity(1000)
     }
 

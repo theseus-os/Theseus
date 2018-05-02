@@ -381,15 +381,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-     //test window manager
-    if true {
-        #[cfg(not(feature = "loadable"))]
-        {
-            use window_manager::test_window_manager;
-            spawn::spawn_kthread(test_window_manager::test_text, None, String::from("test_text"), None).unwrap();
-        }
-    }
-
     // create and jump to the first userspace thread
     if true
     {
