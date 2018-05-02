@@ -81,9 +81,9 @@ pub fn schedule() -> bool {
 type TaskRef = Arc<RwLockIrqSafe<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
-/// There is one runqueue per core, each core can only access its own private runqueue
-/// and select a task from that runqueue to schedule in.
 lazy_static! {
+    /// There is one runqueue per core, each core can only access its own private runqueue
+    /// and select a task from that runqueue to schedule in.
     static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 

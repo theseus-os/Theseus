@@ -18,8 +18,8 @@ use memory::VirtualAddress;
 pub const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 
-/// The TSS list, one per core, indexed by a key of apic_id
 lazy_static! {
+    /// The TSS list, one per core, indexed by a key of apic_id.
     static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 }
 
