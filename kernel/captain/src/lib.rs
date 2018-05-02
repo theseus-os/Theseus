@@ -37,6 +37,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate network;
 
 extern crate scheduler;
 extern crate console;
@@ -311,6 +312,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         driver_init::init(console_queue_producer).unwrap();
     }
+
     
 
     // boot up the other cores (APs)
@@ -330,6 +332,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     };
     info!("Finished handling and booting up all {} AP cores.", ap_count);
     // assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
+
+
+    // Initialize the udp server
+    if true {
+
+        #[cfg(not(feature = "loadable"))]
+        {
+            use network::server::server_init;
+            spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
+
+        }
+    }  
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
@@ -368,6 +382,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None).unwrap();
         }
     }  
+
+
 
 
     // create and jump to the first userspace thread
