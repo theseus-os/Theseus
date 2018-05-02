@@ -479,7 +479,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 index += 1;
             }
 
-            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xA_0000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
 
             // // now that we've mapped all the sections above 0x10_0000 (1 MiB), 
