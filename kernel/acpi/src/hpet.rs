@@ -1,7 +1,9 @@
 use core::{mem, ptr};
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
+use owning_ref::BoxRefMut;
 use kernel_config::memory::address_page_offset;
+use alloc::boxed::Box;
 
 use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
 
@@ -89,21 +91,9 @@ pub struct HpetTimer {
 }
 
 
-pub struct HpetMappedPages {
-    mapped_pages: MappedPages, 
-    offset: usize,
-}
-impl HpetMappedPages {
-    pub fn as_hpet<'a>(&'a self) -> Result<&'a mut Hpet, &'static str> {
-        let hpet: &'a mut Hpet = self.mapped_pages.as_type_mut(self.offset)?;
-        Ok(hpet)
-    }
-}
-
-
 /// Finds and initializes the HPET, and enables its main counter.
 /// Returns a mutable reference to the `Hpet` struct
-pub fn init(active_table: &mut ActivePageTable) -> Result<HpetMappedPages, &'static str> {
+pub fn init(active_table: &mut ActivePageTable) -> Result<BoxRefMut<MappedPages, Hpet>, &'static str> {
     let hpet_sdt = find_sdt("HPET");
     let hpet_inner = try!( 
         if hpet_sdt.len() == 1 {
@@ -122,21 +112,16 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<HpetMappedPages, &'sta
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
     );
 
-    let hpet_mp = HpetMappedPages {
-        mapped_pages: hpet_page,
-        offset: address_page_offset(phys_addr),
-    };
-
+    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr)))?;
     // get an HPET instance here just to initially enable the main counter
     {
-        let hpet = hpet_mp.as_hpet()?;
         hpet.enable_counter(true);
         debug!("Initialized HPET, period: {}, counter val: {}, num timers: {}, vendor_id: {}", 
             hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers(), hpet.vendor_id()
         );
     }
 
-    Ok(hpet_mp)
+    Ok(hpet)
 }
 
 
