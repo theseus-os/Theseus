@@ -11,7 +11,6 @@
 #![feature(asm)]
 #![feature(used)]
 
-
 extern crate alloc;
 #[macro_use] extern crate log;
 
@@ -43,7 +42,8 @@ extern crate window_manager;
 extern crate scheduler;
 extern crate console;
 
-
+#[cfg(target_feature = "sse2")]
+extern crate simd_test;
 
 // temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
 /// calls print!() with an extra "\n" at the end. 
@@ -96,7 +96,7 @@ use core::fmt;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, enable_interrupts};
 
 #[cfg(feature = "loadable")] use task::Task;
 #[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
@@ -455,12 +455,19 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             let func: fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = unsafe { ::core::mem::transmute(vaddr) };
             func(module, None).unwrap();
         }
-        #[cfg(not(feature = "loadable"))]
+    #[cfg(not(feature = "loadable"))]
         {
             spawn::spawn_userspace(module, None).unwrap();
         }
     }
 
+    #[cfg(target_feature = "sse2")]
+    {
+        spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
+        
+    }
 
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
     debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");

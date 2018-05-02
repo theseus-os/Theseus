@@ -7,10 +7,10 @@ SHELL := /bin/bash
 .PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
 
 
-arch ?= x86_64
-target ?= $(arch)-theseus
-nano_core := kernel/build/nano_core-$(arch).bin
-iso := build/theseus-$(arch).iso
+ARCH ?= x86_64
+TARGET ?= $(ARCH)-theseus
+nano_core := kernel/build/nano_core-$(ARCH).bin
+iso := build/theseus-$(ARCH).iso
 grub_cfg := cfg/grub.cfg
 
 ifeq ($(bypass),yes)
@@ -192,7 +192,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@for f in `find ./kernel/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
 	done
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(target)/lib/core-*.o $(grub-isofiles)/modules/__k_libcore.o
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_libcore.o
 ### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin

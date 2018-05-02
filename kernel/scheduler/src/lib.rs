@@ -13,7 +13,7 @@ extern crate task;
 use core::ops::DerefMut;
 use alloc::arc::Arc;
 use alloc::VecDeque;
-use irq_safety::{RwLockIrqSafe, interrupts_enabled, disable_interrupts};
+use irq_safety::{RwLockIrqSafe, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{Task, get_my_current_task};
 use apic::get_my_apic_id;

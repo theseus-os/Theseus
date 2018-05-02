@@ -16,7 +16,6 @@ PWD := $(shell pwd)
 KERNEL_BUILD_DIR ?= ${PWD}/build
 
 ## specifies where the configuration files are kept, like target json files
-# CFG_DIR ?= ${PWD}/../../cfg
 CFG_DIR ?= ${PWD}/../cfg
 
 
