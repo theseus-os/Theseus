@@ -50,7 +50,7 @@ impl Madt {
             // }
 
             try!(handle_ioapic_entry(iter.clone(), active_table));
-            try!(handle_bsp_entry(iter.clone()));
+            try!(handle_bsp_entry(iter.clone(), active_table));
             Ok(iter)
         } else {
             error!("Unable to find MADT");
@@ -105,7 +105,7 @@ fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) 
 }
 
 
-fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
+fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let all_lapics = get_lapics();
     let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
 
@@ -120,7 +120,7 @@ fn handle_bsp_entry(madt_iter: MadtIter) -> Result<(), &'static str> {
                     debug!("        This is my (the BSP's) local APIC");
                     let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                    let mut bsp_lapic = try!(LocalApic::new(lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
+                    let mut bsp_lapic = try!(LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
                     let bsp_id = bsp_lapic.id();
 
                     use pic::PIC_MASTER_OFFSET;

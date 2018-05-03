@@ -14,7 +14,7 @@ extern crate apic;
 use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
 use spin::RwLock;
 use irq_safety::{enable_interrupts};
-use memory::{VirtualAddress, get_kernel_mmi_ref};
+use memory::{VirtualAddress, MemoryManagementInfo, PageTable, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics, get_my_apic_id};
 
@@ -40,33 +40,49 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
 
     // initialize interrupts (including TSS/GDT) for this AP
-    let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: kernel_mmi ref was None");
+    let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
     let (double_fault_stack, privilege_stack, syscall_stack) = { 
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
-            kernel_mmi.alloc_stack(1).expect("could not allocate double fault stack"),
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate privilege stack"),
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("could not allocate syscall stack")
+            kernel_mmi.alloc_stack(1).expect("kstart_ap(): could not allocate double fault stack"),
+            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate privilege stack"),
+            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate syscall stack")
         )
     };
     interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
-                    .expect("failed to initialize interrupts!");
+        .expect("kstart_ap(): failed to initialize interrupts!");
 
     syscall::init(syscall_stack.top_usable());
 
     spawn::init(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
 
+
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    let lapic = LocalApic::new(processor_id, apic_id, false, nmi_lint, nmi_flags)
-                      .expect("kstart_ap(): failed to create LocalApic");
-    
+    let lapic = {
+        let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: couldn't get ref to kernel mmi");
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            .. 
+        } = &mut *kernel_mmi;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                LocalApic::new(active_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+                    .expect("kstart_ap(): failed to create LocalApic")
+            }
+            _ => {
+                error!("kstart_ap(): couldn't get kernel's active_table!");
+                panic!("kstart_ap(): couldn't get kernel's active_table");
+            }
+        }
+    };
     if get_my_apic_id() != Some(apic_id) {
         error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
     }
-
     get_lapics().insert(apic_id, RwLock::new(lapic));
 
 

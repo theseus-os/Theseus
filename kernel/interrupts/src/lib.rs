@@ -231,7 +231,7 @@ fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
         InterruptChip::APIC |
         InterruptChip::X2APIC => {
-            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").read().eoi();
+            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").write().eoi();
         }
         InterruptChip::PIC => {
             PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));

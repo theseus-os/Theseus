@@ -13,6 +13,11 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 atomic = { version = "0.3.4", features = ["nightly"]}
 
 
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
