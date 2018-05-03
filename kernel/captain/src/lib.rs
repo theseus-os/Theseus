@@ -386,8 +386,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    if true {
-        // NOTE: haven't yet figured out how to invoke generic functions yet, like spawn_kthread
+    if false {
+        // NOTE: haven't yet figured out how to invoke generic functions  (like spawn_kthread) yet in loadable mode
         // #[cfg(feature = "loadable")]
         // {
         //     let section = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().ok_or("no symbol: e1000::test_nic_driver::test_nic_driver")?;

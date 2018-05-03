@@ -15,6 +15,7 @@ extern crate pci;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
 use memory::{MemoryManagementInfo, PageTable};
+use pci::get_pci_device_vd;
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -52,9 +53,14 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         debug!("Found pci device: {:?}", dev);
     }
 
-    if true {
-        try!(e1000::init_nic());
+    if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
+        debug!("e1000 Device found: {:?}", e1000_pci_dev);
+        try!(e1000::init_nic(e1000_pci_dev));
     }
+    else {
+        warn!("No e1000 device found on this system.");
+    }
+    
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

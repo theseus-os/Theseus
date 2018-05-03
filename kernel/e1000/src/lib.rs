@@ -27,10 +27,10 @@ use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalA
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 
-static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel 
-static E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
-const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
+pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
+pub const E1000_DEV:                u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
+pub const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
+pub const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
@@ -845,7 +845,7 @@ lazy_static! {
 }
 
 /// initialize the nic
-pub fn init_nic() -> Result<(), &'static str>{
+pub fn init_nic(e1000_pci: &PciDevice) -> Result<(), &'static str>{
 
         let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
         debug!("e1000 Device found: {:?}", pci_dev);
