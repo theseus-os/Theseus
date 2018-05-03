@@ -7,7 +7,7 @@ extern crate vga_buffer;
 extern crate spin;
 extern crate dfqueue;
 #[macro_use] extern crate log;
-extern crate window_manager;
+// extern crate window_manager;
 extern crate spawn;
 
 // temporary, should remove this once we fix crate system
@@ -159,29 +159,30 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
         return;
     }
     
-    //Pass TAB event to window manager
-    //Window manager consumes dir();ection key input
-    match keyevent.keycode {
-         Keycode::Tab => {
-             //window_manager::set_time_start();
-             loop{
-                 window_manager::window_switch();
-             }
-         }
-         Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
-            window_manager::put_key_code(keyevent.keycode).unwrap();
-         }
-         _ => {}
-    }
+    /*
+        //Pass TAB event to window manager
+        //Window manager consumes dir();ection key input
+        match keyevent.keycode {
+            Keycode::Tab => {
+                //window_manager::set_time_start();
+                loop{
+                    window_manager::window_switch();
+                }
+            }
+            Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+                window_manager::put_key_code(keyevent.keycode).unwrap();
+            }
+            _ => {}
+        }
 
-    //Pass Delete event and direction key event to 3d drawer application
-    /*match keyevent.keycode {
-         Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
-            graph_drawer::put_key_code(keyevent.keycode).unwrap();
-         }
-         _ => {}
-    }*/
-
+        //Pass Delete event and direction key event to 3d drawer application
+        /*match keyevent.keycode {
+            Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+                graph_drawer::put_key_code(keyevent.keycode).unwrap();
+            }
+            _ => {}
+        }*/
+    */
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
         Some(c) => { 
