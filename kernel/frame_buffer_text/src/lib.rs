@@ -3,7 +3,6 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
-#![feature(unique)]
 #![feature(asm)]
 
 extern crate frame_buffer;
@@ -288,7 +287,7 @@ const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
 pub enum DisplayPosition {
-    /// Move the display to the very top of the VgaBuffer
+    /// Move the display to the very top of the FrameBuffer
     Start,
     /// Refresh the display without scrolling it
     Same, 
@@ -296,7 +295,7 @@ pub enum DisplayPosition {
     Down(usize),
     /// Move the display up by the specified number of lines
     Up(usize),
-    /// Move the display to the very end of the VgaBuffer
+    /// Move the display to the very end of the FrameBuffer
     End
 }
 
@@ -314,17 +313,17 @@ pub struct FrameTextBuffer {
     display_scroll_end: bool,
     /// the column position in the last line where the next character will go
     column: usize,
-    /// the actual buffer memory that can be written to the VGA memory
+    /// the actual buffer memory that can be written to the frame memory
     lines: Vec<Line>,
 }
 
 impl FrameTextBuffer {
-    /// Create a new VgaBuffer.
+    /// Create a new FrameBuffer.
     pub fn new() -> FrameTextBuffer {
         FrameTextBuffer::with_capacity(1000)
     }
 
-    // Create a new VgaBuffer with the given capacity, specified in number of lines. 
+    // Create a new FrameBuffer with the given capacity, specified in number of lines. 
     fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
         let first_line = BLANK_LINE;
         let mut lines = Vec::with_capacity(num_initial_lines);
@@ -361,8 +360,8 @@ impl FrameTextBuffer {
             }
         }
 
-        // refresh the VGA text display if the changes would be visible on screen
-        // i.e., if the end of the vga buffer is visible
+        // refresh the Frame text display if the changes would be visible on screen
+        // i.e., if the end of the frame buffer is visible
         let last_line = self.lines.len() - 1;;
         if  self.display_scroll_end || 
             (last_line >= self.display_line && last_line <= (self.display_line + WINDOW_LINES))
@@ -370,8 +369,8 @@ impl FrameTextBuffer {
             self.display(DisplayPosition::End);
         }
         
-        // // refresh the VGA text display if the changes would be visible on screen
-        // // keep in mind the latest write to the VGA buffer is always written into the last element of self.lines
+        // // refresh the Frame text display if the changes would be visible on screen
+        // // keep in mind the latest write to the frame buffer is always written into the last element of self.lines
         // let display_line = self.display_line;
         // let written_line = self.lines.len();
         // if written_line >= display_line && written_line <= display_line + BUFFER_HEIGHT {
@@ -381,7 +380,7 @@ impl FrameTextBuffer {
 
     }
 
-
+    ///Write string to console with color
     pub fn write_string_with_color(&mut self, s: &String, color: usize) {
         self.write_str_with_color(s.as_str(), color);
     }
@@ -404,9 +403,9 @@ impl FrameTextBuffer {
 
 
 
-    /// Displays this VgaBuffer at the given string offset by flushing it to the screen.
+    /// Displays this FrameBuffer at the given string offset by flushing it to the screen.
     pub fn display(&mut self, position: DisplayPosition) {
-        // trace!("VgaBuffer::display(): position {:?}", position);
+        // trace!("FrameBuffer::display(): position {:?}", position);
         let (start, end) = match position {
             DisplayPosition::Start => {
                 self.display_scroll_end = false;
@@ -446,7 +445,7 @@ impl FrameTextBuffer {
         };
 
         // trace!("   initial start {}, end {}", start, end);
-        // if we're displaying the end of the VgaBuffer, the range of characters displayed needs to start before that
+        // if we're displaying the end of the FrameBuffer, the range of characters displayed needs to start before that
         let start = if start == (self.lines.len() - 1) {
             start.saturating_sub(WINDOW_LINES - 1)
         } else {
