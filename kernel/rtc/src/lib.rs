@@ -97,6 +97,7 @@ fn read_register(register: u8) -> u8{
 }
 
 /// A timestamp obtained from the real-time clock.
+#[derive(Debug)]
 pub struct RtcTime {
     pub seconds: u8,
     pub minutes: u8,
@@ -104,6 +105,13 @@ pub struct RtcTime {
     pub days: u8,
     pub months: u8,
     pub years: u8,
+}
+use core::fmt;
+impl fmt::Display for RtcTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "RTC Time: {}/{}/{} {}:{}:{}", 
+            self.years, self.months, self.days, self.hours, self.minutes, self.seconds)
+    }
 }
 
 //call this function to print RTC's date and time
@@ -116,8 +124,6 @@ pub fn read_rtc() -> RtcTime {
     let day = read_register(0x07);
     let month = read_register(0x08);
     let year = read_register(0x09);
-    
-    trace!("RTC time: {}/{}/{} {}:{}:{}", year, month, day, hour, minute, second);
 
     RtcTime {
         seconds: second, 

@@ -6,7 +6,6 @@ version = "0.1.0"
 
 [dependencies]
 
-
 [dependencies.log]
 default-features = false
 version = "0.3.7"
@@ -28,6 +27,18 @@ path = "../logger"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
+[dependencies.frame_buffer_3d]
+path = "../frame_buffer_3d"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+#[dependencies.graph_drawer]
+#path = "../graph_drawer"
 
 [dependencies.console_types]
 path = "../console_types"
@@ -73,6 +84,11 @@ path = "../task"
 
 [dependencies.scheduler]
 path = "../scheduler"
+
+
+## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
+[target.'cfg(target_feature = "sse2")'.dependencies.simd_test]
+path = "../simd_test"
 
 
 [features]

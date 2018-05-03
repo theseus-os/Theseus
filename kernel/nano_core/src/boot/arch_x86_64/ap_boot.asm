@@ -16,12 +16,18 @@ KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
 section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
+
+extern set_up_SSE
+
 global ap_start_protected_mode
 ap_start_protected_mode:
 	; xchg bx, bx ; bochs magic breakpoint
 	 
 	mov esp, 0xFC00; set a new stack pointer, 512 bytes below our AP_STARTUP code region
-    call set_up_paging_ap
+
+	call set_up_SSE ; in boot.asm
+    
+	call set_up_paging_ap
 	
 
     ; each character is reversed in the dword cuz of little endianness
@@ -33,15 +39,6 @@ ap_start_protected_mode:
 
 	; Load the 64-bit GDT
 	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
-
-
-	; mov ax, GDT_AP.data
-	; ; mov ax, 0
-	; mov ds, ax
-	; mov es, ax
-	; mov fs, ax
-	; mov gs, ax
-	; mov ss, ax
 
 
 	; prints GDT
@@ -57,7 +54,7 @@ ap_start_protected_mode:
 	; From now on instructions are 64 bits
 	jmp dword GDT_AP.code:long_mode_start_ap; -> !
 
-	; an alternative to jmp, we construct a jmp here. No difference though.
+	; an alternative to jmp, we construct a jmp instr on the stack. No difference though.
 	; push 8
 	; push long_mode_start_ap
 	; retf

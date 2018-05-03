@@ -24,7 +24,9 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 #[macro_use] extern crate vga_buffer; 
 extern crate logger;
 extern crate state_store;
-extern crate memory; // the virtual memory subsystem 
+extern crate memory; // the virtual memory subsystem
+extern crate frame_buffer;
+extern crate frame_buffer_3d;
 extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
@@ -73,13 +75,13 @@ fn shutdown(msg: &'static str) -> ! {
 
 /// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
 ///
-/// This is called from assembly code entry point for Theseus, found in `src/boot/arch_x86_64/boot.asm`.
+/// This is called from assembly code entry point for Theseus, found in `nano_core/src/boot/arch_x86_64/boot.asm`.
 ///
 /// This function does the following things: 
 ///
-/// * Bootstraps the OS, including [logging](../logger.html) and basic [exception handlers](../exceptions.init_early_exceptions.html)
-/// * Sets up basic [virtual memory](../memory.init.html)
-/// * Initializes the [state_store](../state_store.html) module
+/// * Bootstraps the OS, including [logging](../logger/index.html) and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
+/// * Sets up basic [virtual memory](../memory/fn.init.html)
+/// * Initializes the [state_store](../state_store/index.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
 ///
 /// If a failure occurs and is propagated back up to this function, the OS is shut down.
@@ -106,6 +108,20 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+
+    //init frame_buffer
+    let rs = frame_buffer::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
+    let rs = frame_buffer_3d::init();
+    if rs.is_ok() {
+        trace!("frame_buffer initialized.");
+    } else {
+        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();

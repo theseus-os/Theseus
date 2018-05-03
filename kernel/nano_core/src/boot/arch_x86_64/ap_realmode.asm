@@ -37,6 +37,47 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
+; set graphic mode
+;    mov ax, 0x4f02
+;    mov bx, 0x4112
+;    int 0x10
+
+
+;    push ds
+;    push es
+;    mov ax,0x1103
+;    mov  bh,6
+;    int 0x10
+;    push es
+;    pop ds
+;    pop es
+;    mov si,bp
+;    mov cx,256*16/4
+;    rep movsd
+;    pop ds
+
+    ;test code to find lfb address
+    ;mov ax, 0xb
+    ;mov es, ax
+    ;mov ax, 0x8000
+    ;mov di, ax
+    ;mov ax, 0x4f01
+    ;mov cx, 0x4112    
+    ;int 0x10
+
+    ;mov ax, [es:di+0x2b]
+
+    ;mov ah, 0x00
+    ;cmp ax, 0x00fd
+    ;je next
+    ;mov ah, 0x13
+    ;next:
+
+    ;mov al, ah
+    ;mov ah, 0x00
+    ;int 0x10
+
+
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
     ; since this code will be forcibly loaded by GRUB multiboot above 1MB, and we're in 16-bit real mode,
     ; we cannot create a gdt regularly. We have to 

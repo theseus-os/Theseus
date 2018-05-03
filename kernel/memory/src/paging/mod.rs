@@ -563,12 +563,11 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 data_flags, allocator.deref_mut())
             ));
 
-
-            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xA_0000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
 
             // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
-            // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
+            // VGA text mode only goes from 0xB_8000 - 0XC_0000
             let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;

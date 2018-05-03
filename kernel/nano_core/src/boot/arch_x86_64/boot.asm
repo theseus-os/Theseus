@@ -196,7 +196,9 @@ check_long_mode:
 	mov al, "2"
 	jmp _error
 
+
 ; Check for SSE and enable it. Throw error 'a' if unsupported
+global set_up_SSE
 set_up_SSE:
 	mov eax, 0x1
 	cpuid
@@ -306,39 +308,6 @@ KEXIT:
 .loop:
 	hlt
 	jmp .loop
-
-
-
-; Performs the actual context switch from prev to next task.
-; First argument  (rdi): mutable pointer to the previous task's stack pointer
-; Second argument (rsi): the value of the next task's stack pointer
-global task_switch
-task_switch: 
-	push rbx
-	push rbp
-	push r12
-	push r13
-	push r14
-	push r15
-
-	; save current stack pointer into prev task
-	mov [rdi], rsp
-	; load stack pointer from next task
-	mov rsp, rsi
-
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop rbp
-	pop rbx
-	; pops the last value off the top of the stack,
-	; so the new task's stack top must point to a target function
-	ret
-
-
-
-
 
 
 

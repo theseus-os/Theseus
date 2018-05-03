@@ -12,7 +12,6 @@
 #![feature(used)]
 #![feature(core_intrinsics)]
 
-
 extern crate alloc;
 #[macro_use] extern crate log;
 
@@ -39,11 +38,13 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate window_manager;
 
 extern crate scheduler;
 extern crate console;
 
-
+#[cfg(target_feature = "sse2")]
+extern crate simd_test;
 
 // temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
 /// calls print!() with an extra "\n" at the end. 
@@ -429,6 +430,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }  
 
+    //test window manager
+    if false {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use window_manager::test_window_manager;
+            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
+            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
+
+        }
+    }
 
     // create and jump to the first userspace thread
     if true
@@ -511,10 +522,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
-        #[cfg(not(feature = "loadable"))]
+    #[cfg(not(feature = "loadable"))]
         {
             spawn::spawn_userspace(module, None)?;
         }
+    }
+
+    #[cfg(target_feature = "sse2")]
+    {
+        spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
+        spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
+        
     }
 
     println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
