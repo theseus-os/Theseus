@@ -2,7 +2,6 @@
 #![feature(alloc)]
 
 #![allow(dead_code)]
-#![allow(safe_packed_borrows)]
 
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -185,38 +184,11 @@ const APIC_DISABLE: u32 = 0x1_0000;
 const APIC_NMI: u32 = 4 << 8;
 
 
-const APIC_REG_LAPIC_ID               : u32 =  0x20;
-const APIC_REG_LAPIC_VERSION          : u32 =  0x30;
-const APIC_REG_TASK_PRIORITY          : u32 =  0x80;	// Task Priority
-const APIC_REG_ARBITRATION_PRIORITY   : u32 =  0x90;	// Arbitration Priority
-const APIC_REG_PROCESSOR_PRIORITY     : u32 =  0xA0;	// Processor Priority
-const APIC_REG_EOI                    : u32 =  0xB0; // End of Interrupt
-const APIC_REG_REMOTE_READ            : u32 =  0xC0;	// Remote Read
-const APIC_REG_LDR                    : u32 =  0xD0;	// Logical Destination
-const APIC_REG_DFR                    : u32 =  0xE0;	// Destination Format
-const APIC_REG_SIR                    : u32 =  0xF0;	// Spurious Interrupt Vector
-const APIC_REG_ISR                    : u32 =  0x100;	// In-Service Register (First of 8)
-const APIC_REG_TMR                    : u32 =  0x180;	// Trigger Mode (1/8)
-const APIC_REG_IRR                    : u32 =  0x200;	// Interrupt Request Register (1/8)
-const APIC_REG_ERROR_STATUS           : u32 =  0x280;	// Error Status
-const APIC_REG_LVT_CMCI               : u32 =  0x2F0;	// LVT CMCI Registers (?)
-const APIC_REG_ICR_LOW                : u32 =  0x300;	// Interrupt Command Register (1/2)
-const APIC_REG_ICR_HIGH               : u32 =  0x310;	// Interrupt Command Register (2/2)
-const APIC_REG_LVT_TIMER              : u32 =  0x320;
-const APIC_REG_LVT_THERMAL            : u32 =  0x330; // Thermal sensor
-const APIC_REG_LVT_PMI                : u32 =  0x340; // Performance Monitoring information
-const APIC_REG_LVT_LINT0              : u32 =  0x350;
-const APIC_REG_LVT_LINT1              : u32 =  0x360;
-const APIC_REG_LVT_ERROR              : u32 =  0x370;
-const APIC_REG_INIT_COUNT             : u32 =  0x380;
-const APIC_REG_CURRENT_COUNT          : u32 =  0x390;
-const APIC_REG_TIMER_DIVIDE           : u32 =  0x3E0;
-
 
 /// A structure that offers access to APIC/xAPIC through its I/O registers.
 /// Definitions are based on [Intel's x86 Manual Vol 3a, Table 10-1]
 /// (https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf). 
-#[repr(packed)]
+#[repr(C)]
 pub struct ApicRegisters {
     _padding0:                        [u32; 8],
     /// This Lapic's ID. Some systems allow setting the ID, but it is typically read-only.
@@ -273,7 +245,7 @@ pub struct ApicRegisters {
     // ends at 0x400
 }
 
-
+#[repr(C)]
 pub struct RegisterArray {
     reg0:                             ReadOnly<u32>,
     _padding0:                        [u32; 3],
@@ -533,7 +505,7 @@ impl LocalApic {
         if has_x2apic() {
             (rdmsr(IA32_X2APIC_VERSION) & 0xFFFF_FFFF) as u32
         } else {
-            unsafe { self.regs.as_ref().expect("ApicRegisters").lapic_version.read() }
+            self.regs.as_ref().expect("ApicRegisters").lapic_version.read()
         }
     }
 
@@ -541,7 +513,7 @@ impl LocalApic {
         let raw = if has_x2apic() {
             (rdmsr(IA32_X2APIC_ESR) & 0xFFFF_FFFF) as u32
         } else {
-            unsafe { self.regs.as_ref().expect("ApicRegisters").error_status.read() }
+            self.regs.as_ref().expect("ApicRegisters").error_status.read()
         };
         raw & 0x0000_00F0
     }
@@ -558,11 +530,9 @@ impl LocalApic {
         if has_x2apic() {
             rdmsr(IA32_X2APIC_ICR)
         } else {
-            unsafe {
-                let high = self.regs.as_ref().expect("ApicRegisters").interrupt_command_high.read();
-                let low  = self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read();
-                ((high as u64) << 32) | (low as u64)
-            }
+            let high = self.regs.as_ref().expect("ApicRegisters").interrupt_command_high.read();
+            let low  = self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read();
+            ((high as u64) << 32) | (low as u64)
         }
     }
 
@@ -570,15 +540,13 @@ impl LocalApic {
         if has_x2apic() {
             unsafe { wrmsr(IA32_X2APIC_ICR, value); }
         } else {
-            unsafe {
-                const ICR_DELIVERY_STATUS: u32 = 1 << 12;
-                while self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read() & ICR_DELIVERY_STATUS == ICR_DELIVERY_STATUS {} // wait until ready
-                let high = (value >> 32) as u32;
-                self.regs.as_mut().expect("ApicRegisters").interrupt_command_high.write(high); // sets part of ICR register, but doesn't yet issue the IPI
-                let low = value as u32;
-                self.regs.as_mut().expect("ApicRegisters").interrupt_command_low.write(low); // this actually issues the IPI
-                while self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read() & ICR_DELIVERY_STATUS == ICR_DELIVERY_STATUS {} // wait until finished
-            }
+            const ICR_DELIVERY_STATUS: u32 = 1 << 12;
+            while self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read() & ICR_DELIVERY_STATUS == ICR_DELIVERY_STATUS {} // wait until ready
+            let high = (value >> 32) as u32;
+            self.regs.as_mut().expect("ApicRegisters").interrupt_command_high.write(high); // sets part of ICR register, but doesn't yet issue the IPI
+            let low = value as u32;
+            self.regs.as_mut().expect("ApicRegisters").interrupt_command_low.write(low); // this actually issues the IPI
+            while self.regs.as_ref().expect("ApicRegisters").interrupt_command_low.read() & ICR_DELIVERY_STATUS == ICR_DELIVERY_STATUS {} // wait until finished
         }
     }
 
@@ -673,10 +641,8 @@ impl LocalApic {
 
     pub fn set_ldr(&mut self, value: u32) {
         assert!(!has_x2apic(),"set_ldr(): Setting LDR MSR for x2apic is forbidden! (causes GPF)");
-        unsafe {
-            let old_ldr = self.regs.as_ref().expect("ApicRegisters").destination_format.read();
-            self.regs.as_mut().expect("ApicRegisters").destination_format.write(old_ldr & 0x00FF_FFFF | value);
-        }
+        let old_ldr = self.regs.as_ref().expect("ApicRegisters").destination_format.read();
+        self.regs.as_mut().expect("ApicRegisters").destination_format.write(old_ldr & 0x00FF_FFFF | value);
     }
 
     /// Set the NonMaskableInterrupt redirect for this LocalApic.
@@ -731,32 +697,30 @@ impl LocalApic {
 
 
     pub fn get_irr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
-        unsafe {
-            if has_x2apic() {
-                ( 
-                    rdmsr(IA32_X2APIC_IRR0) as u32, 
-                    rdmsr(IA32_X2APIC_IRR1) as u32,
-                    rdmsr(IA32_X2APIC_IRR2) as u32, 
-                    rdmsr(IA32_X2APIC_IRR3) as u32,
-                    rdmsr(IA32_X2APIC_IRR4) as u32,
-                    rdmsr(IA32_X2APIC_IRR5) as u32,
-                    rdmsr(IA32_X2APIC_IRR6) as u32,
-                    rdmsr(IA32_X2APIC_IRR7) as u32,
-                )
-            }
-            else {
-                let ref irr = self.regs.as_ref().expect("ApicRegisters").interrupt_request_registers;
-                (
-                    irr.reg0.read(),
-                    irr.reg1.read(),
-                    irr.reg2.read(),
-                    irr.reg3.read(),
-                    irr.reg4.read(),
-                    irr.reg5.read(),
-                    irr.reg6.read(),
-                    irr.reg7.read(),
-                )
-            }
+        if has_x2apic() {
+            ( 
+                rdmsr(IA32_X2APIC_IRR0) as u32, 
+                rdmsr(IA32_X2APIC_IRR1) as u32,
+                rdmsr(IA32_X2APIC_IRR2) as u32, 
+                rdmsr(IA32_X2APIC_IRR3) as u32,
+                rdmsr(IA32_X2APIC_IRR4) as u32,
+                rdmsr(IA32_X2APIC_IRR5) as u32,
+                rdmsr(IA32_X2APIC_IRR6) as u32,
+                rdmsr(IA32_X2APIC_IRR7) as u32,
+            )
+        }
+        else {
+            let ref irr = self.regs.as_ref().expect("ApicRegisters").interrupt_request_registers;
+            (
+                irr.reg0.read(),
+                irr.reg1.read(),
+                irr.reg2.read(),
+                irr.reg3.read(),
+                irr.reg4.read(),
+                irr.reg5.read(),
+                irr.reg6.read(),
+                irr.reg7.read(),
+            )
         }
     }
 }

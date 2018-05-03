@@ -24,7 +24,7 @@ use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
-use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
+use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 
 pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
