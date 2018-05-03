@@ -2,7 +2,7 @@
 #![feature(alloc)]
 
 extern crate keycodes_ascii;
-extern crate frame_buffer_text;
+extern crate vga_buffer;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
@@ -16,23 +16,21 @@ extern crate console_types;
 use console_types::{ConsoleEvent, ConsoleOutputEvent};
 
 
-use frame_buffer_text::{FrameTextBuffer, DisplayPosition};
+use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
+
+
 lazy_static! {
-    /// An instance of FrameBufferText for writing to the console.
-    /// try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Hello world!\n").map_err(|_| "error in FrameBuffer's write_str()")); 
-    pub static ref CONSOLE_FRAME_TEXT_BUFFER: Mutex<FrameTextBuffer> = Mutex::new(FrameTextBuffer::new());
+    static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
 }
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
-const FONT_COLOR:usize = 0x90ee90;
 
-///A function to print console output
 pub fn print_to_console(s: String) -> Result<(), &'static str> {
     let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s));
     try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
@@ -81,14 +79,14 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
         match event_data {
             &ConsoleEvent::ExitEvent => {
                 use core::fmt::Write;
-                try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
+                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 handle_key_event(input_event.key_event);
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&output_event.text, FONT_COLOR);
+                CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default());
             }
         }
         event.mark_completed();
@@ -137,27 +135,27 @@ fn handle_key_event(keyevent: KeyEvent) {
 
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Start);
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
         return;
     }
     if keyevent.keycode == Keycode::End {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::End);
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
         return;
     }
     if keyevent.keycode == Keycode::PageUp {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(20));
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
         return;
     }
     if keyevent.keycode == Keycode::PageDown {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(20));
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
         return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Up(1));
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
         return;
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
-        CONSOLE_FRAME_TEXT_BUFFER.lock().display(DisplayPosition::Down(1));
+        CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
         return;
     }
     
@@ -190,7 +188,7 @@ fn handle_key_event(keyevent: KeyEvent) {
             // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
             use alloc::string::ToString;
-            CONSOLE_FRAME_TEXT_BUFFER.lock().write_string_with_color(&c.to_string(), FONT_COLOR);
+            CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
