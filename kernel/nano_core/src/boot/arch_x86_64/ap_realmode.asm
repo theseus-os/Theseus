@@ -37,24 +37,24 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
-; set graphic mode+
-    mov ax, 0x4f02
-    mov bx, 0x4112
-    int 0x10
+; set graphic mode
+;    mov ax, 0x4f02
+;    mov bx, 0x4112
+;    int 0x10
 
 
-    push ds
-    push es
-    mov ax,0x1103
-    mov  bh,6
-    int 0x10
-    push es
-    pop ds
-    pop es
-    mov si,bp
-    mov cx,256*16/4
-    rep movsd
-    pop ds
+;    push ds
+;    push es
+;    mov ax,0x1103
+;    mov  bh,6
+;    int 0x10
+;    push es
+;    pop ds
+;    pop es
+;    mov si,bp
+;    mov cx,256*16/4
+;    rep movsd
+;    pop ds
 
     ;test code to find lfb address
     ;mov ax, 0xb
