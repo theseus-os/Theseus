@@ -38,6 +38,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
+extern crate e1000e;
 extern crate window_manager;
 
 extern crate scheduler;
@@ -411,7 +412,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    if false {
+    if true {
         // NOTE: haven't yet figured out how to invoke generic functions  (like spawn_kthread) yet in loadable mode
         // #[cfg(feature = "loadable")]
         // {
@@ -425,7 +426,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         // }
         #[cfg(not(feature = "loadable"))]
         {
-            use e1000::test_nic_driver::test_nic_driver;
+            use e1000::test_e1000_driver::test_nic_driver;
             spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
         }
     }  

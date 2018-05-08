@@ -4,6 +4,7 @@
 extern crate console_types;
 extern crate ata_pio;
 extern crate e1000;
+extern crate e1000e;
 extern crate memory;
 extern crate dfqueue; 
 extern crate apic;
@@ -61,6 +62,14 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         warn!("No e1000 device found on this system.");
     }
     
+    if let Some(e1000e_pci_dev) = get_pci_device_vd(e1000e::INTEL_VEND, e1000e::E1000_82579LM) {
+        debug!("e1000e Device found: {:?}", e1000e_pci_dev);
+        try!(e1000e::init_nic(e1000e_pci_dev));
+    }
+    else {
+        warn!("No e1000e device found on this system.");
+    }
+
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*

@@ -29,6 +29,9 @@ path = "../apic"
 [dependencies.e1000]
 path = "../e1000"
 
+[dependencies.e1000e]
+path = "../e1000e"
+
 [dependencies.acpi]
 path = "../acpi"
 

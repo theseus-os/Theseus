@@ -71,14 +71,6 @@ fn shutdown(msg: &'static str) -> ! {
     panic!(msg);
 }
 
-fn test_bb_proc(_: Option<u64>) {
-    println!("TESTING BB_PROC!!");
-
-    loop {
-        process_data();
-        schedule!();
-    }
-}
 
 
 /// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 

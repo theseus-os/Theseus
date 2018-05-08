@@ -14,7 +14,7 @@ extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
 
-pub mod test_nic_driver;
+pub mod test_e1000_driver;
 
 
 use core::ptr::{read_volatile, write_volatile};
@@ -23,16 +23,12 @@ use spin::Once;
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter, PhysicalMemoryArea};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
-//use baseband_proc::bb_proc::FIFO_RAW_PILOTS;
-//use baseband_proc::packet_types::{PilotPacketBytes, PILOT_LENGTH_BYTES,MAX_ETH_PAYLOAD};
 
 pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:                u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-pub const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
-pub const E1000_82577LM:            u16 = 0x10EA;  // Device ID for Intel 82577LM
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
@@ -142,9 +138,6 @@ const E1000_SIZE_TX_BUFFER:     usize = 256;
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
-
-//static mut PILOT: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
-//static mut PILOT_ITER:          usize = 0;
 
 /// struct to represent receive descriptors
 #[repr(C,packed)]
@@ -840,41 +833,6 @@ impl Nic{
 
                         self.write_command(REG_RXDESCTAIL, old_cur );
                 } */
-
-                //preliminary pilot packets processing
-
-                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
-                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
-                        
-                        let length = self.rx_descs[self.rx_cur as usize].length;
-                        let packet = self.rx_buf_addr[self.rx_cur as usize] as *const u8;
-                        for i in 14..length { //14 to remove header
-                                unsafe{
-                                        PILOT.buffer[PILOT_ITER] = *packet.offset(i as isize);
-                                        PILOT_ITER += 1;
-                                }
-                        }
-
-                        //when the last part of the packet is recived, push it into the fifo for processing
-                        if (length as usize) < MAX_ETH_PAYLOAD {
-                                let mut pilot_new: PilotPacketBytes = PilotPacketBytes{buffer: [0;PILOT_LENGTH_BYTES]};
-                                unsafe{
-                                        PILOT_ITER = 0;
-                                        
-                                        for i in 0..PILOT_LENGTH_BYTES  {
-                                                pilot_new.buffer[i] = PILOT.buffer[i];
-                                        }
-                                }
-                                let mut fifo = FIFO_RAW_PILOTS.lock();
-                                fifo.push(pilot_new);
-                        }
-
-                        self.rx_descs[self.rx_cur as usize].status = 0;
-                        let old_cur = self.rx_cur as u32;
-                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-                        self.write_command(REG_RXDESCTAIL, old_cur );
-                }  */
-
                 
         }  
 
@@ -963,4 +921,22 @@ pub fn e1000_handler () {
         e1000_nc.read_command(0xc0); //clear interrupt
         
 
+}
+
+/// Poll for recieved messages
+/// Can be used as analternative to interrupts
+pub fn rx_poll(){
+        //debug!("e1000e poll function");
+        let mut e1000_nc = E1000_NIC.lock();
+
+        //detect if a packet has beem received
+        //debug!("E1000E_RX POLL");
+        /* for i in 0..E1000_NUM_RX_DESC {
+                debug!("rx desc status {}",self.rx_descs[i].status);
+        } */
+        //debug!("E1000E RCTL{:#X}",self.read_command(REG_RCTRL));
+        if (e1000_nc.rx_descs[e1000_nc.rx_cur as usize].status&0xF) != 0 {                        
+                e1000_nc.handle_receive();
+        }
+        
 }
