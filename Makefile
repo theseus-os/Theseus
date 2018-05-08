@@ -4,13 +4,13 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all clean run debug iso userspace cargo gdb
+.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
 
 
-arch ?= x86_64
-target ?= $(arch)-theseus
-nano_core := kernel/nano_core/build/nano_core-$(arch).bin
-iso := build/theseus-$(arch).iso
+ARCH ?= x86_64
+TARGET ?= $(ARCH)-theseus
+nano_core := kernel/build/nano_core-$(ARCH).bin
+iso := build/theseus-$(ARCH).iso
 grub_cfg := cfg/grub.cfg
 
 ifeq ($(bypass),yes)
@@ -25,11 +25,11 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.24.0-nightly (5a2465e2b 2017-12-06)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2017-12-07
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.27.0-nightly (ac3c2288f 2018-04-18)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-04-19
 RUSTC_OUTPUT=$(shell rustc --version)
 
-test_rustc: 	
+check_rustc: 	
 ifneq (${BYPASS_RUSTC_CHECK}, yes)
 ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
 	@echo -e "\nError: your rustc version does not match our supported compiler version."
@@ -44,6 +44,31 @@ else
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
 endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
 endif ## BYPASS_RUSTC_CHECK
+
+
+
+###################################################################################################
+### For ensuring that the host computer has the proper version of xargo
+###################################################################################################
+
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.10
+XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
+
+check_xargo: 	
+ifneq (${BYPASS_XARGO_CHECK}, yes)
+ifneq (xargo ${XARGO_CURRENT_SUPPORTED_VERSION}, ${XARGO_OUTPUT})
+	@echo -e "\nError: your xargo version does not match our supported xargo version."
+	@echo -e "To install the proper version of xargo, run the following commands:\n"
+	@echo -e "   cargo uninstall xargo"
+	@echo -e "   cargo install --vers $(XARGO_CURRENT_SUPPORTED_VERSION) xargo"
+	@echo -e "   make clean\n"
+	@echo -e "Then you can retry building!\n"
+	@exit 1
+else
+	@echo -e '\nFound proper xargo version, proceeding with build...\n'
+endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
+endif ## BYPASS_XARGO_CHECK
+
 
 
 ###################################################################################################
@@ -91,6 +116,14 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
+
+### Currently, loadable module mode requires release build mode
+# loadable : export RUST_FEATURES = --package nano_core --features loadable
+loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features loadable
+loadable : export BUILD_MODE = release
+loadable: run
+
+
 ### builds and runs Theseus in QEMU
 run: $(iso) 
 	@qemu-img resize random_data2.img 100K
@@ -107,12 +140,12 @@ debug: $(iso)
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
-### TODO: add more symbol files besides nano_core once they're split from nano_core
 
 
 
 ### builds and runs Theseus in Bochs
-bochs : export RUST_FEATURES = --features "apic_timer_fixed"
+# bochs : export RUST_FEATURES = --package apic --features apic_timer_fixed
+bochs : export RUST_FEATURES = --manifest-path "apic/Cargo.toml" --features "apic_timer_fixed"
 bochs: $(iso) 
 	#@qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -120,7 +153,6 @@ bochs: $(iso)
 
 
 check_usb:
-	@echo -e  'RUST_FEATURES = $(RUST_FEATURES)'
 ifneq (,$(findstring sd, $(usb)))
 ifeq ("$(wildcard /dev/$(usb))", "")
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
@@ -138,7 +170,8 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export RUST_FEATURES = --features "mirror_serial"
+# boot : export RUST_FEATURES = --package nano_core --features mirror_serial
+boot : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -162,6 +195,7 @@ $(iso): kernel userspace $(grub_cfg)
 	@for f in `find ./kernel/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
 	done
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 ### copy kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
@@ -177,10 +211,30 @@ userspace:
 
 
 ### this builds all kernel components
-kernel: test_rustc
+kernel: check_rustc check_xargo
 	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
 
+
+DOC_ROOT := build/doc/Theseus/index.html
+
+doc:
+	@rm -rf build/doc
+	@mkdir -p build
+	@$(MAKE) -C kernel doc
+	@cp -rf kernel/target/doc ./build/
+	@echo -e "\n\nDocumentation is now available in the build/doc directory."
+	@echo -e "You run 'make view-doc' to view it, or just open $(DOC_ROOT)"
+
+docs: doc
+
+
+## Opens the documentation root in the system's default browser. 
+## the "powershell" command is used on Windows Subsystem for Linux
+view-doc: doc
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+
+view-docs: view-doc
 
 
 clean:
@@ -206,6 +260,10 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "  doc:"
+	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
+	@echo -e "  view-doc:"
+	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
 	@echo -e "\nThe following options are available for QEMU:"
 	@echo -e "  int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."

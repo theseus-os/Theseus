@@ -3,89 +3,66 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
 version = "0.1.0"
 
+
 [dependencies]
-bit_field = "0.7.0"
-bitflags = "1.0"
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
 multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
 once = "0.3.2"
 rlibc = "1.0.0"
-spin = "0.4.5"
-# volatile = "0.2.3"
-x86 = "0.8.1"
-atomic = { version = "0.3.4", features = ["nightly"]}
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-rustc-demangle = "0.1.5" 
 
 
-# this is needed for our odd approach of including the nano_core as a library for other kernel crates
-# compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" } #unsure if needed
-
-[dependencies.goblin]  ## for linker relocation typedefs
-version = "0.0.13"
-default-features = false
-features = ["elf64", "goblin"]
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
-[dependencies.heap_irq_safe]
-path = "../../libs/heap_irq_safe"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "0.2.1"
-
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
-[dependencies.port_io]
-path = "../../libs/port_io"
-version = "0.2.1"
-
-[dependencies.irq_safety]
-path = "../../libs/irq_safety"
-version = "0.1.1"
-# features = ["const_fn"]  #if we need them later
-
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.state_store]
-path = "../state_store"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.logger]
-path = "../logger"
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[dependencies.rtc]
-path = "../rtc"
+[dependencies.frame_buffer]
+path = "../frame_buffer"
 
-[dependencies.test_lib]
-path = "../test_lib"
+[dependencies.frame_buffer_3d]
+path = "../frame_buffer_3d"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
+[dependencies.logger]
+path = "../logger"
+
+[dependencies.state_store]
+path = "../state_store"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.exceptions]
+path = "../exceptions"
+
+[dependencies.captain]
+path = "../captain"
 
 
-[profile.release]
-debug = true
+### below: Extra dependencies to make sure things are built
+[dependencies.console]
+path = "../console"
+
 
 [features]
+loadable = [ "captain/loadable" ]
 mirror_serial = []
-apic_timer_fixed = []
 
 
 [lib]
@@ -95,5 +72,5 @@ apic_timer_fixed = []
 # we choose rlib instead of dylib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
 # meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it
 # Furthermore we cannot build it as a dylib instead of rlib because he custom x86_64-theseus target triple doesn't support it (really, Xargo doesn't support it)
-crate-type = ["staticlib", "rlib"]  
+crate-type = ["staticlib"]  
 

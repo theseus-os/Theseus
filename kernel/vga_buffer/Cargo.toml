@@ -22,4 +22,4 @@ path = "../kernel_config"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["lib"] # "lib" does the same thing I think

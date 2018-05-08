@@ -7,7 +7,7 @@ version = "0.1.0"
 path = "../../libs/port_io"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

@@ -70,19 +70,19 @@ static EARLY_VGA_WRITER: Mutex<RawVgaBuffer> = Mutex::new(
 );
 
 #[macro_export]
-macro_rules! print_early {
+macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        $crate::raw::print_args_early(format_args!($($arg)*)).unwrap();
+        let _ = $crate::raw::print_args_raw(format_args!($($arg)*));
     });
 }
 
 #[macro_export]
-macro_rules! println_early {
-    ($fmt:expr) => (print_early!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print_early!(concat!($fmt, "\n"), $($arg)*));
+macro_rules! println_raw {
+    ($fmt:expr) => (print_raw!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print_raw!(concat!($fmt, "\n"), $($arg)*));
 }
 
-pub fn print_args_early(args: fmt::Arguments) -> fmt::Result {
+pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
     unsafe { EARLY_VGA_WRITER.force_unlock(); }
     EARLY_VGA_WRITER.lock().write_fmt(args)

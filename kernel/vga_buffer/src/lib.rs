@@ -4,6 +4,7 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unique)]
+#![feature(ptr_internals)]
 
 extern crate spin;
 extern crate volatile;
@@ -36,7 +37,7 @@ const BUFFER_WIDTH: usize = 80;
 pub mod raw;
 
 
-/// Specifies where we want to scroll the display, and by how much
+/// Specifies where we want to scroll the VGA display, and by how much.
 #[derive(Debug)]
 pub enum DisplayPosition {
     /// Move the display to the very top of the VgaBuffer
@@ -75,7 +76,7 @@ impl VgaBuffer {
         VgaBuffer::with_capacity(1000)
     }
 
-    // Create a new VgaBuffer with the given capacity, specified in number of lines. 
+    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines. 
     pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
         let first_line = BLANK_LINE;
         let mut lines = Vec::with_capacity(num_initial_lines);
@@ -88,14 +89,15 @@ impl VgaBuffer {
             lines: lines,
         }
     }
-    
 
-    pub fn write_str_with_color(&mut self, s: &str, color: ColorCode) {
+
+    /// Writes the given string with the given color to this `VgaBuffer`.
+    pub fn write_str_with_color(&mut self, s: &str, color: ColorCode) -> fmt::Result {
         for byte in s.bytes() {
             match byte {
                 // handle new line
                 b'\n' => {
-                    self.new_line(color);
+                    try!(self.new_line(color));
                 }
 
                 // handle backspace
@@ -104,13 +106,13 @@ impl VgaBuffer {
                 // all other regular bytes
                 byte => {
                     {
-                        let mut curr_line = self.lines.last_mut().unwrap();
+                        let mut curr_line = try!(self.lines.last_mut().ok_or(fmt::Error));
                         curr_line[self.column] = ScreenChar::new(byte, color);
                     }
                     self.column += 1;
 
                     if self.column == BUFFER_WIDTH { // wrap to a new line
-                        self.new_line(color); 
+                        try!(self.new_line(color)); 
                     }
                 }
             }
@@ -124,47 +126,45 @@ impl VgaBuffer {
         {
             self.display(DisplayPosition::End);
         }
-        
-        // // refresh the VGA text display if the changes would be visible on screen
-        // // keep in mind the latest write to the VGA buffer is always written into the last element of self.lines
-        // let display_line = self.display_line;
-        // let written_line = self.lines.len();
-        // if written_line >= display_line && written_line <= display_line + BUFFER_HEIGHT {
-        //     // the recent write will be visible
-        //     self.display(DisplayPosition::Same);
-        // }
 
+        Ok(())
     }
 
 
-    pub fn write_string_with_color(&mut self, s: &String, color: ColorCode) {
-        self.write_str_with_color(s.as_str(), color);
+    /// Writes the given string with the given color to this `VgaBuffer`.    
+    pub fn write_string_with_color(&mut self, s: &String, color: ColorCode) -> fmt::Result {
+        self.write_str_with_color(s.as_str(), color)
     }
 
 
-    pub fn write_args(&mut self, args: fmt::Arguments) -> fmt::Result {
-        use core::fmt::Write;
+    /// Writes the given formatting args to this `VgaBuffer` with the default color scheme.
+    #[allow(dead_code)]
+    fn write_args(&mut self, args: fmt::Arguments) -> fmt::Result {
+        use fmt::Write;
         self.write_fmt(args)
     }
 
-    /// To create a new line, this function does the following:
-    /// 1) Clears the rest of the current line.
-    /// 2) Resets the column index to 0 (beginning of next line).
-    /// 3) Allocates a new Line and pushes it to the `lines` Vec.
-    fn new_line(&mut self, color: ColorCode) {
+    /// Writes a new line to the VgaBuffer, which does the following:
+    /// 
+    /// 1. Clears the rest of the current line.
+    /// 2. Resets the column index to 0 (beginning of next line).
+    /// 3. Allocates a new Line and pushes it to the `lines` Vec.
+    fn new_line(&mut self, color: ColorCode) -> fmt::Result {
         // clear out the rest of the current line
         let ref mut lines = self.lines;
         for c in self.column .. BUFFER_WIDTH {
-            lines.last_mut().unwrap()[c] = ScreenChar::new(b' ', color);
+            try!(lines.last_mut().ok_or(fmt::Error))[c] = ScreenChar::new(b' ', color);
         }
         
         self.column = 0; 
         lines.push([ScreenChar::new(b' ', color); BUFFER_WIDTH]);
+
+        Ok(())
     }
 
 
 
-    /// Displays this VgaBuffer at the given string offset by flushing it to the screen.
+    /// Displays (refreshes) this VgaBuffer at the given position.
     pub fn display(&mut self, position: DisplayPosition) {
         // trace!("VgaBuffer::display(): position {:?}", position);
         let (start, end) = match position {
@@ -236,32 +236,14 @@ impl VgaBuffer {
                 }
              }
         }
-
-
-        // // here, we do the actual writing of the VGA memory
-        // unsafe {
-        //     // copy lines from the our VgaBuffer to the VGA text memory
-        //     let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR as *mut Line), num_lines);
-        //     dest.copy_from_slice(&self.lines[start .. end]);
-            
-        //     // if the buffer is too small, fill in the rest of the lines
-        //     if num_lines < BUFFER_HEIGHT {
-        //         let start = BUFFER_HEIGHT - num_lines;
-        //         for line in start .. BUFFER_HEIGHT {
-        //             let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR + (line * mem::size_of::<Line>())) as *mut ScreenChar, BUFFER_WIDTH); // copy 1 line at a time
-        //             dest.copy_from_slice(&BLANK_LINE);
-        //         }
-        //     }
-        // }
     }
 
 }
 
 impl fmt::Write for VgaBuffer {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        let ret = serial_port::write_str(s); // mirror to serial port
-        self.write_str_with_color(s, ColorCode::default());
-        ret
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        try!(self.write_str_with_color(s, ColorCode::default()));
+        serial_port::write_str(s) // mirror to serial port
     }
 }
 
