@@ -31,6 +31,9 @@ path = "../window_manager"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
 [dependencies.console_types]
 path = "../console_types"
 

@@ -6,6 +6,8 @@ extern crate vga_buffer;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
+extern crate atomic_linked_list; 
+
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 // extern crate window_manager;
@@ -21,11 +23,12 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-
+use atomic_linked_list::atomic_map::AtomicMap;
 
 
 lazy_static! {
     static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
+    static ref COMMAND_TABLE: AtomicMap<String, String> = AtomicMap::new();
 }
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
@@ -37,7 +40,6 @@ pub fn print_to_console(s: String) -> Result<(), &'static str> {
     try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
     Ok(())
 }
-
 
 /// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
 /// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
@@ -54,6 +56,8 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop"), None));
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
+    build_command_table();
+
 
     try!(print_to_console(String::from(WELCOME_STRING)));
     try!(print_to_console(String::from("Console says hello!\n")));
@@ -67,6 +71,9 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 /// It's an infinite loop, but will return if forced to exit because of an error. 
 fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> { // Option<usize> just a placeholder because kthread functions must have one Argument right now... :(
     use core::ops::Deref;
+    let mut console_input_string = String::new();
+    
+    try!(print_to_console(String::from("type command: ")));
 
     loop { 
         let event = match consumer.peek() {
@@ -82,8 +89,9 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
                 );
                 return Ok(()); 
             }
+            
             &ConsoleEvent::InputEvent(ref input_event) => {
-                try!(handle_key_event(input_event.key_event));
+                try!(handle_key_event(input_event.key_event, &mut console_input_string));
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
                 try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default())
@@ -97,10 +105,11 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
 }
 
 
-fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
+fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String) -> Result<(), &'static str> {
 
     // Ctrl+D or Ctrl+Alt+Del kills the OS
-    if keyevent.modifiers.control && keyevent.keycode == Keycode::D || 
+    if keyevent.modifiers.control && keyevent.keycode == Keycode::D
+     || 
             keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
         panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
     }
@@ -134,6 +143,30 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
 
+    if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some(){
+
+
+        console_input_string.push(keyevent.keycode.to_ascii(keyevent.modifiers).unwrap());
+;
+    }
+
+    if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+;
+        // Calls the match_command function to see if the command exists in the command table
+        debug!("{:?}", console_input_string);
+        match match_command(console_input_string){
+            Ok(command_function) => {
+                try!(print_to_console(String::from("executing command...\n")));
+            }
+            Err(&_) => {
+                try!(print_to_console(String::from("ERROR: NOT A VALID COMMAND \n")));
+            }
+        };
+        // Clears the buffer for another command once current command is finished executing
+        console_input_string.clear();
+        try!(print_to_console(String::from("type command: ")));
+
+    }
 
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
@@ -160,10 +193,12 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
         return Ok(());
     }
+
+    
     
     /*
         //Pass TAB event to window manager
-        //Window manager consumes dir();ection key input
+        //Window manager consumes direction key input
         match keyevent.keycode {
             Keycode::Tab => {
                 //window_manager::set_time_start();
@@ -181,7 +216,7 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
         /*match keyevent.keycode {
             Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
                 graph_drawer::put_key_code(keyevent.keycode).unwrap();
-            }
+            }c
             _ => {}
         }*/
     */
@@ -194,6 +229,7 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
             try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default())
                 .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
             );
+
         }
         // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
@@ -202,6 +238,31 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
     Ok(())
 }
 
+
+fn match_command(console_input_string: &mut String) -> Result<String, &'static str> {
+    use alloc::string::ToString;
+    use alloc::vec::Vec;
+    let mut words: Vec<&str> = console_input_string.split_whitespace().collect();
+    let command_string = words.remove(0);
+    let arguments = &words;
+    debug!("{:?}", arguments);
+
+    let valid_command = COMMAND_TABLE.get(&command_string.to_string());
+    if valid_command.is_some() {
+        return Ok(command_string.to_string());
+    }
+    else {
+        return Err("invalid command");
+    }
+
+}
+
+
+
+fn build_command_table() {
+    // use alloc::string::ToString;
+    COMMAND_TABLE.insert(String::from("date"), String::from("execute date command"));
+}
 
 
 
@@ -212,4 +273,4 @@ const WELCOME_STRING: &'static str = "\n\n
 |_   _| |__   ___  ___  ___ _   _ ___ 
   | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
-  |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
+  |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n ";
