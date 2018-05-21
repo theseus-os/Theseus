@@ -335,9 +335,8 @@ pub fn init(boot_info: BootInformation, tlb_shootdown_cb: fn(VirtualAddress))
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
     assert_has_not_been_called!("memory::init must be called only once");
-    debug!("memory::init() at top!");
-    let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
-    debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
+    // let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
+    // debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
     
     BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| tlb_shootdown_cb); // for use in remap/unmap
 
