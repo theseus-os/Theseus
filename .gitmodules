@@ -15,9 +15,12 @@
 	branch = master
 [submodule "libs/smoltcp"]
 	path = libs/smoltcp
-	url = https://github.com/nisalmenuka2/smoltcp.git
+	url = https://github.com/nisalmenuka2/smoltcp
 	branch = master
 [submodule "libs/smoltcp/libs/rust-managed"]
 	path = libs/smoltcp/libs/rust-managed
 	url = https://github.com/nisalmenuka2/rust-managed.git
 	branch = master
+[submodule "libs/rust-managed"]
+	path = libs/rust-managed
+	url = https://github.com/nisalmenuka2/rust-managed
