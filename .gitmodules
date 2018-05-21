@@ -13,3 +13,11 @@
 	path = libs/multiboot2-elf64
 	url = https://github.com/kevinaboos/multiboot2-elf64.git
 	branch = master
+[submodule "libs/smoltcp"]
+	path = libs/smoltcp
+	url = https://github.com/nisalmenuka2/smoltcp.git
+	branch = master
+[submodule "libs/smoltcp/libs/rust-managed"]
+	path = libs/smoltcp/libs/rust-managed
+	url = https://github.com/nisalmenuka2/rust-managed.git
+	branch = master
