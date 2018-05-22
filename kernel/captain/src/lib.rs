@@ -12,18 +12,18 @@
 #![feature(used)]
 #![feature(core_intrinsics)]
 
+
+#[cfg(feature = "loadable")] 
+#[macro_use(format)] extern crate alloc;
+#[cfg(not(feature = "loadable"))] 
 extern crate alloc;
+
 #[macro_use] extern crate log;
 
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
-
-#[cfg(feature = "loadable")]
-#[macro_use] extern crate vga_buffer;
-#[cfg(not(feature = "loadable"))]
-extern crate vga_buffer;
 
 extern crate console_types; // a temporary way to use console types 
 extern crate logger;
@@ -39,66 +39,17 @@ extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
-
 extern crate scheduler;
+
+
+#[cfg(feature = "loadable")] 
 extern crate console;
+#[cfg(not(feature = "loadable"))] 
+#[macro_use] extern crate console;
+
 
 #[cfg(target_feature = "sse2")]
 extern crate simd_test;
-
-// temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
-/// calls print!() with an extra "\n" at the end. 
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
-
-/// The main printing macro, which simply pushes an output event to the console's event queue. 
-/// This ensures that only one thread (the console) ever accesses the UI, which right now is just the VGA buffer.
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        use alloc::String;
-        let mut s: String = String::new();
-        match write!(&mut s, $($arg)*) {
-            Ok(_) => { }
-            Err(e) => error!("print!(): writing to String failed, error: {}", e),
-        }
-        
-        #[cfg(feature = "loadable")] {
-            if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-                type PrintFuncSignature = fn(String) -> Result<(), &'static str>;
-                
-                if let Some(mp) = section.mapped_pages() {
-                    let mut space = 0; // this must persist throughout the print_func being called
-                    let print_func: Result<&PrintFuncSignature, &'static str> = mp.as_func(section.mapped_pages_offset(), &mut space);
-                    match print_func {
-                        Ok(func) => { 
-                            let _ = func(s.clone());
-                        }
-                        Err(e) => {
-                            error!("print!(): couldn't get print_func from the section's mapped_pages, error: {}", e);
-                        }
-                    }
-                }
-                else {
-                    error!("print!(): couldn't get section's mapped_pages");
-                }
-            }
-            else {
-                // if console crate hasn't been loaded yet, write to the raw VGA buffer instead
-                error!("print!(): no \"console::print_to_console\" symbol. Printing: {}", s);
-                println_raw!("print!(): couldn't get \"console::print_to_console\" symbol! Tried to print: {}", s);
-            }
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            let _ = console::print_to_console(s);
-        } 
-    });
-}
 
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -125,7 +76,20 @@ use irq_safety::{MutexIrqSafe, enable_interrupts};
 
 /// the callback use in the logger crate for mirroring log functions to the console
 pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
-    println!("{} {}", prefix, args);
+    #[cfg(feature = "loadable")]
+    {
+        let mut space = 0;
+        if let Some(section) = mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
+            if let Some(func) = section.mapped_pages().and_then(|mp| mp.as_func::<fn(String)>(section.mapped_pages_offset(), &mut space).ok()) 
+            {
+                let _ = func(format!("{} {}", prefix, args));
+            }
+        }
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        println!("{} {}", prefix, args);
+    }
 }
 
 
@@ -497,7 +461,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
-    #[cfg(not(feature = "loadable"))]
+        #[cfg(not(feature = "loadable"))]
         {
             spawn::spawn_userspace(module, None)?;
         }
@@ -511,7 +475,22 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
     }
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    #[cfg(feature = "loadable")]
+    {
+        let section = mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade().ok_or("no symbol: console::print_to_console")?;
+        let mut space = 0;
+        let func: & fn(String) -> Result<(), &'static str> = 
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"console::print_to_console\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
+        // this is effectively doing what the println macro does
+        func(String::from("initialization done! Enabling interrupts to schedule away from Task 0 ...\n"))?;
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
+    }
+
     debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
 

@@ -24,6 +24,37 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
 
 
+
+/// Calls `print!()` with an extra newilne ('\n') appended to the end. 
+#[macro_export]
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}
+
+/// The main printing macro, which simply pushes an output event to the console's event queue. 
+/// This ensures that only one thread (the console acting as a consumer) ever accesses the GUI.
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        use alloc::String;
+        let mut s: String = String::new();
+        match write!(&mut s, $($arg)*) {
+            Ok(_) => { 
+                if let Err(e) = $crate::print_to_console(s) {
+                    error!("print!(): print_to_console failed, error: {}", e);
+                }
+            }
+            Err(err) => {
+                error!("print!(): writing to String failed, error: {}", err);
+            }
+        }
+    });
+}
+
+
+
 lazy_static! {
     static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
 }
@@ -191,7 +222,6 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
             use alloc::string::ToString;
             CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
         }
-        // _ => { println!("Couldn't get ascii for keyevent {:?}", keyevent); } 
         _ => { } 
     }
 
