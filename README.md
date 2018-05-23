@@ -16,10 +16,27 @@ Currently, we support building and running Theseus on the following host OSes:
  * Mac OS X is not currently supported officially, but it should be possible. 
 
 
-### Setting up Rust
 
-Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html).
-Or, basically just run this command and follow the instructions:   
+### Setting up the build environment
+First, update your system's package list:    
+`sudo apt-get update`.   
+
+You will need to install the following packages:  
+`sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
+
+If you're on Windows using WSL, you'll need to do the following:
+  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
+  * Set an X display, by running `export DISPLAY=:0`. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with `echo "export DISPLAY=:0" >> ~/.bashrc`.
+  * If you get this error: `Could not initialize SDL(No available video device) - exiting`, then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
+  * Install a C compiler and linker toolchain, such as `gcc`.
+
+When you first check out the project, don't forget to checkout all the submodule repositories too:    
+`git submodule update --init --recursive`
+
+
+### Installing Rust
+
+Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html), which is basically just this command:   
 `curl https://sh.rustup.rs -sSf | sh`
 
 Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with:   
@@ -32,25 +49,11 @@ We also need to install Xargo, a drop-in replacement wrapper for Cargo that make
 `cargo install --vers 0.3.10 xargo`
 
 
-### Finishing the build
-You will need to install the following packages:  
-`sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
-
-If you're on Windows using WSL, you'll need to do the following:
-  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
-  * Set an X display, by running `export DISPLAY=:0`. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with `echo "export DISPLAY=:0" >> ~/.bashrc`.
-  * If you get this error: `Could not initialize SDL(No available video device) - exiting`, then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
-
-When you first check out the project, don't forget to checkout all the submodule repositories too:    
-`git submodule update --init --recursive`
-
+### Building and Running
 To build and run Theseus in QEMU, simply run:   
 `make run`
 
-To run it again without rebuilding the whole project:   
-`make orun`
-
-Run `make help` to see other make tarets. 
+Run `make help` to see other make targets. 
 
 
 ### Note: Rust compiler versions
@@ -88,7 +91,7 @@ After that, you should have a `rust-os-gdb` directory that contains the `gdb` ex
 
 Then, simply run `make debug` to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.   
 To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
-Try setting a breakpoint at the kernel's entry function using `b rust_main` or at a specific file/line, e.g., `b scheduler.rs:40`.
+Try setting a breakpoint at the kernel's entry function using `b nano_core::nano_core_start` or at a specific file/line, e.g., `b scheduler.rs:40`.
 
 
 ## Documentation

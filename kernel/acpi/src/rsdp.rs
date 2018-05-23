@@ -1,5 +1,8 @@
-use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, VirtualAddress, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use core::ops::DerefMut;
+use core::mem;
+use owning_ref::BoxRef;
+use alloc::boxed::Box;
 
 const RDSP_SEARCH_START: PhysicalAddress = 0xE_0000;
 const RDSP_SEARCH_END:   PhysicalAddress = 0xF_FFFF;
@@ -22,7 +25,7 @@ pub struct RSDP {
 impl RSDP {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
     /// Returns the RDSP structure and the pages that are currently mapping it.
-    pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<(RSDP, MappedPages)> {
+    pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<BoxRef<MappedPages, RSDP>> {
         let size: usize = RDSP_SEARCH_END - RDSP_SEARCH_START;
         let pages = try_opt!(allocate_pages_by_bytes(size));
         let search_range = Frame::range_inclusive(
@@ -35,21 +38,22 @@ impl RSDP {
             let mut allocator = allocator_mutex.lock();
             try_opt!(active_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.deref_mut()).ok())
         };
-        let rsdp = RSDP::search(mapped_pages.start_address(), mapped_pages.start_address() + size);
-        debug!("Found RSDP at addr {:#X}: {:?}", &rsdp as *const _ as usize, rsdp);
         
-        rsdp.and_then(|r| Some((r, mapped_pages)))
+        RSDP::search(mapped_pages)
     }
 
     /// Searches a region of memory for thee RSDP table, which is identified by the "RSD PTR " signature.
-    fn search(start_addr: VirtualAddress, end_addr: VirtualAddress) -> Option<RSDP> {
-        for i in 0 .. (end_addr + 1 - start_addr)/16 {
-            let rsdp = unsafe { &*((start_addr + i * 16) as *const RSDP) };
-            if &rsdp.signature == b"RSD PTR " {
-                return Some(*rsdp);
+    fn search(region: MappedPages) -> Option<BoxRef<MappedPages, RSDP>> {
+        let size = region.size_in_bytes() - mem::size_of::<RSDP>();
+        let mut found_offset: Option<usize> = None;
+        for offset in (0 .. size).step_by(16) {
+            if let Ok(rsdp) = region.as_type::<RSDP>(offset) {
+                if &rsdp.signature == b"RSD PTR " {
+                    found_offset = Some(offset);
+                }
             }
         }
-        None
+        found_offset.and_then(|off| BoxRef::new(Box::new(region)).try_map(|mp| mp.as_type::<RSDP>(off)).ok())
     }
 
     /// Get the RSDT or XSDT address

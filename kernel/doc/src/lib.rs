@@ -10,25 +10,27 @@
 //!
 //! ## Key Modules
 //! #### `nano_core`
-//! The `nano_core` is the aptly-name tiny core module that contains the first code to run
-//! The `nano_core` is very simple, and only does the following things:
+//! `nano_core` is the aptly-named tiny module that contains the first code to run.
+//! `nano_core` is very simple, and only does the following things:
 //! 
-//! 1. Bootstraps the OS after the bootloade is finished, and initializes simple things like logging.
+//! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
 //! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
-//! 4. That's it! Once the `nano_core` gives complete control to the `captain`, it takes no other actions.
+//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
-//! In general, you shouldn't ever need to change the `nano_core` ... **ever**. That's because the `nano_core` doesn't contain any specific program logic, it just sets up an initial environment so that other things can run.
+//! In general, you shouldn't ever need to change `nano_core` ... **ever**. That's because `nano_core` doesn't contain any specific program logic, it just sets up an initial environment so that other things can run.
 //! If you want to change how the OS starts up and initializes, you should change the code in the `captain` instead.
 //!
 //! #### `captain`
+//LZ: module has its own meaning in Rust. Here you are using module not as Rust module but it can be confusing.
+//LZ: maybe we need a new term 
 //! The `captain` steers the ship of Theseus, meaning that it contains the logic that initializes and connects all the other module crates in the proper order and with the proper flow of data between modules. 
 //! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a console thread and createsa queue to send keyboard presses to the console, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test userspace processes (liable to change).     
 //! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. It then falls into an idle loop that does nothing except yields the processor to another Task.    
 //!
 //! **Note**: the `captain` makes copious usage of conditional compilation based on the `loadable` feature. You don't need to worry about using this feature when initially developing a new module; it's only necessary once you want to make it runtime-loadable.    
 //! It is easiest to read what the `captain` does if you only read the instructions within the NOT-loadable code blocks, i.e., within `#[cfg(not(feature = "loadable"))]`.
-//! Soon, a macro will cleanup the structure of `loadable` code such that it is much easier to read. 
+//! Soon, a macro will clean up the structure of `loadable` code such that it is much easier to read. 
 //! 
 
 
