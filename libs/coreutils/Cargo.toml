@@ -15,8 +15,8 @@ version = "0.3.7"
 [dependencies.rtc]
 path = "../../kernel/rtc"
 
-# [dependencies.console]
-# path = "../../kernel/console"
+#[dependencies.console]
+#makepath = "../../kernel/console"
 
 
 [lib]
