@@ -218,7 +218,14 @@ impl ModuleArea {
 }
 
 
-/// A region of virtual memory that is mapped into a `Task`'s address space
+/// Returns an iterator over all of the [`ModuleArea`](struct.ModuleArea.html)s that exist.
+pub fn module_iterator() -> impl Iterator<Item = &'static ModuleArea> {
+    MODULE_AREAS.try().map(|modules| modules.iter()).unwrap_or([].iter())
+}
+
+
+
+/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct VirtualMemoryArea {
     start: VirtualAddress,

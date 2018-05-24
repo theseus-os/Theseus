@@ -15,7 +15,7 @@ use alloc::arc::Arc;
 use alloc::VecDeque;
 use irq_safety::{RwLockIrqSafe, disable_interrupts};
 use atomic_linked_list::atomic_map::AtomicMap;
-use task::{Task, get_my_current_task};
+use task::{Task, TaskRef, get_my_current_task};
 use apic::get_my_apic_id;
 
 
@@ -77,8 +77,6 @@ pub fn schedule() -> bool {
 }
 
 
-
-type TaskRef = Arc<RwLockIrqSafe<Task>>;
 type RunQueue = VecDeque<TaskRef>;
 
 lazy_static! {
