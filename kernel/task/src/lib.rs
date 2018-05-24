@@ -10,11 +10,14 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate apic;
+extern crate mod_mgmt;
 
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
+use core::any::Any;
 use alloc::String;
+use alloc::boxed::Box;
 use alloc::arc::Arc;
 
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
@@ -22,6 +25,9 @@ use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
+use mod_mgmt::metadata::LoadedCrate;
+
+
 
 
 lazy_static! {
@@ -36,7 +42,7 @@ lazy_static! {
 
 lazy_static! {
     /// The list of all Tasks in the system.
-    pub static ref TASKLIST: AtomicMap<usize, Arc<RwLockIrqSafe<Task>>> = AtomicMap::new();
+    pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
 
@@ -53,38 +59,71 @@ pub fn get_my_current_task_id() -> Option<usize> {
 }
 
 /// returns a shared reference to the current `Task`
-pub fn get_my_current_task() -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
+pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_my_current_task_id().and_then(|id| {
         TASKLIST.get(&id)
     })
 }
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
-pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
+pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
     TASKLIST.get(&task_id)
 }
 
 
-
-
-#[repr(u8)] // one byte
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub enum RunState {
-    /// in the midst of setting up the task
-    INITING = 0,
-    /// able to be scheduled in, but not currently running
-    RUNNABLE,
-    /// blocked on something, like I/O or a wait event
-    BLOCKED,
-    /// thread has completed and is ready for cleanup
-    EXITED,
+// TODO FIXME: there is a PanicInfo type already defined in core lib
+#[derive(Debug, Clone, Copy)]
+pub struct PanicInfo {
+    file: &'static str,
+    line: u32,
+    column: u32,
+    msg: &'static str,
 }
 
 
+/// The list of possible reasons that a given `Task` was killed prematurely.
+#[derive(Debug)]
+pub enum KillReason {
+    /// The user or another task requested that this `Task` be killed. 
+    /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
+    Requested,
+    /// A Rust-level panic occurred while running this `Task`
+    Panic(PanicInfo),
+    /// A non-language-level problem, such as a Page Fault or some other machine exception.
+    Exception,
+}
 
+
+pub type ExitValue = Result<Box<Any>, KillReason>;
+
+#[derive(Debug)]
+pub enum RunState {
+    /// in the midst of setting up the task
+    Initing,
+    /// able to be scheduled in, but not necessarily currently running. 
+    /// To check whether it is currently running, use [`is_running`](#method.is_running)
+    Runnable,
+    /// blocked on something, like I/O or a wait event
+    Blocked,
+    /// the `Task` has completed and is ready for cleanup.
+    /// Includes the Task's exit status, a `Result` in which an `Ok` value 
+    /// indicates that the `Task` successfully ran to completion, 
+    /// and an `Err` value indicates that the `Task` was killed and did not finish running.
+    /// An `Ok` result contains a boxed `Any` value that is the returned exit value itself,
+    /// whereas an `Err` result contains a `KillReason`.
+    Exited(ExitValue),
+}
+
+
+pub type TaskRef = Arc<RwLockIrqSafe<Task>>;
+
+
+/// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
     /// the unique id of this Task.
     pub id: usize,
+    /// the simple name of this Task
+    pub name: String,
     /// which cpu core the Task is currently running on.
     /// negative if not currently running.
     pub running_on_cpu: isize,
@@ -92,15 +131,13 @@ pub struct Task {
     pub runstate: RunState,
     /// the saved stack pointer value, used for context switching.
     pub saved_sp: usize,
-    /// the simple name of this Task
-    pub name: String,
+    /// memory management details: page tables, mappings, allocators, etc.
+    /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
+    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub kstack: Option<Stack>,
     /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
     pub ustack: Option<Stack>,
-    /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
-    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
@@ -109,6 +146,9 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core.
     pub is_an_idle_task: bool,
+    /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
+    /// that contains the backing memory regions and sections for running this `Task`'s object file 
+    pub app_crate: Option<LoadedCrate>,
 }
 
 impl fmt::Debug for Task {
@@ -131,7 +171,7 @@ impl Task {
         
         Task {
             id: task_id,
-            runstate: RunState::INITING,
+            runstate: RunState::Initing,
             running_on_cpu: -1, // not running on any cpu
             saved_sp: 0,
             name: format!("task{}", task_id),
@@ -141,6 +181,7 @@ impl Task {
             new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
+            app_crate: None,
         }
     }
 
@@ -149,38 +190,88 @@ impl Task {
         self.name = n;
     }
 
-    /// set the RunState of this Task
-    pub fn set_runstate(&mut self, rs: RunState) {
-        self.runstate = rs;
-    }
-
     /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
         self.running_on_cpu >= 0
     }
 
+    /// Returns true if this `Task` is Runnable, i.e., able to be scheduled in.
+    /// # Note
+    /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
-        self.runstate == RunState::RUNNABLE
+        match self.runstate {
+            RunState::Runnable => true,
+            _ => false,
+        }
     }
 
+    /// Returns true if this is an application `Task`.
+    pub fn is_application(&self) -> bool {
+        self.app_crate.is_some()
+    }
+
+    /// Returns true if this is an idle task, of which there is one per CPU core.
     pub fn is_an_idle_task(&self) -> bool {
         self.is_an_idle_task
     }
 
+
+    /// Returns the exit_value of this `Task`, if its runstate is `RunState::Exited`.
+    pub fn get_exit_value(&self) -> Option<&ExitValue> {
+        if let RunState::Exited(ref val) = self.runstate {
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    /// Call this function to indicate that this task has successfully ran to completion,
+    /// and that it has returned the given `exit_value`.
+    /// # Return
+    /// Returns true if the exit status was successfully set.
+    /// Returns false if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    pub fn exit(&mut self, exit_value: Box<Any>) -> Result<(), &'static str> {
+        if let RunState::Exited(_) = self.runstate {
+            Err("task was already exited! (not overwriting its existing exit value)")
+        } else {
+            self.runstate = RunState::Exited(Ok(exit_value));
+            Ok(())
+        }
+    }
+
+    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
+    /// The given `KillReason` indicates why it was killed.
+    /// # Return
+    /// Returns true if the exit status was successfully set.
+    /// Returns false if this `Task` was already exited, and does not overwrite the existing exit status. 
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    pub fn kill(&mut self, reason: KillReason) -> bool {
+        if let RunState::Exited(_) = self.runstate {
+            false
+        } else {
+            self.runstate = RunState::Exited(Err(reason));
+            true
+        }
+    }
 
     /// switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn context_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("context_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
         
-        let my_context_switch_lock: &AtomicBool;
-        if let Some(csl) = CONTEXT_SWITCH_LOCKS.get(&apic_id) {
-            my_context_switch_lock = csl;
-        } 
-        else {
-            error!("context_switch(): no context switch lock present for AP {}, skipping context switch!", apic_id);
-            return;
-        }
+        let my_context_switch_lock: &AtomicBool = match CONTEXT_SWITCH_LOCKS.get(&apic_id) {
+            Some(csl) => csl,
+            _ => {
+                error!("context_switch(): no context switch lock present for AP {}, skipping context switch!", apic_id);
+                return;
+            }
+        };
         
         // acquire this core's context switch lock
         // TODO: add timeout
@@ -189,12 +280,12 @@ impl Task {
         }
 
         // debug!("context_switch [1], testing runstates.");
-        if next.runstate != RunState::RUNNABLE {
-            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was not RUNNABLE! Current: {:?}, Next: {:?}", self, next);
+        if !next.is_runnable() {
+            error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
             my_context_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
-        if next.running_on_cpu != -1 {
+        if next.is_running() {
             error!("Skipping context_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
             my_context_switch_lock.store(false, Ordering::SeqCst);
             return;

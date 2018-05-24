@@ -34,6 +34,8 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

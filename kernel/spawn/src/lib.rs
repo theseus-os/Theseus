@@ -12,6 +12,7 @@ extern crate task;
 extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
+extern crate owning_ref;
 
 use core::fmt;
 use core::mem;
@@ -25,7 +26,7 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, get_my_current_task, RunState, TASKLIST, CONTEXT_SWITCH_LOCKS, CURRENT_TASKS};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, CONTEXT_SWITCH_LOCKS, CURRENT_TASKS};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 
 
@@ -33,7 +34,7 @@ use gdt::{AvailableSegmentSelector, get_segment_selector};
 /// and creating its initial idle task for that core. 
 pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8,
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-            -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> 
+            -> Result<TaskRef, &'static str> 
 {
     CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
 
@@ -337,12 +338,12 @@ pub fn get_task(task_id: usize) -> Option<&'static Arc<RwLockIrqSafe<Task>>> {
 /// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
 fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                       apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-                      -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
+                      -> Result<TaskRef, &'static str> {
 
     let mut idle_task = Task::new();
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
-    idle_task.runstate = RunState::RUNNABLE;
+    idle_task.runstate = RunState::Runnable;
     idle_task.running_on_cpu = apic_id as isize; 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
     idle_task.mmi = Some(kernel_mmi_ref);
@@ -491,7 +492,7 @@ impl<A, R> KthreadCall<A, R> {
 
 /// Spawns a new kernel task with the same address space as the current task. 
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
-/// This merely makes the new task Runanble, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
 /// 
 /// # Arguments
 /// 
@@ -501,9 +502,9 @@ impl<A, R> KthreadCall<A, R> {
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
 /// 
 #[inline(never)]
-pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A, thread_name: String, pin_on_core: Option<u8>)
-        -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
-
+pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug + 'static>(func: fn(arg: A) -> R, arg: A, thread_name: String, pin_on_core: Option<u8>)
+    -> Result<TaskRef, &'static str> 
+{
     let mut new_task = Task::new();
     new_task.set_name(thread_name);
 
@@ -540,7 +541,7 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 
 
     new_task.kstack = Some(kstack);
-    new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
+    new_task.runstate = RunState::Runnable; // ready to be scheduled in
 
     let new_task_id = new_task.id;
     let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
@@ -562,9 +563,55 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug>(func: fn(arg: A) -> R, arg: A
 }
 
 
-/// Spawns a new userspace task based on the provided `ModuleArea`, which should have an entry point called `main`.
-/// optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
-pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> {
+
+type MainFuncSignature = fn(Vec<String>) -> isize;
+
+
+/// Spawns a new application task within the kernel, based on the provided `ModuleArea` which must have an entry point called `main`.
+/// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
+/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// 
+/// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
+/// 
+/// # Arguments
+/// 
+/// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
+/// * `args`: the arguments that will be passed to the `main` function of the application. 
+/// * `task_name`: the String name of the new task. If None, the `module`'s name will be used. 
+/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
+/// 
+pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
+    -> Result<TaskRef, &'static str> 
+{
+    let app_crate = {
+        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_application_crate(module, kernel_mmi.deref_mut(), false)?
+    };
+    
+    let task_name = task_name.unwrap_or(app_crate.crate_name.clone());
+
+    let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
+    let main_func = {
+        // get the TextSection for the "main" function in the app_crate
+        let main_func_sec = app_crate.get_function_section("main").ok_or("spawn_application(): couldn't find \"main\" function!")?;
+        let mapped_pages = main_func_sec.mapped_pages.upgrade().ok_or("logic error: module's main_func text section was found but didn't have any mapped pages")?;
+        debug!("spawn_application(): func mapped_pages: {:?}", mapped_pages);
+        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
+    };
+
+    let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
+    app_task.write().app_crate = Some(app_crate);
+
+    Ok(app_task)
+}
+
+
+
+
+/// Spawns a new userspace task based on the provided `ModuleArea`, which must be an ELF executable file with a defined entry point.
+/// Optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
+pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<TaskRef, &'static str> {
 
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
@@ -720,7 +767,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
     assert!(ustack.is_some(), "spawn_userspace(): ustack was None after trying to alloc_stack!");
     new_task.ustack = ustack;
     new_task.mmi = Some(Arc::new(MutexIrqSafe::new(new_userspace_mmi)));
-    new_task.runstate = RunState::RUNNABLE; // ready to be scheduled in
+    new_task.runstate = RunState::Runnable; // ready to be scheduled in
     let new_task_id = new_task.id;
 
     let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
@@ -745,7 +792,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Arc<
 ///
 /// ## Returns
 /// An Option with a reference counter for the removed Task.
-pub fn remove_task(_id: usize) -> Option<Arc<RwLockIrqSafe<Task>>> {
+pub fn remove_task(_id: usize) -> Option<TaskRef> {
     unimplemented!();
 // assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
     // TASKLIST.remove(id)
@@ -753,20 +800,59 @@ pub fn remove_task(_id: usize) -> Option<Arc<RwLockIrqSafe<Task>>> {
 
 
 
-/// this does not return
-fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
 
-    let kthread_call_stack_ptr: *mut KthreadCall<A, R>;
-    {
-        let currtask = get_my_current_task().expect("kthread_wrapper(): get_my_current_task() failed in getting kstack").read();
-        let kstack = currtask.kstack.as_ref().expect("kthread_wrapper(): failed to get current task's kstack.");
+/// Waits until the given `task` has finished executing, 
+/// i.e., blocks until its runstate is `RunState::Exited`.
+/// Returns `Ok()` when the given `task` is actually exited,
+/// and `Err()` if there is a problem or interruption while waiting for it to exit. 
+/// # Note
+/// * You cannot call `join()` on the current thread, because a thread cannot wait for itself to finish running. 
+/// This will result in an `Err()` being immediately returned.
+/// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock.
+pub fn join(task: &TaskRef) -> Result<(), &'static str> {
+    let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
+    if Arc::ptr_eq(task, curr_task) {
+        return Err("logic error: cannot call join() on yourself (the current task).");
+    }
+
+    if !interrupts_enabled() {
+        return Err("logic error: cannot call join() with interrupts disabled; it will cause deadlock.")
+    }
+
+    
+    // First, wait for this Task to be marked as Exited (no longer runnable).
+    loop {
+        if let RunState::Exited(_) = task.read().runstate {
+            break;
+        }
+    }
+
+    // Then, wait for it to actually stop running on any CPU core.
+    loop {
+        let t = task.read();
+        if !t.is_running() {
+            return Ok(());
+        }
+    }
+}
+
+
+
+/// The entry point for all new kernel `Task`s. This does not return!
+fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug + 'static>() -> ! {
+    let curr_task_ref = get_my_current_task().expect("kthread_wrapper(): couldn't get_my_current_task().");
+    let curr_task_name = curr_task_ref.read().name.clone();
+
+    let kthread_call_stack_ptr: *mut KthreadCall<A, R> = {
+        let t = curr_task_ref.read();
+        let kstack = t.kstack.as_ref().expect("kthread_wrapper(): failed to get current task's kstack.");
         // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            kthread_call_stack_ptr = *(kstack.bottom() as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>;
+            *(kstack.bottom() as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>
         }
-    }
+    };
 
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
     let kthread_call: Box<KthreadCall<A, R>> = unsafe {
@@ -774,35 +860,31 @@ fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug>() -> ! {
     };
     let kthread_call_val: KthreadCall<A, R> = *kthread_call;
 
-    // debug!("recovered kthread_call: {:?}", kthread_call_val);
-
     let arg: Box<A> = unsafe {
         Box::from_raw(kthread_call_val.arg)
     };
     let func: fn(arg: A) -> R = kthread_call_val.func;
     let arg: A = *arg; 
-    // debug!("kthread_wrapper [0.1]: arg {:?}", arg);
-    // debug!("kthread_wrapper [0.2]: func {:?}", func);
 
+    
     enable_interrupts();
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
-    info!("kthread_wrapper(): about to call kthread func {:?} with arg {:?}, interrupts are {}", func, arg, interrupts_enabled());
-    assert!(interrupts_enabled(), "FATAL ERROR: kthread_wrapper(): interrupts did not get enabled properly!");
+    debug!("kthread_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, func, arg, interrupts_enabled());
 
     // actually invoke the function spawned in this kernel thread
-    let exit_status = func(arg);
-
-    debug!("kthread_wrapper [2]: exited with return value {:?}", exit_status);
+    let exit_value = func(arg);
 
     // cleanup current thread: put it into non-runnable mode, save exit status
-    {
-        get_my_current_task().expect("kthread_wrapper(): couldn't get_my_current_task() after kthread func returned.")
-                             .write().set_runstate(RunState::EXITED);
+
+    debug!("kthread_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, exit_value);
+
+    if curr_task_ref.write().exit(Box::new(exit_value)).is_err() {
+        warn!("kthread_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
     }
 
     scheduler::schedule();
+    // nothing below here should ever run again, we should never ever reach this point
 
-    // we should never ever reach this point
     panic!("KTHREAD_WRAPPER WAS RESCHEDULED AFTER BEING DEAD!")
 }
 
@@ -817,7 +899,7 @@ fn userspace_wrapper() -> ! {
     let ustack_top: usize;
     let entry_func: usize; 
 
-    { // scoped to release tasklist lock before calling jump_to_userspace
+    { // scoped to release current task's RwLock before calling jump_to_userspace
         let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
@@ -828,6 +910,7 @@ fn userspace_wrapper() -> ! {
     unsafe {
         jump_to_userspace(ustack_top, entry_func);
     }
+    // nothing below here should ever run again, we should never ever reach this point
 
 
     panic!("userspace_wrapper [end]: jump_to_userspace returned!!!");

@@ -1,0 +1,30 @@
+[package]
+name = "hello"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.console]
+path = "../../kernel/console"
+
+
+
+### These profiles fix the new rustc behavior of splitting one crate into many object files. 
+### That messes up our module loading, which is bad!
+### See this link about profiles: https://doc.rust-lang.org/cargo/reference/manifest.html
+# workaround rust-lang/rust#47074
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+# workaround rust-lang/rust#47074
+[profile.release]
+codegen-units = 1
+incremental = false

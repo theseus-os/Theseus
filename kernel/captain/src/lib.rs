@@ -13,11 +13,7 @@
 #![feature(core_intrinsics)]
 
 
-#[cfg(feature = "loadable")] 
-#[macro_use(format)] extern crate alloc;
-#[cfg(not(feature = "loadable"))] 
-extern crate alloc;
-
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
 
@@ -42,9 +38,9 @@ extern crate window_manager;
 extern crate scheduler;
 
 
-#[cfg(feature = "loadable")] 
-extern crate console;
-#[cfg(not(feature = "loadable"))] 
+// #[cfg(feature = "loadable")] 
+// extern crate console;
+// #[cfg(not(feature = "loadable"))] 
 #[macro_use] extern crate console;
 
 
@@ -257,7 +253,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         let section = mod_mgmt::metadata::get_symbol("spawn::init").upgrade().ok_or("no symbol: spawn::init")?;
         let mut space = 0;
-        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<TaskRef, &'static str> = 
             section.mapped_pages()
             .ok_or("Couldn't get section's mapped_pages for \"spawn::init\"")?
             .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -381,16 +377,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
-        let module = memory::get_module("test_program").ok_or("Error: no userspace modules named 'test_program' found!")?;
+        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -402,16 +398,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("test_program").ok_or("Error: no userspace modules named 'test_program' found!")?;
+        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -427,13 +423,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if false
     {
         debug!("trying out a system call module");
-        let module = memory::get_module("syscall_send").ok_or("Error: no module named 'syscall_send' found!")?;
+        let module = memory::get_module("__u_syscall_send").ok_or("Error: no module named '__u_syscall_send' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -449,13 +445,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if false
     {
         debug!("trying out a receive system call module");
-        let module = memory::get_module("syscall_receive").ok_or("Error: no module named 'syscall_receive' found!")?;
+        let module = memory::get_module("__u_syscall_receive").ok_or("Error: no module named '__u_syscall_receive' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -467,6 +463,30 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
+
+    // run a hello world application in the kernel
+    if true {
+        let module = memory::get_module("__a_hello").ok_or("Error: no module named '__a_hello' found!")?;
+        let args = vec![String::from("yo"), String::from("what"), String::from("up")];
+
+        #[cfg(feature = "loadable")]
+        {
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
+            func(module, args, None, None)?;
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            let hello_taskref = spawn::spawn_application(module, args, None, None)?;
+            spawn::spawn_kthread(wait_for_hello, hello_taskref, String::from("wait_for_hello"), None)?;
+        }
+    }
+
+
     #[cfg(target_feature = "sse2")]
     {
         spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
@@ -475,28 +495,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
     }
 
-    #[cfg(feature = "loadable")]
-    {
-        let section = mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade().ok_or("no symbol: console::print_to_console")?;
-        let mut space = 0;
-        let func: & fn(String) -> Result<(), &'static str> = 
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"console::print_to_console\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        // this is effectively doing what the println macro does
-        func(String::from("initialization done! Enabling interrupts to schedule away from Task 0 ...\n"))?;
-    }
-    #[cfg(not(feature = "loadable"))]
-    {
-        println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    }
 
-    debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
-
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
     
+
     loop { 
         
         #[cfg(feature = "loadable")]
@@ -514,5 +519,31 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
+}
 
+
+use task::TaskRef;
+fn wait_for_hello(hello_taskref: TaskRef) -> Option<isize> {
+    warn!("WAITING FOR HELLO TASK!"); 
+    
+    warn!("JOIN RETURNED: {:?}", spawn::join(&hello_taskref)); 
+
+    let locked_task = hello_taskref.read();
+    if let Some(exit_result) = locked_task.get_exit_value() {
+        match exit_result {
+            Ok(exit_reason) => {
+                // here: the task exited successfully and ran to completion, so it has a real exit value
+                // we know the return type of the hello task is `isize`, so we need to downcast it from Any to isize
+                let isize_option = exit_reason.downcast_ref::<isize>();
+                warn!("hello task returned exit value: {:?}", isize_option);
+                return isize_option.cloned();
+            }
+            Err(kill_reason) => {
+                // here
+                warn!("hello task was killed, reason: {:?}", kill_reason);
+            }
+        }
+    }
+
+    None
 }

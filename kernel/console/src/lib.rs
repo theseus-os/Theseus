@@ -71,6 +71,11 @@ pub fn print_to_console(s: String) -> Result<(), &'static str> {
 }
 
 
+pub fn print_to_console_str(s: &str) -> Result<(), &'static str> {
+    print_to_console(String::from(s))
+}
+
+
 /// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
 /// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
 /// This allows other modules to push console events onto the queue. 
