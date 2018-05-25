@@ -30,14 +30,14 @@ clean:
 
 
 cargo: 
-	RUST_TARGET_PATH="${CFG_DIR}" RUSTFLAGS="${RUSTFLAGS}" xargo build $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
 
 
 $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(KERNEL_BUILD_DIR)
 	ld -n -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)
 	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  /d;/WEAK   /d' > $(KERNEL_BUILD_DIR)/nano_core.sym   # removes LOCAL and WEAK symbols from the ELF file
-	@for objfile in ./target/$(TARGET)/${BUILD_MODE}/deps/*.o ; do \
+	@for objfile in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
 		cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/\1.o/p'` ; \
 	done
 
