@@ -57,6 +57,9 @@ path = "../pit_clock"
 [dependencies.keyboard]
 path = "../keyboard"
 
+[dependencies.mouse]
+path = "../mouse"
+
 [dependencies.scheduler]
 path = "../scheduler"
 
