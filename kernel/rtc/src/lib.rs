@@ -2,7 +2,6 @@
 #![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unboxed_closures)]
-#![feature(conservative_impl_trait)]
 #![feature(abi_x86_interrupt)]
 #![feature(fn_traits)]
 
@@ -207,7 +206,7 @@ fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     write_cmos(0x8A); 
 
     unsafe{
-        CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0) | dividor));
+        CMOS_WRITE_SETTINGS.lock().write((prev & 0xF0) | dividor);
     }
 
     trace!("RTC frequency changed to {} Hz!", rate);

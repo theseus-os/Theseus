@@ -1,3 +1,31 @@
+//! This crate contains the `Task` structure for supporting multithreading, 
+//! and the associated code for dealing with tasks.
+//! 
+//! To create new `Task`s, use the [`spawn`](../spawn/index.html) crate.
+//! 
+//! # Examples
+//! How to wait for a `Task` to complete (using `join()`) and get its exit value.
+//! ```
+//! spawn::join(&taskref)); // taskref is the task that we're waiting on
+//! let locked_task = taskref.read();
+//! if let Some(exit_result) = locked_task.get_exit_value() {
+//!     match exit_result {
+//!         Ok(exit_value) => {
+//!             // here: the task ran to completion successfully, so it has an exit value.
+//!             // we know the return type of this task is `isize`,
+//!             // so we need to downcast it from Any to isize.
+//!             let val: Option<&isize> = exit_value.downcast_ref::<isize>();
+//!             warn!("task returned exit value: {:?}", val);
+//!         }
+//!         Err(kill_reason) => {
+//!             // here: the task exited prematurely, e.g., it was killed for some reason.
+//!             warn!("task was killed, reason: {:?}", kill_reason);
+//!         }
+//!     }
+//! }
+//! ```
+//! 
+
 #![no_std]
 #![feature(alloc)]
 #![feature(asm, naked_functions)]

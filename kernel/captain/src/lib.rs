@@ -38,9 +38,12 @@ extern crate window_manager;
 extern crate scheduler;
 
 
-// #[cfg(feature = "loadable")] 
-// extern crate console;
-// #[cfg(not(feature = "loadable"))] 
+extern crate rtc; // just to make sure it gets built
+
+
+#[cfg(feature = "loadable")] 
+extern crate console;
+#[cfg(not(feature = "loadable"))] 
 #[macro_use] extern crate console;
 
 
@@ -60,13 +63,11 @@ use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
-#[cfg(feature = "loadable")] use task::Task;
+#[cfg(feature = "loadable")] use task::TaskRef;
 #[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
 #[cfg(feature = "loadable")] use console_types::ConsoleEvent;
 #[cfg(feature = "loadable")] use dfqueue::DFQueueProducer;
-#[cfg(feature = "loadable")] use irq_safety::RwLockIrqSafe;
 #[cfg(feature = "loadable")] use acpi::madt::MadtIter;
-
 
 
 
@@ -166,6 +167,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi")            .ok_or("couldn't find __k_acpi module")?,           &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000")           .ok_or("couldn't find __k_e1000 module")?,          &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init")     .ok_or("couldn't find __k_driver_init module")?,    &mut kernel_mmi, false)?;
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;
     }
 
 
@@ -481,8 +483,29 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
         #[cfg(not(feature = "loadable"))]
         {
-            let hello_taskref = spawn::spawn_application(module, args, None, None)?;
-            spawn::spawn_kthread(wait_for_hello, hello_taskref, String::from("wait_for_hello"), None)?;
+            spawn::spawn_application(module, args, None, None)?;
+        }
+    }
+
+
+    // test the date application
+    if true {
+        let module = memory::get_module("__a_date").ok_or("Error: no module named '__a_date' found!")?;
+        let args = vec![];
+
+        #[cfg(feature = "loadable")]
+        {
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
+            func(module, args, None, None)?;
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_application(module, args, None, None)?;
         }
     }
 
@@ -493,6 +516,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
+    }
+
+
+    #[cfg(not(feature = "loadable"))]
+    {
+        let _ = rtc::read_rtc(); // just to make sure it gets built
     }
 
 
@@ -519,31 +548,4 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
-}
-
-
-use task::TaskRef;
-fn wait_for_hello(hello_taskref: TaskRef) -> Option<isize> {
-    warn!("WAITING FOR HELLO TASK!"); 
-    
-    warn!("JOIN RETURNED: {:?}", spawn::join(&hello_taskref)); 
-
-    let locked_task = hello_taskref.read();
-    if let Some(exit_result) = locked_task.get_exit_value() {
-        match exit_result {
-            Ok(exit_reason) => {
-                // here: the task exited successfully and ran to completion, so it has a real exit value
-                // we know the return type of the hello task is `isize`, so we need to downcast it from Any to isize
-                let isize_option = exit_reason.downcast_ref::<isize>();
-                warn!("hello task returned exit value: {:?}", isize_option);
-                return isize_option.cloned();
-            }
-            Err(kill_reason) => {
-                // here
-                warn!("hello task was killed, reason: {:?}", kill_reason);
-            }
-        }
-    }
-
-    None
 }
