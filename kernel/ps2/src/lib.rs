@@ -121,7 +121,7 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) {
     mouse::init();
     info!("\n\n\nmouse driver initialized\n\n\n");
     keyboard::init(console_producer);
-    info!("\n\n\nkeyboard driver initialized\n\n\n");
+    info!("\n\n\nkeyboard driver initialized\n\n");
 }
 
 
