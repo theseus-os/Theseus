@@ -38,6 +38,9 @@ path = "../pci"
 [dependencies.keyboard]
 path = "../keyboard"
 
+[dependencies.ps2]
+path = "../ps2"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
