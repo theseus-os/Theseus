@@ -322,7 +322,6 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
                 }else if readdata & 0x08 == 0{
                     error!("some thing wrong about the data")
                 } else{
-                    info!("{:x}",readdata);
                     let mouse_event = &mouse::handle_mouse_input(readdata);
                     mouse_to_print(mouse_event);
                 }
