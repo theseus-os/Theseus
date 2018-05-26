@@ -9,6 +9,7 @@
 #![feature(alloc)]
 #![feature(lang_items)]
 #![feature(used)]
+#![feature(non_lexical_lifetimes)]
 
 
 
@@ -31,7 +32,8 @@ extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
 extern crate captain;
-
+extern crate panic;
+extern crate task;
 
 
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
@@ -41,7 +43,6 @@ extern crate captain;
 pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
 }
-
 
 
 use core::ops::DerefMut;
@@ -204,18 +205,80 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 #[doc(hidden)]
-pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    let apic_id = apic::get_my_apic_id().unwrap_or(0xFF);
+pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
+    
+    if let Err(e) = default_panic_handler(fmt_args, file, line, col) {
+        error!("Error in default panic handler: {}", e);
+        println_raw!("Error in default panic handler: {}", e);
+    }
 
-    error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    error!("    {}", fmt);
-    unsafe { memory::stack_trace(); }
-
-    println_raw!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    println_raw!("    {}", fmt);
-
+    // if we failed to handle the panic, there's not really much we can do about it
+    // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
+    // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
+    
     loop {}
 }
+
+
+/// performs the standard panic handling routine, which involves the following:
+/// 
+/// * printing a basic panic message
+/// * getting the current task 
+fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str> {
+    use alloc::String;
+    use panic::{PanicInfo, PanicLocation};
+    use task::{TaskRef, KillReason};
+
+    let apic_id = apic::get_my_apic_id();
+    let panic_info = PanicInfo::with_fmt_args(PanicLocation::new(file, line, col), fmt_args);
+
+    // get current task to see if it has a panic_handler
+    let curr_task: Option<&TaskRef> = {
+        #[cfg(feature = "loadable")]
+        {
+            let section = mod_mgmt::metadata::get_symbol("task::get_my_current_task").upgrade().ok_or("no symbol: task::get_my_current_task")?;
+            let mut space = 0;
+            let func: & fn() -> Option<&'static TaskRef> =
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"task::get_my_current_task\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
+            func()
+        } 
+        #[cfg(not(feature = "loadable"))] 
+        {
+            task::get_my_current_task()
+        }
+    };
+
+    let curr_task_name = curr_task.map(|t| t.read().name.clone()).unwrap_or(String::from("UNKNOWN!"));
+    error!("\n\nPANIC in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
+    memory::stack_trace();
+
+    let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
+    
+    // call this task's panic handler, if it has one. 
+    let curr_task_locked = curr_task.read();
+    let panic_handler = curr_task_locked.panic_handler.as_ref();
+    // let panic_handler = curr_task.read().panic_handler.cloned();
+    if let Some(ref ph_func) = panic_handler {
+        trace!("invoking panic_handler...");
+        ph_func(&panic_info);
+        trace!("panic_handler returned.");
+    }
+    else {
+        error!(      "\n\nPANIC (unhandled) in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
+        println_raw!("\n\nPANIC (unhandled) in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
+    }
+
+    // kill the offending task (the current task)
+    error!("Killing panicked task \"{}\"", curr_task_name);
+    curr_task.write().kill(KillReason::Panic(panic_info));
+    
+    // scheduler::schedule(); // yield the current task after it's done
+
+    Ok(())
+}
+
 
 /// This function isn't used since our Theseus target.json file
 /// chooses panic=abort (as does our build process), 
