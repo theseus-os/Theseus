@@ -5,6 +5,7 @@
 members = [
 	"hello",
 	"date",
+	"test_panic",
 ]
 
 exclude = [

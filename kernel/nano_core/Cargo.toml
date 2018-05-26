@@ -54,6 +54,11 @@ path = "../exceptions"
 [dependencies.captain]
 path = "../captain"
 
+[dependencies.task]
+path = "../task"
+
+[dependencies.panic]
+path = "../panic"
 
 ### below: Extra dependencies to make sure things are built
 [dependencies.console]

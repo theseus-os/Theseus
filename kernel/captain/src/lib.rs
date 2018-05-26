@@ -491,9 +491,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    // run a hello world application in the kernel
+    // run some sample applications as a test
     if true {
-        let module = memory::get_module("__a_hello").ok_or("Error: no module named '__a_hello' found!")?;
+        let hello_module        = memory::get_module("__a_hello")       .ok_or("Error: no module named '__a_hello' found!")?;
+        let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
+        let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
         let args = vec![String::from("yo"), String::from("what"), String::from("up")];
 
         #[cfg(feature = "loadable")]
@@ -504,33 +506,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, args, None, None)?;
+            
+            func(hello_module, args, None, None)?; // run hello
+            func(date_module, args, None, None)?; // run date
+            func(test_panic_module, args, None, None)?; // run test_panic
         }
         #[cfg(not(feature = "loadable"))]
         {
-            spawn::spawn_application(module, args, None, None)?;
-        }
-    }
-
-
-    // test the date application
-    if true {
-        let module = memory::get_module("__a_date").ok_or("Error: no module named '__a_date' found!")?;
-        let args = vec![];
-
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
-            let mut space = 0;
-            let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, args, None, None)?;
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            spawn::spawn_application(module, args, None, None)?;
+            spawn::spawn_application(hello_module,       args.clone(), None, None)?;
+            spawn::spawn_application(date_module,        args.clone(), None, None)?;
+            spawn::spawn_application(test_panic_module,  args.clone(), None, None)?;
         }
     }
 

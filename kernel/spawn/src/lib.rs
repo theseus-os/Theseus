@@ -521,7 +521,8 @@ pub fn remove_task(_id: usize) -> Option<TaskRef> {
 /// # Note
 /// * You cannot call `join()` on the current thread, because a thread cannot wait for itself to finish running. 
 /// This will result in an `Err()` being immediately returned.
-/// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock.
+/// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
+/// (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
 pub fn join(task: &TaskRef) -> Result<(), &'static str> {
     let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
     if Arc::ptr_eq(task, curr_task) {

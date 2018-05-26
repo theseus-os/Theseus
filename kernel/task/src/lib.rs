@@ -39,6 +39,7 @@ extern crate memory;
 extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
+extern crate panic;
 
 
 use core::fmt;
@@ -54,6 +55,7 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::LoadedCrate;
+use panic::{PanicInfo, PanicHandler};
 
 
 
@@ -79,14 +81,14 @@ pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
     CURRENT_TASKS.get(&apic_id).cloned()
 }
 
-/// Get the id of the currently running Task on this current task
+/// Get the id of the currently running Task on this core.
 pub fn get_my_current_task_id() -> Option<usize> {
     get_my_apic_id().and_then(|id| {
         get_current_task_id(id)
     })
 }
 
-/// returns a shared reference to the current `Task`
+/// returns a shared reference to the current `Task` running on this core.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_my_current_task_id().and_then(|id| {
         TASKLIST.get(&id)
@@ -99,16 +101,6 @@ pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
 }
 
 
-// TODO FIXME: there is a PanicInfo type already defined in core lib
-#[derive(Debug, Clone, Copy)]
-pub struct PanicInfo {
-    file: &'static str,
-    line: u32,
-    column: u32,
-    msg: &'static str,
-}
-
-
 /// The list of possible reasons that a given `Task` was killed prematurely.
 #[derive(Debug)]
 pub enum KillReason {
@@ -118,7 +110,8 @@ pub enum KillReason {
     /// A Rust-level panic occurred while running this `Task`
     Panic(PanicInfo),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
-    Exception,
+    /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
+    Exception(u8),
 }
 
 
@@ -140,6 +133,10 @@ pub enum RunState {
     /// An `Ok` result contains a boxed `Any` value that is the returned exit value itself,
     /// whereas an `Err` result contains a `KillReason`.
     Exited(ExitValue),
+    /// This `Task` had already exited and now its ExitValue has been taken;
+    /// its exit value can only be taken once, and consumed by another `Task`.
+    /// This `Task` is basically now useless, and can be deleted.
+    Reaped,
 }
 
 
@@ -177,6 +174,8 @@ pub struct Task {
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
     /// that contains the backing memory regions and sections for running this `Task`'s object file 
     pub app_crate: Option<LoadedCrate>,
+    /// The function that will be called when this `Task` panics
+    pub panic_handler: Option<PanicHandler>,
 }
 
 impl fmt::Debug for Task {
@@ -210,6 +209,7 @@ impl Task {
             pinned_core: None,
             is_an_idle_task: false,
             app_crate: None,
+            panic_handler: None,
         }
     }
 
@@ -244,11 +244,36 @@ impl Task {
     }
 
 
-    /// Returns the exit_value of this `Task`, if its runstate is `RunState::Exited`.
+    /// Registers a function or closure that will be called if this `Task` panics.
+    pub fn register_panic_handler(&mut self, callback: PanicHandler) {
+        self.panic_handler = Some(callback);
+    }
+
+    /// Returns a reference to the exit value of this `Task`, 
+    /// if its runstate is `RunState::Exited`. 
+    /// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.
     pub fn get_exit_value(&self) -> Option<&ExitValue> {
         if let RunState::Exited(ref val) = self.runstate {
             Some(val)
         } else {
+            None
+        }
+    }
+
+    /// Takes ownership of this `Task`'s exit value and returns it,
+    /// if and only if this `Task` was in the `Exited` runstate.
+    /// After invoking this, the `Task`'s runstate will be `Reaped`.
+    pub fn take_exit_value(&mut self) -> Option<ExitValue> {
+        match self.runstate {
+            RunState::Exited(_) => { }
+            _ => return None, 
+        }
+
+        let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
+        if let RunState::Exited(exit_value) = exited {
+            Some(exit_value)
+        } 
+        else {
             None
         }
     }
