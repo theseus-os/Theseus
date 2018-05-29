@@ -19,11 +19,18 @@ use panic::PanicInfo;
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
-    if let Some(t) = task::get_my_current_task() {
-        t.write().register_panic_handler(Box::new(panic_handler));
-    }
+    // if let Some(t) = task::get_my_current_task() {
+    //     // t.write().set_panic_handler(Box::new(panic_handler));
+    //     t.write().set_panic_handler(Box::new(|info| {
+    //         println!("Caught a panic: {}", info);
+    //     }));
+    // }
 
+    task::set_my_panic_handler(Box::new(|info| {
+        // println!("Caught a panic: {}", info);
+    })).unwrap();
     info!("test_panic::main(): registered panic handler. Calling panic...");
+
 
     panic!("yo i'm testing a panic!!");
 
@@ -34,5 +41,5 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
 fn panic_handler(info: &PanicInfo) {
-    println!("In test_panic::panic_handler:  {:?}", info);
+    println!("Caught a panic: {}", info);
 }

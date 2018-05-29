@@ -101,6 +101,17 @@ pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
 }
 
 
+/// Sets the panic handler function for the current `Task`
+pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
+    get_my_current_task()
+        .ok_or("couldn't get_my_current_task")
+        .map(|taskref| {
+            taskref.write().set_panic_handler(handler)
+        })
+}
+
+
+
 /// The list of possible reasons that a given `Task` was killed prematurely.
 #[derive(Debug)]
 pub enum KillReason {
@@ -245,7 +256,7 @@ impl Task {
 
 
     /// Registers a function or closure that will be called if this `Task` panics.
-    pub fn register_panic_handler(&mut self, callback: PanicHandler) {
+    pub fn set_panic_handler(&mut self, callback: PanicHandler) {
         self.panic_handler = Some(callback);
     }
 

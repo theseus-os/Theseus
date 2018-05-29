@@ -24,9 +24,6 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
