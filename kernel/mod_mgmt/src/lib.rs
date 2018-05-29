@@ -35,6 +35,13 @@ use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, Loade
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
 
+
+const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
+const APPLICATION_NAME_PREFIX:   &'static str = "__a_";
+const USERSPACE_NAME_PREFIX:     &'static str = "__u_";
+
+
+
 pub struct ElfProgramSegment {
     /// the VirtualMemoryAddress that will represent the virtual mapping of this Program segment.
     /// Provides starting virtual address, size in memory, mapping flags, and a text description.
@@ -116,12 +123,11 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
     // first we need to map the module memory region into our address space, 
     // so we can then parse the module as an ELF file in the kernel.
-    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
     {
         // destructure the kernel's MMI so we can access its page table and vmas
         let &mut MemoryManagementInfo { 
             page_table: ref mut kernel_page_table, 
-            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+            ..
         } = kernel_mmi;
 
         match kernel_page_table {
@@ -143,7 +149,7 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                 let new_syms = metadata::add_crate(new_crate, log);
                 info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
                 Ok(new_syms)
-
+                
                 // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
             }
             _ => {
@@ -157,18 +163,64 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
 
 
-// pub struct ElfTextSection {
-//     /// The full demangled name of this text section
-//     pub demangled_name: String,
-//     // /// The offset where this section exists within the ElfFile.
-//     // pub offset: usize,
-//     /// the slice including the actual data of this text section
-//     pub data: [u8]
-//     /// The size in bytes of this text section
-//     pub size: usize,
-//     /// The flags to be used when mapping this section into memory
-//     pub flags: EntryFlags,
-// }
+/// Loads the specified application crate into memory, allowing it to be invoked.  
+/// Returns a Result containing the new crate.
+pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) 
+    -> Result<LoadedCrate, &'static str> 
+{
+    
+    if !module.name().starts_with(APPLICATION_NAME_PREFIX) {
+        error!("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+        return Err("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+    }
+    
+    use kernel_config::memory::address_is_page_aligned;
+    if !address_is_page_aligned(module.start_address()) {
+        error!("module {} is not page aligned!", module.name());
+        return Err("module was not page aligned");
+    } 
+    
+    debug!("load_application_crate: trying to load \"{}\" application module", module.name());
+
+    // first we need to map the module memory region into our address space, 
+    // so we can then parse the module as an ELF file in the kernel.
+    {
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            .. 
+        } = kernel_mmi;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let size = module.size();
+                let flags = EntryFlags::PRESENT;
+
+                let temp_module_mapping = {
+                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
+                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+                    try!( active_table.map_allocated_pages_to(
+                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                        flags, frame_allocator.deref_mut())
+                    )
+                };
+
+                let new_crate = try!(parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log));
+                info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+                Ok(new_crate)
+
+                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+            }
+            _ => {
+                error!("load_application_crate(): error getting kernel's active page table to map module.");
+                Err("load_application_crate(): couldn't get kernel's active page table")
+            }
+        }
+    }
+}
+
+
+
 
 /// A representation of a demangled symbol, e.g., my_crate::module::func_name.
 /// If the symbol wasn't originally mangled, `symbol` == `full`. 
@@ -199,21 +251,26 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
-                              size_in_bytes: usize, 
-                              module_name: &String, 
-                              active_table: &mut ActivePageTable, 
-                              log: bool)
-                              -> Result<LoadedCrate, &'static str>
+fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
+                          size_in_bytes: usize, 
+                          module_name: &String, 
+                          active_table: &mut ActivePageTable, 
+                          log: bool)
+                          -> Result<LoadedCrate, &'static str>
 {
-    // all kernel module crate names must start with "__k_"
-    const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
+    let is_application = module_name.starts_with(APPLICATION_NAME_PREFIX);
+    let is_kernel_module = module_name.starts_with(KERNEL_MODULE_NAME_PREFIX);
 
-    if !module_name.starts_with(KERNEL_MODULE_NAME_PREFIX) {
-        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {}.", module_name, KERNEL_MODULE_NAME_PREFIX);
-        return Err("module_name didn't start with __k_");
-    }
-
+    let crate_name = if is_application {
+        module_name.get(APPLICATION_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of application module after \"__a_\"")?
+    } else if is_kernel_module {
+        module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of kernel module crate after \"__k_\"")?
+    } else {
+        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {} or {}.",
+            module_name, KERNEL_MODULE_NAME_PREFIX, APPLICATION_NAME_PREFIX);
+        return Err("module_name didn't start with __k_ or __a_");
+    };
+    let crate_name = String::from(crate_name);
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
     let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
@@ -261,9 +318,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 }
                             }
                         }
-                        _ => {
-                            continue;
-                        }
+                        _ => { }
                     }
                 }
             }
@@ -333,10 +388,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             if data_bytecount   > 0 { Some( Arc::new( try!( allocate_pages_closure(data_bytecount))))   } else { None }
         )
     };
-
-    let crate_name = String::from(try!(module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. )
-        .ok_or("Couldn't get name of crate module after \"__k_\"")
-    ));
     
 
     // First, we need to parse all the sections and load the text and data sections

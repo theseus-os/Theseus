@@ -44,6 +44,7 @@ pub fn nano_core_public_func(val: u8) {
 
 
 
+use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
 
 static EARLY_IDT: LockedIdt = LockedIdt::new();
@@ -134,33 +135,27 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         logger::mirror_to_vga(captain::mirror_to_vga_cb);
     }
 
-    // parse our two main crates, the nano_core (the code we're already running), and the libcore (Rust no_std lib),
-    // both which satisfy dependencies that many other crates have. 
+    // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
+    // since we need it to load and run applications as crates in the kernel
+    {
+        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
+        // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
+    }
+    
+
+    // parse the core library (Rust no_std lib) and the captain crate
     #[cfg(feature = "loadable")] 
     {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(&mut kernel_mmi, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
-        // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
-        
         let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(
             try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module")), 
-            &mut kernel_mmi, false)
+            kernel_mmi_ref.lock().deref_mut(), false)
         );
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
         let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(
             try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module")), 
-            &mut kernel_mmi, false)
+            kernel_mmi_ref.lock().deref_mut(), false)
         );
-    }
-    #[cfg(not(feature = "loadable"))]
-    {
-        // if we don't put the text/rodata/data_mapped_pages into a nano_kernel metadata crate, 
-        // then we need to save those pages in the kernel's MMI struct to prevent them from being dropped
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        kernel_mmi.extra_mapped_pages.push(text_mapped_pages);
-        kernel_mmi.extra_mapped_pages.push(rodata_mapped_pages);
-        kernel_mmi.extra_mapped_pages.push(data_mapped_pages);
     }
 
 

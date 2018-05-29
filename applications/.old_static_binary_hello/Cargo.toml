@@ -1,0 +1,26 @@
+[package]
+name = "hello"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+
+[dependencies]
+rlibc = "1.0.0"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.console]
+path = "../../kernel/console"
+
+# [lib]
+# crate-type = ["rlib"] # "lib" does the same thing I think
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

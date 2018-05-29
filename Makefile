@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso applications userspace cargo gdb doc docs view-doc view-docs
 
 
 ARCH ?= x86_64
@@ -182,35 +182,58 @@ boot: check_usb $(iso)
 iso: $(iso)
 grub-isofiles := build/grub-isofiles
 
-### This target builds an .iso OS image from the userspace and kernel.
-$(iso): kernel userspace $(grub_cfg)
-	@rm -rf $(grub-isofiles)
-### copy userspace module build files
-	@mkdir -p $(grub-isofiles)/modules
-	@cp userspace/build/* $(grub-isofiles)/modules/
-### copy kernel module build files and add the __k_ prefix
-	@for f in `find ./kernel/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
-	done
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
-### copy kernel boot image files
+
+### This target builds an .iso OS image from the applications and kernel.
+$(iso): kernel applications $(grub_cfg)
+    # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
+
+
+# ### This target builds an .iso OS image from the userspace and kernel.
+# $(iso): kernel userspace $(grub_cfg)
+#     # after building kernel and userspace modules, copy the kernel boot image files
+# 	@mkdir -p $(grub-isofiles)/boot/grub
+# 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
+# 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
+# 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 	
+
+
+### this builds all applications, which run in the kernel
+applications: check_rustc check_xargo
+	@echo -e "\n======== BUILDING APPLICATIONS ========"
+	@$(MAKE) -C applications all
+	# copy applications' object files and add the __a_ prefix
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./applications/build -type f` ; do \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__a_\1/p'` 2> /dev/null ; \
+	done
 
 
 ### this builds all userspace programs
 userspace: 
 	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
+	# copy userspace binary files and add the __u_ prefix
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./userspace/build -type f` ; do \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+	done
 
 
 ### this builds all kernel components
 kernel: check_rustc check_xargo
 	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
+	# copy kernel module build files and add the __k_ prefix
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./kernel/build -type f` ; do \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
+	done
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 
 
 DOC_ROOT := build/doc/Theseus/index.html
@@ -237,6 +260,7 @@ view-docs: view-doc
 clean:
 	@rm -rf build
 	@$(MAKE) -C kernel clean
+	@$(MAKE) -C applications clean
 	@$(MAKE) -C userspace clean
 	
 

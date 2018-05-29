@@ -1,21 +1,19 @@
 #![no_std]
 #![feature(alloc)]
-
 extern crate keycodes_ascii;
 extern crate vga_buffer;
-extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
-
+extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
+extern crate memory;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-
+#[macro_use] extern crate alloc;
 // extern crate window_manager;
-
 
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
@@ -31,9 +29,6 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use atomic_linked_list::atomic_map::AtomicMap;
-use task::{RunState};
-
 
 
 /// Calls `print!()` with an extra newilne ('\n') appended to the end. 
@@ -67,11 +62,10 @@ macro_rules! print {
 
 
 // type MainFuncSignature = fn(Vec<String>) -> Result<String, &'static str>; 
-type MainFuncSignature = fn(Vec<String>) -> Result<isize, &'static str>; 
+// This is the function signature that all new application modules must implement
 
 lazy_static! {
     static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
-    static ref COMMAND_TABLE: AtomicMap<String, MainFuncSignature> = AtomicMap::new();
 }
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
@@ -98,11 +92,10 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     try!(spawn::spawn_kthread(main_loop, console_consumer, String::from("console_loop"), None));
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
-    build_command_table();
-
 
     try!(print_to_console(String::from(WELCOME_STRING)));
     try!(print_to_console(String::from("Console says hello!\n")));
+    try!(print_to_console(String::from("Press Ctrl+C to quit a task\n")));
     
     Ok(returned_producer)
 }
@@ -125,7 +118,7 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
 
     
     try!(print_to_console(String::from("\ntype command:")));
-
+    // initializes the cursor to the starting position
     vga_buffer::init_cursor();
     vga_buffer::update_cursor(13,12);
 
@@ -136,14 +129,45 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
             _ => { continue; }
         };
 
-        // Resets the current task id variable once current task finishes so user can enter a new command
+        // Constantly checks to see if command thread has finished or manually killed
+        // task id is 0 if there are no command line tasks running
         if current_task_id != 0 {
-            let task_ref = task::get_task(current_task_id);
-            if task_ref.unwrap().read().runstate == RunState::EXITED {
-                current_task_id = 0;
-                try!(print_to_console(String::from("\ntype command:")));
-            }
+            // gets the task from the current task id variable
+            let result = task::get_task(current_task_id);
+            if let Some(ref task_result)  = result {
+                let end_task = task_result.read();
+                let exit_result = end_task.get_exit_value();
+                // match statement will see if the task has finished with an exit value yet
+                match exit_result {
+                    Some(exit_val) => {
+                        let my_exit_val = exit_val.clone();
+                        match my_exit_val {
+                            // if the task finishes successfully
+                            Ok(boxed_val) => {
+                                if boxed_val.downcast_ref::<isize>().is_some() {
+                                    print_to_console(format!("finished with exit value {:?}\n", boxed_val.downcast_ref::<isize>().unwrap()))?;
+                                }
+                            },
+                            // if the user presses Ctrl+C
+                            Err(task::KillReason::Requested) => {
+                                try!(print_to_console(format!("\ncommand manually aborted\n")));
+                            }
+                            // catches any other errors
+                            Err(_) => {
+                                try!(print_to_console(String::from("\ntask could not be run\n")));
+                            },
+                        }
+                        // Resets the current task id to be ready for the next command
+                        current_task_id = 0;
+                        try!(print_to_console(String::from("\ntype command:")));
+                    },
+                    // None value indicates task has not yet finished so does nothing
+                    None => {
+                    },
+                }
+            }   
         }
+        
 
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
@@ -170,7 +194,6 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
         let display_line = CONSOLE_VGA_BUFFER.lock().display_line;
         let new_y = if display_line < 24 {display_line as u16} else {24 as u16};
         vga_buffer::update_cursor(new_x, new_y);
-
         event.mark_completed();
     }
 }
@@ -188,18 +211,15 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
             keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
     panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
     }
-    
-    // Ctrl+C kills the current task
+
+    // Ctrl+C signals the main loop to exit the task
     if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
         
         if *current_task_id != 0 {
             let task_ref = task::get_task(*current_task_id);
-            task_ref.unwrap().write().set_runstate(RunState::EXITED);
-            // Setting this to 0 will let program know that there is no command task currently running
-            *current_task_id = 0;
-            try!(print_to_console(String::from("COMMAND EXITED\n")));
-            console_input_string.clear();
-            try!(print_to_console(String::from("\ntype command:")));
+            if task_ref.is_some() {
+                let _result = task_ref.unwrap().write().kill(task::KillReason::Requested);
+            }
         } 
         return Ok(());
     }
@@ -216,19 +236,23 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
 
-        // Controls cursor movement as the user types, excluding the backspace and enter key, which are special
-       if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
+    // Controls cursor movement as the user types, excluding the backspace and enter key, which are special
+    if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
         && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             if *text_offset == *cursor_pos {
-                console_input_string.push(keyevent.keycode.to_ascii(keyevent.modifiers).unwrap());    
+                if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+                    console_input_string.push(keyevent.keycode.to_ascii(keyevent.modifiers).unwrap());    
+                }
             } else {
+                // controls cursor movement and associated variables if the cursor is not at the end of the current line
                 let insert_idx: usize = *cursor_pos as usize - *max_left_pos as usize;
                 console_input_string.remove(insert_idx); // Take this out once you can dynamically shift buffer 
-                console_input_string.insert(insert_idx,keyevent.keycode.to_ascii(keyevent.modifiers).unwrap()); 
+                if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+                    console_input_string.insert(insert_idx,keyevent.keycode.to_ascii(keyevent.modifiers).unwrap()); 
+                }
             }
             // DON'T RETURN HERE
     }
-
 
     if keyevent.keycode == Keycode::Backspace  {
         // Prevents user from moving cursor to the left of the typing bounds
@@ -249,21 +273,21 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
         } else if *current_task_id != 0 { // prevents the user from trying to execute a new command while one is currently running
             try!(print_to_console(String::from("Wait until the current command is finished executing\n")));        
         } else {
-            // Calls the match_command function to see if the command exists in the command table
-            match match_command(console_input_string){
-                Ok(command_structure) => {
-                    // Spawns new thread if good
-                    match run_command_new_thread(command_structure, current_task_id) {
-                        Ok(()) => {
-                            // try!(print_to_console(String::from("done\n")));
-                        } Err(&_) => {
-                            try!(print_to_console(String::from("running command on new thread failed\n")));
-                        }
+            // Calls the parse_input function to see if the command exists in the command table
+            let command_structure = parse_input(console_input_string);
+            match run_command_new_thread(command_structure, current_task_id) {
+                    Ok(()) => {
+                        // try!(print_to_console(String::from("done\n")));
+                    } Err("Error: no module with this name found!") => {
+                        try!(print_to_console(String::from("command not found\n")));
+                        try!(print_to_console(String::from("\ntype command: ")));
+                    
+                    } Err(&_) => {
+                        try!(print_to_console(String::from("running command on new thread failed\n")));
+                        try!(print_to_console(String::from("\ntype command: ")));
                     }
-                } Err(&_) => {
-                    try!(print_to_console(String::from("ERROR: NOT A VALID COMMAND \n")));
-                    try!(print_to_console(String::from("\ntype command:")));
                 }
+
         };
         // Clears the buffer for another command once current command is finished executing
         console_input_string.clear();
@@ -272,7 +296,7 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
         *text_offset  = y * 80 + x;
         *cursor_pos = y * 80 + x;
         *max_left_pos =  y * 80 + x;
-        }
+        
     }
 
     // home, end, page up, page down, up arrow, down arrow for the console
@@ -327,7 +351,7 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
                     window_manager::window_switch();
                 }
             }
-            Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
+            Keycode::LeCOMMAND EXITft|Keycode::Right|Keycode::Up|Keycode::Down => {
                 window_manager::put_key_code(keyevent.keycode).unwrap();
             }
             _ => {}
@@ -339,8 +363,9 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
                 graph_drawer::put_key_code(keyevent.keycode).unwrap();
             }c
             _ => {}
-        }*/
+        } */
     */
+    
 
     match keyevent.keycode.to_ascii(keyevent.modifiers) {
         Some(c) => { 
@@ -361,13 +386,7 @@ fn handle_key_event(keyevent: KeyEvent, console_input_string: &mut String, curre
             }
         }
         _ => { } 
-        
-
     }
-
-    // let new_x = CONSOLE_VGA_BUFFER.lock().column as u16;
-    // let new_y = CONSOLE_VGA_BUFFER.lock().display_line as u16 ;
-    // vga_buffer::update_cursor(new_x, new_y);
 
     Ok(())
 }
@@ -380,60 +399,51 @@ struct CommandStruct {
 }
 
 
-fn match_command(console_input_string: &mut String) -> Result<CommandStruct, &'static str> {
+fn parse_input(console_input_string: &mut String) -> CommandStruct {
     // This function parses the string that the user inputted when Enter is pressed and populates the CommandStruct
     let mut words: Vec<String> = console_input_string.split_whitespace().map(|s| s.to_string()).collect();
-    let command_string = words.remove(0);
-    let valid_command = COMMAND_TABLE.get(&command_string.to_string()).clone();
-    // Checks if the command string returns Some or None value
-    // May want to move this checking feature down to run_command_new_thread and propogate invalid command errors from there
-    if valid_command.is_some() {
-        let command_structure = CommandStruct {
-            command_str: command_string.to_string(),
-            arguments: words
-        };
-        return Ok(command_structure);
-    }
-    else {
-        return Err("invalid command");
-    }
+    let mut command_string = words.remove(0);
+    // Formats the string into the application module syntax
+    command_string.insert(0, '_');
+    command_string.insert(0, 'a');
+    command_string.insert(0, '_');
+    command_string.insert(0, '_');
+    // Forms command structure to pass to the function that runs command on the new thread
+    let command_structure = CommandStruct {
+        command_str: command_string.to_string(),
+        arguments: words
+    };
+    return command_structure;
+
 }
 
 
 fn run_command_new_thread(command_structure: CommandStruct, current_task_id: &mut usize) -> Result<(),&'static str> {
     // Function will execute the command on a new thread 
-    let thread_execution = try!(spawn::spawn_kthread(run_command, command_structure, 
-    String::from("executing command on new thread"), None));
-    *current_task_id = thread_execution.read().id;
-    Ok(())
+    use memory; 
+    let module = memory::get_module(&command_structure.command_str).ok_or("Error: no module with this name found!")?;
+    let args = command_structure.arguments;
+
+    #[cfg(feature = "loadable")]
+    {
+        let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
+        let mut space = 0;
+        let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
+            section.mapped_pages()
+            .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
+        func(module, args, None, None)?;
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        let taskref = spawn::spawn_application(module, args, None, None)?;
+        // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
+        *current_task_id = taskref.read().id;
+        return Ok(());
+    }
+    
 }
 
-fn run_command(command_structure: CommandStruct) {
-    // This function gets passed to the spawn_thread function by necessity
-    let fn_pointer: fn(Vec<String>) -> Result<isize, &'static str> = *COMMAND_TABLE.get(&command_structure.command_str.to_string()).clone().unwrap();
-    print_to_console(String::from("executing command...\n")).unwrap();
-    // Calls the function
-    let result = fn_pointer(command_structure.arguments);
-    return ();
-}
-
-extern crate coreutils;
-
-fn build_command_table() {
-    // Builds command table by mapping command string to its function pointer
-    // Registers date command
-    COMMAND_TABLE.insert(String::from("date"), coreutils::get_date);
-
-    // Registers test command
-    COMMAND_TABLE.insert(String::from("test"), coreutils::test);
-}
-
-// pub fn add_command(command_string: String, func: fn(Vec<&str>) -> Result<String, &'static str>) {
-//     COMMAND_TABLE.insert(String::from(command_string),func);
-// }
-
-// this doesn't line up as shown here because of the escaped backslashes,
-// but it lines up properly when printed :)
 const WELCOME_STRING: &'static str = "\n\n
  _____ _                              
 |_   _| |__   ___  ___  ___ _   _ ___ 

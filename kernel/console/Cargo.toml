@@ -46,8 +46,11 @@ path = "../spawn"
 [dependencies.task]
 path = "../task"
 
-[dependencies.rtc]
-path = "../rtc"
+[dependencies.memory]
+path  = "../memory"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
