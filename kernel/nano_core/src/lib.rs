@@ -9,7 +9,6 @@
 #![feature(alloc)]
 #![feature(lang_items)]
 #![feature(used)]
-#![feature(non_lexical_lifetimes)]
 
 
 
@@ -261,9 +260,9 @@ fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, lin
     let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
     
     // call this task's panic handler, if it has one. 
-    let curr_task_locked = curr_task.read();
-    let panic_handler = curr_task_locked.panic_handler.as_ref();
-    // let panic_handler = curr_task.read().panic_handler.cloned();
+    let panic_handler = { 
+        curr_task.write().take_panic_handler()
+    };
     if let Some(ref ph_func) = panic_handler {
         ph_func(&panic_info);
         error!("PANIC handled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);

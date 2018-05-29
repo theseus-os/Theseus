@@ -27,7 +27,7 @@ pub fn main(_args: Vec<String>) -> isize {
     // }
 
     task::set_my_panic_handler(Box::new(|info| {
-        // println!("Caught a panic: {}", info);
+        println!("Caught a panic: {}", info);
     })).unwrap();
     info!("test_panic::main(): registered panic handler. Calling panic...");
 
