@@ -22,7 +22,6 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
 
-#[macro_use] extern crate vga_buffer; 
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
@@ -208,8 +207,7 @@ pub extern "C" fn eh_personality() {}
 pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
     
     if let Err(e) = default_panic_handler(fmt_args, file, line, col) {
-        error!("Error in default panic handler: {}", e);
-        println_raw!("Error in default panic handler: {}", e);
+        error!("PANIC: error in default panic handler: {}.\nPanic in {}:{}:{} -- {}", e, file, line, col, fmt_args);
     }
 
     // if we failed to handle the panic, there's not really much we can do about it
@@ -251,9 +249,6 @@ fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, lin
     };
 
     let curr_task_name = curr_task.map(|t| t.read().name.clone()).unwrap_or(String::from("UNKNOWN!"));
-    error!("\n\nPANIC in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
-    memory::stack_trace();
-
     let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
     
     // call this task's panic handler, if it has one. 
@@ -261,13 +256,12 @@ fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, lin
     let panic_handler = curr_task_locked.panic_handler.as_ref();
     // let panic_handler = curr_task.read().panic_handler.cloned();
     if let Some(ref ph_func) = panic_handler {
-        trace!("invoking panic_handler...");
         ph_func(&panic_info);
-        trace!("panic_handler returned.");
+        error!("PANIC handled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
     }
     else {
-        error!(      "\n\nPANIC (unhandled) in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
-        println_raw!("\n\nPANIC (unhandled) in task \"{}\" on core {:?} at {:?}", curr_task_name, apic_id, panic_info);
+        error!("PANIC was unhandled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
+        memory::stack_trace();
     }
 
     // kill the offending task (the current task)
@@ -290,7 +284,6 @@ fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, lin
 #[doc(hidden)]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    println_raw!("\n\nin rust_eh_unwind_resume, unimplemented!");
     loop {}
 }
 
@@ -301,7 +294,6 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[doc(hidden)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_raw!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 

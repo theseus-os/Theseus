@@ -32,13 +32,18 @@ impl PanicLocation {
         }
     }
 }
+impl fmt::Display for PanicLocation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.file, self.line, self.col)
+    }
+}
 
 
 /// Similar to the core library's PanicInfo, but simpler. 
 #[derive(Debug)]
 pub struct PanicInfo {
-    location: PanicLocation,
-    msg: String,
+    pub location: PanicLocation,
+    pub msg: String,
 }
 impl PanicInfo {
     /// Create a new PanicInfo struct with the given message `String`.
@@ -60,8 +65,12 @@ impl PanicInfo {
     }
 }
 
+impl fmt::Display for PanicInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} -- {}", self.location, self.msg)
+    }
+}
+
 
 /// The signature of the callback function that can hook into receiving a panic. 
-/// TODO change this to a closure, i.e., whatever type panic::set_hook() accepts in the core library.
-// pub type PanicHandler = fn(&PanicInfo);
 pub type PanicHandler = Box<Fn(&PanicInfo)>;
