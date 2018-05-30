@@ -4,6 +4,7 @@ extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
 extern crate console_types;
+extern crate ps2;
 #[macro_use] extern crate log;
 
 
@@ -11,6 +12,7 @@ use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction,
 use spin::Once;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
+use ps2::{init_ps2_port1,test_ps2_port1};
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
@@ -27,7 +29,10 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
     
     // set keyboard to scancode set 1
 
-
+    //init the first ps2 port for keyboard
+    init_ps2_port1();
+    //test the first port
+    test_ps2_port1();
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });

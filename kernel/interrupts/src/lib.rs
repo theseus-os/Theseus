@@ -263,7 +263,6 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
         PS2_PORT.lock().read()
     };
 	// trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
-
     
     let extended = unsafe { EXTENDED_SCANCODE };
 
@@ -304,6 +303,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
     };
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01{
+        //whether the data is coming from the mouse
         if indicator & 0x20 == 0x20{
             let byte_1 = PS2_PORT.lock().read() as u32;
             if byte_1 & 0xFA == 0xFA{
