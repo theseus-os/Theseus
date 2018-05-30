@@ -15,8 +15,11 @@ PWD := $(shell pwd)
 # KERNEL_BUILD_DIR ?= ${PWD}/../build
 KERNEL_BUILD_DIR ?= ${PWD}/build
 
+## The top level directory of the Theseus project
+ROOT_DIR ?= ${PWD}/..
+
 ## specifies where the configuration files are kept, like target json files
-CFG_DIR ?= ${PWD}/../cfg
+CFG_DIR ?= ${ROOT_DIR}/cfg
 
 
 ## Build modes:  debug is default (dev mode), release is release with full optimizations.
