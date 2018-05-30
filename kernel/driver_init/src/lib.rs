@@ -10,7 +10,7 @@ extern crate apic;
 extern crate acpi;
 extern crate keyboard;
 extern crate pci;
-extern crate ps2;
+extern crate mouse;
 
 
 use dfqueue::DFQueueProducer;
@@ -48,7 +48,9 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 
 pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
-    ps2::init(console_producer);
+    keyboard::init(console_producer);
+    mouse::init();
+
     
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);

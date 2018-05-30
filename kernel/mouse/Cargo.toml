@@ -15,15 +15,13 @@ version = "0.3.7"
 path = "../../libs/mouse_data"
 
 
-
-
-[dependencies.port_io]
-path = "../../libs/port_io"
-
 # [dependencies.lazy_static]
 # features = ["spin_no_std"]
 # version = "0.2.1"
 
+
+[dependencies.ps2]
+path = "../ps2"
 
 
 

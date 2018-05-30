@@ -13,22 +13,6 @@ version = "0.3.7"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
-[dependencies.console_types]
-path = "../console_types"
-
-[dependencies.mouse]
-path = "..//mouse"
-
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
-[dependencies.keyboard]
-path = "..//keyboard"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

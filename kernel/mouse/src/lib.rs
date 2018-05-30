@@ -2,86 +2,30 @@
 #![feature(alloc)]
 #[macro_use] extern crate log;
 
-extern crate port_io;
 extern crate mouse_data;
-extern crate spin;
+extern crate ps2;
 
-use spin::Mutex;
 
-use port_io::Port;
 use mouse_data::{ButtonAction, MouseMovement,MouseEvent};
-use spin::Once;
+use ps2::{init_ps2_port2,test_ps2_port2,set_mouse_id,check_mouse_id};
 
-
-
-
-// TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
 static mut MOUSE_MOVE: MouseMovement = MouseMovement::default();
 static mut BUTTON_ACT: ButtonAction = ButtonAction::default();
-static PS2_PORT: Mutex<Port<u8>> = Mutex::new( Port::new(0x60));
-static PS2_COMMAND_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
-
-// write data to second PS2 port, since mouse uses the second one
-// it is called write to mouse
-pub fn write_data_to_mouse(value:u8)->u8{
-    unsafe { PS2_COMMAND_PORT.lock().write(0xD4) };
-    unsafe { PS2_PORT.lock().write(value) };
-    PS2_PORT.lock().read()
-}
-
-
-fn set_sampling_rate(value:u8){
-    write_data_to_mouse(0xF3);
-    write_data_to_mouse(value);
-}
-
-
-// set the mouse ID to 4
-fn set_mouse_id_4(){
-    set_sampling_rate(200);
-    set_sampling_rate(100);
-    set_sampling_rate(80);
-    set_sampling_rate(200);
-    set_sampling_rate(200);
-    set_sampling_rate(80);
-}
 /// Initialize the mouse driver.
 pub fn init() {
 
-
+    // init the second ps2 port for mouse
+    init_ps2_port2();
+    // test the second ps2 port
+    test_ps2_port2();
     // set Mouse ID to 4
-    set_mouse_id_4();
+    set_mouse_id(4);
     // check the ID
-    {
-        unsafe { PS2_COMMAND_PORT.lock().write(0xD4) };
-
-        unsafe { PS2_PORT.lock().write(0xF5) };
-        loop {
-            let read = PS2_PORT.lock().read();
-            if read == 0xFA {
-                unsafe { PS2_COMMAND_PORT.lock().write(0xD4) };
-                unsafe { PS2_PORT.lock().write(0xF2) };
-                loop {
-                    let read1 = PS2_PORT.lock().read();
-                    if read1 == 0xFA {
-                        let firstbyte = PS2_PORT.lock().read();
-                        info!("check the mouse ID \n ,mouse ID:{:x}", firstbyte);
-                        break;
-                    }
-                }
-
-                break;
-            }
-        }
-    }
-
-
-    write_data_to_mouse(0xF4);
+    let id = check_mouse_id();
+    info!("the initial mouse ID is: {}",id);
 
 }
-
-
 
 /// print the mouse actions
 pub fn mouse_to_print(mouse_event:&MouseEvent) {
