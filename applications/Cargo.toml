@@ -5,6 +5,7 @@
 members = [
 	"hello",
 	"date",
+	"ps",
 	"test_panic",
 ]
 
