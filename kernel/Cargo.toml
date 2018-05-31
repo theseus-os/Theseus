@@ -5,7 +5,6 @@
 ## Other crates will be built as needed, if they are actually used.
 members = [
 	"nano_core",
-	"rtc",
 ]
 
 exclude = [
