@@ -188,6 +188,7 @@ grub-isofiles := build/grub-isofiles
 
 
 ### This target builds an .iso OS image from the applications and kernel.
+### It skips userspace for now, but you can add it back in easily on the line below.
 $(iso): kernel applications $(grub_cfg)
     # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
@@ -210,10 +211,10 @@ $(iso): kernel applications $(grub_cfg)
 applications: check_rustc check_xargo
 	@echo -e "\n======== BUILDING APPLICATIONS ========"
 	@$(MAKE) -C applications all
-	# copy applications' object files and add the __a_ prefix
+# copy applications' object files
 	@mkdir -p $(grub-isofiles)/modules
-	@for f in `find ./applications/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__a_\1/p'` 2> /dev/null ; \
+	@for f in  ./applications/build/*.o ; do \
+		cp -vn  $${f}  $(grub-isofiles)/modules/  ; \
 	done
 
 
@@ -221,7 +222,7 @@ applications: check_rustc check_xargo
 userspace: 
 	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
-	# copy userspace binary files and add the __u_ prefix
+# copy userspace binary files and add the __u_ prefix
 	@mkdir -p $(grub-isofiles)/modules
 	@for f in `find ./userspace/build -type f` ; do \
 		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
@@ -232,11 +233,12 @@ userspace:
 kernel: check_rustc check_xargo
 	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
-	# copy kernel module build files and add the __k_ prefix
+# copy kernel module build files
 	@mkdir -p $(grub-isofiles)/modules
-	@for f in `find ./kernel/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
+	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+		cp -vn  $${f}  $(grub-isofiles)/modules/  ; \
 	done
+# copy the core library's object file
 	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 
 

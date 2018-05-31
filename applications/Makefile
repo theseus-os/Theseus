@@ -6,7 +6,7 @@ BUILD_MODE := release
 
 ## Since applications are run in the kernel, we use the same Config.mk file 
 ## as the one that defines all config options for building regular kernel crates.
-include ../kernel/Config.mk   
+include ../cfg/Config.mk   
 
 
 ## The directory where we store custom lints (compiler plugins)
@@ -52,28 +52,36 @@ clean:
 
 ### Builds our custom lints in the compiler plugins directory so we can use them here
 compiler_plugins:
-	cd $(COMPILER_PLUGINS_DIR) && cargo build $(XARGO_RELEASE_ARG)
+	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(XARGO_RELEASE_ARG)
 
 
 cargo: compiler_plugins
-### For the "cargo rustc" command below, all of the arguments to cargo come before the "--",
+### For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
 ### whereas all of the arguments to rustc come after the "--".
-	@for app in $(APPS) ; do  \
-		cd $${app} ; \
-		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-			xargo rustc \
-			$(XARGO_RELEASE_ARG) \
-			--target $(TARGET) \
-			-- \
-			$(COMPILER_LINTS) ; \
-		cd .. ; \
-	done
+# for app in $(APPS) ; do  \
+# 	cd $${app} ; \
+# 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 		xargo rustc \
+# 		$(XARGO_RELEASE_ARG) \
+# 		--target $(TARGET) \
+# 		-- \
+# 		$(COMPILER_LINTS) ; \
+# 	cd .. ; \
+# done
+### Old command
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(XARGO_RELEASE_ARG) --all --target $(TARGET)
 	
 
-### This first calls the cargo target, but then copies all application object files into the build dir. 
+### This first calls the cargo target, but then copies all object files into the build dir. 
+### It gives all object files the "__k_" prefix, except for "executable" application object files that get the "__a_" prefix.
 build: cargo
 	@mkdir -p ./build
+
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
+		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/__k_\1\.o/p'` 2> /dev/null ; \
+	done
+	
 	@for app in $(APPS) ; do  \
-		cp -vf `ls -t ./target/$(TARGET)/$(BUILD_MODE)/deps/$${app}*.o | head -n1`  ./build/$${app}.o ; \
-		strip --strip-debug  ./build/$${app}.o ; \
+		mv  ./build/__k_$${app}.o  ./build/__a_$${app}.o ; \
+		strip --strip-debug  ./build/__a_$${app}.o ; \
 	done

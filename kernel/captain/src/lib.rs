@@ -213,9 +213,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi")            .ok_or("couldn't find __k_acpi module")?,           &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000")           .ok_or("couldn't find __k_e1000 module")?,          &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init")     .ok_or("couldn't find __k_driver_init module")?,    &mut kernel_mmi, false)?;
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;
     }
 
+    // load RTC regardless, since an app uses it. Once we have full dependency resolution, this can be removed.
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
+    }
+    
 
     // now we initialize early driver stuff, like APIC/ACPI
     let madt_iter = {
@@ -530,9 +535,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             
-            func(hello_module, args, None, None)?; // run hello
-            func(date_module, args, None, None)?; // run date
-            func(test_panic_module, args, None, None)?; // run test_panic
+            func(hello_module,       args.clone(), None, None)?; // run hello
+            func(date_module,        args.clone(), None, None)?; // run date
+            func(test_panic_module,  args.clone(), None, None)?; // run test_panic
         }
         #[cfg(not(feature = "loadable"))]
         {
@@ -550,13 +555,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-
-
-    #[cfg(not(feature = "loadable"))]
-    {
-        let _ = rtc::read_rtc(); // just to make sure it gets built
-    }
-
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
