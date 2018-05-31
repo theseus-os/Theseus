@@ -28,8 +28,11 @@ extern crate pic;
 extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
+extern crate ps2;
 
 
+
+use ps2::handle_mouse_packet;
 use mouse::mouse_to_print;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::{Mutex, Once};
@@ -55,7 +58,6 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 static PS2_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 /// Port 0x60 indicator data port, 0x64.
 static PS2_COMMAND_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
-
 
 
 
@@ -272,9 +274,7 @@ static mut EXTENDED_SCANCODE: bool = false;
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
-    let scan_code = {
-        PS2_PORT.lock().read()
-    };
+    let scan_code = ps2::ps2_read_data();
 	// trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
     
     let extended = unsafe { EXTENDED_SCANCODE };
@@ -325,35 +325,33 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
 #[allow(non_snake_case)]
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
 
-    let indicator: u8 = {
-        PS2_COMMAND_PORT.lock().read()
-    };
+    let indicator = PS2_COMMAND_PORT.lock().read();
+
+
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01{
         //whether the data is coming from the mouse
         if indicator & 0x20 == 0x20{
-            let byte_1 = PS2_PORT.lock().read() as u32;
-            if byte_1 & 0xFA == 0xFA{
-                info!("the mouse acknowledges your command")
-            }else{
-                let mut readdata :u32 = 0;
-                {
-                    let byte_2 = PS2_PORT.lock().read() as u32;
-                    let byte_3 = PS2_PORT.lock().read() as u32;
-                    let byte_4 = PS2_PORT.lock().read() as u32;
-                    readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
-                }
-                if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
-                    error!("although i don't understand what the error actually is. \
-                    You may move too fast or too far away!")
-                }else if readdata & 0x08 == 0{
-                    error!("some thing wrong about the data")
-                } else{
-                    let mouse_event = &mouse::handle_mouse_input(readdata);
-                    mouse_to_print(mouse_event);
-                }
 
+
+//            let byte_1 = PS2_PORT.lock().read() as u32;
+//            let byte_2 = PS2_PORT.lock().read() as u32;
+//            let byte_3 = PS2_PORT.lock().read() as u32;
+//            let byte_4 = PS2_PORT.lock().read() as u32;
+//            let readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
+            let readdata = handle_mouse_packet();
+
+            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
+                error!("although i don't understand what the error actually is. \
+                   You may move too fast or too far away!")
+            }else if readdata & 0x08 == 0{
+                error!("some thing wrong about the data")
+            } else{
+                let mouse_event = &mouse::handle_mouse_input(readdata);
+                mouse_to_print(mouse_event);
             }
+
+
         }
     }
 
