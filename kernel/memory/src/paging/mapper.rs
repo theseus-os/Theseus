@@ -39,6 +39,38 @@ impl Mapper {
         unsafe { self.p4.as_mut() }
     }
 
+    /// Dumps all page table entries at all four levels for the given `VirtualAddress`, 
+    /// and also shows their `EntryFlags`.
+    /// 
+    /// Useful for debugging page faults. 
+    pub fn dump_pte(&self, virtual_address: VirtualAddress) {
+        let page = Page::containing_address(virtual_address);
+        let p4 = self.p4();
+        let p3 = p4.next_table(page.p4_index());
+        let p2 = p3.and_then(|p3| p3.next_table(page.p3_index()));
+        let p1 = p2.and_then(|p2| p2.next_table(page.p2_index()));
+        if let Some(_pte) = p1.map(|p1| &p1[page.p1_index()]) {
+            debug!("VirtualAddress: {:#X}:
+                    P4 entry:        {:#X}   ({:?})
+                    P3 entry:        {:#X}   ({:?})
+                    P2 entry:        {:#X}   ({:?})
+                    P1 entry: (PTE)  {:#X}   ({:?})",
+                virtual_address, 
+                &p4[page.p4_index()].value(), 
+                &p4[page.p4_index()].flags(),
+                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0), 
+                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
+                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0), 
+                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
+                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),  // _pet.value()
+                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),                 // _pte.flags()
+            );
+        }
+        else {
+            debug!("Error: couldn't get PTE entry for vaddr: {:#X}. Has it been mapped?", virtual_address);
+        }
+    }
+
     /// translates a VirtualAddress to a PhysicalAddress
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
         let offset = virtual_address % PAGE_SIZE;
@@ -92,12 +124,17 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
+        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        let mut top_level_flags = flags.clone();
+        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
+
         for page in pages.clone() {
             let frame = try!(allocator.allocate_frame().ok_or("map_internal(): couldn't allocate new frame, out of memory!"));
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
+            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -120,6 +157,10 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
+        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        let mut top_level_flags = flags.clone();
+        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         let pages_count = pages.clone().count();
         let frames_count = frames.clone().count();
@@ -132,9 +173,9 @@ impl Mapper {
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.clone().zip(frames) {
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
+            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
