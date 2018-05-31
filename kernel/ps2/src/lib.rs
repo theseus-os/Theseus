@@ -361,7 +361,7 @@ pub fn reset_mouse()->Result<(), &'static str> {
             }
         }
         warn!("disable streaming failed");
-        Err("command reset mouse failed!!!")
+        Err("fail to command reset mouse fail!!!")
 
     }
 
