@@ -20,7 +20,7 @@ pub fn init() {
     // test the second ps2 port
     test_ps2_port2();
     // set Mouse ID to 4
-    set_mouse_id(4);
+//    set_mouse_id(4);
     // check the ID
     let id = check_mouse_id();
     info!("the initial mouse ID is: {}",id);

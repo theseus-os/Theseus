@@ -60,6 +60,9 @@ path = "../keyboard"
 [dependencies.mouse]
 path = "../mouse"
 
+[dependencies.ps2]
+path = "../ps2"
+
 [dependencies.scheduler]
 path = "../scheduler"
 
