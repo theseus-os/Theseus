@@ -260,6 +260,14 @@ impl Task {
         self.panic_handler = Some(callback);
     }
 
+    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// and returns it so it can be invoked without holding this `Task`'s `RwLock`.
+    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
+    pub fn take_panic_handler(&mut self) -> Option<PanicHandler> {
+        self.panic_handler.take()
+    }
+
+
     /// Returns a reference to the exit value of this `Task`, 
     /// if its runstate is `RunState::Exited`. 
     /// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.

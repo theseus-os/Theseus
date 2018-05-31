@@ -2,15 +2,17 @@
 
 
 ## Here, we specify which applications should be built.
+## All subdirectories should be built, except for those starting with a "."
+## So, we build everything except hidden directories.
 members = [
-	"hello",
-	"date",
-	"ps",
-	"test_panic",
+	"[!.]*/"
 ]
 
-exclude = [
 
+## exclude target and build directories
+exclude = [
+	"target",
+	"build",
 ]
 
 
