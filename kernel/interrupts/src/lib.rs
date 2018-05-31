@@ -339,23 +339,74 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
 //            let byte_3 = PS2_PORT.lock().read() as u32;
 //            let byte_4 = PS2_PORT.lock().read() as u32;
 //            let readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
-            let readdata = handle_mouse_packet();
+//            let readdata = handle_mouse_packet();
+//
+//            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
+//                error!("although i don't understand what the error actually is. \
+//                   You may move too fast or too far away!")
+//            }else if readdata & 0x08 == 0{
+//                error!("some thing wrong about the data")
+//            } else{
+//                let mouse_event = &mouse::handle_mouse_input(readdata);
+//                mouse_to_print(mouse_event);
+//            }
+//
+//
+//        }
+//    }
+//
+//    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+            let handle = handle_mouse_packet();
+            match handle{
+                // if error occurs, stop streaming and clean the buffer
+                Err(_e) => {
+                    // stop streaming
+                    ps2::ps2_write_command(0xD4);
+                    unsafe { PS2_PORT.lock().write(0xF5) };
+                    let response = ps2::ps2_read_data();
+                    if response != 0xFA {
+                        loop {
+                            let response = ps2::ps2_read_data();
+                            if response == 0xFA {
+                                break;
+                            }
+                        }
+                    }
 
-            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
-                error!("although i don't understand what the error actually is. \
-                   You may move too fast or too far away!")
-            }else if readdata & 0x08 == 0{
-                error!("some thing wrong about the data")
-            } else{
-                let mouse_event = &mouse::handle_mouse_input(readdata);
-                mouse_to_print(mouse_event);
+                    //clean the otput buffer
+                    ps2::ps2_clean_buffer();
+
+                    //enable the streaming
+                    ps2::ps2_write_command(0xD4);
+                    unsafe { PS2_PORT.lock().write(0xF4) };
+                    let response = ps2::ps2_read_data();
+                    if response != 0xFA {
+                        loop {
+                            let response = ps2::ps2_read_data();
+                            if response == 0xFA {
+                                break;
+                            }
+                        }
+                    }
+                } ,
+                // print the mouse actions
+                Ok(readdata) => {
+                    if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
+                    error!("although i don't understand what the error actually is. \
+                    You may move too fast or too far away!")
+                    }else if readdata & 0x08 == 0{
+                        error!("some thing wrong about the data")
+                    } else{
+                        let mouse_event = &mouse::handle_mouse_input(readdata);
+                        mouse_to_print(mouse_event);
+                    }
+                }
             }
-
-
         }
     }
 
     eoi(Some(PIC_MASTER_OFFSET + 0xc));
+
 
 }
 
