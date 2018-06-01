@@ -1,12 +1,13 @@
 #![no_std]
 #![feature(alloc)]
 
-extern crate keycodes_ascii;
-extern crate vga_buffer;
+#[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate dfqueue;
-#[macro_use] extern crate log;
+extern crate keycodes_ascii;
+#[macro_use] extern crate vga_buffer;
 // extern crate window_manager;
 extern crate spawn;
 
@@ -37,19 +38,7 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        use alloc::String;
-        let mut s: String = String::new();
-        match write!(&mut s, $($arg)*) {
-            Ok(_) => { 
-                if let Err(e) = $crate::print_to_console(s) {
-                    error!("print!(): print_to_console failed, error: {}", e);
-                }
-            }
-            Err(err) => {
-                error!("print!(): writing to String failed, error: {}", err);
-            }
-        }
+        $crate::print_to_console_args(format_args!($($arg)*));
     });
 }
 
@@ -63,16 +52,23 @@ lazy_static! {
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
 
-/// Queues up the given `String` to be printed out to the console.
-pub fn print_to_console(s: String) -> Result<(), &'static str> {
-    let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s));
-    try!(PRINT_PRODUCER.try().ok_or("Console print producer isn't yet initialized!")).enqueue(output_event);
-    Ok(())
+/// Queues up the given string to be printed out to the console.
+/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console<S: Into<String>>(s: S) {
+    if let Some(print_producer) = PRINT_PRODUCER.try() {
+        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()));
+        print_producer.enqueue(output_event);
+    }
+    else {
+        print_raw!("[no console yet]: {}", s.into());
+    }
 }
 
-
-pub fn print_to_console_str(s: &str) -> Result<(), &'static str> {
-    print_to_console(String::from(s))
+use core::fmt;
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
+/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console_args(fmt_args: fmt::Arguments) {
+    print_to_console(format!("{}", fmt_args));
 }
 
 
@@ -92,8 +88,8 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     // vga_buffer::print_str("console::init(): successfully spawned kthread!\n").unwrap();
     info!("console::init(): successfully spawned kthread!");
 
-    try!(print_to_console(String::from(WELCOME_STRING)));
-    try!(print_to_console(String::from("Console says hello!\n")));
+    print_to_console(String::from(WELCOME_STRING));
+    print_to_console(String::from("Console says hello!\n"));
     Ok(returned_producer)
 }
 

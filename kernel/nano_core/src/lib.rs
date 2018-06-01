@@ -33,6 +33,8 @@ extern crate captain;
 extern crate panic;
 extern crate task;
 
+#[macro_use] extern crate vga_buffer;
+
 
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
@@ -86,20 +88,25 @@ fn shutdown(msg: &'static str) -> ! {
 ///
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
+    println_raw!("Entered nano_core_start()."); 
 	
 	// start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
-	
+
     // first, bring up the logger so we can debug
     shutdown!(logger::init().map_err(|_| "couldn't init logger!"));
     trace!("Logger initialized.");
+    println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
+    println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we just have to trust the multiboot address we get from the boot-up asm code
     debug!("multiboot_information_vaddr: {:#X}", multiboot_information_virtual_address);
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
+    println_raw!("nano_core_start(): loaded multiboot2 info."); 
+
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
@@ -123,13 +130,17 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
+    println_raw!("nano_core_start(): initialized state store."); 
     
-    
+
     #[cfg(feature = "mirror_serial")]
     {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(captain::mirror_to_vga_cb);
     }
+    // at this point, we no longer need to use println_raw, because we can see the logs,
+    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
+
 
     // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel

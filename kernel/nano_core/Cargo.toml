@@ -57,9 +57,8 @@ path = "../task"
 [dependencies.panic]
 path = "../panic"
 
-### below: Extra dependencies to make sure things are built
-[dependencies.console]
-path = "../console"
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 
 [features]
