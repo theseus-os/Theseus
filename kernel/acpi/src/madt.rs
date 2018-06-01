@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 use core::ptr::{read_volatile, write_volatile};
 use alloc::boxed::Box;
 use alloc::arc::Arc;
-use spin::RwLock;
+use spin::{Mutex, RwLock};
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use ioapic;
@@ -49,7 +49,7 @@ impl Madt {
             //     debug!("  {:?}", e);
             // }
 
-            try!(handle_ioapic_entry(iter.clone(), active_table));
+            try!(handle_ioapic_entries(iter.clone(), active_table));
             try!(handle_bsp_entry(iter.clone(), active_table));
             Ok(iter)
         } else {
@@ -82,35 +82,28 @@ impl Madt {
 }
 
 
-fn handle_ioapic_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-    let mut ioapic_count = 0;
+fn handle_ioapic_entries(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     for madt_entry in madt_iter {
         match madt_entry {
             MadtEntry::IoApic(ioa) => {
-                ioapic_count += 1;
-                try!(ioapic::init(active_table, ioa.id, ioa.address as usize, ioa.gsi_base));
+                let ioapic = ioapic::IoApic::new(active_table, ioa.id, ioa.address as PhysicalAddress, ioa.gsi_base)?;
+                ioapic::get_ioapics().insert(ioa.id, Mutex::new(ioapic));
             }
             // we only handle IoApic entries here
             _ => { }
         }
     }
 
-    if ioapic_count == 1 {
-        Ok(())
-    }
-    else {
-        error!("We need exactly 1 IoApic (found {}), cannot support more than 1, or 0 IoApics.", ioapic_count);
-        Err("Found more than one IoApic")
-    }
+    Ok(())
 }
 
 
 fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let all_lapics = get_lapics();
-    let me = try!(get_my_apic_id().ok_or("Couldn't get_my_apic_id"));
+    let me = try!(get_my_apic_id().ok_or("handle_bsp_entry(): Couldn't get_my_apic_id"));
 
-    let mut ioapic_locked = ioapic::get_ioapic();
-    let ioapic_ref = try!(ioapic_locked.as_mut().ok_or("Couldn't get ioapic_ref!"));
+    let mut ioapic_locked = ioapic::get_first_ioapic();
+    let ioapic_ref = try!(ioapic_locked.as_mut().ok_or("handle_bsp_entry(): Couldn't get ioapic_ref!"));
 
 
     for madt_entry in madt_iter.clone() {
@@ -156,13 +149,13 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
         }
     }
 
-    let bsp_id = try!(get_bsp_id().ok_or("Couldn't find BSP LocalApic in Madt!"));
+    let bsp_id = try!(get_bsp_id().ok_or("handle_bsp_entry(): Couldn't find BSP LocalApic in Madt!"));
 
     // now that we've established the BSP,  go through the interrupt source override entries
     for madt_entry in madt_iter {
         match madt_entry {
             MadtEntry::IntSrcOverride(int_src) => {
-                assert!(int_src.gsi <= (u8::max_value() as u32), "Unsupported: gsi value is larger than size of u8: {:?}", int_src);
+                assert!(int_src.gsi <= (u8::max_value() as u32), "handle_bsp_entry(): Unsupported: gsi value is larger than size of u8: {:?}", int_src);
                 // using BSP for now, but later we could redirect the IRQ to more (or all) cores
                 use pic::PIC_MASTER_OFFSET;
                 ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
