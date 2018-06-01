@@ -175,7 +175,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // load RTC regardless, since an app uses it. Once we have full dependency resolution, this can be removed.
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;  
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_getopts")         .ok_or("couldn't find __k_getopts module")?,        &mut kernel_mmi, false)?;    
+        // debug!("SYMBOL MAP after getopts: {}", mod_mgmt::metadata::dump_symbol_map());
     }
     
 
@@ -500,7 +502,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
         let ps_module           = memory::get_module("__a_ps")          .ok_or("Error: no module named '__a_ps' found!")?;
         let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
-        let args = vec![String::from("yo"), String::from("what"), String::from("up")];
+        let args = vec![String::from("-h")];
 
         #[cfg(feature = "loadable")]
         {
