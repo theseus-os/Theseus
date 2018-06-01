@@ -137,7 +137,8 @@ impl AreaFrameAllocator {
         }
     }
 
-    /// Whether or not the given Frame is within any occupied memory area.
+    /// Determines whether or not the current `next_free_frame` is within any occupied memory area,
+    /// and advances it to the start of the next free region after the occupied area.
     fn skip_occupied_frames(&mut self) {
         let orig_frame: usize = self.next_free_frame.number;
         match self.occupied {
@@ -207,24 +208,26 @@ impl FrameAllocator for AreaFrameAllocator {
 
     fn allocate_frame(&mut self) -> Option<Frame> {
         if let Some(area) = self.current_area {
+            // first, see if we need to skip beyond the current area (it may be already occupied)
+            self.skip_occupied_frames();
+
             // "clone" the frame to return it if it's free. Frame doesn't
             // implement Clone, but we can construct an identical frame.
             let frame = Frame { number: self.next_free_frame.number };
 
             // the last frame of the current area
-            let current_area_last_frame = {
+            let last_frame_in_current_area = {
                 let address = area.base_addr + area.size_in_bytes - 1;
                 Frame::containing_address(address as usize)
             };
 
-            self.skip_occupied_frames();
-
-            if frame > current_area_last_frame {
+            if frame > last_frame_in_current_area {
                 // all frames of current area are used, switch to next area
                 self.select_next_area();
             } else {
                 // frame is unused, increment `next_free_frame` and return it
                 self.next_free_frame += 1;
+                // trace!("AreaFrameAllocator: allocated frame {:?}", frame);
                 return Some(frame);
             }
             // `frame` was not valid, try it again with the updated `next_free_frame`
