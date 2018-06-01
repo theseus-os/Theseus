@@ -33,6 +33,8 @@ extern crate captain;
 extern crate panic;
 extern crate task;
 
+#[macro_use] extern crate vga_buffer;
+
 
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
@@ -87,52 +89,62 @@ fn shutdown(msg: &'static str) -> ! {
 /// If a failure occurs and is propagated back up to this function, the OS is shut down.
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
+    println_raw!("Entered nano_core_start()."); 
 	
 	// start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
-	
+
     // first, bring up the logger so we can debug
     try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
     trace!("Logger initialized.");
+    println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
+    println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
     if !memory::Page::is_valid_address(multiboot_information_virtual_address) {
         try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
+    println_raw!("nano_core_start(): loaded multiboot2 info."); 
+
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+    println_raw!("nano_core_start(): initialized memory subsystem."); 
 
-    //init frame_buffer
-    let rs = frame_buffer::init();
-    if rs.is_ok() {
-        trace!("frame_buffer initialized.");
-    } else {
-        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
-    let rs = frame_buffer_3d::init();
-    if rs.is_ok() {
-        trace!("frame_buffer initialized.");
-    } else {
-        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
+    // //init frame_buffer
+    // let rs = frame_buffer::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
+    // let rs = frame_buffer_3d::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
+    println_raw!("nano_core_start(): initialized state store."); 
     
-    
+
     #[cfg(feature = "mirror_serial")]
     {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(captain::mirror_to_vga_cb);
     }
+    // at this point, we no longer need to use println_raw, because we can see the logs,
+    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
+
 
     // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel
