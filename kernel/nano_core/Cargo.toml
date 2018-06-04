@@ -24,9 +24,6 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
@@ -54,10 +51,14 @@ path = "../exceptions"
 [dependencies.captain]
 path = "../captain"
 
+[dependencies.task]
+path = "../task"
 
-### below: Extra dependencies to make sure things are built
-[dependencies.console]
-path = "../console"
+[dependencies.panic]
+path = "../panic"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 
 [features]

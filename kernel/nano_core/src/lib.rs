@@ -21,7 +21,6 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
 
-#[macro_use] extern crate vga_buffer; 
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
@@ -31,7 +30,10 @@ extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
 extern crate captain;
+extern crate panic;
+extern crate task;
 
+#[macro_use] extern crate vga_buffer;
 
 
 // see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
@@ -41,7 +43,6 @@ extern crate captain;
 pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
 }
-
 
 
 use core::ops::DerefMut;
@@ -88,52 +89,62 @@ fn shutdown(msg: &'static str) -> ! {
 /// If a failure occurs and is propagated back up to this function, the OS is shut down.
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
+    println_raw!("Entered nano_core_start()."); 
 	
 	// start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
-	
+
     // first, bring up the logger so we can debug
     try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
     trace!("Logger initialized.");
+    println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
     exceptions::init_early_exceptions(&EARLY_IDT);
+    println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
     if !memory::Page::is_valid_address(multiboot_information_virtual_address) {
         try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
+    println_raw!("nano_core_start(): loaded multiboot2 info."); 
+
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+    println_raw!("nano_core_start(): initialized memory subsystem."); 
 
-    //init frame_buffer
-    let rs = frame_buffer::init();
-    if rs.is_ok() {
-        trace!("frame_buffer initialized.");
-    } else {
-        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
-    let rs = frame_buffer_3d::init();
-    if rs.is_ok() {
-        trace!("frame_buffer initialized.");
-    } else {
-        debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
+    // //init frame_buffer
+    // let rs = frame_buffer::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
+    // let rs = frame_buffer_3d::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
 
     // now that we have a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
+    println_raw!("nano_core_start(): initialized state store."); 
     
-    
+
     #[cfg(feature = "mirror_serial")]
     {
          // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(captain::mirror_to_vga_cb);
     }
+    // at this point, we no longer need to use println_raw, because we can see the logs,
+    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
+
 
     // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel
@@ -213,18 +224,75 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 #[doc(hidden)]
-pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
-    let apic_id = apic::get_my_apic_id().unwrap_or(0xFF);
+pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
+    
+    if let Err(e) = default_panic_handler(fmt_args, file, line, col) {
+        error!("PANIC: error in default panic handler: {}.\nPanic in {}:{}:{} -- {}", e, file, line, col, fmt_args);
+    }
 
-    error!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    error!("    {}", fmt);
-    memory::stack_trace();
-
-    println_raw!("\n\nPANIC (AP {:?}) in {} at line {}:", apic_id, file, line);
-    println_raw!("    {}", fmt);
-
+    // if we failed to handle the panic, there's not really much we can do about it
+    // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
+    // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
+    
     loop {}
 }
+
+
+/// performs the standard panic handling routine, which involves the following:
+/// 
+/// * printing a basic panic message
+/// * getting the current task 
+fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str> {
+    use alloc::String;
+    use panic::{PanicInfo, PanicLocation};
+    use task::{TaskRef, KillReason};
+
+    let apic_id = apic::get_my_apic_id();
+    let panic_info = PanicInfo::with_fmt_args(PanicLocation::new(file, line, col), fmt_args);
+
+    // get current task to see if it has a panic_handler
+    let curr_task: Option<&TaskRef> = {
+        #[cfg(feature = "loadable")]
+        {
+            let section = mod_mgmt::metadata::get_symbol("task::get_my_current_task").upgrade().ok_or("no symbol: task::get_my_current_task")?;
+            let mut space = 0;
+            let func: & fn() -> Option<&'static TaskRef> =
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"task::get_my_current_task\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
+            func()
+        } 
+        #[cfg(not(feature = "loadable"))] 
+        {
+            task::get_my_current_task()
+        }
+    };
+
+    let curr_task_name = curr_task.map(|t| t.read().name.clone()).unwrap_or(String::from("UNKNOWN!"));
+    let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
+    
+    // call this task's panic handler, if it has one. 
+    let panic_handler = { 
+        curr_task.write().take_panic_handler()
+    };
+    if let Some(ref ph_func) = panic_handler {
+        ph_func(&panic_info);
+        error!("PANIC handled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
+    }
+    else {
+        error!("PANIC was unhandled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
+        memory::stack_trace();
+    }
+
+    // kill the offending task (the current task)
+    error!("Killing panicked task \"{}\"", curr_task_name);
+    curr_task.write().kill(KillReason::Panic(panic_info));
+    
+    // scheduler::schedule(); // yield the current task after it's done
+
+    Ok(())
+}
+
 
 /// This function isn't used since our Theseus target.json file
 /// chooses panic=abort (as does our build process), 
@@ -236,7 +304,6 @@ pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line:
 #[doc(hidden)]
 pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    println_raw!("\n\nin rust_eh_unwind_resume, unimplemented!");
     loop {}
 }
 
@@ -247,7 +314,6 @@ pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
 #[doc(hidden)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
-    println_raw!("\n\nin _Unwind_Resume, unimplemented!");
     loop {}
 }
 

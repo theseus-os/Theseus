@@ -6,10 +6,21 @@ BUILD_MODE := release
 
 ## Since applications are run in the kernel, we use the same Config.mk file 
 ## as the one that defines all config options for building regular kernel crates.
-include ../kernel/Config.mk   
+include ../cfg/Config.mk   
+
+
+## The directory where we store custom lints (compiler plugins)
+COMPILER_PLUGINS_DIR = $(ROOT_DIR)/compiler_plugins
+
 
 ## Applications are forbidden from using unsafe code
-# COMPILER_LINTS += -D unsafe-code
+COMPILER_LINTS += -D unsafe-code
+
+## Applications must have a main function
+COMPILER_LINTS += --extern application_main_fn=$(COMPILER_PLUGINS_DIR)/target/$(BUILD_MODE)/libapplication_main_fn.so  \
+				  -Z extra-plugins=application_main_fn \
+				  -D application_main_fn
+
 
 ## these don't work -- put them in the Cargo.toml file instead
 # RUSTFLAGS += -C codegen-units=1
@@ -27,7 +38,7 @@ APPS := $(patsubst %/., %, $(APPS))
 
 
 
-.PHONY: all clean cargo build 
+.PHONY: all clean cargo build compiler_plugins
 .DEFAULT_GOAL := all
 all: build
 
@@ -38,24 +49,39 @@ clean:
 	rm -rf ./build
 
 
-### TODO FIXME: change this to use xargo rustc so we can feed in the COMPILER_LINTS argument, 
-### However, I cannot figure out how to do this while using a cargo virtual workspace.
-### (Solution: I guess we could just invoke xargo rustc in each subdirectory manually)
-cargo:
-### For the "cargo rustc" command above, all of the arguments to cargo come before the "--",
+
+### Builds our custom lints in the compiler plugins directory so we can use them here
+compiler_plugins:
+	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(XARGO_RELEASE_ARG)
+
+
+cargo: compiler_plugins
+### For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
 ### whereas all of the arguments to rustc come after the "--".
-	@RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-		xargo build \
-		$(XARGO_RELEASE_ARG) \
-		--target $(TARGET) \
-		-- \
-		# $(COMPILER_LINTS)
+# for app in $(APPS) ; do  \
+# 	cd $${app} ; \
+# 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 		xargo rustc \
+# 		$(XARGO_RELEASE_ARG) \
+# 		--target $(TARGET) \
+# 		-- \
+# 		$(COMPILER_LINTS) ; \
+# 	cd .. ; \
+# done
+### Old command
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(XARGO_RELEASE_ARG) --all --target $(TARGET)
+	
 
-
-### This first calls the cargo target, but then copies all application object files into the build dir. 
+### This first calls the cargo target, but then copies all object files into the build dir. 
+### It gives all object files the "__k_" prefix, except for "executable" application object files that get the "__a_" prefix.
 build: cargo
 	@mkdir -p ./build
+
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
+		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/__k_\1\.o/p'` 2> /dev/null ; \
+	done
+	
 	@for app in $(APPS) ; do  \
-		cp -vf `ls -t ./target/$(TARGET)/$(BUILD_MODE)/deps/$${app}*.o | head -n1`  ./build/$${app}.o ; \
-		strip --strip-debug  ./build/$${app}.o ; \
+		mv  ./build/__k_$${app}.o  ./build/__a_$${app}.o ; \
+		strip --strip-debug  ./build/__a_$${app}.o ; \
 	done

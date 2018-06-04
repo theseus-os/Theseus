@@ -55,6 +55,7 @@ macro_rules! print {
                 error!("print!(): writing to String failed, error: {}", err);
             }
         }
+        $crate::print_to_console_args(format_args!($($arg)*));
     });
 }
 
@@ -388,13 +389,21 @@ impl Terminal {
     }
 
 }
-
+// FUCK
 
 pub fn print_to_console(s: String) -> Result<(), &'static str> {
     // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
     let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s, Some(1)));
     RUNNING_TERMINALS.lock().get_mut(0).ok_or("could not acquire kernel terminal")?.term_print_producer.enqueue(output_event);
-    return Ok(())
+    return Ok(());
+}
+
+
+use core::fmt;
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
+/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console_args(fmt_args: fmt::Arguments) {
+    let _result = print_to_console(format!("{}", fmt_args));
 }
 
 

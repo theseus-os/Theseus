@@ -38,8 +38,6 @@ extern crate window_manager;
 extern crate scheduler;
 
 
-extern crate rtc; // just to make sure it gets built
-
 
 #[cfg(feature = "loadable")] 
 extern crate console;
@@ -172,9 +170,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_acpi")            .ok_or("couldn't find __k_acpi module")?,           &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_e1000")           .ok_or("couldn't find __k_e1000 module")?,          &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init")     .ok_or("couldn't find __k_driver_init module")?,    &mut kernel_mmi, false)?;
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;
     }
 
+    // load RTC regardless, since an app uses it. Once we have full dependency resolution, this can be removed.
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
+    }
+    
 
     // now we initialize early driver stuff, like APIC/ACPI
     let madt_iter = {
@@ -491,9 +494,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    // run a hello world application in the kernel
+    // run some sample applications as a test
     // if true {
-    //     let module = memory::get_module("__a_hello").ok_or("Error: no module named '__a_hello' found!")?;
+    //     let hello_module        = memory::get_module("__a_hello")       .ok_or("Error: no module named '__a_hello' found!")?;
+    //     let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
+    //     let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
     //     let args = vec![String::from("yo"), String::from("what"), String::from("up")];
 
     //     #[cfg(feature = "loadable")]
@@ -504,33 +509,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     //             section.mapped_pages()
     //             .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
     //             .as_func(section.mapped_pages_offset(), &mut space)?; 
-    //         func(module, args, None, None)?;
+            
+    //         func(hello_module,       args.clone(), None, None)?; // run hello
+    //         func(date_module,        args.clone(), None, None)?; // run date
+    //         func(test_panic_module,  args.clone(), None, None)?; // run test_panic
     //     }
     //     #[cfg(not(feature = "loadable"))]
     //     {
-    //         spawn::spawn_application(module, args, None, None)?;
-    //     }
-    // }
-
-
-    // // test the date application
-    // if true {
-    //     let module = memory::get_module("__a_date").ok_or("Error: no module named '__a_date' found!")?;
-    //     let args = vec![];
-
-    //     #[cfg(feature = "loadable")]
-    //     {
-    //         let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
-    //         let mut space = 0;
-    //         let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
-    //             section.mapped_pages()
-    //             .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
-    //             .as_func(section.mapped_pages_offset(), &mut space)?; 
-    //         func(module, args, None, None)?;
-    //     }
-    //     #[cfg(not(feature = "loadable"))]
-    //     {
-    //         spawn::spawn_application(module, args, None, None)?;
+    //         spawn::spawn_application(hello_module,       args.clone(), None, None)?;
+    //         spawn::spawn_application(date_module,        args.clone(), None, None)?;
+    //         spawn::spawn_application(test_panic_module,  args.clone(), None, None)?;
     //     }
     // }
 
@@ -542,13 +530,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-
-
-    #[cfg(not(feature = "loadable"))]
-    {
-        let _ = rtc::read_rtc(); // just to make sure it gets built
-    }
-
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
