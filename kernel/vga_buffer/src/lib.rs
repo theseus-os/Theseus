@@ -220,6 +220,40 @@ impl VgaBuffer {
     }
 
 
+    pub fn init_cursor(&self) {
+
+        // {
+        //     let locked_port = CURSOR_PORT_END.lock();
+        //     CURSOR_PORT_END.lock().read();
+        //     locked_port.write(val)
+        // }
+
+
+        unsafe {
+            let cursor_start = 0b00000001;
+            let cursor_end = 0b00010000;
+            CURSOR_PORT_START.lock().write(0x0A);
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & 0xC0) | cursor_start;
+            CURSOR_PORT_END.lock().write(temp_read);
+            CURSOR_PORT_START.lock().write(0x0B);
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & 0xE0) | cursor_end;
+            CURSOR_PORT_END.lock().write(temp_read2);
+        }
+        return
+    }
+
+    pub fn update_cursor(&self, x: u16, y:u16) { 
+        let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+        unsafe {
+            CURSOR_PORT_START.lock().write(0x0F);
+            CURSOR_PORT_END.lock().write((pos & 0xFF) as u8);
+            CURSOR_PORT_START.lock().write(0x0E);
+            CURSOR_PORT_END.lock().write(((pos>>8) & 0xFF) as u8);
+        }
+        return
+    }
+
+
 
     /// Displays (refreshes) this VgaBuffer at the given position.
     pub fn display(&mut self, position: DisplayPosition) {

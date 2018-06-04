@@ -13,8 +13,8 @@ extern crate goblin;
 extern crate util;
 extern crate rustc_demangle;
 
-
 use core::ops::DerefMut;
+
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
