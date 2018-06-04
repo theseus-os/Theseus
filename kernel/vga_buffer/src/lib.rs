@@ -66,6 +66,18 @@ const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen
     static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
     static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
+const UNLOCK_SEQ_1:u8  = 0x0A;
+const UNLOCK_SEQ_2:u8 = 0x0B;
+const UNLOCK_SEQ_3:u8 = 0xC0;
+const UNLOCK_SEQ_4:u8 = 0xE0;
+const UPDATE_SEQ_1: u8 = 0x0E;
+const UPDATE_SEQ_2: u8 = 0x0F;
+const UPDATE_SEQ_3: u16 = 0xFF;
+const CURSOR_START:u8 =  0b00000001;
+const CURSOR_END:u8 = 0b00010000;
+const RIGHT_BIT_SHIFT: u8 = 8;
+
+
 pub fn init_cursor() {
 
     // {
@@ -76,13 +88,11 @@ pub fn init_cursor() {
 
 
     unsafe {
-        let cursor_start = 0b00000001;
-        let cursor_end = 0b00010000;
-        CURSOR_PORT_START.lock().write(0x0A);
-        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & 0xC0) | cursor_start;
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
         CURSOR_PORT_END.lock().write(temp_read);
-        CURSOR_PORT_START.lock().write(0x0B);
-        let temp_read2 = (AUXILLARY_ADDR.lock().read() & 0xE0) | cursor_end;
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
         CURSOR_PORT_END.lock().write(temp_read2);
     }
     return
@@ -91,10 +101,10 @@ pub fn init_cursor() {
 pub fn update_cursor (x: u16, y:u16) { 
     let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
     unsafe {
-        CURSOR_PORT_START.lock().write(0x0F);
-        CURSOR_PORT_END.lock().write((pos & 0xFF) as u8);
-        CURSOR_PORT_START.lock().write(0x0E);
-        CURSOR_PORT_END.lock().write(((pos>>8) & 0xFF) as u8);
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+        CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
     }
     return
 }
@@ -219,7 +229,6 @@ impl VgaBuffer {
         Ok(())
     }
 
-
     pub fn init_cursor(&self) {
 
         // {
@@ -232,11 +241,11 @@ impl VgaBuffer {
         unsafe {
             let cursor_start = 0b00000001;
             let cursor_end = 0b00010000;
-            CURSOR_PORT_START.lock().write(0x0A);
-            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & 0xC0) | cursor_start;
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | cursor_start;
             CURSOR_PORT_END.lock().write(temp_read);
-            CURSOR_PORT_START.lock().write(0x0B);
-            let temp_read2 = (AUXILLARY_ADDR.lock().read() & 0xE0) | cursor_end;
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
             CURSOR_PORT_END.lock().write(temp_read2);
         }
         return
@@ -245,10 +254,10 @@ impl VgaBuffer {
     pub fn update_cursor(&self, x: u16, y:u16) { 
         let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
         unsafe {
-            CURSOR_PORT_START.lock().write(0x0F);
-            CURSOR_PORT_END.lock().write((pos & 0xFF) as u8);
-            CURSOR_PORT_START.lock().write(0x0E);
-            CURSOR_PORT_END.lock().write(((pos>>8) & 0xFF) as u8);
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+            CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+            CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
         }
         return
     }
@@ -266,7 +275,6 @@ impl VgaBuffer {
             }
             DisplayPosition::Up(u) => {
                 if self.display_scroll_end {
-                    // handle the case when it was previously at the end, but then scrolled up
                     // handle the case when it was previously at the end, but then scrolled up
                     self.display_line = self.display_line.saturating_sub(BUFFER_HEIGHT);
                 }
@@ -372,7 +380,7 @@ impl ColorCode {
 
 impl Default for ColorCode {
 	fn default() -> ColorCode {
-		ColorCode::new(Color::Pink, Color::Black)
+		ColorCode::new(Color::LightGreen, Color::Black)
 	}
 
 }

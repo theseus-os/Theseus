@@ -21,6 +21,8 @@ impl ConsoleEvent {
     }
 
     pub fn new_output_event<S>(s: S, x: Option<usize>) -> ConsoleEvent where S: Into<String> {
+        // x: Option<usize> is the terminal reference number. Used so that this output event is outputted to the correct Terminal's VGA buffer
+        // Matches with Terminal.term_ref
         ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(),x))
     }
 }
