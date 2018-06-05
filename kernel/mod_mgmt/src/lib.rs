@@ -35,6 +35,13 @@ use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, Loade
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
 
+
+const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
+const APPLICATION_NAME_PREFIX:   &'static str = "__a_";
+const USERSPACE_NAME_PREFIX:     &'static str = "__u_";
+
+
+
 pub struct ElfProgramSegment {
     /// the VirtualMemoryAddress that will represent the virtual mapping of this Program segment.
     /// Provides starting virtual address, size in memory, mapping flags, and a text description.
@@ -116,12 +123,11 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
     // first we need to map the module memory region into our address space, 
     // so we can then parse the module as an ELF file in the kernel.
-    // For now just use identity mapping, we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
     {
         // destructure the kernel's MMI so we can access its page table and vmas
         let &mut MemoryManagementInfo { 
             page_table: ref mut kernel_page_table, 
-            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+            ..
         } = kernel_mmi;
 
         match kernel_page_table {
@@ -143,7 +149,7 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
                 let new_syms = metadata::add_crate(new_crate, log);
                 info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
                 Ok(new_syms)
-
+                
                 // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
             }
             _ => {
@@ -157,18 +163,64 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 
 
 
-// pub struct ElfTextSection {
-//     /// The full demangled name of this text section
-//     pub demangled_name: String,
-//     // /// The offset where this section exists within the ElfFile.
-//     // pub offset: usize,
-//     /// the slice including the actual data of this text section
-//     pub data: [u8]
-//     /// The size in bytes of this text section
-//     pub size: usize,
-//     /// The flags to be used when mapping this section into memory
-//     pub flags: EntryFlags,
-// }
+/// Loads the specified application crate into memory, allowing it to be invoked.  
+/// Returns a Result containing the new crate.
+pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) 
+    -> Result<LoadedCrate, &'static str> 
+{
+    
+    if !module.name().starts_with(APPLICATION_NAME_PREFIX) {
+        error!("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+        return Err("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+    }
+    
+    use kernel_config::memory::address_is_page_aligned;
+    if !address_is_page_aligned(module.start_address()) {
+        error!("module {} is not page aligned!", module.name());
+        return Err("module was not page aligned");
+    } 
+    
+    debug!("load_application_crate: trying to load \"{}\" application module", module.name());
+
+    // first we need to map the module memory region into our address space, 
+    // so we can then parse the module as an ELF file in the kernel.
+    {
+        // destructure the kernel's MMI so we can access its page table and vmas
+        let &mut MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            .. 
+        } = kernel_mmi;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                let size = module.size();
+                let flags = EntryFlags::PRESENT;
+
+                let temp_module_mapping = {
+                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
+                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+                    try!( active_table.map_allocated_pages_to(
+                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                        flags, frame_allocator.deref_mut())
+                    )
+                };
+
+                let new_crate = try!(parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log));
+                info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+                Ok(new_crate)
+
+                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+            }
+            _ => {
+                error!("load_application_crate(): error getting kernel's active page table to map module.");
+                Err("load_application_crate(): couldn't get kernel's active page table")
+            }
+        }
+    }
+}
+
+
+
 
 /// A representation of a demangled symbol, e.g., my_crate::module::func_name.
 /// If the symbol wasn't originally mangled, `symbol` == `full`. 
@@ -199,21 +251,26 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
-pub fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
-                              size_in_bytes: usize, 
-                              module_name: &String, 
-                              active_table: &mut ActivePageTable, 
-                              log: bool)
-                              -> Result<LoadedCrate, &'static str>
+fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
+                          size_in_bytes: usize, 
+                          module_name: &String, 
+                          active_table: &mut ActivePageTable, 
+                          log: bool)
+                          -> Result<LoadedCrate, &'static str>
 {
-    // all kernel module crate names must start with "__k_"
-    const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
+    let is_application = module_name.starts_with(APPLICATION_NAME_PREFIX);
+    let is_kernel_module = module_name.starts_with(KERNEL_MODULE_NAME_PREFIX);
 
-    if !module_name.starts_with(KERNEL_MODULE_NAME_PREFIX) {
-        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {}.", module_name, KERNEL_MODULE_NAME_PREFIX);
-        return Err("module_name didn't start with __k_");
-    }
-
+    let crate_name = if is_application {
+        module_name.get(APPLICATION_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of application module after \"__a_\"")?
+    } else if is_kernel_module {
+        module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of kernel module crate after \"__k_\"")?
+    } else {
+        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {} or {}.",
+            module_name, KERNEL_MODULE_NAME_PREFIX, APPLICATION_NAME_PREFIX);
+        return Err("module_name didn't start with __k_ or __a_");
+    };
+    let crate_name = String::from(crate_name);
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
     let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
@@ -261,9 +318,7 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 }
                             }
                         }
-                        _ => {
-                            continue;
-                        }
+                        _ => { }
                     }
                 }
             }
@@ -333,10 +388,6 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             if data_bytecount   > 0 { Some( Arc::new( try!( allocate_pages_closure(data_bytecount))))   } else { None }
         )
     };
-
-    let crate_name = String::from(try!(module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. )
-        .ok_or("Couldn't get name of crate module after \"__k_\"")
-    ));
     
 
     // First, we need to parse all the sections and load the text and data sections
@@ -834,6 +885,10 @@ pub fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
 
 
+/// Decides which parsing technique to use, either the symbol file or the actual binary file.
+/// `parse_nano_core_binary()` is VERY SLOW in debug mode for large binaries, so we use the more efficient symbol file parser instead.
+/// Note that this must match the setup of the kernel/Makefile as well as the cfg/grub.cfg entry
+const PARSE_NANO_CORE_SYMBOL_FILE: bool = true;
 
 
 // Parses the nano_core module that represents the already loaded (and currently running) nano_core code.
@@ -862,10 +917,20 @@ pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo,
 
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            // + 1 to add space for appending a null character to the end of the symbol file string
-            let size = module.size() + 1;
-            // WRITABLE because we need to write that null character
-            let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE;
+            let (size, flags) = if PARSE_NANO_CORE_SYMBOL_FILE {
+                (
+                    // + 1 to add space for appending a null character to the end of the symbol file string
+                    module.size() + 1, 
+                    // WRITABLE because we need to write that null character
+                    EntryFlags::PRESENT | EntryFlags::WRITABLE
+                )
+            }
+            else {
+                ( 
+                    module.size(), 
+                    EntryFlags::PRESENT 
+                )
+            };
 
             let temp_module_mapping = {
                 let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for nano_core module"));
@@ -876,7 +941,11 @@ pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo,
                 )
             };
 
-            let new_crate = try!(parse_nano_core_symbol_file(temp_module_mapping, text_pages, rodata_pages, data_pages, size));
+            let new_crate = if PARSE_NANO_CORE_SYMBOL_FILE {
+                parse_nano_core_symbol_file(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
+            } else {
+                parse_nano_core_binary(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
+            };
 
             let new_syms = metadata::add_crate(new_crate, log);
             info!("parsed nano_core crate, {} new symbols.", new_syms);
@@ -897,7 +966,7 @@ pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo,
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
-fn parse_nano_core_symbol_file(mapped_pages: MappedPages, 
+pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages, 
                                text_pages: MappedPages, 
                                rodata_pages: MappedPages, 
                                data_pages: MappedPages, 
@@ -943,14 +1012,16 @@ fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
         let mut rodata_shndx: Option<usize> = None;
         let mut bss_shndx:    Option<usize> = None;
 
-        for (_line_num, line) in symbol_str.lines().enumerate() {
+        // first, find the section indices that we care about: .text, .data, .rodata, and .bss
+        let file_iterator = symbol_str.lines().enumerate();
+        for (_line_num, line) in file_iterator.clone() {
+
             let line = line.trim();
             // skip empty lines
             if line.is_empty() { continue; }
 
             // debug!("Looking at line: {:?}", line);
 
-            // find the .text, .data, .rodata, and .bss section indices
             if line.contains(".text") && line.contains("PROGBITS") {
                 text_shndx = get_section_index(line);
             }
@@ -964,91 +1035,119 @@ fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                 bss_shndx = get_section_index(line);
             }
 
-            
-            // find a symbol table entry, either "GLOBAL DEFAULT" or "GLOBAL HIDDEN"
-            if line.contains(" GLOBAL ") {
-                // we need the following items from a symbol table entry:
-                // * Value (address),  column 1
-                // * Size,             column 2
-                // * Ndx,              column 6
-                // * Name (mangled),   column 7
-                let mut tokens   = line.split_whitespace();
-                let _num         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 0"));
-                let sec_vaddr    = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 1"));
-                let sec_size     = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 2"));
-                let _typ         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 3"));
-                let _bind        = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 4"));
-                let _vis         = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 5"));
-                let sec_ndx      = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 6"));
-                let name_mangled = try!(tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 7"));
+            // once we've found the 4 sections we care about, we're done
+            if text_shndx.is_some() && rodata_shndx.is_some() && data_shndx.is_some() && bss_shndx.is_some() {
+                break;
+            }
+        }
 
-                
-                let sec_vaddr = try!(usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
-                    error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num, e, line);
-                    "parse_nano_core_symbols(): couldn't parse virtual address Value"
-                })); 
-                let sec_size  = try!(usize::from_str_radix(sec_size, 10).map_err(|e| {
-                    error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num, e, line);
-                    "parse_nano_core_symbols(): couldn't parse size"
-                })); 
-                // while vaddr and size are required, ndx isn't. If ndx is not a number (like "ABS"), then we just skip that entry. 
-                let sec_ndx   = usize::from_str_radix(sec_ndx, 10).ok(); 
-                if sec_ndx.is_none() {
-                    // trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num, line);
+        let text_shndx   = text_shndx.ok_or("parse_nano_core_symbols(): couldn't find .text section index")?;
+        let rodata_shndx = rodata_shndx.ok_or("parse_nano_core_symbols(): couldn't find .rodata section index")?;
+        let data_shndx   = data_shndx.ok_or("parse_nano_core_symbols(): couldn't find .data section index")?;
+        let bss_shndx    = bss_shndx.ok_or("parse_nano_core_symbols(): couldn't find .bss section index")?;
+
+
+        // second, skip ahead to the start of the symbol table 
+        let mut file_iterator = file_iterator.skip_while( | (_line_num, line) |  {
+            !line.starts_with("Symbol table")
+        });
+        // skip the symbol table start line, e.g., "Symbol table '.symtab' contains N entries:"
+        if let Some((_num, _line)) = file_iterator.next() {
+            // trace!("SKIPPING LINE {}: {}", _num + 1, _line);
+        }
+        // skip one more line, the line with the column headers, e.g., "Num:     Value     Size Type   Bind   Vis ..."
+        if let Some((_num, _line)) = file_iterator.next() {
+            // trace!("SKIPPING LINE {}: {}", _num + 1, _line);
+        }
+
+
+        // third, parse each symbol table entry, which should all have "GLOBAL" bindings
+        for (_line_num, line) in file_iterator {
+            // we need the following items from a symbol table entry:
+            // * Value (address),  column 1
+            // * Size,             column 2
+            // * Ndx,              column 6
+            // * Name (mangled),   column 7
+            let mut tokens   = line.split_whitespace();
+            let _num         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 0")?;
+            let sec_vaddr    = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 1")?;
+            let sec_size     = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 2")?;
+            let _typ         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 3")?;
+            let _bind        = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 4")?;
+            let _vis         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 5")?;
+            let sec_ndx      = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 6")?;
+            let name_mangled = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 7")?;
+
+            
+            let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
+                error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
+            })?; 
+            let sec_size = usize::from_str_radix(sec_size, 10).map_err(|e| {
+                error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                "parse_nano_core_symbols(): couldn't parse size column"
+            })?; 
+
+            // while vaddr and size are required, ndx could be valid or not. 
+            let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
+                // If ndx is a valid number, proceed on. 
+                Ok(ndx) => ndx,
+                // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line). 
+                _ => {
+                    trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num + 1, line);
                     continue;
                 }
+            };
 
-                let demangled = demangle_symbol(name_mangled);
-                // debug!("parse_nano_core_symbols(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {:?}", name_mangled, demangled.full, sec_vaddr, sec_size, sec_ndx);
+            let demangled = demangle_symbol(name_mangled);
+            // debug!("parse_nano_core_symbols(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", demangled.full, sec_vaddr, sec_size, sec_ndx);
 
 
-                let new_section = {
-                    if sec_ndx == text_shndx {
-                        Some(LoadedSection::Text(TextSection{
-                            // symbol: demangled.symbol,
-                            abs_symbol: demangled.full,
-                            hash: demangled.hash,
-                            mapped_pages: Arc::downgrade(&text_pages),
-                            mapped_pages_offset: try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
-                            size: sec_size,
-                            global: true,
-                            parent_crate: crate_name.clone(),
-                        }))
-                    }
-                    else if sec_ndx == rodata_shndx {
-                        Some(LoadedSection::Rodata(RodataSection{
-                            // symbol: demangled.symbol,
-                            abs_symbol: demangled.full,
-                            hash: demangled.hash,
-                            mapped_pages: Arc::downgrade(&rodata_pages),
-                            mapped_pages_offset: try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
-                            size: sec_size,
-                            global: true,
-                            parent_crate: crate_name.clone(),
-                        }))
-                    }
-                    else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
-                        Some(LoadedSection::Data(DataSection{
-                            // symbol: demangled.symbol,
-                            abs_symbol: demangled.full,
-                            hash: demangled.hash,
-                            mapped_pages: Arc::downgrade(&data_pages),
-                            mapped_pages_offset: try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
-                            size: sec_size,
-                            global: true,
-                            parent_crate: crate_name.clone(),
-                        }))
-                    }
-                    else {
-                        None
-                    }
-                };
-
-                if let Some(sec) = new_section {
-                    // debug!("parse_nano_core: new section: {:?}", sec);
-                    sections.push(Arc::new(sec));
-                }
-            }  
+            if sec_ndx == text_shndx {
+                sections.push(Arc::new(
+                    LoadedSection::Text(TextSection{
+                        // symbol: demangled.symbol,
+                        abs_symbol: demangled.full,
+                        hash: demangled.hash,
+                        mapped_pages: Arc::downgrade(&text_pages),
+                        mapped_pages_offset: text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
+                        size: sec_size,
+                        global: true,
+                        parent_crate: crate_name.clone(),
+                    })
+                ));
+            }
+            else if sec_ndx == rodata_shndx {
+                sections.push(Arc::new(
+                    LoadedSection::Rodata(RodataSection{
+                        // symbol: demangled.symbol,
+                        abs_symbol: demangled.full,
+                        hash: demangled.hash,
+                        mapped_pages: Arc::downgrade(&rodata_pages),
+                        mapped_pages_offset: rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
+                        size: sec_size,
+                        global: true,
+                        parent_crate: crate_name.clone(),
+                    })
+                ));
+            }
+            else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
+                sections.push(Arc::new(
+                    LoadedSection::Data(DataSection{
+                        // symbol: demangled.symbol,
+                        abs_symbol: demangled.full,
+                        hash: demangled.hash,
+                        mapped_pages: Arc::downgrade(&data_pages),
+                        mapped_pages_offset: data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
+                        size: sec_size,
+                        global: true,
+                        parent_crate: crate_name.clone(),
+                    })
+                ));
+            }
+            else {
+                trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, demangled.full, sec_vaddr, sec_size);
+            }
 
         }
 
@@ -1065,6 +1164,207 @@ fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
 
     Ok(new_crate)
 }
+
+
+
+
+/// Parses the nano_core ELF binary file, which is already loaded and running.  
+/// Thus, we simply search for its global symbols, and add them to the system map and the crate metadata.
+/// 
+/// Drops the given `mapped_pages` that hold the nano_core binary file itself.
+fn parse_nano_core_binary(mapped_pages: MappedPages, 
+                          text_pages: MappedPages, 
+                          rodata_pages: MappedPages, 
+                          data_pages: MappedPages, 
+                          size_in_bytes: usize) 
+                          -> Result<LoadedCrate, &'static str> 
+{
+    let crate_name = String::from("nano_core");
+    debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
+            crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
+
+    // wrap these in an Arc so we can get a weak ref to it
+    let text_pages   = Arc::new(text_pages);
+    let rodata_pages = Arc::new(rodata_pages);
+    let data_pages   = Arc::new(data_pages);
+
+
+    let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
+    // debug!("BYTE SLICE: {:?}", byte_slice);
+    let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
+
+
+    // For us to properly load the ELF file, it must NOT have been stripped,
+    // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
+    use xmas_elf::sections::SectionData::SymbolTable64;
+    let sssec = find_first_section_by_type(&elf_file, ShType::SymTab);
+    let symtab_data = match sssec.ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) {
+        Ok(SymbolTable64(symtab)) => Ok(symtab),
+        _ => {
+            error!("parse_nano_core_binary(): can't load file: no symbol table found. Was file stripped?");
+            Err("cannot load nano_core: no symbol table found. Was file stripped?")
+        }
+    };
+    let symtab = try!(symtab_data);
+    // debug!("symtab: {:?}", symtab);
+
+    
+    // find the .text, .data, and .rodata sections
+    let mut text_shndx:   Option<usize> = None;
+    let mut rodata_shndx: Option<usize> = None;
+    let mut data_shndx:   Option<usize> = None;
+    let mut bss_shndx:    Option<usize> = None;
+
+    for (shndx, sec) in elf_file.section_iter().enumerate() {
+        // trace!("parse_nano_core_binary(): looking at sec[{}]: {:?}", shndx, sec);
+        // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
+        if let Ok(ShType::ProgBits) = sec.get_type() {
+            // skip null section and any empty sections
+            let sec_size = sec.size() as usize;
+            if sec_size == 0 { continue; }
+
+            if let Ok(name) = sec.get_name(&elf_file) {
+                match name {
+                    ".text" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR), ".text section had wrong flags!");
+                        text_shndx = Some(shndx);
+                    }
+                    ".data" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".data section had wrong flags!");
+                        data_shndx = Some(shndx);
+                    }
+                    ".rodata" => {
+                        assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC), ".rodata section had wrong flags!");
+                        rodata_shndx = Some(shndx);
+                    }
+                    _ => {
+                        continue;
+                    }
+                };
+            }
+        }
+        // look for .bss section
+        else if let Ok(ShType::NoBits) = sec.get_type() {
+            // skip null section and any empty sections
+            let sec_size = sec.size() as usize;
+            if sec_size == 0 { continue; }
+
+            if let Ok(name) = sec.get_name(&elf_file) {
+                if name == ".bss" {
+                    assert!(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE), ".bss section had wrong flags!");
+                    bss_shndx = Some(shndx);
+                }
+            }
+        }
+
+        // // once we've found the 4 sections we care about, skip the rest.
+        // if text_shndx.is_some() && rodata_shndx.is_some() && data_shndx.is_some() && bss_shndx.is_some() {
+        //     break;
+        // }
+    }
+
+    let text_shndx   = try!(text_shndx.ok_or("couldn't find .text section in nano_core ELF"));
+    let rodata_shndx = try!(rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF"));
+    let data_shndx   = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
+    let bss_shndx    = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
+
+    // iterate through the symbol table so we can find which sections are global (publicly visible)
+
+    let loaded_sections = {
+        let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+        use xmas_elf::symbol_table::Entry;
+        for entry in symtab.iter() {
+            // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)
+
+            // use xmas_elf::symbol_table::Visibility;
+            // match entry.get_other() {
+            //     Visibility::Default | Visibility::Hidden => {
+            //         // do nothing, fall through to proceed
+            //     }
+            //     _ => {
+            //         continue; // skip this
+            //     }
+            // };
+            
+            if let Ok(bind) = entry.get_binding() {
+                if bind == xmas_elf::symbol_table::Binding::Global {
+                    if let Ok(typ) = entry.get_type() {
+                        if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                            let sec_vaddr = entry.value() as VirtualAddress;
+                            let sec_size = entry.size() as usize;
+                            let name = entry.get_name(&elf_file)?;
+
+                            let demangled = demangle_symbol(name);
+                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled.full, sec_vaddr, sec_size);
+
+                            let new_section = {
+                                if entry.shndx() as usize == text_shndx {
+                                    Some(LoadedSection::Text(TextSection{
+                                        // symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        mapped_pages: Arc::downgrade(&text_pages),
+                                        mapped_pages_offset: try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
+                                        size: sec_size,
+                                        global: true,
+                                        parent_crate: crate_name.clone(),
+                                    }))
+                                }
+                                else if entry.shndx() as usize == rodata_shndx {
+                                    Some(LoadedSection::Rodata(RodataSection{
+                                        // symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        mapped_pages: Arc::downgrade(&rodata_pages),
+                                        mapped_pages_offset: try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
+                                        size: sec_size,
+                                        global: true,
+                                        parent_crate: crate_name.clone(),
+                                    }))
+                                }
+                                else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
+                                    Some(LoadedSection::Data(DataSection{
+                                        // symbol: demangled.symbol,
+                                        abs_symbol: demangled.full,
+                                        hash: demangled.hash,
+                                        mapped_pages: Arc::downgrade(&data_pages),
+                                        mapped_pages_offset: try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
+                                        size: sec_size,
+                                        global: true,
+                                        parent_crate: crate_name.clone(),
+                                    }))
+                                }
+                                else {
+                                    error!("Unexpected entry.shndx(): {}", entry.shndx());
+                                    None
+                                }
+                            };
+
+                            if let Some(sec) = new_section {
+                                // debug!("parse_nano_core: new section: {:?}", sec);
+                                sections.push(Arc::new(sec));
+                            }
+                        }
+                    }
+                }
+            }
+        }   
+        sections 
+    };
+
+
+    let new_crate = LoadedCrate{
+        crate_name:   crate_name, 
+        sections:     loaded_sections,
+        text_pages:   Some(text_pages),
+        rodata_pages: Some(rodata_pages),
+        data_pages:   Some(data_pages),
+    };
+
+    Ok(new_crate)
+}
+
+
 
 
 

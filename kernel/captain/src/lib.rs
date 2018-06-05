@@ -12,7 +12,8 @@
 #![feature(used)]
 #![feature(core_intrinsics)]
 
-extern crate alloc;
+
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
 
@@ -20,12 +21,7 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-#[cfg(feature = "loadable")]
-#[macro_use] extern crate vga_buffer;
-#[cfg(not(feature = "loadable"))]
-extern crate vga_buffer;
-
-extern crate console_types; // a temporary way to use console types
+extern crate console_types; // a temporary way to use console types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
@@ -39,67 +35,18 @@ extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
-
 extern crate scheduler;
+
+
+
+#[cfg(feature = "loadable")] 
 extern crate console;
+#[cfg(not(feature = "loadable"))] 
+#[macro_use] extern crate console;
 
 
 #[cfg(target_feature = "sse2")]
 extern crate simd_test;
-
-// temporarily moving these macros here because I'm not sure if/how we can load macros from a crate at runtime
-/// calls print!() with an extra "\n" at the end. 
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
-
-/// The main printing macro, which simply pushes an output event to the console's event queue. 
-/// This ensures that only one thread (the console) ever accesses the UI, which right now is just the VGA buffer.
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        use alloc::String;
-        let mut s: String = String::new();
-        match write!(&mut s, $($arg)*) {
-            Ok(_) => { }
-            Err(e) => error!("print!(): writing to String failed, error: {}", e),
-        }
-        
-        #[cfg(feature = "loadable")] {
-            if let Some(section) = ::mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-                type PrintFuncSignature = fn(String) -> Result<(), &'static str>;
-                
-                if let Some(mp) = section.mapped_pages() {
-                    let mut space = 0; // this must persist throughout the print_func being called
-                    let print_func: Result<&PrintFuncSignature, &'static str> = mp.as_func(section.mapped_pages_offset(), &mut space);
-                    match print_func {
-                        Ok(func) => { 
-                            let _ = func(s.clone());
-                        }
-                        Err(e) => {
-                            error!("print!(): couldn't get print_func from the section's mapped_pages, error: {}", e);
-                        }
-                    }
-                }
-                else {
-                    error!("print!(): couldn't get section's mapped_pages");
-                }
-            }
-            else {
-                // if console crate hasn't been loaded yet, write to the raw VGA buffer instead
-                error!("print!(): no \"console::print_to_console\" symbol. Printing: {}", s);
-                println_raw!("print!(): couldn't get \"console::print_to_console\" symbol! Tried to print: {}", s);
-            }
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            let _ = console::print_to_console(s);
-        } 
-    });
-}
 
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -114,20 +61,30 @@ use memory::{MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
-#[cfg(feature = "loadable")] use task::Task;
+#[cfg(feature = "loadable")] use task::TaskRef;
 #[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
 #[cfg(feature = "loadable")] use console_types::ConsoleEvent;
-#[cfg(feature = "loadable")] use mouse_console_type::MouseConsoleEvent;
 #[cfg(feature = "loadable")] use dfqueue::DFQueueProducer;
-#[cfg(feature = "loadable")] use irq_safety::RwLockIrqSafe;
 #[cfg(feature = "loadable")] use acpi::madt::MadtIter;
-
 
 
 
 /// the callback use in the logger crate for mirroring log functions to the console
 pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
-    println!("{} {}", prefix, args);
+    #[cfg(feature = "loadable")]
+    {
+        let mut space = 0;
+        if let Some(section) = mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
+            if let Some(func) = section.mapped_pages().and_then(|mp| mp.as_func::<fn(String)>(section.mapped_pages_offset(), &mut space).ok()) 
+            {
+                let _ = func(format!("{} {}", prefix, args));
+            }
+        }
+    }
+    #[cfg(not(feature = "loadable"))]
+    {
+        println!("{} {}", prefix, args);
+    }
 }
 
 
@@ -141,7 +98,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             ap_start_realmode_begin: usize, ap_start_realmode_end: usize) 
             -> Result<(), &'static str>
 {
-
+	
     #[cfg(feature = "loadable")]
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -186,12 +143,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_keycodes_ascii")  .ok_or("couldn't find __k_keycodes_ascii module")?, &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_console_types")   .ok_or("couldn't find __k_console_types module")?,  &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_keyboard")        .ok_or("couldn't find __k_keyboard module")?,       &mut kernel_mmi, false)?;
-
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_mouse_data")  .ok_or("couldn't find __k_mouse_data module")?, &mut kernel_mmi, false)?;
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_mouse_console_type")   .ok_or("couldn't find __k_mouse_console_type module")?,  &mut kernel_mmi, false)?;
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_mouse")        .ok_or("couldn't find __k_mouse module")?,       &mut kernel_mmi, false)?;
-        debug!("Here is the Bowen's mouse stuffs, I just want to see whether my stuffs are acutually being called \n\n\n\n\n\n\n\n\n\n\n\
-        \n I hope tey are called \n\n\n\n\n\n");
         
         mod_mgmt::load_kernel_crate(memory::get_module("__k_spin")            .ok_or("couldn't find __k_spin module")?,           &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_pci")             .ok_or("couldn't find __k_pci module")?,            &mut kernel_mmi, false)?;
@@ -210,7 +161,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_interrupts")      .ok_or("couldn't find __k_interrupts module")?,     &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_vga_buffer")      .ok_or("couldn't find __k_vga_buffer module")?,     &mut kernel_mmi, false)?;
         mod_mgmt::load_kernel_crate(memory::get_module("__k_console")         .ok_or("couldn't find __k_console module")?,        &mut kernel_mmi, false)?;
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_mouse_console")         .ok_or("couldn't find __k_mouse_console module")?,        &mut kernel_mmi, false)?;
     
     
         mod_mgmt::load_kernel_crate(memory::get_module("__k_dbus")            .ok_or("couldn't find __k_dbus module")?,           &mut kernel_mmi, false)?;
@@ -222,6 +172,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init")     .ok_or("couldn't find __k_driver_init module")?,    &mut kernel_mmi, false)?;
     }
 
+    // load RTC regardless, since an app uses it. Once we have full dependency resolution, this can be removed.
+    {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
+    }
+    
 
     // now we initialize early driver stuff, like APIC/ACPI
     let madt_iter = {
@@ -327,7 +283,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         let section = mod_mgmt::metadata::get_symbol("spawn::init").upgrade().ok_or("no symbol: spawn::init")?;
         let mut space = 0;
-        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<TaskRef, &'static str> = 
             section.mapped_pages()
             .ok_or("Couldn't get section's mapped_pages for \"spawn::init\"")?
             .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -358,6 +314,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     };
 
 
+
     // initialize the rest of our drivers
     #[cfg(feature = "loadable")]
     {
@@ -366,12 +323,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         let func: & fn(DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str> =
             section.mapped_pages()
             .ok_or("Couldn't get section's mapped_pages for \"driver_init::init\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?;
-
+            .as_func(section.mapped_pages_offset(), &mut space)?; 
         func(console_queue_producer)?;
     }
-
-
     #[cfg(not(feature = "loadable"))]
     {
         driver_init::init(console_queue_producer)?;
@@ -453,16 +407,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     // create and jump to the first userspace thread
-    if true
+    if false
     {
         debug!("trying to jump to userspace");
-        let module = memory::get_module("test_program").ok_or("Error: no userspace modules named 'test_program' found!")?;
+        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -474,16 +428,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    if true
+    if false
     {
         debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("test_program").ok_or("Error: no userspace modules named 'test_program' found!")?;
+        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -499,13 +453,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if false
     {
         debug!("trying out a system call module");
-        let module = memory::get_module("syscall_send").ok_or("Error: no module named 'syscall_send' found!")?;
+        let module = memory::get_module("__u_syscall_send").ok_or("Error: no module named '__u_syscall_send' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
@@ -521,23 +475,53 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if false
     {
         debug!("trying out a receive system call module");
-        let module = memory::get_module("syscall_receive").ok_or("Error: no module named 'syscall_receive' found!")?;
+        let module = memory::get_module("__u_syscall_receive").ok_or("Error: no module named '__u_syscall_receive' found!")?;
         
         #[cfg(feature = "loadable")]
         {
             let section = mod_mgmt::metadata::get_symbol("spawn::spawn_userspace").upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
             let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<Arc<RwLockIrqSafe<Task>>, &'static str> = 
+            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
                 section.mapped_pages()
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             func(module, None)?;
         }
-    #[cfg(not(feature = "loadable"))]
+        #[cfg(not(feature = "loadable"))]
         {
             spawn::spawn_userspace(module, None)?;
         }
     }
+
+
+    // run some sample applications as a test
+    if true {
+        let hello_module        = memory::get_module("__a_hello")       .ok_or("Error: no module named '__a_hello' found!")?;
+        let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
+        let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
+        let args = vec![String::from("yo"), String::from("what"), String::from("up")];
+
+        #[cfg(feature = "loadable")]
+        {
+            let section = mod_mgmt::metadata::get_symbol("spawn::spawn_application").upgrade().ok_or("no symbol: spawn::spawn_application")?;
+            let mut space = 0;
+            let func: & fn(&ModuleArea, Vec<String>, Option<String>, Option<u8>) -> Result<TaskRef, &'static str> = 
+                section.mapped_pages()
+                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
+                .as_func(section.mapped_pages_offset(), &mut space)?; 
+            
+            func(hello_module,       args.clone(), None, None)?; // run hello
+            func(date_module,        args.clone(), None, None)?; // run date
+            func(test_panic_module,  args.clone(), None, None)?; // run test_panic
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            spawn::spawn_application(hello_module,       args.clone(), None, None)?;
+            spawn::spawn_application(date_module,        args.clone(), None, None)?;
+            spawn::spawn_application(test_panic_module,  args.clone(), None, None)?;
+        }
+    }
+
 
     #[cfg(target_feature = "sse2")]
     {
@@ -547,16 +531,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
     }
 
-    println!("initialization done! Enabling interrupts to schedule away from Task 0 ...");
-    debug!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
-
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
     
+
     loop { 
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
-
 }

@@ -22,6 +22,11 @@ version = "1.0"
 git = "https://github.com/kevinaboos/irq_safety"
 version = "0.1.1"
 
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 

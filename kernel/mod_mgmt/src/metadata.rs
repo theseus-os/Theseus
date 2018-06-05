@@ -3,6 +3,7 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
+use core::ops::Deref;
 use spin::Mutex;
 use irq_safety::MutexIrqSafe;
 use alloc::{Vec, String, BTreeMap};
@@ -54,6 +55,7 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
             if let Some(key) = sec.key() {
                 // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
                 // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
+                // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
                 let entry = locked_kmap.entry(key.clone());
                 match entry {
                     Entry::Occupied(old_val) => {
@@ -62,8 +64,10 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
                                 if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate.crate_name, key); }
                             }
                             else {
-                                warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                    new_crate.crate_name, old_sec.size(), new_sec_size, key);
+                                if log_replacements { 
+                                    warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
+                                        new_crate.crate_name, old_sec.size(), new_sec_size, key);
+                                }
                             }
                         }
                     }
@@ -126,6 +130,21 @@ pub struct LoadedCrate {
     // crate_dependencies: Vec<LoadedCrate>,
 }
 
+impl LoadedCrate {
+    /// Returns the `TextSection` matching the requested function name, if it exists in this `LoadedCrate`.
+    /// Only matches demangled names, e.g., "my_crate::foo".
+    pub fn get_function_section(&self, func_name: &str) -> Option<&TextSection> {
+        for sec in &self.sections {
+            if let LoadedSection::Text(text) = sec.deref() {
+                if &text.abs_symbol == func_name {
+                    return Some(text);
+                }
+            }
+        }
+        None
+    }
+}
+
 
 
 #[derive(Debug)]
@@ -142,11 +161,11 @@ impl LoadedSection {
             &LoadedSection::Data(ref data) => data.size,
         }
     }
-    pub fn key(&self) -> Option<String> {
+    pub fn key(&self) -> Option<&String> {
         match self {
-            &LoadedSection::Text(ref text) => Some(text.abs_symbol.clone()),
-            &LoadedSection::Rodata(ref rodata) => Some(rodata.abs_symbol.clone()),
-            &LoadedSection::Data(ref data) => Some(data.abs_symbol.clone()),
+            &LoadedSection::Text(ref text) => Some(&text.abs_symbol),
+            &LoadedSection::Rodata(ref rodata) => Some(&rodata.abs_symbol),
+            &LoadedSection::Data(ref data) => Some(&data.abs_symbol),
         }
     }
     pub fn is_global(&self) -> bool {
