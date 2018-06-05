@@ -43,7 +43,6 @@ path = "../window_manager"
 [dependencies.console_types]
 path = "../console_types"
 
-
 [dependencies.memory]
 path = "../memory"
 

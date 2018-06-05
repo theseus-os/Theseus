@@ -33,7 +33,6 @@ extern crate ps2;
 
 
 use ps2::handle_mouse_packet;
-use mouse::mouse_to_print;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::Once;
 //use port_io::Port;
@@ -256,8 +255,8 @@ static mut EXTENDED_SCANCODE: bool = false;
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-    let indicator = ps2::ps2_status_register();
 
+    let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01 {
@@ -266,8 +265,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
             // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
             let scan_code = ps2::ps2_read_data();
             // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
-//            ps2::disable_scanning();
-//            ps2::enable_scanning();
+
 
             let extended = unsafe { EXTENDED_SCANCODE };
 
@@ -301,10 +299,9 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
 }
 
 /// 0x2C
-#[allow(non_snake_case)]
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
-    let indicator = ps2::ps2_status_register();
 
+    let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01 {
@@ -312,12 +309,12 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
         if indicator & 0x20 == 0x20 {
             let readdata = handle_mouse_packet();
             if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
-                error!("Displacement overflows!")
+                error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
             } else if readdata & 0x08 == 0 {
-                error!("third bit should always be 1")
+                error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
             } else {
-                let mouse_event = &mouse::handle_mouse_input(readdata);
-                mouse_to_print(mouse_event);
+                let _mouse_event = mouse::handle_mouse_input(readdata);
+                // mouse::mouse_to_print(&_mouse_event);
             }
 
         }
