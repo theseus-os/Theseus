@@ -498,11 +498,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // run some sample applications as a test
     if true {
-        let hello_module        = memory::get_module("__a_hello")       .ok_or("Error: no module named '__a_hello' found!")?;
-        let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
+        // let hello_module        = memory::get_module("__a_hello")       .ok_or("Error: no module named '__a_hello' found!")?;
+        // let date_module         = memory::get_module("__a_date")        .ok_or("Error: no module named '__a_date' found!")?;
         let ps_module           = memory::get_module("__a_ps")          .ok_or("Error: no module named '__a_ps' found!")?;
-        let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
-        let args = vec![String::from("-h")];
+        let kill_module         = memory::get_module("__a_kill")        .ok_or("Error: no module named '__a_kill' found!")?;
+        // let test_panic_module   = memory::get_module("__a_test_panic")  .ok_or("Error: no module named '__a_test_panic' found!")?;
+        let args = vec![String::from("0")];
 
         #[cfg(feature = "loadable")]
         {
@@ -513,17 +514,21 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
                 .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_application\"")?
                 .as_func(section.mapped_pages_offset(), &mut space)?; 
             
-            func(hello_module, args, None, None)?; // run hello
-            func(date_module, args, None, None)?; // run date
+            //func(hello_module, args, None, None)?; // run hello
+            //func(date_module, args, None, None)?; // run date
             func(ps_module, args, None, None)?; // run ps
-            func(test_panic_module, args, None, None)?; // run test_panic
+            func(kill_module, args, None, None)?; // run kill
+            func(ps_module, args, None, None)?; // run ps again
+            //func(test_panic_module, args, None, None)?; // run test_panic
         }
         #[cfg(not(feature = "loadable"))]
         {
-            spawn::spawn_application(hello_module,       args.clone(), None, None)?;
-            spawn::spawn_application(date_module,        args.clone(), None, None)?;
-            spawn::spawn_application(ps_module,          args.clone(), None, None)?;
-            spawn::spawn_application(test_panic_module,  args.clone(), None, None)?;
+            //spawn::spawn_application(hello_module,       args.clone(), None, None)?;
+            //spawn::spawn_application(date_module,        args.clone(), None, None)?;
+            spawn::spawn_application(ps_module,            args.clone(), None, None)?;
+            spawn::spawn_application(kill_module,          args.clone(), None, None)?;
+            spawn::spawn_application(ps_module,            args.clone(), None, None)?;
+            //spawn::spawn_application(test_panic_module,  args.clone(), None, None)?;
         }
     }
 

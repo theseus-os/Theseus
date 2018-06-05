@@ -11,8 +11,6 @@ use self::task::TASKLIST;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
-    let program = _args[0].clone();
-    
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("a", "all", "print all processes in detail");
