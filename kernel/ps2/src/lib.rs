@@ -4,12 +4,13 @@
 #[macro_use] extern crate log;
 extern crate port_io;
 extern crate spin;
-
+extern crate alloc;
 
 
 
 use spin::Mutex;
 use port_io::Port;
+use alloc::Vec;
 
 
 static PS2_PORT: Mutex<Port<u8>> = Mutex::new( Port::new(0x60));
@@ -17,18 +18,22 @@ static PS2_COMMAND_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
 
 
-/// clean the ps2 data port input buffer
-pub fn ps2_clean_buffer() {
+/// clean the PS2 data port (0x60) output buffer
+/// also return the vec of data previously in the buffer which may be useful
+pub fn ps2_clean_buffer() -> Vec<u8> {
+    let mut buffer_data = Vec::new();
     loop {
+        // if no more data in the output buffer
         if ps2_status_register() & 0x01 == 0 {
             break;
         } else {
-            ps2_read_data();
+            buffer_data.push(ps2_read_data());
         }
     }
+    buffer_data
 }
 
-/// write command to the command ps2 port
+/// write command to the command ps2 port (0x64)
 pub fn ps2_write_command(value: u8) {
     unsafe { PS2_COMMAND_PORT.lock().write(value); }
 }
@@ -38,11 +43,12 @@ pub fn ps2_status_register()-> u8{
     PS2_COMMAND_PORT.lock().read()
 }
 
-/// read dat from ps2 data port
+/// read dat from ps2 data port (0x60)
 pub fn ps2_read_data()->u8{
 
     PS2_PORT.lock().read()
 }
+
 /// read the config of the ps2 port
 pub fn ps2_read_config() -> u8 {
     ps2_write_command(0x20);
@@ -50,7 +56,7 @@ pub fn ps2_read_config() -> u8 {
     config
 }
 
-/// write the new config tothe ps2 port
+/// write the new config to the ps2 command port (0x64)
 pub fn ps2_write_config(value: u8) {
     ps2_write_command(0x60);
     unsafe { PS2_PORT.lock().write(value) };
@@ -61,12 +67,12 @@ pub fn ps2_write_config(value: u8) {
 pub fn init_ps2_port1() {
 
     //disable PS2 ports first
-
     ps2_write_command(0xA7);
     ps2_write_command(0xAD);
 
+    // clean the output buffer of ps2 to avoid conflicts
     ps2_clean_buffer();
-    // clean the output buffer of ps2
+
 
     // set the configuration
     {
@@ -194,21 +200,54 @@ pub fn test_ps2_port2() {
 }
 
 /// write data to the first ps2 data port and return the response
-/// right now only used for mouse
 pub fn data_to_port1(value: u8) -> u8{
     unsafe { PS2_PORT.lock().write(value) };
     let response = ps2_read_data();
     response
 }
 
-/// write command to the second ps2 data port and return the result
-pub fn data_to_port2(value: u8) -> Result<(), &'static str>{
+/// write data to the second ps2 data port and return the response
+pub fn data_to_port2(value: u8) -> u8{
     ps2_write_command(0xD4);
-    unsafe { PS2_PORT.lock().write(value) };
-    let response = ps2_read_data();
+    data_to_port1(value)
+}
+
+/// write command to the keyboard and return the result
+pub fn command_to_keyboard(value:u8) ->  Result<(), &'static str>{
+    let response = data_to_port1(value);
+
+    match response{
+
+        0xFA => {// keyboard acknowledges the command
+            Ok(())},
+        0xFE => {
+            // keyboard doesn't acknowledge the command
+            Err("Fail to send the command to the keyboard")},
+        _=> {
+
+            for _x in 0..14 {
+                // wait for response
+                let response = ps2_read_data();
+                if response == 0xFA{
+                    return Ok(());
+                }else if response == 0xfe{
+                    return Err("Please resend the command to the keyboard");
+                }
+            }
+            Err("command is not acknowledged")
+        }
+    }
+}
+
+/// write command to the mouse and return the result
+pub fn command_to_mouse(value: u8) -> Result<(), &'static str>{
+    // if the mouse doesn't acknowledge the command return error
+    let response = data_to_port2(value);
     if response != 0xFA {
         for _x in 0..14 {
+
             let response = ps2_read_data();
+
             if response == 0xFA{
 //                info!("mouse command is responded !!!!");
                 return Ok(());
@@ -221,61 +260,56 @@ pub fn data_to_port2(value: u8) -> Result<(), &'static str>{
     Ok(())
 }
 
+/// write data to the second ps2 output buffer
+pub fn write_to_second_output_buffer(value:u8){
+    ps2_write_command(0xD3);
+    unsafe{PS2_PORT.lock().write(value)};
+}
 
-///handle mouse data packet according to the current mouse ID
-/// return 0 means failed
-pub fn handle_mouse_packet() -> Result<u32, &'static str>{
+/// read mouse data packet
 
+pub fn handle_mouse_packet() -> u32{
+    // since nowadays almost every mouse has scroll, so there is a 4 byte packet
+    // which means that only mouse with ID 3 or 4 can be applied this function
+    // because the mouse is initialized to have ID 3 or 4, so this function can
+    // handle the mouse data packet
 
     let byte_1 = ps2_read_data() as u32;
     let byte_2 = ps2_read_data()  as u32;
     let byte_3 = ps2_read_data()  as u32;
     let byte_4 = ps2_read_data()  as u32;
-    if let Err(_e) = mouse_packet_streaming(1){
-        return Err("packets may stuck in the buffer and cause error");
-    }
-    ps2_clean_buffer();
-    let mut readdata:u32 = 0;
-    let id = check_mouse_id();
-    if id == 99{
-        return Err("read mouse id wrong, cannot read the packet correctly");
-    }
-//    info!("mouse ID{}",id);
-    if id == 4 || id == 3 {
-        readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
-    }else if id == 0{
-        readdata = (byte_3 << 16) | (byte_2 << 8) | byte_1;
-        let byte = byte_4 as u8;
-        ps2_write_command(0xD3);
-        unsafe{PS2_PORT.lock().write(byte)};
-    }
-    if let Err(_e) = mouse_packet_streaming(0){
-        return Err("fail to enable the mouse steaming ");
-    }
-    Ok(readdata)
+    let readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
+    readdata
 
 }
 
 /// set ps2 mouse's sampling rate
 pub fn set_sampling_rate(value:u8)->Result<(), &'static str>{
-    if let Err(_e) = data_to_port2(0xF3){
+
+    // if command is not acknowledged
+    if let Err(_e) = command_to_mouse(0xF3){
         Err("set mouse sampling rate failled, please try again")
     }else{
-        if let Err(_e) = data_to_port2(value){
+        // if second byte command is not acknowledged
+        if let Err(_e) = command_to_mouse(value){
             Err("set mouse sampling rate failled, please try again")
         }else{
-//            info!("set mouse sampling rate succeeded!!!");
             Ok(())
         }
     }
 }
 
 /// set the mouse ID (3 or 4 ) by magic sequence
+/// 3 means that the mouse has scroll
+/// 4 means that the mouse has scroll, fourth and fifth buttons
 pub fn set_mouse_id(id:u8)->Result<(), &'static str>{
+    // stop the mouse's streaming before trying to set the ID
+    // if fail to stop the streaming, return error
     if let Err(_e) = mouse_packet_streaming(1){
         warn!("fail to stop streaming, before trying to read mouse id");
         return Err("fail to set the mouse id!!!");
     }else {
+        // set the id to 3
         if id == 3 {
             if let Err(_e) = set_sampling_rate(200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
@@ -289,7 +323,9 @@ pub fn set_mouse_id(id:u8)->Result<(), &'static str>{
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-        } else if id == 4 {
+        }
+            // set the id to 4
+            else if id == 4 {
             if let Err(_e) = set_sampling_rate(200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
@@ -327,36 +363,43 @@ pub fn set_mouse_id(id:u8)->Result<(), &'static str>{
 
 }
 
-/// check mouse's id
+/// check the mouse's id
 /// return 99 if failed
 pub fn check_mouse_id()->u8 {
     let mut id_num: u8 = 99;
-    if let Err(_e) = mouse_packet_streaming(1) {
-        warn!("plz try read the id later");
-    } else {
-        if let Err(_e) = data_to_port2(0xF2) {
-            warn!("check id command is not accepted!!!, please try later");
-        } else {
-            id_num = ps2_read_data();
+    //stop the streaming before trying to read the mouse's id
+    let result = mouse_packet_streaming(1);
+    match result{
+        Err(e) => {
+            warn!("please try read the id later due to that: {}", e);
+        },
+        Ok(_buffer_data) => {
+            // check whether the command is acknowledged
+            if let Err(_e) = command_to_mouse(0xF2) {
+                warn!("check id command is not accepted!!!, please try later");
+            } else {
+                id_num = ps2_read_data();
+            }
+            // begin streaming again
             if let Err(_e) = mouse_packet_streaming(0) {
-                warn!("the streaming oo mouse is disabled,please open it manually");
+                warn!("the streaming of mouse is disabled,please open it manually");
             }
             return id_num;
+            }
         }
-    }
-    warn!("read mouse id failled, return 99");
+    warn!("failed to read mouse id , return 99");
     id_num
 }
 
 /// reset the mouse
 pub fn reset_mouse()->Result<(), &'static str> {
-    if let Err(_e) = data_to_port2(0xFF){
+    if let Err(_e) = command_to_mouse(0xFF){
         Err("reset mouse failled please try again")
     }else{
         for _x in 0..14{
             let more_bytes = ps2_read_data();
             if more_bytes == 0xAA {
-//                info!("command reset mouse succeeded!!!");
+            // command reset mouse succeeded
                 return Ok(());
             }
         }
@@ -370,32 +413,44 @@ pub fn reset_mouse()->Result<(), &'static str> {
 
 ///resend the most recent packet again
 pub fn mouse_resend()->Result<(), &'static str>{
-    if let Err(_e) = data_to_port2(0xFE){
+    if let Err(_e) = command_to_mouse(0xFE){
         Err("mouse resend request failled, please request again")
     }else{
-//        info!("mouse resend request  succeeded!!!");
+        // mouse resend request succeeded
         Ok(())
     }
 }
 
 ///enable or disable the packet streaming
-/// 0 enable, 1 disable
-pub fn mouse_packet_streaming(value:u8)->Result<(), &'static str> {
+/// parameter: 0 enable, 1 disable
+/// also return the vec of data previously in the buffer which may be useful
+pub fn mouse_packet_streaming(value:u8)->Result<Vec<u8>, &'static str> {
     if value == 1 {
-        if let Err(_e) = data_to_port2(0xf5){
-            warn!("disable streaming failed");
-            Err("disable mouse streaming failed")
-        }else{
-//            info!("disable streaming succeeded!!");
-            Ok(())
+        let mut buffer_data = Vec::new();
+        if data_to_port2(0xf5) != 0xfa{
+            for x in 0..15{
+                if x == 14{
+                    warn!("disable streaming failed");
+                    return Err("disable mouse streaming failed");
+                }
+                let response = ps2_read_data();
+
+                if response != 0xfa{
+                    buffer_data.push(response);
+                }else{
+                    return Ok(buffer_data);
+                }
+            }
         }
-    }else if value == 0 {
-        if let Err(_e) = data_to_port2(0xf4){
+        Ok(buffer_data)
+        }
+    else if value == 0 {
+        if let Err(_e) = command_to_mouse(0xf4){
             warn!("enable streaming failed");
             Err("enable mouse streaming failed")
         }else{
 //            info!("enable streaming succeeded!!");
-            Ok(())
+            Ok(Vec::new())
         }
     }else{
         Err("invalid parameter, please enter 0 or 1 to enable or disable streaming")
@@ -403,14 +458,15 @@ pub fn mouse_packet_streaming(value:u8)->Result<(), &'static str> {
 }
 
 ///set the resolution of the mouse
+/// parameter :
 /// 0x00: 1 count/mm; 0x01 2 count/mm;
 /// 0x02 4 count/mm; 0x03 8 count/mm;
 pub fn mouse_resolution(value:u8)->Result<(), &'static str>{
-    if let Err(_e) = data_to_port2(0xE8){
+    if let Err(_e) = command_to_mouse(0xE8){
         warn!("command set mouse resolution is not accepted");
         Err("set mouse resolution failed!!!")
     }else{
-        if let Err(_e) = data_to_port2(value){
+        if let Err(_e) = command_to_mouse(value){
             warn!("the resolution value is not accepted");
             Err("set mouse resolution failed!!!")
         }else{
@@ -421,53 +477,51 @@ pub fn mouse_resolution(value:u8)->Result<(), &'static str>{
 }
 
 ///set LED status of the keyboard
+/// parameter :
 /// 0: ScrollLock; 1: NumberLock; 2: CapsLock
 pub fn keyboard_led(value:u8){
-    let response = data_to_port1(0xED);
-    if response == 0xFA{
-        let ack = data_to_port1(value);
-        if ack != 0xFA{
-            warn!("set LED failed")
-        }
-    }else if response == 0xFE{
-        warn!("plz send the set led command again!");
-    }else{
-        warn!("command is not accepted")
+    if let Err(_e) = command_to_keyboard(0xED){
+        warn!("failed to set the keyboard led");
+    }else if let Err(_e) = command_to_keyboard(value) {
+        warn!("failed to set the keyboard led");
     }
 }
 
 /// set the scancode set of the keyboard
 /// 0: get the current set; 1: set 1
 /// 2: set 2; 3: set 3
-pub fn keyboard_scancode_set(value:u8){
-    let response = data_to_port1(0xF0);
-    if response == 0xFA{
-        let ack = data_to_port1(value);
-        if ack != 0xFA && ack != 0xFE{
-            warn!("request failed")
-        }
-    } else if response == 0xFE{
-        warn!("plz resend the command again!");
-    }else{
-        warn!("command is not accepted!");
+pub fn keyboard_scancode_set(value:u8) -> Result<(), &'static str>{
+    if let Err(_e) = command_to_keyboard(0xF0){
+        return Err("failed to set the keyboard scancode set");
+    } else if let Err(_e) = command_to_keyboard(value){
+        return Err("failed to set the keyboard scancode set");
     }
+    Ok(())
 
 }
 
 ///detect the keyboard's type
-pub fn keyboard_detect(){
-    let response = data_to_port1(0xF2);
-        if response == 0xFA{
-            let reply = ps2_read_data();
-            match reply {
-                0xAB => info!("MF2 keyboard with translation enabled in the PS/Controller"),
-                0x41 => info!("MF2 keyboard with translation enabled in the PS/Controller"),
-                0xC1 => info!("MF2 keyboard with translation enabled in the PS/Controller"),
-                0x83 => info!("MF2 keyboard"),
-                _=> info!("Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)")
-            }
-        }else {
-            warn!("command is not accepted!")
+pub fn keyboard_detect() ->Result<&'static str, &'static str>{
+//    let reply = data_to_port1(0xF2);
+//    info!("{:x}",reply);
+//    match reply {
+//        0xAB => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+//        0x41 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+//        0xC1 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+//        0x83 => Ok("MF2 keyboard"),
+//        _=> Err("Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)")
+//    }
+    if let Err(e) = command_to_keyboard(0xF2){
+        return Err(e);
+    }else{
+        let reply = ps2_read_data();
+        match reply {
+            0xAB => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+            0x41 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+            0xC1 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
+            0x83 => Ok("MF2 keyboard"),
+            _=> Ok("Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)")
         }
+    }
 
 }

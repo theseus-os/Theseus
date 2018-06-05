@@ -12,7 +12,7 @@ use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction,
 use spin::Once;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
-use ps2::{init_ps2_port1,test_ps2_port1};
+use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect};
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
@@ -33,6 +33,12 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
     init_ps2_port1();
     //test the first port
     test_ps2_port1();
+    match keyboard_detect(){
+        Err(e) => {warn!("fail to read keyboard type due to that,{} " ,e )},
+        Ok(s) => {info!("The keyboard type is: {}",s)}
+    }
+//    keyboard_led(0x1);
+//    keyboard_led(0x4);
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });
@@ -45,17 +51,92 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
 pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
-   
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
 
     // first, update the modifier keys
     match scan_code {
         x if x == Keycode::Control as u8 => { modifiers.control = true }
         x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
+
         x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { modifiers.shift = true }
 
         // toggle caps lock on press only
-        x if x == Keycode::CapsLock as u8 => { modifiers.caps_lock ^= true }
+        x if x == Keycode::CapsLock as u8 => {
+            let old_cap = modifiers.caps_lock.clone();
+            modifiers.caps_lock ^= true;
+            if !old_cap && modifiers.caps_lock{
+                if modifiers.scroll_lock{
+                    if modifiers.num_lock{
+                        let _e = keyboard_led(0b111);
+                    }else{
+                        let _e = keyboard_led(0b101);
+                    }
+                }else{
+                    let _e = keyboard_led(0b100);
+                }
+            }else if old_cap && !modifiers.caps_lock{
+                if modifiers.scroll_lock{
+                    if modifiers.num_lock{
+                        let _e = keyboard_led(0b011);
+                    }else{
+                        let _e = keyboard_led(0b001);
+                    }
+                }else{
+                    let _e = keyboard_led(0b000);
+                }
+            }
+
+        }
+        x if x == Keycode::ScrollLock     as u8 => {
+            let old_scroll = modifiers.scroll_lock.clone();
+            modifiers.scroll_lock ^= true;
+            if !old_scroll && modifiers.scroll_lock{
+                if modifiers.num_lock{
+                    if modifiers.caps_lock{
+                        let _e = keyboard_led(0b111);
+                    }else{
+                        let _e = keyboard_led(0b011);
+                    }
+                }else{
+                    let _e = keyboard_led(0b001);
+                }
+            } else if !old_scroll && modifiers.scroll_lock{
+                if modifiers.num_lock{
+                    if modifiers.caps_lock{
+                        let _e = keyboard_led(0b110);
+                    }else{
+                        let _e = keyboard_led(0b010);
+                    }
+                }else{
+                    let _e = keyboard_led(0b000);
+                }
+            }
+        }
+        x if x == Keycode::NumLock    as u8 => {
+            let old_num = modifiers.num_lock.clone();
+            modifiers.num_lock ^= true;
+            if !old_num && modifiers.num_lock{
+                if modifiers.scroll_lock{
+                    if modifiers.caps_lock{
+                        let _e = keyboard_led(0b111);
+                    }else{
+                        let _e = keyboard_led(0b011);
+                    }
+                }else{
+                    let _e = keyboard_led(0b010);
+                }
+            } else if old_num && !modifiers.num_lock{
+                if modifiers.scroll_lock{
+                    if modifiers.caps_lock{
+                        let _e = keyboard_led(0b101);
+                    }else{
+                        let _e = keyboard_led(0b001);
+                    }
+                }else{
+                    let _e = keyboard_led(0b000);
+                }
+            }
+        }
 
         x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
         x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { modifiers.alt = false }
@@ -64,7 +145,7 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
         _ => { } // do nothing
     }
 
-    // debug!("KBD_MODIFIERS after {}: {:?}", scan_code, modifiers);
+//    debug!("KBD_MODIFIERS after {}: {:?}", scan_code, modifiers);
 
     // second,  put the keycode and it's action (pressed or released) in the keyboard queue
     match scan_code {

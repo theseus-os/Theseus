@@ -5,7 +5,27 @@
 
 
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
+pub struct Displacement{
+    pub x : u8,
+    pub y : u8
+}
+
+impl Displacement{
+    pub const fn default() ->Displacement{
+        Displacement{
+            x: 0,
+            y: 0
+        }
+    }
+    pub fn read_from_data(& mut self, readdata: u32){
+        let x_dis:u8 = ((readdata & 0x0000ff00) >> 8) as u8;
+        let y_dis:u8 = ((readdata & 0x00ff0000) >> 16) as u8;
+        self.x = x_dis;
+        self.y = y_dis;
+    }
+}
+#[derive(Debug, Copy, Clone)]
 pub struct ButtonAction{
     pub left_button_hold: bool,
     pub right_button_hold: bool,
@@ -137,13 +157,15 @@ impl MouseMovement{
 pub struct MouseEvent {
     pub buttonact: ButtonAction,
     pub mousemove: MouseMovement,
+    pub displacement: Displacement
 }
 
 impl MouseEvent{
-    pub fn new(buttonact: ButtonAction, mousemove: MouseMovement,)-> MouseEvent {
+    pub fn new(buttonact: ButtonAction, mousemove: MouseMovement,displacement: Displacement)-> MouseEvent {
         MouseEvent{
             buttonact,
             mousemove,
+            displacement
         }
     }
 }
