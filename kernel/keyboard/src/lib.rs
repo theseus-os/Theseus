@@ -12,7 +12,7 @@ use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction,
 use spin::Once;
 use dfqueue::DFQueueProducer;
 use console_types::ConsoleEvent;
-use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect};
+use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardType};
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
@@ -21,12 +21,16 @@ static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 
 static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
+/// Bitmask for the Scroll Lock keyboard LED
+const SCROLL_LED: u8 = 0b001;
+/// Bitmask for the Num Lock keyboard LED
+const NUM_LED: u8 = 0b010;
+/// Bitmask for the Caps Lock keyboard LED
+const CAPS_LED: u8 = 0b100;
 
 /// Initialize the keyboard driver. 
 /// Arguments: a reference to a queue onto which keyboard events should be enqueued. 
 pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
-    // assert_has_not_been_called!("keyboard init was called more than once!");
-    
     // set keyboard to scancode set 1
 
     //init the first ps2 port for keyboard
@@ -34,11 +38,17 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
     //test the first port
     test_ps2_port1();
     match keyboard_detect(){
-        Err(e) => {warn!("fail to read keyboard type due to that,{} " ,e )},
-        Ok(s) => {info!("The keyboard type is: {}",s)}
+        Err(e) => { 
+            error!("failed to read keyboard type due to: {} ", e)
+        },
+        Ok(s) => {
+            match s {
+                KeyboardType::AncientATKeyboard => info!("Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
+                KeyboardType::MF2Keyboard => info!("MF2Keyboard"),
+                KeyboardType::MF2KeyboardWithPSControllerTranslator => info!("MF2 Keyboard with translator enabled in PS/2 Controller"),
+            }
+        }
     }
-//    keyboard_led(0x1);
-//    keyboard_led(0x4);
     CONSOLE_PRODUCER.call_once(|| {
         console_queue_producer
     });
@@ -58,84 +68,24 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
         x if x == Keycode::Control as u8 => { modifiers.control = true }
         x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
 
-        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { modifiers.shift = true }
+        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { 
+            modifiers.shift = true 
+        }
 
         // toggle caps lock on press only
         x if x == Keycode::CapsLock as u8 => {
-            let old_cap = modifiers.caps_lock.clone();
             modifiers.caps_lock ^= true;
-            if !old_cap && modifiers.caps_lock{
-                if modifiers.scroll_lock{
-                    if modifiers.num_lock{
-                        let _e = keyboard_led(0b111);
-                    }else{
-                        let _e = keyboard_led(0b101);
-                    }
-                }else{
-                    let _e = keyboard_led(0b100);
-                }
-            }else if old_cap && !modifiers.caps_lock{
-                if modifiers.scroll_lock{
-                    if modifiers.num_lock{
-                        let _e = keyboard_led(0b011);
-                    }else{
-                        let _e = keyboard_led(0b001);
-                    }
-                }else{
-                    let _e = keyboard_led(0b000);
-                }
-            }
+            set_keyboard_led(&modifiers);
+        }
 
-        }
-        x if x == Keycode::ScrollLock     as u8 => {
-            let old_scroll = modifiers.scroll_lock.clone();
+        x if x == Keycode::ScrollLock as u8 => {
             modifiers.scroll_lock ^= true;
-            if !old_scroll && modifiers.scroll_lock{
-                if modifiers.num_lock{
-                    if modifiers.caps_lock{
-                        let _e = keyboard_led(0b111);
-                    }else{
-                        let _e = keyboard_led(0b011);
-                    }
-                }else{
-                    let _e = keyboard_led(0b001);
-                }
-            } else if !old_scroll && modifiers.scroll_lock{
-                if modifiers.num_lock{
-                    if modifiers.caps_lock{
-                        let _e = keyboard_led(0b110);
-                    }else{
-                        let _e = keyboard_led(0b010);
-                    }
-                }else{
-                    let _e = keyboard_led(0b000);
-                }
-            }
+            set_keyboard_led(&modifiers);
         }
+
         x if x == Keycode::NumLock    as u8 => {
-            let old_num = modifiers.num_lock.clone();
             modifiers.num_lock ^= true;
-            if !old_num && modifiers.num_lock{
-                if modifiers.scroll_lock{
-                    if modifiers.caps_lock{
-                        let _e = keyboard_led(0b111);
-                    }else{
-                        let _e = keyboard_led(0b011);
-                    }
-                }else{
-                    let _e = keyboard_led(0b010);
-                }
-            } else if old_num && !modifiers.num_lock{
-                if modifiers.scroll_lock{
-                    if modifiers.caps_lock{
-                        let _e = keyboard_led(0b101);
-                    }else{
-                        let _e = keyboard_led(0b001);
-                    }
-                }else{
-                    let _e = keyboard_led(0b000);
-                }
-            }
+            set_keyboard_led(&modifiers);
         }
 
         x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
@@ -182,4 +132,20 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
         }
     }
 
+}
+
+
+fn set_keyboard_led(modifiers: &KeyboardModifiers) {
+    let mut led_bitmask: u8 = 0; 
+    if modifiers.caps_lock {
+        led_bitmask |= CAPS_LED;
+    }
+    if modifiers.num_lock {
+        led_bitmask |= NUM_LED;
+    }
+    if modifiers.scroll_lock {
+        led_bitmask |= SCROLL_LED;
+    }
+
+    keyboard_led(led_bitmask);
 }
