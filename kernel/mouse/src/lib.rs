@@ -6,11 +6,12 @@ extern crate mouse_data;
 extern crate ps2;
 
 
-use mouse_data::{ButtonAction, MouseMovement,MouseEvent};
+use mouse_data::{ButtonAction, MouseMovement,MouseEvent,Displacement};
 use ps2::{init_ps2_port2,test_ps2_port2,set_mouse_id,check_mouse_id};
 
 static mut MOUSE_MOVE: MouseMovement = MouseMovement::default();
 static mut BUTTON_ACT: ButtonAction = ButtonAction::default();
+static mut DISPLACEMENT: Displacement = Displacement::default();
 
 /// Initialize the mouse driver.
 pub fn init() {
@@ -19,6 +20,7 @@ pub fn init() {
     init_ps2_port2();
     // test the second ps2 port
     test_ps2_port2();
+
     // set Mouse ID to 4
     let _e = set_mouse_id(4);
     // check the ID
@@ -31,28 +33,31 @@ pub fn init() {
 pub fn mouse_to_print(mouse_event:&MouseEvent) {
     let mouse_movement = &mouse_event.mousemove;
     let mouse_buttons = &mouse_event.buttonact;
+    let mouse_displacement = &mouse_event.displacement;
+    let x = mouse_displacement.x as i8;
+    let y = mouse_displacement.y as i8;
     // print direction
     {
         if mouse_movement.right {
             if mouse_movement.up {
-                info!("right,up,\n");
+                info!("right: {},up: {},\n",x ,y );
             } else if mouse_movement.down {
-                info!("right,down,\n");
+                info!("right: {},down: {},\n",x,y);
             } else {
-                info!("right\n");
+                info!("right: {}\n", x);
             }
         } else if mouse_movement.left {
             if mouse_movement.up {
-                info!("left,up,\n");
+                info!("left: {},up : {},\n", x,y);
             } else if mouse_movement.down {
-                info!("left,down,\n");
+                info!("left: {},down: {},\n",x,y);
             } else {
-                info!("left\n");
+                info!("left: {}\n",x);
             }
         } else if mouse_movement.up {
-            info!("up,\n");
+            info!("up: {},\n", y);
         } else if mouse_movement.down {
-            info!("down,\n");
+            info!("down: {},\n", y);
         } else if mouse_movement.scrolling_up {
             info!("scrollingup, \n");
         } else if mouse_movement.scrolling_down {
@@ -84,10 +89,12 @@ pub fn mouse_to_print(mouse_event:&MouseEvent) {
 pub fn handle_mouse_input(readdata: u32) -> MouseEvent{
     let action = unsafe{ &mut BUTTON_ACT};
     let mmove = unsafe{&mut MOUSE_MOVE};
+    let dis = unsafe{&mut DISPLACEMENT};
 
     mmove.read_from_data(readdata);
     action.read_from_data(readdata);
-    MouseEvent::new(*action, *mmove)
+    dis.read_from_data(readdata);
+    MouseEvent::new(*action, *mmove,*dis)
 
 }
 

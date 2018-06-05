@@ -35,8 +35,8 @@ extern crate ps2;
 use ps2::handle_mouse_packet;
 use mouse::mouse_to_print;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
-use spin::{Mutex, Once};
-use port_io::Port;
+use spin::Once;
+//use port_io::Port;
 // use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
@@ -54,10 +54,6 @@ pub static IDT: LockedIdt = LockedIdt::new();
 
 /// Interface to our PIC (programmable interrupt controller) chips.
 static PIC: Once<pic::ChainedPics> = Once::new();
-/// The PS2_PORT data port, port 0x60.
-static PS2_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
-/// Port 0x60 indicator data port, 0x64.
-static PS2_COMMAND_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
 
 
@@ -155,23 +151,12 @@ pub fn init_handlers_apic() {
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(ps2_keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
-        idt[0x2B].set_handler_fn(nic_handler);
         idt[0x24].set_handler_fn(com1_serial_handler);
         // idt[0x25].set_handler_fn(irq_0x25_handler);
         idt[0x26].set_handler_fn(apic_irq_0x26_handler);
         idt[0x27].set_handler_fn(spurious_interrupt_handler); 
 
         // idt[0x28].set_handler_fn(irq_0x28_handler);
-<<<<<<< HEAD
-        // idt[0x29].set_handler_fn(irq_0x29_handler);
-        // idt[0x2a].set_handler_fn(irq_0x2A_handler);
-        // idt[0x2b].set_handler_fn(irq_0x2B_handler);
-        // idt[0x2c].set_handler_fn(irq_0x2C_handler);
-        // idt[0x2d].set_handler_fn(irq_0x2D_handler);
-        // idt[0x2e].set_handler_fn(irq_0x2E_handler);
-        // idt[0x2f].set_handler_fn(irq_0x2F_handler);
-
-=======
         idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
         idt[0x2B].set_handler_fn(nic_handler);
@@ -179,7 +164,6 @@ pub fn init_handlers_apic() {
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
->>>>>>> a new crate "mouse_data" that handle input data from mouse;
 
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
 
@@ -272,120 +256,76 @@ static mut EXTENDED_SCANCODE: bool = false;
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
-    let scan_code = ps2::ps2_read_data();
-	// trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
-    
-    let extended = unsafe { EXTENDED_SCANCODE };
-   
-
-    // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
-    if scan_code == 0xE0 {
-        if extended {
-            error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
-        }
-        // mark it true for the next interrupt
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else if scan_code == 0xE1 {
-        error!("PAUSE/BREAK key pressed ... ignoring it!");
-        // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts) 
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else { // a regular scancode, go ahead and handle it
-        // if the previous interrupt's scan_code was an extended scan_code, then this one is not
-        if extended {
-            unsafe { EXTENDED_SCANCODE = false; }
-        }
-        if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
-            if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
-                error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
-            }
-        }
-    }
-
-    // call keyboard::handle_keyboard_input
-    if let Some(section) = ::mod_mgmt::metadata::get_symbol("keyboard::handle_keyboard_input").upgrade() {
-        let handle_keyboard_input_func: fn(u8) -> Result<(), &'static str> = unsafe { ::core::mem::transmute(section.virt_addr()) };
-        if let Err(e) = handle_keyboard_input_func(scan_code) {
-            error!("keyboard_handler: error handling keyboard input: {:?}", e);
-        }
-    }
-    else {
-        error!("getting keyboard::handle_keyboard_input symbol failed!");
-    }
-
-   
-
-    eoi(Some(PIC_MASTER_OFFSET + 0x1));
-}
-
-/// 0x2C
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    let indicator = PS2_COMMAND_PORT.lock().read();
+    let indicator = ps2::ps2_status_register();
 
 
     // whether there is any data on the port 0x60
-    if indicator & 0x01 == 0x01{
+    if indicator & 0x01 == 0x01 {
         //whether the data is coming from the mouse
-        if indicator & 0x20 == 0x20{
+        if indicator & 0x20 != 0x20 {
+            // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
+            let scan_code = ps2::ps2_read_data();
+            // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
+//            ps2::disable_scanning();
+//            ps2::enable_scanning();
 
-            let handle = handle_mouse_packet();
-            match handle{
-                // if error occurs, stop streaming and clean the buffer
-                Err(_e) => {
-                    // stop streaming
-                    ps2::ps2_write_command(0xD4);
-                    unsafe { PS2_PORT.lock().write(0xF5) };
-                    let response = ps2::ps2_read_data();
-                    if response != 0xFA {
-                        loop {
-                            let response = ps2::ps2_read_data();
-                            if response == 0xFA {
-                                break;
-                            }
-                        }
-                    }
-                    //clean the otput buffer
-                    ps2::ps2_clean_buffer();
+            let extended = unsafe { EXTENDED_SCANCODE };
 
-                    //enable the streaming
-                    ps2::ps2_write_command(0xD4);
-                    unsafe { PS2_PORT.lock().write(0xF4) };
-                    let response = ps2::ps2_read_data();
-                    if response != 0xFA {
-                        loop {
-                            let response = ps2::ps2_read_data();
-                            if response == 0xFA {
-                                break;
-                            }
-                        }
-                    }
-                } ,
-                // print the mouse actions
-                Ok(readdata) => {
-                    if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40){
-                    error!("although i don't understand what the error actually is. \
-                    You may move too fast or too far away!")
-                    }else if readdata & 0x08 == 0{
-                        error!("some thing wrong about the data")
-                    } else{
-                        let mouse_event = &mouse::handle_mouse_input(readdata);
-                        mouse_to_print(mouse_event);
+            // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
+            if scan_code == 0xE0 {
+                if extended {
+                    error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
+                }
+                // mark it true for the next interrupt
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else if scan_code == 0xE1 {
+                error!("PAUSE/BREAK key pressed ... ignoring it!");
+                // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else { // a regular scancode, go ahead and handle it
+                // if the previous interrupt's scan_code was an extended scan_code, then this one is not
+                if extended {
+                    unsafe { EXTENDED_SCANCODE = false; }
+                }
+                if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
+                    if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
+                        error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
                     }
                 }
             }
         }
     }
-
-    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+            eoi(Some(PIC_MASTER_OFFSET + 0x1));
 
 
 }
 
+/// 0x2C
+#[allow(non_snake_case)]
+extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
+    let indicator = ps2::ps2_status_register();
+
+
+    // whether there is any data on the port 0x60
+    if indicator & 0x01 == 0x01 {
+        //whether the data is coming from the mouse
+        if indicator & 0x20 == 0x20 {
+            let readdata = handle_mouse_packet();
+            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
+                error!("Displacement overflows!")
+            } else if readdata & 0x08 == 0 {
+                error!("third bit should always be 1")
+            } else {
+                let mouse_event = &mouse::handle_mouse_input(readdata);
+                mouse_to_print(mouse_event);
+            }
+
+        }
+
+    }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+}
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
