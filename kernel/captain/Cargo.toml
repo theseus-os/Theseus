@@ -85,6 +85,12 @@ path = "../task"
 [dependencies.scheduler]
 path = "../scheduler"
 
+[dependencies.rtc]
+path = "../rtc"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
 [target.'cfg(target_feature = "sse2")'.dependencies.simd_test]
