@@ -35,10 +35,65 @@ use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, Loade
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
 
+#[derive(PartialEq)]
+pub enum CrateType {
+    KernelModule,
+    ApplicationModule,
+    UserspaceModule,
+}
+impl CrateType {
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            CrateType::KernelModule       => "__k_",
+            CrateType::ApplicationModule  => "__a_",
+            CrateType::UserspaceModule    => "__u_",
+        }
+    }
 
-const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
-const APPLICATION_NAME_PREFIX:   &'static str = "__a_";
-const _USERSPACE_NAME_PREFIX:     &'static str = "__u_";
+    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
+    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// # Examples 
+    /// ```
+    /// let result = CrateType::from_module_name("__k_my_crate");
+    /// assert_eq!(result, (CrateType::KernelModule, "my_crate") );
+    /// ```
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+        if module_name.starts_with(CrateType::ApplicationModule.prefix()) {
+            Ok((
+                CrateType::ApplicationModule,
+                module_name.get(CrateType::ApplicationModule.prefix().len() .. ).ok_or("Couldn't get name of application module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::KernelModule.prefix()) {
+            Ok((
+                CrateType::KernelModule,
+                module_name.get(CrateType::KernelModule.prefix().len() .. ).ok_or("Couldn't get name of kernel module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::UserspaceModule.prefix()) {
+            Ok((
+                CrateType::UserspaceModule,
+                module_name.get(CrateType::UserspaceModule.prefix().len() .. ).ok_or("Couldn't get name of userspace module")?
+            ))
+        }
+        else {
+            Err("module_name didn't start with a known CrateType prefix")
+        }
+    }
+
+
+    pub fn is_application(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::ApplicationModule.prefix())
+    }
+
+    pub fn is_kernel(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::KernelModule.prefix())
+    }
+
+    pub fn is_userspace(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::UserspaceModule.prefix())
+    }
+}
 
 
 
@@ -121,6 +176,8 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
         return Err("module was not page aligned");
     } 
 
+
+
     let size = module.size();
 
     // first we need to map the module memory region into our address space, 
@@ -158,15 +215,15 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) 
     -> Result<LoadedCrate, &'static str> 
 {
-    
-    if !module.name().starts_with(APPLICATION_NAME_PREFIX) {
-        error!("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
-        return Err("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+    if !CrateType::is_application(module.name()) {
+        error!("load_application_crate() cannot be used for module \"{}\", only for application modules starting with \"{}\"",
+            module.name(), CrateType::ApplicationModule.prefix());
+        return Err("load_application_crate() can only be used for application modules");
     }
     
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
-        error!("module {} is not page aligned!", module.name());
+        error!("module {} was not page aligned!", module.name());
         return Err("module was not page aligned");
     } 
     
@@ -234,6 +291,7 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
+/// The primary internal routine for parsing, loading, and linking a crate's module object file.
 fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
                           size_in_bytes: usize, 
                           module_name: &String, 
@@ -241,18 +299,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                           log: bool)
                           -> Result<LoadedCrate, &'static str>
 {
-    let is_application = module_name.starts_with(APPLICATION_NAME_PREFIX);
-    let is_kernel_module = module_name.starts_with(KERNEL_MODULE_NAME_PREFIX);
-
-    let crate_name = if is_application {
-        module_name.get(APPLICATION_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of application module after \"__a_\"")?
-    } else if is_kernel_module {
-        module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of kernel module crate after \"__k_\"")?
-    } else {
-        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {} or {}.",
-            module_name, KERNEL_MODULE_NAME_PREFIX, APPLICATION_NAME_PREFIX);
-        return Err("module_name didn't start with __k_ or __a_");
-    };
+    
+    let (_crate_type, crate_name) = CrateType::from_module_name(module_name)?;
     let crate_name = String::from(crate_name);
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
@@ -766,39 +814,9 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                         let demangled = demangle_symbol(source_sec_name);
 
                                         // search for the symbol's demangled name in the kernel's symbol map
-                                        if let Some(sec) = metadata::get_symbol(&demangled.full).upgrade() {
-                                            Ok(sec)
-                                        }
-                                        else {                                        
-                                            // If we couldn't get the source section based on its shndx, nor based on its name, 
-                                            // then we must attempt to load the kernel crate containing that symbol.
-                                            // We are only able to do this for mangled symbols, those that have a leading crate name,
-                                            // such as "my_crate::foo". 
-                                            // If "foo()" was marked no_mangle, then we don't know which crate to load. 
-                                            if let Some(crate_dependency_name) = demangled.full.split("::").next() {
-                                                trace!("Crate \"{}\" depends on foreign symbol \"{}\", attemping to load that symbol's containing crate {:?}", 
-                                                        crate_name, demangled.full, crate_dependency_name);
-                                                
-                                                let crate_dependency_name = format!("{}{}", KERNEL_MODULE_NAME_PREFIX, crate_dependency_name);
-                                                if let Some(dependency_module) = memory::get_module(&crate_dependency_name) {
-                                                    // try to load the missing symbol's containing crate
-                                                    load_kernel_crate(dependency_module, kernel_mmi, log)?;
-                                                    // try again to find the missing symbol
-                                                    metadata::get_symbol(&demangled.full).upgrade().ok_or("Loaded crate dependency, but still couldn't find symbol needed for relocation")
-                                                }
-                                                else {
-                                                    error!("Crate \"{}\" depends on foreign symbol \"{}\", but there is no corresponding module \"{}\".", 
-                                                            crate_name, demangled.full, crate_dependency_name);
-                                                    return Err("Crate relocation depends on a foreign symbol, but that symbol's crate module did not exist.");                                                            
-                                                }
-                                            }
-                                            else {
-                                                error!("Crate \"{}\" depends on foreign symbol \"{}\", but we do not know which crate it is from (no leading crate namespace)", 
-                                                        crate_name, demangled.full);
-                                                return Err("Crate relocation depends on a foreign symbol, but that symbol does not have a clear containing crate.");
-                                            }
-                                        }
-
+                                        metadata::get_symbol_or_load(&demangled.full, kernel_mmi)
+                                            .upgrade()
+                                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                                     }
                                     else {
                                         let _source_sec_header = source_sec_entry

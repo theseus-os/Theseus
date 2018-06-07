@@ -24,8 +24,6 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
-extern crate frame_buffer;
-extern crate frame_buffer_3d;
 extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
@@ -81,12 +79,20 @@ fn shutdown(msg: &'static str) -> ! {
 ///
 /// This function does the following things: 
 ///
-/// * Bootstraps the OS, including [logging](../logger/index.html) and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
+/// * Bootstraps the OS, including [logging](../logger/index.html) 
+///   and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
 /// * Sets up basic [virtual memory](../memory/fn.init.html)
 /// * Initializes the [state_store](../state_store/index.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
 ///
 /// If a failure occurs and is propagated back up to this function, the OS is shut down.
+/// 
+/// # Note
+/// In general, you never need to modify the `nano_core` to change Theseus's behavior,
+/// because the `nano_core` is essentially logic-agnostic boilerplate code and set up routines. 
+/// If you want to customize or change how the OS components are initialized, 
+/// then change the [`captain::init`](../captain/fn.init.html) routine.
+/// 
 #[no_mangle]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
     println_raw!("Entered nano_core_start()."); 
@@ -149,6 +155,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel
     {
+        println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
         let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
     }
@@ -157,16 +164,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // parse the core library (Rust no_std lib) and the captain crate
     #[cfg(feature = "loadable")] 
     {
-        let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(
-            try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module")), 
-            kernel_mmi_ref.lock().deref_mut(), false)
-        );
+        let core_module = try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module"));
+        let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(core_module, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
-        let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(
-            try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module")), 
-            kernel_mmi_ref.lock().deref_mut(), false)
-        );
+        let captain_module = try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module"));
+        let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(captain_module, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
 
@@ -179,7 +182,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use alloc::Vec;
         use irq_safety::MutexIrqSafe;
 
-        let section = try_exit!(mod_mgmt::metadata::get_symbol("captain::init").upgrade().ok_or("no symbol: captain::init"));
+        let section = try_exit!(mod_mgmt::metadata::get_symbol_or_load("captain::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: captain::init"));
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
         let func: &CaptainInitFunc = try_exit!( 
@@ -226,13 +229,15 @@ pub extern "C" fn eh_personality() {}
 #[doc(hidden)]
 pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
     
-    if let Err(e) = default_panic_handler(fmt_args, file, line, col) {
-        error!("PANIC: error in default panic handler: {}.\nPanic in {}:{}:{} -- {}", e, file, line, col, fmt_args);
+    if let Err(_e) = default_panic_handler(fmt_args, file, line, col) {
+        error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
+        println_raw!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
     }
 
     // if we failed to handle the panic, there's not really much we can do about it
     // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
     // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
+    // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
     
     loop {}
 }
@@ -240,8 +245,11 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
 
 /// performs the standard panic handling routine, which involves the following:
 /// 
-/// * printing a basic panic message
-/// * getting the current task 
+/// * printing a basic panic message.
+/// * getting the current `Task`.
+/// * invoking the current `Task`'s `panic_handler` routine, if it has registered one.
+/// * if there is no registered panic handler, then it prints a standard message plus a stack backtrace.
+/// * Finally, it kills the panicked `Task`.
 fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str> {
     use alloc::String;
     use panic::{PanicInfo, PanicLocation};
