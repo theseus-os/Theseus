@@ -229,15 +229,8 @@ impl VgaBuffer {
         Ok(())
     }
 
+
     pub fn init_cursor(&self) {
-
-        // {
-        //     let locked_port = CURSOR_PORT_END.lock();
-        //     CURSOR_PORT_END.lock().read();
-        //     locked_port.write(val)
-        // }
-
-
         unsafe {
             let cursor_start = 0b00000001;
             let cursor_end = 0b00010000;
