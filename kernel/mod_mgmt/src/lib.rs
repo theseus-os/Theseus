@@ -38,7 +38,7 @@ use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, Loade
 
 const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
 const APPLICATION_NAME_PREFIX:   &'static str = "__a_";
-const USERSPACE_NAME_PREFIX:     &'static str = "__u_";
+const _USERSPACE_NAME_PREFIX:     &'static str = "__u_";
 
 
 

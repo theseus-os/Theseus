@@ -14,7 +14,7 @@ use alloc::{Vec, String};
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     // info!("Hello, world! (from hello application)");
-    console::print_to_console(String::from("Hello, world from hello app!\n"));
+    let _result = console::print_to_console(String::from("Hello, world from hello app!\n"));
     // println!("Hello world app args: {:?}", _args);
 
     0

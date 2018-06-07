@@ -1,0 +1,18 @@
+[package]
+name = "ps2"
+version = "0.1.0"
+authors = ["bowenliu"]
+
+[dependencies]
+spin = "0.4.5"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think
+

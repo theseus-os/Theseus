@@ -14,7 +14,7 @@ extern crate owning_ref;
 
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
