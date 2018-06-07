@@ -229,7 +229,6 @@ impl VgaBuffer {
         Ok(())
     }
 
-
     pub fn init_cursor(&self) {
         unsafe {
             let cursor_start = 0b00000001;

@@ -596,7 +596,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             RUNNING_TERMINALS.lock().push(new_term_obj);
         }
         event.mark_completed();
-        
     }
 }
 
