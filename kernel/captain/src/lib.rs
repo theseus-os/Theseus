@@ -172,13 +172,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         mod_mgmt::load_kernel_crate(memory::get_module("__k_driver_init")     .ok_or("couldn't find __k_driver_init module")?,    &mut kernel_mmi, false)?;
     }
 
-    // load RTC regardless, since an app uses it. Once we have full dependency resolution, this can be removed.
-    {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
-        // mod_mgmt::load_kernel_crate(memory::get_module("__k_getopts")         .ok_or("couldn't find __k_getopts module")?,        &mut kernel_mmi, false)?;    
-    }
-    
 
     // now we initialize early driver stuff, like APIC/ACPI
     let madt_iter = {
