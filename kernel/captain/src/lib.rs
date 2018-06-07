@@ -176,6 +176,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         mod_mgmt::load_kernel_crate(memory::get_module("__k_rtc")             .ok_or("couldn't find __k_rtc module")?,            &mut kernel_mmi, false)?;    
+        // mod_mgmt::load_kernel_crate(memory::get_module("__k_getopts")         .ok_or("couldn't find __k_getopts module")?,        &mut kernel_mmi, false)?;    
     }
     
 

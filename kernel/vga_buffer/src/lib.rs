@@ -6,7 +6,7 @@
 #![feature(unique)]
 #![feature(ptr_internals)]
 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate spin;
 extern crate volatile;
 extern crate alloc;

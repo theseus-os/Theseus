@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 extern crate keycodes_ascii;
-extern crate vga_buffer;
+#[macro_use] extern crate vga_buffer;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
@@ -38,22 +38,6 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        use alloc::String;
-        let mut s: String = String::new();
-
-
-        match write!(&mut s, $($arg)*) {
-            Ok(_) => { 
-                if let Err(e) = $crate::print_to_console(s) {
-                    error!("print!(): print_to_console failed, error: {}", e);
-
-                }
-            }
-            Err(err) => {
-                error!("print!(): writing to String failed, error: {}", err);
-            }
-        }
         $crate::print_to_console_args(format_args!($($arg)*));
     });
 }
@@ -420,12 +404,20 @@ impl Terminal {
     }
 }
 
-/// Printing function used to print to the default kernel terminal
-pub fn print_to_console(s: String) -> Result<(), &'static str> {
-    // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
-    let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s, Some(1)));
-    RUNNING_TERMINALS.lock().get_mut(0).ok_or("could not acquire kernel terminal")?.term_print_producer.enqueue(output_event);
-    return Ok(());
+
+/// Queues up the given string to be printed out to the default kernel terminal.
+/// If no terminals have been initialized yet, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
+    if let Some(kernel_term) = RUNNING_TERMINALS.lock().get_mut(0) {
+        // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
+        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(), Some(1)));
+        kernel_term.term_print_producer.enqueue(output_event);
+        Ok(())
+    }
+    else {
+        print_raw!("[RAW] {}", s.into());
+        Ok(())
+    }
 }
 
 use core::fmt;

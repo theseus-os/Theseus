@@ -85,9 +85,6 @@ path = "../task"
 [dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.rtc]
-path = "../rtc"
-
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
