@@ -76,17 +76,12 @@ const UPDATE_SEQ_3: u16 = 0xFF;
 const CURSOR_START:u8 =  0b00000001;
 const CURSOR_END:u8 = 0b00010000;
 const RIGHT_BIT_SHIFT: u8 = 8;
+const DISABLE_SEQ_1: u8 = 0x0A;
+const DISABLE_SEQ_2: u8 = 0x20;
+
 
 
 pub fn init_cursor() {
-
-    // {
-    //     let locked_port = CURSOR_PORT_END.lock();
-    //     CURSOR_PORT_END.lock().read();
-    //     locked_port.write(val)
-    // }
-
-
     unsafe {
         CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
         let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
@@ -95,7 +90,6 @@ pub fn init_cursor() {
         let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
         CURSOR_PORT_END.lock().write(temp_read2);
     }
-    return
 }
 
 pub fn update_cursor (x: u16, y:u16) { 
@@ -106,7 +100,13 @@ pub fn update_cursor (x: u16, y:u16) {
         CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
         CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
     }
-    return
+}
+
+pub fn disable_cursor () {
+    unsafe {
+        CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
+        CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
+    }
 }
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
@@ -114,7 +114,7 @@ pub struct VgaBuffer {
     /// the index of the line that is currently being displayed
     pub display_line: usize,
     /// whether the display is locked to scroll with the end and show new lines as printed
-    display_scroll_end: bool,
+    pub display_scroll_end: bool,
     /// the column position in the last line where the next character will go
     pub column: usize,
     /// the actual buffer memory that can be written to the VGA memory
@@ -261,6 +261,15 @@ impl VgaBuffer {
         }
         return
     }
+
+    pub fn disable_cursor (&self) {
+        unsafe {
+            CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
+            CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
+        }
+    }   
+
+
 
 
 

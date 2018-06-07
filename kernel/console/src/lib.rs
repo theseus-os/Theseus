@@ -56,22 +56,37 @@ const VGA_BUFFER_HEIGHT: u16= 24;
 // Defines the max number of terminals that can be running
 const MAX_TERMS: usize = 9;
 
+#[derive(Debug)] 
+// Struct contains the command string and its arguments
+struct CommandStruct {
+    command_str: String,
+    arguments: Vec<String>
+}
 
 pub struct Terminal {
     vga_buffer: VgaBuffer,
     term_print_producer: DFQueueProducer<ConsoleEvent>,
     term_ref: usize,
     console_input_string: String,
+    // This string is used for tracking the keypresses of the user while another command is running
+    console_buffer_string: String,
     current_task_id: usize,
     max_left_pos: u16,
     text_offset: u16, 
     cursor_pos: u16,
+    prompt_string: String,
 }
  
 /// Terminal Structure that allows multiple terminals to be individually run
 impl Terminal {
     /// Creates a new terminal object
     fn new(dfqueue_consumer: &DFQueueConsumer<ConsoleEvent>, ref_num: usize) -> Terminal {
+        let prompt_string: String;
+        if ref_num == 1 {
+            prompt_string = "kernel:~$ ".to_string();
+        } else {
+            prompt_string = format!("terminal_{}:~$ ", ref_num);
+        }
         // creates a new terminal object
         Terminal {
             // internal number used to track the terminal object 
@@ -79,11 +94,14 @@ impl Terminal {
             term_print_producer: dfqueue_consumer.obtain_producer(),
             vga_buffer: VgaBuffer::new(),
             console_input_string: String::new(),
+            console_buffer_string: String::new(),
             current_task_id: 0,
             // track the cursor position and bounds 
             max_left_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
-            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel
+            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                // debug!("start here");
+
             cursor_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
+            prompt_string: prompt_string,
         }
     }
     
@@ -105,40 +123,58 @@ impl Terminal {
             let result = task::get_task(self.current_task_id);
             if let Some(ref task_result)  = result {
                 let mut end_task = task_result.write();
-                let exit_result = end_task.take_exit_value();
-                // match statement will see if the task has finished with an exit value yet
-                match exit_result {
-                    Some(exit_val) => {
-                        match exit_val {
-                            Ok(exit_status) => {
-                                // here: the task ran to completion successfully, so it has an exit value.
-                                // we know the return type of this task is `isize`,
-                                // so we need to downcast it from Any to isize.
-                                let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                warn!("task returned exit value: {:?}", val);
-                                if let Some(unwrapped_val) = val {
-                                    self.print_to_terminal(format!("task returned with exit value {:?}\n", unwrapped_val))?;
+                    let exit_result = end_task.take_exit_value();
+                    // match statement will see if the task has finished with an exit value yet
+                    match exit_result {
+                        Some(exit_val) => {
+                            match exit_val {
+                                Ok(exit_status) => {
+                                    // here: the task ran to completion successfully, so it has an exit value.
+                                    // we know the return type of this task is `isize`,
+                                    // so we need to downcast it from Any to isize.
+                                    let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                                    warn!("task returned exit value: {:?}", val);
+                                    if let Some(unwrapped_val) = val {
+                                        self.print_to_terminal(format!("task returned with exit value {:?}\n", unwrapped_val))?;
+                                    }
+                                }
+                                // If the user manually aborts the task
+                                Err(task::KillReason::Requested) => {
+                                    warn!("task was manually aborted");
+                                    self.print_to_terminal("^C\n".to_string())?;
+                                }
+                                Err(kill_reason) => {
+                                    // here: the task exited prematurely, e.g., it was killed for some reason.
+                                    warn!("task was killed, reason: {:?}", kill_reason);
+                                    self.print_to_terminal(format!("task was killed, reason: {:?}\n", kill_reason))?;
                                 }
                             }
-                            // If the user manually aborts the task
-                            Err(task::KillReason::Requested) => {
-                                warn!("task was manually aborted");
-                                self.print_to_terminal("^C".to_string())?;
-                            }
-                            Err(kill_reason) => {
-                                // here: the task exited prematurely, e.g., it was killed for some reason.
-                                warn!("task was killed, reason: {:?}", kill_reason);
-                                self.print_to_terminal(format!("task was killed, reason: {:?}\n", kill_reason))?;
-                            }
-                        }
-                        // Resets the current task id to be ready for the next command
-                        self.current_task_id = 0;
-                        self.print_to_terminal("\ntype command: ".to_string())?
-                    },
-                    // None value indicates task has not yet finished so does nothing
-                None => {
-                    },
-                }
+                            // Resets the current task id to be ready for the next command
+                            self.current_task_id = 0;
+                            let prompt_string = self.prompt_string.clone();
+                            self.print_to_terminal(prompt_string)?;
+
+
+                            if self.console_buffer_string.len() > 0 {
+                                let temp = self.console_buffer_string.clone();
+                                self.print_to_terminal(temp.clone())?;
+                                // for c in self.console_buffer_string.chars() {
+                                //     self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
+                                //         .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")?;
+                                //         self.cursor_pos += 1;
+                                //         self.text_offset += 1; 
+                                // }
+                                
+                                self.console_input_string = temp;
+                                self.text_offset += self.console_buffer_string.len() as u16;
+                                self.cursor_pos += self.console_buffer_string.len() as u16;
+                                self.console_buffer_string.clear();
+                                }
+                        },
+                        // None value indicates task has not yet finished so does nothing
+                    None => {
+                        },
+                    }
             }   
         }
         return Ok(());
@@ -182,7 +218,13 @@ impl Terminal {
                 if let Some(curr_task) = task_ref {
                     let _result = curr_task.write().kill(task::KillReason::Requested);
                 }
-            } 
+            } else {
+                self.console_input_string.clear();
+                self.console_buffer_string.clear();
+                let _result = self.vga_buffer.write_string_with_color(&"^C\n".to_string(), ColorCode::default());
+                let prompt_string = self.prompt_string.clone();
+                self.print_to_terminal(prompt_string)?;
+            }
             return Ok(());
         }
 
@@ -205,12 +247,12 @@ impl Terminal {
                             selected_num = digit;
                         },
                         None => {
-                            return Err("Could not unwrap key");
+                            return Ok(());
                         }
                     }
                 },
                 None => {
-                    return Err("invalid key");
+                    return Ok(());
                 },
             }
             // Prevents user from switching to terminal tab that doesn't yet exist
@@ -236,11 +278,6 @@ impl Terminal {
             return Ok(());
         }
 
-        // Prevents any keypress below here from registering if a command is running
-        if self.current_task_id != 0 {
-            return Ok(());
-        }
-
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
         if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
             && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
@@ -248,7 +285,12 @@ impl Terminal {
                     if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
                         match keyevent.keycode.to_ascii(keyevent.modifiers) {
                             Some(string) => {
-                                self.console_input_string.push(string);
+                                if self.current_task_id != 0 {
+                                    self.console_buffer_string.push(string);
+                                    return Ok(());
+                                } else {
+                                    self.console_input_string.push(string);
+                                }
                             },
                             None => {
                                 return Err("Couldn't get key event");
@@ -274,7 +316,7 @@ impl Terminal {
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
             // Prevents user from moving cursor to the left of the typing bounds
-            if self.cursor_pos == self.max_left_pos {    
+            if self.console_input_string.len() == 0 { 
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
@@ -293,16 +335,18 @@ impl Terminal {
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
             } else {
                 // Calls the parse_input function to see if the command exists in the command table and obtains a command struct
-                let command_structure = parse_input(&mut self.console_input_string);
-                match run_command_new_thread(command_structure) {
+                let console_input_string = self.console_input_string.clone();
+                let command_structure = self.parse_input(&console_input_string);
+                let prompt_string = self.prompt_string.clone();
+                match self.run_command_new_thread(command_structure) {
                         Ok(new_task_id) => { 
                             self.current_task_id = new_task_id;
                         } Err("Error: no module with this name found!") => {
-                            self.print_to_terminal("command not found\n\ntype command: ".to_string())?;
+                            self.print_to_terminal(format!("{}: command not found\n\n{}",console_input_string, prompt_string))?;
                         } Err(&_) => {
-                            self.print_to_terminal("running command on new thread failed\n\ntype command: ".to_string())?;
+                            self.print_to_terminal(format!("running command on new thread failed\n\n{}", prompt_string))?;
                         }
-                    }
+                }
             };
             // Clears the buffer for another command once current command is finished executing
             self.console_input_string.clear();
@@ -310,23 +354,30 @@ impl Terminal {
             self.text_offset  = y * VGA_BUFFER_WIDTH + x;
             self.cursor_pos = y * VGA_BUFFER_WIDTH + x;
             self.max_left_pos =  y * VGA_BUFFER_WIDTH + x;
+
         }
 
         // home, end, page up, page down, up arrow, down arrow for the console
         if keyevent.keycode == Keycode::Home {
             self.vga_buffer.display(DisplayPosition::Start);
+            self.vga_buffer.disable_cursor();
             return Ok(());
         }
         if keyevent.keycode == Keycode::End {
             self.vga_buffer.display(DisplayPosition::End);
+            self.vga_buffer.init_cursor();
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageUp {
             self.vga_buffer.display(DisplayPosition::Up(20));
+            self.vga_buffer.disable_cursor();
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageDown {
             self.vga_buffer.display(DisplayPosition::Down(20));
+            if self.vga_buffer.display_scroll_end {
+                self.vga_buffer.init_cursor();
+            }
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
@@ -402,6 +453,37 @@ impl Terminal {
         }
         Ok(())
     }
+    
+    /// This function parses the string that the user inputted when Enter is pressed and populates the CommandStruct
+    fn parse_input(&self, console_input_string: &String) -> CommandStruct {
+        let mut words: Vec<String> = console_input_string.split_whitespace().map(|s| s.to_string()).collect();
+        // This will never panic because pressing the enter key does not register if she has not entered anything
+        let mut command_string = words.remove(0);
+        // Formats the string into the application module syntax
+        command_string.insert(0, '_');
+        command_string.insert(0, 'a');
+        command_string.insert(0, '_');
+        command_string.insert(0, '_');
+        // Forms command structure to pass to the function that runs command on the new thread
+        let command_structure = CommandStruct {
+            command_str: command_string.to_string(),
+            arguments: words
+        };
+        return command_structure;
+    }
+
+
+    /// Function will execute the command on a new thread 
+    fn run_command_new_thread(&mut self, command_structure: CommandStruct) -> Result<usize, &'static str> {
+        use memory; 
+        let module = memory::get_module(&command_structure.command_str).ok_or("Error: no module with this name found!")?;
+        let args = command_structure.arguments; 
+        let taskref = spawn::spawn_application(module, args, None, None)?;
+        // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
+        let new_task_id = taskref.read().id;
+        return Ok(new_task_id);
+        
+    }
 }
 
 
@@ -438,7 +520,8 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     // Initializes the default kernel terminal
     let mut kernel_term = Terminal::new(&console_consumer, 1);
     kernel_term.print_to_terminal(WELCOME_STRING.to_string())?; 
-    kernel_term.print_to_terminal("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\ntype command: ".to_string())?;
+    let prompt_string = kernel_term.prompt_string.clone();
+    kernel_term.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
     kernel_term.vga_buffer.init_cursor();
     kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
@@ -503,8 +586,10 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             // Creates a new terminal object whenever handle keyevent sets the current_terminal_num to 0
             current_terminal_num = num_running + 1;
             let mut new_term_obj = Terminal::new(&consumer, current_terminal_num.clone());
-            new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?; 
-            new_term_obj.print_to_terminal("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\ntype command: ".to_string())?;  
+            let prompt_string = new_term_obj.prompt_string.clone();
+            let ref_num = new_term_obj.term_ref;
+            new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?;
+            new_term_obj.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nTerminal_{}\n{}", ref_num, prompt_string))?;  
             new_term_obj.vga_buffer.init_cursor();
             new_term_obj.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
             // List now owns the terminal object
@@ -514,45 +599,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
     }
 }
 
-
-#[derive(Debug)] 
-// Struct contains the command string and its arguments
-struct CommandStruct {
-    command_str: String,
-    arguments: Vec<String>
-}
-
- 
-/// This function parses the string that the user inputted when Enter is pressed and populates the CommandStruct
-fn parse_input(console_input_string: &mut String) -> CommandStruct {
-    let mut words: Vec<String> = console_input_string.split_whitespace().map(|s| s.to_string()).collect();
-    // This will never panic because pressing the enter key does not register if she has not entered anything
-    let mut command_string = words.remove(0);
-    // Formats the string into the application module syntax
-    command_string.insert(0, '_');
-    command_string.insert(0, 'a');
-    command_string.insert(0, '_');
-    command_string.insert(0, '_');
-    // Forms command structure to pass to the function that runs command on the new thread
-    let command_structure = CommandStruct {
-        command_str: command_string.to_string(),
-        arguments: words
-    };
-    return command_structure;
-}
-
-
- /// Function will execute the command on a new thread 
-fn run_command_new_thread(command_structure: CommandStruct) -> Result<usize, &'static str> {
-    use memory; 
-    let module = memory::get_module(&command_structure.command_str).ok_or("Error: no module with this name found!")?;
-    let args = command_structure.arguments; 
-    let taskref = spawn::spawn_application(module, args, None, None)?;
-    // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-    let new_task_id = taskref.read().id;
-    return Ok(new_task_id);
-    
-}
 
 const WELCOME_STRING: &'static str = "\n\n
  _____ _                              
