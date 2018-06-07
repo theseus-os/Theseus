@@ -100,14 +100,13 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
 }
 
 
-/// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol String.
-pub fn get_symbol<S: Into<String>>(symbol: S) -> Weak<LoadedSection> {
-    match SYSTEM_MAP.lock().get(&symbol.into()) {
+/// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string.
+pub fn get_symbol(symbol: &str) -> Weak<LoadedSection> {
+    match SYSTEM_MAP.lock().get(symbol) {
         Some(sec) => sec.clone(),
         _ => Weak::default(),
     }
 }
-
 
 
 
