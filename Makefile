@@ -11,7 +11,6 @@ ARCH ?= x86_64
 TARGET ?= $(ARCH)-theseus
 nano_core := kernel/build/nano_core-$(ARCH).bin
 iso := build/theseus-$(ARCH).iso
-grub_cfg := cfg/grub.cfg
 
 ifeq ($(bypass),yes)
 	BYPASS_RUSTC_CHECK := yes
@@ -185,20 +184,22 @@ grub-isofiles := build/grub-isofiles
 
 ### This target builds an .iso OS image from the applications and kernel.
 ### It skips userspace for now, but you can add it back in easily on the line below.
-$(iso): kernel applications $(grub_cfg)
-    # after building kernel and application modules, copy the kernel boot image files
+$(iso): kernel applications
+# after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
-	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
+# autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub-cfg-generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 
 
 # ### This target builds an .iso OS image from the userspace and kernel.
-# $(iso): kernel userspace $(grub_cfg)
-#     # after building kernel and userspace modules, copy the kernel boot image files
+# $(iso): kernel userspace
+# # after building kernel and userspace modules, copy the kernel boot image files
 # 	@mkdir -p $(grub-isofiles)/boot/grub
 # 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
-# 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
+# # autogenerate the grub.cfg file
+#	cargo run --manifest-path tools/grub-cfg-generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 # 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 	
 
