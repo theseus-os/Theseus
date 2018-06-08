@@ -20,8 +20,10 @@ impl ConsoleEvent {
         ConsoleEvent::InputEvent(ConsoleInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S) -> ConsoleEvent where S: Into<String> {
-        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()))
+    pub fn new_output_event<S>(s: S, x: Option<usize>) -> ConsoleEvent where S: Into<String> {
+        // x: Option<usize> is the terminal reference number. Used so that this output event is outputted to the correct Terminal's VGA buffer
+        // Matches with Terminal.term_ref
+        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(),x))
     }
 }
 
@@ -45,12 +47,14 @@ impl ConsoleInputEvent {
 #[derive(Debug)]
 pub struct ConsoleOutputEvent {
     pub text: String,
+    pub term_num: Option<usize>,
 }
 
 impl ConsoleOutputEvent {
-    pub fn new(s: String) -> ConsoleOutputEvent {
+    pub fn new(s: String, term_ref: Option<usize>) -> ConsoleOutputEvent {
         ConsoleOutputEvent {
             text: s,
+            term_num: term_ref, 
         }
     }
 }

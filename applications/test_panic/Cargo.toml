@@ -14,8 +14,8 @@ version = "0.3.7"
 [dependencies.console]
 path = "../../kernel/console"
 
-[dependencies.panic]
-path = "../../kernel/panic"
+[dependencies.panic_info]
+path = "../../kernel/panic_info"
 
 [dependencies.task]
 path = "../../kernel/task"

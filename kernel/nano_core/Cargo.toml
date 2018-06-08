@@ -24,11 +24,11 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+# [dependencies.frame_buffer]
+# path = "../frame_buffer"
 
-[dependencies.frame_buffer_3d]
-path = "../frame_buffer_3d"
+# [dependencies.frame_buffer_3d]
+# path = "../frame_buffer_3d"
 
 [dependencies.logger]
 path = "../logger"
@@ -54,16 +54,15 @@ path = "../captain"
 [dependencies.task]
 path = "../task"
 
-[dependencies.panic]
-path = "../panic"
+[dependencies.panic_handling]
+path = "../panic_handling"
 
-### below: Extra dependencies to make sure things are built
-[dependencies.console]
-path = "../console"
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 
 [features]
-loadable = [ "captain/loadable" ]
+loadable = []
 mirror_serial = []
 
 

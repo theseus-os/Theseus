@@ -4,36 +4,45 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate memory;
 extern crate volatile;
+extern crate atomic_linked_list;
 extern crate owning_ref;
 
 
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
+use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
 
-
-static IOAPIC: Once<Mutex<IoApic>> = Once::new();
-
-
-pub fn init(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32)
-            -> Result<&'static Mutex<IoApic>, &'static str>
-{
-    let ioapic = try!(IoApic::create(active_table, id, phys_addr, gsi_base));
-    let res = IOAPIC.call_once( || {
-	    Mutex::new(ioapic)
-    });
-    Ok(res)
+lazy_static! {
+    /// The system-wide list of all `IoApic`s, of which there is usually one, 
+    /// but larger systems can have multiple IoApic chips.
+    static ref IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
 }
 
-pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
-	IOAPIC.try().map( |ioapic| ioapic.lock())
+
+/// Returns a reference to the list of IoApics.
+pub fn get_ioapics() -> &'static AtomicMap<u8, Mutex<IoApic>> {
+	&IOAPICS
+}
+
+/// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)
+/// and return the locked `IoApic`.
+pub fn get_ioapic(ioapic_id: u8) -> Option<MutexGuard<'static, IoApic>> {
+	IOAPICS.get(&ioapic_id).map(|ioapic| ioapic.lock())
+}
+
+/// Returns the first `IoApic` that was created, if any, after locking it.
+/// This is not necessarily the default one.
+pub fn get_first_ioapic() -> Option<MutexGuard<'static, IoApic>> {
+	IOAPICS.iter().next().map(|(_id, ioapic)| ioapic.lock())
 }
 
 
@@ -61,10 +70,11 @@ pub struct IoApic {
 }
 
 impl IoApic {
-    fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
+    /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`.
+    pub fn new(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
 
         let ioapic_mapped_page = {
-    		let new_page = try!(allocate_pages(1).ok_or("IoApic::create(): couldn't allocate_pages!"));
+    		let new_page = try!(allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!"));
             let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
 			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
             try!(active_table.map_allocated_pages_to(new_page, frame, 

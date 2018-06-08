@@ -6,11 +6,13 @@
 #![feature(unique)]
 #![feature(ptr_internals)]
 
+// #[macro_use] extern crate log;
 extern crate spin;
 extern crate volatile;
 extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
+extern crate port_io;
 // #[macro_use] extern crate log;
 
 use core::ptr::Unique;
@@ -23,9 +25,13 @@ use volatile::Volatile;
 use alloc::string::String;
 use alloc::Vec;
 use kernel_config::memory::KERNEL_OFFSET;
+use port_io::Port;
 
 /// defined by x86's physical memory maps
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+
+
+
 
 /// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
@@ -56,16 +62,61 @@ pub enum DisplayPosition {
 type Line = [ScreenChar; BUFFER_WIDTH];
 
 const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
+    static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
+    static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
+    static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
+const UNLOCK_SEQ_1:u8  = 0x0A;
+const UNLOCK_SEQ_2:u8 = 0x0B;
+const UNLOCK_SEQ_3:u8 = 0xC0;
+const UNLOCK_SEQ_4:u8 = 0xE0;
+const UPDATE_SEQ_1: u8 = 0x0E;
+const UPDATE_SEQ_2: u8 = 0x0F;
+const UPDATE_SEQ_3: u16 = 0xFF;
+const CURSOR_START:u8 =  0b00000001;
+const CURSOR_END:u8 = 0b00010000;
+const RIGHT_BIT_SHIFT: u8 = 8;
+
+
+pub fn init_cursor() {
+
+    // {
+    //     let locked_port = CURSOR_PORT_END.lock();
+    //     CURSOR_PORT_END.lock().read();
+    //     locked_port.write(val)
+    // }
+
+
+    unsafe {
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
+        CURSOR_PORT_END.lock().write(temp_read);
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
+        CURSOR_PORT_END.lock().write(temp_read2);
+    }
+    return
+}
+
+pub fn update_cursor (x: u16, y:u16) { 
+    let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+    unsafe {
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+        CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
+    }
+    return
+}
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct VgaBuffer {
     /// the index of the line that is currently being displayed
-    display_line: usize,
+    pub display_line: usize,
     /// whether the display is locked to scroll with the end and show new lines as printed
     display_scroll_end: bool,
     /// the column position in the last line where the next character will go
-    column: usize,
+    pub column: usize,
     /// the actual buffer memory that can be written to the VGA memory
     lines: Vec<Line>,
 }
@@ -93,6 +144,7 @@ impl VgaBuffer {
 
     /// Writes the given string with the given color to this `VgaBuffer`.
     pub fn write_str_with_color(&mut self, s: &str, color: ColorCode) -> fmt::Result {
+        let last_line = self.lines.len() - 1;
         for byte in s.bytes() {
             match byte {
                 // handle new line
@@ -101,7 +153,22 @@ impl VgaBuffer {
                 }
 
                 // handle backspace
-                // 0x08 => { }
+                0x08 => { 
+                    if self.column != 0 {
+                        // goes back one column and writes a blank space over the deleted character
+                        self.column -= 1;
+                        let mut curr_line = try!(self.lines.last_mut().ok_or(fmt::Error));
+                        curr_line[self.column] = ScreenChar::new(b' ', color);
+                        
+                    }
+                    else {
+                        // covers the case whenever the user backspaces after the cursor wraps to the next line
+                        self.column = BUFFER_WIDTH-1;
+                        self.lines.pop();
+                        let mut curr_line = try!(self.lines.last_mut().ok_or(fmt::Error));
+                        curr_line[self.column] = ScreenChar::new(b' ', color);
+                    }
+                }
 
                 // all other regular bytes
                 byte => {
@@ -120,7 +187,7 @@ impl VgaBuffer {
 
         // refresh the VGA text display if the changes would be visible on screen
         // i.e., if the end of the vga buffer is visible
-        let last_line = self.lines.len() - 1;;
+        
         if  self.display_scroll_end || 
             (last_line >= self.display_line && last_line <= (self.display_line + BUFFER_HEIGHT))
         {
@@ -160,6 +227,39 @@ impl VgaBuffer {
         lines.push([ScreenChar::new(b' ', color); BUFFER_WIDTH]);
 
         Ok(())
+    }
+
+    pub fn init_cursor(&self) {
+
+        // {
+        //     let locked_port = CURSOR_PORT_END.lock();
+        //     CURSOR_PORT_END.lock().read();
+        //     locked_port.write(val)
+        // }
+
+
+        unsafe {
+            let cursor_start = 0b00000001;
+            let cursor_end = 0b00010000;
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | cursor_start;
+            CURSOR_PORT_END.lock().write(temp_read);
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
+            CURSOR_PORT_END.lock().write(temp_read2);
+        }
+        return
+    }
+
+    pub fn update_cursor(&self, x: u16, y:u16) { 
+        let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+        unsafe {
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+            CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+            CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
+        }
+        return
     }
 
 

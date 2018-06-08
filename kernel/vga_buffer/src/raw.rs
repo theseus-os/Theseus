@@ -53,7 +53,9 @@ impl RawVgaBuffer {
 impl fmt::Write for RawVgaBuffer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         
-        let ret = serial_port::write_str(s); // mirror to serial port
+        // mirror DIRECTLY to serial port, do not use the log statements
+        // because that can introduce an infinite loop when mirror_to_serial is enabled.
+        let ret = serial_port::write_str(s); 
         
         for byte in s.bytes() {
             self.write_byte(byte)

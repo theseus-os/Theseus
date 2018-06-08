@@ -22,6 +22,9 @@ version = "0.1.0"
 [dependencies.console_types]
 path = "../console_types"
 
+[dependencies.ps2]
+path = "../ps2"
+
 # [dependencies.lazy_static]
 # features = ["spin_no_std"]
 # version = "0.2.1"

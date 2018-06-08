@@ -7,12 +7,9 @@
 #![feature(alloc)]
 
 #[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
-
 
 use core::fmt;
 use alloc::String;
-use alloc::boxed::Box;
 
 
 /// Contains details about where a panic occurred.
@@ -70,7 +67,3 @@ impl fmt::Display for PanicInfo {
         write!(f, "{} -- {}", self.location, self.msg)
     }
 }
-
-
-/// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfo)>;

@@ -27,11 +27,15 @@ extern crate exceptions;
 extern crate pic;
 extern crate scheduler;
 extern crate keyboard;
+extern crate mouse;
+extern crate ps2;
 
 
+
+use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
-use spin::{Mutex, Once};
-use port_io::Port;
+use spin::Once;
+//use port_io::Port;
 // use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
@@ -49,8 +53,6 @@ pub static IDT: LockedIdt = LockedIdt::new();
 
 /// Interface to our PIC (programmable interrupt controller) chips.
 static PIC: Once<pic::ChainedPics> = Once::new();
-/// The Keyboard data port, port 0x60.
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 
 
@@ -122,7 +124,6 @@ pub fn init_ap(apic_id: u8,
     info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-
     // info!("trying to load IDT for AP {}...", apic_id);
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
@@ -147,7 +148,7 @@ pub fn init_handlers_apic() {
         }
 
         idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
         // idt[0x23].set_handler_fn(irq_0x23_handler);
         idt[0x24].set_handler_fn(com1_serial_handler);
@@ -159,7 +160,7 @@ pub fn init_handlers_apic() {
         idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
         idt[0x2B].set_handler_fn(nic_handler);
-        // idt[0x2C].set_handler_fn(irq_0x2C_handler);
+        idt[0x2C].set_handler_fn(ps2_mouse_handler);
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
@@ -183,7 +184,7 @@ pub fn init_handlers_pic() {
        
         // MASTER PIC starts here (0x20 - 0x27)
         idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
         // there is no IRQ 0x22        
         idt[0x23].set_handler_fn(irq_0x23_handler); 
         idt[0x24].set_handler_fn(com1_serial_handler); 
@@ -200,7 +201,7 @@ pub fn init_handlers_pic() {
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
         //idt[0x2B].set_handler_fn(irq_0x2B_handler);
         idt[0x2B].set_handler_fn(nic_handler); 
-        idt[0x2C].set_handler_fn(irq_0x2C_handler); 
+        idt[0x2C].set_handler_fn(ps2_mouse_handler);
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
@@ -252,44 +253,75 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFra
 static mut EXTENDED_SCANCODE: bool = false;
 
 /// 0x21
-extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
 
-    // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
-    let scan_code: u8 = { 
-        KEYBOARD.lock().read()
-    };
-	// trace!("Keyboard interrupt: raw scan_code {:#X}", scan_code);
-    
-    let extended = unsafe { EXTENDED_SCANCODE };
+    let indicator = ps2::ps2_status_register();
 
-    // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
-    if scan_code == 0xE0 {
-        if extended {
-            error!("keyboard interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
-        }
-        // mark it true for the next interrupt
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else if scan_code == 0xE1 {
-        error!("PAUSE/BREAK key pressed ... ignoring it!");
-        // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts) 
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else { // a regular scancode, go ahead and handle it
-        // if the previous interrupt's scan_code was an extended scan_code, then this one is not
-        if extended {
-            unsafe { EXTENDED_SCANCODE = false; }
-        }
-        if scan_code != 0 {  // a scan code of zero is a keyboard error that we can ignore
-            if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
-                error!("keyboard_handler: error handling keyboard input: {:?}", e);
+    // whether there is any data on the port 0x60
+    if indicator & 0x01 == 0x01 {
+        //whether the data is coming from the mouse
+        if indicator & 0x20 != 0x20 {
+            // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
+            let scan_code = ps2::ps2_read_data();
+            // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
+
+
+            let extended = unsafe { EXTENDED_SCANCODE };
+
+            // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
+            if scan_code == 0xE0 {
+                if extended {
+                    error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
+                }
+                // mark it true for the next interrupt
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else if scan_code == 0xE1 {
+                error!("PAUSE/BREAK key pressed ... ignoring it!");
+                // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else { // a regular scancode, go ahead and handle it
+                // if the previous interrupt's scan_code was an extended scan_code, then this one is not
+                if extended {
+                    unsafe { EXTENDED_SCANCODE = false; }
+                }
+                if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
+                    if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
+                        error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
+                    }
+                }
             }
         }
     }
+            eoi(Some(PIC_MASTER_OFFSET + 0x1));
 
-    eoi(Some(PIC_MASTER_OFFSET + 0x1));
+
 }
 
+/// 0x2C
+extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    let indicator = ps2::ps2_status_register();
+
+    // whether there is any data on the port 0x60
+    if indicator & 0x01 == 0x01 {
+        //whether the data is coming from the mouse
+        if indicator & 0x20 == 0x20 {
+            let readdata = handle_mouse_packet();
+            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
+                error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
+            } else if readdata & 0x08 == 0 {
+                error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
+            } else {
+                let _mouse_event = mouse::handle_mouse_input(readdata);
+                // mouse::mouse_to_print(&_mouse_event);
+            }
+
+        }
+
+    }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+}
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
@@ -515,14 +547,7 @@ extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2C_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2C interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
 
-    loop { }
-}
 
 #[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {

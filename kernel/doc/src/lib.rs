@@ -25,13 +25,9 @@
 //LZ: module has its own meaning in Rust. Here you are using module not as Rust module but it can be confusing.
 //LZ: maybe we need a new term 
 //! The `captain` steers the ship of Theseus, meaning that it contains the logic that initializes and connects all the other module crates in the proper order and with the proper flow of data between modules. 
-//! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a console thread and createsa queue to send keyboard presses to the console, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test userspace processes (liable to change).     
+//! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a console thread and createsa queue to send keyboard presses to the console, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test Tasks (liable to change).     
 //! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. It then falls into an idle loop that does nothing except yields the processor to another Task.    
 //!
-//! **Note**: the `captain` makes copious usage of conditional compilation based on the `loadable` feature. You don't need to worry about using this feature when initially developing a new module; it's only necessary once you want to make it runtime-loadable.    
-//! It is easiest to read what the `captain` does if you only read the instructions within the NOT-loadable code blocks, i.e., within `#[cfg(not(feature = "loadable"))]`.
-//! Soon, a macro will clean up the structure of `loadable` code such that it is much easier to read. 
-//! 
 
 
 //! # Basic Overview of Each Crate
@@ -96,7 +92,7 @@
 //! * Enables release mode in order to make each module file smaller and faster to load, i.e., sets `BUILD_MODE=release`.
 //! * Copies each crate's object file into the top-level build directory's module subdirectory (`build/grub-isofiles/modules`) such that each module is a separate object file in the final .iso image. 
 //!   That allows the running instance of Theseus to see all the modules currently available just by asking the bootloader (without needing a filesystem), and to load them individually.
-//! * Sets the `loadable` config option, which as seen in the `nano_core` and `captain` code, will enable the `#![cfg(loadable)]` code blocks that load each crate. 
+//! * Sets the `loadable` config option, which as seen in the `nano_core`, will enable the `#![cfg(loadable)]` code blocks that loads other crates (e.g., the `captain`) dynamically rather than include them as static dependencies.
 //! 
 //! 
 

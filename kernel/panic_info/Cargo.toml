@@ -1,0 +1,11 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "panic_info"
+description = "Struct definitions with panic information"
+version = "0.1.0"
+
+[dependencies]
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

@@ -12,7 +12,7 @@ extern crate console;
 
 fn main() {
     info!("Hello, world! (from hello application)");
-    console::print_to_console_str("HELLO WORLD FROM HELLO APP!").unwrap();
+    console::print_to_console("HELLO WORLD FROM HELLO APP!");
 }
 
 #[no_mangle]
