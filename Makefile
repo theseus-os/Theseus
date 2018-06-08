@@ -76,7 +76,7 @@ endif ## BYPASS_XARGO_CHECK
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 ## the most recent CPU model supported by QEMU 2.5.0
-QEMU_FLAGS += -cpu Broadwell
+QEMU_FLAGS += -cpu host
 ## multicore 
 QEMU_FLAGS += -smp 4
 
@@ -86,13 +86,12 @@ QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vl
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
 
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 -enable-kvm
 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
 ifeq ($(kvm),yes)
-#### We're disabling KVM for the time being because it breaks some features, like RDMSR used for TSC
 	#QEMU_FLAGS += -enable-kvm
 endif
 

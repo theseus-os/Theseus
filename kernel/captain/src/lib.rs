@@ -36,6 +36,7 @@ extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
+extern crate diagnostics;
 #[macro_use] extern crate console;
 
 
@@ -210,6 +211,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    
+    diagnostics::init();
+    if let Ok(mut e) = diagnostics::Counter::new("LONGEST_LAT_CACHE.MISS") {
+        e.start();
+
+        debug!("Here's how many branch instructions were retired: {}!", e.get_count_since_start().unwrap());
+    }
+    
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
