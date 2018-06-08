@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all check_rustc check_xargo clean run debug iso applications userspace cargo gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso kernel applications userspace cargo gdb doc docs view-doc view-docs
 
 
 ARCH ?= x86_64
@@ -189,7 +189,7 @@ $(iso): kernel applications
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 # autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub-cfg-generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 
 
@@ -199,7 +199,7 @@ $(iso): kernel applications
 # 	@mkdir -p $(grub-isofiles)/boot/grub
 # 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
 # # autogenerate the grub.cfg file
-#	cargo run --manifest-path tools/grub-cfg-generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
+#	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 # 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
 	
 
@@ -211,8 +211,10 @@ applications: check_rustc check_xargo
 # copy applications' object files
 	@mkdir -p $(grub-isofiles)/modules
 	@for f in  ./applications/build/*.o ; do \
-		cp -vn  $${f}  $(grub-isofiles)/modules/  ; \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
 	done
+### TODO FIXME: not sure if it's correct to forcibly overwrite all module files with the applications' version (the cp line above),
+### since sometimes the kernel is build in debug mode but applications are alwasy built in release mode right now 
 
 
 ### this builds all userspace programs
@@ -233,7 +235,7 @@ kernel: check_rustc check_xargo
 # copy kernel module build files
 	@mkdir -p $(grub-isofiles)/modules
 	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
-		cp -vn  $${f}  $(grub-isofiles)/modules/  ; \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
 	done
 # copy the core library's object file
 	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
