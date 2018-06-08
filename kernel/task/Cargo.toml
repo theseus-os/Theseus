@@ -34,8 +34,8 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.panic]
-path = "../panic"
+[dependencies.panic_info]
+path = "../panic_info"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

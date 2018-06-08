@@ -13,7 +13,7 @@
 #![feature(core_intrinsics)]
 
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 
 
@@ -36,12 +36,6 @@ extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
-
-
-
-#[cfg(feature = "loadable")] 
-extern crate console;
-#[cfg(not(feature = "loadable"))] 
 #[macro_use] extern crate console;
 
 
@@ -62,30 +56,12 @@ use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
-#[cfg(feature = "loadable")] use task::TaskRef;
-#[cfg(feature = "loadable")] use memory::{VirtualAddress, ModuleArea};
-#[cfg(feature = "loadable")] use console_types::ConsoleEvent;
-#[cfg(feature = "loadable")] use dfqueue::DFQueueProducer;
-#[cfg(feature = "loadable")] use acpi::madt::MadtIter;
 
 
 
 /// the callback use in the logger crate for mirroring log functions to the console
 pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
-    #[cfg(feature = "loadable")]
-    {
-        let mut space = 0;
-        if let Some(section) = mod_mgmt::metadata::get_symbol("console::print_to_console").upgrade() {
-            if let Some(func) = section.mapped_pages().and_then(|mp| mp.as_func::<fn(String)>(section.mapped_pages_offset(), &mut space).ok()) 
-            {
-                let _ = func(format!("{} {}", prefix, args));
-            }
-        }
-    }
-    #[cfg(not(feature = "loadable"))]
-    {
-        println!("{} {}", prefix, args);
-    }
+    println!("{} {}", prefix, args);
 }
 
 
@@ -99,46 +75,21 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             ap_start_realmode_begin: usize, ap_start_realmode_end: usize) 
             -> Result<(), &'static str>
 {
-	
+    #[cfg(feature = "mirror_serial")]
+    {
+        // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
+        logger::mirror_to_vga(captain::mirror_to_vga_cb);
+    }
+    // at this point, we no longer *need* to use println_raw, because we can see the logs,
+    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
+
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
-    let _tsc_freq = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("tsc::get_tsc_frequency", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: tsc::get_tsc_frequency")?;
-            let mut space = 0;
-            let func: & fn() -> Result<u64, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"tsc::get_tsc_frequency\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func()?
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            tsc::get_tsc_frequency()?
-        }   
-    };
+    let _tsc_freq = tsc::get_tsc_frequency()?;
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
-
     // now we initialize early driver stuff, like APIC/ACPI
-    let madt_iter = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("driver_init::early_init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: driver_init::early_init")?;
-            let mut space = 0;
-            let func: & fn(&mut memory::MemoryManagementInfo) -> Result<MadtIter, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"driver_init::early_init\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(kernel_mmi_ref.lock().deref_mut())?
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            driver_init::early_init(kernel_mmi_ref.lock().deref_mut())?
-        }
-    };
-
+    let madt_iter = driver_init::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack, syscall_stack) = { 
@@ -149,149 +100,30 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate syscall stack")?
         )
     };
-
-    #[cfg(feature = "loadable")]
-    {
-        let section = mod_mgmt::metadata::get_symbol_or_load("interrupts::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: interrupts::init")?;
-        let mut space = 0;
-        let func: & fn(usize, usize) -> Result<(), &'static str> =
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"interrupts::init\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        func(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
-    } 
-    #[cfg(not(feature = "loadable"))] 
-    {
-        interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
-    }
+    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
-
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
-    #[cfg(feature = "loadable")] 
-    {
-        let section = mod_mgmt::metadata::get_symbol_or_load("interrupts::init_handlers_apic", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: interrupts::init_handlers_apic")?;
-        let mut space = 0;
-        let func: & fn() = 
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"interrupts::init_handlers_apic\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        func();
-    } 
-    #[cfg(not(feature = "loadable"))]
-    {
-        interrupts::init_handlers_apic();
-    }
-
-    // initialize the syscall subsystem
-    #[cfg(feature = "loadable")]
-    {
-        let section = mod_mgmt::metadata::get_symbol_or_load("syscall::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: syscall::init")?;
-        let mut space = 0;
-        let func: & fn(usize) = 
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"syscall::init\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        func(syscall_stack.top_usable());
-    }
-    #[cfg(not(feature = "loadable"))]
-    {
-        syscall::init(syscall_stack.top_usable());
-    }
+    interrupts::init_handlers_apic();
+    
+    // initialize the syscall 
+    syscall::init(syscall_stack.top_usable());
 
     // get BSP's apic id
-    let bsp_apic_id = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("apic::get_bsp_id", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: apic::get_bsp_id")?;
-            let mut space = 0;
-            let func: & fn() -> Option<u8> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"apic::get_bsp_id\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func().ok_or("captain::init(): Coudln't get BSP's apic_id!")?
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?
-        }
-    };
-    
+    let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
     
     // create the initial `Task`, i.e., task_zero
-    #[cfg(feature = "loadable")] 
-    {
-        let section = mod_mgmt::metadata::get_symbol_or_load("spawn::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: spawn::init")?;
-        let mut space = 0;
-        let func: & fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, u8, VirtualAddress, VirtualAddress) -> Result<TaskRef, &'static str> = 
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"spawn::init\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        func(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
-    } 
-    #[cfg(not(feature = "loadable"))]
-    {
-        spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
-    }
-
+    spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // initialize the kernel console
-    let console_queue_producer = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("console::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: console::init")?;
-            let mut space = 0;
-            let func: & fn() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> =
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"console::init\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func()?
-        } 
-        #[cfg(not(feature = "loadable"))]
-        {
-            console::init()?
-        }
-    };
-
-
+    let console_queue_producer = console::init()?;
 
     // initialize the rest of our drivers
-    #[cfg(feature = "loadable")]
-    {
-        let section = mod_mgmt::metadata::get_symbol_or_load("driver_init::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: driver_init::init")?;
-        let mut space = 0;
-        let func: & fn(DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str> =
-            section.mapped_pages()
-            .ok_or("Couldn't get section's mapped_pages for \"driver_init::init\"")?
-            .as_func(section.mapped_pages_offset(), &mut space)?; 
-        func(console_queue_producer)?;
-    }
-    #[cfg(not(feature = "loadable"))]
-    {
-        driver_init::init(console_queue_producer)?;
-    }
+    driver_init::init(console_queue_producer)?;
     
-
     // boot up the other cores (APs)
-    let ap_count = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("acpi::madt::handle_ap_cores", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: acpi::madt::handle_ap_cores")?;
-            let mut space = 0;
-            let func: & fn(MadtIter, Arc<MutexIrqSafe<MemoryManagementInfo>>, usize, usize) -> Result<usize, &'static str> =
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"acpi::madt::handle_ap_cores\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?
-        }
-    };
+    let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
-    // assert!(apic::get_lapics().iter().count() == ap_count + 1, "SANITY CHECK FAILED: too many LocalApics in the list!");
-
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
@@ -312,121 +144,60 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
+    // //init frame_buffer
+    // let rs = frame_buffer::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
+    // let rs = frame_buffer_3d::init();
+    // if rs.is_ok() {
+    //     trace!("frame_buffer initialized.");
+    // } else {
+    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    // }
+
+
+    // testing nic
+    // TODO: remove this (@Ramla)
     if false {
-        // NOTE: haven't yet figured out how to invoke generic functions  (like spawn_kthread) yet in loadable mode
-        // #[cfg(feature = "loadable")]
-        // {
-        //     let section = mod_mgmt::metadata::get_symbol_or_load("e1000::test_nic_driver::test_nic_driver", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: e1000::test_nic_driver::test_nic_driver")?;
-        //     let mut space = 0;
-        //     let func: & fn(Option<u64>) =
-        //         section.mapped_pages()
-        //         .ok_or("Couldn't get section's mapped_pages for \"e1000::test_nic_driver::test_nic_driver\"")?
-        //         .as_func(section.mapped_pages_offset(), &mut space)?; 
-        //     spawn::spawn_kthread(func, None, String::from("test_nic_driver"))?;
-        // }
-        #[cfg(not(feature = "loadable"))]
-        {
-            use e1000::test_nic_driver::test_nic_driver;
-            spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
-        }
+        use e1000::test_nic_driver::test_nic_driver;
+        spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
     }  
 
     //test window manager
     if false {
-        #[cfg(not(feature = "loadable"))]
-        {
-            use window_manager::test_window_manager;
-            spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
-            spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
-
-        }
+        use window_manager::test_window_manager;
+        spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
+        spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
     }
 
     // create and jump to the first userspace thread
-    if false
-    {
+    if false {
         debug!("trying to jump to userspace");
         let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
-        
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("spawn::spawn_userspace", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
-            let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, Some(String::from("test_program_1")))?;
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
-        }
+        spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
     }
 
-    if false
-    {
+    if false {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
-        
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("spawn::spawn_userspace", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
-            let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, Some(String::from("test_program_2")))?;
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
-        }
+        spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if false
-    {
+    if false {
         debug!("trying out a system call module");
         let module = memory::get_module("__u_syscall_send").ok_or("Error: no module named '__u_syscall_send' found!")?;
-        
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("spawn::spawn_userspace", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
-            let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, None)?;
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            spawn::spawn_userspace(module, None)?;
-        }
+        spawn::spawn_userspace(module, None)?;
     }
 
     // a second duplicate syscall test user task
-    if false
-    {
+    if false {
         debug!("trying out a receive system call module");
         let module = memory::get_module("__u_syscall_receive").ok_or("Error: no module named '__u_syscall_receive' found!")?;
-        
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol_or_load("spawn::spawn_userspace", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: spawn::spawn_userspace")?;
-            let mut space = 0;
-            let func: & fn(&ModuleArea, Option<String>) -> Result<TaskRef, &'static str> = 
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"spawn::spawn_userspace\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func(module, None)?;
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            spawn::spawn_userspace(module, None)?;
-        }
+        spawn::spawn_userspace(module, None)?;
     }
 
 
