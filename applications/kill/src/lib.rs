@@ -1,7 +1,8 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate alloc;
-extern crate console;
+#[macro_use] extern crate console;
+
 extern crate task;
 extern crate getopts;
 
@@ -28,26 +29,18 @@ pub fn main(_args: Vec<String>) -> isize {
                 if let Some(task_ref) = task::get_task(task_id) {
                     use core::ops::Deref;
                     if task_ref.write().kill(task::KillReason::Requested) {
-                        if console::print_to_console(String::from(format!("Killed task {} \n", task_ref.read().deref()))).is_ok() {
-                            return 0;
-                        }
+                        println!("Killed task {} \n", task_ref.read().deref());
                     }
                     else {
-                        if console::print_to_console(String::from(format!("Failed to kill task {} \n", task_ref.read().deref()))).is_ok() {
-                            return -1;
-                        } 
+                        println!("Failed to kill task {} \n", task_ref.read().deref())
                     }
                 }
                 else {
-                    if console::print_to_console(String::from(format!("Not a valid task id \n"))).is_ok() {
-                            return -1;
-                        } 
+                    println!("Not a valid task id \n");  
                 }
             }, 
             _ => { 
-                if console::print_to_console(String::from("Not a valid task ID \n")).is_ok() {
-                    return -1;
-                }
+                println!("Not a valid task id \n");  
             },
         };   
     }
@@ -56,9 +49,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 fn print_usage(opts: Options) -> isize {
     let brief = format!("Usage: kill [task id]");
-    if console::print_to_console(format!("{} \n", opts.usage(&brief))).is_err() {
-        return -1;
-    }
+    println!("{} \n", opts.usage(&brief));
     0
 }
 

@@ -1,7 +1,8 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate alloc;
-extern crate console;
+#[macro_use] extern crate console;
+
 extern crate task;
 extern crate getopts;
 
@@ -10,62 +11,51 @@ use alloc::{Vec, String};
 use self::task::TASKLIST;
 
 #[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
+pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("a", "all", "print all processes in detail");
 
-    let matches = match opts.parse(&_args) {
+    let matches = match opts.parse(&args) {
         Ok(m) => { m }
         Err(_f) => { panic!("{}", _f) }
     };
     if matches.opt_present("h") {
         return print_usage(opts)
     }
-    if matches.opt_present("a") {
-        return print_detailed_processes()
-    }
-    else {
-        return print_processes()
-    }
-}
+    let mut process_string =  {
+        if matches.opt_present("a") {
+            String::from(format!("{0:<4} | {1:<10} | {2:<15} | {3:<10} | {4:<10} \n", 
+            "ID", "CPU CORE", "PINNED CORE", "RUNSTATE", "NAME"))
+        }
+        else {
+            String::from(format!("{0:<4} | {1:<10} \n", 
+            "ID", "NAME"))
+        }
+    };
 
-fn print_detailed_processes()-> isize {
-    let mut all_process_string = String::from(format!("{0:<4} | {1:<10} | {2:<15} | {3:<15} | {4:<10} \n", 
-            "ID", "CPU CORE", "NAME", "PINNED CORE", "RUNSTATE"));
-    for cur_process in TASKLIST.iter() {
-        //all_process_string.push_str(&format!("{} \n", *cur_process.1.read().deref()));
-        let id = cur_process.0;
-        let cpu_core = &cur_process.1.read().running_on_cpu;
-        let runstate = &cur_process.1.read().runstate;
-        let pinned_core = &cur_process.1.read().pinned_core;
-        let name = &cur_process.1.read().name;
-        all_process_string.push_str(&format!("{0:<4} | {1:<10} | {2:<15} | {3:?} | {4:<10?} \n", id, cpu_core, name, pinned_core, runstate));
-    }
-    if console::print_to_console(all_process_string).is_err(){
-        return -1;
-    }
-    return 0;
-}
+    use alloc::string::ToString;
 
-fn print_processes() -> isize {
-    let mut all_process_string = String::from(format!("{0:<4} | {1:<10} \n", 
-            "ID", "NAME"));
-    for cur_process in TASKLIST.iter() {
-        let id = cur_process.0;
-        let name = &cur_process.1.read().name;
-        all_process_string.push_str(&format!("{0:<4} | {1:<10} \n", id, name));
+    for process in TASKLIST.iter() {
+        let id = process.0;
+        let cpu_core = &process.1.read().running_on_cpu;
+        let runstate = &process.1.read().runstate;
+        let pinned_core = &process.1.read().pinned_core.map(|x| x.to_string()).unwrap_or(String::from("None"));
+        let name = &process.1.read().name;
+        if matches.opt_present("a") {
+            process_string.push_str(&format!("{0:<4} | {1:<10} | {2:<15} | {3:<10?} | {4:<10} \n", id, cpu_core, pinned_core, runstate, name));
+        }
+        else {
+            process_string.push_str(&format!("{0:<4} | {1:<10} \n", id, name));
+        }
+        
     }
-    if console::print_to_console(all_process_string).is_err(){
-        return -1;
-    }
+    println!("{}", process_string);
     return 0;
 }
 
 fn print_usage(opts: Options) -> isize {
     let brief = format!("Usage: ps [options]");
-    if console::print_to_console(format!("{}", opts.usage(&brief))).is_err(){
-        return -1;
-    }
+    println!("{}", opts.usage(&brief));
     return 0;
 }
