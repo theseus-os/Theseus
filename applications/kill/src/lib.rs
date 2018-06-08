@@ -30,31 +30,30 @@ pub fn main(_args: Vec<String>) -> isize {
                     use core::ops::Deref;
                     if task_ref.write().kill(task::KillReason::Requested) {
                         println!("Killed task {} \n", task_ref.read().deref());
+                        0
                     }
                     else {
-                        println!("Failed to kill task {} \n", task_ref.read().deref())
+                        println!("{} was already exited \n", task_ref.read().deref());
+                        -1
                     }
                 }
                 else {
-                    println!("Not a valid task id \n");  
+                    println!("Task ID does not exist \n");
+                    -1  
                 }
             }, 
             _ => { 
-                println!("Not a valid task id \n");  
+                println!("Not a valid task ID \n"); 
+                -1
             },
         };   
     }
-    return -1; 
+    -1
 }
 
 fn print_usage(opts: Options) -> isize {
-    let brief = format!("Usage: kill [task id]");
+    let brief = format!("Usage: kill TASK_ID");
     println!("{} \n", opts.usage(&brief));
     0
 }
 
-
-// NEED TO FIX
-// reads only first argument
-// don't know how to deal with `print_to_console` right now using is_ok()
-// not sure why running ps again the original killed task is still there may not remove it from TASKLIST?
