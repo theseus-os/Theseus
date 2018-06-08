@@ -63,7 +63,6 @@ path = "../vga_buffer"
 
 [features]
 loadable = []
-mirror_serial = []
 
 
 [lib]
