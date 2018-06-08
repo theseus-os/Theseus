@@ -246,10 +246,10 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
         try!(rxsdt.map_all(active_table));
 
-        {
-            let mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
-            debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", mapped_pages);
-        }
+        // {
+        //     let _mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
+        //     debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", _mapped_pages);
+        // }
 
 
         for sdt_paddr in rxsdt.iter() {

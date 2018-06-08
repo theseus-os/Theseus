@@ -99,24 +99,26 @@ fn handle_ioapic_entries(madt_iter: MadtIter, active_table: &mut ActivePageTable
 
 
 fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    use pic::PIC_MASTER_OFFSET;
+
     let all_lapics = get_lapics();
     let me = try!(get_my_apic_id().ok_or("handle_bsp_entry(): Couldn't get_my_apic_id"));
 
-    let mut ioapic_locked = ioapic::get_first_ioapic();
-    let ioapic_ref = try!(ioapic_locked.as_mut().ok_or("handle_bsp_entry(): Couldn't get ioapic_ref!"));
-
 
     for madt_entry in madt_iter.clone() {
-        match madt_entry {
-             MadtEntry::LocalApic(lapic_entry) => { 
-                if lapic_entry.apic_id == me {
-                    debug!("        This is my (the BSP's) local APIC");
-                    let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+        if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+            if lapic_entry.apic_id == me {
+                debug!("        This is my (the BSP's) local APIC");
+                let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                    let mut bsp_lapic = try!(LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
-                    let bsp_id = bsp_lapic.id();
+                let mut bsp_lapic = try!(LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
+                let bsp_id = bsp_lapic.id();
 
-                    use pic::PIC_MASTER_OFFSET;
+                // redirect every IoApic's interrupts to the one BSP
+                // TODO FIXME: I'm unsure if this is actually correct!
+                for ioapic in ioapic::get_ioapics().iter() {
+                    let mut ioapic_ref = ioapic.1.lock();
+
                     // set the BSP to receive regular PIC interrupts routed through the IoApic
                     ioapic_ref.set_irq(0x0, bsp_id, PIC_MASTER_OFFSET + 0x0);
                     ioapic_ref.set_irq(0x1, bsp_id, PIC_MASTER_OFFSET + 0x1); // keyboard interrupt 0x1 -> 0x21 in IDT
@@ -134,18 +136,18 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0xd, bsp_id, PIC_MASTER_OFFSET + 0xd);
                     ioapic_ref.set_irq(0xe, bsp_id, PIC_MASTER_OFFSET + 0xe);
                     ioapic_ref.set_irq(0xf, bsp_id, PIC_MASTER_OFFSET + 0xf);
+
                     // ioapic_ref.set_irq(0x1, 0xFF, PIC_MASTER_OFFSET + 0x1); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
-                    
-                    // add the BSP lapic to the list (should be empty until here)
-                    assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                    all_lapics.insert(lapic_entry.apic_id, RwLock::new(bsp_lapic));
-
-                    // there's only ever one BSP, so we can exit the loop here
-                    break;
                 }
+                
+                // add the BSP lapic to the list (should be empty until here)
+                assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
+                all_lapics.insert(lapic_entry.apic_id, RwLock::new(bsp_lapic));
+
+                // there's only ever one BSP, so we can exit the loop here
+                break;
             }
-            _ => { }
         }
     }
 
@@ -153,14 +155,25 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
 
     // now that we've established the BSP,  go through the interrupt source override entries
     for madt_entry in madt_iter {
-        match madt_entry {
-            MadtEntry::IntSrcOverride(int_src) => {
-                assert!(int_src.gsi <= (u8::max_value() as u32), "handle_bsp_entry(): Unsupported: gsi value is larger than size of u8: {:?}", int_src);
-                // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                use pic::PIC_MASTER_OFFSET;
-                ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
-            } 
-            _ => { }
+        if let MadtEntry::IntSrcOverride(int_src) = madt_entry {
+            let mut handled = false;
+
+            // find the IoApic that should handle this interrupt source override entry
+            for (_id, ioapic) in ioapic::get_ioapics().iter() {
+                let mut ioapic_ref = ioapic.lock();
+                if ioapic_ref.handles_irq(int_src.gsi) {
+                    // using BSP for now, but later we could redirect the IRQ to more (or all) cores
+                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
+                    trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}.",
+                    int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags, ioapic_ref.id);
+                    handled = true;
+                }
+            }
+
+            if !handled {
+                error!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) not handled by any IoApic!",
+                    int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags);
+            }
         }
     }
 
