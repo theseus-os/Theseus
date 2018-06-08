@@ -28,8 +28,7 @@ extern crate mod_mgmt;
 extern crate apic;
 extern crate exceptions;
 extern crate captain;
-extern crate panic;
-extern crate task;
+extern crate panic_handling;
 
 #[macro_use] extern crate vga_buffer;
 
@@ -46,6 +45,7 @@ pub fn nano_core_public_func(val: u8) {
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
 
+/// An initial interrupt descriptor table for catching very simple exceptions only.
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
@@ -119,38 +119,17 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
+    // TODO FIXME:  remove apic as a hard static dependency here. Register the tlb shootdown func elsewhere?
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
-    // //init frame_buffer
-    // let rs = frame_buffer::init();
-    // if rs.is_ok() {
-    //     trace!("frame_buffer initialized.");
-    // } else {
-    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    // }
-    // let rs = frame_buffer_3d::init();
-    // if rs.is_ok() {
-    //     trace!("frame_buffer initialized.");
-    // } else {
-    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    // }
 
-    // now that we have a heap, we can create basic things like state_store
+    // now that we have virtual memory, including a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
     println_raw!("nano_core_start(): initialized state store."); 
     
-
-    #[cfg(feature = "mirror_serial")]
-    {
-         // enables mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        logger::mirror_to_vga(captain::mirror_to_vga_cb);
-    }
-    // at this point, we no longer need to use println_raw, because we can see the logs,
-    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
-
 
     // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel
@@ -160,8 +139,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
     }
     
-
-    // parse the core library (Rust no_std lib) and the captain crate
+    // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
     #[cfg(feature = "loadable")] 
     {
         let core_module = try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module"));
@@ -177,12 +155,16 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // That's it, the nano_core is done! That's really all it does! 
     #[cfg(feature = "loadable")]
     {
-        use memory::{MappedPages, MemoryManagementInfo};
-        use alloc::arc::Arc;
         use alloc::Vec;
+        use alloc::arc::Arc;
         use irq_safety::MutexIrqSafe;
+        use memory::{MappedPages, MemoryManagementInfo};
 
-        let section = try_exit!(mod_mgmt::metadata::get_symbol_or_load("captain::init", kernel_mmi_ref.lock().deref_mut()).upgrade().ok_or("no symbol: captain::init"));
+        let section = try_exit!(
+            mod_mgmt::metadata::get_symbol_or_load("captain::init", kernel_mmi_ref.lock().deref_mut())
+            .upgrade()
+            .ok_or("no symbol: captain::init")
+        );
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
         let func: &CaptainInitFunc = try_exit!( 
@@ -229,9 +211,41 @@ pub extern "C" fn eh_personality() {}
 #[doc(hidden)]
 pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
     
-    if let Err(_e) = default_panic_handler(fmt_args, file, line, col) {
+    // Since a panic could occur before the memory subsystem is initialized,
+    // we must check before using alloc types or other functions that depend on the memory system (the heap).
+    // We can check that by seeing if the kernel mmi has been initialized.
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
+    let res = if kernel_mmi_ref.is_some() {
+        // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
+        #[cfg(feature = "loadable")]
+        {
+            type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
+            let section = kernel_mmi_ref.and_then(|kernel_mmi| {
+                mod_mgmt::metadata::get_symbol_or_load("panic_handling::panic_wrapper", kernel_mmi.lock().deref_mut()).upgrade()
+            }).ok_or("Couldn't get symbol: \"panic_handling::panic_wrapper\"");
+
+            // call the panic_wrapper function, otherwise return an Err into "res"
+            let mut space = 0;
+            section.and_then(|sec| sec.mapped_pages().ok_or("couldn't get mapped_pages for panic_wrapper LoadedSection")
+                .and_then(|mp| {
+                    mp.as_func::<PanicWrapperFunc>(sec.mapped_pages_offset(), &mut space)
+                        .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
+                })
+            )
+        }
+        #[cfg(not(feature = "loadable"))]
+        {
+            panic_handling::panic_wrapper(fmt_args, file, line, col)
+        }
+    }
+    else {
+        Err("memory subsystem not yet initialized, cannot call panic_wrapper because it requires alloc types")
+    };
+
+    if let Err(_e) = res {
+        // basic early panic printing with no dependencies
         error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
-        println_raw!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
+        println_raw!("\nPANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
     }
 
     // if we failed to handle the panic, there's not really much we can do about it
@@ -242,64 +256,6 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
     loop {}
 }
 
-
-/// performs the standard panic handling routine, which involves the following:
-/// 
-/// * printing a basic panic message.
-/// * getting the current `Task`.
-/// * invoking the current `Task`'s `panic_handler` routine, if it has registered one.
-/// * if there is no registered panic handler, then it prints a standard message plus a stack backtrace.
-/// * Finally, it kills the panicked `Task`.
-fn default_panic_handler(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str> {
-    use alloc::String;
-    use panic::{PanicInfo, PanicLocation};
-    use task::{TaskRef, KillReason};
-
-    let apic_id = apic::get_my_apic_id();
-    let panic_info = PanicInfo::with_fmt_args(PanicLocation::new(file, line, col), fmt_args);
-
-    // get current task to see if it has a panic_handler
-    let curr_task: Option<&TaskRef> = {
-        #[cfg(feature = "loadable")]
-        {
-            let section = mod_mgmt::metadata::get_symbol("task::get_my_current_task").upgrade().ok_or("no symbol: task::get_my_current_task")?;
-            let mut space = 0;
-            let func: & fn() -> Option<&'static TaskRef> =
-                section.mapped_pages()
-                .ok_or("Couldn't get section's mapped_pages for \"task::get_my_current_task\"")?
-                .as_func(section.mapped_pages_offset(), &mut space)?; 
-            func()
-        } 
-        #[cfg(not(feature = "loadable"))] 
-        {
-            task::get_my_current_task()
-        }
-    };
-
-    let curr_task_name = curr_task.map(|t| t.read().name.clone()).unwrap_or(String::from("UNKNOWN!"));
-    let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
-    
-    // call this task's panic handler, if it has one. 
-    let panic_handler = { 
-        curr_task.write().take_panic_handler()
-    };
-    if let Some(ref ph_func) = panic_handler {
-        ph_func(&panic_info);
-        error!("PANIC handled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
-    }
-    else {
-        error!("PANIC was unhandled in task \"{}\" on core {:?} at {} -- {}", curr_task_name, apic_id, panic_info.location, panic_info.msg);
-        memory::stack_trace();
-    }
-
-    // kill the offending task (the current task)
-    error!("Killing panicked task \"{}\"", curr_task_name);
-    curr_task.write().kill(KillReason::Panic(panic_info));
-    
-    // scheduler::schedule(); // yield the current task after it's done
-
-    Ok(())
-}
 
 
 /// This function isn't used since our Theseus target.json file

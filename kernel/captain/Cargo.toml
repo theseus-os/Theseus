@@ -94,8 +94,5 @@ path = "../../libs/keycodes_ascii"
 path = "../simd_test"
 
 
-[features]
-loadable = []
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
