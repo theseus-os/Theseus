@@ -64,9 +64,11 @@ $(nano_core-obj): cargo $(cargo-obj) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(KERNEL_BUILD_DIR)
 	ld -n -T $(linker_script) -o $(nano_core-obj) $(assembly_object_files) $(cargo-obj)
 	@readelf -S -s -W $(nano_core-obj) | sed '/LOCAL  /d;/WEAK   /d' > $(KERNEL_BUILD_DIR)/__k_nano_core.sym   # removes LOCAL and WEAK symbols from the ELF file
-	@for objfile in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
-		cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/__k_\1.o/p'` ; \
-	done
+# copy the object files into the kernel build directory
+	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  -v  ./target/$(TARGET)/$(BUILD_MODE)/deps/  $(KERNEL_BUILD_DIR)
+	# @for objfile in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
+	# 	cp -vf $${objfile}  $(KERNEL_BUILD_DIR)/`basename $${objfile} | sed -n -e 's/\(.*\)-.*.o/__k_\1.o/p'` ; \
+	# done
 
 # compile assembly files
 $(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm

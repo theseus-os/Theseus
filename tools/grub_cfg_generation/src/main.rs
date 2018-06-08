@@ -11,10 +11,8 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let program = args[0].clone();
-
     let mut opts = Options::new();
-    opts.optopt("o", "", "set output file path", "NAME");
+    opts.optopt("o", "", "set output file path, e.g., \"/my/dir/grub.cfg\"", "OUTPUT_PATH");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -23,17 +21,19 @@ fn main() {
     };
 
     if matches.opt_present("h") {
-        print_usage(&program, opts);
+        print_usage("cargo run -- ", opts);
         process::exit(0);
     }
 
     // Require input directory 
     let input_directory = match matches.free.len() {
-        0=>{ eprintln!("No input directory");
+        0 => {
+            eprintln!("No input directory");
             process::exit(-1);
         },
-        1=>{ matches.free[0].clone() }, 
-        _=>{ eprintln!("Too many arguments entered");
+        1 => matches.free[0].clone(), 
+        _ => { 
+            eprintln!("Too many arguments entered");
             process::exit(-1);
         },
     };
@@ -43,12 +43,12 @@ fn main() {
     // Write to file 
     if matches.opt_present("o") {
         let output_file_path = match matches.opt_str("o") {
-            Some(s)=>s, 
-            None=>process::exit(-1)
+            Some(s) => s, 
+            None    => process::exit(-1)
         };
         write_to_file(grub_cfg_string, output_file_path);
     }
-    // Write to stdout
+    // Write to stdout by default
     else {
         println!("{}", grub_cfg_string);
     }
@@ -56,7 +56,7 @@ fn main() {
 }
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options]", program);
+    let brief = format!("Usage: {} [options] INPUT_DIRECTORY", program);
     print!("{}", opts.usage(&brief));
 }
 
