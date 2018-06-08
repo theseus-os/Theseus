@@ -81,7 +81,7 @@ const DISABLE_SEQ_2: u8 = 0x20;
 
 
 
-pub fn init_cursor() {
+pub fn enable_cursor() {
     unsafe {
         CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
         let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
@@ -114,7 +114,7 @@ pub struct VgaBuffer {
     /// the index of the line that is currently being displayed
     pub display_line: usize,
     /// whether the display is locked to scroll with the end and show new lines as printed
-    pub display_scroll_end: bool,
+    display_scroll_end: bool,
     /// the column position in the last line where the next character will go
     pub column: usize,
     /// the actual buffer memory that can be written to the VGA memory
@@ -228,8 +228,9 @@ impl VgaBuffer {
 
         Ok(())
     }
-
-    pub fn init_cursor(&self) {
+    
+    /// Enables the cursor by writing to four ports 
+    pub fn enable_cursor(&self) {
         unsafe {
             let cursor_start = 0b00000001;
             let cursor_end = 0b00010000;
@@ -243,6 +244,10 @@ impl VgaBuffer {
         return
     }
 
+    /// Update the cursor based on the given x and y coordinates,
+    /// which correspond to the column and row (line) respectively
+    /// Note that the coordinates must correspond to the absolute coordinates the cursor should be 
+    /// displayed onto the buffer, not the coordinates relative to the 80x24 grid
     pub fn update_cursor(&self, x: u16, y:u16) { 
         let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
         unsafe {
@@ -254,6 +259,8 @@ impl VgaBuffer {
         return
     }
 
+    /// Disables the cursor 
+    /// Still maintains the cursor's position
     pub fn disable_cursor (&self) {
         unsafe {
             CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
@@ -261,8 +268,15 @@ impl VgaBuffer {
         }
     }   
 
-
-
+    /// Returns a bool that indicates whether the vga buffer has the ability to scroll 
+    /// i.e. if there are more lines than the vga buffer can display at one time
+    pub fn can_scroll(&self) -> bool {
+        if self.lines.len() > BUFFER_HEIGHT {
+            return true
+        } else {
+            return false
+        }
+    }
 
 
     /// Displays (refreshes) this VgaBuffer at the given position.

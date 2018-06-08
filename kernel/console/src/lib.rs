@@ -59,21 +59,32 @@ const MAX_TERMS: usize = 9;
 #[derive(Debug)] 
 // Struct contains the command string and its arguments
 struct CommandStruct {
+    /// String that contains the command keyword
     command_str: String,
+    /// Vector of strings that contain any arguments to the command, though support for this is not fully developed yet
     arguments: Vec<String>
 }
 
 pub struct Terminal {
+    /// The terminal's own vga buffer that it displays to
     vga_buffer: VgaBuffer,
+    /// The terminal's print producer queue that it pushes output events to that will later be handled by the main loop
     term_print_producer: DFQueueProducer<ConsoleEvent>,
+    /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
+    /// The string that stores the users keypresses after the prompt
     console_input_string: String,
-    // This string is used for tracking the keypresses of the user while another command is running
+    /// The string that stores the user's keypresses if a command is currently running
     console_buffer_string: String,
+    /// Variable that stores the task id of any application manually spawned from the terminal
     current_task_id: usize,
+    /// The leftmost position in the vga buffer that the cursor may travel (calculated via row * vga buffer width + column)
     max_left_pos: u16,
+    /// The rightmost position in the vga buffer that the cursor may travel (calculated via row * vga buffer width + column)
     text_offset: u16, 
+    /// The current position in the vga buffer (calculated via row * vga buffer width + column)
     cursor_pos: u16,
+    /// The string that is prompted to the user (ex. kernel_term~$)
     prompt_string: String,
 }
  
@@ -153,17 +164,10 @@ impl Terminal {
                             self.current_task_id = 0;
                             let prompt_string = self.prompt_string.clone();
                             self.print_to_terminal(prompt_string)?;
-
-
+ 
                             if self.console_buffer_string.len() > 0 {
                                 let temp = self.console_buffer_string.clone();
                                 self.print_to_terminal(temp.clone())?;
-                                // for c in self.console_buffer_string.chars() {
-                                //     self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
-                                //         .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")?;
-                                //         self.cursor_pos += 1;
-                                //         self.text_offset += 1; 
-                                // }
                                 
                                 self.console_input_string = temp;
                                 self.text_offset += self.console_buffer_string.len() as u16;
@@ -359,25 +363,29 @@ impl Terminal {
 
         // home, end, page up, page down, up arrow, down arrow for the console
         if keyevent.keycode == Keycode::Home {
-            self.vga_buffer.display(DisplayPosition::Start);
-            self.vga_buffer.disable_cursor();
+            // Home command only registers if the vga buffer has the ability to scroll
+            if self.vga_buffer.can_scroll(){
+                self.vga_buffer.display(DisplayPosition::Start);
+                self.vga_buffer.disable_cursor();
+            }
             return Ok(());
         }
         if keyevent.keycode == Keycode::End {
             self.vga_buffer.display(DisplayPosition::End);
-            self.vga_buffer.init_cursor();
+            self.vga_buffer.enable_cursor();
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageUp {
-            self.vga_buffer.display(DisplayPosition::Up(20));
-            self.vga_buffer.disable_cursor();
+            // only registers the page up command if the vga buffer can already scroll
+            if self.vga_buffer.can_scroll(){
+               self.vga_buffer.display(DisplayPosition::Up(20));
+               self.vga_buffer.disable_cursor();
+            }
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageDown {
             self.vga_buffer.display(DisplayPosition::Down(20));
-            if self.vga_buffer.display_scroll_end {
-                self.vga_buffer.init_cursor();
-            }
+            self.vga_buffer.enable_cursor();
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
@@ -522,7 +530,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     kernel_term.print_to_terminal(WELCOME_STRING.to_string())?; 
     let prompt_string = kernel_term.prompt_string.clone();
     kernel_term.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
-    kernel_term.vga_buffer.init_cursor();
+    kernel_term.vga_buffer.enable_cursor();
     kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
@@ -590,7 +598,7 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             let ref_num = new_term_obj.term_ref;
             new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?;
             new_term_obj.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nTerminal_{}\n{}", ref_num, prompt_string))?;  
-            new_term_obj.vga_buffer.init_cursor();
+            new_term_obj.vga_buffer.enable_cursor();
             new_term_obj.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
             // List now owns the terminal object
             RUNNING_TERMINALS.lock().push(new_term_obj);
