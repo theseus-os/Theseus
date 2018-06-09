@@ -49,13 +49,12 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate syscall stack")
         )
     };
-    interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+    let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
 
     syscall::init(syscall_stack.top_usable());
 
     spawn::init(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
-
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
