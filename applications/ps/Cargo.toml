@@ -1,25 +1,16 @@
 [package]
-name = "test_panic"
+name = "ps"
 version = "0.1.0"
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Christine Wang <chrissywang54@gmail.com>"]
 
 [dependencies]
-
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
+getopts = { git = "https://github.com/kevinaboos/getopts" }
 
 [dependencies.console]
 path = "../../kernel/console"
 
-[dependencies.panic_info]
-path = "../../kernel/panic_info"
-
 [dependencies.task]
 path = "../../kernel/task"
-
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

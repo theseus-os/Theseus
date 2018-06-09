@@ -25,7 +25,7 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, get_module, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, ActivePageTable, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, get_module, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
 
 pub mod metadata;
@@ -35,10 +35,65 @@ use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, Loade
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
 
+#[derive(PartialEq)]
+pub enum CrateType {
+    KernelModule,
+    ApplicationModule,
+    UserspaceModule,
+}
+impl CrateType {
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            CrateType::KernelModule       => "__k_",
+            CrateType::ApplicationModule  => "__a_",
+            CrateType::UserspaceModule    => "__u_",
+        }
+    }
 
-const KERNEL_MODULE_NAME_PREFIX: &'static str = "__k_";
-const APPLICATION_NAME_PREFIX:   &'static str = "__a_";
-const _USERSPACE_NAME_PREFIX:     &'static str = "__u_";
+    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
+    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// # Examples 
+    /// ```
+    /// let result = CrateType::from_module_name("__k_my_crate");
+    /// assert_eq!(result, (CrateType::KernelModule, "my_crate") );
+    /// ```
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+        if module_name.starts_with(CrateType::ApplicationModule.prefix()) {
+            Ok((
+                CrateType::ApplicationModule,
+                module_name.get(CrateType::ApplicationModule.prefix().len() .. ).ok_or("Couldn't get name of application module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::KernelModule.prefix()) {
+            Ok((
+                CrateType::KernelModule,
+                module_name.get(CrateType::KernelModule.prefix().len() .. ).ok_or("Couldn't get name of kernel module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::UserspaceModule.prefix()) {
+            Ok((
+                CrateType::UserspaceModule,
+                module_name.get(CrateType::UserspaceModule.prefix().len() .. ).ok_or("Couldn't get name of userspace module")?
+            ))
+        }
+        else {
+            Err("module_name didn't start with a known CrateType prefix")
+        }
+    }
+
+
+    pub fn is_application(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::ApplicationModule.prefix())
+    }
+
+    pub fn is_kernel(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::KernelModule.prefix())
+    }
+
+    pub fn is_userspace(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::UserspaceModule.prefix())
+    }
+}
 
 
 
@@ -121,43 +176,35 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
         return Err("module was not page aligned");
     } 
 
+
+
+    let size = module.size();
+
     // first we need to map the module memory region into our address space, 
     // so we can then parse the module as an ELF file in the kernel.
-    {
-        // destructure the kernel's MMI so we can access its page table and vmas
-        let &mut MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            ..
-        } = kernel_mmi;
+    let temp_module_mapping = {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            let flags = EntryFlags::PRESENT;
 
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let size = module.size();
-                let flags = EntryFlags::PRESENT;
-
-                let temp_module_mapping = {
-                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
-                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
-                    try!( active_table.map_allocated_pages_to(
-                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
-                        flags, frame_allocator.deref_mut())
-                    )
-                };
-
-                let new_crate = try!(parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log));
-
-                let new_syms = metadata::add_crate(new_crate, log);
-                info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
-                Ok(new_syms)
-                
-                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-            }
-            _ => {
-                error!("load_kernel_crate(): error getting kernel's active page table to map module.");
-                Err("couldn't get kernel's active page table")
-            }
+            let new_pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module")?;
+            let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+            active_table.map_allocated_pages_to(
+                new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                flags, frame_allocator.deref_mut()
+            )?
         }
-    }
+        else {
+            error!("load_kernel_crate(): error getting kernel's active page table to temporarily map module.");
+            return Err("couldn't get kernel's active page table");
+        }
+    };
+
+    let new_crate = parse_elf_kernel_crate(temp_module_mapping, size, module.name(), kernel_mmi, log)?;
+    let new_syms = metadata::add_crate(new_crate, log);
+    info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
+    Ok(new_syms)
+    
+    // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
 }
 
 
@@ -168,55 +215,48 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) 
     -> Result<LoadedCrate, &'static str> 
 {
-    
-    if !module.name().starts_with(APPLICATION_NAME_PREFIX) {
-        error!("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
-        return Err("load_application_crate() can only be used for application modules (ones that start with \"__a_\")");
+    if !CrateType::is_application(module.name()) {
+        error!("load_application_crate() cannot be used for module \"{}\", only for application modules starting with \"{}\"",
+            module.name(), CrateType::ApplicationModule.prefix());
+        return Err("load_application_crate() can only be used for application modules");
     }
     
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
-        error!("module {} is not page aligned!", module.name());
+        error!("module {} was not page aligned!", module.name());
         return Err("module was not page aligned");
     } 
     
     debug!("load_application_crate: trying to load \"{}\" application module", module.name());
 
+
+
+    let size = module.size();
+
     // first we need to map the module memory region into our address space, 
     // so we can then parse the module as an ELF file in the kernel.
-    {
-        // destructure the kernel's MMI so we can access its page table and vmas
-        let &mut MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            .. 
-        } = kernel_mmi;
+    let temp_module_mapping = {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            let flags = EntryFlags::PRESENT;
 
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let size = module.size();
-                let flags = EntryFlags::PRESENT;
-
-                let temp_module_mapping = {
-                    let new_pages = try!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module"));
-                    let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
-                    try!( active_table.map_allocated_pages_to(
-                        new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
-                        flags, frame_allocator.deref_mut())
-                    )
-                };
-
-                let new_crate = try!(parse_elf_kernel_crate(temp_module_mapping, size, module.name(), active_table, log));
-                info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
-                Ok(new_crate)
-
-                // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-            }
-            _ => {
-                error!("load_application_crate(): error getting kernel's active page table to map module.");
-                Err("load_application_crate(): couldn't get kernel's active page table")
-            }
+            let new_pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for crate module")?;
+            let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+            active_table.map_allocated_pages_to(
+                new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
+                flags, frame_allocator.deref_mut()
+            )?
         }
-    }
+        else {
+            error!("load_application_crate(): error getting kernel's active page table to temporarily map module.");
+            return Err("load_application_crate(): couldn't get kernel's active page table");
+        }
+    };
+
+    let new_crate = parse_elf_kernel_crate(temp_module_mapping, size, module.name(), kernel_mmi, log)?;
+    info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+    Ok(new_crate)
+
+    // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
 }
 
 
@@ -251,25 +291,16 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
 
 
 
+/// The primary internal routine for parsing, loading, and linking a crate's module object file.
 fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
                           size_in_bytes: usize, 
                           module_name: &String, 
-                          active_table: &mut ActivePageTable, 
+                          kernel_mmi: &mut MemoryManagementInfo, 
                           log: bool)
                           -> Result<LoadedCrate, &'static str>
 {
-    let is_application = module_name.starts_with(APPLICATION_NAME_PREFIX);
-    let is_kernel_module = module_name.starts_with(KERNEL_MODULE_NAME_PREFIX);
-
-    let crate_name = if is_application {
-        module_name.get(APPLICATION_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of application module after \"__a_\"")?
-    } else if is_kernel_module {
-        module_name.get(KERNEL_MODULE_NAME_PREFIX.len() .. ).ok_or("Couldn't get name of kernel module crate after \"__k_\"")?
-    } else {
-        error!("parse_elf_kernel_crate(): error parsing crate: {}, name must start with {} or {}.",
-            module_name, KERNEL_MODULE_NAME_PREFIX, APPLICATION_NAME_PREFIX);
-        return Err("module_name didn't start with __k_ or __a_");
-    };
+    
+    let (_crate_type, crate_name) = CrateType::from_module_name(module_name)?;
     let crate_name = String::from(crate_name);
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
@@ -374,11 +405,17 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
         let mut allocate_pages_closure = |size_in_bytes: usize| {
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
 
-            // Right now we're just simply copying small sections to the new memory,
-            // so we have to map those pages to real (randomly chosen) frames first. 
-            // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
-            // and then change the page permissions (by using remap) later. 
-            active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
+            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                // Right now we're just simply copying small sections to the new memory,
+                // so we have to map those pages to real (randomly chosen) frames first. 
+                // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
+                // and then change the page permissions (by using remap) later. 
+                active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
+            }
+            else {
+                return Err("couldn't get kernel's active page table");
+            }
+
         };
 
         // we must allocate these pages separately because they will have different flags later
@@ -750,47 +787,43 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
                                 Err("Unsupported source section shndx SHN_ABS!!")
                             }
+
                             // match anything else, i.e., a valid source section shndx
                             shndx => {
                                 // first, we try to get the relevant section based on its shndx only
                                 let loaded_sec = if shndx == SHN_UNDEF { None } else { loaded_sections.get(&(shndx as usize)) };
-                                match loaded_sec {
-                                    Some(sec) => Ok(sec.clone()), // yay, we found the source_sec 
-                                    None => { 
-                                        // second, if we couldn't get the section based on its shndx, it means that the source section wasn't in this module.
-                                        // Thus, we *have* to to get the source section's name and check our list of loaded external crates to see if it's there.
-                                        // At this point, there's no other way to search for the source section besides its name
-                                        match source_sec_entry.get_name(&elf_file) {
-                                            Ok(source_sec_name) => {
-                                                const DATARELRO: &'static str = ".data.rel.ro.";
-                                                let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                                    let relro_name = try!(source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
-                                                    // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
-                                                    relro_name
-                                                }
-                                                else {
-                                                    source_sec_name
-                                                };
-
-                                                // search for the symbol's demangled name in the kernel's symbol map
-                                                let demangled = demangle_symbol(source_sec_name);
-                                                match metadata::get_symbol(demangled.full).upgrade() {
-                                                    Some(sec) => Ok(sec), 
-                                                    None => {
-                                                        // if we couldn't get the source section based on its shndx, nor based on its name, then that's an error
-                                                        let source_sec_header = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                                                                                .and_then(|s| s.get_name(&elf_file));
-                                                        error!("Could not resolve source section for symbol relocation for symtab[{}] name={:?} header={:?}", 
-                                                                shndx, source_sec_name, source_sec_header);
-                                                        Err("Could not resolve source section for symbol relocation")
-                                                    }
-                                                }
-                                            }
-                                            Err(_e) => {
-                                                error!("Couldn't get source section [{}]'s name when necessary for non-local relocation entry", shndx);
-                                                Err("Couldn't get source section's name when necessary for non-local relocation entry")
-                                            }
+                                if let Some(sec) = loaded_sec {
+                                    // yay, we found the source_sec 
+                                    Ok(sec.clone())
+                                }
+                                else {
+                                    // second, if we couldn't get the section based on its shndx, it means that the source section wasn't in this module.
+                                    // Thus, we *have* to to get the source section's name and check our list of loaded external crates to see if it's there.
+                                    // At this point, there's no other way to search for the source section besides its name
+                                    if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                                        const DATARELRO: &'static str = ".data.rel.ro.";
+                                        let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                                            let relro_name = try!(source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
+                                            // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
+                                            relro_name
                                         }
+                                        else {
+                                            source_sec_name
+                                        };
+
+                                        let demangled = demangle_symbol(source_sec_name);
+
+                                        // search for the symbol's demangled name in the kernel's symbol map
+                                        metadata::get_symbol_or_load(&demangled.full, kernel_mmi)
+                                            .upgrade()
+                                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
+                                    }
+                                    else {
+                                        let _source_sec_header = source_sec_entry
+                                            .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                                            .and_then(|s| s.get_name(&elf_file));
+                                        error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", shndx, _source_sec_header);
+                                        Err("Couldn't get source section's name, needed for non-local relocation entry")
                                     }
                                 }
                             }
@@ -859,14 +892,19 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
     
     // since we initially mapped the pages as writable, we need to remap them properly according to each section
-    if let Some(ref tp) = text_pages { 
-        try!(active_table.remap(tp, EntryFlags::PRESENT)); // present and executable (not no_execute)
+    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        if let Some(ref tp) = text_pages { 
+            try!(active_table.remap(tp, EntryFlags::PRESENT)); // present and executable (not no_execute)
+        }
+        if let Some(ref rp) = rodata_pages { 
+            try!(active_table.remap(rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
+        }
+        if let Some(ref dp) = data_pages { 
+            try!(active_table.remap(dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
+        }
     }
-    if let Some(ref rp) = rodata_pages { 
-        try!(active_table.remap(rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
-    }
-    if let Some(ref dp) = data_pages { 
-        try!(active_table.remap(dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
+    else {
+        return Err("couldn't get kernel's active page table");
     }
     
     // extract just the sections from the section map

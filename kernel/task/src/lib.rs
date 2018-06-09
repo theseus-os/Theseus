@@ -39,7 +39,7 @@ extern crate memory;
 extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
-extern crate panic;
+extern crate panic_info;
 
 
 use core::fmt;
@@ -55,8 +55,12 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::LoadedCrate;
-use panic::{PanicInfo, PanicHandler};
+use panic_info::PanicInfo;
 
+
+
+/// The signature of the callback function that can hook into receiving a panic. 
+pub type PanicHandler = Box<Fn(&PanicInfo)>;
 
 
 

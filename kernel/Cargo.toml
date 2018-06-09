@@ -12,13 +12,6 @@ exclude = [
 ]
 
 
-## Cargo doesn't yet support features for virtual workspace manifests
-# [features]
-# loadable = [ "nano_core/loadable", "captain/loadable" ]
-# mirror_serial = [ "nano_core/mirror_serial" ]
-# apic_timer_fixed = [ "apic/apic_timer_fixed" ]
-
-
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
