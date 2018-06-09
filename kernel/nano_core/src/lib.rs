@@ -26,7 +26,7 @@ extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate apic;
-extern crate exceptions;
+extern crate exceptions_early;
 extern crate captain;
 extern crate panic_handling;
 
@@ -80,7 +80,7 @@ fn shutdown(msg: &'static str) -> ! {
 /// This function does the following things: 
 ///
 /// * Bootstraps the OS, including [logging](../logger/index.html) 
-///   and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
+///   and basic early [exception handlers](../exceptions_early/fn.init.html)
 /// * Sets up basic [virtual memory](../memory/fn.init.html)
 /// * Initializes the [state_store](../state_store/index.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
@@ -106,7 +106,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions::init_early_exceptions(&EARLY_IDT);
+    exceptions_early::init(&EARLY_IDT);
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity

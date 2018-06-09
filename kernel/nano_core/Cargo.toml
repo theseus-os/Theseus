@@ -45,8 +45,8 @@ path = "../mod_mgmt"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
