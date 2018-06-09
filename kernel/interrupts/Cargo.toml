@@ -45,8 +45,8 @@ path = "../gdt"
 [dependencies.pic]
 path = "../pic"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.task]
 path = "../task"
