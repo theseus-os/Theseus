@@ -126,7 +126,7 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-struct Point {
+pub struct Point {
     pub x: usize,
     pub y: usize,
     pub color: usize,
@@ -163,13 +163,12 @@ impl Drawer {
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
-        let mut points = Vec::new();
         if width.abs() > height.abs() {
             let mut y;
             for x in start_x..end_x {
                 y = (x-start_x)*height/width+start_y;
                 if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, color:color});
+                    self.draw_pixel(x as usize, y as usize, color);
                 }
             }
         }
@@ -178,11 +177,10 @@ impl Drawer {
             for y in start_y..end_y {
                 x = (y-start_y)*width/height+start_x;
                 if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, color:color});
+                    self.draw_pixel(x as usize, y as usize, color);
                 }            
             }
         }
-        self.draw_points(points);
     }
 
     fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
@@ -190,16 +188,12 @@ impl Drawer {
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
             else { FRAME_BUFFER_HEIGHT };  
-        let mut points = Vec::new();
 
         for x in start_x..end_x{
             for y in start_y..end_y{
-                points.push(Point{x:x as usize, y:y as usize, color:color});
-              // draw_pixel(x, y, color);
+                self.draw_pixel(x, y, color);
             }
         }
-        self.draw_points(points);
-
     }
 
 

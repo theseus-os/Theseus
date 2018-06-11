@@ -25,7 +25,7 @@ const CHARACTER_HEIGHT:usize = 16;
 const BUFFER_WIDTH:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
 const BUFFER_HEIGHT:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
 
-pub const FONT_COLOR:usize = 0xFFFFFF;
+pub const FONT_COLOR:usize = 0x90ee90;
 const BACKGROUND_COLOR:usize = 0x000000;
 
 const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
@@ -387,6 +387,7 @@ impl FrameTextBuffer {
 
     fn write_str_with_color(&mut self, s: &str, color: usize)-> fmt::Result {
         for byte in s.chars() {
+            //trace!("Wenqiu:print chars {}", byte);
             match byte {
                 // handle new line
                 '\n' => {
@@ -501,7 +502,7 @@ impl FrameTextBuffer {
 
     /// Displays this FrameBuffer at the given string offset by flushing it to the screen.
     pub fn display(&mut self, position: DisplayPosition) {
-        // trace!("FrameBuffer::display(): position {:?}", position);
+        //trace!("FrameBuffer::display(): position {:?}", position);
         let (start, end) = match position {
             DisplayPosition::Start => {
                 self.display_scroll_end = false;
@@ -614,6 +615,7 @@ impl ScreenChar {
 }
 
 fn printline(line_num:usize, line:Line){
+    //trace!("printline");
     for i in 0..BUFFER_WIDTH{
         printchar(line[i].ascii_character, line_num, i, line[i].color_code);
     }
@@ -628,10 +630,16 @@ fn printchar(character:char, line:usize, col:usize, color:usize){
         debug!("frame_buffer_text::print(): The line is out of bound");
         return
     }
+
+    if character == ' ' {
+        return
+    }
     for k in 0..CHARACTER_HEIGHT{
+        trace!("start to draw {}", character as usize);
+
         let ascii = character as usize;
-        let x = (col*CHARACTER_WIDTH)+1;//leave 1 pixel left margin for every character
-        let y = line*CHARACTER_HEIGHT + k;
+        let x = (col * CHARACTER_WIDTH) + 1;//leave 1 pixel left margin for every character
+        let y = line * CHARACTER_HEIGHT + k;
         let num = FONT_BASIC[ascii][k];
         for i in 0..8 {
             if num & (0x80 >> i) !=0 {
@@ -640,6 +648,7 @@ fn printchar(character:char, line:usize, col:usize, color:usize){
                 frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
             }
         }
+        trace!("end to draw");
     }  
 }
 
