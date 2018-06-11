@@ -10,18 +10,22 @@ extern crate frame_buffer;
 extern crate alloc;
 extern crate serial_port;
 extern crate spin;
+extern crate port_io;
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::cmp::min;
+use spin::Mutex;
+use port_io::Port;
+
 
 const CHARACTER_WIDTH:usize = 9;
 const CHARACTER_HEIGHT:usize = 16;
-const WINDOW_COLUMNS:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
-const WINDOW_LINES:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
+const BUFFER_WIDTH:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
+const BUFFER_HEIGHT:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
 
-const FONT_COLOR:usize = 0xFFFFFF;
+pub const FONT_COLOR:usize = 0xFFFFFF;
 const BACKGROUND_COLOR:usize = 0x000000;
 
 const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
@@ -300,19 +304,62 @@ pub enum DisplayPosition {
 }
 
 
-type Line = [ScreenChar; WINDOW_COLUMNS];
+type Line = [ScreenChar; BUFFER_WIDTH];
 
-const BLANK_LINE: Line = [ScreenChar::new(' ', 0); WINDOW_COLUMNS];
+const BLANK_LINE: Line = [ScreenChar::new(' ', 0); BUFFER_WIDTH];
+    static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
+    static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
+    static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
+const UNLOCK_SEQ_1:u8  = 0x0A;
+const UNLOCK_SEQ_2:u8 = 0x0B;
+const UNLOCK_SEQ_3:u8 = 0xC0;
+const UNLOCK_SEQ_4:u8 = 0xE0;
+const UPDATE_SEQ_1: u8 = 0x0E;
+const UPDATE_SEQ_2: u8 = 0x0F;
+const UPDATE_SEQ_3: u16 = 0xFF;
+const CURSOR_START:u8 =  0b00000001;
+const CURSOR_END:u8 = 0b00010000;
+const RIGHT_BIT_SHIFT: u8 = 8;
+const DISABLE_SEQ_1: u8 = 0x0A;
+const DISABLE_SEQ_2: u8 = 0x20;
+
+pub fn enable_cursor() {
+    unsafe {
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
+        CURSOR_PORT_END.lock().write(temp_read);
+        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
+        CURSOR_PORT_END.lock().write(temp_read2);
+    }
+}
+
+pub fn update_cursor (x: u16, y:u16) { 
+    let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+    unsafe {
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+        CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
+    }
+}
+
+pub fn disable_cursor () {
+    unsafe {
+        CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
+        CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
+    }
+}
 
 /// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
     /// the index of the line that is currently being displayed
-    display_line: usize,
+    pub display_line: usize,
     /// whether the display is locked to scroll with the end and show new lines as printed
     display_scroll_end: bool,
     /// the column position in the last line where the next character will go
-    column: usize,
+    pub column: usize,
     /// the actual buffer memory that can be written to the frame memory
     lines: Vec<Line>,
 }
@@ -338,7 +385,7 @@ impl FrameTextBuffer {
     }
     
 
-    fn write_str_with_color(&mut self, s: &str, color: usize) {
+    fn write_str_with_color(&mut self, s: &str, color: usize)-> fmt::Result {
         for byte in s.chars() {
             match byte {
                 // handle new line
@@ -353,7 +400,7 @@ impl FrameTextBuffer {
                     }
                     self.column += 1;
 
-                    if self.column == WINDOW_COLUMNS { // wrap to a new line
+                    if self.column == BUFFER_WIDTH { // wrap to a new line
                         self.new_line(color); 
                     }
                 }
@@ -364,7 +411,7 @@ impl FrameTextBuffer {
         // i.e., if the end of the frame buffer is visible
         let last_line = self.lines.len() - 1;;
         if  self.display_scroll_end || 
-            (last_line >= self.display_line && last_line <= (self.display_line + WINDOW_LINES))
+            (last_line >= self.display_line && last_line <= (self.display_line + BUFFER_HEIGHT))
         {
             self.display(DisplayPosition::End);
         }
@@ -378,11 +425,13 @@ impl FrameTextBuffer {
         //     self.display(DisplayPosition::Same);
         // }
 
+        Ok(())
+
     }
 
     ///Write string to console with color
-    pub fn write_string_with_color(&mut self, s: &String, color: usize) {
-        self.write_str_with_color(s.as_str(), color);
+    pub fn write_string_with_color(&mut self, s: &String, color: usize)-> fmt::Result {
+        self.write_str_with_color(s.as_str(), color)
     }
 
 
@@ -393,15 +442,62 @@ impl FrameTextBuffer {
     fn new_line(&mut self, color: usize) {
         // clear out the rest of the current line
         let ref mut lines = self.lines;
-        for c in self.column .. WINDOW_COLUMNS {
+        for c in self.column .. BUFFER_WIDTH {
             lines.last_mut().unwrap()[c] = ScreenChar::new(' ', color);
         }
         
         self.column = 0; 
-        lines.push([ScreenChar::new(' ', color); WINDOW_COLUMNS]);
+        lines.push([ScreenChar::new(' ', color); BUFFER_WIDTH]);
     }
 
+    /// Enables the cursor by writing to four ports 
+    pub fn enable_cursor(&self) {
+        unsafe {
+            let cursor_start = 0b00000001;
+            let cursor_end = 0b00010000;
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | cursor_start;
+            CURSOR_PORT_END.lock().write(temp_read);
+            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
+            CURSOR_PORT_END.lock().write(temp_read2);
+        }
+        return
+    }
 
+    /// Update the cursor based on the given x and y coordinates,
+    /// which correspond to the column and row (line) respectively
+    /// Note that the coordinates must correspond to the absolute coordinates the cursor should be 
+    /// displayed onto the buffer, not the coordinates relative to the 80x24 grid
+    pub fn update_cursor(&self, x: u16, y:u16) { 
+        let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+        unsafe {
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
+            CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
+            CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
+            CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
+        }
+        return
+    }
+
+    /// Disables the cursor 
+    /// Still maintains the cursor's position
+    pub fn disable_cursor (&self) {
+        unsafe {
+            CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
+            CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
+        }
+    }   
+
+    /// Returns a bool that indicates whether the vga buffer has the ability to scroll 
+    /// i.e. if there are more lines than the vga buffer can display at one time
+    pub fn can_scroll(&self) -> bool {
+        if self.lines.len() > BUFFER_HEIGHT {
+            return true
+        } else {
+            return false
+        }
+    }
 
     /// Displays this FrameBuffer at the given string offset by flushing it to the screen.
     pub fn display(&mut self, position: DisplayPosition) {
@@ -410,16 +506,16 @@ impl FrameTextBuffer {
             DisplayPosition::Start => {
                 self.display_scroll_end = false;
                 self.display_line = 0;
-                (0, WINDOW_LINES)
+                (0, BUFFER_HEIGHT)
             }
             DisplayPosition::Up(u) => {
                 if self.display_scroll_end {
                     // handle the case when it was previously at the end, but then scrolled up
-                    self.display_line = self.display_line.saturating_sub(WINDOW_LINES);
+                    self.display_line = self.display_line.saturating_sub(BUFFER_HEIGHT);
                 }
                 self.display_scroll_end = false;
                 self.display_line = self.display_line.saturating_sub(u);
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
             DisplayPosition::Down(d) => {
                 if self.display_scroll_end {
@@ -427,27 +523,27 @@ impl FrameTextBuffer {
                 }
                 else {
                     self.display_line = self.display_line.saturating_add(d);
-                    if self.display_line + WINDOW_LINES >= self.lines.len() {
+                    if self.display_line + BUFFER_HEIGHT >= self.lines.len() {
                         self.display_scroll_end = true;
                         self.display_line = self.lines.len() - 1;
                     }
                 }
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
             DisplayPosition::Same => {
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
             DisplayPosition::End => {
                 self.display_scroll_end = true;
                 self.display_line = self.lines.len() - 1;
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
+                (self.display_line, self.display_line.saturating_add(BUFFER_HEIGHT))
             }
         };
 
         // trace!("   initial start {}, end {}", start, end);
         // if we're displaying the end of the FrameBuffer, the range of characters displayed needs to start before that
         let start = if start == (self.lines.len() - 1) {
-            start.saturating_sub(WINDOW_LINES - 1)
+            start.saturating_sub(BUFFER_HEIGHT - 1)
         } else {
             start
         };
@@ -464,8 +560,8 @@ impl FrameTextBuffer {
         }
 
         // fill the rest of the space, if any, with blank lines
-        /*    if num_lines < WINDOW_LINES {
-            for i in num_lines .. WINDOW_LINES {
+        /*    if num_lines < BUFFER_HEIGHT {
+            for i in num_lines .. BUFFER_HEIGHT {
                 //trace!(self.lines[line]);
 
                 //  write_volatile(addr, BLANK_LINE);
@@ -494,9 +590,8 @@ impl FrameTextBuffer {
 
 impl fmt::Write for FrameTextBuffer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        let ret = serial_port::write_str(s); // mirror to serial port
-        self.write_str_with_color(s, FONT_COLOR);
-        ret
+        try!(self.write_str_with_color(s, FONT_COLOR));
+        serial_port::write_str(s)
     }
 }
 
@@ -519,17 +614,17 @@ impl ScreenChar {
 }
 
 fn printline(line_num:usize, line:Line){
-    for i in 0..WINDOW_COLUMNS{
+    for i in 0..BUFFER_WIDTH{
         printchar(line[i].ascii_character, line_num, i, line[i].color_code);
     }
 }
 
 fn printchar(character:char, line:usize, col:usize, color:usize){
-    if col >= WINDOW_COLUMNS {
+    if col >= BUFFER_WIDTH {
         debug!("frame_buffer_text::print(): The col is out of bound");
         return
     }
-    if line >= WINDOW_LINES {
+    if line >= BUFFER_HEIGHT {
         debug!("frame_buffer_text::print(): The line is out of bound");
         return
     }

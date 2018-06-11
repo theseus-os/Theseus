@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 extern crate keycodes_ascii;
-#[macro_use] extern crate vga_buffer;
+#[macro_use] extern crate frame_buffer_text;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
@@ -18,7 +18,7 @@ extern crate memory;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 use console_types::{ConsoleEvent, ConsoleOutputEvent};
-use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
+use frame_buffer_text::{FrameTextBuffer, DisplayPosition};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;
@@ -50,8 +50,8 @@ lazy_static! {
 // Variables for the vga buffer cursor
 const DEFAULT_X_POS: u16 = 13;
 const DEFAULT_Y_POS: u16 = 12;
-const VGA_BUFFER_WIDTH: u16 = 80;
-const VGA_BUFFER_HEIGHT: u16= 24;
+const FRAME_BUFFER_WIDTH: u16 = 80;
+const FRAME_BUFFER_HEIGHT: u16= 24;
 
 // Defines the max number of terminals that can be running
 const MAX_TERMS: usize = 9;
@@ -67,7 +67,7 @@ struct CommandStruct {
 
 pub struct Terminal {
     /// The terminal's own vga buffer that it displays to
-    vga_buffer: VgaBuffer,
+    frame_buffer: FrameTextBuffer,
     /// The terminal's print producer queue that it pushes output events to that will later be handled by the main loop
     term_print_producer: DFQueueProducer<ConsoleEvent>,
     /// The reference number that can be used to switch between/correctly identify the terminal object
@@ -103,15 +103,15 @@ impl Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
             term_print_producer: dfqueue_consumer.obtain_producer(),
-            vga_buffer: VgaBuffer::new(),
+            frame_buffer: FrameTextBuffer::new(),
             console_input_string: String::new(),
             console_buffer_string: String::new(),
             current_task_id: 0,
             // track the cursor position and bounds 
-            max_left_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
-            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                // debug!("start here");
+            max_left_pos: DEFAULT_Y_POS * FRAME_BUFFER_WIDTH + DEFAULT_X_POS,
+            text_offset: DEFAULT_Y_POS * FRAME_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                // debug!("start here");
 
-            cursor_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
+            cursor_pos: DEFAULT_Y_POS * FRAME_BUFFER_WIDTH + DEFAULT_X_POS,
             prompt_string: prompt_string,
         }
     }
@@ -187,25 +187,25 @@ impl Terminal {
 
     /// Updates the cursor to a new position 
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
-        let new_x = self.vga_buffer.column as u16;
-        let display_line = self.vga_buffer.display_line;
+        let new_x = self.frame_buffer.column as u16;
+        let display_line = self.frame_buffer.display_line;
         let new_y;
-        if display_line < VGA_BUFFER_HEIGHT as usize {
+        if display_line < FRAME_BUFFER_HEIGHT as usize {
             new_y = display_line as u16;
         } else {
-            new_y = VGA_BUFFER_HEIGHT;
+            new_y = FRAME_BUFFER_HEIGHT;
         };
-        vga_buffer::update_cursor(new_x, new_y);
+        frame_buffer_text::update_cursor(new_x, new_y);
         // Refreshes the display
-        self.vga_buffer.display(DisplayPosition::Same);
+        self.frame_buffer.display(DisplayPosition::Same);
         return Ok(());
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent, current_terminal_num: &mut usize, num_running: usize) -> Result<(), &'static str> {
         // Finds current coordinates of the VGA buffer
-        let y = self.vga_buffer.display_line as u16;
-        let x = self.vga_buffer.column as u16;
+        let y = self.frame_buffer.display_line as u16;
+        let x = self.frame_buffer.column as u16;
 
         // Ctrl+D or Ctrl+Alt+Del kills the OS
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D
@@ -225,7 +225,7 @@ impl Terminal {
             } else {
                 self.console_input_string.clear();
                 self.console_buffer_string.clear();
-                let _result = self.vga_buffer.write_string_with_color(&"^C\n".to_string(), ColorCode::default());
+                let _result = self.frame_buffer.write_string_with_color(&"^C\n".to_string(), frame_buffer_text::FONT_COLOR);
                 let prompt_string = self.prompt_string.clone();
                 self.print_to_terminal(prompt_string)?;
             }
@@ -355,59 +355,59 @@ impl Terminal {
             // Clears the buffer for another command once current command is finished executing
             self.console_input_string.clear();
             // Updates the cursor tracking variables when the enter key is pressed 
-            self.text_offset  = y * VGA_BUFFER_WIDTH + x;
-            self.cursor_pos = y * VGA_BUFFER_WIDTH + x;
-            self.max_left_pos =  y * VGA_BUFFER_WIDTH + x;
+            self.text_offset  = y * FRAME_BUFFER_WIDTH + x;
+            self.cursor_pos = y * FRAME_BUFFER_WIDTH + x;
+            self.max_left_pos =  y * FRAME_BUFFER_WIDTH + x;
 
         }
 
         // home, end, page up, page down, up arrow, down arrow for the console
         if keyevent.keycode == Keycode::Home {
             // Home command only registers if the vga buffer has the ability to scroll
-            if self.vga_buffer.can_scroll(){
-                self.vga_buffer.display(DisplayPosition::Start);
-                self.vga_buffer.disable_cursor();
+            if self.frame_buffer.can_scroll(){
+                self.frame_buffer.display(DisplayPosition::Start);
+                self.frame_buffer.disable_cursor();
             }
             return Ok(());
         }
         if keyevent.keycode == Keycode::End {
-            self.vga_buffer.display(DisplayPosition::End);
-            self.vga_buffer.enable_cursor();
+            self.frame_buffer.display(DisplayPosition::End);
+            self.frame_buffer.enable_cursor();
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageUp {
             // only registers the page up command if the vga buffer can already scroll
-            if self.vga_buffer.can_scroll(){
-               self.vga_buffer.display(DisplayPosition::Up(20));
-               self.vga_buffer.disable_cursor();
+            if self.frame_buffer.can_scroll(){
+               self.frame_buffer.display(DisplayPosition::Up(20));
+               self.frame_buffer.disable_cursor();
             }
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageDown {
-            self.vga_buffer.display(DisplayPosition::Down(20));
-            self.vga_buffer.enable_cursor();
+            self.frame_buffer.display(DisplayPosition::Down(20));
+            self.frame_buffer.enable_cursor();
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
-            self.vga_buffer.display(DisplayPosition::Up(1));
+            self.frame_buffer.display(DisplayPosition::Up(1));
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
-            self.vga_buffer.display(DisplayPosition::Down(1));
+            self.frame_buffer.display(DisplayPosition::Down(1));
             return Ok(());
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
             if self.cursor_pos > self.max_left_pos {
-                self.vga_buffer.column -= 1;
+                self.frame_buffer.column -= 1;
                 self.cursor_pos -=1;
                 return Ok(());
             }
         }
         if keyevent.keycode == Keycode::Right {
             if self.cursor_pos < self.text_offset {
-                self.vga_buffer.column += 1;
+                self.frame_buffer.column += 1;
                 self.cursor_pos += 1;
                 return Ok(());
             }
@@ -442,8 +442,8 @@ impl Terminal {
         match keyevent.keycode.to_ascii(keyevent.modifiers) {
             Some(c) => { 
                 // we echo key presses directly to the console without queuing an event
-                try!(self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
-                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+                try!(self.frame_buffer.write_string_with_color(&c.to_string(), frame_buffer_text::FONT_COLOR)
+                    .map_err(|_| "fmt::Error in FrameBuffer's write_string_with_color()")
                 );
                 
                 // adjusts the cursor tracking variables whenever the backspace or ascii keys are pressed, excluding the enter key which is handled above
@@ -505,7 +505,7 @@ pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
         Ok(())
     }
     else {
-        print_raw!("[RAW] {}", s.into());
+        //print_raw!("[RAW] {}", s.into());
         Ok(())
     }
 }
@@ -530,8 +530,8 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     kernel_term.print_to_terminal(WELCOME_STRING.to_string())?; 
     let prompt_string = kernel_term.prompt_string.clone();
     kernel_term.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
-    kernel_term.vga_buffer.enable_cursor();
-    kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
+    kernel_term.frame_buffer.enable_cursor();
+    kernel_term.frame_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
     RUNNING_TERMINALS.lock().push(kernel_term);
@@ -582,8 +582,8 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                 for term in RUNNING_TERMINALS.lock().iter_mut() {
                     if term.term_ref == output_event.term_num.unwrap_or(1 as usize) {
                         let focus_terminal = term;
-                        try!(focus_terminal.vga_buffer.write_string_with_color(&output_event.text, ColorCode::default())
-                        .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()"));
+                        try!(focus_terminal.frame_buffer.write_string_with_color(&output_event.text, frame_buffer_text::FONT_COLOR)
+                        .map_err(|_| "fmt::Error in FrameTextBuffer's write_string_with_color()"));
                         break;
                     }
                 }                
@@ -598,8 +598,8 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             let ref_num = new_term_obj.term_ref;
             new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?;
             new_term_obj.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nTerminal_{}\n{}", ref_num, prompt_string))?;  
-            new_term_obj.vga_buffer.enable_cursor();
-            new_term_obj.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
+            new_term_obj.frame_buffer.enable_cursor();
+            new_term_obj.frame_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
             // List now owns the terminal object
             RUNNING_TERMINALS.lock().push(new_term_obj);
         }

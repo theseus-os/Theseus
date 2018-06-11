@@ -22,4 +22,7 @@ path = "../serial_port"
 features = ["spin_no_std"]
 version = "0.2.1"
 
+[dependencies.port_io]
+path = "../../libs/port_io"
+
 

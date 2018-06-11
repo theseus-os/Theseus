@@ -24,10 +24,13 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
+use kernel_config::memory::KERNEL_OFFSET;
 
 
 
-const VGA_BUFFER_ADDR: usize = 0xa0000;
+
+//const VGA_BUFFER_ADDR: usize = 0xa0000;
+const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 
 //Size of VESA mode 0x4112
 
@@ -52,7 +55,7 @@ macro_rules! try_opt_err {
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
-
+    trace!("I'm a;lsdfh aoijf oaiwje foiawjef");
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
