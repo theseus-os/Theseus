@@ -9,6 +9,7 @@ extern crate getopts;
 use getopts::Options;
 use alloc::{Vec, String};
 use self::task::TASKLIST;
+use task::RunState;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -18,42 +19,47 @@ pub fn main(args: Vec<String>) -> isize {
 
     let matches = match opts.parse(&args) {
         Ok(m) => { m }
-        Err(_f) => { panic!("{}", _f) }
+        Err(_f) => { println!("{} \n", _f);
+                    return -1; }
     };
 
     if matches.opt_present("h") {
         return print_usage(opts)
     }
 
-    let mut process_string =  {
-        if matches.opt_present("b") {
-            String::from(format!("{0:5} | {1:10} \n", 
-            "ID", "NAME"))
-        }
-        else {
-            String::from(format!("{0:10} | {1:5} | {2:5} | {3:5} | {4:5} | {5:20} \n", 
-            "RUNSTATE", "CPU", "PINNED", "TYPE", "ID", "NAME"))
-        }
-    };
+    // Print headers
+    if matches.opt_present("b") {
+        println!("{0:<5}  {1}", "ID", "NAME");
+    }
+    else {
+        println!("{0:<5}  {1:<10}  {2:<10}  {3:<10}  {4:<5}  {5}", "ID", "RUNSTATE", "CPU", "PINNED", "TYPE", "NAME");
+    }
 
+    // Print all tasks
+    let mut process_string = String::new();
     use alloc::string::ToString;
-
     for process in TASKLIST.iter() {
         let id = process.0;
         let name = &process.1.read().name;
-        let runstate = &process.1.read().runstate;
+        let runstate = match &process.1.read().runstate {
+            RunState::Initing => "Initing",
+            RunState::Runnable => "Runnable",
+            RunState::Blocked => "Blocked",
+            RunState::Reaped => "Reaped",
+            _ => "Exited",
+        };
         let cpu = &process.1.read().running_on_cpu;
         let pinned = &process.1.read().pinned_core.map(|x| x.to_string()).unwrap_or(String::from("None"));        
         let task_type = if process.1.read().is_an_idle_task {"I"}
                     else if process.1.read().app_crate.is_some() {"A"}
                     else {" "} ;     
+
         if matches.opt_present("b") {
-            process_string.push_str(&format!("{0:5} | {1:10} \n", id, name));
+            process_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
         else {
-            process_string.push_str(&format!("{0:10?} | {1:5} | {2:5} | {3:5} | {4:5} | {5:20} \n", runstate, cpu, pinned, task_type, id, name));
+            process_string.push_str(&format!("{0:<5}  {1:<10}  {2:<10}  {3:<10}  {4:<5}  {5}\n", id, runstate, cpu, pinned, task_type, name));
         }
-        
     }
     println!("{}", process_string);
     
