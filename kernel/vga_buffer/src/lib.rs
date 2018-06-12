@@ -13,7 +13,7 @@ extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate port_io;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 
 use core::ptr::Unique;
 use core::cmp::min;
@@ -62,9 +62,9 @@ pub enum DisplayPosition {
 type Line = [ScreenChar; BUFFER_WIDTH];
 
 const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
-    static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
-    static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
-    static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
+static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
+static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
+static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
 const UNLOCK_SEQ_1:u8  = 0x0A;
 const UNLOCK_SEQ_2:u8 = 0x0B;
@@ -119,6 +119,9 @@ pub struct VgaBuffer {
     pub column: usize,
     /// the actual buffer memory that can be written to the VGA memory
     lines: Vec<Line>,
+    /// using this to test new vga buffer
+    display_lines: Vec<Line>,
+
 }
 
 impl VgaBuffer {
@@ -132,12 +135,13 @@ impl VgaBuffer {
         let first_line = BLANK_LINE;
         let mut lines = Vec::with_capacity(num_initial_lines);
         lines.push(first_line);
-
+        let display_lines = Vec::with_capacity(num_initial_lines);
         VgaBuffer {
             display_line: 0,
             display_scroll_end: true,
             column: 0,
             lines: lines,
+            display_lines: display_lines,
         }
     }
 
@@ -276,6 +280,78 @@ impl VgaBuffer {
         } else {
             return false
         }
+    }
+
+    /// Returns a tuple containing (buffer height, buffer width)
+    pub fn get_dimensions(&self) -> (usize, usize) {
+        return (BUFFER_WIDTH, BUFFER_HEIGHT);
+    }
+
+    pub fn into_lines(&mut self, slice: &str, color: ColorCode) {
+        let mut curr_column = 0;
+        let mut new_line = BLANK_LINE;
+        for byte in slice.bytes() {
+            if byte == b'\n' {
+                self.display_lines.push(new_line);
+                new_line = BLANK_LINE;
+                curr_column = 0;
+            } else {
+                if curr_column == 80 {
+                    curr_column = 0;
+                    self.display_lines.push(new_line);
+                    new_line = BLANK_LINE;
+                }
+                new_line[curr_column] = ScreenChar::new(byte, color);
+                curr_column += 1;  
+            }
+        }
+        self.display_lines.push(new_line);
+    }
+
+    pub fn display_from_top(&mut self) -> Result<(), &'static str> {
+        let mut iterator = self.display_lines.len();
+        if iterator > BUFFER_HEIGHT {
+            iterator = BUFFER_HEIGHT;
+        } 
+        unsafe {
+            use core::ptr::write_volatile;
+            for (i, line) in (0..iterator).enumerate() {
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                write_volatile(addr, self.display_lines[line]);
+            }
+    
+        // fill the rest of the space, if any, with blank lines
+            if iterator < BUFFER_HEIGHT {
+                for i in iterator .. BUFFER_HEIGHT {
+                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                    // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
+                    write_volatile(addr, BLANK_LINE);
+                }
+            }
+        }
+        // DONT HARDCODE AND JUST PASS VARIABLE
+        self.display_lines = Vec::with_capacity(1000);
+        Ok(())
+    }
+
+    pub fn display_from_bottom(&mut self) -> Result<(), &'static str>{
+        unsafe {
+            let mut idx = self.display_lines.len();
+            if idx < BUFFER_HEIGHT {
+                self.display_from_top()?;
+                return Ok(());
+            }
+            for i in 0..BUFFER_HEIGHT {
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                use core::ptr::write_volatile;
+                write_volatile(addr, self.display_lines[idx-1]);
+                idx -= 1
+            }
+        }
+
+        // DONT HARDCODE AND JUST PASS VARIABLE
+        self.display_lines = Vec::with_capacity(1000);
+        Ok(())
     }
 
 

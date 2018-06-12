@@ -1,5 +1,9 @@
 #![no_std]
 #![feature(alloc)]
+// used by the vga buffer
+#![feature(const_fn)]
+
+
 extern crate keycodes_ascii;
 #[macro_use] extern crate vga_buffer;
 extern crate spin;
@@ -42,6 +46,29 @@ macro_rules! print {
     });
 }
 
+/// Queues up the given string to be printed out to the default kernel terminal.
+/// If no terminals have been initialized yet, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
+    if let Some(kernel_term) = RUNNING_TERMINALS.lock().get_mut(0) {
+        // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
+        // let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(), Some(1)));
+        // kernel_term.term_print_producer.enqueue(output_event);
+        kernel_term.push_to_stdout(s.into());
+        Ok(())
+    }
+    else {
+        print_raw!("[RAW] {}", s.into());
+        Ok(())
+    }
+}
+
+use core::fmt;
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
+/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console_args(fmt_args: fmt::Arguments) {
+    let _result = print_to_console(format!("{}", fmt_args));
+}
+
 
 lazy_static! {
     static ref RUNNING_TERMINALS: Mutex<Vec<Terminal>> = Mutex::new(Vec::new());
@@ -68,8 +95,6 @@ struct CommandStruct {
 pub struct Terminal {
     /// The terminal's own vga buffer that it displays to
     vga_buffer: VgaBuffer,
-    /// The terminal's print producer queue that it pushes output events to that will later be handled by the main loop
-    term_print_producer: DFQueueProducer<ConsoleEvent>,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -86,7 +111,21 @@ pub struct Terminal {
     cursor_pos: u16,
     /// The string that is prompted to the user (ex. kernel_term~$)
     prompt_string: String,
+    /// The console's standard output buffer to store what the terminal instance and its child processes output
+    stdout_buffer: String,
+    /// The console's standard input buffer to store what the user inputs into the terminal application
+    stdin_buffer: String,
+    /// The console's standard error buffer to store any errors logged by the progra
+    stderr_buffer: String,
+    /// The terminal's scrollback buffer which stores a string to be displayed by the VGA buffer
+    scrollback_buffer: String,
+    /// Logs the number of newlines currently in the scrollback buffer, used for scroll-tracking purposes
+    num_newlines: usize,
 }
+
+
+
+type Line = [ScreenChar; VGA_BUFFER_WIDTH as usize];
  
 /// Terminal Structure that allows multiple terminals to be individually run
 impl Terminal {
@@ -102,26 +141,77 @@ impl Terminal {
         Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            term_print_producer: dfqueue_consumer.obtain_producer(),
             vga_buffer: VgaBuffer::new(),
             console_input_string: String::new(),
             console_buffer_string: String::new(),
             current_task_id: 0,
             // track the cursor position and bounds 
             max_left_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
-            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                // debug!("start here");
+            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                
 
             cursor_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
             prompt_string: prompt_string,
+            stdout_buffer: String::new(),
+            stdin_buffer: String::new(),
+            stderr_buffer: String::new(),
+            scrollback_buffer: String::new(),
+            num_newlines: 0,
         }
     }
     
 
     /// Print function that will put a ConsoleOutputEvent into the queue if we ever need it
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
-        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s, Some(self.term_ref)));
-        self.term_print_producer.enqueue(output_event);
-        return Ok(());
+        self.scrollback_buffer.push_str(&s);
+        Ok(())
+    }
+
+    fn push_to_stdout(&mut self, s: String) {
+        self.stdout_buffer.push_str(&s);
+        self.stdout_buffer.push_str(&"\n".to_string());
+        self.scrollback_buffer.push_str(&s);
+        self.scrollback_buffer.push_str("\n");
+    }
+
+    fn push_to_stderr(&mut self, s: String) {
+        self.stderr_buffer.push_str(&s);
+        self.stderr_buffer.push_str("\n");
+        self.scrollback_buffer.push_str(&s);
+        self.scrollback_buffer.push_str("\n");
+    }
+
+    fn push_to_stdin(&mut self, s: String) {
+        self.stdin_buffer.push_str(&s);
+        self.scrollback_buffer.push_str(&s);
+    }
+
+    fn pop_from_stdin(&mut self) {
+        self.stdin_buffer.pop();
+        self.scrollback_buffer.pop();
+    }
+
+    fn print_to_vga(&mut self, mut end_idx: usize) -> Result<(), &'static str> {
+        let DISPLAY_COLOR: ColorCode = ColorCode::default();
+        let (length, width) = self.vga_buffer.get_dimensions();
+        let start_idx;
+        if end_idx < length * width {
+            start_idx = 0;
+        } else {
+            start_idx = end_idx - length * width;
+        }
+        let result = self.scrollback_buffer.get(start_idx..end_idx);
+        if let Some(slice) = result {
+            self.vga_buffer.into_lines(slice, DISPLAY_COLOR);
+        } else {
+            return Err("could not get slice of scrollback buffer string");
+        }
+
+        // debug!("start index: {}", start_idx);
+        // debug!("end index: {}\n", end_idx);
+
+        // have to change this to adjust for scrolling
+        self.vga_buffer.display_from_bottom()?;
+        Ok(())
     }
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
@@ -185,7 +275,7 @@ impl Terminal {
     }
     
 
-    /// Updates the cursor to a new position 
+    /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
         let new_x = self.vga_buffer.column as u16;
         let display_line = self.vga_buffer.display_line;
@@ -272,7 +362,21 @@ impl Terminal {
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
             return Ok(()); 
-        }  
+        }
+
+
+        // TESTING 
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::N {
+            let string = "this is a test\n successful newline\nsuccessful newline 2\ntype command: \n nice";
+            self.vga_buffer.into_lines(string, ColorCode::default());
+            self.vga_buffer.display_from_top()?;
+            let mut counter = 0;
+            for i in 1..20000000 {
+                counter +=1;
+            }
+            return Ok(());
+        }
+          
 
         // Allows user to create a new terminal tab
         if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
@@ -343,13 +447,17 @@ impl Terminal {
                 let command_structure = self.parse_input(&console_input_string);
                 let prompt_string = self.prompt_string.clone();
                 match self.run_command_new_thread(command_structure) {
-                        Ok(new_task_id) => { 
-                            self.current_task_id = new_task_id;
-                        } Err("Error: no module with this name found!") => {
-                            self.print_to_terminal(format!("{}: command not found\n\n{}",console_input_string, prompt_string))?;
-                        } Err(&_) => {
-                            self.print_to_terminal(format!("running command on new thread failed\n\n{}", prompt_string))?;
-                        }
+                    Ok(new_task_id) => { 
+                        self.current_task_id = new_task_id;
+                    } Err("Error: no module with this name found!") => {
+                        self.print_to_terminal(format!("\n{}: command not found\n\n{}",console_input_string, prompt_string))?;
+                        // WILL NEED TO ADJUST THE CURSOR TRACKING VARIABLES
+                        return Ok(());
+                    } Err(&_) => {
+                        self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
+                        // WILL NEED TO ADJUST THE CURSOR TRACKING VARIABLES  
+                        return Ok(())
+                    }
                 }
             };
             // Clears the buffer for another command once current command is finished executing
@@ -442,10 +550,19 @@ impl Terminal {
         match keyevent.keycode.to_ascii(keyevent.modifiers) {
             Some(c) => { 
                 // we echo key presses directly to the console without queuing an event
-                try!(self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
-                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
-                );
-                
+                // try!(self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
+                //     .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+                // );
+                if c == '\u{8}' {
+                    self.pop_from_stdin();
+                } else {
+                    self.push_to_stdin(c.to_string());
+                }
+
+                debug!("-------------------------------------------");
+                debug!("{}", self.scrollback_buffer);
+                // SEE WHAT THIS OUTPUTS TO KNOW IF I NEED TO EDIT DISPLAY FROM BOTTOM FUNCTION
+
                 // adjusts the cursor tracking variables whenever the backspace or ascii keys are pressed, excluding the enter key which is handled above
                 let cursor_pos = self.cursor_pos as usize;
                     let text_offset = self.text_offset as usize;
@@ -495,29 +612,6 @@ impl Terminal {
 }
 
 
-/// Queues up the given string to be printed out to the default kernel terminal.
-/// If no terminals have been initialized yet, it prints to the VGA buffer directly using `print_raw!()`.
-pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
-    if let Some(kernel_term) = RUNNING_TERMINALS.lock().get_mut(0) {
-        // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
-        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(), Some(1)));
-        kernel_term.term_print_producer.enqueue(output_event);
-        Ok(())
-    }
-    else {
-        print_raw!("[RAW] {}", s.into());
-        Ok(())
-    }
-}
-
-use core::fmt;
-/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
-/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
-pub fn print_to_console_args(fmt_args: fmt::Arguments) {
-    let _result = print_to_console(format!("{}", fmt_args));
-}
-
-
 /// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
 /// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
 /// This allows other modules to push console events onto the queue. 
@@ -529,13 +623,26 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let mut kernel_term = Terminal::new(&console_consumer, 1);
     kernel_term.print_to_terminal(WELCOME_STRING.to_string())?; 
     let prompt_string = kernel_term.prompt_string.clone();
-    kernel_term.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
+    kernel_term.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
     kernel_term.vga_buffer.enable_cursor();
     kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
+
+    // test
+    let idx = kernel_term.scrollback_buffer.len();
+    // kernel_term.print_to_vga(idx)?;
     RUNNING_TERMINALS.lock().push(kernel_term);
-    // Spawns the infinite loop to run the terminals
+
+    // // Spawns the infinite loop to run the terminals
+    // let mut counter = 0;
+    // for i in 1..200000000 {
+    //     if i == 20 || i == 200000 {
+    //         counter -= 30;
+    //     }
+    //     counter +=1;
+    // }
+    // debug!("got here");
     spawn::spawn_kthread(input_event_loop, console_consumer, "main input event handling loop".to_string(), None)?;
     Ok(returned_producer)
 }
@@ -553,7 +660,9 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             num_running += 1;
             let _result = term.task_handler();
             if term.term_ref == current_terminal_num {
-                let _result = term.cursor_handler();
+                // let _result = term.cursor_handler();
+                let end_idx  = term.scrollback_buffer.len();
+                term.print_to_vga(end_idx)?;
             }
         }
 
@@ -614,3 +723,24 @@ const WELCOME_STRING: &'static str = "\n\n
   | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
+
+
+// VGA BUFFER CODE
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct ScreenChar {
+    ascii_character: u8,
+    color_code: ColorCode,
+}
+impl ScreenChar {
+    pub const fn new(ascii: u8, color: ColorCode) -> ScreenChar {
+        ScreenChar {
+            ascii_character: ascii,
+            color_code: color,
+        }
+    }
+}
+
+
+
+
