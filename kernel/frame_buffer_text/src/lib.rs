@@ -7,7 +7,7 @@
 
 extern crate frame_buffer;
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate serial_port;
 extern crate spin;
 extern crate port_io;
@@ -619,6 +619,14 @@ fn printline(line_num:usize, line:Line){
     for i in 0..BUFFER_WIDTH{
         printchar(line[i].ascii_character, line_num, i, line[i].color_code);
     }
+
+    let buffer = vec![[33; 640*3]; 300];
+    
+    trace!("Wenqiu: start to copy");
+    frame_buffer::display(0, 300, &buffer);
+    trace!("Wenqiu: start to copy");
+
+    
 }
 
 fn printchar(character:char, line:usize, col:usize, color:usize){

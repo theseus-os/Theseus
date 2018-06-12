@@ -10,7 +10,7 @@
 extern crate spin;
 
 extern crate volatile;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
@@ -126,6 +126,10 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
+pub fn display(start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
+    FRAME_DRAWER.lock().display(start_line, end_line, buffer);
+}
+
 pub struct Point {
     pub x: usize,
     pub y: usize,
@@ -138,7 +142,12 @@ struct Drawer {
 }
 
 impl Drawer {
+    fn display(&mut self, start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
+        self.buffer().chars[start_line..end_line].clone_from_slice(buffer);
+    }
+
     fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
+       
         if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return Some("pixel is ont of bound");
         }
