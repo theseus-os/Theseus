@@ -262,11 +262,13 @@ pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManage
 
 
 
-/// A representation of a demangled symbol, e.g., my_crate::module::func_name.
-/// If the symbol wasn't originally mangled, `symbol` == `full`. 
+/// A representation of a demangled symbol.
+/// # Example
+/// mangled:            "_ZN7console4init17h71243d883671cb51E"
+/// demangled.no_hash:  "console::init"
+/// demangled.hash:     "h71243d883671cb51E"
 struct DemangledSymbol {
-    // symbol: String,
-    full: String, 
+    no_hash: String, 
     hash: Option<String>,
 }
 
@@ -274,7 +276,6 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
     use rustc_demangle::demangle;
     let demangled = demangle(s);
     let without_hash: String = format!("{:#}", demangled); // the fully-qualified symbol, no hash
-    // let symbol_only: Option<String> = without_hash.rsplit("::").next().map(|s| s.to_string()); // last thing after "::", excluding the hash
     let with_hash: String = format!("{}", demangled); // the fully-qualified symbol, with the hash
     let hash_only: Option<String> = with_hash.find::<&str>(without_hash.as_ref())
         .and_then(|index| {
@@ -283,8 +284,7 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
         }); // + 2 to skip the "::" separator
     
     DemangledSymbol {
-        // symbol: symbol_only.unwrap_or(without_hash.clone()),
-        full: without_hash,
+        no_hash: without_hash,
         hash: hash_only,
     }
 }
@@ -534,7 +534,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             if sec_name.starts_with(TEXT_PREFIX) {
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    if log { trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
+                    if log { trace!("Found [{}] .text section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.no_hash, sec_size); }
                     if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
                         error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                         return Err(".text section had wrong flags!");
@@ -550,8 +550,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Text(TextSection{
-                                // symbol: demangled.symbol,
-                                abs_symbol: demangled.full,
+                                abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(tp),
                                 mapped_pages_offset: text_offset,
@@ -576,7 +575,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             else if sec_name.starts_with(RODATA_PREFIX) {
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    if log { trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
+                    if log { trace!("Found [{}] .rodata section: name {:?}, demangled {:?}, size={:#x}", shndx, name, demangled.no_hash, sec_size); }
                     if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
                         error!(".rodata section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                         return Err(".rodata section had wrong flags!");
@@ -591,8 +590,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Rodata(RodataSection{
-                                // symbol: demangled.symbol,
-                                abs_symbol: demangled.full,
+                                abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(rp),
                                 mapped_pages_offset: rodata_offset,
@@ -624,7 +622,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         name
                     };
                     let demangled = demangle_symbol(name);
-                    if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
+                    if log { trace!("Found [{}] .data section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.no_hash, sec_size); }
                     if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                         error!(".data section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                         return Err(".data section had wrong flags!");
@@ -639,8 +637,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Data(DataSection{
-                                // symbol: demangled.symbol,
-                                abs_symbol: demangled.full,
+                                abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
                                 mapped_pages_offset: data_offset,
@@ -666,7 +663,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             else if sec_name.starts_with(BSS_PREFIX) {
                 if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
                     let demangled = demangle_symbol(name);
-                    if log { trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.full, sec_size); }
+                    if log { trace!("Found [{}] .bss section: name {:?}, with_hash {:?}, size={:#x}", shndx, name, demangled.no_hash, sec_size); }
                     if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                         error!(".bss section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                         return Err(".bss section had wrong flags!");
@@ -684,8 +681,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Data(DataSection{
-                                // symbol: demangled.symbol,
-                                abs_symbol: demangled.full,
+                                abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
                                 mapped_pages_offset: data_offset,
@@ -814,7 +810,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                         let demangled = demangle_symbol(source_sec_name);
 
                                         // search for the symbol's demangled name in the kernel's symbol map
-                                        metadata::get_symbol_or_load(&demangled.full, kernel_mmi)
+                                        metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
                                             .upgrade()
                                             .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                                     }
@@ -932,11 +928,11 @@ const PARSE_NANO_CORE_SYMBOL_FILE: bool = true;
 // Parses the nano_core module that represents the already loaded (and currently running) nano_core code.
 // Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo, 
-                       text_pages: MappedPages, 
-                       rodata_pages: MappedPages, 
-                       data_pages: MappedPages, 
-                       log: bool) 
-                       -> Result<usize, &'static str> 
+    text_pages: Arc<MappedPages>, 
+    rodata_pages: Arc<MappedPages>, 
+    data_pages: Arc<MappedPages>, 
+    log: bool) 
+    -> Result<usize, &'static str> 
 {
     debug!("parse_nano_core: trying to load and parse the nano_core file");
     let module = try!(get_module("__k_nano_core").ok_or("Couldn't find module called __k_nano_core"));
@@ -1005,21 +1001,15 @@ pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo,
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
 pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages, 
-                               text_pages: MappedPages, 
-                               rodata_pages: MappedPages, 
-                               data_pages: MappedPages, 
-                               size: usize) 
-                               -> Result<LoadedCrate, &'static str> 
+    text_pages: Arc<MappedPages>, 
+    rodata_pages: Arc<MappedPages>, 
+    data_pages: Arc<MappedPages>, 
+    size: usize) 
+    -> Result<LoadedCrate, &'static str> 
 {
     let crate_name = String::from("nano_core");
-    debug!("Parsing {} symbols: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
-            crate_name, size, size, mapped_pages, text_pages, rodata_pages, data_pages);
-
-    // wrap these in an Arc so we can get a weak ref to it
-    let text_pages   = Arc::new(text_pages);
-    let rodata_pages = Arc::new(rodata_pages);
-    let data_pages   = Arc::new(data_pages);
-
+    debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
+        size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
     let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
     
@@ -1054,8 +1044,8 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
         let file_iterator = symbol_str.lines().enumerate();
         for (_line_num, line) in file_iterator.clone() {
 
-            let line = line.trim();
             // skip empty lines
+            let line = line.trim();
             if line.is_empty() { continue; }
 
             // debug!("Looking at line: {:?}", line);
@@ -1101,21 +1091,56 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
 
         // third, parse each symbol table entry, which should all have "GLOBAL" bindings
         for (_line_num, line) in file_iterator {
+            if line.is_empty() { continue; }
+            
             // we need the following items from a symbol table entry:
-            // * Value (address),  column 1
-            // * Size,             column 2
-            // * Ndx,              column 6
-            // * Name (mangled),   column 7
-            let mut tokens   = line.split_whitespace();
-            let _num         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 0")?;
-            let sec_vaddr    = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 1")?;
-            let sec_size     = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 2")?;
-            let _typ         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 3")?;
-            let _bind        = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 4")?;
-            let _vis         = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 5")?;
-            let sec_ndx      = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 6")?;
-            let name_mangled = tokens.next().ok_or("parse_nano_core_symbols(): couldn't get column 7")?;
+            // * Value (address),      column 1
+            // * Size,                 column 2
+            // * Ndx,                  column 6
+            // * DemangledName#hash    column 7 to end
 
+            // Can't use split_whitespace() here, because we need to splitn and then get the remainder of the line
+            // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.\
+            // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
+            let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
+            let mut parts = line.splitn(8, |c: char| {
+                if c.is_whitespace() {
+                    if prev_whitespace {
+                        false
+                    } else {
+                        prev_whitespace = true;
+                        true
+                    }
+                } else {
+                    prev_whitespace = false;
+                    false
+                }
+            }).map(str::trim);
+
+            let _num         = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 0 'Num:'")?;
+            let sec_vaddr    = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 1 'Value'")?;
+            let sec_size     = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 2 'Size'")?;
+            let _typ         = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 3 'Type'")?;
+            let _bind        = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 4 'Bind'")?;
+            let _vis         = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 5 'Vis'")?;
+            let sec_ndx      = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 6 'Ndx'")?;
+            let name_hash    = parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 7 'Name'")?;
+
+            // According to the operation of the tool "demangle_readelf_file", the last 'Name' column
+            // consists of the already demangled name (which may have spaces) and then an optional hash,
+            // which looks like the following:  NAME#HASH.
+            // If there is no hash, then it will just be:   NAME
+            // Thus, we need to split "name_hash"  at the '#', if it exists
+            let (no_hash, hash) = {
+                let mut tokens = name_hash.split("#");
+                let no_hash = tokens.next().ok_or("parse_nano_core_symbols(): 'Name' column had extraneous '#' characters.")?;
+                let hash = tokens.next();
+                if tokens.next().is_some() {
+                    error!("parse_nano_core_symbols(): 'Name' column \"{}\" had multiple '#' characters, expected only one as the hash separator!", name_hash);
+                    return Err("parse_nano_core_symbols(): 'Name' column had multiple '#' characters, expected only one '#' as the hash separator!");
+                }
+                (no_hash.to_string(), hash.map(str::to_string))
+            };
             
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
                 error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
@@ -1137,16 +1162,13 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                 }
             };
 
-            let demangled = demangle_symbol(name_mangled);
-            // debug!("parse_nano_core_symbols(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", demangled.full, sec_vaddr, sec_size, sec_ndx);
-
+            // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
 
             if sec_ndx == text_shndx {
                 sections.push(Arc::new(
                     LoadedSection::Text(TextSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
+                        abs_symbol: no_hash,
+                        hash: hash,
                         mapped_pages: Arc::downgrade(&text_pages),
                         mapped_pages_offset: text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
                         size: sec_size,
@@ -1158,9 +1180,8 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             else if sec_ndx == rodata_shndx {
                 sections.push(Arc::new(
                     LoadedSection::Rodata(RodataSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
+                        abs_symbol: no_hash,
+                        hash: hash,
                         mapped_pages: Arc::downgrade(&rodata_pages),
                         mapped_pages_offset: rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
                         size: sec_size,
@@ -1172,9 +1193,8 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
                 sections.push(Arc::new(
                     LoadedSection::Data(DataSection{
-                        // symbol: demangled.symbol,
-                        abs_symbol: demangled.full,
-                        hash: demangled.hash,
+                        abs_symbol: no_hash,
+                        hash: hash,
                         mapped_pages: Arc::downgrade(&data_pages),
                         mapped_pages_offset: data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
                         size: sec_size,
@@ -1184,23 +1204,20 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                 ));
             }
             else {
-                trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, demangled.full, sec_vaddr, sec_size);
+                trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
             }
 
         }
 
     } // drops the borrow of `bytes` (and mapped_pages)
 
-
-    let new_crate = LoadedCrate{
+    Ok(LoadedCrate{
         crate_name:   crate_name, 
         sections:     sections,
         text_pages:   Some(text_pages),
         rodata_pages: Some(rodata_pages),
         data_pages:   Some(data_pages),
-    };
-
-    Ok(new_crate)
+    })
 }
 
 
@@ -1211,26 +1228,19 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
 fn parse_nano_core_binary(mapped_pages: MappedPages, 
-                          text_pages: MappedPages, 
-                          rodata_pages: MappedPages, 
-                          data_pages: MappedPages, 
-                          size_in_bytes: usize) 
-                          -> Result<LoadedCrate, &'static str> 
+    text_pages: Arc<MappedPages>, 
+    rodata_pages: Arc<MappedPages>, 
+    data_pages: Arc<MappedPages>, 
+    size_in_bytes: usize) 
+    -> Result<LoadedCrate, &'static str> 
 {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
 
-    // wrap these in an Arc so we can get a weak ref to it
-    let text_pages   = Arc::new(text_pages);
-    let rodata_pages = Arc::new(rodata_pages);
-    let data_pages   = Arc::new(data_pages);
-
-
     let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
-
 
     // For us to properly load the ELF file, it must NOT have been stripped,
     // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
@@ -1333,13 +1343,12 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                             let name = entry.get_name(&elf_file)?;
 
                             let demangled = demangle_symbol(name);
-                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled.full, sec_vaddr, sec_size);
+                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled.no_hash, sec_vaddr, sec_size);
 
                             let new_section = {
                                 if entry.shndx() as usize == text_shndx {
                                     Some(LoadedSection::Text(TextSection{
-                                        // symbol: demangled.symbol,
-                                        abs_symbol: demangled.full,
+                                        abs_symbol: demangled.no_hash,
                                         hash: demangled.hash,
                                         mapped_pages: Arc::downgrade(&text_pages),
                                         mapped_pages_offset: try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
@@ -1350,8 +1359,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
                                     Some(LoadedSection::Rodata(RodataSection{
-                                        // symbol: demangled.symbol,
-                                        abs_symbol: demangled.full,
+                                        abs_symbol: demangled.no_hash,
                                         hash: demangled.hash,
                                         mapped_pages: Arc::downgrade(&rodata_pages),
                                         mapped_pages_offset: try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
@@ -1362,8 +1370,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                 }
                                 else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
                                     Some(LoadedSection::Data(DataSection{
-                                        // symbol: demangled.symbol,
-                                        abs_symbol: demangled.full,
+                                        abs_symbol: demangled.no_hash,
                                         hash: demangled.hash,
                                         mapped_pages: Arc::downgrade(&data_pages),
                                         mapped_pages_offset: try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),

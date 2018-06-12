@@ -58,6 +58,10 @@ struct IoApicRegisters {
 }
 
 
+/// Each IoApic handles a maximum of 24 interrupt redirection entries. 
+const INTERRUPT_ENTRIES_PER_IOAPIC: u32 = 24; 
+
+
 /// A representation of an IoApic (x86-specific interrupt chip for I/O devices).
 pub struct IoApic {
     regs: BoxRefMut<MappedPages, IoApicRegisters>,
@@ -65,8 +69,10 @@ pub struct IoApic {
     pub id: u8,
     /// not yet used.
     _phys_addr: PhysicalAddress,
-    /// not yet used.
-    _gsi_base: u32,
+    /// The first global interrupt number handled by this IoApic.
+    /// Each IoApic only handles 24 interrupts, 
+    /// so the last interrupt number supported by thie IoApic is `gsi_base + 23`.
+    gsi_base: u32,
 }
 
 impl IoApic {
@@ -89,13 +95,18 @@ impl IoApic {
             regs: ioapic_regs,
 			id: id,
             _phys_addr: phys_addr,
-            _gsi_base: gsi_base,
+            gsi_base: gsi_base,
 		};
-		debug!("Created new IoApic, id: {}, phys_addr: {:#X}", id, phys_addr); 
+		debug!("Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}", id, gsi_base, phys_addr); 
         Ok(ioapic)
     }
 
-    
+    /// Returns whether this IoApic handles the given `irq_num`, i.e.,
+    /// whether it's within the range of IRQs handled by this `IoApic`.
+    pub fn handles_irq(&self, irq_num: u32) -> bool {
+        (irq_num >= self.gsi_base) && 
+        (irq_num < (self.gsi_base + INTERRUPT_ENTRIES_PER_IOAPIC))
+    }
 
     fn read_reg(&mut self, register_index: u32) -> u32 {
         // to read from an IoApic reg, we first write which register we want to read from,

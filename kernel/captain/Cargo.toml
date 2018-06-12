@@ -97,5 +97,9 @@ path = "../../libs/keycodes_ascii"
 path = "../simd_test"
 
 
+[features]
+mirror_serial = []
+
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
