@@ -126,8 +126,8 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub fn display(start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
-    FRAME_DRAWER.lock().display(start_line, end_line, buffer);
+pub fn display(start_line:usize, height:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
+    FRAME_DRAWER.lock().display(start_line, start_line+height, buffer);
 }
 
 pub struct Point {

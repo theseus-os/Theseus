@@ -616,20 +616,14 @@ impl ScreenChar {
 
 fn printline(line_num:usize, line:Line){
     //trace!("printline");
+    let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
     for i in 0..BUFFER_WIDTH{
-        printchar(line[i].ascii_character, line_num, i, line[i].color_code);
+        parsechar(line[i].ascii_character, line_num, i, line[i].color_code, &mut linebuffer);
     }
-
-    let buffer = vec![[33; 640*3]; 300];
-    
-    trace!("Wenqiu: start to copy");
-    frame_buffer::display(0, 300, &buffer);
-    trace!("Wenqiu: start to copy");
-
-    
+    frame_buffer::display(line_num * CHARACTER_HEIGHT, CHARACTER_HEIGHT, &linebuffer);
 }
 
-fn printchar(character:char, line:usize, col:usize, color:usize){
+fn parsechar(character:char, line:usize, col:usize, color:usize, linebuffer:&mut [[u8;frame_buffer::FRAME_BUFFER_WIDTH]; 16]){
     if col >= BUFFER_WIDTH {
         debug!("frame_buffer_text::print(): The col is out of bound");
         return
@@ -642,21 +636,25 @@ fn printchar(character:char, line:usize, col:usize, color:usize){
     if character == ' ' {
         return
     }
-    for k in 0..CHARACTER_HEIGHT{
+    for y in 0..CHARACTER_HEIGHT{
         trace!("start to draw {}", character as usize);
 
         let ascii = character as usize;
         let x = (col * CHARACTER_WIDTH) + 1;//leave 1 pixel left margin for every character
-        let y = line * CHARACTER_HEIGHT + k;
-        let num = FONT_BASIC[ascii][k];
+        let num = FONT_BASIC[ascii][y];
         for i in 0..8 {
             if num & (0x80 >> i) !=0 {
-                frame_buffer::draw_pixel(x + i, y, color);        
+                //frame_buffer::draw_pixel(x + i, y, color);
+                linebuffer[y][(x+i)*3] = (color as usize & 255) as u8;
+                linebuffer[y][(x+i)*3+1] = (color as usize >> 8 & 255) as u8; 
+                linebuffer[y][(x+i)*3+2] = (color as usize >> 16 & 255) as u8;
             } else {
-                frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
-            }
+                //frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
+               /* linebuffer[y][(x+i)*3] = (BACKGROUND_COLOR as usize & 255) as u8;
+                linebuffer[y][(x+i)*3+1] = (BACKGROUND_COLOR as usize >> 8 & 255) as u8; 
+                linebuffer[y][(x+i)*3+2] = (BACKGROUND_COLOR as usize >> 16 & 255) as u8;
+            */}
         }
-        trace!("end to draw");
     }  
 }
 
