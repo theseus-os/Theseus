@@ -78,7 +78,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(feature = "mirror_serial")]
     {
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        logger::mirror_to_vga(captain::mirror_to_vga_cb);
+        logger::mirror_to_vga(mirror_to_vga_cb);
     }
     // at this point, we no longer *need* to use println_raw, because we can see the logs,
     // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
