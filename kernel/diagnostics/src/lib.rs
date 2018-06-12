@@ -5,18 +5,23 @@
 
 extern crate spin;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate port_io;
 extern crate x86_64;
 extern crate pit_clock;
 extern crate tsc;
 extern crate raw_cpuid;
+extern crate atomic_linked_list;
+extern crate task;
+
 
 use x86_64::registers::msr::*;
 use x86_64::instructions::rdpmc;
 use raw_cpuid::*;
 use spin::Once;
-use core::sync::atomic::{AtomicBool, Ordering};
-
+use core::sync::atomic::{AtomicPtr, Ordering};
+use atomic_linked_list::atomic_map::*;
+use task::get_my_current_task;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 
@@ -32,7 +37,10 @@ static LLC_MISS_MASK: u64 = (0x03 << 16) | (0x41 << 8) | 0x2E;
 static BR_INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC4;
 static BR_MISS_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC5;
 
-static PMC_LIST: [AtomicBool; 4] = [AtomicBool::new(true), AtomicBool::new(true), AtomicBool::new(true), AtomicBool::new(true)];
+//static `Once<AtomicMap<K,V>>`
+lazy_static!{
+    static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
+}
 static NUM_PMC: u32 = 4;
 
 
@@ -43,6 +51,9 @@ static NUM_PMC: u32 = 4;
 pub fn init() {
     let cpuid = CpuId::new();
     PMU_VERSION.call_once(|| cpuid.get_performance_monitoring_info().unwrap().version_id() as u16);
+    debug!("IA32 PEBS Availability:  {}", rdmsr(IA32_MISC_ENABLE));
+    
+
     if PMU_VERSION.try().unwrap() > &0 {
         unsafe{
             //clear values in counters and their settings
@@ -68,6 +79,7 @@ pub struct Counter {
     pub start_count: u64,
     msr_mask: u32,
     pmc: i32,
+    core: i32,
 }
 
 
@@ -110,8 +122,13 @@ impl Counter {
     /// Allows user to get count since start without stopping/releasing the counter.
     pub fn get_count_since_start(&self) -> Result<u64, &'static str> {
         //checks to make sure the counter hasn't already been released
-        if PMC_LIST[self.msr_mask as usize].load(Ordering::SeqCst) {
-            return Err("Counter used for this event was already marked as free, value stored is likely inaccurute.");
+        if self.msr_mask < NUM_PMC {
+            if PMC_LIST[self.msr_mask as usize].get(&self.core).is_none(){
+                return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
+            } else if PMC_LIST[self.msr_mask as usize].get(&self.core).unwrap() == &true {
+                return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
+ 
+            }
         }
         
         Ok(rdpmc(self.msr_mask) - self.start_count)
@@ -120,7 +137,7 @@ impl Counter {
     /// Stops counting, releases the counter, and returns the count of events since the counter was initialized.
     pub fn end(&self) -> Result<u64, &'static str> {
         //unwrapping here might be an issue because it adds a step to event being counted, unsure how to get around
-        let end_rdpmc = safe_rdpmc(self.msr_mask)?;
+        let end_rdpmc = safe_rdpmc_complete(self.msr_mask, self.core)?;
         let end_val = end_rdpmc.start_count;
         
         //if the msr_mask indicates it's a programmable counter, clears event counting settings and counter 
@@ -129,12 +146,19 @@ impl Counter {
                 wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
                 wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
             }
+            
             //sanity check to make sure the counter wasn't stopped and freed previously
-            if PMC_LIST[self.msr_mask as usize].swap(true, Ordering::SeqCst) {
-                return Err("Counter used for this event was already marked as free, value stored is likely inaccurute.");
+            if PMC_LIST[self.msr_mask as usize].get(&self.core).is_none(){
+                return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
+            } else if PMC_LIST[self.msr_mask as usize].get(&self.core).unwrap() == &true {
+                return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
             }
+
+            PMC_LIST[self.msr_mask as usize].insert(self.core, true);
+            
+
         
-    }
+        }
     return Ok(end_val - self.start_count);
     }
 
@@ -143,22 +167,38 @@ impl Counter {
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    for (i, pmc) in PMC_LIST.iter().enumerate() {
-        if pmc.compare_and_swap(true, false, Ordering::SeqCst) {
-            unsafe{
-                wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
-                wrmsr(IA32_PMC0 + (i as u32), 0);
+    
+    let my_core: i32;
+    
+    if let Some(my_task) = get_my_current_task() {
+        my_core = my_task.write().running_on_cpu as i32;
+        for (i, pmc) in PMC_LIST.iter().enumerate() {
+            if pmc.get(&my_core).is_some() {
+                if !(pmc.get(&my_core).unwrap()) {
+                    continue;
+                }
             }
-            return Ok(Counter{start_count: 0, msr_mask: i as u32, pmc: i as i32});
+            pmc.insert(my_core, false);
+            unsafe{
+                    wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
+                    wrmsr(IA32_PMC0 + (i as u32), 0);
+            }
+            return Ok(Counter{start_count: 0, msr_mask: i as u32, pmc: i as i32, core: my_core});
         }
-    }
+            return Err("All programmable counters currently in use.");
 
-    Err("All programmable counters currently in use.")
+    }
+    return Err("Task implentation not yet initialized.");
+
 }
 
 /// Calls the rdpmc function which is a wrapper for the x86 rdpmc instruction. This function ensures that performance monitoring is 
 /// initialized and enabled.    
 pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
+    let my_core;
+    if let Some(my_task) = get_my_current_task() {
+        my_core = my_task.write().running_on_cpu as i32;
+    }
     // if performance monitoring has not been initialized or is unaivalable, returns an error, otherwise returns counter value
     // ensures PMU available and initialized
     if let Some(version) = PMU_VERSION.try() {
@@ -170,7 +210,25 @@ pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
     }
     
     let count = rdpmc(msr_mask);
-    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1});
+    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: 0});
+}
+
+/// It's important to do the rdpmc as quickly as possible when it's called. 
+/// Calling get_my_current_task() and doing the calculations to unpack the result adds cycles, so I created a version where the core can be passed down.
+/// TODO: Is there some form of function overloading that might be helpful here?   
+pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static str> {
+    // if performance monitoring has not been initialized or is unaivalable, returns an error, otherwise returns counter value
+    // ensures PMU available and initialized
+    if let Some(version) = PMU_VERSION.try() {
+        if version < &1 {
+            return Err("Version ID of 0: Performance monitoring not supported in this environment(likely either due to virtualization without hardware acceleration or old CPU).")
+        }
+    } else {
+        return Err("PMU not yet initialized.")
+    }
+    
+    let count = rdpmc(msr_mask);
+    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
 }
 
 

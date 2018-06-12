@@ -213,6 +213,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     
     diagnostics::init();
+    
     if let Ok(mut e) = diagnostics::Counter::new("LONGEST_LAT_CACHE.MISS") {
         e.start();
 
