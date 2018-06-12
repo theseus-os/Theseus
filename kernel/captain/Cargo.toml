@@ -49,8 +49,8 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_full]
+path = "../exceptions_full"
 
 [dependencies.apic]
 path = "../apic"

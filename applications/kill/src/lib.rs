@@ -10,14 +10,15 @@ use getopts::Options;
 use alloc::{Vec, String};
 
 #[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
+pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     
     opts.optflag("h", "help", "print this help menu");
     
-    let matches = match opts.parse(&_args) {
+    let matches = match opts.parse(&args) {
         Ok(m) => { m }
-        Err(_f) => { panic!("{}", _f) }
+        Err(_f) => { println!("{} \n", _f);
+                    return -1; }
     };
     
     if matches.opt_present("h") {
@@ -48,7 +49,7 @@ pub fn main(_args: Vec<String>) -> isize {
             },
         };   
     }
-    -1
+    0
 }
 
 fn print_usage(opts: Options) -> isize {

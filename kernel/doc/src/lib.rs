@@ -22,8 +22,10 @@
 //! If you want to change how the OS starts up and initializes, you should change the code in the `captain` instead.
 //!
 //! #### `captain`
-//LZ: module has its own meaning in Rust. Here you are using module not as Rust module but it can be confusing.
-//LZ: maybe we need a new term 
+//! LZ: module has its own meaning in Rust. Here you are using module not as Rust module but it can be confusing.
+//! LZ: maybe we need a new term 
+//! KAB:  yeah, agreed. What about something ship-themed? I really like "plank"? Or maybe there's a more modern word for "ship part"?
+//! 
 //! The `captain` steers the ship of Theseus, meaning that it contains the logic that initializes and connects all the other module crates in the proper order and with the proper flow of data between modules. 
 //! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a console thread and createsa queue to send keyboard presses to the console, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test Tasks (liable to change).     
 //! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. It then falls into an idle loop that does nothing except yields the processor to another Task.    
@@ -43,22 +45,30 @@
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `driver_init`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.
-//! * `exceptions`: Exceptions handling in Theseus, mostly early exception handlers that are mere placeholders.
+//! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
+//! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 
 //! * `ioapic`: IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus.
-//! * `keyboard`: The keyboard driver.
+//! * `keyboard`: simple PS2 keyboard driver..
 //! * `memory`: The virtual memory subsystem.
 //! * `mod_mgmt`: Module management, including parsing, loading, linking, unloading, and metadata management.
+//! * `mouse`: simple PS2 mouse driver.
+//! * `panic_handling`: Wrapper functions for handling and propagating panics.
+//! * `panic_info`: Struct definitions containing panic information and such.
 //! * `pci`: Basic PCI support for Theseus, x86 only.
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
+//! * `ps2`: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).
+//! * `rtc``: simple driver for handling the Real Time Clock chip.
 //! * `scheduler`: The scheduler and runqueue management.
+//! * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
 //! * `spawn`: Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes.
 //! * `syscall`: Initializes the system call support, and provides basic handling and dispatching of syscalls in Theseus.
 //! * `task`: Task types and structure definitions, a Task is a thread of execution.
 //! * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
+//! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //!
 //! 
 

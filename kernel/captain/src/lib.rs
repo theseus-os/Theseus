@@ -38,6 +38,7 @@ extern crate window_manager;
 extern crate scheduler;
 extern crate diagnostics;
 #[macro_use] extern crate console;
+extern crate exceptions_full;
 
 
 #[cfg(target_feature = "sse2")]
@@ -101,7 +102,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate syscall stack")?
         )
     };
-    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
+    let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
@@ -115,6 +116,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     
     // create the initial `Task`, i.e., task_zero
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
+
+    // after we've initialized the task subsystem, we can use better exception handlers
+    exceptions_full::init(idt);
 
     // initialize the kernel console
     let console_queue_producer = console::init()?;

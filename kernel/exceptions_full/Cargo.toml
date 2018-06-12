@@ -1,0 +1,26 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "exceptions_full"
+description = "Exception handlers that are fully-featured, i.e., aware of the apic/task subsystems, and kill tasks on an exception"
+version = "0.1.0"
+
+[dependencies]
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
+[dependencies.console]
+path = "../console"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.task]
+path = "../task"
+
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

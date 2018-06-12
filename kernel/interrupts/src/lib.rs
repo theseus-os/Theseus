@@ -23,7 +23,7 @@ extern crate apic;
 extern crate pit_clock;
 extern crate tss;
 extern crate gdt;
-extern crate exceptions;
+extern crate exceptions_early;
 extern crate pic;
 extern crate scheduler;
 extern crate keyboard;
@@ -56,48 +56,27 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 
 
 
-/// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
-/// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
-/// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
-pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) -> Result<(), &'static str> {
-
+/// initializes the interrupt subsystem and properly sets up safer early exception handlers, but no other IRQ handlers.
+/// # Arguments: 
+/// * `double_fault_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack.
+/// * `privilege_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack).
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
+    -> Result<&'static LockedIdt, &'static str> 
+{
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
+    // initialize early exception handlers
+    exceptions_early::init(&IDT);
     {
+        // set the special double fault handler's stack
         let mut idt = IDT.lock(); // withholds interrupts
-        
-        idt.divide_by_zero.set_handler_fn(exceptions::divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        idt.non_maskable_interrupt.set_handler_fn(nmi_handler); // use our local NMI handler, not the default one in exceptions
-        idt.breakpoint.set_handler_fn(exceptions::breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(exceptions::invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(exceptions::device_not_available_handler);
         unsafe {
-            // use a special stack for the double fault handler
-            idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
+            // use a special stack for the double fault handler, which prevents triple faults!
+            idt.double_fault.set_handler_fn(exceptions_early::double_fault_handler)
                             .set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16); 
         }
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(exceptions::segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(exceptions::general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
-        // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
-        
-        
        
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
@@ -112,22 +91,24 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
         info!("loaded IDT for BSP.");
     }
 
-    Ok(())
+    Ok(&IDT)
 
 }
 
 
+/// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 pub fn init_ap(apic_id: u8, 
                double_fault_stack_top_unusable: VirtualAddress, 
                privilege_stack_top_unusable: VirtualAddress)
-               -> Result<(), &'static str> {
+               -> Result<&'static LockedIdt, &'static str> {
     info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-    // info!("trying to load IDT for AP {}...", apic_id);
+    // We've already created the IDT initially (currently all APs share the BSP's IDT),
+    // so we only need to re-load it here for each AP.
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
-    Ok(())
+    Ok(&IDT)
 }
 
 
@@ -581,24 +562,4 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     eoi(None);
-}
-
-
-
-
-extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
-    // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
-    if vaddr != 0 {
-        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(vaddr);
-        return;
-    }
-    
-    // if vaddr is 0, then it's a regular NMI    
-    println_raw!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-    
-    loop { }
 }
