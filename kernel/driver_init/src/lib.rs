@@ -54,15 +54,15 @@ pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'sta
         debug!("Found pci device: {:?}", dev);
     }
 
-    if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
+    /* if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
         debug!("e1000 Device found: {:?}", e1000_pci_dev);
         try!(e1000::init_nic(e1000_pci_dev));
     }
     else {
         warn!("No e1000 device found on this system.");
-    }
+    } */
     
-    if let Some(e1000e_pci_dev) = get_pci_device_vd(e1000e::INTEL_VEND, e1000e::E1000_82579LM) {
+    if let Some(e1000e_pci_dev) = get_pci_device_vd(e1000e::INTEL_VEND, e1000e::E1000_I219_LM_2) {
         debug!("e1000e Device found: {:?}", e1000e_pci_dev);
         try!(e1000e::init_nic(e1000e_pci_dev));
     }

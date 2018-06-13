@@ -412,24 +412,29 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    if true {
-        // NOTE: haven't yet figured out how to invoke generic functions  (like spawn_kthread) yet in loadable mode
-        // #[cfg(feature = "loadable")]
-        // {
-        //     let section = mod_mgmt::metadata::get_symbol("e1000::test_nic_driver::test_nic_driver").upgrade().ok_or("no symbol: e1000::test_nic_driver::test_nic_driver")?;
-        //     let mut space = 0;
-        //     let func: & fn(Option<u64>) =
-        //         section.mapped_pages()
-        //         .ok_or("Couldn't get section's mapped_pages for \"e1000::test_nic_driver::test_nic_driver\"")?
-        //         .as_func(section.mapped_pages_offset(), &mut space)?; 
-        //     spawn::spawn_kthread(func, None, String::from("test_nic_driver"))?;
-        // }
+    if false {
         #[cfg(not(feature = "loadable"))]
         {
             use e1000::test_e1000_driver::test_nic_driver;
             spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
         }
     }  
+
+    if true {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use e1000e::test_e1000e_driver::test_nic_driver_e1000e;
+            spawn::spawn_kthread(test_nic_driver_e1000e, None, String::from("test_nic_driver"), None)?;
+        }
+    }
+
+    if true {
+        #[cfg(not(feature = "loadable"))]
+        {
+            use e1000e::rx_poll;
+            spawn::spawn_kthread(rx_poll, None, String::from("e1000e polling thread"), None)?;
+        }
+    }
 
     //test window manager
     if false {

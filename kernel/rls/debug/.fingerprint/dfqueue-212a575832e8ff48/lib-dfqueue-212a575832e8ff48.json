@@ -1,0 +1,1 @@
+{"rustc":16349303590983159748,"features":"[]","target":7154008469917679023,"profile":7563321638953954158,"path":11567084989652958415,"deps":[["atomic v0.3.4",6990419033600090697],["spin v0.4.8",4820665977431273236]],"local":[{"MtimeBased":[[1528932196,432821759],".fingerprint/dfqueue-212a575832e8ff48/dep-lib-dfqueue-212a575832e8ff48"]}],"rustflags":[],"edition":"Edition2015"}

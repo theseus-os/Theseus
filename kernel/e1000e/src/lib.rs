@@ -1,6 +1,6 @@
 #![no_std]
 #![feature(alloc)]
-
+#![feature(untagged_unions)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 
@@ -13,6 +13,8 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
+extern crate pit_clock; 
+
 
 pub mod test_e1000e_driver;
 
@@ -22,7 +24,6 @@ use spin::Once;
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
-
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter,PhysicalMemoryArea};
 use pci::{PciDevice,pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
@@ -31,7 +32,7 @@ pub static INTEL_VEND:              u16 = 0x8086;  // Vendor ID for Intel
 const E1000_DEV:               u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
 const E1000_I217:               u16 = 0x153A;  // Device ID for Intel I217
 const E1000_I219_LM_1:          u16 = 0x156F;  // Device ID for Intel I219
-const E1000_I219_LM_2:          u16 = 0x15B7;  // Device ID for Intel I219
+pub const E1000_I219_LM_2:          u16 = 0x15B7;  // Device ID for Intel I219****
 const E1000_I219_LM_3:          u16 = 0x15D7;  // Device ID for Intel I219
 const E1000_I219_LM_4:          u16 = 0x15E3;  // Device ID for Intel I219
 const E1000_I219_LM_5:          u16 = 0x15B9;  // Device ID for Intel I219
@@ -136,13 +137,13 @@ const TSTA_EC:                  u32 = (1 << 1);    // Excess Collisions
 const TSTA_LC:                  u32 = (1 << 2);    // Late Collision
 const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
 
-const E1000_NUM_RX_DESC:        usize = 1024;
+const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
 
 const E1000_SIZE_RX_DESC:       usize = 16;
 const E1000_SIZE_TX_DESC:       usize = 16;
 
-const E1000_SIZE_RX_BUFFER:     usize = 8192;
+const E1000_SIZE_RX_BUFFER:     usize = 256;
 const E1000_SIZE_TX_BUFFER:     usize = 256;
 
 /// to hold memory mappings
@@ -165,6 +166,50 @@ impl fmt::Debug for e1000_rx_desc {
                 write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
                         self.addr, self.length, self.checksum, self.status, self.errors, self.special)
         }
+}
+
+/* Receive Descriptor - Extended */
+#[repr(C,packed)]
+struct read {
+	buffer_addr: u64,
+	reserved: u64,
+}
+
+struct csum_ip {
+	ip_id: u16,	/* IP id */
+	csum: u16,	/* Packet Checksum */
+}	
+
+#[repr(C,packed)]
+union hi_dword{
+	rss: u32,	/* RSS Hash */
+        csum_ip_desc: csum_ip,
+				
+}			
+
+#[repr(C,packed)]
+struct lower {
+	mrq: u32,	/* Multiple Rx Queues */
+	hi_dword_desc: hi_dword,		
+}
+
+#[repr(C,packed)]
+struct upper {
+	status_error: u32,	/* ext status/error */
+	length: u16,
+	vlan: u16,
+}
+
+#[repr(C,packed)]
+struct wb {
+        upper_desc: upper, 
+        lower_desc: lower, 
+}
+
+#[repr(C,packed)]
+union e1000_rx_desc_extended {
+	read_desc: read,
+	wb_desc: wb,			
 }
 
 /// struct to represent transmission descriptors
@@ -198,7 +243,7 @@ pub struct Nic {
         /// A buffer for storing the mac address  
         mac: [u8;6],       
         /// Receive Descriptors
-        rx_descs: Vec<e1000_rx_desc>, 
+        rx_descs: Vec<e1000_rx_desc_extended>, 
         /// Transmit Descriptors 
         tx_descs: Vec<e1000_tx_desc>, 
         /// Current Receive Descriptor Buffer
@@ -273,7 +318,7 @@ pub fn translate_v2p(v_addr : usize) -> Result<usize, &'static str> {
 /// functions that setup the NIC struct and handle the sending and receiving of packets
 impl Nic{
         /// store required values from the devices PCI config space
-        pub fn init(&mut self,ref dev:&PciDevice){
+        pub fn init_mem_base(&mut self,ref dev:&PciDevice){
                 // Type of BAR0
                 self.bar_type = (dev.bars[0] as u8) & 0x01;    
                 // IO Base Address
@@ -602,7 +647,7 @@ impl Nic{
                 let ptr1 = ptr + (16-(ptr%16));
                 //debug!("pointers: {:x}, {:x}",ptr, ptr1);
 
-                let raw_ptr = ptr1 as *mut e1000_rx_desc;
+                let raw_ptr = ptr1 as *mut e1000_rx_desc_extended;
                 //debug!("size of e1000_rx_desc: {}, e1000_tx_desc: {}", 
                         //::core::mem::size_of::<e1000_rx_desc>(), ::core::mem::size_of::<e1000_tx_desc>());
                 
@@ -619,24 +664,10 @@ impl Nic{
                                 Some(_x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
                                 None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx buffer"),
                         } 
-                                                
-                        /* let rx_buf = translate_v2p(self.rx_buf_addr[i]);
-                        let buf_addr;
-                        match rx_buf{
-                                Some(_x) => buf_addr = rx_buf.unwrap() as u64,
-                                None => return Err("e1000:rx_init Couldn't translate address for rx buffers"),
-                        } */
-                        
-                        // let buf_addr = (translate_v2p(self.rx_buf_addr[i])).unwrap();
 
                         let buf_addr = try!(translate_v2p(self.rx_buf_addr[i]));
-                        let mut var = e1000_rx_desc {
-                                addr: buf_addr as u64,
-                                length: 0,
-                                checksum: 0,
-                                status: 0,
-                                errors: 0,
-                                special: 0,
+                        let mut var = e1000_rx_desc_extended {
+                                read_desc: read{ buffer_addr: buf_addr as u64, reserved: 0,}
                         };
                                         
                         //debug!("packet buffer: {:x}",var.addr);
@@ -656,20 +687,23 @@ impl Nic{
                 let ptr1 = (ptr & 0xFFFF_FFFF) as u32;
                 let ptr2 = (ptr>>32) as u32;
 
-                
-                self.write_command(REG_TXDESCLO, ptr2);
-                self.write_command(REG_TXDESCHI, ptr1);
-
                 self.write_command(REG_RXDESCLO, ptr1);//lowers bits of 64 bit descriptor base address, 16 byte aligned
                 self.write_command(REG_RXDESCHI, ptr2);//upper 32 bits
                 
-                self.write_command(REG_RXDESCLEN, (E1000_NUM_RX_DESC as u32)* 16);//number of bytes allocated for descriptors, 128 byte aligned
+                self.write_command(REG_RXDESCLEN, (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) as u32);//number of bytes allocated for descriptors, 128 byte aligned
                 
                 self.write_command(REG_RXDESCHEAD, 0);//head pointer for reeive descriptor buffer, points to 16B
-                self.write_command(REG_RXDESCTAIL, (E1000_NUM_RX_DESC-1) as u32);//Tail pointer for receive descriptor buffer, point to 16B
+                //self.write_command(REG_RXDESCTAIL, (E1000_NUM_RX_DESC-1) as u32);//Tail pointer for receive descriptor buffer, point to 16B
+                self.write_command(REG_RXDESCTAIL, 0);//Tail pointer for receive descriptor buffer, point to 16B  
                 self.rx_cur = 0;
                 //self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_8192);
-                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_BSIZE_8192);
+                self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_BSIZE_256);
+                /* unsafe{
+                        for i in 0..E1000_NUM_RX_DESC{
+                                debug!("buff_addr: {}",self.rx_descs[i as usize].read_desc.buffer_addr);
+                                debug!("reserved: {}", self.rx_descs[i as usize].read_desc.reserved);
+                        }
+                } */
                 Ok(())
 
         }               
@@ -713,14 +747,6 @@ impl Nic{
                 let v_addr = slc_ptr as usize;
                 //debug!("v address of tx_desc: {:x}",v_addr);
 
-                /* let t_ptr = translate_v2p(v_addr);
-                let ptr;
-                match t_ptr{
-                        Some(_x) => ptr = t_ptr.unwrap(),
-                        None => return Err("e1000:tx_init Couldn't translate address for tx descriptor"),
-                } */
-                //let ptr = (translate_v2p(v_addr)).unwrap();
-
                 let ptr = try!(translate_v2p(v_addr));
                 
                 
@@ -743,6 +769,8 @@ impl Nic{
 
                 //added for e1000e driver
                 self.write_command(REG_TCTRL, 0x3003F0FA);
+
+                
 
                 Ok(())
                  
@@ -820,14 +848,16 @@ impl Nic{
         /// Handle a packet reception.
         pub fn handle_receive(&mut self) {
                 //print status of all packets until EoP
-                //debug!("packet received");
-                /* while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
-                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
-                        self.rx_descs[self.rx_cur as usize].status = 0;
-                        let old_cur = self.rx_cur as u32;
-                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-                        self.write_command(REG_RXDESCTAIL, old_cur );
-                } */
+                debug!("packet received");
+                unsafe{
+                        while self.rx_descs[self.rx_cur as usize].wb_desc.upper_desc.status_error != 0 {
+                                debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].wb_desc.upper_desc.status_error);
+                                self.rx_descs[self.rx_cur as usize].wb_desc.upper_desc.status_error = 0;
+                                let old_cur = self.rx_cur as u32;
+                                self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+                                self.write_command(REG_RXDESCTAIL, old_cur );
+                        }
+                }
 
                 // Print packets
                 /* while (self.rx_descs[self.rx_cur as usize].status & 0xF) != 0{
@@ -863,9 +893,9 @@ impl Nic{
                         debug!("rx desc status {}",self.rx_descs[i].status);
                 } */
                 //debug!("E1000E RCTL{:#X}",self.read_command(REG_RCTRL));
-                if (self.rx_descs[self.rx_cur as usize].status&0xF) != 0 {                        
+                /* if (self.rx_descs[self.rx_cur as usize].status&0xF) != 0 {                        
                         self.handle_receive();
-                }
+                } */
                 
         }
 
@@ -904,20 +934,36 @@ pub fn init_nic(e1000e_pci: &PciDevice) -> Result<(), &'static str>{
         //pci_write(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE,0x2B);
         //debug!("E1000E Int line: {}" ,pci_read_8(e1000e_pci.bus, e1000e_pci.slot, e1000e_pci.func, PCI_INTERRUPT_LINE));
 
-        e1000e_nc.init(e1000e_pci);
+        e1000e_nc.init_mem_base(e1000e_pci);
         //debug!("E1000E_nc bar_type: {:#X}, mem_base: {:#X}, io_base: {:#X}", e1000e_nc.bar_type, e1000e_nc.mem_base, e1000e_nc.io_base);
         try!(e1000e_nc.mem_map(e1000e_pci));
         try!(e1000e_nc.mem_map_dma());
+        
         e1000e_nc.detect_eeprom();
         e1000e_nc.read_mac_addr();
+        
+        //disable interrupts
+
+        //global reset
+
+        //disable interrupts
+
+        //setup link
         e1000e_nc.start_link();
+
         e1000e_nc.clear_multicast();
         e1000e_nc.clear_statistics();
-        e1000e_nc.enable_interrupts();
+
+        //initialize receive
         try!(e1000e_nc.rx_init());
+
+        //initialize transmit
         try!(e1000e_nc.tx_init());  
 
-       Ok(())
+        //enable interrupts
+        //e1000e_nc.enable_interrupts();
+
+        Ok(())
 }
 
 //Interrupt handler for nic
@@ -944,18 +990,28 @@ pub fn e1000e_handler () {
 
 /// Poll for recieved messages
 /// Can be used as analternative to interrupts
-pub fn rx_poll(){
+pub fn rx_poll(_: Option<u64>){
         //debug!("e1000e poll function");
-        let mut e1000e_nc = E1000E_NIC.lock();
+        loop {
+                let mut e1000e_nc = E1000E_NIC.lock();
 
-        //detect if a packet has beem received
-        //debug!("E1000E_RX POLL");
-        /* for i in 0..E1000_NUM_RX_DESC {
-                debug!("rx desc status {}",self.rx_descs[i].status);
-        } */
-        //debug!("E1000E RCTL{:#X}",self.read_command(REG_RCTRL));
-        if (e1000e_nc.rx_descs[e1000e_nc.rx_cur as usize].status&0xF) != 0 {                        
-                e1000e_nc.handle_receive();
+                //detect if a packet has been received
+                //debug!("E1000E_RX POLL");
+                unsafe {
+                        for i in 0..E1000_NUM_RX_DESC{
+                                debug!("buff_addr: {}", e1000e_nc.rx_descs[i as usize].read_desc.buffer_addr);
+                                debug!("reserved: {}", e1000e_nc.rx_descs[i as usize].read_desc.reserved);
+                        }
+
+                        for i in 0..10000000 {}
+                        /* pit_clock::pit_wait(50000000).expect("bring_up_ap(): failed to pit_wait 5 s");
+                
+                        if e1000e_nc.rx_descs[e1000e_nc.rx_cur as usize].wb_desc.upper_desc.status_error != 0 {                        
+                                e1000e_nc.handle_receive();
+                        } */ 
+                }
+
         }
+        
         
 }

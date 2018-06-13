@@ -7,6 +7,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+extern crate volatile;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
@@ -22,6 +23,7 @@ use core::ops::DerefMut;
 use spin::Once; 
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
+use volatile::{Volatile, ReadOnly, WriteOnly};
 
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter, PhysicalMemoryArea};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
@@ -32,32 +34,7 @@ pub const E1000_DEV:                u16 = 0x100E;  // Device ID for the e1000 Qe
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
-const REG_CTRL:                 u32 = 0x0000;
-const REG_STATUS:               u32 = 0x0008;
-const REG_EEPROM:               u32 = 0x0014;
-const REG_CTRL_EXT:             u32 = 0x0018;
-const REG_IMASK:                u32 = 0x00D0;
-const REG_RCTRL:                u32 = 0x0100;
-const REG_RXDESCLO:             u32 = 0x2800;
-const REG_RXDESCHI:             u32 = 0x2804;
-const REG_RXDESCLEN:            u32 = 0x2808;
-const REG_RXDESCHEAD:           u32 = 0x2810;
-const REG_RXDESCTAIL:           u32 = 0x2818;
-
-const REG_TCTRL:                u32 = 0x0400;
-const REG_TXDESCLO:             u32 = 0x3800;
-const REG_TXDESCHI:             u32 = 0x3804;
-const REG_TXDESCLEN:            u32 = 0x3808;
-const REG_TXDESCHEAD:           u32 = 0x3810;
-const REG_TXDESCTAIL:           u32 = 0x3818;
-
-const REG_RDTR:                 u32 = 0x2820;    // RX Delay Timer Register
-const REG_RXDCTL:               u32 = 0x3828;    // RX Descriptor Control
-const REG_RADV:                 u32 = 0x282C;    // RX Int. Absolute Delay Timer
-const REG_RSRPD:                u32 = 0x2C00;    // RX Small Packet Detect Interrupt
- 
-const REG_MTA:                  u32 = 0x5200; 
-const REG_CRCERRS:              u32 = 0x4000;        
+      
  
 const REG_TIPG:                 u32 = 0x0410;      // Transmit Inter Packet Gap
 const ECTRL_SLU:                u32 = 0x40;        // set link up
@@ -68,7 +45,7 @@ const CTRL_ILOS:                u32 = (1<<7);
 const CTRL_VME:                 u32 = (1<<30); 
 const CTRL_PHY_RST:             u32 = (1<<31);
 
-/// RCTL registers 
+/// RCTL commands
 const RCTL_EN:                  u32 = (1 << 1);    // Receiver Enable
 const RCTL_SBP:                 u32 = (1 << 2);    // Store Bad Packets
 const RCTL_UPE:                 u32 = (1 << 3);    // Unicast Promiscuous Enabled
@@ -112,7 +89,7 @@ const CMD_VLE:                  u32 = (1 << 6);    // VLAN Packet Enable
 const CMD_IDE:                  u32 = (1 << 7);    // Interrupt Delay Enable
  
  
-/// TCTL Register
+/// TCTL commands
  
 const TCTL_EN:                  u32 = (1 << 1);    // Transmit Enable
 const TCTL_PSP:                 u32 = (1 << 3);    // Pad Short Packets
@@ -175,6 +152,49 @@ impl fmt::Debug for e1000_tx_desc {
         }
 }
 
+///struct to hold mapping of registers
+#[repr(C)]
+pub struct IntelEthRegisters {
+    pub ctrl:                       Volatile<u32>,          // 0x0
+    _padding0:                      [u8;4],                 // 0x4 - 0x7
+    pub status:                     ReadOnly<u32>,          // 0x8
+    _padding1:                      [u8;180],               // 0xC - 0xBF
+    
+    //Interrupt registers
+    pub icr:                        ReadOnly<u32>,          // 0xC0   
+    _padding2:                      [u8;12],                // 0xC4 - 0xCF
+    pub ims:                        Volatile<u32>,          // 0xD0
+    _padding3:                      [u8;44],                // 0xD4 - 0xFF 
+
+    //Receive control
+    pub rctl:                       Volatile<u32>,          // 0x100
+    _padding4:                      [u8;764],               // 0x104 - 0x3FF
+
+    //Transmit control
+    pub tctl:                       Volatile<u32>,          // 0x400
+    _padding5:                      [u8;9212],              // 0x404 - 0x27FF
+
+    //Receive    
+    pub rdbal:                      Volatile<u32>,          // 0x2800
+    pub rdbah:                      Volatile<u32>,          // 0x2804
+    pub rdlen:                      Volatile<u32>,          // 0x2808
+    _padding6:                      [u8;4],                 // 0x280C - 0x280F
+    pub rdh:                        Volatile<u32>,          // 0x2810
+    _padding7:                      [u8;4],                 // 0x2814 - 0x2817
+    pub rdt:                        Volatile<u32>,          // 0x2818  
+    _padding8:                      [u8;4052],              // 0x282C - 0x37FF
+
+    //Transmit
+    pub tdbal:                      Volatile<u32>,          // 0x3800
+    pub tdbah:                      Volatile<u32>,          // 0x3804
+    pub tdlen:                      Volatile<u32>,          // 0x3808
+    _padding9:                      [u8;4],                 // 0x380C - 0x380F
+    pub tdh:                        Volatile<u32>,          // 0x3810
+    _padding10:                     [u8;4],                 // 0x3814 - 0x3817
+    pub tdt:                        Volatile<u32>,          // 0x3818  
+    _padding11:                     [u8;116708],            // 0x381C - 0x1FFFF END: 0x20000 (128 KB)
+}
+
 /// struct to hold information for the network card
 pub struct Nic {
         /// Type of BAR0
@@ -199,6 +219,8 @@ pub struct Nic {
         rx_buf_addr: [usize;E1000_NUM_RX_DESC],
         /// The DMA allocator for the nic 
         nic_dma_allocator: DmaAllocator,
+        /// registers
+        pub regs: Option<BoxRefMut<MappedPages, IntelEthRegisters>>,
 }
 
 /// struct that stores addresses for memory allocated for DMA
@@ -259,8 +281,28 @@ pub fn translate_v2p(v_addr : usize) -> Result<usize, &'static str> {
 
 }
 
+
+
 /// functions that setup the NIC struct and handle the sending and receiving of packets
 impl Nic{
+
+        /// return a mapping of nic memory-mapped I/O registers 
+        fn map_nic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
+                
+                let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
+                let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
+                let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+                let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
+                let apic_mapped_page = try!(active_table.map_allocated_pages_to(
+                        new_page, 
+                        frames, 
+                        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+                        fa.deref_mut())
+                );
+
+                Ok(apic_mapped_page)
+        }
+
         /// store required values from the devices PCI config space
         pub fn init(&mut self,ref dev:&PciDevice){
                 // Type of BAR0
@@ -268,7 +310,10 @@ impl Nic{
                 // IO Base Address
                 self.io_base = dev.bars[0] & !1;     
                 // memory mapped base address
-                self.mem_base = (dev.bars[0] as usize) & !3; //hard coded for 32 bit, need to make conditional              
+                self.mem_base = (dev.bars[0] as usize) & !3; //hard coded for 32 bit, need to make conditional  
+
+                let nic_regs = BoxRefMut::new(Box::new(map_nic(active_table)?)).try_map_mut(|mp| mp.as_type_mut::<IntelEthRegisters>(0))?;
+                self.regs = Some(nic_regs);            
         }
 
         /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
