@@ -1,8 +1,6 @@
 #![no_std]
 #![feature(alloc)]
 // used by the vga buffer
-#![feature(const_fn)]
-
 
 extern crate keycodes_ascii;
 #[macro_use] extern crate vga_buffer;
@@ -72,12 +70,6 @@ lazy_static! {
     static ref RUNNING_TERMINALS: Mutex<Vec<Terminal>> = Mutex::new(Vec::new());
 }
 
-// Variables for the vga buffer cursor
-const DEFAULT_X_POS: u16 = 13;
-const DEFAULT_Y_POS: u16 = 12;
-const VGA_BUFFER_WIDTH: u16 = 80;
-const VGA_BUFFER_HEIGHT: u16= 24;
-
 // Defines the max number of terminals that can be running
 const MAX_TERMS: usize = 9;
 
@@ -97,9 +89,10 @@ pub struct Terminal {
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
     console_input_string: String,
-    /// Vector that stores all entered commands
+    /// Vector that stores the history of commands that the user has entered
     entered_commands: Vec<String>,
-    /// Stores how many commands the user is off from the last command in the entered commands vector
+    /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
+    /// ex. if the user has pressed up twice and down once, then command shift = # ups - # downs = 1 (cannot be negative)
     command_shift: usize,
     /// The string that stores the user's keypresses if a command is currently running
     console_buffer_string: String,
@@ -167,7 +160,7 @@ impl Terminal {
     }
     
 
-    /// Print function that will put a ConsoleOutputEvent into the queue if we ever need it
+    /// Printing function for use within the terminal crate
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
         self.scrollback_buffer.push_str(&s);
         Ok(())
@@ -176,17 +169,13 @@ impl Terminal {
     /// Pushes a string to the standard out buffer and the scrollback buffer with a new line
     fn push_to_stdout(&mut self, s: String) {
         self.stdout_buffer.push_str(&s);
-        self.stdout_buffer.push_str(&"\n".to_string());
         self.scrollback_buffer.push_str(&s);
-        self.scrollback_buffer.push_str("\n");
     }
 
     /// Pushes a string to the standard error buffer and the scrollback buffer with a new line
     fn push_to_stderr(&mut self, s: String) {
         self.stderr_buffer.push_str(&s);
-        self.stderr_buffer.push_str("\n");
         self.scrollback_buffer.push_str(&s);
-        self.scrollback_buffer.push_str("\n");
     }
     /// Pushes a string to the standard in buffer and the scrollback buffer with a new line
     fn push_to_stdin(&mut self, s: String) {
@@ -211,11 +200,11 @@ impl Terminal {
     /// calculates the starting index so that when displayed on the vga buffer, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> usize{
-        let (length,width) = self.vga_buffer.get_dimensions();
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
         let mut start_idx = end_idx;
         let result;
-        if end_idx > length * width {
-            result = self.scrollback_buffer.get(end_idx - length*width..end_idx);
+        if end_idx > buffer_width * buffer_height {
+            result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
         } else {
             result = self.scrollback_buffer.get(0..end_idx);
         }        
@@ -226,7 +215,7 @@ impl Terminal {
             for byte in slice.bytes().rev() {
                 if byte == b'\n' {
                     num_lines += 1;
-                    if num_lines >= VGA_BUFFER_HEIGHT -1 {
+                    if num_lines >= buffer_height-1 {
                         break;
                     }
                     curr_column = 0;
@@ -234,7 +223,7 @@ impl Terminal {
                     if curr_column == 80 {
                         curr_column = 0;
                         num_lines += 1;
-                        if num_lines >= VGA_BUFFER_HEIGHT -1 {
+                        if num_lines >= buffer_height -1 {
                             break;
                         }
                     }
@@ -250,7 +239,7 @@ impl Terminal {
             if start_idx <= 1 {
                 return 0;
             }
-            let mut one_line_back = start_idx.clone()-2;
+            let mut one_line_back = start_idx - 2;
             loop {
                 if self.scrollback_buffer.as_str().chars().nth(one_line_back) == Some('\n') {
                     break;
@@ -259,7 +248,7 @@ impl Terminal {
                 }
             }
 
-            let diff = ((start_idx-2) - one_line_back)%VGA_BUFFER_WIDTH as usize;
+            let diff = ((start_idx-2) - one_line_back)%buffer_width as usize;
             return start_idx - 1 - diff;
             } else {
                 return 0;
@@ -270,14 +259,14 @@ impl Terminal {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// vga buffer. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (length,width) = self.vga_buffer.get_dimensions();
+        let (buffer_width,buffer_height) = self.vga_buffer.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx + 1;
         let result;
-        if start_idx + length * width > scrollback_buffer_len {
+        if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
             result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
         } else {
-            result = self.scrollback_buffer.get(start_idx..start_idx + length * width);
+            result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
         }
             // calculate the starting index for the slice
             if let Some(slice) = result {
@@ -286,7 +275,7 @@ impl Terminal {
             for byte in slice.bytes(){
                 if byte == b'\n' {
                     num_lines += 1;
-                    if num_lines >= VGA_BUFFER_HEIGHT {
+                    if num_lines >= buffer_height {
                         break;
                     }
                     curr_column = 0;
@@ -294,7 +283,7 @@ impl Terminal {
                     if curr_column == 80 {
                         curr_column = 0;
                         num_lines += 1;
-                        if num_lines >= VGA_BUFFER_HEIGHT {
+                        if num_lines >= buffer_height {
                             break;
                         }
                     }
@@ -327,7 +316,7 @@ impl Terminal {
     }
 
     /// Scrolls up by the vga buffer equivalent of one line
-    fn up(&mut self) {
+    fn scroll_up_one_line(&mut self) {
         let prev_end_idx;
         if self.is_scroll_end == true {
             prev_end_idx = self.scrollback_buffer.len();
@@ -360,7 +349,7 @@ impl Terminal {
     }
 
     /// Scrolls down the vga buffer equivalent of one line
-    fn down(&mut self) {
+    fn scroll_down_one_line(&mut self) {
         let prev_start_idx;
         if self.is_scroll_end == true {
             return;
@@ -450,25 +439,27 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
-        let mut new_x = self.absolute_cursor_pos as u16%VGA_BUFFER_WIDTH;
-        let mut new_y = self.absolute_cursor_pos as u16/VGA_BUFFER_WIDTH;
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let mut new_x = self.absolute_cursor_pos %buffer_width;
+        let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x > self.left_shift as u16 {
-            new_x -= self.left_shift as u16;
+        if new_x > self.left_shift  {
+            new_x -= self.left_shift;
         } else {
-            new_x = VGA_BUFFER_WIDTH  + new_x - self.left_shift as u16;
+            new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        vga_buffer::update_cursor(new_x, new_y);
+        vga_buffer::update_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent, current_terminal_num: &mut usize, num_running: usize) -> Result<(), &'static str> {
         // Finds current coordinates of the VGA buffer
-        let absolute_position: u16 = self.scrollback_buffer.len() as u16 - self.scroll_start_idx as u16;
-        let x = absolute_position%VGA_BUFFER_WIDTH;
-        let y = absolute_position/VGA_BUFFER_WIDTH;
+        let absolute_position = self.scrollback_buffer.len() - self.scroll_start_idx ;
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let x = absolute_position%buffer_width;
+        let y = absolute_position/buffer_width;
         // Ctrl+D or Ctrl+Alt+Del kills the OS
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D
         || 
@@ -650,14 +641,14 @@ impl Terminal {
         }
         if keyevent.keycode == Keycode::PageUp {
             if self.scroll_end_idx != 0 {
-                self.up();
+                self.scroll_up_one_line();
                 self.vga_buffer.disable_cursor();                
             }
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageDown {
             if !self.is_scroll_end {
-                self.down();
+                self.scroll_down_one_line();
                 self.vga_buffer.enable_cursor();
             }
             return Ok(());
@@ -778,7 +769,6 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let prompt_string = kernel_term.prompt_string.clone();
     kernel_term.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
     kernel_term.vga_buffer.enable_cursor();
-    kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
     RUNNING_TERMINALS.lock().push(kernel_term);
@@ -842,7 +832,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?;
             new_term_obj.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nTerminal_{}\n{}", ref_num, prompt_string))?;  
             new_term_obj.vga_buffer.enable_cursor();
-            new_term_obj.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
             // List now owns the terminal object
             RUNNING_TERMINALS.lock().push(new_term_obj);
         }

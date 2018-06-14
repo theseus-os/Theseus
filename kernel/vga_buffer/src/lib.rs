@@ -151,7 +151,7 @@ impl VgaBuffer {
 
     /// Returns a tuple containing (buffer height, buffer width)
     pub fn get_dimensions(&self) -> (usize, usize) {
-        return (BUFFER_WIDTH, BUFFER_HEIGHT);
+        (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
 
     /// Requires that a str slice that will exactly fit the vga buffer
