@@ -4,7 +4,7 @@
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
 use core::ops::Deref;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use alloc::btree_map::Entry; 
@@ -13,7 +13,7 @@ use memory::{MappedPages, MemoryManagementInfo, get_module};
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
     /// Maps a String crate_name to its crate instance.
-    static ref CRATE_TREE: Mutex<BTreeMap<String, LoadedCrate>> = Mutex::new(BTreeMap::new());
+    static ref CRATE_TREE: Mutex<BTreeMap<String, Arc<RwLock<LoadedCrate>>>> = Mutex::new(BTreeMap::new());
 }
 
 
@@ -40,12 +40,13 @@ pub fn dump_symbol_map() -> String {
 
 /// Adds a new crate to the module tree, and adds its symbols to the system map.
 /// Returns the number of global symbols added to the system map. 
-pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
+pub fn add_crate(new_crate: Arc<RwLock<LoadedCrate>>, log_replacements: bool) -> usize {
     let mut count = 0;
     // add all the global symbols to the system map
     {
         let mut locked_kmap = SYSTEM_MAP.lock();
-        for sec in new_crate.sections.iter().filter(|s| s.is_global()) {
+        let new_crate_locked = new_crate.read();
+        for sec in new_crate_locked.sections.iter().filter(|s| s.is_global()) {
             let new_sec_size = sec.size();
 
             if let Some(key) = sec.key() {
@@ -57,12 +58,12 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
                     Entry::Occupied(old_val) => {
                         if let Some(old_sec) = old_val.get().upgrade() {
                             if old_sec.size() == new_sec_size {
-                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate.crate_name, key); }
+                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate_locked.crate_name, key); }
                             }
                             else {
                                 if log_replacements { 
                                     warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                        new_crate.crate_name, old_sec.size(), new_sec_size, key);
+                                        new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
                                 }
                             }
                         }
@@ -75,23 +76,24 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
                 
                 // BELOW: the old way that just blindly replaced the old symbol with the new
                 // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
-                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate.crate_name, key, sec.virt_addr());
+                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate_locked.crate_name, key, sec.virt_addr());
                 // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
                 //     if old_sec.size() == new_sec_size {
                 //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
                 //     }
                 //     else {
                 //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
-                //                new_crate.crate_name, old_sec.size(), new_sec_size, key);
+                //                new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
                 //     }
                 // }
 
                 count += 1;
-                // debug!("add_crate(): [{}], new symbol: {}", new_crate.crate_name, key);
+                // debug!("add_crate(): [{}], new symbol: {}", new_crate_locked.crate_name, key);
             }
         }
     }
-    CRATE_TREE.lock().insert(new_crate.crate_name.clone(), new_crate);
+    let crate_name = new_crate.read().crate_name.clone();
+    CRATE_TREE.lock().insert(crate_name, new_crate);
     count
 }
 
@@ -210,18 +212,17 @@ pub struct LoadedCrate {
 impl LoadedCrate {
     /// Returns the `TextSection` matching the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
-    pub fn get_function_section(&self, func_name: &str) -> Option<&TextSection> {
+    pub fn get_function_section(&self, func_name: &str) -> Option<Arc<LoadedSection>> {
         for sec in &self.sections {
             if let LoadedSection::Text(text) = sec.deref() {
                 if &text.abs_symbol == func_name {
-                    return Some(text);
+                    return Some(sec.clone());
                 }
             }
         }
         None
     }
 }
-
 
 
 #[derive(Debug)]
@@ -281,9 +282,6 @@ impl LoadedSection {
 /// corresponds to a single function. 
 #[derive(Debug)]
 pub struct TextSection {
-    // /// The String representation of just this symbol,
-    // /// without any preceding crate namespaces or anything.
-    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
@@ -300,17 +298,25 @@ pub struct TextSection {
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
-    /// The name of the `LoadedCrate` object that contains/owns this section
-    pub parent_crate: String,
+    /// The `LoadedCrate` object that contains/owns this section
+    pub parent_crate: Weak<RwLock<LoadedCrate>>,
+    // /// The sections that this section depends on.
+    // /// This is kept as a list of strong references because these dependency sections must outlast this section,
+    // /// i.e., those sections cannot be removed/deleted until this one is deleted.
+    // pub dependencies: Vec<RelcationDependency>,
+    // /// The sections that depend on this section. 
+    // /// This is kept as a list of Weak references because we must be able to remove other sections
+    // /// that are dependent upon this one before we remove this one.
+    // /// If we kept strong references to the sections dependent on this one, 
+    // /// then we wouldn't be able to remove/delete those sections before deleting this one.
+    // pub dependents: Vec<WeakSection>,
+
 }
 
 
 /// Represents a .rodata section in a crate.
 #[derive(Debug)]
 pub struct RodataSection {
-    // /// The String representation of just this symbol,
-    // /// without any preceding crate namespaces or anything.
-    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
@@ -327,17 +333,14 @@ pub struct RodataSection {
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
-    /// The name of the `LoadedCrate` object that contains/owns this section
-    pub parent_crate: String,
+    /// The `LoadedCrate` object that contains/owns this section
+    pub parent_crate: Weak<RwLock<LoadedCrate>>,
 }
 
 
 /// Represents a .data section in a crate.
 #[derive(Debug)]
 pub struct DataSection {
-    // /// The String representation of just this symbol,
-    // /// without any preceding crate namespaces or anything.
-    // pub symbol: String,
     /// The full String representation of this symbol. 
     /// Format <crate>::<module>::<struct>::<fn_name>
     /// For example, test_lib::MyStruct::new
@@ -354,6 +357,24 @@ pub struct DataSection {
     pub size: usize,
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
-    /// The name of the `LoadedCrate` object that contains/owns this section
-    pub parent_crate: String,
+    /// The `LoadedCrate` object that contains/owns this section
+    pub parent_crate: Weak<RwLock<LoadedCrate>>,
 }
+
+
+
+/// A representation that the section object containing this struct
+/// has a dependency on the given `section`.
+/// The dependent section is not specifically included here;
+/// it's implicit that the owner of this object is the one who depends on the `section`.
+/// A dependency is a strong reference to another `LoadedSection`, 
+pub struct RelocationDependency {
+    section: StrongSection,
+    rel_type: u32,
+}
+
+
+/// A Strong reference (`Arc`) to a `LoadedSection`.
+pub type StrongSection  = Arc<Mutex<LoadedSection>>;
+/// A Weak reference (`Weak`) to a `LoadedSection`.
+pub type WeakSection = Weak<Mutex<LoadedSection>>;

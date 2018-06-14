@@ -18,6 +18,7 @@ use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
+use spin::RwLock;
 
 use xmas_elf::ElfFile;
 use xmas_elf::sections::{SectionHeader, SectionData, ShType};
@@ -213,7 +214,7 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
 /// Loads the specified application crate into memory, allowing it to be invoked.  
 /// Returns a Result containing the new crate.
 pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementInfo, log: bool) 
-    -> Result<LoadedCrate, &'static str> 
+    -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
 {
     if !CrateType::is_application(module.name()) {
         error!("load_application_crate() cannot be used for module \"{}\", only for application modules starting with \"{}\"",
@@ -253,7 +254,10 @@ pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManage
     };
 
     let new_crate = parse_elf_kernel_crate(temp_module_mapping, size, module.name(), kernel_mmi, log)?;
-    info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+    { 
+        let new_crate_locked = new_crate.read(); 
+        info!("loaded new application crate module: {}, num sections: {}", new_crate_locked.crate_name, new_crate_locked.sections.len());
+    }
     Ok(new_crate)
 
     // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
@@ -297,7 +301,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                           module_name: &String, 
                           kernel_mmi: &mut MemoryManagementInfo, 
                           log: bool)
-                          -> Result<LoadedCrate, &'static str>
+                          -> Result<Arc<RwLock<LoadedCrate>>, &'static str>
 {
     
     let (_crate_type, crate_name) = CrateType::from_module_name(module_name)?;
@@ -429,10 +433,21 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
     // First, we need to parse all the sections and load the text and data sections
     let mut loaded_sections: BTreeMap<usize, Arc<LoadedSection>> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
+
+    // we create the new crate here so we can obtain references to it later
+    let new_crate = Arc::new(RwLock::new(
+        LoadedCrate {
+            crate_name:   crate_name, 
+            sections:     Vec::new(),
+            text_pages:   None,
+            rodata_pages: None,
+            data_pages:   None,
+        }
+    ));
+
     let mut text_offset:   usize = 0;
     let mut rodata_offset: usize = 0;
     let mut data_offset:   usize = 0;
-
                 
     const TEXT_PREFIX:   &'static str = ".text.";
     const RODATA_PREFIX: &'static str = ".rodata.";
@@ -533,14 +548,14 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
             
                         loaded_sections.insert(shndx, 
-                            Arc::new( LoadedSection::Text(TextSection{
+                            Arc::new(LoadedSection::Text(TextSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(tp),
                                 mapped_pages_offset: text_offset,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
-                                parent_crate: crate_name.clone(),
+                                parent_crate: Arc::downgrade(&new_crate),
                             }))
                         );
 
@@ -586,14 +601,14 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new( LoadedSection::Rodata(RodataSection{
+                            Arc::new(LoadedSection::Rodata(RodataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(rp),
                                 mapped_pages_offset: rodata_offset,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
-                                parent_crate: crate_name.clone(),
+                                parent_crate: Arc::downgrade(&new_crate),
                             }))
                         );
 
@@ -646,14 +661,14 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new( LoadedSection::Data(DataSection{
+                            Arc::new(LoadedSection::Data(DataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
                                 mapped_pages_offset: data_offset,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
-                                parent_crate: crate_name.clone(),
+                                parent_crate: Arc::downgrade(&new_crate),
                             }))
                         );
 
@@ -692,14 +707,14 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         };
 
                         loaded_sections.insert(shndx, 
-                            Arc::new( LoadedSection::Data(DataSection{
+                            Arc::new(LoadedSection::Data(DataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
                                 mapped_pages_offset: data_offset,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
-                                parent_crate: crate_name.clone(),
+                                parent_crate: Arc::downgrade(&new_crate),
                             }))
                         );
 
@@ -786,6 +801,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         use xmas_elf::sections::{SHN_UNDEF, SHN_LORESERVE, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_HIRESERVE};
 
+                        let mut depends_on_another_crate = false;
                         let source_sec: Result<Arc<LoadedSection>, &'static str> = match source_sec_shndx {
                             SHN_LORESERVE | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_HIRESERVE => {
                                 error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
@@ -801,7 +817,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 // first, we try to get the relevant section based on its shndx only
                                 let loaded_sec = if shndx == SHN_UNDEF { None } else { loaded_sections.get(&(shndx as usize)) };
                                 if let Some(sec) = loaded_sec {
-                                    // yay, we found the source_sec 
+                                    // yay, we found the source_sec, it's from the same crate module currently being loaded
+                                    depends_on_another_crate = false;
                                     Ok(sec.clone())
                                 }
                                 else {
@@ -818,8 +835,9 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                         else {
                                             source_sec_name
                                         };
-
                                         let demangled = demangle_symbol(source_sec_name);
+
+                                        depends_on_another_crate = true; 
 
                                         // search for the symbol's demangled name in the kernel's symbol map
                                         metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
@@ -841,6 +859,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         let source_mapped_pages = try!(source_sec.mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation"));
                         let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(source_sec.mapped_pages_offset())) as *const _ as usize;
 
+                        // Write the actual relocation entries here
                         // There is a great, succint table of relocation types here
                         // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
                         match rela_entry.get_type() {
@@ -883,7 +902,18 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", rela_entry);
                                 return Err("found unsupported relocation type");
                             }
-                        }   
+                        }
+
+                        // we only really care about tracking dependencies on other crates,
+                        // since every crate has "dependencies" on itself. 
+                        if depends_on_another_crate {
+                            // let target_dependency = ForeignRelocationDependency {
+                            //     source_section: source_sec.clone(),
+                            //     rel_type: rela_entry.get_type(),
+                            // };
+                            // target_sec.dependencies.push(target_dependency);
+                        }
+                         
                     }
                 }
                 else {
@@ -918,14 +948,13 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
     // extract just the sections from the section map
     let (_keys, values): (Vec<usize>, Vec<Arc<LoadedSection>>) = loaded_sections.into_iter().unzip();
 
-    let new_crate = LoadedCrate{
-        crate_name:   crate_name, 
-        sections:     values,
-        text_pages:   text_pages,
-        rodata_pages: rodata_pages,
-        data_pages:   data_pages,
-    };
-
+    {
+        let mut new_crate_locked = new_crate.write();
+        new_crate_locked.sections     = values;
+        new_crate_locked.text_pages   = text_pages;
+        new_crate_locked.rodata_pages = rodata_pages;
+        new_crate_locked.data_pages   = data_pages;
+    }
     Ok(new_crate)
 }
 
@@ -1017,16 +1046,27 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
     rodata_pages: Arc<MappedPages>, 
     data_pages: Arc<MappedPages>, 
     size: usize) 
-    -> Result<LoadedCrate, &'static str> 
+    -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
 {
     let crate_name = String::from("nano_core");
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
     let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+
+    // we create the new crate here so we can obtain references to it later
+    let new_crate = Arc::new(RwLock::new(
+        LoadedCrate {
+            crate_name:   crate_name, 
+            sections:     Vec::new(),
+            text_pages:   None,
+            rodata_pages: None,
+            data_pages:   None,
+        }
+    ));
     
+    // ensure that there's a null byte at the end
     {
-        // ensure that there's a null byte at the end
         let null_byte: &mut u8 = try!(mapped_pages.as_type_mut(size - 1));
         *null_byte = 0u8;
     }
@@ -1063,16 +1103,16 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             // debug!("Looking at line: {:?}", line);
 
             if line.contains(".text") && line.contains("PROGBITS") {
-                text_shndx = get_section_index(line);
+                text_shndx = parse_section_ndx(line);
             }
             else if line.contains(".data") && line.contains("PROGBITS") {
-                data_shndx = get_section_index(line);
+                data_shndx = parse_section_ndx(line);
             }
             else if line.contains(".rodata") && line.contains("PROGBITS") {
-                rodata_shndx = get_section_index(line);
+                rodata_shndx = parse_section_ndx(line);
             }
             else if line.contains(".bss") && line.contains("NOBITS") {
-                bss_shndx = get_section_index(line);
+                bss_shndx = parse_section_ndx(line);
             }
 
             // once we've found the 4 sections we care about, we're done
@@ -1185,7 +1225,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         mapped_pages_offset: text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
                         size: sec_size,
                         global: true,
-                        parent_crate: crate_name.clone(),
+                        parent_crate: Arc::downgrade(&new_crate),
                     })
                 ));
             }
@@ -1198,7 +1238,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         mapped_pages_offset: rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
                         size: sec_size,
                         global: true,
-                        parent_crate: crate_name.clone(),
+                        parent_crate: Arc::downgrade(&new_crate),
                     })
                 ));
             }
@@ -1211,7 +1251,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         mapped_pages_offset: data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
                         size: sec_size,
                         global: true,
-                        parent_crate: crate_name.clone(),
+                        parent_crate: Arc::downgrade(&new_crate),
                     })
                 ));
             }
@@ -1223,13 +1263,14 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
 
     } // drops the borrow of `bytes` (and mapped_pages)
 
-    Ok(LoadedCrate{
-        crate_name:   crate_name, 
-        sections:     sections,
-        text_pages:   Some(text_pages),
-        rodata_pages: Some(rodata_pages),
-        data_pages:   Some(data_pages),
-    })
+    {
+        let mut new_crate_locked = new_crate.write();
+        new_crate_locked.sections     = sections;
+        new_crate_locked.text_pages   = Some(text_pages);
+        new_crate_locked.rodata_pages = Some(rodata_pages);
+        new_crate_locked.data_pages   = Some(data_pages);
+    }
+    Ok(new_crate)
 }
 
 
@@ -1244,7 +1285,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
     rodata_pages: Arc<MappedPages>, 
     data_pages: Arc<MappedPages>, 
     size_in_bytes: usize) 
-    -> Result<LoadedCrate, &'static str> 
+    -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
 {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
@@ -1328,8 +1369,18 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
     let data_shndx   = try!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"));
     let bss_shndx    = try!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"));
 
-    // iterate through the symbol table so we can find which sections are global (publicly visible)
+    // we create the new crate here so we can obtain references to it later
+    let new_crate = Arc::new(RwLock::new(
+        LoadedCrate {
+            crate_name:   crate_name, 
+            sections:     Vec::new(),
+            text_pages:   None,
+            rodata_pages: None,
+            data_pages:   None,
+        }
+    ));
 
+    // iterate through the symbol table so we can find which sections are global (publicly visible)
     let loaded_sections = {
         let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
         use xmas_elf::symbol_table::Entry;
@@ -1366,7 +1417,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         mapped_pages_offset: try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
                                         size: sec_size,
                                         global: true,
-                                        parent_crate: crate_name.clone(),
+                                        parent_crate: Arc::downgrade(&new_crate),
                                     }))
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
@@ -1377,7 +1428,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         mapped_pages_offset: try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
                                         size: sec_size,
                                         global: true,
-                                        parent_crate: crate_name.clone(),
+                                        parent_crate: Arc::downgrade(&new_crate),
                                     }))
                                 }
                                 else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
@@ -1388,7 +1439,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         mapped_pages_offset: try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
                                         size: sec_size,
                                         global: true,
-                                        parent_crate: crate_name.clone(),
+                                        parent_crate: Arc::downgrade(&new_crate),
                                     }))
                                 }
                                 else {
@@ -1409,23 +1460,19 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
         sections 
     };
 
-
-    let new_crate = LoadedCrate{
-        crate_name:   crate_name, 
-        sections:     loaded_sections,
-        text_pages:   Some(text_pages),
-        rodata_pages: Some(rodata_pages),
-        data_pages:   Some(data_pages),
-    };
-
+    {
+        let mut new_crate_locked = new_crate.write();
+        new_crate_locked.sections     = loaded_sections;
+        new_crate_locked.text_pages   = Some(text_pages);
+        new_crate_locked.rodata_pages = Some(rodata_pages);
+        new_crate_locked.data_pages   = Some(data_pages);
+    }
     Ok(new_crate)
 }
 
 
-
-
-
-fn get_section_index<'a>(s: &str) -> Option<usize> {
+/// Parses a section index out of a string like "[7]"
+fn parse_section_ndx<'a>(s: &str) -> Option<usize> {
     let open  = s.find("[");
     let close = s.find("]");
     open.and_then(|start| close.and_then(|end| s.get((start + 1) .. end)))
