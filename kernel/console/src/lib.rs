@@ -142,8 +142,8 @@ impl Terminal {
             term_ref: ref_num,
             vga_buffer: VgaBuffer::new(),
             console_input_string: String::new(),
-            entered_commands: Vec::new(),
-            command_shift: 0,
+            command_history: Vec::new(),
+            history_index: 0,
             console_buffer_string: String::new(),
             current_task_id: 0,              
             prompt_string: prompt_string,
@@ -595,8 +595,8 @@ impl Terminal {
                 let command_structure = self.parse_input(&console_input_string);
                 let prompt_string = self.prompt_string.clone();
                 let console_input = self.console_input_string.clone();
-                self.entered_commands.push(console_input);
-                self.command_shift = 0;
+                self.command_history.push(console_input);
+                self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_id) => { 
                         self.current_task_id = new_task_id;
@@ -656,7 +656,7 @@ impl Terminal {
 
         // Cycles to the next previous command
         if  keyevent.keycode == Keycode::Up {
-            if self.command_shift == self.entered_commands.len() {
+            if self.history_index == self.command_history.len() {
                 return Ok(());
             }
             self.left_shift = 0;
@@ -664,12 +664,12 @@ impl Terminal {
             for _i in 0..console_input.len() {
                 self.pop_from_stdin();
             }
-            if self.command_shift == 0 && self.console_input_string.len() != 0 {
-                self.entered_commands.push(console_input);
-                self.command_shift += 1;
+            if self.history_index == 0 && self.console_input_string.len() != 0 {
+                self.command_history.push(console_input);
+                self.history_index += 1;
             } 
-            self.command_shift += 1;
-            let selected_command = self.entered_commands[self.entered_commands.len() - self.command_shift].clone();
+            self.history_index += 1;
+            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
             self.console_input_string = selected_command;
             self.push_to_stdin(selected_command2);
@@ -677,7 +677,7 @@ impl Terminal {
         }
         // Cycles to the next most recent command
         if keyevent.keycode == Keycode::Down {
-            if self.command_shift <= 1 {
+            if self.history_index <= 1 {
                 return Ok(());
             }
             self.left_shift = 0;
@@ -685,9 +685,9 @@ impl Terminal {
             for _i in 0..console_input.len() {
                 self.pop_from_stdin();
             }
-            self.command_shift -=1;
-            if self.command_shift == 0 {return Ok(())}
-            let selected_command = self.entered_commands[self.entered_commands.len() - self.command_shift].clone();
+            self.history_index -=1;
+            if self.history_index == 0 {return Ok(())}
+            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
             self.console_input_string = selected_command;
             self.push_to_stdin(selected_command2);
