@@ -90,10 +90,10 @@ pub struct Terminal {
     /// The string that stores the users keypresses after the prompt
     console_input_string: String,
     /// Vector that stores the history of commands that the user has entered
-    entered_commands: Vec<String>,
+    command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
     /// ex. if the user has pressed up twice and down once, then command shift = # ups - # downs = 1 (cannot be negative)
-    command_shift: usize,
+    history_index: usize,
     /// The string that stores the user's keypresses if a command is currently running
     console_buffer_string: String,
     /// Variable that stores the task id of any application manually spawned from the terminal
