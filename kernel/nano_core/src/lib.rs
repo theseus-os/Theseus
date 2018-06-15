@@ -153,7 +153,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // since we need it to load and run applications as crates in the kernel
     {
         println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
+        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
         // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
     }
     

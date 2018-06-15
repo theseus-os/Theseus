@@ -153,7 +153,7 @@ pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryMa
             demangled_full_symbol, crate_dependency_name);
         
         // module names have a prefix like "__k_", so we need to prepend that to the crate name
-        let crate_dependency_name = format!("{}{}", super::CrateType::KernelModule.prefix(), crate_dependency_name);
+        let crate_dependency_name = format!("{}{}", super::CrateType::Kernel.prefix(), crate_dependency_name);
 
         if let Some(dependency_module) = get_module(&crate_dependency_name) {
             // try to load the missing symbol's containing crate
@@ -261,10 +261,10 @@ pub struct LoadedSection {
     pub global: bool,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
-    // /// The sections that this section depends on.
-    // /// This is kept as a list of strong references because these dependency sections must outlast this section,
-    // /// i.e., those sections cannot be removed/deleted until this one is deleted.
-    // pub dependencies: Vec<RelocationDependency>,
+    /// The sections that this section depends on.
+    /// This is kept as a list of strong references because these dependency sections must outlast this section,
+    /// i.e., those sections cannot be removed/deleted until this one is deleted.
+    pub dependencies: Vec<RelocationDependency>,
     // /// The sections that depend on this section. 
     // /// This is kept as a list of Weak references because we must be able to remove other sections
     // /// that are dependent upon this one before we remove this one.
@@ -273,7 +273,9 @@ pub struct LoadedSection {
     // pub dependents: Vec<WeakSectionRef>,
 }
 impl LoadedSection {
-    pub fn new(typ: SectionType, 
+    /// Create a new `LoadedSection`, with an empty `dependencies` list.
+    pub fn new(
+        typ: SectionType, 
         name: String, 
         hash: Option<String>, 
         mapped_pages: Weak<MappedPages>, 
@@ -282,8 +284,23 @@ impl LoadedSection {
         global: bool, 
         parent_crate: WeakCrateRef
     ) -> LoadedSection {
+        LoadedSection::with_dependencies(typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate, Vec::new())
+    }
+
+    /// Same as `LoadedSection::new()`, but uses the given `dependencies` instead of the default empty list.
+    pub fn with_dependencies(
+        typ: SectionType, 
+        name: String, 
+        hash: Option<String>, 
+        mapped_pages: Weak<MappedPages>, 
+        mapped_pages_offset: usize,
+        size: usize,
+        global: bool, 
+        parent_crate: WeakCrateRef,
+        dependencies: Vec<RelocationDependency>
+    ) -> LoadedSection {
         LoadedSection {
-            typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate
+            typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate, dependencies
         }
     }
 
@@ -308,7 +325,9 @@ impl LoadedSection {
 /// has a dependency on the given `section`.
 /// The dependent section is not specifically included here;
 /// it's implicit that the owner of this object is the one who depends on the `section`.
-/// A dependency is a strong reference to another `LoadedSection`, 
+///  
+/// A dependency is a strong reference to another `LoadedSection`,
+/// because a given section should not be removed if there are still sections that depend on it.
 #[derive(Debug)]
 pub struct RelocationDependency {
     pub section: StrongSectionRef,
