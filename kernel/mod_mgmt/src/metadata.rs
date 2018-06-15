@@ -3,6 +3,7 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
+use core::ops::Deref;
 use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
@@ -20,7 +21,7 @@ lazy_static! {
     /// A flat map of all symbols currently loaded into the kernel. 
     /// Maps a fully-qualified kernel symbol name (String) to the corresponding `LoadedSection`. 
     /// Symbols declared as "no_mangle" will appear in the root namespace with no crate prefixex, as expected.
-    static ref SYSTEM_MAP: Mutex<BTreeMap<String, WeakSectionRef>> = Mutex::new(BTreeMap::new());
+    static ref SYSTEM_MAP: Mutex<SymbolMap> = Mutex::new(BTreeMap::new());
 }
 
 
@@ -37,60 +38,48 @@ pub fn dump_symbol_map() -> String {
 }
 
 
-/// Adds a new crate to the module tree, and adds its symbols to the system map.
-/// Returns the number of global symbols added to the system map. 
+/// Adds a new crate to the module tree, and adds only its global symbols to the system map.
+/// Returns the number of *new* unique global symbols added to the system map. 
+/// If a symbol already exists in the system map, this leaves it intact and *does not* replace it.
 pub fn add_crate(new_crate: StrongCrateRef, log_replacements: bool) -> usize {
+    let crate_name = new_crate.read().crate_name.clone();
+    let mut system_map = SYSTEM_MAP.lock();
+    let new_map = new_crate.read().global_symbol_map();
+
+    // We *could* just use `append()` here, but that wouldn't let us know which entries
+    // in the system map were being overwritten, which is currently a valuable bit of debugging info that we need.
+    // Proper way for the future:  system_map.append(&mut new_map);
+
+    // add all the global symbols to the system map, in a way that lets us inspect/log each one
     let mut count = 0;
-    // add all the global symbols to the system map
-    {
-        let mut locked_kmap = SYSTEM_MAP.lock();
-        let new_crate_locked = new_crate.read();
-        for sec in new_crate_locked.sections.iter().filter(|s| s.lock().global) {
-            let new_sec_size = sec.lock().size;
-            let ref key = sec.lock().name;
-            // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
-            // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
-            // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
-            let entry = locked_kmap.entry(key.clone());
-            match entry {
-                Entry::Occupied(old_val) => {
-                    if let Some(old_sec) = old_val.get().upgrade() {
-                        let old_sec_size = old_sec.lock().size;
-                        if old_sec_size == new_sec_size {
-                            if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate_locked.crate_name, key); }
-                        }
-                        else {
-                            if log_replacements { 
-                                warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                    new_crate_locked.crate_name, old_sec_size, new_sec_size, key);
-                            }
+    for (key, new_sec) in new_map {
+        // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
+        // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
+        // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
+        let entry = system_map.entry(key.clone());
+        match entry {
+            Entry::Occupied(old_val) => {
+                if let (Some(new_sec), Some(old_sec)) = (new_sec.upgrade(), old_val.get().upgrade()) {
+                    let new_sec_size = new_sec.lock().size;
+                    let old_sec_size = old_sec.lock().size;
+                    if old_sec_size == new_sec_size {
+                        if log_replacements { info!("       add_crate \"{}\": Ignoring new symbol already present: {}", crate_name, key); }
+                    }
+                    else {
+                        if log_replacements { 
+                            warn!("       add_crate \"{}\": unexpected: different section sizes (old={}, new={}), ignoring new symbol: {}", 
+                                crate_name, old_sec_size, new_sec_size, key);
                         }
                     }
                 }
-                Entry::Vacant(new) => {
-                    new.insert(Arc::downgrade(sec));
-                }
             }
-
-            
-            // BELOW: the old way that just blindly replaced the old symbol with the new
-            // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
-            // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate_locked.crate_name, key, sec.virt_addr());
-            // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
-            //     if old_sec.size() == new_sec_size {
-            //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
-            //     }
-            //     else {
-            //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
-            //                new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
-            //     }
-            // }
-
-            count += 1;
-            // debug!("add_crate(): [{}], new symbol: {}", new_crate_locked.crate_name, key);
+            Entry::Vacant(new) => {
+                new.insert(new_sec);
+                count += 1;
+            }
         }
     }
-    let crate_name = new_crate.read().crate_name.clone();
+
     CRATE_TREE.lock().insert(crate_name, new_crate);
     count
 }
@@ -104,7 +93,8 @@ fn is_valid_crate_name_char(c: char) -> bool {
     c == '-'
 }
 
-
+/// A convenince function that returns a weak reference to the `LoadedSection`
+/// that matches the given name (`demangled_full_symbol`), if it exists in the system map.
 fn get_symbol_internal(demangled_full_symbol: &str) -> Option<WeakSectionRef> {
     SYSTEM_MAP.lock().get(demangled_full_symbol).cloned()
 }
@@ -185,9 +175,10 @@ pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryMa
 
 
 
+/// Represents a single crate object file that has been loaded into the system.
 #[derive(Debug)]
 pub struct LoadedCrate {
-    /// The name of this crate
+    /// The name of this crate.
     pub crate_name: String,
     /// The list of all sections in this crate.
     pub sections: Vec<StrongSectionRef>,
@@ -213,9 +204,38 @@ impl LoadedCrate {
             sec.is_text() && sec.name == func_name
         }).next().cloned()
     }
+
+    /// Returns a map containing all of this crate's global symbols 
+    pub fn global_symbol_map(&self) -> SymbolMap {
+        self.symbol_map(|sec| sec.global)
+    }
+
+    /// Returns a map containing all of this crate's symbols,
+    /// filtered to include only `LoadedSection`s that satisfy the given predicate
+    /// (if the predicate returns true for a given section, then it is included in the map).
+    pub fn symbol_map<F>(&self, predicate: F) -> SymbolMap 
+        where F: Fn(&LoadedSection) -> bool
+    {
+        let mut map: SymbolMap = BTreeMap::new();
+        for sec in self.sections.iter().filter(|sec| predicate(sec.lock().deref())) {
+            let key = sec.lock().name.clone();
+            if let Some(old_val) = map.insert(key.clone(), Arc::downgrade(&sec)) {
+                if key.ends_with("_LOC") || self.crate_name == "nano_core" {
+                    // ignoring these special cases currently
+                }
+                else {
+                    warn!("symbol_map(): crate \"{}\" had duplicate section for symbol \"{}\", old: {:?}, new: {:?}", 
+                        self.crate_name, key, old_val.upgrade(), sec);
+                }
+            }
+        }
+
+        map
+    }
 }
 
-
+/// 
+pub type SymbolMap = BTreeMap<String, WeakSectionRef>;
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
