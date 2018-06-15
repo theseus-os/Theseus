@@ -30,7 +30,7 @@ use memory::{FRAME_ALLOCATOR, get_module, VirtualMemoryArea, MemoryManagementInf
 
 
 pub mod metadata;
-use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, LoadedSection, StrongSectionRef, RelocationDependency};
+use self::metadata::{LoadedCrate, LoadedSection, SectionType, StrongSectionRef, RelocationDependency};
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
@@ -548,15 +548,16 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
             
                         loaded_sections.insert(shndx, 
-                            Arc::new(Mutex::new(LoadedSection::Text(TextSection{
-                                abs_symbol: demangled.no_hash,
-                                hash: demangled.hash,
-                                mapped_pages: Arc::downgrade(tp),
-                                mapped_pages_offset: text_offset,
-                                size: sec_size,
-                                global: global_sections.contains(&shndx),
-                                parent_crate: Arc::downgrade(&new_crate),
-                            })))
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Text,
+                                demangled.no_hash,
+                                demangled.hash,
+                                Arc::downgrade(tp),
+                                text_offset,
+                                sec_size,
+                                global_sections.contains(&shndx),
+                                Arc::downgrade(&new_crate),
+                            )))
                         );
 
                         text_offset += round_up_power_of_two(sec_size, sec_align);
@@ -601,15 +602,16 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(Mutex::new(LoadedSection::Rodata(RodataSection{
-                                abs_symbol: demangled.no_hash,
-                                hash: demangled.hash,
-                                mapped_pages: Arc::downgrade(rp),
-                                mapped_pages_offset: rodata_offset,
-                                size: sec_size,
-                                global: global_sections.contains(&shndx),
-                                parent_crate: Arc::downgrade(&new_crate),
-                            })))
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Rodata,
+                                demangled.no_hash,
+                                demangled.hash,
+                                Arc::downgrade(rp),
+                                rodata_offset,
+                                sec_size,
+                                global_sections.contains(&shndx),
+                                Arc::downgrade(&new_crate),
+                            )))
                         );
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
@@ -661,15 +663,16 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(Mutex::new(LoadedSection::Data(DataSection{
-                                abs_symbol: demangled.no_hash,
-                                hash: demangled.hash,
-                                mapped_pages: Arc::downgrade(dp),
-                                mapped_pages_offset: data_offset,
-                                size: sec_size,
-                                global: global_sections.contains(&shndx),
-                                parent_crate: Arc::downgrade(&new_crate),
-                            })))
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Data,
+                                demangled.no_hash,
+                                demangled.hash,
+                                Arc::downgrade(dp),
+                                data_offset,
+                                sec_size,
+                                global_sections.contains(&shndx),
+                                Arc::downgrade(&new_crate),
+                            )))
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
@@ -707,15 +710,16 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         };
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(Mutex::new(LoadedSection::Data(DataSection{
-                                abs_symbol: demangled.no_hash,
-                                hash: demangled.hash,
-                                mapped_pages: Arc::downgrade(dp),
-                                mapped_pages_offset: data_offset,
-                                size: sec_size,
-                                global: global_sections.contains(&shndx),
-                                parent_crate: Arc::downgrade(&new_crate),
-                            })))
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Data,
+                                demangled.no_hash,
+                                demangled.hash,
+                                Arc::downgrade(dp),
+                                data_offset,
+                                sec_size,
+                                global_sections.contains(&shndx),
+                                Arc::downgrade(&new_crate),
+                            )))
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
@@ -787,8 +791,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         // common to all relocations for this target section: calculate the relocation destination and get the source section
-                        let dest_offset = target_sec.lock().mapped_pages_offset() + rela_entry.get_offset() as usize;
-                        let dest_mapped_pages = target_sec.lock().mapped_pages().ok_or("couldn't get MappedPages reference for target_sec's relocation")?;
+                        let dest_offset = target_sec.lock().mapped_pages_offset + rela_entry.get_offset() as usize;
+                        let dest_mapped_pages = target_sec.lock().mapped_pages.upgrade().ok_or("couldn't get MappedPages reference for target_sec's relocation")?;
                         let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                         let source_sec_shndx = source_sec_entry.shndx() as usize; 
                         if log { 
@@ -838,8 +842,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             }
                         }?;
 
-                        let source_mapped_pages = source_sec.lock().mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation")?;
-                        let source_vaddr = source_mapped_pages.as_type::<&usize>(source_sec.lock().mapped_pages_offset())? as *const _ as usize;
+                        let source_mapped_pages = source_sec.lock().mapped_pages.upgrade().ok_or("couldn't get MappedPages reference for source_sec's relocation")?;
+                        let source_vaddr = source_mapped_pages.as_type::<&usize>(source_sec.lock().mapped_pages_offset)? as *const _ as usize;
 
                         // Write the actual relocation entries here
                         // There is a great, succint table of relocation types here
@@ -1201,43 +1205,46 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
 
             if sec_ndx == text_shndx {
-                sections.push(Arc::new(Mutex::new(
-                    LoadedSection::Text(TextSection{
-                        abs_symbol: no_hash,
-                        hash: hash,
-                        mapped_pages: Arc::downgrade(&text_pages),
-                        mapped_pages_offset: text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
-                        size: sec_size,
-                        global: true,
-                        parent_crate: Arc::downgrade(&new_crate),
-                    }))
-                ));
+                sections.push(
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::Text,
+                        no_hash,
+                        hash,
+                        Arc::downgrade(&text_pages),
+                        text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
+                        sec_size,
+                        true,
+                        Arc::downgrade(&new_crate),
+                    )))
+                );
             }
             else if sec_ndx == rodata_shndx {
-                sections.push(Arc::new(Mutex::new(
-                    LoadedSection::Rodata(RodataSection{
-                        abs_symbol: no_hash,
-                        hash: hash,
-                        mapped_pages: Arc::downgrade(&rodata_pages),
-                        mapped_pages_offset: rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
-                        size: sec_size,
-                        global: true,
-                        parent_crate: Arc::downgrade(&new_crate),
-                    }))
-                ));
+                sections.push(
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::Rodata,
+                        no_hash,
+                        hash,
+                        Arc::downgrade(&rodata_pages),
+                        rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
+                        sec_size,
+                        true,
+                        Arc::downgrade(&new_crate),
+                    )))
+                );
             }
             else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
-                sections.push(Arc::new(Mutex::new(
-                    LoadedSection::Data(DataSection{
-                        abs_symbol: no_hash,
-                        hash: hash,
-                        mapped_pages: Arc::downgrade(&data_pages),
-                        mapped_pages_offset: data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
-                        size: sec_size,
-                        global: true,
-                        parent_crate: Arc::downgrade(&new_crate),
-                    }))
-                ));
+                sections.push(
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::Data,
+                        no_hash,
+                        hash,
+                        Arc::downgrade(&data_pages),
+                        data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
+                        sec_size,
+                        true,
+                        Arc::downgrade(&new_crate),
+                    )))
+                );
             }
             else {
                 trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
@@ -1394,37 +1401,40 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
 
                             let new_section = {
                                 if entry.shndx() as usize == text_shndx {
-                                    Some(LoadedSection::Text(TextSection{
-                                        abs_symbol: demangled.no_hash,
-                                        hash: demangled.hash,
-                                        mapped_pages: Arc::downgrade(&text_pages),
-                                        mapped_pages_offset: try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
-                                        size: sec_size,
-                                        global: true,
-                                        parent_crate: Arc::downgrade(&new_crate),
-                                    }))
+                                    Some(LoadedSection::new(
+                                        SectionType::Text,
+                                        demangled.no_hash,
+                                        demangled.hash,
+                                        Arc::downgrade(&text_pages),
+                                        try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
+                                        sec_size,
+                                        true,
+                                        Arc::downgrade(&new_crate),
+                                    ))
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
-                                    Some(LoadedSection::Rodata(RodataSection{
-                                        abs_symbol: demangled.no_hash,
-                                        hash: demangled.hash,
-                                        mapped_pages: Arc::downgrade(&rodata_pages),
-                                        mapped_pages_offset: try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
-                                        size: sec_size,
-                                        global: true,
-                                        parent_crate: Arc::downgrade(&new_crate),
-                                    }))
+                                    Some(LoadedSection::new(
+                                        SectionType::Rodata,
+                                        demangled.no_hash,
+                                        demangled.hash,
+                                        Arc::downgrade(&rodata_pages),
+                                        try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
+                                        sec_size,
+                                        true,
+                                        Arc::downgrade(&new_crate),
+                                    ))
                                 }
                                 else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
-                                    Some(LoadedSection::Data(DataSection{
-                                        abs_symbol: demangled.no_hash,
-                                        hash: demangled.hash,
-                                        mapped_pages: Arc::downgrade(&data_pages),
-                                        mapped_pages_offset: try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
-                                        size: sec_size,
-                                        global: true,
-                                        parent_crate: Arc::downgrade(&new_crate),
-                                    }))
+                                    Some(LoadedSection::new(
+                                        SectionType::Data,
+                                        demangled.no_hash,
+                                        demangled.hash,
+                                        Arc::downgrade(&data_pages),
+                                        try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
+                                        sec_size,
+                                        true,
+                                        Arc::downgrade(&new_crate),
+                                    ))
                                 }
                                 else {
                                     error!("Unexpected entry.shndx(): {}", entry.shndx());

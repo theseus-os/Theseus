@@ -3,7 +3,6 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
-use core::ops::Deref;
 use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
@@ -13,7 +12,7 @@ use memory::{MappedPages, MemoryManagementInfo, get_module};
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
     /// Maps a String crate_name to its crate instance.
-    static ref CRATE_TREE: Mutex<BTreeMap<String, Arc<RwLock<LoadedCrate>>>> = Mutex::new(BTreeMap::new());
+    static ref CRATE_TREE: Mutex<BTreeMap<String, StrongCrateRef>> = Mutex::new(BTreeMap::new());
 }
 
 
@@ -40,56 +39,55 @@ pub fn dump_symbol_map() -> String {
 
 /// Adds a new crate to the module tree, and adds its symbols to the system map.
 /// Returns the number of global symbols added to the system map. 
-pub fn add_crate(new_crate: Arc<RwLock<LoadedCrate>>, log_replacements: bool) -> usize {
+pub fn add_crate(new_crate: StrongCrateRef, log_replacements: bool) -> usize {
     let mut count = 0;
     // add all the global symbols to the system map
     {
         let mut locked_kmap = SYSTEM_MAP.lock();
         let new_crate_locked = new_crate.read();
-        for sec in new_crate_locked.sections.iter().filter(|s| s.lock().is_global()) {
-            let new_sec_size = sec.lock().size();
-
-            if let Some(key) = sec.lock().key() {
-                // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
-                // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
-                // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
-                let entry = locked_kmap.entry(key.clone());
-                match entry {
-                    Entry::Occupied(old_val) => {
-                        if let Some(old_sec) = old_val.get().upgrade() {
-                            if old_sec.lock().size() == new_sec_size {
-                                if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate_locked.crate_name, key); }
-                            }
-                            else {
-                                if log_replacements { 
-                                    warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                        new_crate_locked.crate_name, old_sec.lock().size(), new_sec_size, key);
-                                }
+        for sec in new_crate_locked.sections.iter().filter(|s| s.lock().global) {
+            let new_sec_size = sec.lock().size;
+            let ref key = sec.lock().name;
+            // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
+            // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
+            // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
+            let entry = locked_kmap.entry(key.clone());
+            match entry {
+                Entry::Occupied(old_val) => {
+                    if let Some(old_sec) = old_val.get().upgrade() {
+                        let old_sec_size = old_sec.lock().size;
+                        if old_sec_size == new_sec_size {
+                            if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate_locked.crate_name, key); }
+                        }
+                        else {
+                            if log_replacements { 
+                                warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
+                                    new_crate_locked.crate_name, old_sec_size, new_sec_size, key);
                             }
                         }
                     }
-                    Entry::Vacant(new) => {
-                        new.insert(Arc::downgrade(sec));
-                    }
                 }
-
-                
-                // BELOW: the old way that just blindly replaced the old symbol with the new
-                // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
-                // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate_locked.crate_name, key, sec.virt_addr());
-                // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
-                //     if old_sec.size() == new_sec_size {
-                //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
-                //     }
-                //     else {
-                //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
-                //                new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
-                //     }
-                // }
-
-                count += 1;
-                // debug!("add_crate(): [{}], new symbol: {}", new_crate_locked.crate_name, key);
+                Entry::Vacant(new) => {
+                    new.insert(Arc::downgrade(sec));
+                }
             }
+
+            
+            // BELOW: the old way that just blindly replaced the old symbol with the new
+            // let old_val = locked_kmap.insert(key.clone(), Arc::downgrade(sec));
+            // debug!("Crate \"{}\": added new symbol: {} at vaddr: {:#X}", new_crate_locked.crate_name, key, sec.virt_addr());
+            // if let Some(old_sec) = old_val.and_then(|w| w.upgrade()) {
+            //     if old_sec.size() == new_sec_size {
+            //         if true || log_replacements { info!("       Crate \"{}\": Replaced existing entry in system map: {}", crate_name, key); }
+            //     }
+            //     else {
+            //         warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when replacing existing entry in system map: {}", 
+            //                new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
+            //     }
+            // }
+
+            count += 1;
+            // debug!("add_crate(): [{}], new symbol: {}", new_crate_locked.crate_name, key);
         }
     }
     let crate_name = new_crate.read().crate_name.clone();
@@ -187,9 +185,6 @@ pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryMa
 
 
 
-
-
-
 #[derive(Debug)]
 pub struct LoadedCrate {
     /// The name of this crate
@@ -210,90 +205,48 @@ pub struct LoadedCrate {
 }
 
 impl LoadedCrate {
-    /// Returns the `TextSection` matching the requested function name, if it exists in this `LoadedCrate`.
+    /// Returns the `LoadedSection` of type `SectionType::Text` that matches the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
     pub fn get_function_section(&self, func_name: &str) -> Option<StrongSectionRef> {
-        for sec in &self.sections {
-            if let LoadedSection::Text(text) = sec.lock().deref() {
-                if &text.abs_symbol == func_name {
-                    return Some(sec.clone());
-                }
-            }
-        }
-        None
+        self.sections.iter().filter(|sec_ref| {
+            let sec = sec_ref.lock();
+            sec.is_text() && sec.name == func_name
+        }).next().cloned()
     }
 }
-
-
 
 
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
 pub type WeakSectionRef = Weak<Mutex<LoadedSection>>;
+/// A Strong reference (`Arc`) to a `LoadedCrate`.
+pub type StrongCrateRef  = Arc<RwLock<LoadedCrate>>;
+/// A Weak reference (`Weak`) to a `LoadedCrate`.
+pub type WeakCrateRef = Weak<RwLock<LoadedCrate>>;
 
 
-#[derive(Debug)]
-pub enum LoadedSection{
-    Text(TextSection),
-    Rodata(RodataSection),
-    Data(DataSection),
-}
-impl LoadedSection {
-    pub fn size(&self) -> usize {
-        match self {
-            &LoadedSection::Text(ref text) => text.size,
-            &LoadedSection::Rodata(ref rodata) => rodata.size,
-            &LoadedSection::Data(ref data) => data.size,
-        }
-    }
-    pub fn key(&self) -> Option<&String> {
-        match self {
-            &LoadedSection::Text(ref text) => Some(&text.abs_symbol),
-            &LoadedSection::Rodata(ref rodata) => Some(&rodata.abs_symbol),
-            &LoadedSection::Data(ref data) => Some(&data.abs_symbol),
-        }
-    }
-    pub fn is_global(&self) -> bool {
-        match self {
-            &LoadedSection::Text(ref text) => text.global,
-            &LoadedSection::Rodata(ref rodata) => rodata.global,
-            &LoadedSection::Data(ref data) => data.global,
-        }
-    }
-    pub fn mapped_pages_offset(&self) -> usize {
-        match self {
-            &LoadedSection::Text(ref text) => text.mapped_pages_offset,
-            &LoadedSection::Rodata(ref rodata) => rodata.mapped_pages_offset,
-            &LoadedSection::Data(ref data) => data.mapped_pages_offset,
-        }
-    }
-    pub fn mapped_pages(&self) -> Option<Arc<MappedPages>> {
-        match self {
-            &LoadedSection::Text(ref text) => text.mapped_pages.upgrade(),
-            &LoadedSection::Rodata(ref rodata) => rodata.mapped_pages.upgrade(),
-            &LoadedSection::Data(ref data) => data.mapped_pages.upgrade(),
-        }
-    }
-
-    // pub fn parent(&self) -> &String {
-    //     match self {
-    //         &LoadedSection::Text(ref text) => &text.parent_crate,
-    //         &LoadedSection::Rodata(ref rodata) => &rodata.parent_crate,
-    //         &LoadedSection::Data(ref data) => &data.parent_crate,
-    //     }
-    // }
+/// The possible types of `LoadedSection`s: .text, .rodata, or .data.
+/// A .bss section is considered the same as .data.
+#[derive(Debug, PartialEq)]
+pub enum SectionType {
+    Text, 
+    Rodata,
+    Data,
 }
 
-
-/// Represents a .text section in a crate, which in Rust,
-/// corresponds to a single function. 
+/// Represents a .text, .rodata, .data, or .bss section
+/// that has been loaded and is part of a `LoadedCrate`.
+/// The containing `SectionType` enum determines which type of section it is.
 #[derive(Debug)]
-pub struct TextSection {
-    /// The full String representation of this symbol. 
-    /// Format <crate>::<module>::<struct>::<fn_name>
+pub struct LoadedSection {
+    /// The type of this section: .text, .rodata, or .data.
+    /// A .bss section is considered the same as .data.
+    pub typ: SectionType,
+    /// The full String name of this section, a fully-qualified symbol, 
+    /// e.g., `<crate>::<module>::<struct>::<fn_name>`
     /// For example, test_lib::MyStruct::new
-    pub abs_symbol: String,
+    pub name: String,
     /// the unique hash generated for this section by the Rust compiler,
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
@@ -307,68 +260,48 @@ pub struct TextSection {
     /// Whether or not this section's symbol was exported globally (is public)
     pub global: bool,
     /// The `LoadedCrate` object that contains/owns this section
-    pub parent_crate: Weak<RwLock<LoadedCrate>>,
+    pub parent_crate: WeakCrateRef,
     // /// The sections that this section depends on.
     // /// This is kept as a list of strong references because these dependency sections must outlast this section,
     // /// i.e., those sections cannot be removed/deleted until this one is deleted.
-    // pub dependencies: Vec<RelcationDependency>,
+    // pub dependencies: Vec<RelocationDependency>,
     // /// The sections that depend on this section. 
     // /// This is kept as a list of Weak references because we must be able to remove other sections
     // /// that are dependent upon this one before we remove this one.
     // /// If we kept strong references to the sections dependent on this one, 
     // /// then we wouldn't be able to remove/delete those sections before deleting this one.
     // pub dependents: Vec<WeakSectionRef>,
-
 }
+impl LoadedSection {
+    pub fn new(typ: SectionType, 
+        name: String, 
+        hash: Option<String>, 
+        mapped_pages: Weak<MappedPages>, 
+        mapped_pages_offset: usize,
+        size: usize,
+        global: bool, 
+        parent_crate: WeakCrateRef
+    ) -> LoadedSection {
+        LoadedSection {
+            typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate
+        }
+    }
 
+    /// Whether this `LoadedSection` is a .text section
+    pub fn is_text(&self) -> bool {
+        self.typ == SectionType::Text
+    }
 
-/// Represents a .rodata section in a crate.
-#[derive(Debug)]
-pub struct RodataSection {
-    /// The full String representation of this symbol. 
-    /// Format <crate>::<module>::<struct>::<fn_name>
-    /// For example, test_lib::MyStruct::new
-    pub abs_symbol: String,
-    /// the unique hash generated for this section by the Rust compiler,
-    /// which can be used as a version identifier. 
-    /// Not all symbols will have a hash, like those that are not mangled.
-    pub hash: Option<String>,
-    /// A reference to the `MappedPages` object that covers this section
-    pub mapped_pages: Weak<MappedPages>,
-    /// The offset into the `MappedPages` where this section starts
-    pub mapped_pages_offset: usize,
-    /// The size in bytes of this section
-    pub size: usize,
-    /// Whether or not this section's symbol was exported globally (is public)
-    pub global: bool,
-    /// The `LoadedCrate` object that contains/owns this section
-    pub parent_crate: Weak<RwLock<LoadedCrate>>,
+    /// Whether this `LoadedSection` is a .rodata section
+    pub fn is_rodata(&self) -> bool {
+        self.typ == SectionType::Rodata
+    }
+
+    /// Whether this `LoadedSection` is a .data or .bss section
+    pub fn is_data_or_bss(&self) -> bool {
+        self.typ == SectionType::Data
+    }
 }
-
-
-/// Represents a .data section in a crate.
-#[derive(Debug)]
-pub struct DataSection {
-    /// The full String representation of this symbol. 
-    /// Format <crate>::<module>::<struct>::<fn_name>
-    /// For example, test_lib::MyStruct::new
-    pub abs_symbol: String,
-    /// the unique hash generated for this section by the Rust compiler,
-    /// which can be used as a version identifier. 
-    /// Not all symbols will have a hash, like those that are not mangled.
-    pub hash: Option<String>,
-    /// A reference to the `MappedPages` object that covers this section
-    pub mapped_pages: Weak<MappedPages>,
-    /// The offset into the `MappedPages` where this section starts
-    pub mapped_pages_offset: usize,
-    /// The size in bytes of this section
-    pub size: usize,
-    /// Whether or not this section's symbol was exported globally (is public)
-    pub global: bool,
-    /// The `LoadedCrate` object that contains/owns this section
-    pub parent_crate: Weak<RwLock<LoadedCrate>>,
-}
-
 
 
 /// A representation that the section object containing this struct
@@ -376,9 +309,9 @@ pub struct DataSection {
 /// The dependent section is not specifically included here;
 /// it's implicit that the owner of this object is the one who depends on the `section`.
 /// A dependency is a strong reference to another `LoadedSection`, 
+#[derive(Debug)]
 pub struct RelocationDependency {
     pub section: StrongSectionRef,
     pub rel_type: u32,
     pub offset: usize,
 }
-
