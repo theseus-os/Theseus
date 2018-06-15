@@ -312,10 +312,10 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
     let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
     let main_func = {
         // get the TextSection for the "main" function in the app_crate
-        let mapped_pages = main_func_sec.mapped_pages()
+        let mapped_pages = main_func_sec.lock().mapped_pages()
             .ok_or("logic error: module's main_func text section was found but didn't have any mapped pages")?;
         debug!("spawn_application(): func mapped_pages: {:?}", mapped_pages);
-        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset(), &mut space)?
+        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.lock().mapped_pages_offset(), &mut space)?
     };
 
     let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;

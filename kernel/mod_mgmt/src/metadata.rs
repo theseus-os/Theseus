@@ -21,7 +21,7 @@ lazy_static! {
     /// A flat map of all symbols currently loaded into the kernel. 
     /// Maps a fully-qualified kernel symbol name (String) to the corresponding `LoadedSection`. 
     /// Symbols declared as "no_mangle" will appear in the root namespace with no crate prefixex, as expected.
-    static ref SYSTEM_MAP: Mutex<BTreeMap<String, Weak<LoadedSection>>> = Mutex::new(BTreeMap::new());
+    static ref SYSTEM_MAP: Mutex<BTreeMap<String, WeakSectionRef>> = Mutex::new(BTreeMap::new());
 }
 
 
@@ -46,10 +46,10 @@ pub fn add_crate(new_crate: Arc<RwLock<LoadedCrate>>, log_replacements: bool) ->
     {
         let mut locked_kmap = SYSTEM_MAP.lock();
         let new_crate_locked = new_crate.read();
-        for sec in new_crate_locked.sections.iter().filter(|s| s.is_global()) {
-            let new_sec_size = sec.size();
+        for sec in new_crate_locked.sections.iter().filter(|s| s.lock().is_global()) {
+            let new_sec_size = sec.lock().size();
 
-            if let Some(key) = sec.key() {
+            if let Some(key) = sec.lock().key() {
                 // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
                 // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
                 // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
@@ -57,13 +57,13 @@ pub fn add_crate(new_crate: Arc<RwLock<LoadedCrate>>, log_replacements: bool) ->
                 match entry {
                     Entry::Occupied(old_val) => {
                         if let Some(old_sec) = old_val.get().upgrade() {
-                            if old_sec.size() == new_sec_size {
+                            if old_sec.lock().size() == new_sec_size {
                                 if log_replacements { info!("       Crate \"{}\": Ignoring new symbol already present: {}", new_crate_locked.crate_name, key); }
                             }
                             else {
                                 if log_replacements { 
                                     warn!("       Unexpected: crate \"{}\": different section sizes (old={}, new={}) when ignoring new symbol in system map: {}", 
-                                        new_crate_locked.crate_name, old_sec.size(), new_sec_size, key);
+                                        new_crate_locked.crate_name, old_sec.lock().size(), new_sec_size, key);
                                 }
                             }
                         }
@@ -107,7 +107,7 @@ fn is_valid_crate_name_char(c: char) -> bool {
 }
 
 
-fn get_symbol_internal(demangled_full_symbol: &str) -> Option<Weak<LoadedSection>> {
+fn get_symbol_internal(demangled_full_symbol: &str) -> Option<WeakSectionRef> {
     SYSTEM_MAP.lock().get(demangled_full_symbol).cloned()
 }
 
@@ -116,7 +116,7 @@ fn get_symbol_internal(demangled_full_symbol: &str) -> Option<Weak<LoadedSection
 /// 
 /// # Note
 /// This is not an interrupt-safe function. DO NOT call it from within an interrupt handler context.
-pub fn get_symbol(demangled_full_symbol: &str) -> Weak<LoadedSection> {
+pub fn get_symbol(demangled_full_symbol: &str) -> WeakSectionRef {
     get_symbol_internal(demangled_full_symbol)
         .unwrap_or(Weak::default())
 }
@@ -132,7 +132,7 @@ pub fn get_symbol(demangled_full_symbol: &str) -> Weak<LoadedSection> {
 /// 
 /// # Note
 /// This is not an interrupt-safe function. DO NOT call it from within an interrupt handler context.
-pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryManagementInfo) -> Weak<LoadedSection> {
+pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryManagementInfo) -> WeakSectionRef {
     if let Some(sec) = get_symbol_internal(demangled_full_symbol) {
         return sec;
     }
@@ -195,7 +195,7 @@ pub struct LoadedCrate {
     /// The name of this crate
     pub crate_name: String,
     /// The list of all sections in this crate.
-    pub sections: Vec<Arc<LoadedSection>>,
+    pub sections: Vec<StrongSectionRef>,
     /// The `MappedPages` that include the text sections for this crate,
     /// i.e., sections that are readable and executable.
     pub text_pages: Option<Arc<MappedPages>>,
@@ -212,9 +212,9 @@ pub struct LoadedCrate {
 impl LoadedCrate {
     /// Returns the `TextSection` matching the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
-    pub fn get_function_section(&self, func_name: &str) -> Option<Arc<LoadedSection>> {
+    pub fn get_function_section(&self, func_name: &str) -> Option<StrongSectionRef> {
         for sec in &self.sections {
-            if let LoadedSection::Text(text) = sec.deref() {
+            if let LoadedSection::Text(text) = sec.lock().deref() {
                 if &text.abs_symbol == func_name {
                     return Some(sec.clone());
                 }
@@ -223,6 +223,14 @@ impl LoadedCrate {
         None
     }
 }
+
+
+
+
+/// A Strong reference (`Arc`) to a `LoadedSection`.
+pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
+/// A Weak reference (`Weak`) to a `LoadedSection`.
+pub type WeakSectionRef = Weak<Mutex<LoadedSection>>;
 
 
 #[derive(Debug)]
@@ -309,7 +317,7 @@ pub struct TextSection {
     // /// that are dependent upon this one before we remove this one.
     // /// If we kept strong references to the sections dependent on this one, 
     // /// then we wouldn't be able to remove/delete those sections before deleting this one.
-    // pub dependents: Vec<WeakSection>,
+    // pub dependents: Vec<WeakSectionRef>,
 
 }
 
@@ -369,12 +377,8 @@ pub struct DataSection {
 /// it's implicit that the owner of this object is the one who depends on the `section`.
 /// A dependency is a strong reference to another `LoadedSection`, 
 pub struct RelocationDependency {
-    section: StrongSection,
-    rel_type: u32,
+    pub section: StrongSectionRef,
+    pub rel_type: u32,
+    pub offset: usize,
 }
 
-
-/// A Strong reference (`Arc`) to a `LoadedSection`.
-pub type StrongSection  = Arc<Mutex<LoadedSection>>;
-/// A Weak reference (`Weak`) to a `LoadedSection`.
-pub type WeakSection = Weak<Mutex<LoadedSection>>;

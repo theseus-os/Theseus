@@ -18,7 +18,7 @@ use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
-use spin::RwLock;
+use spin::{Mutex, RwLock};
 
 use xmas_elf::ElfFile;
 use xmas_elf::sections::{SectionHeader, SectionData, ShType};
@@ -30,7 +30,7 @@ use memory::{FRAME_ALLOCATOR, get_module, VirtualMemoryArea, MemoryManagementInf
 
 
 pub mod metadata;
-use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, LoadedSection};
+use self::metadata::{LoadedCrate, TextSection, DataSection, RodataSection, LoadedSection, StrongSectionRef, RelocationDependency};
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
@@ -432,7 +432,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
     
 
     // First, we need to parse all the sections and load the text and data sections
-    let mut loaded_sections: BTreeMap<usize, Arc<LoadedSection>> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
+    let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
 
     // we create the new crate here so we can obtain references to it later
     let new_crate = Arc::new(RwLock::new(
@@ -548,7 +548,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
             
                         loaded_sections.insert(shndx, 
-                            Arc::new(LoadedSection::Text(TextSection{
+                            Arc::new(Mutex::new(LoadedSection::Text(TextSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(tp),
@@ -556,7 +556,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
                                 parent_crate: Arc::downgrade(&new_crate),
-                            }))
+                            })))
                         );
 
                         text_offset += round_up_power_of_two(sec_size, sec_align);
@@ -601,7 +601,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(LoadedSection::Rodata(RodataSection{
+                            Arc::new(Mutex::new(LoadedSection::Rodata(RodataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(rp),
@@ -609,7 +609,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
                                 parent_crate: Arc::downgrade(&new_crate),
-                            }))
+                            })))
                         );
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
@@ -661,7 +661,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(LoadedSection::Data(DataSection{
+                            Arc::new(Mutex::new(LoadedSection::Data(DataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
@@ -669,7 +669,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
                                 parent_crate: Arc::downgrade(&new_crate),
-                            }))
+                            })))
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
@@ -707,7 +707,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         };
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(LoadedSection::Data(DataSection{
+                            Arc::new(Mutex::new(LoadedSection::Data(DataSection{
                                 abs_symbol: demangled.no_hash,
                                 hash: demangled.hash,
                                 mapped_pages: Arc::downgrade(dp),
@@ -715,7 +715,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 size: sec_size,
                                 global: global_sections.contains(&shndx),
                                 parent_crate: Arc::downgrade(&new_crate),
-                            }))
+                            })))
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
@@ -770,6 +770,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                 }
             }
 
+            let mut target_sec_dependencies: Vec<RelocationDependency> = Vec::new();
+
             // the target section is where we write the relocation data to.
             // the source section is where we get the data from. 
             // There is one target section per rela section, and one source section per entry in this rela section.
@@ -785,13 +787,13 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         }
 
                         // common to all relocations for this target section: calculate the relocation destination and get the source section
-                        let dest_offset = target_sec.mapped_pages_offset() + rela_entry.get_offset() as usize;
-                        let dest_mapped_pages = try!(target_sec.mapped_pages().ok_or("couldn't get MappedPages reference for target_sec's relocation"));
+                        let dest_offset = target_sec.lock().mapped_pages_offset() + rela_entry.get_offset() as usize;
+                        let dest_mapped_pages = target_sec.lock().mapped_pages().ok_or("couldn't get MappedPages reference for target_sec's relocation")?;
                         let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-                        let source_sec_shndx: u16 = source_sec_entry.shndx(); 
+                        let source_sec_shndx = source_sec_entry.shndx() as usize; 
                         if log { 
                             let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                                                    .and_then(|s| s.get_name(&elf_file));
+                                .and_then(|s| s.get_name(&elf_file));
                             trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
                             // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
                             //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
@@ -799,65 +801,45 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                             //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                         }
 
-                        use xmas_elf::sections::{SHN_UNDEF, SHN_LORESERVE, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_HIRESERVE};
 
-                        let mut depends_on_another_crate = false;
-                        let source_sec: Result<Arc<LoadedSection>, &'static str> = match source_sec_shndx {
-                            SHN_LORESERVE | SHN_HIPROC | SHN_LOOS | SHN_HIOS | SHN_COMMON | SHN_HIRESERVE => {
-                                error!("Unsupported source section shndx {} in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
-                                Err("Unsupported source section shndx")
-                            }
-                            SHN_ABS => {
-                                error!("No support for SHN_ABS source section shndx ({}), found in symtab entry {}", source_sec_shndx, rela_entry.get_symbol_table_index());
-                                Err("Unsupported source section shndx SHN_ABS!!")
-                            }
+                        // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
+                        let source_sec = match loaded_sections.get(&source_sec_shndx) {
+                            Some(ss) => Ok(ss.clone()),
 
-                            // match anything else, i.e., a valid source section shndx
-                            shndx => {
-                                // first, we try to get the relevant section based on its shndx only
-                                let loaded_sec = if shndx == SHN_UNDEF { None } else { loaded_sections.get(&(shndx as usize)) };
-                                if let Some(sec) = loaded_sec {
-                                    // yay, we found the source_sec, it's from the same crate module currently being loaded
-                                    depends_on_another_crate = false;
-                                    Ok(sec.clone())
-                                }
-                                else {
-                                    // second, if we couldn't get the section based on its shndx, it means that the source section wasn't in this module.
-                                    // Thus, we *have* to to get the source section's name and check our list of loaded external crates to see if it's there.
-                                    // At this point, there's no other way to search for the source section besides its name
-                                    if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                                        const DATARELRO: &'static str = ".data.rel.ro.";
-                                        let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                            let relro_name = try!(source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
-                                            // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
-                                            relro_name
-                                        }
-                                        else {
-                                            source_sec_name
-                                        };
-                                        let demangled = demangle_symbol(source_sec_name);
-
-                                        depends_on_another_crate = true; 
-
-                                        // search for the symbol's demangled name in the kernel's symbol map
-                                        metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
-                                            .upgrade()
-                                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
+                            // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
+                            // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
+                            // At this point, there's no other way to search for the source section besides its name.
+                            None => {
+                                if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                                    const DATARELRO: &'static str = ".data.rel.ro.";
+                                    let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                                        let relro_name = source_sec_name.get(DATARELRO.len() ..)
+                                            .ok_or("Couldn't get name of .data.rel.ro. section")?;
+                                        // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
+                                        relro_name
                                     }
                                     else {
-                                        let _source_sec_header = source_sec_entry
-                                            .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                            .and_then(|s| s.get_name(&elf_file));
-                                        error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", shndx, _source_sec_header);
-                                        Err("Couldn't get source section's name, needed for non-local relocation entry")
-                                    }
+                                        source_sec_name
+                                    };
+                                    let demangled = demangle_symbol(source_sec_name);
+
+                                    // search for the symbol's demangled name in the kernel's symbol map
+                                    metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
+                                        .upgrade()
+                                        .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
+                                }
+                                else {
+                                    let _source_sec_header = source_sec_entry
+                                        .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                                        .and_then(|s| s.get_name(&elf_file));
+                                    error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
+                                    Err("Couldn't get source section's name, needed for non-local relocation entry")
                                 }
                             }
-                        };
+                        }?;
 
-                        let source_sec = try!(source_sec);
-                        let source_mapped_pages = try!(source_sec.mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation"));
-                        let source_vaddr = try!(source_mapped_pages.as_type::<&usize>(source_sec.mapped_pages_offset())) as *const _ as usize;
+                        let source_mapped_pages = source_sec.lock().mapped_pages().ok_or("couldn't get MappedPages reference for source_sec's relocation")?;
+                        let source_vaddr = source_mapped_pages.as_type::<&usize>(source_sec.lock().mapped_pages_offset())? as *const _ as usize;
 
                         // Write the actual relocation entries here
                         // There is a great, succint table of relocation types here
@@ -906,13 +888,12 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
 
                         // we only really care about tracking dependencies on other crates,
                         // since every crate has "dependencies" on itself. 
-                        if depends_on_another_crate {
-                            // let target_dependency = ForeignRelocationDependency {
-                            //     source_section: source_sec.clone(),
-                            //     rel_type: rela_entry.get_type(),
-                            // };
-                            // target_sec.dependencies.push(target_dependency);
-                        }
+                        let target_dependency = RelocationDependency {
+                            section: source_sec,
+                            rel_type: rela_entry.get_type(),
+                            offset: dest_offset,
+                        };
+                        target_sec_dependencies.push(target_dependency);
                          
                     }
                 }
@@ -920,6 +901,9 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
                     return Err("Found Rela section that wasn't able to be parsed as Rela64");
                 }
+
+                // add dependencies to the target section
+                // target_sec.lock().dependencies.append(target_sec_dependencies);
             }
             else {
                 error!("Skipping Rela section {:?} for target section that wasn't loaded!", sec.get_name(&elf_file));
@@ -945,8 +929,8 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
         return Err("couldn't get kernel's active page table");
     }
     
-    // extract just the sections from the section map
-    let (_keys, values): (Vec<usize>, Vec<Arc<LoadedSection>>) = loaded_sections.into_iter().unzip();
+    // extract just the section refs from the loaded_section map
+    let (_keys, values): (Vec<usize>, Vec<StrongSectionRef>) = loaded_sections.into_iter().unzip();
 
     {
         let mut new_crate_locked = new_crate.write();
@@ -1052,7 +1036,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
-    let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+    let mut sections: Vec<StrongSectionRef> = Vec::new();
 
     // we create the new crate here so we can obtain references to it later
     let new_crate = Arc::new(RwLock::new(
@@ -1217,7 +1201,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
 
             if sec_ndx == text_shndx {
-                sections.push(Arc::new(
+                sections.push(Arc::new(Mutex::new(
                     LoadedSection::Text(TextSection{
                         abs_symbol: no_hash,
                         hash: hash,
@@ -1226,11 +1210,11 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         size: sec_size,
                         global: true,
                         parent_crate: Arc::downgrade(&new_crate),
-                    })
+                    }))
                 ));
             }
             else if sec_ndx == rodata_shndx {
-                sections.push(Arc::new(
+                sections.push(Arc::new(Mutex::new(
                     LoadedSection::Rodata(RodataSection{
                         abs_symbol: no_hash,
                         hash: hash,
@@ -1239,11 +1223,11 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         size: sec_size,
                         global: true,
                         parent_crate: Arc::downgrade(&new_crate),
-                    })
+                    }))
                 ));
             }
             else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
-                sections.push(Arc::new(
+                sections.push(Arc::new(Mutex::new(
                     LoadedSection::Data(DataSection{
                         abs_symbol: no_hash,
                         hash: hash,
@@ -1252,7 +1236,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         size: sec_size,
                         global: true,
                         parent_crate: Arc::downgrade(&new_crate),
-                    })
+                    }))
                 ));
             }
             else {
@@ -1382,7 +1366,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
     let loaded_sections = {
-        let mut sections: Vec<Arc<LoadedSection>> = Vec::new();
+        let mut sections: Vec<StrongSectionRef> = Vec::new();
         use xmas_elf::symbol_table::Entry;
         for entry in symtab.iter() {
             // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)
@@ -1450,7 +1434,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
 
                             if let Some(sec) = new_section {
                                 // debug!("parse_nano_core: new section: {:?}", sec);
-                                sections.push(Arc::new(sec));
+                                sections.push(Arc::new(Mutex::new(sec)));
                             }
                         }
                     }

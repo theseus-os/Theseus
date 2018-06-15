@@ -185,9 +185,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         );
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
+        let offset = section.lock().mapped_pages_offset();
         let func: &CaptainInitFunc = try_exit!( 
-            try_exit!(section.mapped_pages().ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
-            .as_func(section.mapped_pages_offset(), &mut space) 
+            try_exit!(section.lock().mapped_pages().ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
+                .as_func(offset, &mut space)
         );
 
         try_exit!(
@@ -244,12 +245,15 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
-            section.and_then(|sec| sec.mapped_pages().ok_or("couldn't get mapped_pages for panic_wrapper LoadedSection")
-                .and_then(|mp| {
-                    mp.as_func::<PanicWrapperFunc>(sec.mapped_pages_offset(), &mut space)
+            section.and_then(|sec| {
+                let offset = sec.lock().mapped_pages_offset();
+                let mapped_pages = sec.lock().mapped_pages().ok_or("Couldn't get mapped_pages for panic_wrapper");
+                mapped_pages.and_then(|mp| {
+                    mp.as_func::<PanicWrapperFunc>(offset, &mut space)
                         .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
-                })
-            )
+                    }
+                )
+            }) 
         }
         #[cfg(not(feature = "loadable"))]
         {
