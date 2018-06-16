@@ -3,12 +3,12 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
-use core::ops::Deref;
+use core::ops::{Deref};
 use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use alloc::btree_map::Entry; 
-use memory::{MappedPages, MemoryManagementInfo, get_module};
+use memory::{MappedPages, MemoryManagementInfo, get_module, VirtualMemoryArea};
 
 lazy_static! {
     /// The main metadata structure that contains a tree of all loaded crates.
@@ -23,6 +23,81 @@ lazy_static! {
     /// Symbols declared as "no_mangle" will appear in the root namespace with no crate prefixex, as expected.
     static ref SYSTEM_MAP: Mutex<SymbolMap> = Mutex::new(BTreeMap::new());
 }
+
+
+
+
+#[derive(PartialEq)]
+pub enum CrateType {
+    Kernel,
+    Application,
+    Userspace,
+}
+impl CrateType {
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            CrateType::Kernel       => "__k_",
+            CrateType::Application  => "__a_",
+            CrateType::Userspace    => "__u_",
+        }
+    }
+
+    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
+    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// # Examples 
+    /// ```
+    /// let result = CrateType::from_module_name("__k_my_crate");
+    /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
+    /// ```
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+        if module_name.starts_with(CrateType::Application.prefix()) {
+            Ok((
+                CrateType::Application,
+                module_name.get(CrateType::Application.prefix().len() .. ).ok_or("Couldn't get name of application module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::Kernel.prefix()) {
+            Ok((
+                CrateType::Kernel,
+                module_name.get(CrateType::Kernel.prefix().len() .. ).ok_or("Couldn't get name of kernel module")?
+            ))
+        }
+        else if module_name.starts_with(CrateType::Userspace.prefix()) {
+            Ok((
+                CrateType::Userspace,
+                module_name.get(CrateType::Userspace.prefix().len() .. ).ok_or("Couldn't get name of userspace module")?
+            ))
+        }
+        else {
+            Err("module_name didn't start with a known CrateType prefix")
+        }
+    }
+
+
+    pub fn is_application(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::Application.prefix())
+    }
+
+    pub fn is_kernel(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::Kernel.prefix())
+    }
+
+    pub fn is_userspace(module_name: &str) -> bool {
+        module_name.starts_with(CrateType::Userspace.prefix())
+    }
+}
+
+
+
+pub struct ElfProgramSegment {
+    /// the VirtualMemoryAddress that will represent the virtual mapping of this Program segment.
+    /// Provides starting virtual address, size in memory, mapping flags, and a text description.
+    pub vma: VirtualMemoryArea,
+    /// the offset of this segment into the file.
+    /// This plus the physical address of the Elf file is the physical address of this Program segment.
+    pub offset: usize,
+}
+
 
 
 
@@ -183,14 +258,14 @@ pub struct LoadedCrate {
     /// The list of all sections in this crate.
     pub sections: Vec<StrongSectionRef>,
     /// The `MappedPages` that include the text sections for this crate,
-    /// i.e., sections that are readable and executable.
-    pub text_pages: Option<Arc<MappedPages>>,
+    /// i.e., sections that are readable and executable, but not writable.
+    pub text_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
     /// The `MappedPages` that include the rodata sections for this crate.
     /// i.e., sections that are read-only, not writable nor executable.
-    pub rodata_pages: Option<Arc<MappedPages>>,
+    pub rodata_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
     /// The `MappedPages` that include the data and bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
-    pub data_pages: Option<Arc<MappedPages>>,
+    pub data_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
 
     // crate_dependencies: Vec<LoadedCrate>,
 }
@@ -271,9 +346,7 @@ pub struct LoadedSection {
     /// which can be used as a version identifier. 
     /// Not all symbols will have a hash, like those that are not mangled.
     pub hash: Option<String>,
-    /// A reference to the `MappedPages` object that covers this section
-    pub mapped_pages: Weak<MappedPages>,
-    /// The offset into the `MappedPages` where this section starts
+    /// The offset into the `parent_crate`'s `MappedPages` where this section starts
     pub mapped_pages_offset: usize,
     /// The size in bytes of this section
     pub size: usize,
@@ -298,13 +371,12 @@ impl LoadedSection {
         typ: SectionType, 
         name: String, 
         hash: Option<String>, 
-        mapped_pages: Weak<MappedPages>, 
         mapped_pages_offset: usize,
         size: usize,
         global: bool, 
         parent_crate: WeakCrateRef
     ) -> LoadedSection {
-        LoadedSection::with_dependencies(typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate, Vec::new())
+        LoadedSection::with_dependencies(typ, name, hash, mapped_pages_offset, size, global, parent_crate, Vec::new())
     }
 
     /// Same as `LoadedSection::new()`, but uses the given `dependencies` instead of the default empty list.
@@ -312,7 +384,6 @@ impl LoadedSection {
         typ: SectionType, 
         name: String, 
         hash: Option<String>, 
-        mapped_pages: Weak<MappedPages>, 
         mapped_pages_offset: usize,
         size: usize,
         global: bool, 
@@ -320,7 +391,31 @@ impl LoadedSection {
         dependencies: Vec<RelocationDependency>
     ) -> LoadedSection {
         LoadedSection {
-            typ, name, hash, mapped_pages, mapped_pages_offset, size, global, parent_crate, dependencies
+            typ, name, hash, mapped_pages_offset, size, global, parent_crate, dependencies
+        }
+    }
+
+    /// Returns a reference to the `MappedPages` that covers this `LoadedSection`.
+    /// Because that `MappedPages` object is owned by this `LoadedSection`'s `parent_crate`,
+    /// the lifetime of the returned `MappedPages` reference is tied to the lifetime 
+    /// of the given `LoadedCrate` parent crate object. 
+    pub fn mapped_pages<'a>(&self, parent_crate: &'a LoadedCrate) -> Option<&'a MappedPages> {
+        match self.typ {
+            SectionType::Text   => parent_crate.text_pages.as_ref(),
+            SectionType::Rodata => parent_crate.rodata_pages.as_ref(),
+            SectionType::Data   => parent_crate.data_pages.as_ref(),
+        }
+    }
+
+    /// Returns a mutable reference to the `MappedPages` that covers this `LoadedSection`.
+    /// Because that `MappedPages` object is owned by this `LoadedSection`'s `parent_crate`,
+    /// the lifetime of the returned `MappedPages` reference is tied to the lifetime 
+    /// of the given `LoadedCrate` parent crate object. 
+    pub fn mapped_pages_mut<'a>(&self, parent_crate: &'a mut LoadedCrate) -> Option<&'a mut MappedPages> {
+        match self.typ {
+            SectionType::Text   => parent_crate.text_pages.as_mut(),
+            SectionType::Rodata => parent_crate.rodata_pages.as_mut(),
+            SectionType::Data   => parent_crate.data_pages.as_mut(),
         }
     }
 

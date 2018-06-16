@@ -27,13 +27,13 @@ const PARSE_NANO_CORE_SYMBOL_FILE: bool = true;
 
 // Parses the nano_core module that represents the already loaded (and currently running) nano_core code.
 // Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
-pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo, 
-    text_pages: Arc<MappedPages>, 
-    rodata_pages: Arc<MappedPages>, 
-    data_pages: Arc<MappedPages>, 
-    log: bool) 
-    -> Result<usize, &'static str> 
-{
+pub fn parse_nano_core(
+    kernel_mmi: &mut MemoryManagementInfo, 
+    text_pages:   MappedPages, 
+    rodata_pages: MappedPages, 
+    data_pages:   MappedPages, 
+    log: bool
+) -> Result<usize, &'static str> {
     debug!("parse_nano_core: trying to load and parse the nano_core file");
     let module = try!(get_module("__k_nano_core").ok_or("Couldn't find module called __k_nano_core"));
     use kernel_config::memory::address_is_page_aligned;
@@ -92,13 +92,13 @@ pub fn parse_nano_core(kernel_mmi: &mut MemoryManagementInfo,
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
-pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages, 
-    text_pages: Arc<MappedPages>, 
-    rodata_pages: Arc<MappedPages>, 
-    data_pages: Arc<MappedPages>, 
-    size: usize) 
-    -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
-{
+pub fn parse_nano_core_symbol_file(
+    mapped_pages: MappedPages, 
+    text_pages:   MappedPages, 
+    rodata_pages: MappedPages, 
+    data_pages:   MappedPages, 
+    size: usize
+) -> Result<Arc<RwLock<LoadedCrate>>, &'static str> {
     let crate_name = String::from("nano_core");
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -282,8 +282,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         SectionType::Text,
                         no_hash,
                         hash,
-                        Arc::downgrade(&text_pages),
-                        text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
+                        text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")?,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -296,8 +295,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         SectionType::Rodata,
                         no_hash,
                         hash,
-                        Arc::downgrade(&rodata_pages),
-                        rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
+                        rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")?,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -310,8 +308,7 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
                         SectionType::Data,
                         no_hash,
                         hash,
-                        Arc::downgrade(&data_pages),
-                        data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
+                        data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")?,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -343,13 +340,13 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
 /// Thus, we simply search for its global symbols, and add them to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
-fn parse_nano_core_binary(mapped_pages: MappedPages, 
-    text_pages: Arc<MappedPages>, 
-    rodata_pages: Arc<MappedPages>, 
-    data_pages: Arc<MappedPages>, 
-    size_in_bytes: usize) 
-    -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
-{
+fn parse_nano_core_binary(
+    mapped_pages: MappedPages, 
+    text_pages:   MappedPages, 
+    rodata_pages: MappedPages, 
+    data_pages:   MappedPages, 
+    size_in_bytes: usize
+) -> Result<Arc<RwLock<LoadedCrate>>, &'static str> {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -477,8 +474,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         SectionType::Text,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        Arc::downgrade(&text_pages),
-                                        try!(text_pages.offset_of(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
+                                        try!(text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!")),
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -489,8 +485,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         SectionType::Rodata,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        Arc::downgrade(&rodata_pages),
-                                        try!(rodata_pages.offset_of(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
+                                        try!(rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!")),
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -501,8 +496,7 @@ fn parse_nano_core_binary(mapped_pages: MappedPages,
                                         SectionType::Data,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        Arc::downgrade(&data_pages),
-                                        try!(data_pages.offset_of(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
+                                        try!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!")),
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),

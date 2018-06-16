@@ -137,10 +137,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
     // save references to the kernel's currently running text, rodata, and data sections
-    let text_mapped_pages   = Arc::new(text_mapped_pages);
-    let rodata_mapped_pages = Arc::new(rodata_mapped_pages);
-    let data_mapped_pages   = Arc::new(data_mapped_pages);
-    NANO_CORE_PAGES.call_once(|| (text_mapped_pages.clone(), rodata_mapped_pages.clone(), data_mapped_pages.clone()));
+    // let text_mapped_pages   = Arc::new(text_mapped_pages);
+    // let rodata_mapped_pages = Arc::new(rodata_mapped_pages);
+    // let data_mapped_pages   = Arc::new(data_mapped_pages);
+    // NANO_CORE_PAGES.call_once(|| (text_mapped_pages.clone(), rodata_mapped_pages.clone(), data_mapped_pages.clone()));
 
 
     // now that we have virtual memory, including a heap, we can create basic things like state_store
@@ -186,8 +186,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
         let offset = section.lock().mapped_pages_offset;
+        let parent_crate_ref = try_exit!(section.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate"));
+        let parent_crate = parent_crate_ref.read();
         let func: &CaptainInitFunc = try_exit!( 
-            try_exit!(section.lock().mapped_pages.upgrade().ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
+            try_exit!(section.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
                 .as_func(offset, &mut space)
         );
 
@@ -247,13 +249,16 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
             let mut space = 0;
             section.and_then(|sec| {
                 let offset = sec.lock().mapped_pages_offset;
-                let mapped_pages = sec.lock().mapped_pages.upgrade().ok_or("Couldn't get mapped_pages for panic_wrapper");
-                mapped_pages.and_then(|mp| {
-                    mp.as_func::<PanicWrapperFunc>(offset, &mut space)
-                        .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
-                    }
-                )
-            }) 
+                let parent_crate_ref = sec.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate");
+                parent_crate_ref.and_then(|parent_crate_ref| {
+                    let parent_crate = parent_crate_ref.read();
+                    let mapped_pages = sec.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get mapped_pages for panic_wrapper");
+                    mapped_pages.and_then(|mp| {
+                        mp.as_func::<PanicWrapperFunc>(offset, &mut space)
+                            .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
+                    })
+                })
+            })
         }
         #[cfg(not(feature = "loadable"))]
         {

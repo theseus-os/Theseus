@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(alloc)]
+#![feature(rustc_private)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -26,87 +27,15 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, VirtualMemoryArea, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
 
 pub mod parse_nano_core;
 pub mod metadata;
-use self::metadata::{LoadedCrate, LoadedSection, SectionType, StrongSectionRef, RelocationDependency};
+use self::metadata::*;
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
-
-
-#[derive(PartialEq)]
-pub enum CrateType {
-    Kernel,
-    Application,
-    Userspace,
-}
-impl CrateType {
-    pub fn prefix(&self) -> &'static str {
-        match self {
-            CrateType::Kernel       => "__k_",
-            CrateType::Application  => "__a_",
-            CrateType::Userspace    => "__u_",
-        }
-    }
-
-    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
-    /// in which the `&str` is the rest of the module name after the prefix. 
-    /// # Examples 
-    /// ```
-    /// let result = CrateType::from_module_name("__k_my_crate");
-    /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
-    /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
-        if module_name.starts_with(CrateType::Application.prefix()) {
-            Ok((
-                CrateType::Application,
-                module_name.get(CrateType::Application.prefix().len() .. ).ok_or("Couldn't get name of application module")?
-            ))
-        }
-        else if module_name.starts_with(CrateType::Kernel.prefix()) {
-            Ok((
-                CrateType::Kernel,
-                module_name.get(CrateType::Kernel.prefix().len() .. ).ok_or("Couldn't get name of kernel module")?
-            ))
-        }
-        else if module_name.starts_with(CrateType::Userspace.prefix()) {
-            Ok((
-                CrateType::Userspace,
-                module_name.get(CrateType::Userspace.prefix().len() .. ).ok_or("Couldn't get name of userspace module")?
-            ))
-        }
-        else {
-            Err("module_name didn't start with a known CrateType prefix")
-        }
-    }
-
-
-    pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.prefix())
-    }
-
-    pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.prefix())
-    }
-
-    pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.prefix())
-    }
-}
-
-
-
-pub struct ElfProgramSegment {
-    /// the VirtualMemoryAddress that will represent the virtual mapping of this Program segment.
-    /// Provides starting virtual address, size in memory, mapping flags, and a text description.
-    pub vma: VirtualMemoryArea,
-    /// the offset of this segment into the file.
-    /// This plus the physical address of the Elf file is the physical address of this Program segment.
-    pub offset: usize,
-}
 
 
 /// Parses an elf executable file as a slice of bytes starting at the given `MappedPages` mapping.
@@ -177,8 +106,6 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
         error!("module {} is not page aligned!", module.name());
         return Err("module was not page aligned");
     } 
-
-
 
     let size = module.size();
 
@@ -294,49 +221,73 @@ fn demangle_symbol(s: &str) -> DemangledSymbol {
     }
 }
 
+/// A convenience wrapper for a set of the three possible types of `MappedPages`
+/// that can be allocated and mapped for a single `LoadedCrate`. 
+struct SectionPages {
+    /// MappedPages that cover all .text sections, if any exist.
+    text_pages:   Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
+    /// MappedPages that cover all .rodata sections, if any exist.
+    rodata_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
+    /// MappedPages that cover all .data and .bss sections, if any exist.
+    data_pages:   Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
+}
 
 
 /// The primary internal routine for parsing, loading, and linking a crate's module object file.
-fn parse_elf_kernel_crate(mapped_pages: MappedPages, 
-                          size_in_bytes: usize, 
-                          module_name: &String, 
-                          kernel_mmi: &mut MemoryManagementInfo, 
-                          log: bool)
-                          -> Result<Arc<RwLock<LoadedCrate>>, &'static str>
-{
+fn parse_elf_kernel_crate(
+    mapped_pages: MappedPages, 
+    size_in_bytes: usize, 
+    module_name: &String, 
+    kernel_mmi: &mut MemoryManagementInfo, 
+    log: bool
+) -> Result<Arc<RwLock<LoadedCrate>>, &'static str> {
     
     let (_crate_type, crate_name) = CrateType::from_module_name(module_name)?;
-    let crate_name = String::from(crate_name);
     debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
     let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
     // debug!("BYTE SLICE: {:?}", byte_slice);
     let elf_file = try!(ElfFile::new(byte_slice)); // returns Err(&str) if ELF parse fails
 
-    // check that elf_file is a relocatable type 
-    {
-        use xmas_elf::header::Type;
-        let typ = elf_file.header.pt2.type_().as_type();
-        if typ != Type::Relocatable {
-            error!("parse_elf_kernel_crate(): module {} was of type {:?}, must be a Relocatable Elf File!", module_name, typ);
-            return Err("not a relocatable elf file");
-        }
+    // first step is allocate enough space to load the sections
+    let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+
+    // second step is to load the acutal sections in the crate
+    let (new_crate, loaded_sections) = load_crate_sections(&elf_file, crate_name, section_pages, log)?;
+
+    if log {
+        debug!("=========== moving on to the relocations for crate {} =========", module_name);
     }
 
+    // third step is to perform the relocations for the newly loaded crate
+    perform_relocations(&elf_file, &new_crate, loaded_sections, kernel_mmi, log)?;
+
+    Ok(new_crate)
+}
+
+
+
+/// Parses each section in the given `ElfFile`.
+/// Returns a tuple of the new `LoadedCrate`, the list of newly `LoadedSection`s, and the crate's symbol table.
+/// The list of sections is actually a map from its section index (shndx) to the `LoadedSection` itself,
+/// which is kept separate and has not yet been added to the new `LoadedCrate` beause it needs to be used for relocations.
+fn load_crate_sections(
+    elf_file:      &ElfFile, 
+    crate_name:    &str, 
+    section_pages: SectionPages,
+    log:           bool
+) -> Result<(StrongCrateRef, BTreeMap<usize, StrongSectionRef>), &'static str> {
+    // check that elf_file is a relocatable type 
+    use xmas_elf::header::Type;
+    let typ = elf_file.header.pt2.type_().as_type();
+    if typ != Type::Relocatable {
+    error!("parse_elf_kernel_crate(): crate \"{}\" was a {:?} Elf File, must be Relocatable!", crate_name, typ);
+        return Err("not a relocatable elf file");
+    }
 
     // For us to properly load the ELF file, it must NOT have been stripped,
     // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
-    use xmas_elf::sections::SectionData::SymbolTable64;
-    let symtab_data = match elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::SymTab)).next()
-        .ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) 
-    {
-        Ok(SymbolTable64(symtab)) => Ok(symtab),
-        _ => {
-            error!("parse_elf_kernel_crate(): can't load file: no symbol table found. Was file stripped?");
-            Err("cannot load: no symbol table found. Was file stripped?")
-        }
-    };
-    let symtab = try!(symtab_data);
+    let symtab = get_symbol_table(&elf_file)?;
     // debug!("symtab: {:?}", symtab);
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
@@ -348,99 +299,25 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             if let Ok(typ) = entry.get_type() {
                 if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
                     use xmas_elf::symbol_table::Visibility;
-                    match entry.get_other() {
-                        Visibility::Default => {
-                            if let Ok(bind) = entry.get_binding() {
-                                if bind == xmas_elf::symbol_table::Binding::Global {
-                                    globals.insert(entry.shndx() as usize);
-                                }
-                            }
+                    if let Visibility::Default = entry.get_other() {
+                        if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
+                            globals.insert(entry.shndx() as usize);
                         }
-                        _ => { }
                     }
                 }
             }
-        }   
+        }
         globals 
     };
 
-    // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
-    // which are text (present | exec), rodata (present | noexec), data/bss (present | writable)
-    let (text_bytecount, rodata_bytecount, data_bytecount): (usize, usize, usize) = {
-        let (mut text, mut rodata, mut data) = (0, 0, 0);
-        for sec in elf_file.section_iter() {
-            let sec_typ = sec.get_type();
-            // look for .text, .rodata, .data, and .bss sections
-            if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
-                let size = sec.size() as usize;
-                if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
-                    continue; // skip non-allocated sections (they're useless)
-                }
-
-                let align = sec.align() as usize;
-                let addend = round_up_power_of_two(size, align);
-
-                // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-                let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
-                let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
-                if exec {
-                    // trace!("  Looking at sec with size {:#X} align {:#X} --> addend {:#X}", size, align, addend);
-                    text += addend;
-                }
-                else if write {
-                    // .bss sections have the same flags (write and alloc) as data, so combine them
-                    data += addend;
-                }
-                else {
-                    rodata += addend;
-                }
-            }
-        }
-        (text, rodata, data)
-    };
-
-    if log {
-        debug!("    crate {} needs {:#X} text bytes, {:#X} rodata bytes, {:#X} data bytes", module_name, text_bytecount, rodata_bytecount, data_bytecount);
-    }
-
-    // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<MappedPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Option<Arc<MappedPages>>, Option<Arc<MappedPages>>, Option<Arc<MappedPages>>) = {
-        use memory::FRAME_ALLOCATOR;
-        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
-
-        let mut allocate_pages_closure = |size_in_bytes: usize| {
-            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
-
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                // Right now we're just simply copying small sections to the new memory,
-                // so we have to map those pages to real (randomly chosen) frames first. 
-                // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
-                // and then change the page permissions (by using remap) later. 
-                active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
-            }
-            else {
-                return Err("couldn't get kernel's active page table");
-            }
-
-        };
-
-        // we must allocate these pages separately because they will have different flags later
-        (
-            if text_bytecount   > 0 { Some( Arc::new( try!( allocate_pages_closure(text_bytecount))))   } else { None }, 
-            if rodata_bytecount > 0 { Some( Arc::new( try!( allocate_pages_closure(rodata_bytecount)))) } else { None }, 
-            if data_bytecount   > 0 { Some( Arc::new( try!( allocate_pages_closure(data_bytecount))))   } else { None }
-        )
-    };
-    
-
-    // First, we need to parse all the sections and load the text and data sections
+    // We need to parse all the sections and load the text and data sections
     let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); // map section header index (shndx) to LoadedSection
 
-    // we create the new crate here so we can obtain references to it later
+    // We create the new crate here so we can obtain references to it later.
+    // The latter fields will be filled in later.
     let new_crate = Arc::new(RwLock::new(
         LoadedCrate {
-            crate_name:   crate_name, 
+            crate_name:   String::from(crate_name), 
             sections:     Vec::new(),
             text_pages:   None,
             rodata_pages: None,
@@ -530,7 +407,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         return Err(".text section had wrong flags!");
                     }
 
-                    if let Some(ref tp) = text_pages {
+                    if let Some(ref tp) = section_pages.text_pages {
                         // here: we're ready to copy the text section to the proper address
                         let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
                         if log { 
@@ -555,7 +432,6 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 SectionType::Text,
                                 demangled.no_hash,
                                 demangled.hash,
-                                Arc::downgrade(tp),
                                 text_offset,
                                 sec_size,
                                 global_sections.contains(&shndx),
@@ -584,7 +460,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         return Err(".rodata section had wrong flags!");
                     }
 
-                    if let Some(ref rp) = rodata_pages {
+                    if let Some(ref rp) = section_pages.rodata_pages {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
                         if log { 
@@ -609,7 +485,6 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 SectionType::Rodata,
                                 demangled.no_hash,
                                 demangled.hash,
-                                Arc::downgrade(rp),
                                 rodata_offset,
                                 sec_size,
                                 global_sections.contains(&shndx),
@@ -645,7 +520,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         return Err(".data section had wrong flags!");
                     }
                     
-                    if let Some(ref dp) = data_pages {
+                    if let Some(ref dp) = section_pages.data_pages {
                         // here: we're ready to copy the data/bss section to the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                         if log { 
@@ -670,7 +545,6 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 SectionType::Data,
                                 demangled.no_hash,
                                 demangled.hash,
-                                Arc::downgrade(dp),
                                 data_offset,
                                 sec_size,
                                 global_sections.contains(&shndx),
@@ -701,7 +575,7 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     }
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let Some(ref dp) = data_pages {
+                    if let Some(ref dp) = section_pages.data_pages {
                         // here: we're ready to fill the bss section with zeroes at the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                         if log { 
@@ -717,7 +591,6 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                                 SectionType::Data,
                                 demangled.no_hash,
                                 demangled.hash,
-                                Arc::downgrade(dp),
                                 data_offset,
                                 sec_size,
                                 global_sections.contains(&shndx),
@@ -743,208 +616,335 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                 continue;
             }
 
-        
         }
-    }  // end of handling PROGBITS sections: text, data, rodata, bss
-
-
-    if log {
-        debug!("=========== moving on to the relocations for module {} =========", module_name);
     }
 
+    // Now that we have loaded the section content above into the mapped pages, 
+    // we can place them into the ownership of the `LoadedCrate`. 
+    {
+        let mut new_crate_locked = new_crate.write();
+        new_crate_locked.text_pages   = section_pages.text_pages;
+        new_crate_locked.rodata_pages = section_pages.rodata_pages;
+        new_crate_locked.data_pages   = section_pages.data_pages;
+    }
 
-    // Second, we need to fix up the sections we just loaded with proper relocation info
-    for sec in elf_file.section_iter() {
-
-        if let Ok(ShType::Rela) = sec.get_type() {
-            // skip null section and any empty sections
-            let sec_size = sec.size() as usize;
-            if sec_size == 0 { continue; }
-
-            // offset is the destination 
-            use xmas_elf::sections::SectionData::Rela64;
-            use xmas_elf::symbol_table::Entry;
-            if log { trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", sec.get_name(&elf_file), sec.get_type(), sec.info()); }
-
-            // currently not using eh_frame, gcc, note, and debug sections
-            if let Ok(name) = sec.get_name(&elf_file) {
-                if  name.starts_with(".rela.eh_frame")   || 
-                    name.starts_with(".rela.note")   ||   // ignore GNU note sections
-                    name.starts_with(".rela.gcc")    ||   // ignore gcc special sections for now
-                    name.starts_with(".rela.debug")       // ignore debug special sections for now
-                {
-                    continue;
-                }
-            }
-
-            let mut target_sec_dependencies: Vec<RelocationDependency> = Vec::new();
-
-            // the target section is where we write the relocation data to.
-            // the source section is where we get the data from. 
-            // There is one target section per rela section, and one source section per entry in this rela section.
-            // The "info" field in the Rela section specifies which section is the target of the relocation.
-            
-            // check if this Rela sections has a valid target section (one that we've already loaded)
-            if let Some(target_sec) = loaded_sections.get(&(sec.info() as usize)) {
-                if let Ok(Rela64(rela_arr)) = sec.get_data(&elf_file) {
-                    for rela_entry in rela_arr {
-                        if log { 
-                            trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
-                                    rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
-                        }
-
-                        // common to all relocations for this target section: calculate the relocation destination and get the source section
-                        let dest_offset = target_sec.lock().mapped_pages_offset + rela_entry.get_offset() as usize;
-                        let dest_mapped_pages = target_sec.lock().mapped_pages.upgrade().ok_or("couldn't get MappedPages reference for target_sec's relocation")?;
-                        let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-                        let source_sec_shndx = source_sec_entry.shndx() as usize; 
-                        if log { 
-                            let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                .and_then(|s| s.get_name(&elf_file));
-                            trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
-                            // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
-                            //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
-                            //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
-                            //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
-                        }
+    Ok((new_crate, loaded_sections))
+}
 
 
-                        // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
-                        let source_sec = match loaded_sections.get(&source_sec_shndx) {
-                            Some(ss) => Ok(ss.clone()),
+/// The second stage of parsing and loading a new kernel crate, 
+/// filling in the missing relocation information in the already-loaded sections. 
+/// It also remaps the `new_crate`'s MappedPages according to each of their section permissions.
+fn perform_relocations(elf_file: &ElfFile, 
+    new_crate: &StrongCrateRef, 
+    loaded_sections: BTreeMap<usize, StrongSectionRef>,
+    kernel_mmi: &mut MemoryManagementInfo,
+    log: bool
+) -> Result<(), &'static str> {
 
-                            // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
-                            // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
-                            // At this point, there's no other way to search for the source section besides its name.
-                            None => {
-                                if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                                    const DATARELRO: &'static str = ".data.rel.ro.";
-                                    let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                        let relro_name = source_sec_name.get(DATARELRO.len() ..)
-                                            .ok_or("Couldn't get name of .data.rel.ro. section")?;
-                                        // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
-                                        relro_name
-                                    }
-                                    else {
-                                        source_sec_name
-                                    };
-                                    let demangled = demangle_symbol(source_sec_name);
+    let symtab = get_symbol_table(&elf_file)?;
 
-                                    // search for the symbol's demangled name in the kernel's symbol map
-                                    metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
-                                        .upgrade()
-                                        .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
-                                }
-                                else {
-                                    let _source_sec_header = source_sec_entry
-                                        .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                        .and_then(|s| s.get_name(&elf_file));
-                                    error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
-                                    Err("Couldn't get source section's name, needed for non-local relocation entry")
-                                }
-                            }
-                        }?;
+    // Fix up the sections that were just loaded, using proper relocation info.
+    // Iterate over every non-zero relocation section in the file
+    for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela) && sec.size() != 0) {
+        use xmas_elf::sections::SectionData::Rela64;
+        use xmas_elf::symbol_table::Entry;
+        if log { 
+            trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
+            sec.get_name(&elf_file), sec.get_type(), sec.info()); 
+        }
 
-                        let source_mapped_pages = source_sec.lock().mapped_pages.upgrade().ok_or("couldn't get MappedPages reference for source_sec's relocation")?;
-                        let source_vaddr = source_mapped_pages.as_type::<&usize>(source_sec.lock().mapped_pages_offset)? as *const _ as usize;
-
-                        // Write the actual relocation entries here
-                        // There is a great, succint table of relocation types here
-                        // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
-                        match rela_entry.get_type() {
-                            R_X86_64_32 => {
-                                let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
-                                let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
-                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                
-                                *dest_ref = source_val as u32;
-                            }
-                            R_X86_64_64 => {
-                                let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
-                                let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
-                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-                                
-                                *dest_ref = source_val as u64;
-                            }
-                            R_X86_64_PC32 => {
-                                let dest_ref: &mut u32 = try!(dest_mapped_pages.as_type_mut(dest_offset));
-                                let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
-                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-
-                                *dest_ref = source_val as u32;
-                            }
-                            R_X86_64_PC64 => {
-                                let dest_ref: &mut u64 = try!(dest_mapped_pages.as_type_mut(dest_offset));
-                                let dest_ptr = dest_ref as *mut _ as usize;
-                                let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(dest_ptr);
-                                if log { trace!("                    dest_ptr: {:#X}, source_val: {:#X} ({:?})", dest_ptr, source_val, source_sec); }
-
-                                *dest_ref = source_val as u64;
-                            }
-                            // R_X86_64_GOTPCREL => { 
-                            //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
-                            // }
-                            _ => {
-                                error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", rela_entry);
-                                return Err("found unsupported relocation type");
-                            }
-                        }
-
-                        // we only really care about tracking dependencies on other crates,
-                        // since every crate has "dependencies" on itself. 
-                        let target_dependency = RelocationDependency {
-                            section: source_sec,
-                            rel_type: rela_entry.get_type(),
-                            offset: dest_offset,
-                        };
-                        target_sec_dependencies.push(target_dependency);
-                         
-                    }
-                }
-                else {
-                    error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
-                    return Err("Found Rela section that wasn't able to be parsed as Rela64");
-                }
-
-                // add dependencies to the target section
-                target_sec.lock().dependencies.append(&mut target_sec_dependencies);
-            }
-            else {
-                error!("Skipping Rela section {:?} for target section that wasn't loaded!", sec.get_name(&elf_file));
+        // currently not using eh_frame, gcc, note, and debug sections
+        if let Ok(name) = sec.get_name(&elf_file) {
+            if  name.starts_with(".rela.eh_frame")   || 
+                name.starts_with(".rela.note")   ||   // ignore GNU note sections
+                name.starts_with(".rela.gcc")    ||   // ignore gcc special sections for now
+                name.starts_with(".rela.debug")       // ignore debug special sections for now
+            {
                 continue;
             }
         }
+
+        // the target section is where we write the relocation data to.
+        // the source section is where we get the data from. 
+        // There is one target section per rela section, and one source section per entry in this rela section.
+        // The "info" field in the Rela section specifies which section is the target of the relocation.
+            
+        // get the target section (that we should have already loaded) for this Rela section
+        let target_sec = loaded_sections.get(&(sec.info() as usize)).ok_or_else(|| {
+            error!("Target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
+            "target section was not loaded for Rela section"
+        })?; 
+
+        let rela_array = match sec.get_data(&elf_file) {
+            Ok(Rela64(rela_arr)) => rela_arr,
+            _ => {
+                error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                return Err("Found Rela section that wasn't able to be parsed as Rela64");
+            } 
+        };
+
+        // the target MappedPages and its dependencies are common to all relocations for this target section
+        let target_sec_parent_crate_ref = target_sec.lock().parent_crate.upgrade().ok_or("Couldn't get target_sec's parent_crate")?;
+        let mut target_sec_parent_crate = target_sec_parent_crate_ref.write();
+        let target_mapped_pages = target_sec.lock().mapped_pages(&target_sec_parent_crate).ok_or("couldn't get target_sec's MappedPages for relocation")?;
+        let mut target_sec_dependencies: Vec<RelocationDependency> = Vec::new();
+
+        // iterate through each relocation entry in the relocation array for the target_sec
+        for rela_entry in rela_array {
+            if log { 
+                trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                    rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
+            }
+
+            let target_offset = target_sec.lock().mapped_pages_offset + rela_entry.get_offset() as usize;
+            let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+            let source_sec_shndx = source_sec_entry.shndx() as usize; 
+            if log { 
+                let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                    .and_then(|s| s.get_name(&elf_file));
+                trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
+                // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+            }
+
+            // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
+            let source_sec = match loaded_sections.get(&source_sec_shndx) {
+                Some(ss) => Ok(ss.clone()),
+
+                // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
+                // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
+                // At this point, there's no other way to search for the source section besides its name.
+                None => {
+                    if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                        const DATARELRO: &'static str = ".data.rel.ro.";
+                        let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                            let relro_name = source_sec_name.get(DATARELRO.len() ..)
+                                .ok_or("Couldn't get name of .data.rel.ro. section")?;
+                            // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
+                            relro_name
+                        }
+                        else {
+                            source_sec_name
+                        };
+                        let demangled = demangle_symbol(source_sec_name);
+
+                        // search for the symbol's demangled name in the kernel's symbol map
+                        metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
+                            .upgrade()
+                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
+                    }
+                    else {
+                        let _source_sec_header = source_sec_entry
+                            .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                            .and_then(|s| s.get_name(&elf_file));
+                        error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
+                        Err("Couldn't get source section's name, needed for non-local relocation entry")
+                    }
+                }
+            }?;
+
+            // the source section details are specific to each relocation entry in the rela_array
+            let source_sec_parent_crate_ref = source_sec.lock().parent_crate.upgrade().ok_or("Couldn't get source_sec's parent_crate")?;
+            let source_vaddr = if Arc::ptr_eq(&target_sec_parent_crate_ref, &source_sec_parent_crate_ref) {
+                // Here, the relocation target and source are in the same crate, so use the target_sec's parent_crate reference,
+                // which was already locked, rather than trying to lock the same parent crate again, causing deadlock.
+                let source_mapped_pages = source_sec.lock().mapped_pages(&target_sec_parent_crate).ok_or("couldn't get source_sec's MappedPages (same as target_sec) for relocation")?;
+                source_mapped_pages.address_at_offset(source_sec.lock().mapped_pages_offset)
+            } else {
+                // Here, the relocation target and source are in the different crate, so use the source_sec's actual parent_crate.
+                let source_sec_parent_crate = source_sec_parent_crate_ref.write();
+                let source_mapped_pages = source_sec.lock().mapped_pages(&source_sec_parent_crate).ok_or("couldn't get source_sec's MappedPages (different from target_sec) for relocation")?;
+                source_mapped_pages.address_at_offset(source_sec.lock().mapped_pages_offset)
+            }.ok_or("couldn't get virtual address of source section")?;
+
+            // Write the actual relocation entries here
+            // There is a great, succint table of relocation types here
+            // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
+            match rela_entry.get_type() {
+                R_X86_64_32 => {
+                    let target_ref: &mut u32 = try!(target_mapped_pages.as_type_mut(target_offset));
+                    let target_ptr = target_ref as *mut _ as usize;
+                    let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
+                    if log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
+                                
+                    *target_ref = source_val as u32;
+                }
+                R_X86_64_64 => {
+                    let target_ref: &mut u64 = try!(target_mapped_pages.as_type_mut(target_offset));
+                    let target_ptr = target_ref as *mut _ as usize;
+                    let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
+                    if log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
+                                
+                    *target_ref = source_val as u64;
+                }
+                R_X86_64_PC32 => {
+                    let target_ref: &mut u32 = try!(target_mapped_pages.as_type_mut(target_offset));
+                    let target_ptr = target_ref as *mut _ as usize;
+                    let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ptr);
+                    if log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
+
+                    *target_ref = source_val as u32;
+                }
+                R_X86_64_PC64 => {
+                    let target_ref: &mut u64 = try!(target_mapped_pages.as_type_mut(target_offset));
+                    let target_ptr = target_ref as *mut _ as usize;
+                    let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ptr);
+                    if log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
+
+                    *target_ref = source_val as u64;
+                    }
+                // R_X86_64_GOTPCREL => { 
+                //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
+                // }
+                _ => {
+                    error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", rela_entry);
+                    return Err("found unsupported relocation type");
+                }
+            }
+
+            // we only really care about tracking dependencies on other crates,
+            // since every crate has "dependencies" on itself. 
+            let target_dependency = RelocationDependency {
+                section: source_sec,
+                rel_type: rela_entry.get_type(),
+                offset: target_offset,
+            };
+            target_sec_dependencies.push(target_dependency);          
+        }
+
+        // add dependencies to the target section
+        target_sec.lock().dependencies.append(&mut target_sec_dependencies);
     }
 
-    
-    // since we initially mapped the pages as writable, we need to remap them properly according to each section
+
+    // Two final remaining tasks before the new crate is ready to go:
+    // 1) remapping each section's mapped pages to the proper permission bits, since we initially mapped them all as writable
+    // 2) give the new crate ownership of the loaded sections
     if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-        if let Some(ref tp) = text_pages { 
-            try!(active_table.remap(tp, EntryFlags::PRESENT)); // present and executable (not no_execute)
+        let mut new_crate_locked = new_crate.write();
+        // since we initially mapped the pages as writable, we need to remap them properly according to each section
+        if let Some(ref mut tp) = new_crate_locked.text_pages { 
+            try!(tp.remap(active_table, EntryFlags::PRESENT)); // present and executable (not no_execute)
         }
-        if let Some(ref rp) = rodata_pages { 
-            try!(active_table.remap(rp, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
+        if let Some(ref mut rp) = new_crate_locked.rodata_pages { 
+            try!(rp.remap(active_table, EntryFlags::PRESENT | EntryFlags::NO_EXECUTE)); // present (just readable)
         }
-        if let Some(ref dp) = data_pages { 
-            try!(active_table.remap(dp, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
+        if let Some(ref mut dp) = new_crate_locked.data_pages { 
+            try!(dp.remap(active_table, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE)); // read/write
         }
+
+        let (_keys, values): (Vec<usize>, Vec<StrongSectionRef>) = loaded_sections.into_iter().unzip();
+        new_crate_locked.sections = values;
     }
     else {
         return Err("couldn't get kernel's active page table");
     }
-    
-    // extract just the section refs from the loaded_section map
-    let (_keys, values): (Vec<usize>, Vec<StrongSectionRef>) = loaded_sections.into_iter().unzip();
 
+    Ok(())
+}
+
+
+/// Allocates enough space for the sections that are found in the given `ElfFile`.
+/// Returns a tuple of `MappedPages` for the .text, .rodata, and .data/.bss sections, in that order.
+fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementInfo) 
+    -> Result<SectionPages, &'static str> 
+{
+    // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
+    // which are text (present | exec), rodata (present | noexec), data/bss (present | writable)
+    let (text_bytecount, rodata_bytecount, data_bytecount): (usize, usize, usize) = {
+        let (mut text, mut rodata, mut data) = (0, 0, 0);
+        for sec in elf_file.section_iter() {
+            let sec_typ = sec.get_type();
+            // look for .text, .rodata, .data, and .bss sections
+            if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
+                let size = sec.size() as usize;
+                if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
+                    continue; // skip non-allocated sections (they're useless)
+                }
+
+                let align = sec.align() as usize;
+                let addend = round_up_power_of_two(size, align);
+    
+                // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
+                let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
+                let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
+                if exec {
+                    // trace!("  Looking at sec with size {:#X} align {:#X} --> addend {:#X}", size, align, addend);
+                    text += addend;
+                }
+                else if write {
+                    // .bss sections have the same flags (write and alloc) as data, so combine them
+                    data += addend;
+                }
+                else {
+                    rodata += addend;
+                }
+            }
+        }
+        (text, rodata, data)
+    };
+
+    // create a closure here to allocate N contiguous virtual memory pages
+    // and map them to random frames as writable, returns Result<MappedPages, &'static str>
+    let (text_pages, rodata_pages, data_pages): (Option<MappedPages>, Option<MappedPages>, Option<MappedPages>) = {
+        use memory::FRAME_ALLOCATOR;
+        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+
+        let mut allocate_pages_closure = |size_in_bytes: usize| {
+            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
+
+            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                // Right now we're just simply copying small sections to the new memory,
+                // so we have to map those pages to real (randomly chosen) frames first. 
+                // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
+                // and then change the page permissions (by using remap) later. 
+                active_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
+            }
+            else {
+                return Err("couldn't get kernel's active page table");
+            }
+    
+        };
+
+        // we must allocate these pages separately because they will have different flags later
+        (
+            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount).ok()   } else { None }, 
+            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount).ok() } else { None }, 
+            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount).ok()   } else { None }
+        )
+    };
+
+    Ok(
+        SectionPages {
+            text_pages,
+            rodata_pages,
+            data_pages,
+            // text_pages:   text_pages  .map(|tp| Arc::new(Mutex::new(tp))), 
+            // rodata_pages: rodata_pages.map(|rp| Arc::new(Mutex::new(rp))),
+            // data_pages:   data_pages  .map(|dp| Arc::new(Mutex::new(dp))),
+        }
+    )
+}
+
+
+/// Returns a reference to the symbol table in the given `ElfFile`.
+fn get_symbol_table<'e>(elf_file: &'e ElfFile) 
+    -> Result<&'e [xmas_elf::symbol_table::Entry64], &'static str>
     {
-        let mut new_crate_locked = new_crate.write();
-        new_crate_locked.sections     = values;
-        new_crate_locked.text_pages   = text_pages;
-        new_crate_locked.rodata_pages = rodata_pages;
-        new_crate_locked.data_pages   = data_pages;
+    use xmas_elf::sections::SectionData::SymbolTable64;
+    let symtab_data = elf_file.section_iter()
+        .filter(|sec| sec.get_type() == Ok(ShType::SymTab))
+        .next()
+        .ok_or("no symtab section")
+        .and_then(|s| s.get_data(&elf_file));
+
+    match symtab_data {
+        Ok(SymbolTable64(symtab)) => Ok(symtab),
+        _ => {
+            Err("no symbol table found. Was file stripped?")
+        }
     }
-    Ok(new_crate)
 }
