@@ -16,7 +16,7 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
-use metadata::{LoadedSection, StrongSectionRef, LoadedCrate, SectionType, add_crate};
+use metadata::{LoadedSection, StrongSectionRef, LoadedCrate, SectionType};
 
 
 /// Decides which parsing technique to use, either the symbol file or the actual binary file.
@@ -74,7 +74,7 @@ pub fn parse_nano_core(
             parse_nano_core_binary(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
         };
 
-        let new_syms = add_crate(new_crate, log);
+        let new_syms = super::DEFAULT_CRATE_NAMESPACE.add_crate(new_crate, log);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
 

@@ -33,6 +33,11 @@ path = "../kernel_config"
 default-features = false
 version = "0.3.7"
 
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.memory]
 path = "../memory"
 

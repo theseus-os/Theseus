@@ -13,6 +13,7 @@ extern crate kernel_config;
 extern crate goblin;
 extern crate util;
 extern crate rustc_demangle;
+extern crate owning_ref;
 
 
 use core::ops::DerefMut;
@@ -32,11 +33,24 @@ use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, ModuleArea, Frame, PageTable
 
 pub mod parse_nano_core;
 pub mod metadata;
+pub mod namespace;
+
+use self::namespace::*;
 use self::metadata::*;
 
 // Can also try this crate: https://crates.io/crates/goblin
 // ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
+
+lazy_static! {
+    /// The initial `CrateNamespace` that all crates are added to by default,
+    /// unless otherwise specified for crate swapping purposes.
+    static ref DEFAULT_CRATE_NAMESPACE: CrateNamespace = CrateNamespace::default();
+}
+
+pub fn get_default_namespace() -> &'static CrateNamespace {
+    &DEFAULT_CRATE_NAMESPACE
+}
 
 /// Parses an elf executable file as a slice of bytes starting at the given `MappedPages` mapping.
 /// Consumes the given `MappedPages`, which automatically unmaps it at the end of this function. 
@@ -129,7 +143,7 @@ pub fn load_kernel_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManagementI
     };
 
     let new_crate = parse_elf_kernel_crate(temp_module_mapping, size, module.name(), kernel_mmi, log)?;
-    let new_syms = metadata::add_crate(new_crate, log);
+    let new_syms = DEFAULT_CRATE_NAMESPACE.add_crate(new_crate, log);
     info!("loaded new crate module: {}, {} new symbols.", module.name(), new_syms);
     Ok(new_syms)
     
@@ -157,8 +171,6 @@ pub fn load_application_crate(module: &ModuleArea, kernel_mmi: &mut MemoryManage
     } 
     
     debug!("load_application_crate: trying to load \"{}\" application module", module.name());
-
-
 
     let size = module.size();
 
@@ -732,7 +744,7 @@ fn perform_relocations(elf_file: &ElfFile,
                         let demangled = demangle_symbol(source_sec_name);
 
                         // search for the symbol's demangled name in the kernel's symbol map
-                        metadata::get_symbol_or_load(&demangled.no_hash, kernel_mmi)
+                        DEFAULT_CRATE_NAMESPACE.get_symbol_or_load(&demangled.no_hash, kernel_mmi)
                             .upgrade()
                             .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                     }
