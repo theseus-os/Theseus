@@ -55,7 +55,6 @@ macro_rules! try_opt_err {
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
-    trace!("I'm a;lsdfh aoijf oaiwje foiawjef");
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
@@ -143,6 +142,7 @@ struct Drawer {
 
 impl Drawer {
     fn display(&mut self, start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
+        //TODO: add size limitation
         self.buffer().chars[start_line..end_line].clone_from_slice(buffer);
     }
 

@@ -37,6 +37,8 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
+extern crate frame_buffer_text;
+
 #[macro_use] extern crate console;
 
 
@@ -144,6 +146,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
+    //init font
+    let rs = frame_buffer_text::font::init();
+    if rs.is_ok() {
+         trace!("frame_buffer initialized.");
+    } else {
+         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
 
     // //init frame_buffer
     let rs = frame_buffer::init();
@@ -152,6 +161,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     } else {
          debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
     }
+
+   
+
     //let rs = frame_buffer_3d::init();
     //if rs.is_ok() {
     //     trace!("frame_buffer initialized.");

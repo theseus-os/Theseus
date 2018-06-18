@@ -119,10 +119,8 @@ impl Terminal {
 
     /// Print function that will put a ConsoleOutputEvent into the queue if we ever need it
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
-        trace!("Wenqiu:print to terminal");
         let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s, Some(self.term_ref)));
         self.term_print_producer.enqueue(output_event);
-        trace!("Wenqiu:print to terminal");
 
         return Ok(());
     }
@@ -565,7 +563,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             _ => { continue; }
         };
 
-        trace!("Wenqiu:consumer.peek");
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
                 let _result = print_to_console("\nSmoothly exiting console main loop.\n".to_string());
