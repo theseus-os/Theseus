@@ -5,6 +5,7 @@ description = "The main driver of Theseus. Controls the loading and initializati
 version = "0.1.0"
 
 [dependencies]
+x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 
 [dependencies.log]
 default-features = false

@@ -39,6 +39,8 @@ extern crate scheduler;
 extern crate diagnostics;
 #[macro_use] extern crate console;
 extern crate exceptions_full;
+extern crate x86_64;
+
 
 
 #[cfg(target_feature = "sse2")]
@@ -57,6 +59,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use x86_64::instructions::rdpmc;
 
 
 
@@ -215,15 +218,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
-    
-    diagnostics::init();
-    
-    if let Ok(mut e) = diagnostics::Counter::new("LONGEST_LAT_CACHE.MISS") {
-        e.start();
-
-        debug!("Here's how many branch instructions were retired: {}!", e.get_count_since_start().unwrap());
-    }
-    
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)

@@ -1,7 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 name = "diagnostics"
-description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86."
+description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86 Nehalem and above."
 version = "0.1.0"
 
 [dependencies]
@@ -33,7 +33,7 @@ path = "../../libs/atomic_linked_list"
 path = "../task"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]
 
 [dependencies.raw-cpuid]
 git = "https://github.com/gz/rust-cpuid"
