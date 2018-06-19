@@ -161,11 +161,11 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(feature = "loadable")] 
     {
         let core_module = try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module"));
-        let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(core_module, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
         let captain_module = try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module"));
-        let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(captain_module, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
 
@@ -179,7 +179,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use memory::{MappedPages, MemoryManagementInfo};
 
         let section = try_exit!(
-            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", kernel_mmi_ref.lock().deref_mut())
+            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", None, kernel_mmi_ref.lock().deref_mut(), false)
             .upgrade()
             .ok_or("no symbol: captain::init")
         );
@@ -242,7 +242,7 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
         {
             type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
             let section = kernel_mmi_ref.and_then(|kernel_mmi| {
-                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_handling::panic_wrapper", kernel_mmi.lock().deref_mut()).upgrade()
+                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_handling::panic_wrapper", None, kernel_mmi.lock().deref_mut(), false).upgrade()
             }).ok_or("Couldn't get symbol: \"panic_handling::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"

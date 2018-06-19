@@ -299,7 +299,7 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
     let app_crate = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_application_crate(module, kernel_mmi.deref_mut(), false)?
+        mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), false)?
     };
 
     let task_name = task_name.unwrap_or(app_crate.read().crate_name.clone());
@@ -413,7 +413,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
                         )
                     };
 
-                    try!(mod_mgmt::parse_elf_executable(temp_module_mapping, module.size()))
+                    try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
                     
                     // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
                 };

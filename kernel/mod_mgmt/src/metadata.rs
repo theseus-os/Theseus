@@ -3,16 +3,14 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
-use core::ops::{Deref, DerefMut};
-use spin::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use core::ops::{Deref};
+use core::slice::Iter;
+use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
-use memory::{MappedPages, VirtualMemoryArea};
+use memory::MappedPages;
 
-use owning_ref::{ArcRef, OwningRef, RwLockReadGuardRef, RwLockWriteGuardRefMut};
-use namespace::*;
-
-
+use super::SymbolMap;
 
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
@@ -86,17 +84,6 @@ impl CrateType {
 
 
 
-pub struct ElfProgramSegment {
-    /// the VirtualMemoryAddress that will represent the virtual mapping of this Program segment.
-    /// Provides starting virtual address, size in memory, mapping flags, and a text description.
-    pub vma: VirtualMemoryArea,
-    /// the offset of this segment into the file.
-    /// This plus the physical address of the Elf file is the physical address of this Program segment.
-    pub offset: usize,
-}
-
-
-
 
 /// Represents a single crate object file that has been loaded into the system.
 #[derive(Debug)]
@@ -127,34 +114,49 @@ impl LoadedCrate {
             sec.is_text() && sec.name == func_name
         }).next().cloned()
     }
+}
 
-    /// Returns a map containing all of this crate's global symbols 
-    pub fn global_symbol_map(&self) -> SymbolMap {
-        self.symbol_map(|sec| sec.global)
-    }
 
-    /// Returns a map containing all of this crate's symbols,
-    /// filtered to include only `LoadedSection`s that satisfy the given predicate
-    /// (if the predicate returns true for a given section, then it is included in the map).
-    pub fn symbol_map<F>(&self, predicate: F) -> SymbolMap 
-        where F: Fn(&LoadedSection) -> bool
-    {
-        let mut map: SymbolMap = BTreeMap::new();
-        for sec in self.sections.iter().filter(|sec| predicate(sec.lock().deref())) {
-            let key = sec.lock().name.clone();
-            if let Some(old_val) = map.insert(key.clone(), Arc::downgrade(&sec)) {
-                if key.ends_with("_LOC") || self.crate_name == "nano_core" {
-                    // ignoring these special cases currently
-                }
-                else {
-                    warn!("symbol_map(): crate \"{}\" had duplicate section for symbol \"{}\", old: {:?}, new: {:?}", 
-                        self.crate_name, key, old_val.upgrade(), sec);
-                }
+/// Returns a map containing all of the global symbols 
+/// in the given section iterator (if Some), otherwise in this crate's sections list.
+pub fn global_symbol_map<'a, I>(sections: I, crate_name: &str) -> SymbolMap 
+    where I: IntoIterator<Item = &'a StrongSectionRef> 
+{
+    symbol_map(sections, crate_name, |sec| sec.global)
+}
+
+
+/// Returns a map containing all symbols filtered to include only `LoadedSection`s 
+/// that satisfy the given predicate
+/// (if the predicate returns true for a given section, then it is included in the map).
+/// 
+/// The symbols come from the sections in the given section iterator (if Some), 
+/// otherwise they come from this crate's sections list.
+/// 
+/// See [`global_symbol_map`](#method.global_system_map) for an example.
+pub fn symbol_map<'a, I, F>(
+    sections: I,
+    crate_name: &str,
+    predicate: F,
+) -> SymbolMap 
+    where F: Fn(&LoadedSection) -> bool, 
+            I: IntoIterator<Item = &'a StrongSectionRef> 
+{
+    let mut map: SymbolMap = BTreeMap::new();
+    for sec in sections.into_iter().filter(|sec| predicate(sec.lock().deref())) {
+        let key = sec.lock().name.clone();
+        if let Some(old_val) = map.insert(key.clone(), Arc::downgrade(&sec)) {
+            if key.ends_with("_LOC") || crate_name == "nano_core" {
+                // ignoring these special cases currently
+            }
+            else {
+                warn!("symbol_map(): crate \"{}\" had duplicate section for symbol \"{}\", old: {:?}, new: {:?}", 
+                    crate_name, key, old_val.upgrade(), sec);
             }
         }
-
-        map
     }
+
+    map
 }
 
 
@@ -231,36 +233,6 @@ impl LoadedSection {
             typ, name, hash, mapped_pages_offset, size, global, parent_crate, dependencies
         }
     }
-
-
-    /// Obtains a read-only lock to to this section's parent `LoadedCrate`,
-    /// if it exists, and returns an immutable reference to it.
-    pub fn parent_crate<'a>(&'a self) -> Option<OwningRef<StrongCrateRef, LoadedCrate>> {
-
-        let oref = ArcRef::new(self.parent_crate.upgrade().unwrap());
-
-            // .map(|pc_arc| pc_arc.deref());
-
-        
-        // RwLockReadGuardRef::new()
-        // let r = OwningRef::new()
-        //     .map(|pc_arc| {
-        //         OwningRef::new(pc_arc).map(|a| a.read()) 
-        //     });
-
-
-        None
-    }
-
-    /// Obtains a writable lock to to this section's parent `LoadedCrate`,
-    /// if it exists, and returns a mutable reference to it.
-    pub fn parent_crate_mut(&self) -> Option<OwningRef<StrongCrateRef, LoadedCrate>> {
-        // self.parent_crate.upgrade().map(|pc_arc| {
-        //     OwningRef::new(pc_arc).map(|a| a.write().deref_mut()) 
-        // })
-        None
-    }
-
 
     /// Returns a reference to the `MappedPages` that covers this `LoadedSection`.
     /// Because that `MappedPages` object is owned by this `LoadedSection`'s `parent_crate`,

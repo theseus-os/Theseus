@@ -2,7 +2,6 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
-
 use core::ops::DerefMut;
 use alloc::{Vec, String};
 use alloc::arc::Arc;
@@ -15,7 +14,6 @@ use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-
 use metadata::{LoadedSection, StrongSectionRef, LoadedCrate, SectionType};
 
 
@@ -28,12 +26,13 @@ const PARSE_NANO_CORE_SYMBOL_FILE: bool = true;
 // Parses the nano_core module that represents the already loaded (and currently running) nano_core code.
 // Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 pub fn parse_nano_core(
-    kernel_mmi: &mut MemoryManagementInfo, 
+    kernel_mmi:   &mut MemoryManagementInfo, 
     text_pages:   MappedPages, 
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
-    log: bool
+    verbose_log: bool
 ) -> Result<usize, &'static str> {
+    let crate_name = String::from("nano_core");
     debug!("parse_nano_core: trying to load and parse the nano_core file");
     let module = try!(get_module("__k_nano_core").ok_or("Couldn't find module called __k_nano_core"));
     use kernel_config::memory::address_is_page_aligned;
@@ -74,7 +73,9 @@ pub fn parse_nano_core(
             parse_nano_core_binary(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
         };
 
-        let new_syms = super::DEFAULT_CRATE_NAMESPACE.add_crate(new_crate, log);
+        let default_namespace = super::get_default_namespace();
+        let new_syms = default_namespace.add_symbols(&new_crate.read().sections, &crate_name, verbose_log);
+        default_namespace.crate_tree.lock().insert(crate_name, new_crate);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
 
@@ -92,7 +93,7 @@ pub fn parse_nano_core(
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
-pub fn parse_nano_core_symbol_file(
+fn parse_nano_core_symbol_file(
     mapped_pages: MappedPages, 
     text_pages:   MappedPages, 
     rodata_pages: MappedPages, 
@@ -368,7 +369,6 @@ fn parse_nano_core_binary(
     };
     let symtab = try!(symtab_data);
     // debug!("symtab: {:?}", symtab);
-
     
     // find the .text, .data, and .rodata sections
     let mut text_shndx:   Option<usize> = None;
