@@ -40,6 +40,7 @@ extern crate frame_buffer;
 extern crate frame_buffer_text;
 
 #[macro_use] extern crate console;
+extern crate exceptions_full;
 
 
 #[cfg(target_feature = "sse2")]
@@ -81,7 +82,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(feature = "mirror_serial")]
     {
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        logger::mirror_to_vga(captain::mirror_to_vga_cb);
+        logger::mirror_to_vga(mirror_to_vga_cb);
     }
     // at this point, we no longer *need* to use println_raw, because we can see the logs,
     // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
@@ -103,7 +104,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate syscall stack")?
         )
     };
-    interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
+    let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // init other featureful (non-exception) interrupt handlers
     // interrupts::init_handlers_pic();
@@ -117,6 +118,27 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     
     // create the initial `Task`, i.e., task_zero
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
+
+    // after we've initialized the task subsystem, we can use better exception handlers
+    exceptions_full::init(idt);
+
+    //init font
+    //TODO check framebuffer init before using it
+    let rs = frame_buffer_text::font::init();
+    if rs.is_ok() {
+         trace!("frame_buffer text initialized.");
+    } else {
+         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
+
+    // //init frame_buffer
+    let rs = frame_buffer::init();
+    if rs.is_ok() {
+         trace!("frame_buffer initialized.");
+    } else {
+         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+    }
+
 
     // initialize the kernel console
     let console_queue_producer = console::init()?;
@@ -145,32 +167,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
         }
     }
-
-    //init font
-    let rs = frame_buffer_text::font::init();
-    if rs.is_ok() {
-         trace!("frame_buffer initialized.");
-    } else {
-         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
-
-    // //init frame_buffer
-    let rs = frame_buffer::init();
-    if rs.is_ok() {
-         trace!("frame_buffer initialized.");
-    } else {
-         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
-
-   
-
-    //let rs = frame_buffer_3d::init();
-    //if rs.is_ok() {
-    //     trace!("frame_buffer initialized.");
-    //} else {
-    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    //}
-
 
     // testing nic
     // TODO: remove this (@Ramla)

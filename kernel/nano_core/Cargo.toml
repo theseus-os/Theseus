@@ -5,9 +5,9 @@ version = "0.1.0"
 
 
 [dependencies]
+spin = "0.4.5"
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
 multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
-once = "0.3.2"
 rlibc = "1.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
@@ -45,8 +45,8 @@ path = "../mod_mgmt"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
@@ -63,7 +63,6 @@ path = "../vga_buffer"
 
 [features]
 loadable = []
-mirror_serial = []
 
 
 [lib]

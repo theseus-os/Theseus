@@ -96,6 +96,14 @@ pub fn add_crate(new_crate: LoadedCrate, log_replacements: bool) -> usize {
 }
 
 
+/// Crate names must be only alphanumeric characters, an underscore, or a dash. 
+/// See: <https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/>
+fn is_valid_crate_name_char(c: char) -> bool {
+    char::is_alphanumeric(c) || 
+    c == '_' || 
+    c == '-'
+}
+
 
 fn get_symbol_internal(demangled_full_symbol: &str) -> Option<Weak<LoadedSection>> {
     SYSTEM_MAP.lock().get(demangled_full_symbol).cloned()
@@ -132,12 +140,12 @@ pub fn get_symbol_or_load(demangled_full_symbol: &str, kernel_mmi: &mut MemoryMa
     // such as "my_crate::foo". 
     // If "foo()" was marked no_mangle, then we don't know which crate to load. 
     if let Some(crate_dependency_name) = demangled_full_symbol.split("::").next() {
-
-        // we need to filter out any leading characters that aren't part of the crate name (aren't alphanumeric)
-        // For example, a symbol could be "<my_crate::MyStruct as XYZ>::foo", and we need to get "my_crate", not "<my_crate"
+        // Get the last word right before the first "::", which handles symbol names like:
+        // <*const T as core::fmt::Debug>::fmt   -->  "core" 
+        // <alloc::boxed::Box<T>>::into_unique   -->  "alloc"
         let crate_dependency_name = crate_dependency_name
-            .find(char::is_alphanumeric)
-            .and_then(|start|  crate_dependency_name.get(start .. ))
+            .rsplit(|c| !is_valid_crate_name_char(c))
+            .next() // the first element of the iterator (last element before the "::")
             .unwrap_or(crate_dependency_name); // if we can't parse it, just stick with the original crate name
 
 

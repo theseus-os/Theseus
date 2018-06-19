@@ -15,6 +15,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
+extern crate spin;
 extern crate multiboot2;
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
@@ -26,7 +27,7 @@ extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate apic;
-extern crate exceptions;
+extern crate exceptions_early;
 extern crate captain;
 extern crate panic_handling;
 
@@ -43,10 +44,21 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
+use alloc::arc::Arc;
+use spin::Once;
 use x86_64::structures::idt::LockedIdt;
+use memory::MappedPages;
+
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
+/// This is no longer used after interrupts are set up properly, it's just a failsafe.
 static EARLY_IDT: LockedIdt = LockedIdt::new();
+
+/// References to the kernel's text, rodata, and data mapped pages,
+/// which we hold here because if they were accidentally dropped, the OS would triple fault
+/// beacuse they contain the code/data currently being run.
+/// These aren't needed for regular proper operation, they're only a failsafe.
+static NANO_CORE_PAGES: Once<(Arc<MappedPages>, Arc<MappedPages>, Arc<MappedPages>)> = Once::new();
 
 
 
@@ -80,7 +92,7 @@ fn shutdown(msg: &'static str) -> ! {
 /// This function does the following things: 
 ///
 /// * Bootstraps the OS, including [logging](../logger/index.html) 
-///   and basic [exception handlers](../exceptions/fn.init_early_exceptions.html)
+///   and basic early [exception handlers](../exceptions_early/fn.init.html)
 /// * Sets up basic [virtual memory](../memory/fn.init.html)
 /// * Initializes the [state_store](../state_store/index.html) module
 /// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
@@ -106,7 +118,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions::init_early_exceptions(&EARLY_IDT);
+    exceptions_early::init(&EARLY_IDT);
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
@@ -123,6 +135,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
+
+    // save references to the kernel's currently running text, rodata, and data sections
+    let text_mapped_pages   = Arc::new(text_mapped_pages);
+    let rodata_mapped_pages = Arc::new(rodata_mapped_pages);
+    let data_mapped_pages   = Arc::new(data_mapped_pages);
+    NANO_CORE_PAGES.call_once(|| (text_mapped_pages.clone(), rodata_mapped_pages.clone(), data_mapped_pages.clone()));
 
 
     // now that we have virtual memory, including a heap, we can create basic things like state_store
