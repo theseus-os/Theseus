@@ -4,7 +4,6 @@
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
 use core::ops::{Deref};
-use core::slice::Iter;
 use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};

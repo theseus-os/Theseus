@@ -592,7 +592,6 @@ impl CrateNamespace {
         }
 
         Ok(PartiallyLoadedCrate {
-            temp_module_mapping: mapped_pages,
             new_crate: new_crate,
             loaded_sections: loaded_sections,
             elf_file: elf_file,
@@ -1003,7 +1002,6 @@ fn is_valid_crate_name_char(c: char) -> bool {
 
 
 struct PartiallyLoadedCrate<'e> {
-    temp_module_mapping: &'e MappedPages,
     loaded_sections: BTreeMap<usize, StrongSectionRef>,
     elf_file: ElfFile<'e>,
     new_crate: StrongCrateRef,

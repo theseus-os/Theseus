@@ -54,13 +54,6 @@ use memory::MappedPages;
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
-/// References to the kernel's text, rodata, and data mapped pages,
-/// which we hold here because if they were accidentally dropped, the OS would triple fault
-/// beacuse they contain the code/data currently being run.
-/// These aren't needed for regular proper operation, they're only a failsafe.
-static NANO_CORE_PAGES: Once<(Arc<MappedPages>, Arc<MappedPages>, Arc<MappedPages>)> = Once::new();
-
-
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
@@ -68,19 +61,19 @@ macro_rules! try_exit {
     ($expr:expr) => (match $expr {
         Ok(val) => val,
         Err(err_msg) => {
-            $crate::shutdown(err_msg);
+            $crate::shutdown(format_args!("{}", err_msg));
         }
     });
     ($expr:expr,) => (try!($expr));
 }
 
 
-/// Shuts down Theseus and prints the given string.
-fn shutdown(msg: &'static str) -> ! {
+/// Shuts down Theseus and prints the given formatted arguuments.
+fn shutdown(msg: core::fmt::Arguments) -> ! {
     warn!("Theseus is shutting down, msg: {}", msg);
 
     // TODO: handle shutdowns properly with ACPI commands
-    panic!(msg);
+    panic!("{}", msg);
 }
 
 
@@ -136,25 +129,24 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
-    // save references to the kernel's currently running text, rodata, and data sections
-    // let text_mapped_pages   = Arc::new(text_mapped_pages);
-    // let rodata_mapped_pages = Arc::new(rodata_mapped_pages);
-    // let data_mapped_pages   = Arc::new(data_mapped_pages);
-    // NANO_CORE_PAGES.call_once(|| (text_mapped_pages.clone(), rodata_mapped_pages.clone(), data_mapped_pages.clone()));
-
-
     // now that we have virtual memory, including a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
-    println_raw!("nano_core_start(): initialized state store."); 
-    
+    println_raw!("nano_core_start(): initialized state store.");     
 
-    // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
-    // since we need it to load and run applications as crates in the kernel
-    {
-        println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
-        // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
+    // Parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
+    // since we need it to load and run applications as crates in the kernel.
+    println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
+    match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
+        Ok(_new_syms) => {
+            // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
+        }
+        Err((msg, mapped_pages)) => {
+            // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
+            // we have to make sure these mapped_pages aren't dropped.
+            core::mem::forget(mapped_pages);
+            shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
+        }
     }
     
     // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
