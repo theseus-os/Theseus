@@ -1,5 +1,7 @@
 #![no_std]
 #![feature(alloc)]
+// used by the vga buffer
+
 extern crate keycodes_ascii;
 #[macro_use] extern crate vga_buffer;
 extern crate spin;
@@ -17,8 +19,8 @@ extern crate memory;
 
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
-use console_types::{ConsoleEvent, ConsoleOutputEvent};
-use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
+use console_types::{ConsoleEvent};
+use vga_buffer::{VgaBuffer};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;
@@ -42,16 +44,31 @@ macro_rules! print {
     });
 }
 
+/// Queues up the given string to be printed out to the default kernel terminal.
+/// If no terminals have been initialized yet, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
+    if let Some(kernel_term) = RUNNING_TERMINALS.lock().get_mut(0) {
+        // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
+        kernel_term.push_to_stdout(s.into());
+        Ok(())
+    }
+    else {
+        print_raw!("[RAW] {}", s.into());
+        Ok(())
+    }
+}
+
+use core::fmt;
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
+/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
+pub fn print_to_console_args(fmt_args: fmt::Arguments) {
+    let _result = print_to_console(format!("{}", fmt_args));
+}
+
 
 lazy_static! {
     static ref RUNNING_TERMINALS: Mutex<Vec<Terminal>> = Mutex::new(Vec::new());
 }
-
-// Variables for the vga buffer cursor
-const DEFAULT_X_POS: u16 = 13;
-const DEFAULT_Y_POS: u16 = 12;
-const VGA_BUFFER_WIDTH: u16 = 80;
-const VGA_BUFFER_HEIGHT: u16= 24;
 
 // Defines the max number of terminals that can be running
 const MAX_TERMS: usize = 9;
@@ -68,30 +85,51 @@ struct CommandStruct {
 pub struct Terminal {
     /// The terminal's own vga buffer that it displays to
     vga_buffer: VgaBuffer,
-    /// The terminal's print producer queue that it pushes output events to that will later be handled by the main loop
-    term_print_producer: DFQueueProducer<ConsoleEvent>,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
     console_input_string: String,
+    /// Vector that stores the history of commands that the user has entered
+    command_history: Vec<String>,
+    /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
+    /// ex. if the user has pressed up twice and down once, then command shift = # ups - # downs = 1 (cannot be negative)
+    history_index: usize,
     /// The string that stores the user's keypresses if a command is currently running
     console_buffer_string: String,
     /// Variable that stores the task id of any application manually spawned from the terminal
     current_task_id: usize,
-    /// The leftmost position in the vga buffer that the cursor may travel (calculated via row * vga buffer width + column)
-    max_left_pos: u16,
-    /// The rightmost position in the vga buffer that the cursor may travel (calculated via row * vga buffer width + column)
-    text_offset: u16, 
-    /// The current position in the vga buffer (calculated via row * vga buffer width + column)
-    cursor_pos: u16,
     /// The string that is prompted to the user (ex. kernel_term~$)
     prompt_string: String,
+    /// The console's standard output buffer to store what the terminal instance and its child processes output
+    stdout_buffer: String,
+    /// The console's standard input buffer to store what the user inputs into the terminal application
+    stdin_buffer: String,
+    /// The console's standard error buffer to store any errors logged by the program
+    stderr_buffer: String,
+    /// The terminal's scrollback buffer which stores a string to be displayed by the VGA buffer
+    scrollback_buffer: String,
+    /// Indicates whether the vga buffer is displaying the last part of the scrollback buffer slice
+    is_scroll_end: bool,
+    /// The starting index of the scrollback buffer string slice that is currently being displayed on the vga buffer
+    scroll_start_idx: usize,
+    /// The ending index of the scrollback buffer string slice that is currently being displayed on the vga buffer
+    scroll_end_idx: usize,
+    /// Indicates the rightmost position of the cursor on the vga buffer (i.e. one more than the position of the last non_whitespace character
+    /// being displayed on the vga buffer)
+    /// The x and y coordinates on the vga buffer can be calculated as:
+    /// x = absolute_cursor_pos % VGA BUFFER WIDTH
+    /// y = asolute_cursor_pos / VGA BUFFER WIDTH
+    absolute_cursor_pos: usize,
+    /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
+    /// absolute_cursor_pos - left shift will be the position on the vga buffer where the cursor will be displayed
+    left_shift: usize,
+
 }
  
 /// Terminal Structure that allows multiple terminals to be individually run
 impl Terminal {
     /// Creates a new terminal object
-    fn new(dfqueue_consumer: &DFQueueConsumer<ConsoleEvent>, ref_num: usize) -> Terminal {
+    fn new(ref_num: usize) -> Terminal {
         let prompt_string: String;
         if ref_num == 1 {
             prompt_string = "kernel:~$ ".to_string();
@@ -102,26 +140,242 @@ impl Terminal {
         Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            term_print_producer: dfqueue_consumer.obtain_producer(),
             vga_buffer: VgaBuffer::new(),
             console_input_string: String::new(),
+            command_history: Vec::new(),
+            history_index: 0,
             console_buffer_string: String::new(),
-            current_task_id: 0,
-            // track the cursor position and bounds 
-            max_left_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
-            text_offset: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS, // this is rightmost position that the cursor can travel                // debug!("start here");
-
-            cursor_pos: DEFAULT_Y_POS * VGA_BUFFER_WIDTH + DEFAULT_X_POS,
+            current_task_id: 0,              
             prompt_string: prompt_string,
+            stdout_buffer: String::new(),
+            stdin_buffer: String::new(),
+            stderr_buffer: String::new(),
+            scrollback_buffer: String::new(),
+            scroll_start_idx: 0,
+            scroll_end_idx: 0,
+            is_scroll_end: true,
+            absolute_cursor_pos: 0, 
+            left_shift: 0,
         }
     }
     
 
-    /// Print function that will put a ConsoleOutputEvent into the queue if we ever need it
+    /// Printing function for use within the terminal crate
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
-        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s, Some(self.term_ref)));
-        self.term_print_producer.enqueue(output_event);
-        return Ok(());
+        self.scrollback_buffer.push_str(&s);
+        Ok(())
+    }
+
+    /// Pushes a string to the standard out buffer and the scrollback buffer with a new line
+    fn push_to_stdout(&mut self, s: String) {
+        self.stdout_buffer.push_str(&s);
+        self.scrollback_buffer.push_str(&s);
+    }
+
+    /// Pushes a string to the standard error buffer and the scrollback buffer with a new line
+    fn push_to_stderr(&mut self, s: String) {
+        self.stderr_buffer.push_str(&s);
+        self.scrollback_buffer.push_str(&s);
+    }
+    /// Pushes a string to the standard in buffer and the scrollback buffer with a new line
+    fn push_to_stdin(&mut self, s: String) {
+        let buffer_len = self.stdin_buffer.len();
+        self.stdin_buffer.insert_str(buffer_len - self.left_shift, &s);
+        let buffer_len = self.scrollback_buffer.len();
+        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &s);
+    }
+
+    /// Removes a character from the stdin buffer; will remove the character specified by the left shift field
+    fn pop_from_stdin(&mut self) {
+        let buffer_len = self.stdin_buffer.len();
+        self.stdin_buffer.remove(buffer_len - self.left_shift - 1);
+        let buffer_len = self.scrollback_buffer.len();
+        self.scrollback_buffer.remove(buffer_len - self.left_shift -1);
+    }
+
+    /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
+    /// vga buffer. 
+    /// If the vga buffer's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
+    /// calculates the starting index so that when displayed on the vga buffer, it preserves that line so that it looks the same
+    /// as if the whole physical line is displayed on the buffer
+    fn calc_start_idx(&mut self, end_idx: usize) -> usize{
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let mut start_idx = end_idx;
+        let result;
+        if end_idx > buffer_width * buffer_height {
+            result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
+        } else {
+            result = self.scrollback_buffer.get(0..end_idx);
+        }        
+            // calculate the starting index for the slice
+            if let Some(slice) = result {
+            let mut num_lines = 0;
+            let mut curr_column = 0;
+            for byte in slice.bytes().rev() {
+                if byte == b'\n' {
+                    num_lines += 1;
+                    if num_lines >= buffer_height-1 {
+                        break;
+                    }
+                    curr_column = 0;
+                } else {
+                    if curr_column == 80 {
+                        curr_column = 0;
+                        num_lines += 1;
+                        if num_lines >= buffer_height -1 {
+                            break;
+                        }
+                    }
+                    curr_column += 1;
+                }
+                if start_idx > 0 {
+                    start_idx -=1;
+                } else {
+                    return 0;
+                }
+            }
+            // for the very first line of the vga buffer, finds how many characters will fit 
+            if start_idx <= 1 {
+                return 0;
+            }
+            let mut one_line_back = start_idx - 2;
+            loop {
+                if self.scrollback_buffer.as_str().chars().nth(one_line_back) == Some('\n') {
+                    break;
+                } else {
+                    one_line_back -=1;
+                }
+            }
+
+            let diff = ((start_idx-2) - one_line_back)%buffer_width as usize;
+            return start_idx - 1 - diff;
+            } else {
+                return 0;
+            }
+    }
+
+   /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
+    /// vga buffer. 
+    fn calc_end_idx(&mut self, start_idx: usize) -> usize {
+        let (buffer_width,buffer_height) = self.vga_buffer.get_dimensions();
+        let scrollback_buffer_len = self.scrollback_buffer.len();
+        let mut end_idx = start_idx + 1;
+        let result;
+        if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
+            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
+        } else {
+            result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
+        }
+            // calculate the starting index for the slice
+            if let Some(slice) = result {
+            let mut num_lines = 0;
+            let mut curr_column = 0;
+            for byte in slice.bytes(){
+                if byte == b'\n' {
+                    num_lines += 1;
+                    if num_lines >= buffer_height {
+                        break;
+                    }
+                    curr_column = 0;
+                } else {
+                    if curr_column == 80 {
+                        curr_column = 0;
+                        num_lines += 1;
+                        if num_lines >= buffer_height {
+                            break;
+                        }
+                    }
+                    curr_column += 1;
+                }
+                if start_idx < scrollback_buffer_len {
+                    end_idx += 1;
+                } else {
+                    return scrollback_buffer_len
+                }
+            }
+            return end_idx
+            } else {
+                return self.scrollback_buffer.len();
+            }
+    }
+
+    /// Takes in a usize that corresponds to the end index of a string slice of the scrollback buffer that will be displayed on the vga buffer
+    fn print_to_vga(&mut self, end_idx: usize) -> Result<(), &'static str> {
+        let start_idx = self.calc_start_idx(end_idx);
+        self.scroll_start_idx = start_idx;
+        self.scroll_end_idx = end_idx;
+        let result  = self.scrollback_buffer.get(start_idx..end_idx);
+        if let Some(slice) = result {
+            self.absolute_cursor_pos = self.vga_buffer.display_string(slice)?;
+        } else {
+            return Err("could not get slice of scrollback buffer string");
+        }
+        Ok(())
+    }
+
+    /// Scrolls up by the vga buffer equivalent of one line
+    fn scroll_up_one_line(&mut self) {
+        let prev_end_idx;
+        if self.is_scroll_end == true {
+            prev_end_idx = self.scrollback_buffer.len();
+        } else {
+            prev_end_idx = self.scroll_end_idx;
+        }
+        
+        let mut start_idx = self.calc_start_idx(prev_end_idx);
+        //indicates that the user has scrolled to the top of the page
+        if start_idx < 2 {
+            return; 
+        } else {
+            start_idx -= 2;
+        }
+        let mut num_chars = 0;
+        loop {
+            if self.scrollback_buffer.as_str().chars().nth(start_idx) == Some('\n') {
+                break;
+            }
+            num_chars += 1;
+            if num_chars > 80 {
+                break;
+            }
+            start_idx -= 1;
+        }
+        self.scroll_start_idx = start_idx;
+        let end_idx = self.calc_end_idx(start_idx);
+        self.scroll_end_idx = end_idx;
+        self.is_scroll_end = false;
+    }
+
+    /// Scrolls down the vga buffer equivalent of one line
+    fn scroll_down_one_line(&mut self) {
+        let prev_start_idx;
+        if self.is_scroll_end == true {
+            return;
+        } else {
+            prev_start_idx = self.scroll_start_idx;
+        }
+        let mut end_idx = self.calc_end_idx(prev_start_idx);
+        end_idx += 2;
+        let mut num_chars = 0;
+        loop {
+            if self.scrollback_buffer.as_str().chars().nth(end_idx) == Some('\n') {
+                break;
+            }
+            num_chars += 1;
+            if num_chars == 80 {
+                break;
+            }
+            end_idx += 1;
+            if end_idx == self.scrollback_buffer.len() {
+                self.is_scroll_end = true;
+                break;
+            }
+        }
+        self.scroll_end_idx = end_idx;
+        let start_idx = self.calc_start_idx(end_idx);
+        self.scroll_start_idx = start_idx;
     }
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
@@ -170,8 +424,6 @@ impl Terminal {
                                 self.print_to_terminal(temp.clone())?;
                                 
                                 self.console_input_string = temp;
-                                self.text_offset += self.console_buffer_string.len() as u16;
-                                self.cursor_pos += self.console_buffer_string.len() as u16;
                                 self.console_buffer_string.clear();
                                 }
                         },
@@ -185,33 +437,39 @@ impl Terminal {
     }
     
 
-    /// Updates the cursor to a new position 
+    /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
-        let new_x = self.vga_buffer.column as u16;
-        let display_line = self.vga_buffer.display_line;
-        let new_y;
-        if display_line < VGA_BUFFER_HEIGHT as usize {
-            new_y = display_line as u16;
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let mut new_x = self.absolute_cursor_pos %buffer_width;
+        let mut new_y = self.absolute_cursor_pos /buffer_width;
+        // adjusts to the correct position relative to the max rightmost absolute cursor position
+        if new_x > self.left_shift  {
+            new_x -= self.left_shift;
         } else {
-            new_y = VGA_BUFFER_HEIGHT;
-        };
-        vga_buffer::update_cursor(new_x, new_y);
-        // Refreshes the display
-        self.vga_buffer.display(DisplayPosition::Same);
+            new_x = buffer_width  + new_x - self.left_shift;
+            new_y -=1;
+        }
+        vga_buffer::update_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent, current_terminal_num: &mut usize, num_running: usize) -> Result<(), &'static str> {
         // Finds current coordinates of the VGA buffer
-        let y = self.vga_buffer.display_line as u16;
-        let x = self.vga_buffer.column as u16;
-
+        let absolute_position = self.scrollback_buffer.len() - self.scroll_start_idx ;
+        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let x = absolute_position%buffer_width;
+        let y = absolute_position/buffer_width;
         // Ctrl+D or Ctrl+Alt+Del kills the OS
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D
         || 
                 keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
         panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
+        }
+        
+        // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
+        if keyevent.action != KeyAction::Pressed {
+            return Ok(()); 
         }
 
         // Ctrl+C signals the main loop to exit the task
@@ -225,7 +483,7 @@ impl Terminal {
             } else {
                 self.console_input_string.clear();
                 self.console_buffer_string.clear();
-                let _result = self.vga_buffer.write_string_with_color(&"^C\n".to_string(), ColorCode::default());
+                self.print_to_terminal("^C\n".to_string())?;
                 let prompt_string = self.prompt_string.clone();
                 self.print_to_terminal(prompt_string)?;
             }
@@ -267,12 +525,7 @@ impl Terminal {
                 return Ok(());
             }
         }
-
-
-        // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
-        if keyevent.action != KeyAction::Pressed {
-            return Ok(()); 
-        }  
+          
 
         // Allows user to create a new terminal tab
         if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
@@ -285,15 +538,16 @@ impl Terminal {
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
         if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
             && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-                if self.text_offset == self.cursor_pos {
+                if self.left_shift == 0 {
                     if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
                         match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                            Some(string) => {
+                            Some(c) => {
+                                // Appends to the temporary buffer string if the user types while a command is running
                                 if self.current_task_id != 0 {
-                                    self.console_buffer_string.push(string);
+                                    self.console_buffer_string.push(c);
                                     return Ok(());
                                 } else {
-                                    self.console_input_string.push(string);
+                                    self.console_input_string.push(c);
                                 }
                             },
                             None => {
@@ -304,11 +558,10 @@ impl Terminal {
                     }
                 } else {
                     // controls cursor movement and associated variables if the cursor is not at the end of the current line
-                    let insert_idx: usize = self.cursor_pos as usize - self.max_left_pos as usize;
-                    self.console_input_string.remove(insert_idx); // Take this out once you can dynamically shift buffer 
                     match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                        Some(string) => {
-                            self.console_input_string.push(string);
+                        Some(c) => {
+                            let insert_idx: usize = self.console_input_string.len() - self.left_shift;
+                            self.console_input_string.insert(insert_idx, c);
                         },
                         None => {
                             return Err("Couldn't get key event");
@@ -320,13 +573,12 @@ impl Terminal {
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
             // Prevents user from moving cursor to the left of the typing bounds
-            if self.console_input_string.len() == 0 { 
+            if self.console_input_string.len() == 0 || self.console_input_string.len() - self.left_shift == 0 { 
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                let remove_idx: usize =  self.cursor_pos as usize  - self.max_left_pos as usize -1;
+                let remove_idx: usize =  self.console_input_string.len() - self.left_shift -1;
                 self.console_input_string.remove(remove_idx);
-                if self.cursor_pos < self.text_offset {self.console_input_string.insert(remove_idx, ' ')};
             }
         }
 
@@ -342,119 +594,128 @@ impl Terminal {
                 let console_input_string = self.console_input_string.clone();
                 let command_structure = self.parse_input(&console_input_string);
                 let prompt_string = self.prompt_string.clone();
+                let console_input = self.console_input_string.clone();
+                self.command_history.push(console_input);
+                self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
-                        Ok(new_task_id) => { 
-                            self.current_task_id = new_task_id;
-                        } Err("Error: no module with this name found!") => {
-                            self.print_to_terminal(format!("{}: command not found\n\n{}",console_input_string, prompt_string))?;
-                        } Err(&_) => {
-                            self.print_to_terminal(format!("running command on new thread failed\n\n{}", prompt_string))?;
-                        }
+                    Ok(new_task_id) => { 
+                        self.current_task_id = new_task_id;
+                    } Err("Error: no module with this name found!") => {
+                        self.print_to_terminal(format!("\n{}: command not found\n\n{}",console_input_string, prompt_string))?;
+                        self.console_input_string.clear();
+                        self.left_shift = 0;
+                        return Ok(());
+                    } Err(&_) => {
+                        self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
+                        self.console_input_string.clear();
+                        self.left_shift = 0;
+                        return Ok(())
+                    }
                 }
             };
             // Clears the buffer for another command once current command is finished executing
             self.console_input_string.clear();
-            // Updates the cursor tracking variables when the enter key is pressed 
-            self.text_offset  = y * VGA_BUFFER_WIDTH + x;
-            self.cursor_pos = y * VGA_BUFFER_WIDTH + x;
-            self.max_left_pos =  y * VGA_BUFFER_WIDTH + x;
-
+            self.left_shift = 0;
         }
 
         // home, end, page up, page down, up arrow, down arrow for the console
         if keyevent.keycode == Keycode::Home {
             // Home command only registers if the vga buffer has the ability to scroll
-            if self.vga_buffer.can_scroll(){
-                self.vga_buffer.display(DisplayPosition::Start);
+            if self.scroll_start_idx != 0 {
+                self.is_scroll_end = false;
+                self.scroll_start_idx = 0;
+                self.scroll_end_idx = self.calc_end_idx(0);
                 self.vga_buffer.disable_cursor();
             }
             return Ok(());
         }
         if keyevent.keycode == Keycode::End {
-            self.vga_buffer.display(DisplayPosition::End);
-            self.vga_buffer.enable_cursor();
+            if !self.is_scroll_end {
+                self.is_scroll_end = true;
+                self.scroll_end_idx = self.scrollback_buffer.len();
+                let end_idx = self.scroll_end_idx;
+                self.scroll_start_idx = self.calc_start_idx(end_idx);
+                self.vga_buffer.enable_cursor();
+            }
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageUp {
-            // only registers the page up command if the vga buffer can already scroll
-            if self.vga_buffer.can_scroll(){
-               self.vga_buffer.display(DisplayPosition::Up(20));
-               self.vga_buffer.disable_cursor();
+            if self.scroll_end_idx != 0 {
+                self.scroll_up_one_line();
+                self.vga_buffer.disable_cursor();                
             }
             return Ok(());
         }
         if keyevent.keycode == Keycode::PageDown {
-            self.vga_buffer.display(DisplayPosition::Down(20));
-            self.vga_buffer.enable_cursor();
+            if !self.is_scroll_end {
+                self.scroll_down_one_line();
+                self.vga_buffer.enable_cursor();
+            }
             return Ok(());
         }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
-            self.vga_buffer.display(DisplayPosition::Up(1));
+
+        // Cycles to the next previous command
+        if  keyevent.keycode == Keycode::Up {
+            if self.history_index == self.command_history.len() {
+                return Ok(());
+            }
+            self.left_shift = 0;
+            let console_input = self.console_input_string.clone();
+            for _i in 0..console_input.len() {
+                self.pop_from_stdin();
+            }
+            if self.history_index == 0 && self.console_input_string.len() != 0 {
+                self.command_history.push(console_input);
+                self.history_index += 1;
+            } 
+            self.history_index += 1;
+            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
+            let selected_command2 = selected_command.clone();
+            self.console_input_string = selected_command;
+            self.push_to_stdin(selected_command2);
             return Ok(());
         }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
-            self.vga_buffer.display(DisplayPosition::Down(1));
+        // Cycles to the next most recent command
+        if keyevent.keycode == Keycode::Down {
+            if self.history_index <= 1 {
+                return Ok(());
+            }
+            self.left_shift = 0;
+            let console_input = self.console_input_string.clone();
+            for _i in 0..console_input.len() {
+                self.pop_from_stdin();
+            }
+            self.history_index -=1;
+            if self.history_index == 0 {return Ok(())}
+            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
+            let selected_command2 = selected_command.clone();
+            self.console_input_string = selected_command;
+            self.push_to_stdin(selected_command2);
             return Ok(());
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            if self.cursor_pos > self.max_left_pos {
-                self.vga_buffer.column -= 1;
-                self.cursor_pos -=1;
+            if self.left_shift < self.console_input_string.len() {
+                self.left_shift += 1;
+            }
                 return Ok(());
             }
-        }
+        
         if keyevent.keycode == Keycode::Right {
-            if self.cursor_pos < self.text_offset {
-                self.vga_buffer.column += 1;
-                self.cursor_pos += 1;
+            if self.left_shift > 0 {
+                self.left_shift -= 1;
                 return Ok(());
             }
         }
         
-        /*
-            //Pass TAB event to window manager
-            //Window manager consumes direction key input
-            match keyevent.keycode {
-                Keycode::Tab => {
-                    //window_manager::set_time_start();
-                    loop{
-                        window_manager::window_switch();
-                    }
-                }
-                Keycode::LeCOMMAND EXITft|Keycode::Right|Keycode::Up|Keycode::Down => {
-                    window_manager::put_key_code(keyevent.keycode).unwrap();
-                }
-                _ => {}
-            }
-
-            //Pass Delete event and direction key event to 3d drawer application
-            /*match keyevent.keycode {
-                Keycode::Tab|Keycode::Delete|Keycode::Left|Keycode::Right|Keycode::Up|Keycode::Down => {
-                    graph_drawer::put_key_code(keyevent.keycode).unwrap();
-                }c
-                _ => {}
-            } */
-        */
-        
-
+        // Pushes regular keypresses (ie ascii characters and non-meta characters) into the standard-in buffer
         match keyevent.keycode.to_ascii(keyevent.modifiers) {
             Some(c) => { 
-                // we echo key presses directly to the console without queuing an event
-                try!(self.vga_buffer.write_string_with_color(&c.to_string(), ColorCode::default())
-                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
-                );
-                
-                // adjusts the cursor tracking variables whenever the backspace or ascii keys are pressed, excluding the enter key which is handled above
-                let cursor_pos = self.cursor_pos as usize;
-                    let text_offset = self.text_offset as usize;
-                if keyevent.keycode == Keycode::Backspace {
-                    if cursor_pos == text_offset {self.text_offset -= 1;}
-                    self.cursor_pos -= 1;
-                } else if keyevent.keycode != Keycode::Enter {
-                    if cursor_pos == text_offset {self.text_offset += 1;}
-                    self.cursor_pos += 1;
+                if c == '\u{8}' {
+                    self.pop_from_stdin();
+                } else {
+                    self.push_to_stdin(c.to_string());
                 }
             }
             _ => { } 
@@ -462,7 +723,7 @@ impl Terminal {
         Ok(())
     }
     
-    /// This function parses the string that the user inputted when Enter is pressed and populates the CommandStruct
+    /// Parses the string that the user inputted when Enter is pressed and populates the CommandStruct
     fn parse_input(&self, console_input_string: &String) -> CommandStruct {
         let mut words: Vec<String> = console_input_string.split_whitespace().map(|s| s.to_string()).collect();
         // This will never panic because pressing the enter key does not register if she has not entered anything
@@ -481,7 +742,7 @@ impl Terminal {
     }
 
 
-    /// Function will execute the command on a new thread 
+    /// Execute the command on a new thread 
     fn run_command_new_thread(&mut self, command_structure: CommandStruct) -> Result<usize, &'static str> {
         use memory; 
         let module = memory::get_module(&command_structure.command_str).ok_or("Error: no module with this name found!")?;
@@ -495,29 +756,6 @@ impl Terminal {
 }
 
 
-/// Queues up the given string to be printed out to the default kernel terminal.
-/// If no terminals have been initialized yet, it prints to the VGA buffer directly using `print_raw!()`.
-pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
-    if let Some(kernel_term) = RUNNING_TERMINALS.lock().get_mut(0) {
-        // temporary hack to print the text output to the default kernel terminal; replace once we abstract standard streams
-        let output_event = ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(), Some(1)));
-        kernel_term.term_print_producer.enqueue(output_event);
-        Ok(())
-    }
-    else {
-        print_raw!("[RAW] {}", s.into());
-        Ok(())
-    }
-}
-
-use core::fmt;
-/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
-/// If the console hasn't yet been initialized, it prints to the VGA buffer directly using `print_raw!()`.
-pub fn print_to_console_args(fmt_args: fmt::Arguments) {
-    let _result = print_to_console(format!("{}", fmt_args));
-}
-
-
 /// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
 /// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
 /// This allows other modules to push console events onto the queue. 
@@ -526,16 +764,14 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let console_consumer = console_dfq.into_consumer();
     let returned_producer = console_consumer.obtain_producer();
     // Initializes the default kernel terminal
-    let mut kernel_term = Terminal::new(&console_consumer, 1);
+    let mut kernel_term = Terminal::new(1);
     kernel_term.print_to_terminal(WELCOME_STRING.to_string())?; 
     let prompt_string = kernel_term.prompt_string.clone();
-    kernel_term.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
+    kernel_term.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
     kernel_term.vga_buffer.enable_cursor();
-    kernel_term.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
     RUNNING_TERMINALS.lock().push(kernel_term);
-    // Spawns the infinite loop to run the terminals
     spawn::spawn_kthread(input_event_loop, console_consumer, "main input event handling loop".to_string(), None)?;
     Ok(returned_producer)
 }
@@ -553,7 +789,14 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             num_running += 1;
             let _result = term.task_handler();
             if term.term_ref == current_terminal_num {
-                let _result = term.cursor_handler();
+                let end_idx = term.scrollback_buffer.len();
+                if term.is_scroll_end {
+                    term.print_to_vga(end_idx)?;
+                } else {
+                    let scroll_end_idx = term.scroll_end_idx;
+                    term.print_to_vga(scroll_end_idx)?;
+                }
+                term.cursor_handler()?;
             }
         }
 
@@ -577,29 +820,18 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     }
                 }
             }
-
-            &ConsoleEvent::OutputEvent(ref output_event) => {
-                for term in RUNNING_TERMINALS.lock().iter_mut() {
-                    if term.term_ref == output_event.term_num.unwrap_or(1 as usize) {
-                        let focus_terminal = term;
-                        try!(focus_terminal.vga_buffer.write_string_with_color(&output_event.text, ColorCode::default())
-                        .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()"));
-                        break;
-                    }
-                }                
-            }
+            _ => { }
         }
 
         if current_terminal_num  == 0 {
             // Creates a new terminal object whenever handle keyevent sets the current_terminal_num to 0
             current_terminal_num = num_running + 1;
-            let mut new_term_obj = Terminal::new(&consumer, current_terminal_num.clone());
+            let mut new_term_obj = Terminal::new(current_terminal_num.clone());
             let prompt_string = new_term_obj.prompt_string.clone();
             let ref_num = new_term_obj.term_ref;
             new_term_obj.print_to_terminal(WELCOME_STRING.to_string())?;
             new_term_obj.print_to_terminal(format!("Console says hello!\nPress Ctrl+C to quit a task\nTerminal_{}\n{}", ref_num, prompt_string))?;  
             new_term_obj.vga_buffer.enable_cursor();
-            new_term_obj.vga_buffer.update_cursor(DEFAULT_X_POS,DEFAULT_Y_POS);
             // List now owns the terminal object
             RUNNING_TERMINALS.lock().push(new_term_obj);
         }
@@ -614,3 +846,10 @@ const WELCOME_STRING: &'static str = "\n\n
   | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
+
+
+
+
+
+
+

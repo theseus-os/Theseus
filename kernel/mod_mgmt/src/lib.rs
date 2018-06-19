@@ -502,34 +502,6 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
 
-            // if the final choice of section is a .bss section, we need to create a proper-length slice of all zeros as its data
-            // TODO: FIXME: only do this for .bss sections, otherwise it's very wasteful
-            let bss_zero_vec = vec![0; sec_size];
-
-
-            let sec_data  = if sec_name.starts_with(BSS_PREFIX) { // .bss section should have Empty data
-                &[0] // .bss data should always be zero, but it doesn't matter since we don't use it anyway
-
-                // match sec.get_data(&elf_file) {
-                //     Ok(SectionData::Empty) => &[0], // an empty slice, we won't use it anyway
-                //     _ => {
-                //         error!("parse_elf_kernel_crate(): .bss section [{}] {} had data that wasn't Empty. {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                //         return Err(".bss section had data that wasn't Empty");
-                //     }
-                // }
-            } else {
-                match sec.get_data(&elf_file) {
-                    Ok(SectionData::Undefined(sec_data)) => sec_data,
-                    Ok(SectionData::Empty) => &bss_zero_vec, // an empty slice of the proper size
-                    _ => {
-                        error!("parse_elf_kernel_crate(): Couldn't get data (expected \"Undefined\" data) for section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                        return Err("couldn't get sec_data in .text, .data, or .rodata section");
-                    }
-                }
-                
-            };
-            
-
 
             if sec_name.starts_with(TEXT_PREFIX) {
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
@@ -539,15 +511,27 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                         error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                         return Err(".text section had wrong flags!");
                     }
-                        
 
                     if let Some(ref tp) = text_pages {
                         // here: we're ready to copy the text section to the proper address
                         let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
-                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
-                        if log { trace!("       dest_addr: {:#X}, text_offset: {:#X}", dest_addr, text_offset); }
-                        dest_slice.copy_from_slice(sec_data);
-
+                        if log { 
+                            let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                            trace!("       dest_addr: {:#X}, text_offset: {:#X}", dest_addr, text_offset); 
+                        }
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("parse_elf_kernel_crate(): Couldn't get section data for .text section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .text section");
+                            }
+                        }
+            
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Text(TextSection{
                                 abs_symbol: demangled.no_hash,
@@ -584,9 +568,22 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     if let Some(ref rp) = rodata_pages {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
-                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
-                        if log { trace!("       dest_addr: {:#X}, rodata_offset: {:#X}", dest_addr, rodata_offset); }
-                        dest_slice.copy_from_slice(sec_data);
+                        if log { 
+                            let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                            trace!("       dest_addr: {:#X}, rodata_offset: {:#X}", dest_addr, rodata_offset); 
+                        }
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("parse_elf_kernel_crate(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .rodata section");
+                            }
+                        }
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Rodata(RodataSection{
@@ -631,9 +628,22 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     if let Some(ref dp) = data_pages {
                         // here: we're ready to copy the data/bss section to the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
-                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
-                        if log { trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); }
-                        dest_slice.copy_from_slice(sec_data);
+                        if log { 
+                            let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                            trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); 
+                        }
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("parse_elf_kernel_crate(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .data section");
+                            }
+                        }
 
                         loaded_sections.insert(shndx, 
                             Arc::new( LoadedSection::Data(DataSection{
@@ -673,8 +683,10 @@ fn parse_elf_kernel_crate(mapped_pages: MappedPages,
                     if let Some(ref dp) = data_pages {
                         // here: we're ready to fill the bss section with zeroes at the proper address
                         let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
-                        let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
-                        if log { trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); }
+                        if log { 
+                            let dest_addr = dest_slice as *mut [u8] as *mut u8 as VirtualAddress;
+                            trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); 
+                        }
                         for b in dest_slice {
                             *b = 0;
                         };
