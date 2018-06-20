@@ -231,19 +231,24 @@ impl FrameTextBuffer {
         let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
 
         let font_color = parsecolor(FONT_COLOR);
+        let bg_color = parsecolor(BACKGROUND_COLOR);
+
 
         unsafe {// TODO
             for y in 0..CHARACTER_HEIGHT {
                 for i in 0..BUFFER_WIDTH{
                     let character = line[i].ascii_character;
-                    if character != b' ' {
+                    //if character != b' ' {
                         let ascii_code = line[i].ascii_character as usize;
                         for x in 0..8 {
+                            let addr = (i*CHARACTER_WIDTH+x+1)*3;
                             if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
-                                linebuffer[y][(i*CHARACTER_WIDTH+x+1)*3..(i*CHARACTER_WIDTH+x+1)*3+3].clone_from_slice(&font_color);                    
+                                linebuffer[y][addr..addr+3].copy_from_slice(&font_color);
+                            } else {
+                                linebuffer[y][addr..addr+3].copy_from_slice(&bg_color);
                             }
                         }
-                    }
+                    //}
                 }
             }
         }
