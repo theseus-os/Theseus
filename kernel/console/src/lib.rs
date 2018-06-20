@@ -169,7 +169,6 @@ impl Terminal {
     /// Printing function for use within the terminal crate
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
         self.scrollback_buffer.push_str(&s);
-        trace!("WENQIU:push string");
         Ok(())
     }
 
@@ -315,11 +314,8 @@ impl Terminal {
         self.scroll_end_idx = end_idx;
         let result  = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
-            trace!("Wenqiu: display_string");
             self.absolute_cursor_pos = self.frame_buffer.display_string(slice)?;
         } else {
-                        trace!("Wenqiu: display error");
-
             return Err("could not get slice of scrollback buffer string");
         }
         Ok(())
@@ -791,26 +787,19 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
     // variable to track which terminal the user is currently focused on
     // terminal objects have a field term_ref that can be used for this purpose
     let mut current_terminal_num: usize = 1;
-    trace!("wenqiu: input event loop");
     loop {
         use core::ops::Deref;
         let mut num_running: usize = 0;
         for term in RUNNING_TERMINALS.lock().iter_mut() {
             num_running += 1;
             let _result = term.task_handler();
-            trace!("wenqiu: {} = {}", term.term_ref, current_terminal_num);
 
             if term.term_ref == current_terminal_num {
-                trace!("wenqiu:To print");
 
                 let end_idx = term.scrollback_buffer.len();
                 if term.is_scroll_end {
-                                    trace!("wenqiu:To print 1");
-
                     term.print_to_vga(end_idx)?;
                 } else {
-                                    trace!("wenqiu:To print 2   ");
-
                     let scroll_end_idx = term.scroll_end_idx;
                     term.print_to_vga(scroll_end_idx)?;
                 }

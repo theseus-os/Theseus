@@ -182,7 +182,6 @@ impl FrameTextBuffer {
         let mut cursor_pos = 0;
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
         for byte in slice.bytes() {
-            trace!("Wenqiu: the byte is {}", byte as char);
             if byte == b'\n' {
                 self.display_lines.push(new_line);
                 new_line = BLANK_LINE;
@@ -209,7 +208,6 @@ impl FrameTextBuffer {
                 //let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
                 //write_volatile(addr, self.display_lines[line]);
             for i in 0..iterator {
-                trace!("To print line {}", iterator);
                 self.printline(i, self.display_lines[i]);
             }
 
@@ -229,33 +227,29 @@ impl FrameTextBuffer {
 
 
     fn printline(&self, line_num:usize, line:Line){
-    trace!("printline");
-    let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
-    trace!("printline");
+        
+        let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
 
-    let font_color = [0x90 as u8, 0xee as u8, 0x90 as u8];
-    //let bg_color = [(BACKGROUND_COLOR as usize & 255) as u8,(BACKGROUND_COLOR as usize & 255) as u8,(BACKGROUND_COLOR as usize & 255) as u8]
+        let font_color = parsecolor(FONT_COLOR);
 
-    unsafe {// TODO
-        for y in 0..CHARACTER_HEIGHT {
-            for i in 0..BUFFER_WIDTH{
-                let character = line[i].ascii_character;
-                if character != b' ' {
-                    trace!{"WEnqiu:{}", character};
-
-                    let ascii_code = line[i].ascii_character as usize;
-                    for x in 0..8 {
-                        if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
-                            linebuffer[y][(i*CHARACTER_WIDTH+x+1)*3..(i*CHARACTER_WIDTH+x+1)*3+3].clone_from_slice(&font_color);                    
+        unsafe {// TODO
+            for y in 0..CHARACTER_HEIGHT {
+                for i in 0..BUFFER_WIDTH{
+                    let character = line[i].ascii_character;
+                    if character != b' ' {
+                        let ascii_code = line[i].ascii_character as usize;
+                        for x in 0..8 {
+                            if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
+                                linebuffer[y][(i*CHARACTER_WIDTH+x+1)*3..(i*CHARACTER_WIDTH+x+1)*3+3].clone_from_slice(&font_color);                    
+                            }
                         }
                     }
                 }
             }
         }
+        frame_buffer::display(line_num * CHARACTER_HEIGHT, CHARACTER_HEIGHT, &linebuffer);
+    
     }
-    frame_buffer::display(line_num * CHARACTER_HEIGHT, CHARACTER_HEIGHT, &linebuffer);
-   
-}
 
 
 
@@ -279,40 +273,9 @@ impl ScreenChar {
     }
 }
 
-
-
-fn parsechar(character:char, line:usize, col:usize, color:usize, linebuffer:&mut [[u8;frame_buffer::FRAME_BUFFER_WIDTH]; 16]){
-    if col >= BUFFER_WIDTH {
-        debug!("frame_buffer_text::print(): The col is out of bound");
-        return
-    }
-    if line >= BUFFER_HEIGHT {
-        debug!("frame_buffer_text::print(): The line is out of bound");
-        return
-    }
-
-    if character == ' ' {
-        return
-    }
-    for y in 0..CHARACTER_HEIGHT{
-        trace!("start to draw {}", character as usize);
-
-        let ascii = character as usize;
-        let x = (col * CHARACTER_WIDTH) + 1;//leave 1 pixel left margin for every character
-        let num = FONT_BASIC[ascii][y];
-        for i in 0..8 {
-            if num & (0x80 >> i) !=0 {
-                //frame_buffer::draw_pixel(x + i, y, color);
-                linebuffer[y][(x+i)*3] = (color as usize & 255) as u8;
-                linebuffer[y][(x+i)*3+1] = (color as usize >> 8 & 255) as u8; 
-                linebuffer[y][(x+i)*3+2] = (color as usize >> 16 & 255) as u8;
-            } else {
-                //frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
-               /* linebuffer[y][(x+i)*3] = (BACKGROUND_COLOR as usize & 255) as u8;
-                linebuffer[y][(x+i)*3+1] = (BACKGROUND_COLOR as usize >> 8 & 255) as u8; 
-                linebuffer[y][(x+i)*3+2] = (BACKGROUND_COLOR as usize >> 16 & 255) as u8;
-            */}
-        }
-    }  
+fn parsecolor(color:usize) -> [u8;3] {
+    let red = (color >> 16) as u8;
+    let green = ((color >> 8) & 0xff) as u8;
+    let blue = (color & 0xff) as u8;
+    [red, green, blue]
 }
-
