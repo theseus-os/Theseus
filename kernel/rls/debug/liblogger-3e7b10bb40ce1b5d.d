@@ -1,0 +1,1 @@
+/home/argos/ethernet/Theseus/kernel/rls/debug/liblogger-3e7b10bb40ce1b5d.rmeta: /home/argos/ethernet/Theseus/kernel/logger/src/lib.rs /home/argos/ethernet/Theseus/kernel/serial_port/src/lib.rs /home/argos/ethernet/Theseus/libs/port_io/src/lib.rs /home/argos/ethernet/Theseus/libs/port_io/src/x86.rs

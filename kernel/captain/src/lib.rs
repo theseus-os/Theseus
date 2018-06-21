@@ -39,6 +39,7 @@ extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
 extern crate e1000e;
+extern crate ixgbe;
 extern crate window_manager;
 
 extern crate scheduler;

@@ -34,6 +34,32 @@ pub const E1000_DEV:                u16 = 0x100E;  // Device ID for the e1000 Qe
 const PCI_BAR0:                 u16 = 0x10;
 const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
+const REG_CTRL:                 u32 = 0x0000;
+const REG_STATUS:               u32 = 0x0008;
+const REG_EEPROM:               u32 = 0x0014;
+const REG_CTRL_EXT:             u32 = 0x0018;
+const REG_IMASK:                u32 = 0x00D0;
+const REG_RCTRL:                u32 = 0x0100;
+const REG_RXDESCLO:             u32 = 0x2800;
+const REG_RXDESCHI:             u32 = 0x2804;
+const REG_RXDESCLEN:            u32 = 0x2808;
+const REG_RXDESCHEAD:           u32 = 0x2810;
+const REG_RXDESCTAIL:           u32 = 0x2818;
+
+const REG_TCTRL:                u32 = 0x0400;
+const REG_TXDESCLO:             u32 = 0x3800;
+const REG_TXDESCHI:             u32 = 0x3804;
+const REG_TXDESCLEN:            u32 = 0x3808;
+const REG_TXDESCHEAD:           u32 = 0x3810;
+const REG_TXDESCTAIL:           u32 = 0x3818;
+
+const REG_RDTR:                 u32 = 0x2820;    // RX Delay Timer Register
+const REG_RXDCTL:               u32 = 0x3828;    // RX Descriptor Control
+const REG_RADV:                 u32 = 0x282C;    // RX Int. Absolute Delay Timer
+const REG_RSRPD:                u32 = 0x2C00;    // RX Small Packet Detect Interrupt
+ 
+const REG_MTA:                  u32 = 0x5200; 
+const REG_CRCERRS:              u32 = 0x4000;
       
  
 const REG_TIPG:                 u32 = 0x0410;      // Transmit Inter Packet Gap
@@ -219,8 +245,8 @@ pub struct Nic {
         rx_buf_addr: [usize;E1000_NUM_RX_DESC],
         /// The DMA allocator for the nic 
         nic_dma_allocator: DmaAllocator,
-        /// registers
-        pub regs: Option<BoxRefMut<MappedPages, IntelEthRegisters>>,
+        /*/// registers
+        regs: Option<BoxRefMut<MappedPages, IntelEthRegisters>>,*/
 }
 
 /// struct that stores addresses for memory allocated for DMA
@@ -287,21 +313,24 @@ pub fn translate_v2p(v_addr : usize) -> Result<usize, &'static str> {
 impl Nic{
 
         /// return a mapping of nic memory-mapped I/O registers 
-        fn map_nic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
+        /* fn map_nic(&mut self, active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
                 
-                let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
+                let phys_addr = self.mem_base as PhysicalAddress;
+
                 let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
+
                 let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+                
                 let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
-                let apic_mapped_page = try!(active_table.map_allocated_pages_to(
+                let nic_mapped_pages = try!(active_table.map_allocated_pages_to(
                         new_page, 
                         frames, 
                         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
                         fa.deref_mut())
                 );
 
-                Ok(apic_mapped_page)
-        }
+                Ok(nic_mapped_pages)
+        } */
 
         /// store required values from the devices PCI config space
         pub fn init(&mut self,ref dev:&PciDevice){
@@ -312,8 +341,12 @@ impl Nic{
                 // memory mapped base address
                 self.mem_base = (dev.bars[0] as usize) & !3; //hard coded for 32 bit, need to make conditional  
 
-                let nic_regs = BoxRefMut::new(Box::new(map_nic(active_table)?)).try_map_mut(|mp| mp.as_type_mut::<IntelEthRegisters>(0))?;
-                self.regs = Some(nic_regs);            
+                //pci_set_command_bus_master_bit(dev.bus, dev.slot, dev.func);
+                
+                //let nic_regs = BoxRefMut::new(Box::new(map_nic(active_table)?)).try_map_mut(|mp| mp.as_type_mut::<IntelEthRegisters>(0))?;
+                //self.regs = Some(nic_regs);            
+
+                
         }
 
         /// allocates memory for the NIC, starting address and size taken from the PCI BAR0

@@ -79,6 +79,9 @@ path = "../e1000"
 [dependencies.e1000e]
 path = "../e1000e"
 
+[dependencies.ixgbe]
+path = "../ixgbe"
+
 [dependencies.console]
 path = "../console"
 
