@@ -85,7 +85,6 @@ impl CrateType {
 
 
 /// Represents a single crate object file that has been loaded into the system.
-#[derive(Debug)]
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
@@ -102,6 +101,13 @@ pub struct LoadedCrate {
     pub data_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
 
     // crate_dependencies: Vec<LoadedCrate>,
+}
+
+use core::fmt;
+impl fmt::Debug for LoadedCrate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LoadedCrate{{{}}}", self.crate_name)
+    }
 }
 
 impl LoadedCrate {

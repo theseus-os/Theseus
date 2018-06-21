@@ -18,6 +18,7 @@ use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
 use memory::{get_module, ModuleArea};
+use mod_mgmt::metadata::StrongCrateRef;
 use itertools::Itertools;
 
 
@@ -65,13 +66,15 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
+/// Takes a string of arguments and parses it into a series of pairs, formatted as 
+/// `(OLD,NEW) (OLD,NEW) (OLD,NEW)...`
 fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, String> {
     let mut v: Vec<(&str, &str)> = Vec::new();
     let mut open_paren_iter = args.match_indices('(');
 
     // looking for open parenthesis
     while let Some((paren_start, _)) = open_paren_iter.next() {
-        let the_rest = args.get((paren_start + 1) ..).ok_or("unmatched open parenthesis.".to_string())?;
+        let the_rest = args.get((paren_start + 1) ..).ok_or_else(|| "unmatched open parenthesis.".to_string())?;
         // find close parenthesis
         let parsed = the_rest.find(')')
             .and_then(|end_index| the_rest.get(.. end_index))
@@ -98,22 +101,24 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, Stri
 }
 
 
+/// Performs the actual swapping of modules.
 fn swap_modules(pairs: Vec<(&str, &str)>) -> Result<(), String> {
     let modules = {
-        let mut mods: Vec<(&ModuleArea, &ModuleArea)> = Vec::with_capacity(pairs.len());
+        let mut mods: Vec<(StrongCrateRef, &ModuleArea)> = Vec::with_capacity(pairs.len());
         for (o, n) in pairs {
+            println!("   Looking for ({},{})", o, n);
             mods.push(
                 (
-                    get_module(o).ok_or(format!("Couldn't find old module \"{}\".", o))?,
-                    get_module(n).ok_or(format!("Couldn't find new module \"{}\".", n))?
+                    mod_mgmt::get_default_namespace().get_crate(o).ok_or_else(|| format!("Couldn't find old crate \"{}\".", o))?,
+                    get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?
                 )
             );
         }
         mods
     };
 
-    for (old_mod, new_mod) in modules {
-        println!("Replacing old module {:?} with new module {:?}", old_mod.name(), new_mod.name());
+    for (old_crate, new_mod) in modules {
+        println!("Replacing old crate {:?} with new module {:?}", old_crate, new_mod);
     }
 
     Err("swap_modules() is unimplemented!".to_string())
@@ -128,4 +133,5 @@ fn print_usage(opts: Options) {
 
 
 const USAGE: &'static str = "Usage: swap (OLD1,NEW1) [(OLD2,NEW2)]...
-Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.";
+Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.
+The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"__k_my_crate\").";

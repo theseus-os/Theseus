@@ -38,6 +38,7 @@ pub mod demangle;
 pub mod elf_executable;
 pub mod parse_nano_core;
 pub mod metadata;
+pub mod swap;
 
 use self::metadata::*;
 use demangle::demangle_symbol;
@@ -105,6 +106,13 @@ impl CrateNamespace {
     }
 
 
+    /// Returns a strong reference to the `LoadedCrate` in this namespace 
+    /// that matches the given `crate_name`, if it has been loaded into this namespace.
+    pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
+        self.crate_tree.lock().get(crate_name).cloned()
+    }
+
+
     /// Loads the specified application crate into memory, allowing it to be invoked.  
     /// Unlike [`load_kernel_crate`](#method.load_kernel_crate), this does not add the newly-loaded
     /// application crate to this namespace, nor does it add the new crate's symbols to the 
@@ -169,55 +177,6 @@ impl CrateNamespace {
         Ok(new_syms)
         
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-    }
-    
-
-    /// This function first loads all of the given crates into a new, separate namespace in isolation,
-    /// and only after *all* crates are loaded does it move on to linking/relocation calculations. 
-    /// This allows them to be linked against each other first, rather than to always fall back to
-    /// linking against existing symbols from the `backup_namespace`. 
-    /// It is this isolated preloading of crate sections that allows us to create a package of crates
-    /// that are all new and can be swapped as a single unit. 
-    pub fn load_crates_in_new_namespace(
-        new_crates: Vec<&ModuleArea>, 
-        backup_namespace: &CrateNamespace,
-        kernel_mmi: &mut MemoryManagementInfo,
-        verbose_log: bool,  
-    ) -> Result<(), &'static str> {
-        let len = new_crates.len();
-        let crates_iter = new_crates.into_iter();
-
-        // first we map all of the crates' ModuleAreas
-        let mappings = {
-            let mut mappings: Vec<MappedPages> = Vec::with_capacity(len);
-            for crate_module in crates_iter.clone() {
-                mappings.push(map_crate_module(crate_module, kernel_mmi)?);
-            }
-            mappings
-        };
-
-
-        // create a new empty namespace so we can add symbols to it before performing the relocations
-        let new_namespace = CrateNamespace::new();
-        let mut partially_loaded_crates: Vec<PartiallyLoadedCrate> = Vec::with_capacity(len); 
-
-        // first we do all of the section parsing and loading
-        for (i, crate_module) in crates_iter.clone().enumerate() {
-            let temp_module_mapping = mappings.get(i).ok_or("Fatal logic error: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
-            let plc = new_namespace.load_crate_sections(temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
-            let _new_syms = new_namespace.add_symbols(plc.loaded_sections.values(), &plc.new_crate.read().crate_name.clone(), verbose_log);
-            partially_loaded_crates.push(plc);
-        }
-        
-        // then we do all of the relocations 
-        for plc in partially_loaded_crates {
-            let _new_crate = new_namespace.perform_relocations(&plc.elf_file, plc.new_crate, plc.loaded_sections, Some(backup_namespace), kernel_mmi, verbose_log)?;
-            panic!("do something with new_crate");
-            // self.crate_tree.lock().insert(crate_name, new_crate);
-        }
-
-
-        Err("unfinished")
     }
 
 
