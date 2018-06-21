@@ -99,6 +99,12 @@ impl CrateNamespace {
     } 
 
 
+    /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
+    pub fn crate_names(&self) -> Vec<String> {
+        self.crate_tree.lock().keys().cloned().collect()
+    }
+
+
     /// Loads the specified application crate into memory, allowing it to be invoked.  
     /// Unlike [`load_kernel_crate`](#method.load_kernel_crate), this does not add the newly-loaded
     /// application crate to this namespace, nor does it add the new crate's symbols to the 
@@ -187,7 +193,7 @@ impl CrateNamespace {
             for crate_module in crates_iter.clone() {
                 mappings.push(map_crate_module(crate_module, kernel_mmi)?);
             }
-            mappings 
+            mappings
         };
 
 
@@ -197,8 +203,8 @@ impl CrateNamespace {
 
         // first we do all of the section parsing and loading
         for (i, crate_module) in crates_iter.clone().enumerate() {
-            let temp_module_mapping = mappings.get(i).ok_or("FAIL")?;
-            let plc = new_namespace.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
+            let temp_module_mapping = mappings.get(i).ok_or("Fatal logic error: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
+            let plc = new_namespace.load_crate_sections(temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
             let _new_syms = new_namespace.add_symbols(plc.loaded_sections.values(), &plc.new_crate.read().crate_name.clone(), verbose_log);
             partially_loaded_crates.push(plc);
         }

@@ -8,8 +8,7 @@ extern crate getopts;
 
 use getopts::Options;
 use alloc::{Vec, String};
-use self::task::TASKLIST;
-use task::RunState;
+use task::{TASKLIST, RunState};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

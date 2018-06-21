@@ -20,6 +20,7 @@ build/
 # IDE files
 /.idea/
 /.vscode/
+*.code-workspace
 
 # log files
 *.pcap
