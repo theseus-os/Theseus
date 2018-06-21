@@ -2,6 +2,7 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
+#![feature(iterator_step_by)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
@@ -218,10 +219,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
     }
 
     // Search for RSDP
-    if let Some((rsdp, _rsdp_mapped_pages)) = RSDP::get_rsdp(active_table) {
-        // { 
-        //     ACPI_TABLE_MAPPED_PAGES.lock().push(_rsdp_mapped_pages);
-        // }
+    if let Some(rsdp) = RSDP::get_rsdp(active_table) {
 
         let rxsdt = try!(get_sdt(rsdp.sdt_address(), active_table));
         debug!("rxsdt: {:?}", rxsdt);
@@ -248,10 +246,10 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
         try!(rxsdt.map_all(active_table));
 
-        {
-            let mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
-            debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", mapped_pages);
-        }
+        // {
+        //     let _mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
+        //     debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", _mapped_pages);
+        // }
 
 
         for sdt_paddr in rxsdt.iter() {

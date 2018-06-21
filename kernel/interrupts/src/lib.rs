@@ -23,15 +23,19 @@ extern crate apic;
 extern crate pit_clock;
 extern crate tss;
 extern crate gdt;
-extern crate exceptions;
+extern crate exceptions_early;
 extern crate pic;
 extern crate scheduler;
 extern crate keyboard;
+extern crate mouse;
+extern crate ps2;
 
 
+
+use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
-use spin::{Mutex, Once};
-use port_io::Port;
+use spin::Once;
+//use port_io::Port;
 // use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
@@ -49,53 +53,30 @@ pub static IDT: LockedIdt = LockedIdt::new();
 
 /// Interface to our PIC (programmable interrupt controller) chips.
 static PIC: Once<pic::ChainedPics> = Once::new();
-/// The Keyboard data port, port 0x60.
-static KEYBOARD: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 
 
 
-/// initializes the interrupt subsystem and properly sets up safer exception-related IRQs, but no other IRQ handlers.
-/// Arguments: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack 
-/// Arguments: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack)
-pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) -> Result<(), &'static str> {
-
+/// initializes the interrupt subsystem and properly sets up safer early exception handlers, but no other IRQ handlers.
+/// # Arguments: 
+/// * `double_fault_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack.
+/// * `privilege_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack).
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
+    -> Result<&'static LockedIdt, &'static str> 
+{
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
+    // initialize early exception handlers
+    exceptions_early::init(&IDT);
     {
+        // set the special double fault handler's stack
         let mut idt = IDT.lock(); // withholds interrupts
-        
-        idt.divide_by_zero.set_handler_fn(exceptions::divide_by_zero_handler);
-        // missing: 0x01 debug exception
-        idt.non_maskable_interrupt.set_handler_fn(nmi_handler); // use our local NMI handler, not the default one in exceptions
-        idt.breakpoint.set_handler_fn(exceptions::breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
-        idt.invalid_opcode.set_handler_fn(exceptions::invalid_opcode_handler);
-        idt.device_not_available.set_handler_fn(exceptions::device_not_available_handler);
         unsafe {
-            // use a special stack for the double fault handler
-            idt.double_fault.set_handler_fn(exceptions::double_fault_handler)
+            // use a special stack for the double fault handler, which prevents triple faults!
+            idt.double_fault.set_handler_fn(exceptions_early::double_fault_handler)
                             .set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16); 
         }
-        // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
-        idt.segment_not_present.set_handler_fn(exceptions::segment_not_present_handler);
-        // missing: 0x0c stack segment exception
-        idt.general_protection_fault.set_handler_fn(exceptions::general_protection_fault_handler);
-        idt.page_fault.set_handler_fn(exceptions::page_fault_handler);
-        // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
-        
-        
        
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
@@ -110,23 +91,24 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
         info!("loaded IDT for BSP.");
     }
 
-    Ok(())
+    Ok(&IDT)
 
 }
 
 
+/// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 pub fn init_ap(apic_id: u8, 
                double_fault_stack_top_unusable: VirtualAddress, 
                privilege_stack_top_unusable: VirtualAddress)
-               -> Result<(), &'static str> {
+               -> Result<&'static LockedIdt, &'static str> {
     info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-
-    // info!("trying to load IDT for AP {}...", apic_id);
+    // We've already created the IDT initially (currently all APs share the BSP's IDT),
+    // so we only need to re-load it here for each AP.
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
-    Ok(())
+    Ok(&IDT)
 }
 
 
@@ -147,7 +129,7 @@ pub fn init_handlers_apic() {
         }
 
         idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
         // idt[0x23].set_handler_fn(irq_0x23_handler);
         idt[0x24].set_handler_fn(com1_serial_handler);
@@ -159,7 +141,7 @@ pub fn init_handlers_apic() {
         idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
         idt[0x2B].set_handler_fn(nic_handler);
-        // idt[0x2C].set_handler_fn(irq_0x2C_handler);
+        idt[0x2C].set_handler_fn(ps2_mouse_handler);
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
@@ -183,7 +165,7 @@ pub fn init_handlers_pic() {
        
         // MASTER PIC starts here (0x20 - 0x27)
         idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(keyboard_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
         // there is no IRQ 0x22        
         idt[0x23].set_handler_fn(irq_0x23_handler); 
         idt[0x24].set_handler_fn(com1_serial_handler); 
@@ -198,9 +180,9 @@ pub fn init_handlers_pic() {
 
         idt[0x29].set_handler_fn(irq_0x29_handler); 
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
-        idt[0x2B].set_handler_fn(irq_0x2B_handler);
-        //idt[0x2B].set_handler_fn(nic_handler); 
-        idt[0x2C].set_handler_fn(irq_0x2C_handler); 
+        //idt[0x2B].set_handler_fn(irq_0x2B_handler);
+        idt[0x2B].set_handler_fn(nic_handler); 
+        idt[0x2C].set_handler_fn(ps2_mouse_handler);
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
@@ -252,44 +234,75 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFra
 static mut EXTENDED_SCANCODE: bool = false;
 
 /// 0x21
-extern "x86-interrupt" fn keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
 
-    // in this interrupt, we must read the keyboard scancode register before acknowledging the interrupt.
-    let scan_code: u8 = { 
-        KEYBOARD.lock().read()
-    };
-	// trace!("Keyboard interrupt: raw scan_code {:#X}", scan_code);
-    
-    let extended = unsafe { EXTENDED_SCANCODE };
+    let indicator = ps2::ps2_status_register();
 
-    // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
-    if scan_code == 0xE0 {
-        if extended {
-            error!("keyboard interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
-        }
-        // mark it true for the next interrupt
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else if scan_code == 0xE1 {
-        error!("PAUSE/BREAK key pressed ... ignoring it!");
-        // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts) 
-        unsafe { EXTENDED_SCANCODE = true; }
-    }
-    else { // a regular scancode, go ahead and handle it
-        // if the previous interrupt's scan_code was an extended scan_code, then this one is not
-        if extended {
-            unsafe { EXTENDED_SCANCODE = false; }
-        }
-        if scan_code != 0 {  // a scan code of zero is a keyboard error that we can ignore
-            if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
-                error!("keyboard_handler: error handling keyboard input: {:?}", e);
+    // whether there is any data on the port 0x60
+    if indicator & 0x01 == 0x01 {
+        //whether the data is coming from the mouse
+        if indicator & 0x20 != 0x20 {
+            // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
+            let scan_code = ps2::ps2_read_data();
+            // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
+
+
+            let extended = unsafe { EXTENDED_SCANCODE };
+
+            // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
+            if scan_code == 0xE0 {
+                if extended {
+                    error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
+                }
+                // mark it true for the next interrupt
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else if scan_code == 0xE1 {
+                error!("PAUSE/BREAK key pressed ... ignoring it!");
+                // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
+                unsafe { EXTENDED_SCANCODE = true; }
+            } else { // a regular scancode, go ahead and handle it
+                // if the previous interrupt's scan_code was an extended scan_code, then this one is not
+                if extended {
+                    unsafe { EXTENDED_SCANCODE = false; }
+                }
+                if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
+                    if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
+                        error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
+                    }
+                }
             }
         }
     }
+            eoi(Some(PIC_MASTER_OFFSET + 0x1));
 
-    eoi(Some(PIC_MASTER_OFFSET + 0x1));
+
 }
 
+/// 0x2C
+extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    let indicator = ps2::ps2_status_register();
+
+    // whether there is any data on the port 0x60
+    if indicator & 0x01 == 0x01 {
+        //whether the data is coming from the mouse
+        if indicator & 0x20 == 0x20 {
+            let readdata = handle_mouse_packet();
+            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
+                error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
+            } else if readdata & 0x08 == 0 {
+                error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
+            } else {
+                let _mouse_event = mouse::handle_mouse_input(readdata);
+                // mouse::mouse_to_print(&_mouse_event);
+            }
+
+        }
+
+    }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+}
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
@@ -515,14 +528,7 @@ extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFram
     loop { }
 }
 
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2C_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2C interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
 
-    loop { }
-}
 
 #[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {
@@ -556,24 +562,4 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     eoi(None);
-}
-
-
-
-
-extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
-    // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
-    if vaddr != 0 {
-        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(vaddr);
-        return;
-    }
-    
-    // if vaddr is 0, then it's a regular NMI    
-    println_raw!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-    
-    loop { }
 }

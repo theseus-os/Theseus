@@ -45,8 +45,8 @@ path = "../gdt"
 [dependencies.pic]
 path = "../pic"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.task]
 path = "../task"
@@ -56,6 +56,12 @@ path = "../pit_clock"
 
 [dependencies.keyboard]
 path = "../keyboard"
+
+[dependencies.mouse]
+path = "../mouse"
+
+[dependencies.ps2]
+path = "../ps2"
 
 [dependencies.scheduler]
 path = "../scheduler"

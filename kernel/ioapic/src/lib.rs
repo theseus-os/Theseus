@@ -1,47 +1,86 @@
 #![no_std]
+#![feature(alloc)]
 
+
+extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate memory;
+extern crate volatile;
+extern crate atomic_linked_list;
+extern crate owning_ref;
 
 
 use core::ops::DerefMut;
-use core::ptr::{read_volatile, write_volatile};
-use spin::{Mutex, MutexGuard, Once};
+use alloc::boxed::Box;
+use spin::{Mutex, MutexGuard};
+use volatile::{Volatile, WriteOnly};
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
+use atomic_linked_list::atomic_map::AtomicMap;
+use owning_ref::BoxRefMut;
 
-static IOAPIC: Once<Mutex<IoApic>> = Once::new();
 
-
-pub fn init(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32)
-            -> Result<&'static Mutex<IoApic>, &'static str>
-{
-    let ioapic = try!(IoApic::create(active_table, id, phys_addr, gsi_base));
-    let res = IOAPIC.call_once( || {
-	    Mutex::new(ioapic)
-    });
-    Ok(res)
-}
-
-pub fn get_ioapic() -> Option<MutexGuard<'static, IoApic>> {
-	IOAPIC.try().map( |ioapic| ioapic.lock())
+lazy_static! {
+    /// The system-wide list of all `IoApic`s, of which there is usually one, 
+    /// but larger systems can have multiple IoApic chips.
+    static ref IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
 }
 
 
-/// An IoApic 
-#[derive(Debug)]
+/// Returns a reference to the list of IoApics.
+pub fn get_ioapics() -> &'static AtomicMap<u8, Mutex<IoApic>> {
+	&IOAPICS
+}
+
+/// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)
+/// and return the locked `IoApic`.
+pub fn get_ioapic(ioapic_id: u8) -> Option<MutexGuard<'static, IoApic>> {
+	IOAPICS.get(&ioapic_id).map(|ioapic| ioapic.lock())
+}
+
+/// Returns the first `IoApic` that was created, if any, after locking it.
+/// This is not necessarily the default one.
+pub fn get_first_ioapic() -> Option<MutexGuard<'static, IoApic>> {
+	IOAPICS.iter().next().map(|(_id, ioapic)| ioapic.lock())
+}
+
+
+
+#[repr(C)]
+struct IoApicRegisters {
+    /// Chooses which IoApic register the following access will write to or read from.
+    register_index:       WriteOnly<u32>,
+    _padding0:            [u32; 3],
+    /// The register containing the actual data that we want to read or write.
+    register_data:        Volatile<u32>,
+    _padding1:            [u32; 3],    
+}
+
+
+/// Each IoApic handles a maximum of 24 interrupt redirection entries. 
+const INTERRUPT_ENTRIES_PER_IOAPIC: u32 = 24; 
+
+
+/// A representation of an IoApic (x86-specific interrupt chip for I/O devices).
 pub struct IoApic {
-    pub page: MappedPages,
+    regs: BoxRefMut<MappedPages, IoApicRegisters>,
+    /// The ID of this IoApic.
     pub id: u8,
-    phys_addr: PhysicalAddress,
+    /// not yet used.
+    _phys_addr: PhysicalAddress,
+    /// The first global interrupt number handled by this IoApic.
+    /// Each IoApic only handles 24 interrupts, 
+    /// so the last interrupt number supported by thie IoApic is `gsi_base + 23`.
     gsi_base: u32,
 }
 
 impl IoApic {
-    fn create(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
+    /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`.
+    pub fn new(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
 
         let ioapic_mapped_page = {
-    		let new_page = try!(allocate_pages(1).ok_or("IoApic::create(): couldn't allocated virtual page!"));
+    		let new_page = try!(allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!"));
             let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
 			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
             try!(active_table.map_allocated_pages_to(new_page, frame, 
@@ -49,56 +88,61 @@ impl IoApic {
                 fa.deref_mut())
             )
         };
+
+        let ioapic_regs = BoxRefMut::new(Box::new(ioapic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IoApicRegisters>(0))?;
         
         let ioapic = IoApic {
-			page: ioapic_mapped_page,
+            regs: ioapic_regs,
 			id: id,
-            phys_addr: phys_addr,
+            _phys_addr: phys_addr,
             gsi_base: gsi_base,
 		};
-		debug!("Creating new IoApic: {:?}", ioapic); 
+		debug!("Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}", id, gsi_base, phys_addr); 
         Ok(ioapic)
     }
 
-    
+    /// Returns whether this IoApic handles the given `irq_num`, i.e.,
+    /// whether it's within the range of IRQs handled by this `IoApic`.
+    pub fn handles_irq(&self, irq_num: u32) -> bool {
+        (irq_num >= self.gsi_base) && 
+        (irq_num < (self.gsi_base + INTERRUPT_ENTRIES_PER_IOAPIC))
+    }
 
-    unsafe fn read_reg(&self, reg: u32) -> u32 {
+    fn read_reg(&mut self, register_index: u32) -> u32 {
         // to read from an IoApic reg, we first write which register we want to read from,
         // then we read the value from it in the next register
-        write_volatile((self.page.start_address() + 0x0) as *mut u32, reg);
-        read_volatile((self.page.start_address() + 0x10) as *const u32)
+        self.regs.register_index.write(register_index);
+        self.regs.register_data.read()
     }
 
-    unsafe fn write_reg(&mut self, reg: u32, value: u32) {
+    fn write_reg(&mut self, register_index: u32, value: u32) {
         // to write to an IoApic reg, we first write which register we want to write to,
         // then we write the value to it in the next register
-        write_volatile((self.page.start_address() + 0x0) as *mut u32, reg);
-        write_volatile((self.page.start_address() + 0x10) as *mut u32, value);
+        self.regs.register_index.write(register_index);
+        self.regs.register_data.write(value);
     }
 
-    /// I/O APIC id.
-    pub fn id(&self) -> u32 {
-        unsafe { self.read_reg(0x0) }
+    /// gets this IoApic's id.
+    pub fn id(&mut self) -> u32 {
+        self.read_reg(0x0)
     }
 
-    /// I/O APIC version.
-    pub fn version(&self) -> u32 {
-        unsafe { self.read_reg(0x1) }
+    /// gets this IoApic's version.
+    pub fn version(&mut self) -> u32 {
+        self.read_reg(0x1)
     }
 
-    /// I/O APIC arbitration id.
-    pub fn arbitration_id(&self) -> u32 {
-        unsafe { self.read_reg(0x2) }
+    /// gets this IoApic's arbitration id.
+    pub fn arbitration_id(&mut self) -> u32 {
+        self.read_reg(0x2)
     }
 
     /// Masks (disables) the given IRQ line. 
     /// NOTE: this function is UNTESTED!
     pub fn mask_irq(&mut self, irq: u8) {
         let irq_reg: u32 = 0x10 + (2 * irq as u32);
-        unsafe {
-            let direction = self.read_reg(irq_reg);
-            self.write_reg(irq_reg, direction | (1 << 16));
-        }
+        let direction = self.read_reg(irq_reg);
+        self.write_reg(irq_reg, direction | (1 << 16));
     }
 
     /// Set IRQ to an interrupt vector.
@@ -114,17 +158,17 @@ impl IoApic {
         let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
         let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
 
-        let mut high = unsafe { self.read_reg(high_index) };
+        let mut high = self.read_reg(high_index);
         high &= !0xff000000;
         high |= (lapic_id as u32) << 24;
-        unsafe { self.write_reg(high_index, high) };
+        self.write_reg(high_index, high);
 
-        let mut low = unsafe { self.read_reg(low_index) };
+        let mut low = self.read_reg(low_index);
         low &= !(1<<16);
         low &= !(1<<11);
         low &= !0x700;
         low &= !0xff;
         low |= vector as u32;
-        unsafe { self.write_reg(low_index, low) };
+        self.write_reg(low_index, low);
     }
 }

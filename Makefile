@@ -4,14 +4,13 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso kernel applications userspace cargo gdb doc docs view-doc view-docs
 
 
 ARCH ?= x86_64
 TARGET ?= $(ARCH)-theseus
 nano_core := kernel/build/nano_core-$(ARCH).bin
 iso := build/theseus-$(ARCH).iso
-grub_cfg := cfg/grub.cfg
 
 ifeq ($(bypass),yes)
 	BYPASS_RUSTC_CHECK := yes
@@ -170,8 +169,8 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-# boot : export RUST_FEATURES = --package nano_core --features mirror_serial
-boot : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features "mirror_serial"
+# boot : export RUST_FEATURES = --package captain --features mirror_serial
+boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_serial"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -185,35 +184,69 @@ boot: check_usb $(iso)
 iso: $(iso)
 grub-isofiles := build/grub-isofiles
 
-### This target builds an .iso OS image from the userspace and kernel.
-$(iso): kernel userspace $(grub_cfg)
-	@rm -rf $(grub-isofiles)
-### copy userspace module build files
-	@mkdir -p $(grub-isofiles)/modules
-	@cp userspace/build/* $(grub-isofiles)/modules/
-### copy kernel module build files and add the __k_ prefix
-	@for f in `find ./kernel/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__k_\1/p'` 2> /dev/null ; \
-	done
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
-### copy kernel boot image files
+
+### This target builds an .iso OS image from the applications and kernel.
+### It skips userspace for now, but you can add it back in easily on the line below.
+$(iso): kernel applications
+# after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
+<<<<<<< HEAD
 	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
 	@grub-mkrescue -o $(iso) $(grub-isofiles) 
+=======
+# autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
+
+
+# ### This target builds an .iso OS image from the userspace and kernel.
+# $(iso): kernel userspace
+# # after building kernel and userspace modules, copy the kernel boot image files
+# 	@mkdir -p $(grub-isofiles)/boot/grub
+# 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
+# # autogenerate the grub.cfg file
+#	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
+# 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
+>>>>>>> e812d9587ef766b068af6331d6dabccb0c5d0035
 	
+
+
+### this builds all applications, which run in the kernel
+applications: check_rustc check_xargo
+	@echo -e "\n======== BUILDING APPLICATIONS ========"
+	@$(MAKE) -C applications all
+# copy applications' object files
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in  ./applications/build/*.o ; do \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
+	done
+### TODO FIXME: not sure if it's correct to forcibly overwrite all module files with the applications' version (the cp line above),
+### since sometimes the kernel is build in debug mode but applications are alwasy built in release mode right now 
 
 
 ### this builds all userspace programs
 userspace: 
 	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
+# copy userspace binary files and add the __u_ prefix
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./userspace/build -type f` ; do \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+	done
 
 
 ### this builds all kernel components
 kernel: check_rustc check_xargo
 	@echo -e "\n======== BUILDING KERNEL ========"
 	@$(MAKE) -C kernel all
+# copy kernel module build files
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
+	done
+# copy the core library's object file
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 
 
 DOC_ROOT := build/doc/Theseus/index.html
@@ -240,6 +273,7 @@ view-docs: view-doc
 clean:
 	@rm -rf build
 	@$(MAKE) -C kernel clean
+	@$(MAKE) -C applications clean
 	@$(MAKE) -C userspace clean
 	
 

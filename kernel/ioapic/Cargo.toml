@@ -6,8 +6,19 @@ version = "0.1.0"
 
 [dependencies]
 spin = "0.4.5"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+volatile = "0.2.4"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.0"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 
 [dependencies.log]

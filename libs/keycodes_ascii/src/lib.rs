@@ -31,6 +31,7 @@ pub struct KeyboardModifiers {
     pub shift: bool,
     pub caps_lock: bool,
     pub num_lock: bool,
+    pub scroll_lock: bool,
 }
 
 impl KeyboardModifiers {
@@ -42,6 +43,7 @@ impl KeyboardModifiers {
             shift: false,
             caps_lock: false,
             num_lock: false,
+            scroll_lock: false,
         }
     }
 }

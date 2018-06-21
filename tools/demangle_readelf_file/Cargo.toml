@@ -1,0 +1,8 @@
+[package]
+name = "demangle_symbol"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+
+[dependencies]
+rustc-demangle = "=0.1.8"
+getopts = "0.2"

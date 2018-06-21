@@ -5,9 +5,9 @@ version = "0.1.0"
 
 
 [dependencies]
+spin = "0.4.5"
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
 multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
-once = "0.3.2"
 rlibc = "1.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
@@ -24,14 +24,11 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+# [dependencies.frame_buffer]
+# path = "../frame_buffer"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
-
-[dependencies.frame_buffer_3d]
-path = "../frame_buffer_3d"
+# [dependencies.frame_buffer_3d]
+# path = "../frame_buffer_3d"
 
 [dependencies.logger]
 path = "../logger"
@@ -48,29 +45,28 @@ path = "../mod_mgmt"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.exceptions]
-path = "../exceptions"
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
 
+[dependencies.task]
+path = "../task"
 
-### below: Extra dependencies to make sure things are built
-[dependencies.console]
-path = "../console"
+[dependencies.panic_handling]
+path = "../panic_handling"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 
 [features]
-loadable = [ "captain/loadable" ]
-mirror_serial = []
+loadable = []
 
 
 [lib]
-# This builds the nano_core as two types of libraries:
-# 1) staticlib: required to build a self-contained, fully-linked .a file that we can boot into.
-# 2) rlib: to build a partial object file that other crates can include and use without including the full nano_core code in their object file.
-# we choose rlib instead of dylib, because according to https://doc.rust-lang.org/reference/linkage.html, a dynamic library cannot be converted into static,
-# meaning that all "upstream dependencies are required to be in rlib format", so this must be rlib to other crates can be built against it
-# Furthermore we cannot build it as a dylib instead of rlib because he custom x86_64-theseus target triple doesn't support it (really, Xargo doesn't support it)
+# staticlib is required to build a self-contained, fully-linked .a file 
+# that we can jump to from the bootloader.
 crate-type = ["staticlib"]  
 
