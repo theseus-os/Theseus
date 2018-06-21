@@ -75,8 +75,6 @@ endif ## BYPASS_XARGO_CHECK
 ###################################################################################################
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
-## the most recent CPU model supported by QEMU 2.5.0
-QEMU_FLAGS += -cpu host
 ## multicore 
 QEMU_FLAGS += -smp 4
 
@@ -91,8 +89,13 @@ QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
+ifeq ($(host),yes)
+	QEMU_FLAGS += -cpu host -enable-kvm
+else
+	QEMU_FLAGS += -cpu Broadwell
+endif
 ifeq ($(kvm),yes)
-	#QEMU_FLAGS += -enable-kvm
+	QEMU_FLAGS += -enable-kvm
 endif
 
 
