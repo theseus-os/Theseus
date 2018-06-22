@@ -321,7 +321,7 @@ impl LocalApic {
         }
 
         lapic.set_nmi(nmi_lint, nmi_flags)?;
-        info!("Found new processor core ({:?})", lapic);
+        //info!("Found new processor core ({:?})", lapic);
 		Ok(lapic)
     }
 
@@ -332,7 +332,7 @@ impl LocalApic {
         let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
         // globally enable the apic by setting the xapic_enable bit
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
-        info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
+        //info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
             INTERRUPT_CHIP.store(InterruptChip::APIC, Ordering::Release);
         }
@@ -341,7 +341,7 @@ impl LocalApic {
         // see this: http://wiki.osdev.org/APIC#Logical_Destination_Mode
         if let Some(ref mut regs) = self.regs {
             regs.destination_format.write(0xFFFF_FFFF);
-            info!("enable_apic(): LDR = {:#X}", regs.destination_format.read());
+            //info!("enable_apic(): LDR = {:#X}", regs.destination_format.read());
             regs.lvt_timer.write(APIC_DISABLE);
             regs.lvt_perf_monitor.write(APIC_NMI);
             regs.lvt_lint0.write(APIC_DISABLE);
@@ -365,7 +365,7 @@ impl LocalApic {
         let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
         // globally enable the x2apic by setting both the x2apic and xapic enable bits
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
-        info!("LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
+        //info!("LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
             INTERRUPT_CHIP.store(InterruptChip::X2APIC, Ordering::Release);
         }
@@ -377,7 +377,7 @@ impl LocalApic {
         let ldr = rdmsr(IA32_X2APIC_LDR);
         let cluster_id = (ldr >> 16) & 0xFFFF; // highest 16 bits
         let logical_id = ldr & 0xFFFF; // lowest 16 bits
-        info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}", self.id(), self.version(), cluster_id, logical_id, is_bsp);
+        //info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}", self.id(), self.version(), cluster_id, logical_id, is_bsp);
         // NOTE: we're not yet using logical or cluster mode APIC addressing, but rather only physical APIC addressing
         
         unsafe {
@@ -444,7 +444,7 @@ impl LocalApic {
         } else {
             self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)?
         };
-        trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
+        //trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
         if let Some(ref mut regs) = self.regs {
             regs.timer_divide.write(3); // set divide value to 16 ( ... how does 3 => 16 )
@@ -469,13 +469,18 @@ impl LocalApic {
 
     fn init_timer_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
+<<<<<<< d199bea070ec52a97f950db83795e38828522b40
         let x2apic_period = if cfg!(apic_timer_fixed) {
             info!("apic_timer_fixed config: overriding X2APIC timer period to {}", 0x10000);
+=======
+        let x2apic_period = if cfg!(feature = "apic_timer_fixed") {
+            //info!("apic_timer_fixed config: overriding X2APIC timer period to {}", 0x10000);
+>>>>>>> initialization complete, link is up
             0x10000 // for bochs, which doesn't do x2apic periods right
         } else {
             self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };
-        trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
+        //trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
 
         unsafe {
             wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )

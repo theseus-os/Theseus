@@ -65,7 +65,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
     -> Result<&'static LockedIdt, &'static str> 
 {
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
-    info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
+    //info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // initialize early exception handlers
@@ -87,9 +87,9 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
     // try to load our new IDT    
     {
-        info!("trying to load IDT for BSP...");
+        //info!("trying to load IDT for BSP...");
         IDT.load();
-        info!("loaded IDT for BSP.");
+        //info!("loaded IDT for BSP.");
     }
 
     Ok(&IDT)
@@ -102,13 +102,13 @@ pub fn init_ap(apic_id: u8,
                double_fault_stack_top_unusable: VirtualAddress, 
                privilege_stack_top_unusable: VirtualAddress)
                -> Result<&'static LockedIdt, &'static str> {
-    info!("Setting up TSS & GDT for AP {}", apic_id);
+    //info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // We've already created the IDT initially (currently all APs share the BSP's IDT),
     // so we only need to re-load it here for each AP.
     IDT.load();
-    info!("loaded IDT for AP {}.", apic_id);
+    //info!("loaded IDT for AP {}.", apic_id);
     Ok(&IDT)
 }
 

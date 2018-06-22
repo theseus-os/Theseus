@@ -46,7 +46,19 @@ const DMAIDONE:                 u32 = 1<<3;
 const REG_RAL:                  u32 = 0xA200;
 const REG_RAH:                  u32 = 0xA204;
 
-const REG_LINKS:                u32 = 0x42A4; 
+const REG_AUTOC:                u32 = 0x42A0;
+const REG_AUTOC2:               u32 = 0x42A8;
+const REG_LINKS:                u32 = 0x42A4;
+
+const AUTOC_FLU:                u32 = 1;
+const AUTOC_LMS:                u32 = 4<<15; //KX/KX4//KR
+const AUTOC_10G_PMA_PMD_PAR:    u32 = 1<<7;
+const AUTOC2_10G_PMA_PMD_PAR:   u32 = 0<<8|0<<7; 
+const AUTOC_RESTART_AN:         u32 = 1<<12;
+
+const REG_EERD:                 u32 = 0x10014;
+
+/******************/
 
 const REG_EEPROM:               u32 = 0x0014;
 const REG_CTRL_EXT:             u32 = 0x0018;
@@ -524,9 +536,10 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         nic.write_command(REG_EIMC, 0x7FFFFFFF);
 
-        //global reset, write 1 to b3 of ctrl 
+        // master disable algorithm (sec 5.2.5.3.2)
+        //global reset = sw reset + link reset 
         let val = nic.read_command(REG_CTRL);
-        nic.write_command(REG_CTRL, val|CTRL_RST);
+        nic.write_command(REG_CTRL, val|CTRL_RST|CTRL_LRST);
 
         //wait 10 ms
         let _ =pit_clock::pit_wait(10000);
@@ -555,13 +568,23 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
 
         //wait for dma initialization done (RDRXCTL.DMAIDONE)
 
-        debug!("RDRXCTL: {:#X}",nic.read_command(REG_RDRXCTL));
+        debug!("RDRXCTL: {:#X}",nic.read_command(REG_RDRXCTL)); //b3 should be 1
 
         //setup PHY and the link
+        let val = nic.read_command(REG_AUTOC);
+        nic.write_command(REG_AUTOC, val|AUTOC_LMS|AUTOC_10G_PMA_PMD_PAR|AUTOC_FLU);
+
+        let val = nic.read_command(REG_AUTOC2);
+        nic.write_command(REG_AUTOC2, val|AUTOC2_10G_PMA_PMD_PAR);
+
+        let val = nic.read_command(REG_AUTOC);
+        nic.write_command(REG_AUTOC, val|AUTOC_RESTART_AN);
+
+
 
         debug!("STATUS: {:#X}", nic.read_command(REG_STATUS)); 
         debug!("CTRL: {:#X}", nic.read_command(REG_CTRL));
-        debug!("LINKS: {:#X}", nic.read_command(REG_LINKS)); //b7 should be 1 for link up 
+        debug!("LINKS: {:#X}", nic.read_command(REG_LINKS)); //b7 and b30 should be 1 for link up 
 
         /*
         e1000_nc.detect_eeprom();

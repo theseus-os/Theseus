@@ -40,6 +40,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
+extern crate ixgbe;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
