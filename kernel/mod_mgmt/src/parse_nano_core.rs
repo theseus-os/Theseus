@@ -120,7 +120,7 @@ pub fn parse_nano_core(
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
 fn parse_nano_core_symbol_file(
-    mapped_pages: MappedPages,
+    mut mapped_pages: MappedPages,
     text_pages:   MappedPages,
     rodata_pages: MappedPages,
     data_pages:   MappedPages,

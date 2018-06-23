@@ -18,8 +18,8 @@ build/
 /rust-os-gdb/
 
 # IDE files
-/.idea/
-/.vscode/
+*.idea/
+*.vscode/
 *.code-workspace
 
 # log files

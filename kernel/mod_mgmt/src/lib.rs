@@ -38,9 +38,12 @@ pub mod demangle;
 pub mod elf_executable;
 pub mod parse_nano_core;
 pub mod metadata;
+pub mod dependency;
 pub mod swap;
 
 use self::metadata::*;
+use self::dependency::{StrongDependency, WeakDependent};
+
 use demangle::demangle_symbol;
 
 
@@ -212,7 +215,7 @@ impl CrateNamespace {
         debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
-        let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+        let mut section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
 
         // iterate through the symbol table so we can find which sections are global (publicly visible)
         // we keep track of them here in a list
@@ -335,7 +338,7 @@ impl CrateNamespace {
                             return Err(".text section had wrong flags!");
                         }
 
-                        if let Some(ref tp) = section_pages.text_pages {
+                        if let Some(ref mut tp) = section_pages.text_pages {
                             // here: we're ready to copy the text section to the proper address
                             let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
                             if verbose_log { 
@@ -388,7 +391,7 @@ impl CrateNamespace {
                             return Err(".rodata section had wrong flags!");
                         }
 
-                        if let Some(ref rp) = section_pages.rodata_pages {
+                        if let Some(ref mut rp) = section_pages.rodata_pages {
                             // here: we're ready to copy the rodata section to the proper address
                             let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
                             if verbose_log { 
@@ -448,7 +451,7 @@ impl CrateNamespace {
                             return Err(".data section had wrong flags!");
                         }
                         
-                        if let Some(ref dp) = section_pages.data_pages {
+                        if let Some(ref mut dp) = section_pages.data_pages {
                             // here: we're ready to copy the data/bss section to the proper address
                             let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                             if verbose_log { 
@@ -503,7 +506,7 @@ impl CrateNamespace {
                         }
                         
                         // we still use DataSection to represent the .bss sections, since they have the same flags
-                        if let Some(ref dp) = section_pages.data_pages {
+                        if let Some(ref mut dp) = section_pages.data_pages {
                             // here: we're ready to fill the bss section with zeroes at the proper address
                             let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                             if verbose_log { 
@@ -601,17 +604,6 @@ impl CrateNamespace {
                 }
             }
 
-            // the target section is where we write the relocation data to.
-            // the source section is where we get the data from. 
-            // There is one target section per rela section, and one source section per entry in this rela section.
-            // The "info" field in the Rela section specifies which section is the target of the relocation.
-                
-            // get the target section (that we should have already loaded) for this Rela section
-            let target_sec = loaded_sections.get(&(sec.info() as usize)).ok_or_else(|| {
-                error!("Target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
-                "target section was not loaded for Rela section"
-            })?; 
-
             let rela_array = match sec.get_data(&elf_file) {
                 Ok(Rela64(rela_arr)) => rela_arr,
                 _ => {
@@ -620,11 +612,19 @@ impl CrateNamespace {
                 } 
             };
 
-            // the target MappedPages and its dependencies are common to all relocations for this target section
+            // The target section is where we write the relocation data to.
+            // The source section is where we get the data from. 
+            // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
+            // The "info" field in the Rela section specifies which section is the target of the relocation.
+                
+            // Get the target section (that we already loaded) for this rela_array Rela section.
+            let target_sec = loaded_sections.get(&(sec.info() as usize)).ok_or_else(|| {
+                error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
+                "target section was not loaded for Rela section"
+            })?; 
+            let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
+
             let target_sec_parent_crate_ref = target_sec.lock().parent_crate.upgrade().ok_or("Couldn't get target_sec's parent_crate")?;
-            let mut target_sec_parent_crate = target_sec_parent_crate_ref.write();
-            let target_mapped_pages = target_sec.lock().mapped_pages(&target_sec_parent_crate).ok_or("couldn't get target_sec's MappedPages for relocation")?;
-            let mut target_sec_dependencies: Vec<RelocationDependency> = Vec::new();
 
             // iterate through each relocation entry in the relocation array for the target_sec
             for rela_entry in rela_array {
@@ -633,7 +633,6 @@ impl CrateNamespace {
                         rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                 }
 
-                let target_offset = target_sec.lock().mapped_pages_offset + rela_entry.get_offset() as usize;
                 let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                 let source_sec_shndx = source_sec_entry.shndx() as usize; 
                 if verbose_log { 
@@ -657,10 +656,8 @@ impl CrateNamespace {
                         if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
                             const DATARELRO: &'static str = ".data.rel.ro.";
                             let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                let relro_name = source_sec_name.get(DATARELRO.len() ..)
-                                    .ok_or("Couldn't get name of .data.rel.ro. section")?;
-                                // warn!("relro relocation for sec {:?} -> {:?}", source_sec_name, relro_name);
-                                relro_name
+                                source_sec_name.get(DATARELRO.len() ..)
+                                    .ok_or("Couldn't get name of .data.rel.ro. section")?
                             }
                             else {
                                 source_sec_name
@@ -682,79 +679,22 @@ impl CrateNamespace {
                     }
                 }?;
 
-                // the source section details are specific to each relocation entry in the rela_array
-                let source_sec_parent_crate_ref = source_sec.lock().parent_crate.upgrade().ok_or("Couldn't get source_sec's parent_crate")?;
-                let source_vaddr = if Arc::ptr_eq(&target_sec_parent_crate_ref, &source_sec_parent_crate_ref) {
-                    // Here, the relocation target and source are in the same crate, so use the target_sec's parent_crate reference,
-                    // which was already locked, rather than trying to lock the same parent crate again, causing deadlock.
-                    let source_mapped_pages = source_sec.lock().mapped_pages(&target_sec_parent_crate).ok_or("couldn't get source_sec's MappedPages (same as target_sec) for relocation")?;
-                    source_mapped_pages.address_at_offset(source_sec.lock().mapped_pages_offset)
-                } else {
-                    // Here, the relocation target and source are in the different crate, so use the source_sec's actual parent_crate.
-                    let source_sec_parent_crate = source_sec_parent_crate_ref.write();
-                    let source_mapped_pages = source_sec.lock().mapped_pages(&source_sec_parent_crate).ok_or("couldn't get source_sec's MappedPages (different from target_sec) for relocation")?;
-                    source_mapped_pages.address_at_offset(source_sec.lock().mapped_pages_offset)
-                }.ok_or("couldn't get virtual address of source section")?;
-
-                // Write the actual relocation entries here
-                // There is a great, succint table of relocation types here
-                // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
-                match rela_entry.get_type() {
-                    R_X86_64_32 => {
-                        let target_ref: &mut u32 = try!(target_mapped_pages.as_type_mut(target_offset));
-                        let target_ptr = target_ref as *mut _ as usize;
-                        let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
-                        if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
-                                    
-                        *target_ref = source_val as u32;
-                    }
-                    R_X86_64_64 => {
-                        let target_ref: &mut u64 = try!(target_mapped_pages.as_type_mut(target_offset));
-                        let target_ptr = target_ref as *mut _ as usize;
-                        let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize);
-                        if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
-                                    
-                        *target_ref = source_val as u64;
-                    }
-                    R_X86_64_PC32 => {
-                        let target_ref: &mut u32 = try!(target_mapped_pages.as_type_mut(target_offset));
-                        let target_ptr = target_ref as *mut _ as usize;
-                        let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ptr);
-                        if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
-
-                        *target_ref = source_val as u32;
-                    }
-                    R_X86_64_PC64 => {
-                        let target_ref: &mut u64 = try!(target_mapped_pages.as_type_mut(target_offset));
-                        let target_ptr = target_ref as *mut _ as usize;
-                        let source_val = source_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ptr);
-                        if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ptr, source_val, source_sec.lock().name); }
-
-                        *target_ref = source_val as u64;
-                        }
-                    // R_X86_64_GOTPCREL => { 
-                    //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
-                    // }
-                    _ => {
-                        error!("found unsupported relocation {:?}\n  --> Are you building kernel crates with code-model=large?", rela_entry);
-                        return Err("found unsupported relocation type");
-                    }
+                let deps = write_relocation(
+                    rela_entry, 
+                    target_sec, 
+                    Some(target_sec_parent_crate_ref.clone()), 
+                    &source_sec, 
+                    verbose_log
+                )?;
+                if let Some((strong_dependency, weak_dependent)) = deps {
+                    target_sec_dependencies.push(strong_dependency);
+                    source_sec.lock().sections_dependent_on_me.push(weak_dependent);
                 }
-
-                // we only really care about tracking dependencies on other crates,
-                // since every crate has "dependencies" on itself. 
-                let target_dependency = RelocationDependency {
-                    section: source_sec,
-                    rel_type: rela_entry.get_type(),
-                    offset: target_offset,
-                };
-                target_sec_dependencies.push(target_dependency);          
             }
-
-            // add dependencies to the target section
-            target_sec.lock().dependencies.append(&mut target_sec_dependencies);
+            // add all the target section's dependencies at once
+            target_sec.lock().sections_i_depend_on.append(&mut target_sec_dependencies);
         }
-
+        // here, we're done with handling all the relocations in this entire crate
 
         // Two final remaining tasks before the new crate is ready to go:
         // 1) remapping each section's mapped pages to the proper permission bits, since we initially mapped them all as writable
@@ -1094,6 +1034,120 @@ fn map_crate_module(crate_module: &ModuleArea, mmi: &mut MemoryManagementInfo) -
     else {
         error!("map_crate_module(): error getting kernel's active page table to temporarily map crate_module {}.", crate_module.name());
         Err("map_crate_module(): couldn't get kernel's active page table")
+    }
+}
+
+
+/// Write the actual relocation entry.
+/// # Arguments
+/// * `rela_entry`: the relocation entry from the ELF file that specifies which relocation action to perform.
+/// * `target_sec`: the target section of the relocation, i.e., the section where the relocation data will be written to.
+/// * `target_sec_parent_crate`: the parent crate of the `target_sec`, which is an optional performance enhancement 
+///    that prevents this function from having to find the `target_sec`'s parent crate every time.
+/// * `source_sec`: the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `verbose_log`: whether to output verbose logging information about this relocation action.
+/// 
+/// # Returns
+/// If the `target_sec` and `source_sec` are from the same parent `LoadedCrate`, then `None` is returned.
+/// 
+/// If they are from different parent crates, then a tuple of a `StrongDependency` and a `WeakDependent` is returned.
+/// The `StrongDependency` should be added to the `target_sec.sections_i_depend_on`, 
+/// whereas the `WeakDependent` should be added to the `source_sec.sections_dependent_on_me`.
+fn write_relocation(
+    rela_entry: &xmas_elf::sections::Rela<u64>, 
+    target_sec: &StrongSectionRef,
+    target_sec_parent_crate: Option<StrongCrateRef>,
+    source_sec: &StrongSectionRef,
+    verbose_log: bool
+) -> Result<Option<(StrongDependency, WeakDependent)>, &'static str>
+{
+    let target_sec_parent_crate = match target_sec_parent_crate {
+        Some(pc) => pc,
+        _ => target_sec.lock().parent_crate.upgrade().ok_or("Couldn't get target_sec's parent_crate")?,
+    };
+
+    let source_sec_parent_crate = source_sec.lock().parent_crate.upgrade().ok_or("Couldn't get source_sec's parent_crate")?;
+    let source_and_target_have_same_parent_crate = Arc::ptr_eq(&target_sec_parent_crate, &source_sec_parent_crate);
+
+    let source_sec_vaddr = {
+        let parent_crate = source_sec_parent_crate.read();
+        let source_sec_locked = source_sec.lock();
+        let source_mapped_pages = source_sec_locked.mapped_pages(&parent_crate)
+            .ok_or("couldn't get source_sec's MappedPages (in its parent_crate) for relocation")?;
+        source_mapped_pages.address_at_offset(source_sec_locked.mapped_pages_offset)
+            .ok_or("couldn't get source_sec's VirtualAddress for relocation")?
+    };
+
+    let mut target_sec_parent_crate_locked = target_sec_parent_crate.write();
+    let (target_sec_mapped_pages, target_sec_mapped_pages_offset) = {
+        let mut locked_target = target_sec.lock();
+        (
+            locked_target.mapped_pages_mut(&mut target_sec_parent_crate_locked).ok_or("couldn't get target_sec's MappedPages for relocation")?,
+            locked_target.mapped_pages_offset
+        )
+    };
+    
+    // calculate exactly where we should write the relocation data to
+    let target_offset = target_sec_mapped_pages_offset + rela_entry.get_offset() as usize;
+
+    // Perform the actual relocation data writing here.
+    // There is a great, succint table of relocation types here
+    // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
+    let rela_type = rela_entry.get_type();
+    match rela_type {
+        R_X86_64_32 => {
+            let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
+            let source_val = source_sec_vaddr.wrapping_add(rela_entry.get_addend() as usize);
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            *target_ref = source_val as u32;
+        }
+        R_X86_64_64 => {
+            let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
+            let source_val = source_sec_vaddr.wrapping_add(rela_entry.get_addend() as usize);
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            *target_ref = source_val as u64;
+        }
+        R_X86_64_PC32 => {
+            let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
+            let source_val = source_sec_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ref as *mut _ as usize);
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            *target_ref = source_val as u32;
+        }
+        R_X86_64_PC64 => {
+            let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
+            let source_val = source_sec_vaddr.wrapping_add(rela_entry.get_addend() as usize).wrapping_sub(target_ref as *mut _ as usize);
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            *target_ref = source_val as u64;
+        }
+        // R_X86_64_GOTPCREL => { 
+        //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
+        // }
+        _ => {
+            error!("found unsupported relocation type {:?}\n  --> Are you compiling crates with 'code-model=large'?", rela_entry);
+            return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
+        }
+    }
+
+    // We only care about recording dependency information if the source and target sections are in different crates
+    if source_and_target_have_same_parent_crate {
+        Ok(None)
+    }
+    else {
+        // tell the source_sec that the target_sec is dependent upon it
+        let weak_dependent = WeakDependent {
+            section: Arc::downgrade(target_sec),
+            rel_type: rela_type,
+            mapped_pages_offset: target_sec_mapped_pages_offset,
+        };
+        
+        // tell the target_sec that it has a strong dependency on the source_sec
+        let strong_dependency = StrongDependency {
+            section: source_sec.clone(),
+            rel_type: rela_type,
+            mapped_pages_offset: target_sec_mapped_pages_offset,
+        };          
+
+        Ok(Some((strong_dependency, weak_dependent)))
     }
 }
 

@@ -1,4 +1,4 @@
-use alloc::{Vec, String, BTreeMap};
+use alloc::{Vec, BTreeMap};
 use metadata::StrongCrateRef;
 use super::{CrateNamespace, map_crate_module, PartiallyLoadedCrate};
 use memory::{ModuleArea, MappedPages, MemoryManagementInfo};
@@ -31,13 +31,14 @@ pub fn swap_crates(
 /// linking against existing symbols in this namespace, so this namespace serves as the `backup_namespace`. 
 /// It is this isolated preloading of crate sections that allows us to create a package of crates
 /// that are all new and can be swapped as a single unit. 
-fn load_crates_in_new_namespace<'a, I: Iterator<Item = &'a &'a ModuleArea> + Clone>(
+fn load_crates_in_new_namespace<'a, I>(
 	new_modules: I,
 	backup_namespace: &CrateNamespace,
 	kernel_mmi: &mut MemoryManagementInfo,
 	verbose_log: bool,
-) -> Result<CrateNamespace, &'static str> {
-
+) -> Result<CrateNamespace, &'static str> 
+	where I: Iterator<Item = &'a &'a ModuleArea> + Clone 
+{
 	// first we map all of the crates' ModuleAreas
 	let mappings = {
 		let mut mappings: Vec<MappedPages> = Vec::new(); //Vec::with_capacity(len);

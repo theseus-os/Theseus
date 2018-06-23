@@ -8,6 +8,7 @@ use spin::{Mutex, RwLock};
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
 use memory::MappedPages;
+use dependency::*;
 
 use super::SymbolMap;
 
@@ -131,8 +132,8 @@ pub fn global_symbol_map<'a, I>(sections: I, crate_name: &str) -> SymbolMap
 }
 
 
-/// Returns a map containing all symbols filtered to include only `LoadedSection`s 
-/// that satisfy the given predicate
+/// Returns a map containing all symbols,
+/// filtered to include only `LoadedSection`s that satisfy the given predicate
 /// (if the predicate returns true for a given section, then it is included in the map).
 /// 
 /// The symbols come from the sections in the given section iterator (if Some), 
@@ -169,7 +170,7 @@ pub fn symbol_map<'a, I, F>(
 /// A .bss section is considered the same as .data.
 #[derive(Debug, PartialEq)]
 pub enum SectionType {
-    Text, 
+    Text,
     Rodata,
     Data,
 }
@@ -198,16 +199,16 @@ pub struct LoadedSection {
     pub global: bool,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
-    /// The sections that this section depends on.
-    /// This is kept as a list of strong references because these dependency sections must outlast this section,
+    /// The list of other sections that this section depends on, i.e., "my required dependencies".
+    /// This is kept as a list of strong references because these sections must outlast this section,
     /// i.e., those sections cannot be removed/deleted until this one is deleted.
-    pub dependencies: Vec<RelocationDependency>,
-    // /// The sections that depend on this section. 
-    // /// This is kept as a list of Weak references because we must be able to remove other sections
-    // /// that are dependent upon this one before we remove this one.
-    // /// If we kept strong references to the sections dependent on this one, 
-    // /// then we wouldn't be able to remove/delete those sections before deleting this one.
-    // pub dependents: Vec<WeakSectionRef>,
+    pub sections_i_depend_on: Vec<StrongDependency>,
+    /// The list of other sections that depend on this section, i.e., "my dependents".
+    /// This is kept as a list of Weak references because we must be able to remove other sections
+    /// that are dependent upon this one before we remove this one.
+    /// If we kept strong references to the sections dependent on this one, 
+    /// then we wouldn't be able to remove/delete those sections before deleting this one.
+    pub sections_dependent_on_me: Vec<WeakDependent>,
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
@@ -220,7 +221,7 @@ impl LoadedSection {
         global: bool, 
         parent_crate: WeakCrateRef
     ) -> LoadedSection {
-        LoadedSection::with_dependencies(typ, name, hash, mapped_pages_offset, size, global, parent_crate, Vec::new())
+        LoadedSection::with_dependencies(typ, name, hash, mapped_pages_offset, size, global, parent_crate, Vec::new(), Vec::new())
     }
 
     /// Same as `LoadedSection::new()`, but uses the given `dependencies` instead of the default empty list.
@@ -232,10 +233,11 @@ impl LoadedSection {
         size: usize,
         global: bool, 
         parent_crate: WeakCrateRef,
-        dependencies: Vec<RelocationDependency>
+        sections_i_depend_on: Vec<StrongDependency>,
+        sections_dependent_on_me: Vec<WeakDependent>,
     ) -> LoadedSection {
         LoadedSection {
-            typ, name, hash, mapped_pages_offset, size, global, parent_crate, dependencies
+            typ, name, hash, mapped_pages_offset, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me
         }
     }
 
@@ -283,17 +285,3 @@ impl LoadedSection {
     }
 }
 
-
-/// A representation that the section object containing this struct
-/// has a dependency on the given `section`.
-/// The dependent section is not specifically included here;
-/// it's implicit that the owner of this object is the one who depends on the `section`.
-///  
-/// A dependency is a strong reference to another `LoadedSection`,
-/// because a given section should not be removed if there are still sections that depend on it.
-#[derive(Debug)]
-pub struct RelocationDependency {
-    pub section: StrongSectionRef,
-    pub rel_type: u32,
-    pub offset: usize,
-}

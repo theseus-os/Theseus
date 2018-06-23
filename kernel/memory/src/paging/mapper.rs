@@ -463,7 +463,7 @@ impl MappedPages {
     /// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_type_mut<T>(&self, offset: usize) -> Result<&mut T, &'static str> {
+    pub fn as_type_mut<T>(&mut self, offset: usize) -> Result<&mut T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
@@ -550,7 +550,7 @@ impl MappedPages {
     /// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. 
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_slice_mut<T>(&self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
+    pub fn as_slice_mut<T>(&mut self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
