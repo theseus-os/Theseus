@@ -11,13 +11,61 @@ use memory::{ModuleArea, MappedPages, MemoryManagementInfo};
 /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C'`.
 /// 3) Remove module `C` and clean it up, e.g., removing its entries from the system map.
 pub fn swap_crates(
-	swap_pairs: BTreeMap<StrongCrateRef, &ModuleArea>,
+	swap_pairs: Vec<(StrongCrateRef, &ModuleArea)>,
 	backup_namespace: &CrateNamespace,
 	kernel_mmi: &mut MemoryManagementInfo,
 	verbose_log: bool,
 ) -> Result<(), &'static str> {
 	// create a new CrateNamespace and load all of the new crate modules into it
-	let new_namespace = load_crates_in_new_namespace(swap_pairs.values(), backup_namespace, kernel_mmi, verbose_log)?;
+	let swap_pairs = swap_pairs.into_iter();
+	let module_iter = swap_pairs.clone().map(|pair| pair.1);
+	let new_namespace = load_crates_in_new_namespace(module_iter, backup_namespace, kernel_mmi, verbose_log)?;
+
+	for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
+		debug!("====================== Loaded new crate \"{}\"  ===========================", crate_name);
+		let krate = crate_ref.read();
+		krate.text_pages.as_ref().map(|tp|   debug!("    text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
+		krate.rodata_pages.as_ref().map(|rp| debug!("    rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
+		krate.data_pages.as_ref().map(|dp|   debug!("    data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
+	}
+
+	// Now that we have loaded all of the new modules into the new namepsace in isolation,
+	// we simply need to remove all of the old crates
+	// and fix up all of the relocations `WeakDependents` for each of the existing sections
+	// that depend on the old crate that we're replacing here,
+	// such that they refer to the new_module instead of the old_crate.
+	for (old_crate, _new_module) in swap_pairs {
+		let old = old_crate.read();
+		debug!("====================== Replacing old crate \"{}\"  ===========================", old.crate_name);
+		old.text_pages.as_ref().map(|tp|   debug!("    text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
+		old.rodata_pages.as_ref().map(|rp| debug!("    rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
+		old.data_pages.as_ref().map(|dp|   debug!("    data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
+
+		for sec_ref in &old.sections {
+			let sec = sec_ref.lock();
+			if false {
+				if !sec.sections_i_depend_on.is_empty() {
+					debug!("    Section \"{}\": sections i depend on (strong dependencies):", sec.name);
+					for strong_dep in &sec.sections_i_depend_on {
+						debug!("        {}", strong_dep.section.lock().name);
+					}
+				}
+			}
+			if true {
+				if !sec.sections_dependent_on_me.is_empty() {
+					debug!("    Section \"{}\": sections dependent on me (weak dependents):", sec.name);
+					for weak_dep in &sec.sections_dependent_on_me {
+						if let Some(wds) = weak_dep.section.upgrade() {
+							debug!("        {}", wds.lock().name);
+						}
+						else {
+							debug!("        ERROR: weak dependent failed to upgrade()");
+						}
+					}
+				}
+			}
+		}
+	}
 
 
 	Err("unfinished")
@@ -37,7 +85,7 @@ fn load_crates_in_new_namespace<'a, I>(
 	kernel_mmi: &mut MemoryManagementInfo,
 	verbose_log: bool,
 ) -> Result<CrateNamespace, &'static str> 
-	where I: Iterator<Item = &'a &'a ModuleArea> + Clone 
+	where I: Iterator<Item = &'a ModuleArea> + Clone 
 {
 	// first we map all of the crates' ModuleAreas
 	let mappings = {

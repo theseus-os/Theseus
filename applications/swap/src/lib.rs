@@ -1,3 +1,4 @@
+
 //! This application is for performing module management, such as swapping.
 
 
@@ -13,7 +14,8 @@ extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 
-use alloc::{Vec, String};
+use core::ops::DerefMut;
+use alloc::{Vec, String, BTreeMap};
 use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
@@ -103,7 +105,7 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, Stri
 
 /// Performs the actual swapping of modules.
 fn swap_modules(pairs: Vec<(&str, &str)>) -> Result<(), String> {
-    let modules = {
+    let swap_pairs = {
         let mut mods: Vec<(StrongCrateRef, &ModuleArea)> = Vec::with_capacity(pairs.len());
         for (o, n) in pairs {
             println!("   Looking for ({},{})", o, n);
@@ -117,12 +119,14 @@ fn swap_modules(pairs: Vec<(&str, &str)>) -> Result<(), String> {
         mods
     };
 
-    for (old_crate, new_mod) in modules {
-        println!("Replacing old crate {:?} with new module {:?}", old_crate, new_mod);
-    }
-
-    Err("swap_modules() is unimplemented!".to_string())
-
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+    mod_mgmt::swap::swap_crates(
+        swap_pairs, 
+        mod_mgmt::get_default_namespace(), 
+        kernel_mmi.deref_mut(), 
+        true
+    ).map_err(|e| e.to_string())
 }
 
 

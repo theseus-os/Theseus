@@ -1,3 +1,5 @@
+//! Structures for representing dependencies between sections.
+//! 
 //! Dependencies work as follows:
 //!  
 //! If one section `A` references or uses another section `B`, 
@@ -26,7 +28,7 @@
 //! To complete the swap and fully replace `B` with `B'`, 
 //! we would do the following (pseudocode):
 //! ```
-//! for secA in `B.sections_dependent_on_me` {
+//! for secA in B.sections_dependent_on_me {
 //!     change secA's relocation to point to B'
 //!     add WeakDependent(secA) to B'.sections_dependent_on_me
 //!     remove StrongDependency(B) from secA.sections_i_depend_on

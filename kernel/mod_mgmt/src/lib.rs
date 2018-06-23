@@ -776,18 +776,16 @@ impl CrateNamespace {
 
     /// A convenience function that returns a weak reference to the `LoadedSection`
     /// that matches the given name (`demangled_full_symbol`), if it exists in the system map.
+    /// Otherwise, it returns None if the symbol does not exist.
     fn get_symbol_internal(&self, demangled_full_symbol: &str) -> Option<WeakSectionRef> {
         self.symbol_map.lock().get(demangled_full_symbol).cloned()
     }
 
 
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string.
-    /// 
-    /// # Note
-    /// This is not an interrupt-safe function. DO NOT call it from within an interrupt handler context.
     pub fn get_symbol(&self, demangled_full_symbol: &str) -> WeakSectionRef {
         self.get_symbol_internal(demangled_full_symbol)
-            .unwrap_or(Weak::default())
+            .unwrap_or_else(|| Weak::default())
     }
 
 
@@ -831,8 +829,9 @@ impl CrateNamespace {
                 return weak_sec;
             }
             else {
-                error!("get_symbol_or_load(): found symbol \"{}\" in backup_namespace, but unexpectedly couldn't get its section's parent crate!",
+                error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
                     demangled_full_symbol);
+                return Weak::default();
             }
         }
 
