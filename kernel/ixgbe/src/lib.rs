@@ -15,6 +15,8 @@ extern crate memory;
 extern crate pci; 
 extern crate pit_clock;
 
+pub mod test_tx;
+
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
 use spin::Once;
@@ -57,6 +59,21 @@ const AUTOC2_10G_PMA_PMD_PAR:   u32 = 0<<8|0<<7;
 const AUTOC_RESTART_AN:         u32 = 1<<12;
 
 const REG_EERD:                 u32 = 0x10014;
+
+const REG_HLREG0:               u32 = 0x4240;
+const REG_DMATXCTL:             u32 = 0x4A80;
+const REG_DTXTCPFLGL:           u32 = 0x4A88;
+const REG_DTXTCPFLGH:           u32 = 0x4A8C;
+const REG_DCATXCTRL:            u32 = 0x600C;
+const REG_RTTDCS:               u32 = 0x4900;
+
+const REG_TDBAL:                u32 = 0x6000;
+const REG_TDBAH:                u32 = 0x6004;
+const REG_TDLEN:                u32 = 0x6008;
+const REG_TDH:                  u32 = 0x6010;
+const REG_TDT:                  u32 = 0x6018;
+const REG_TXDCTL:               u32 = 0x6028;
+
 
 /******************/
 
@@ -492,6 +509,128 @@ impl Nic{
 
         }
 
+        /// Initialize transmit descriptors 
+        pub fn tx_init(&mut self) -> Result<(), &'static str>  {
+                debug!("HLREG0: {:#X}", self.read_command(REG_HLREG0));
+
+                let val = self.read_command(REG_DMATXCTL);
+                self.write_command(REG_DMATXCTL, val & 0xFFFF_FFFE);// set TE (b1) to 0 
+
+                //let val = self.read_command(REG_RTTDCS);
+                //self.write_command(REG_RTTDCS,val | 1<<6 ); // set b6 to 1
+
+
+                const NO_BYTES: usize = 16*(E1000_NUM_TX_DESC) + 128;
+                
+                let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
+                let ptr;
+                match dma_ptr{
+                        Some(_x) => ptr = dma_ptr.unwrap(),
+                        None => return Err("ixgbe:tx_init Couldn't allocate DMA mem for tx descriptor"),
+                } 
+
+                // make sure memory is 128 byte aligned
+                let ptr1 = ptr + (128-(ptr%128));
+                debug!("tx pointers: {:#X}, {:#X}",ptr, ptr1);
+
+                let raw_ptr = ptr1 as *mut e1000_tx_desc;
+                unsafe{ self.tx_descs = Vec::from_raw_parts(raw_ptr, 0, E1000_NUM_TX_DESC);}
+                //unsafe{debug!("Address of Rx desc: {:?}, value: {:?}",ptr, *pr1);}
+               
+                for _i in 0..E1000_NUM_TX_DESC
+                {
+                        let mut var = e1000_tx_desc {
+                                addr: 0,
+                                length: 0,
+                                cso: 0,
+                                cmd: 0,
+                                status: 0,
+                                css: 0,
+                                special : 0,
+                        };
+                        self.tx_descs.push(var);
+                }
+
+                //TODO: don't need this, use ptr1
+                let slc = self.tx_descs.as_slice(); 
+                let slc_ptr = slc.as_ptr();
+                let v_addr = slc_ptr as usize;
+                debug!("v address of tx_desc: {:x}",v_addr);
+
+                let ptr = try!(translate_v2p(v_addr));
+                
+                debug!("p address of tx_desc: {:x}",ptr);
+
+                let ptr1 = (ptr & 0xFFFF_FFFF) as u32;
+                let ptr2 = (ptr>>32) as u32;
+                
+                self.write_command(REG_TDBAH, ptr2 );
+                self.write_command(REG_TDBAL, ptr1);                
+                
+                //now setup total length of descriptors
+                self.write_command(REG_TDLEN, (E1000_NUM_TX_DESC as u32) * 16);                
+                
+                //setup numbers
+                self.write_command( REG_TDH, 0);
+                self. write_command(REG_TDT,0);
+                self.tx_cur = 0;
+
+                let val = self.read_command(REG_DMATXCTL);
+                self.write_command(REG_DMATXCTL, val | 1);// set TE (b1) to 1 
+
+                //let val = self.read_command(REG_RTTDCS);
+                //self.write_command(REG_RTTDCS,val & 0xFFFF_FFBF); // set b6 to 0
+                
+                let val = self.read_command(REG_TXDCTL);
+                self.write_command(REG_TXDCTL, val | 1<<25); //set b25 to 1
+
+                while self.read_command(REG_TXDCTL)& 1<<25 != 1<<25{} 
+
+                Ok(())
+                 
+        }  
+
+        /// Send a packet, called by a function higher in the network stack
+        /// p_data is address of tranmit buffer, must be pointing to contiguous memory
+        pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
+                
+                //debug!("Value of tx descriptor address_translated: {:x}",ptr);
+                /* let t_ptr = translate_v2p(p_data);
+                let ptr;
+                match t_ptr{
+                        Some(_x) => ptr = t_ptr.unwrap(),
+                        None => return Err("e1000:send_packet Couldn't translate address for tx buffer"),
+                } */ 
+                //let ptr = (translate_v2p(p_data)).unwrap();
+
+                let ptr = try!(translate_v2p(p_data));
+                
+                //debug!("Value of tx descriptor address_translated: {:x}",ptr);
+                self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
+                self.tx_descs[self.tx_cur as usize].length = p_len;
+                self.tx_descs[self.tx_cur as usize].cmd = (CMD_EOP | CMD_IFCS | CMD_RPS | CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
+                self.tx_descs[self.tx_cur as usize].status = 0;
+
+                let old_cur: u8 = self.tx_cur as u8;
+                self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
+                debug!("THD {}",self.read_command(REG_TDH));
+                debug!("TDT!{}",self.read_command(REG_TDT));
+                self. write_command(REG_TDT, self.tx_cur as u32);   
+                debug!("THD {}",self.read_command(REG_TDH));
+                debug!("TDT!{}",self.read_command(REG_TDT));
+                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
+                debug!("Waiting for packet to send!");
+                
+
+                while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
+                        //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                        //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
+                }  //bit 0 should be set when done
+                debug!("Packet is sent!");  
+                Ok(())
+        }
+
 }
 
 /// static variable to represent the network card
@@ -585,6 +724,14 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         debug!("STATUS: {:#X}", nic.read_command(REG_STATUS)); 
         debug!("CTRL: {:#X}", nic.read_command(REG_CTRL));
         debug!("LINKS: {:#X}", nic.read_command(REG_LINKS)); //b7 and b30 should be 1 for link up 
+
+        //Initialize statistics
+
+
+        //Initialize transmit .. legacy descriptors
+
+        try!(nic.tx_init());
+        debug!("TXDCTL: {:#X}", nic.read_command(REG_TXDCTL)); //b25 should be 1 for tx queue enable
 
         /*
         e1000_nc.detect_eeprom();
