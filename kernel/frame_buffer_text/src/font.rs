@@ -266,29 +266,17 @@ pub fn init()-> Result<(), &'static str > {
 
     for i in 0..FONT_BASIC.len(){
 
-    unsafe {
-        for y in 0..CHARACTER_HEIGHT{
-            let num = FONT_BASIC[i][y];
-            for x in 0..8 {
-                if num & (0x80 >> x) !=0 {
-                    
-                    FONT_PIXEL[i][y][x+1] = 1; 
-                    if i==65 {
-                        let a = FONT_PIXEL[i][y][x+1];
-                    }   
-                } else {
-                    //frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
-                /* linebuffer[y][(x+i)*3] = (BACKGROUND_COLOR as usize & 255) as u8;
-                    linebuffer[y][(x+i)*3+1] = (BACKGROUND_COLOR as usize >> 8 & 255) as u8; 
-                    linebuffer[y][(x+i)*3+2] = (BACKGROUND_COLOR as usize >> 16 & 255) as u8;
-                */}
+        unsafe {
+            for y in 0..CHARACTER_HEIGHT{
+                let num = FONT_BASIC[i][y];
+                for x in 0..8 {
+                    if num & (0x80 >> x) !=0 {
+                        FONT_PIXEL[i][y][x+1] = 1; 
+                    }
+                }
             }
         }
     }
-
-    }
-
-   
 
     Ok(())
 }

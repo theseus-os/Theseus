@@ -27,8 +27,8 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_BASIC};
 const BUFFER_WIDTH:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
 const BUFFER_HEIGHT:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
 
-pub const FONT_COLOR:usize = 0x90ee90;
-const BACKGROUND_COLOR:usize = 0x000000;
+pub const FONT_COLOR:u32 = 0x93ee90;
+const BACKGROUND_COLOR:u32 = 0x000000;
 
 pub mod font;
 
@@ -242,11 +242,17 @@ impl FrameTextBuffer {
                     //if character != b' ' {
                         let ascii_code = line[i].ascii_character as usize;
                         for x in 0..8 {
-                            if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
-                                linebuffer[y][addr..addr+3].copy_from_slice(&font_color);
-                            } else {
-                                linebuffer[y][addr..addr+3].copy_from_slice(&bg_color);
-                            }
+                            let mask:u32 = font::FONT_PIXEL[ascii_code][y][x] as u32 * 0xFFFFFF;
+                            //if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
+                                let color:u32 = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
+                                let mut color_array: [u8;4] = unsafe {
+                                    mem::transmute(color)
+                                };
+                                color_array.reverse();
+                                linebuffer[y][addr..addr+3].copy_from_slice(&color_array[1..4]);
+                            //} else {
+                                //linebuffer[y][addr..addr+3].copy_from_slice(&bg_color);
+                            //}
                             addr += 3;
                         }
                         addr += 3;
@@ -280,7 +286,7 @@ impl ScreenChar {
     }
 }
 
-fn parsecolor(color:usize) -> [u8;3] {
+fn parsecolor(color:u32) -> [u8;3] {
     let red = (color >> 16) as u8;
     let green = ((color >> 8) & 0xff) as u8;
     let blue = (color & 0xff) as u8;
