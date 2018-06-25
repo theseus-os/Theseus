@@ -1,7 +1,7 @@
 pub const CHARACTER_WIDTH:usize = 9;
 pub const CHARACTER_HEIGHT:usize = 16;
 
-pub static mut FONT_PIXEL:[[[u8;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]=[[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256];
+pub static mut FONT_PIXEL:[[[u64;3];CHARACTER_HEIGHT];256]=[[[0;3];CHARACTER_HEIGHT];256];
 
 pub const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -268,12 +268,17 @@ pub fn init()-> Result<(), &'static str > {
 
         unsafe {
             for y in 0..CHARACTER_HEIGHT{
-                let num = FONT_BASIC[i][y];
-                for x in 0..8 {
-                    if num & (0x80 >> x) !=0 {
-                        FONT_PIXEL[i][y][x+1] = 1; 
+                let char_font = FONT_BASIC[i][y] as u64;
+
+                FONT_PIXEL[i][y][0] = ((((char_font & 0x80)/0x80) * 0xFFFFFF) << 5*8) | ((((char_font & 0x40)/0x40) * 0xFFFFFF) << 2*8) | ((((char_font & 0x20)/0x20) * 0xFFFFFF) >> 8);
+                FONT_PIXEL[i][y][1] = ((((char_font & 0x20)/0x20) * 0xFFFFFF) << 7*8) | ((((char_font & 0x10)/0x10) * 0xFFFFFF) << 4*8) | ((((char_font & 0x8)/0x8) * 0xFFFFFF) << 8) | ((((char_font & 0x4)/0x4) * 0xFFFFFF) >> 2*8);
+                FONT_PIXEL[i][y][2] = ((((char_font & 0x4)/0x4) * 0xFFFFFF) << 6*8) | ((((char_font & 0x2)/0x2) * 0xFFFFFF) << 3*8) | ((char_font & 0x1) * 0xFFFFFF);
+
+                /*for x in 0..8 {
+                    if char_font & (0x80 >> x) !=0 {
+                        //FONT_PIXEL[i][y][x+1] = 1; 
                     }
-                }
+                }*/
             }
         }
     }

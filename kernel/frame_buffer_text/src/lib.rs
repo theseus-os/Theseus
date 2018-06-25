@@ -233,6 +233,16 @@ impl FrameTextBuffer {
         let font_color = parsecolor(FONT_COLOR);
         let bg_color = parsecolor(BACKGROUND_COLOR);
 
+        let f = FONT_COLOR as u64;
+        let f1 = (f<<5*8)|(f<<2*8)|(f>>8);
+        let f2 = (f<<7*8)|(f<<4*8)|(f<<8)|(f>>2*8);
+        let f3 = (f<<6*8)|(f<<3*8)|f;
+
+        let b = BACKGROUND_COLOR as u64;
+        let b1 = (b<<5*8)|(b<<2*8)|(b>>8); 
+        let b2 = (b<<7*8)|(b<<4*8)|(b<<8)|(b>>2*8);
+        let b3 = (b<<6*8)|(b<<3*8)|b;
+
 
         unsafe {// TODO
             for y in 0..CHARACTER_HEIGHT {
@@ -241,10 +251,20 @@ impl FrameTextBuffer {
                     let character = line[i].ascii_character;
                     //if character != b' ' {
                         let ascii_code = line[i].ascii_character as usize;
-                        for x in 0..8 {
-                            let mask:u32 = font::FONT_PIXEL[ascii_code][y][x] as u32 * 0xFFFFFF;
+                        for x in 0..3 {
+                            if (character == b'a' && y == 5) {
+                                trace!("Wenqiu: {} #{} {:#x}",character, x, font::FONT_PIXEL[ascii_code][y][x]);
+                            }
+                            let mask:u64 = font::FONT_PIXEL[ascii_code][y][x];
+                            let color = f1 & mask | b1 & (!mask);
+                            let mut color_array: [u8;8] = unsafe {
+                                    mem::transmute(color)
+                            };
+                            color_array.reverse();
+                            linebuffer[y][addr..addr+8].copy_from_slice(&color_array);
+                            addr += 8;
                             //if (font::FONT_PIXEL[ascii_code][y][x])!= 0 {
-                                let color:u32 = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
+                            /*    let color:u32 = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
                                 let mut color_array: [u8;4] = unsafe {
                                     mem::transmute(color)
                                 };
@@ -252,8 +272,8 @@ impl FrameTextBuffer {
                                 linebuffer[y][addr..addr+3].copy_from_slice(&color_array[1..4]);
                             //} else {
                                 //linebuffer[y][addr..addr+3].copy_from_slice(&bg_color);
-                            //}
-                            addr += 3;
+                            //}*/
+                            //addr += 3;
                         }
                         addr += 3;
                     //}
