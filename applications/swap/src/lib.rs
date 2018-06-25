@@ -28,6 +28,7 @@ use itertools::Itertools;
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
+    opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
 
 
     let matches = match opts.parse(&args) {
@@ -44,6 +45,8 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
+    let verbose = matches.opt_present("v");
+
     let matches = matches.free.join(" ");
     println!("matches: {}", matches);
 
@@ -58,7 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     println!("mod_pairs: {:?}", mod_pairs);
 
-    match swap_modules(mod_pairs) {
+    match swap_modules(mod_pairs, verbose) {
         Ok(_) => 0,
         Err(e) => {
             println!("Error: {}", e);
@@ -70,8 +73,8 @@ pub fn main(args: Vec<String>) -> isize {
 
 /// Takes a string of arguments and parses it into a series of pairs, formatted as 
 /// `(OLD,NEW) (OLD,NEW) (OLD,NEW)...`
-fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, String> {
-    let mut v: Vec<(&str, &str)> = Vec::new();
+fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option<String>)>, String> {
+    let mut v: Vec<(&str, &str, Option<String>)> = Vec::new();
     let mut open_paren_iter = args.match_indices('(');
 
     // looking for open parenthesis
@@ -81,16 +84,19 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, Stri
         let parsed = the_rest.find(')')
             .and_then(|end_index| the_rest.get(.. end_index))
             .and_then(|inside_paren| {
-                inside_paren.split(',')
-                    .map(str::trim)
-                    .next_tuple()
+                let mut token_iter = inside_paren.split(',').map(str::trim);
+                token_iter.next().and_then(|first| {
+                    token_iter.next().map(|second| {
+                        (first, second, token_iter.next())
+                    })
+                })
             });
-        if let Some((o, n)) = parsed {
-            println!("found pair: {},{}", o, n);
-            v.push((o, n));
-        }
-        else {
-            return Err("list of module pairs is formatted incorrectly.".to_string());
+        match parsed {
+            Some((o, n, override_name)) => {
+                println!("found triple: {:?}, {:?}, {:?}", o, n, override_name);
+                v.push((o, n, override_name.map(|n| n.to_string())));
+            }
+            _ => return Err("list of module pairs is formatted incorrectly.".to_string()),
         }
     }
 
@@ -104,15 +110,16 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str)>, Stri
 
 
 /// Performs the actual swapping of modules.
-fn swap_modules(pairs: Vec<(&str, &str)>) -> Result<(), String> {
+fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> Result<(), String> {
     let swap_pairs = {
-        let mut mods: Vec<(StrongCrateRef, &ModuleArea)> = Vec::with_capacity(pairs.len());
-        for (o, n) in pairs {
-            println!("   Looking for ({},{})", o, n);
+        let mut mods: Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(pairs.len());
+        for (o, n, override_name) in pairs {
+            println!("   Looking for ({},{})  [override: {:?}]", o, n, override_name);
             mods.push(
                 (
                     mod_mgmt::get_default_namespace().get_crate(o).ok_or_else(|| format!("Couldn't find old crate \"{}\".", o))?,
-                    get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?
+                    get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?,
+                    override_name
                 )
             );
         }
@@ -121,11 +128,10 @@ fn swap_modules(pairs: Vec<(&str, &str)>) -> Result<(), String> {
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    mod_mgmt::swap::swap_crates(
+    mod_mgmt::get_default_namespace().swap_crates(
         swap_pairs, 
-        mod_mgmt::get_default_namespace(), 
         kernel_mmi.deref_mut(), 
-        true
+        verbose_log
     ).map_err(|e| e.to_string())
 }
 
@@ -136,6 +142,7 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: swap (OLD1,NEW1) [(OLD2,NEW2)]...
+const USAGE: &'static str = "Usage: swap (OLD1,NEW1[,NEW_NAME1]) [(OLD2,NEW2[,NEW_NAME2])]...
 Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.
-The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"__k_my_crate\").";
+The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"__k_my_crate\").
+A NEW_NAME string is optional, which will override the crate name derived from the NEW module.";

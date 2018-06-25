@@ -38,6 +38,7 @@
 //! ```
 //! 
 
+use xmas_elf;
 use metadata::{StrongSectionRef, WeakSectionRef};
 
 /// A representation that the owner `A` of (a `LoadedSection` object containing) this struct
@@ -53,13 +54,8 @@ use metadata::{StrongSectionRef, WeakSectionRef};
 pub struct StrongDependency {
     /// A strong reference to the `LoadedSection` `B` that the owner of this struct (`A`) depends on.
     pub section: StrongSectionRef,
-    /// The type of relocation calculation that is performed 
-    /// to connect the included `section` `B` to the `LoadedSection` `A` that owns this struct.
-    pub rel_type: u32,
-    /// The offset into the `section`'s (`B`'s) backing `MappedPages` (owned by the `B`'s `parent_crate`)
-    /// where the relocation action should be applied, i.e., the relocation destination.
-    /// The size of that relocation is actually determined by the `rel_type`. 
-    pub mapped_pages_offset: usize,
+    /// The details of the relocation action that was performed.
+    pub relocation: RelocationEntry,
 }
 
 
@@ -78,11 +74,32 @@ pub struct StrongDependency {
 pub struct WeakDependent {
     /// A weak reference to the `LoadedSection` `A` that depends on the owner `B` of this struct.
     pub section: WeakSectionRef,
+    /// The details of the relocation action that was performed.
+    pub relocation: RelocationEntry,
+}
+
+
+/// The information necessary to calculate and write a relocation value,
+/// based on a source section and a target section, in which a value 
+/// based on the location of the source section is written somwhere in the target section.
+#[derive(Debug, Copy, Clone)]
+pub struct RelocationEntry {
     /// The type of relocation calculation that is performed 
-    /// to connect the owner `B` to the `section` `A` in this struct. 
-    pub rel_type: u32,
-    /// The offset into the owner `B`'s backing `MappedPages` (owned by the owner's `parent_crate`)
-    /// where the relocation action should be applied, i.e., the relocation destination.
-    /// The size of that relocation is actually determined by the `rel_type`. 
-    pub mapped_pages_offset: usize,
+    /// to connect the target section to the source section.
+    pub typ: u32,
+    /// The value that is added to the source section's address 
+    /// when performing the calculation of the source value that is written to the target section.
+    pub addend: usize,
+    /// The offset from the starting virtual address of the target section
+    /// that specifies where the relocation value should be written.
+    pub offset: usize,
+}
+impl RelocationEntry {
+    pub fn from_elf_relocation(rela_entry: &xmas_elf::sections::Rela<u64>) -> RelocationEntry {
+        RelocationEntry {
+            typ: rela_entry.get_type(),
+            addend: rela_entry.get_addend() as usize,
+            offset: rela_entry.get_offset() as usize,
+        }
+    }
 }

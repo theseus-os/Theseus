@@ -111,6 +111,12 @@ impl fmt::Debug for LoadedCrate {
     }
 }
 
+impl Drop for LoadedCrate {
+    fn drop(&mut self) {
+        trace!("### Dropped LoadedCrate: {}", self.crate_name);
+    }
+}
+
 impl LoadedCrate {
     /// Returns the `LoadedSection` of type `SectionType::Text` that matches the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
@@ -119,6 +125,29 @@ impl LoadedCrate {
             let sec = sec_ref.lock();
             sec.is_text() && sec.name == func_name
         }).next().cloned()
+    }
+
+
+    pub fn crates_i_depend_on(&self) -> Vec<StrongCrateRef> {
+        unimplemented!();
+    }
+
+    /// Currently may contain duplicates!
+    pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
+        let mut results: Vec<WeakCrateRef> = Vec::new();
+
+        for sec in &self.sections {
+            let sec_locked = sec.lock();
+            for dep_sec in &sec_locked.sections_dependent_on_me {
+                if let Some(dep_sec) = dep_sec.section.upgrade() {
+                    let dep_sec_locked = dep_sec.lock();
+                    let parent_crate = dep_sec_locked.parent_crate.clone();
+                    results.push(parent_crate);
+                }
+            }
+        }
+
+        results
     }
 }
 
@@ -283,5 +312,34 @@ impl LoadedSection {
     pub fn is_data_or_bss(&self) -> bool {
         self.typ == SectionType::Data
     }
+
+    /// Returns the index of the first `StrongDependency` object with a section
+    /// that matches the given `matching_section` in this `LoadedSection`'s `sections_i_depend_on` list.
+    pub fn find_strong_dependency(&self, matching_section: &StrongSectionRef) -> Option<usize> {
+        for (index, strong_dep) in self.sections_i_depend_on.iter().enumerate() {
+            if Arc::ptr_eq(matching_section, &strong_dep.section) {
+                return Some(index);
+            }
+        }
+        None
+    }
+
+    /// Returns the index of the first `WeakDependent` object with a section
+    /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
+    pub fn find_weak_dependent(&self, matching_section: &StrongSectionRef) -> Option<usize> {
+        for (index, weak_dep) in self.sections_dependent_on_me.iter().enumerate() {
+            if let Some(sec_ref) = weak_dep.section.upgrade() {
+                if Arc::ptr_eq(matching_section, &sec_ref) {
+                    return Some(index);
+                }
+            }
+        }
+        None
+    }
 }
 
+impl Drop for LoadedSection {
+    fn drop(&mut self) {
+        trace!("### Dropped LoadedSection {}", self.name);
+    }
+}
