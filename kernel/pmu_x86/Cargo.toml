@@ -1,6 +1,6 @@
 [package]
 authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
-name = "diagnostics"
+name = "pmu_x86"
 description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86 Nehalem and above."
 version = "0.1.0"
 

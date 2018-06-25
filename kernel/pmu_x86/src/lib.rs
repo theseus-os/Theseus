@@ -8,7 +8,7 @@ extern crate x86_64;
 extern crate raw_cpuid;
 extern crate atomic_linked_list;
 extern crate task;
-
+#[macro_use] extern crate log;
 
 use x86_64::registers::msr::*;
 use x86_64::instructions::rdpmc;
@@ -18,7 +18,6 @@ use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
-
 
 static RDPMC_FFC0: u32 = 1 << 30;
 static RDPMC_FFC1: u32 = (1 << 30) + 1;
@@ -36,31 +35,33 @@ lazy_static!{
 static NUM_PMC: u32 = 4;
 
 
-
-
-/// Initialization function that right now only retrieves the version ID number. Version ID of 0 means no 
+/// Initialization function that retrieves the version ID number. Version ID of 0 means no 
 /// performance monitoring is avaialable on the CPU (likely due to virtualization without hardware assistance).
 pub fn init() {
     let cpuid = CpuId::new();
-    PMU_VERSION.call_once(|| cpuid.get_performance_monitoring_info().unwrap().version_id() as u16);
-
-    if PMU_VERSION.try().unwrap() > &0 {
-        unsafe{
-            //clear values in counters and their settings
-            wrmsr(MSR_PERF_GLOBAL_CTRL, 0);
-            wrmsr(IA32_PMC0, 0);
-            wrmsr(IA32_PMC1, 0);
-            wrmsr(IA32_PMC2, 0);
-            wrmsr(IA32_PMC3, 0);
-            wrmsr(IA32_FIXED_CTR0, 0);
-            wrmsr(IA32_FIXED_CTR1, 0);
-            wrmsr(IA32_FIXED_CTR2, 0);
-            //sets fixed function counters to count events at all privilege levels
-            wrmsr(IA32_FIXED_CTR_CTRL, 0x333);
-            //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-            wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
+    debug!("Version ID is: {}", cpuid.get_performance_monitoring_info().unwrap().version_id());
+    if let Some(perf_mon_info) = cpuid.get_performance_monitoring_info() {
+        PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
+        if let Some(pmu_ver) = PMU_VERSION.try() {  
+            if pmu_ver > &0 {
+                unsafe{
+                    //clear values in counters and their settings
+                    wrmsr(MSR_PERF_GLOBAL_CTRL, 0);
+                    wrmsr(IA32_PMC0, 0);
+                    wrmsr(IA32_PMC1, 0);
+                    wrmsr(IA32_PMC2, 0);
+                    wrmsr(IA32_PMC3, 0);
+                    wrmsr(IA32_FIXED_CTR0, 0);
+                    wrmsr(IA32_FIXED_CTR1, 0);
+                    wrmsr(IA32_FIXED_CTR2, 0);
+                    //sets fixed function counters to count events at all privilege levels
+                    wrmsr(IA32_FIXED_CTR_CTRL, 0x333);
+                    //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
+                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
+                }
+            }
         }
-    }
+    } 
 }
 
 
@@ -112,11 +113,12 @@ impl Counter {
     pub fn get_count_since_start(&self) -> Result<u64, &'static str> {
         //checks to make sure the counter hasn't already been released
         if self.msr_mask < NUM_PMC {
-            if PMC_LIST[self.msr_mask as usize].get(&self.core).is_none(){
+            if let Some(core_available) = PMC_LIST[self.msr_mask as usize].get(&self.core) {
+                if *core_available {
+                    return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
+                } 
+            } else {
                 return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
-            } else if PMC_LIST[self.msr_mask as usize].get(&self.core).unwrap() == &true {
-                return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
- 
             }
         }
         
@@ -137,10 +139,12 @@ impl Counter {
             }
             
             //sanity check to make sure the counter wasn't stopped and freed previously
-            if PMC_LIST[self.msr_mask as usize].get(&self.core).is_none(){
+           if let Some(core_available) = PMC_LIST[self.msr_mask as usize].get(&self.core) {
+                if *core_available {
+                    return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
+                } 
+            } else {
                 return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
-            } else if PMC_LIST[self.msr_mask as usize].get(&self.core).unwrap() == &true {
-                return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
             }
 
             PMC_LIST[self.msr_mask as usize].insert(self.core, true);
@@ -150,13 +154,11 @@ impl Counter {
         }
     return Ok(end_val - self.start_count);
     }
-
 }
 
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    
     let my_core: i32;
     
     if let Some(my_task) = get_my_current_task() {
@@ -180,7 +182,6 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 
     }
     return Err("Task implentation not yet initialized.");
-
 }
 
 /// Calls the rdpmc function which is a wrapper for the x86 rdpmc instruction. This function ensures that performance monitoring is 
@@ -208,7 +209,6 @@ pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
 
 /// It's important to do the rdpmc as quickly as possible when it's called. 
 /// Calling get_my_current_task() and doing the calculations to unpack the result adds cycles, so I created a version where the core can be passed down.
-/// TODO: Is there some form of function overloading that might be helpful here instead of having two of the same function?
 pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static str> {
     // if performance monitoring has not been initialized or is unaivalable, returns an error, otherwise returns counter value
     // ensures PMU available and initialized
