@@ -36,7 +36,7 @@ extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
-extern crate diagnostics;
+extern crate pmu_x86;
 #[macro_use] extern crate console;
 extern crate exceptions_full;
 extern crate x86_64;
@@ -216,7 +216,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-
+    pmu_x86::init();
+    let test = pmu_x86::Counter::new("INST_RETIRED.ANY");
+    //let mut inner = test.unwrap();
+    //inner.start();
+    //debug!("Instructions since started: {}", inner.get_count_since_start().unwrap());
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run

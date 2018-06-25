@@ -86,8 +86,8 @@ path = "../task"
 [dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.diagnostics]
-path = "../diagnostics"
+[dependencies.pmu_x86]
+path = "../pmu_x86"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
