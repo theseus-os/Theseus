@@ -198,7 +198,7 @@ pub struct ModuleArea {
 }
 impl fmt::Debug for ModuleArea {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ModuleArea(\"{}\", start: {:#X}, end: {:#X})", 
+        write!(f, "ModuleArea(\"{}\", {:#X}-{:#X})", 
                    self.name, self.mod_start_paddr, self.mod_end_paddr) 
     }
 }
