@@ -30,7 +30,7 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, get_module, ActivePageTable, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
 use metadata::{StrongCrateRef, WeakSectionRef};
 
@@ -209,13 +209,13 @@ impl CrateNamespace {
         let module_iter = swap_pairs.clone().map(|pair| pair.1);
         let new_namespace = load_crates_in_new_namespace(module_iter, self, kernel_mmi, verbose_log)?;
 
-        for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
-            debug!("====================== Loaded new crate \"{}\"  ===========================", crate_name);
-            let krate = crate_ref.read();
-            krate.text_pages.as_ref().map(|tp|   debug!("    text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
-            krate.rodata_pages.as_ref().map(|rp| debug!("    rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
-            krate.data_pages.as_ref().map(|dp|   debug!("    data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
-        }
+        // for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
+        //     debug!("====================== Loaded new crate \"{}\"  ===========================", crate_name);
+        //     let krate = crate_ref.read();
+        //     krate.text_pages.as_ref().map(|tp|   debug!("    text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
+        //     krate.rodata_pages.as_ref().map(|rp| debug!("    rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
+        //     krate.data_pages.as_ref().map(|dp|   debug!("    data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
+        // }
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to remove all of the old crates
@@ -258,26 +258,25 @@ impl CrateNamespace {
             old_crate.data_pages.as_ref().map(|dp|   debug!("  data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
 
             
-            debug!("  Dependent crates:");
-            dump_dependent_crates(&*old_crate, String::from("    "));
-
-            for sec_ref in &old_crate.sections {
-                let sec = sec_ref.lock();
-                if false {
-                    if !sec.sections_i_depend_on.is_empty() {
-                        debug!("  Section \"{}\": sections i depend on (strong dependencies):", sec.name);
-                        for strong_dep in &sec.sections_i_depend_on {
-                            debug!("        {}", strong_dep.section.lock().name);
-                        }
-                    }
-                }
-                if true {
-                    if !sec.sections_dependent_on_me.is_empty() {
-                        let prefix = String::from("  ");
-                        dump_weak_dependents(&*sec, prefix.clone())
-                    }
-                }
-            }
+            // debug!("  Dependent crates:");
+            // dump_dependent_crates(&*old_crate, String::from("    "));
+            // for sec_ref in &old_crate.sections {
+            //     let sec = sec_ref.lock();
+            //     if false {
+            //         if !sec.sections_i_depend_on.is_empty() {
+            //             debug!("  Section \"{}\": sections i depend on (strong dependencies):", sec.name);
+            //             for strong_dep in &sec.sections_i_depend_on {
+            //                 debug!("        {}", strong_dep.section.lock().name);
+            //             }
+            //         }
+            //     }
+            //     if true {
+            //         if !sec.sections_dependent_on_me.is_empty() {
+            //             let prefix = String::from("  ");
+            //             dump_weak_dependents(&*sec, prefix.clone())
+            //         }
+            //     }
+            // }
 
             debug!("Rewriting relocation dependencies for {} -> {}", old_crate.crate_name, new_crate_name);
 
@@ -324,12 +323,23 @@ impl CrateNamespace {
                 // As described in the above loop, we must tell the old section (the one we're replacing)
                 // that no other sections rely on it. 
                 old_sec.sections_dependent_on_me.clear();
+            
+                // Currently we are just copying over the old_sec into the new source_sec,
+                // if they represent a static variable (state spill that would otherwise result in a loss of data).
+                // Currently, static variables (states) are only .bss sections
+                if old_sec.typ == SectionType::Bss {
+                    let mut new_crate = new_crate_ref.write();
+                    let new_dest_sec = new_crate.find_section(|sec| sec.name == old_sec.name).ok_or_else(|| 
+                        "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
+                    )?;
+                    old_sec.copy_section_data_to(&old_crate, &mut new_dest_sec.lock(), &mut new_crate)?;
+                }
             }
             
             // remove the old crate from this namespace, and remove its sections' symbols too
             self.remove_symbols(old_crate.sections.iter(), true);
             if self.crate_tree.lock().remove(&old_crate.crate_name).is_some() {
-                debug!("  Removed old crate {}", old_crate.crate_name);
+                info!("  Removed old crate {}", old_crate.crate_name);
             }
 
             // add the new crate and its sections' symbols to this namespace
@@ -339,10 +349,7 @@ impl CrateNamespace {
         }
 
 
-
-        debug!("===================== Symbol map in current namespace  =====================\n{}", new_namespace.dump_symbol_map());
-
-        Err("unfinished")
+        Ok(())
 
         // here, "new_namespace is dropped, but its crates have already been added 
     }
@@ -685,7 +692,7 @@ impl CrateNamespace {
 
                             loaded_sections.insert(shndx, 
                                 Arc::new(Mutex::new(LoadedSection::new(
-                                    SectionType::Data,
+                                    SectionType::Bss,
                                     demangled.no_hash,
                                     demangled.hash,
                                     data_offset,
@@ -1149,8 +1156,8 @@ fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name:
 
             demangled_full_symbol.get(start_idx .. index_of_first_double_colon)
                 .filter(|&parent_crate_name| { parent_crate_name == old_crate_name })
-                .and_then(|parent_crate_name| {
-                    // debug!("    replace_parent_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, parent_crate_name, start_idx, index_of_first_double_colon);
+                .and_then(|_parent_crate_name| {
+                    // debug!("    replace_parent_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, _parent_crate_name, start_idx, index_of_first_double_colon);
                     demangled_full_symbol.get(.. start_idx).and_then(|before_crate_name| {
                         demangled_full_symbol.get(index_of_first_double_colon ..).map(|after_crate_name| {
                             format!("{}{}{}", before_crate_name, new_crate_name, after_crate_name)

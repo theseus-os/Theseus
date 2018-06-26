@@ -121,9 +121,16 @@ impl LoadedCrate {
     /// Returns the `LoadedSection` of type `SectionType::Text` that matches the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
     pub fn get_function_section(&self, func_name: &str) -> Option<StrongSectionRef> {
+        self.find_section(|sec| sec.is_text() && sec.name == func_name)
+    }
+
+    /// Returns the first `LoadedSection` that matches the given predicate
+    pub fn find_section<F>(&self, predicate: F) -> Option<StrongSectionRef> 
+        where F: Fn(&LoadedSection) -> bool
+    {
         self.sections.iter().filter(|sec_ref| {
             let sec = sec_ref.lock();
-            sec.is_text() && sec.name == func_name
+            predicate(&sec)
         }).next().cloned()
     }
 
@@ -195,13 +202,15 @@ pub fn symbol_map<'a, I, F>(
 }
 
 
-/// The possible types of `LoadedSection`s: .text, .rodata, or .data.
-/// A .bss section is considered the same as .data.
+/// The possible types of `LoadedSection`s: .text, .rodata, .data, or .bss.
+/// A .bss section is basically treated the same as .data, 
+/// but we keep them separate
 #[derive(Debug, PartialEq)]
 pub enum SectionType {
     Text,
     Rodata,
     Data,
+    Bss
 }
 
 /// Represents a .text, .rodata, .data, or .bss section
@@ -209,8 +218,7 @@ pub enum SectionType {
 /// The containing `SectionType` enum determines which type of section it is.
 #[derive(Debug)]
 pub struct LoadedSection {
-    /// The type of this section: .text, .rodata, or .data.
-    /// A .bss section is considered the same as .data.
+    /// The type of this section: .text, .rodata, .data, or .bss.
     pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
     /// e.g., `<crate>::<module>::<struct>::<fn_name>`
@@ -280,7 +288,8 @@ impl LoadedSection {
         match self.typ {
             SectionType::Text   => parent_crate.text_pages.as_ref(),
             SectionType::Rodata => parent_crate.rodata_pages.as_ref(),
-            SectionType::Data   => parent_crate.data_pages.as_ref(),
+            SectionType::Data |
+            SectionType::Bss    => parent_crate.data_pages.as_ref(),
         }
     }
 
@@ -294,7 +303,8 @@ impl LoadedSection {
         match self.typ {
             SectionType::Text   => parent_crate.text_pages.as_mut(),
             SectionType::Rodata => parent_crate.rodata_pages.as_mut(),
-            SectionType::Data   => parent_crate.data_pages.as_mut(),
+            SectionType::Data |
+            SectionType::Bss    => parent_crate.data_pages.as_mut(),
         }
     }
 
@@ -308,9 +318,14 @@ impl LoadedSection {
         self.typ == SectionType::Rodata
     }
 
-    /// Whether this `LoadedSection` is a .data or .bss section
-    pub fn is_data_or_bss(&self) -> bool {
+    /// Whether this `LoadedSection` is a .data section
+    pub fn is_data(&self) -> bool {
         self.typ == SectionType::Data
+    }
+
+    /// Whether this `LoadedSection` is a .bss section
+    pub fn is_bss(&self) -> bool {
+        self.typ == SectionType::Bss
     }
 
     /// Returns the index of the first `StrongDependency` object with a section
@@ -335,6 +350,37 @@ impl LoadedSection {
             }
         }
         None
+    }
+
+    /// Copies the actual data contents of this `LoadedSection` to the given `destination_section`. 
+    /// The following conditions must be met:    
+    /// * The two sections must be from different crates (different parent crates),
+    /// * The two sections must have the same size,
+    /// * The given `destination_section` must be mapped as writable,
+    ///   basically, it must be a .data or .bss section.
+    pub (crate) fn copy_section_data_to(&self, 
+        this_section_parent_crate: &LoadedCrate, 
+        destination_section: &mut LoadedSection,
+        destination_section_parent_crate: &mut LoadedCrate
+    ) -> Result<(), &'static str> {
+
+        let dest_sec_mapped_pages = self.mapped_pages_mut(destination_section_parent_crate).ok_or("Couldn't get the destination_section's MappedPages")?;
+        let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size)?;
+
+        let source_sec_mapped_pages = self.mapped_pages(this_section_parent_crate).ok_or("Couldn't get this section's MappedPages")?;
+        let source_sec_data: &[u8] = source_sec_mapped_pages.as_slice(self.mapped_pages_offset, self.size)?;
+
+        if dest_sec_data.len() == source_sec_data.len() {
+            dest_sec_data.copy_from_slice(source_sec_data);
+            debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
+                self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
+            Ok(())
+        }
+        else {
+            error!("This source section {:?}'s size ({:#X}) is different from the destination section {:?}'s size ({:#X})",
+                self.name, self.size, destination_section.name, destination_section.size);
+            Err("this source section has a different length than the destination section")
+        }
     }
 }
 

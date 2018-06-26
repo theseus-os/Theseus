@@ -287,10 +287,13 @@ fn parse_nano_core_symbol_file(
                 error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
             }), loop_result);
-            let sec_size = try_break!(usize::from_str_radix(sec_size, 10).map_err(|e| {
-                error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                "parse_nano_core_symbols(): couldn't parse size column"
-            }), loop_result);
+            let sec_size = try_break!(usize::from_str_radix(sec_size, 10)
+                .or_else(|_| usize::from_str_radix(sec_size, 16))
+                .map_err(|e| {
+                    error!("parse_nano_core_symbols(): error parsing size column at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                    "parse_nano_core_symbols(): couldn't parse size column"
+                }), 
+            loop_result);
 
             // while vaddr and size are required, ndx could be valid or not. 
             let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
@@ -331,13 +334,26 @@ fn parse_nano_core_symbol_file(
                     )))
                 );
             }
-            else if (sec_ndx == data_shndx) || (sec_ndx == bss_shndx) {
+            else if sec_ndx == data_shndx {
                 sections.push(
                     Arc::new(Mutex::new(LoadedSection::new(
                         SectionType::Data,
                         no_hash,
                         hash,
-                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!"), loop_result),
+                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                        sec_size,
+                        true,
+                        Arc::downgrade(&new_crate),
+                    )))
+                );
+            }
+            else if sec_ndx == bss_shndx {
+                sections.push(
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::Bss,
+                        no_hash,
+                        hash,
+                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -535,12 +551,23 @@ fn parse_nano_core_binary(
                                         Arc::downgrade(&new_crate),
                                     ))
                                 }
-                                else if (entry.shndx() as usize == data_shndx) || (entry.shndx() as usize == bss_shndx) {
+                                else if entry.shndx() as usize == data_shndx {
                                     Some(LoadedSection::new(
                                         SectionType::Data,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data/bss section wasn't covered by its mapped pages!"), loop_result),
+                                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                                        sec_size,
+                                        true,
+                                        Arc::downgrade(&new_crate),
+                                    ))
+                                }
+                                else if entry.shndx() as usize == bss_shndx {
+                                    Some(LoadedSection::new(
+                                        SectionType::Bss,
+                                        demangled.no_hash,
+                                        demangled.hash,
+                                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
