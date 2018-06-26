@@ -30,7 +30,7 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, get_module, ActivePageTable, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
 use metadata::{StrongCrateRef, WeakSectionRef};
 
@@ -233,9 +233,12 @@ impl CrateNamespace {
                 let mut new_crate = new_crate_ref.write();
                 for new_sec_ref in &new_crate.sections {
                     let mut new_sec = new_sec_ref.lock();
+                    // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
                     if let Some(new_name) = replace_parent_crate_name(&new_sec.name, &new_crate.crate_name, &override_name) {
-                        debug!("  Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
-                        new_namespace.replace_symbol_key(&new_sec.name, &new_name)?;
+                        debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
+                        if new_sec.global {
+                            new_namespace.replace_symbol_key(&new_sec.name, &new_name)?;
+                        }
                         new_sec.name = new_name;
                     }
                 }
@@ -296,13 +299,13 @@ impl CrateNamespace {
                         "couldn't find replacement source section in new namespace that the target section needs to point to, perhaps the target section must also be swapped?"
                     )?;
 
-                    let res = write_relocation(weak_dep.relocation, &target_sec, None, &source_sec, true || verbose_log)?;
+                    let res = write_relocation(weak_dep.relocation, &target_sec, None, &source_sec, kernel_mmi, true || verbose_log)?;
                     let (new_strong_dep, new_weak_dep) = res.ok_or_else(|| "logic error: write_relocation() was successful, \
                         but didn't return any new dependencies, meaning that the source_sec and target_sec \
                         were in the same parent crate (which should never happen when fixing up relocations for weak dependencies"
                     )?;
 
-                    // Tell the old source_sec that it no longer has the existing target_sec as a dependent.
+                    // Tell the old source_sec that it no longer has the existing target_sec as a dependent
                         // this is performed all at once at the end of this loop: we clear the whole old_sec.sections_dependent_on_me
                     // Tell the new source_sec that the existing target_sec depends on it.
                     source_sec.lock().sections_dependent_on_me.push(new_weak_dep);
@@ -334,6 +337,10 @@ impl CrateNamespace {
             self.crate_tree.lock().insert(new_crate_name, new_crate_ref);
 
         }
+
+
+
+        debug!("===================== Symbol map in current namespace  =====================\n{}", new_namespace.dump_symbol_map());
 
         Err("unfinished")
 
@@ -839,10 +846,11 @@ impl CrateNamespace {
                 }?;
 
                 let deps = write_relocation(
-                    RelocationEntry::from_elf_relocation(rela_entry), 
-                    target_sec, 
-                    Some(target_sec_parent_crate_ref.clone()), 
-                    &source_sec, 
+                    RelocationEntry::from_elf_relocation(rela_entry),
+                    target_sec,
+                    Some(target_sec_parent_crate_ref.clone()),
+                    &source_sec,
+                    kernel_mmi,
                     verbose_log
                 )?;
                 if let Some((strong_dependency, weak_dependent)) = deps {
@@ -1129,11 +1137,11 @@ fn get_parent_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> 
 /// # Examples
 /// `keyboard::init  -->  keyboard_new::init`
 fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
-    debug!("replace_parent_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
+    // debug!("replace_parent_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
     demangled_full_symbol.match_indices("::").next().and_then(|(index_of_first_double_colon, _substr)| {
         // Get the last word right before the first "::"
         demangled_full_symbol.get(.. index_of_first_double_colon).and_then(|substr| {
-            debug!("  replace_parent_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
+            // debug!("  replace_parent_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
             let start_idx = substr.rmatch_indices(|c| !is_valid_crate_name_char(c))
                 .next() // the first element right before the crate name starts
                 .map(|(index_right_before_parent_crate_name, _substr)| { index_right_before_parent_crate_name + 1 }) // advance to the actual start 
@@ -1142,7 +1150,7 @@ fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name:
             demangled_full_symbol.get(start_idx .. index_of_first_double_colon)
                 .filter(|&parent_crate_name| { parent_crate_name == old_crate_name })
                 .and_then(|parent_crate_name| {
-                    debug!("    replace_parent_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, parent_crate_name, start_idx, index_of_first_double_colon);
+                    // debug!("    replace_parent_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, parent_crate_name, start_idx, index_of_first_double_colon);
                     demangled_full_symbol.get(.. start_idx).and_then(|before_crate_name| {
                         demangled_full_symbol.get(index_of_first_double_colon ..).map(|after_crate_name| {
                             format!("{}{}{}", before_crate_name, new_crate_name, after_crate_name)
@@ -1293,6 +1301,7 @@ fn map_crate_module(crate_module: &ModuleArea, mmi: &mut MemoryManagementInfo) -
 /// * `target_sec_parent_crate`: the parent crate of the `target_sec`, which is an optional performance enhancement 
 ///    that prevents this function from having to find the `target_sec`'s parent crate every time.
 /// * `source_sec`: the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `kernel_mmi`: the `MemoryManagementInfo`  
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
 /// 
 /// # Returns
@@ -1306,6 +1315,7 @@ fn write_relocation(
     target_sec: &StrongSectionRef,
     target_sec_parent_crate: Option<StrongCrateRef>,
     source_sec: &StrongSectionRef,
+    kernel_mmi: &mut MemoryManagementInfo,
     verbose_log: bool
 ) -> Result<Option<(StrongDependency, WeakDependent)>, &'static str>
 {
@@ -1334,8 +1344,20 @@ fn write_relocation(
             locked_target.mapped_pages_offset
         )
     };
-    
-    // calculate exactly where we should write the relocation data to
+
+    // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+    // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+    let target_sec_initial_flags = target_sec_mapped_pages.flags();
+    if !target_sec_initial_flags.is_writable() {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+        }
+        else {
+            return Err("couldn't get kernel's active page table");
+        }
+    }
+
+    // Calculate exactly where we should write the relocation data to.
     let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
 
     // Perform the actual relocation data writing here.
@@ -1372,6 +1394,16 @@ fn write_relocation(
         _ => {
             error!("found unsupported relocation type {}\n  --> Are you compiling crates with 'code-model=large'?", relocation_entry.typ);
             return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
+        }
+    }
+
+    // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+    if !target_sec_initial_flags.is_writable() {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+        }
+        else {
+            return Err("couldn't get kernel's active page table");
         }
     }
 

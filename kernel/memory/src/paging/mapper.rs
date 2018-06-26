@@ -304,6 +304,11 @@ impl MappedPages {
         self.size_in_pages() * PAGE_SIZE
     }
 
+    /// Returns the flags that describe this `MappedPages` page table permissions.
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
     /// Returns the offset of a given virtual address into this mapping, 
     /// if contained within this mapping. 
     /// If not, returns None. 
@@ -358,6 +363,11 @@ impl MappedPages {
     pub fn remap(&mut self, active_table: &mut ActivePageTable, new_flags: EntryFlags) -> Result<(), &'static str> {
         use x86_64::instructions::tlb;
 
+        if new_flags == self.flags {
+            trace!("remap(): new_flags were the same as existing flags, doing nothing.");
+            return Ok(());
+        }
+
         let broadcast_tlb_shootdown = try!(
             BROADCAST_TLB_SHOOTDOWN_FUNC.try()
             .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
@@ -390,7 +400,7 @@ impl MappedPages {
     {
         let broadcast_tlb_shootdown = try!(
             BROADCAST_TLB_SHOOTDOWN_FUNC.try()
-            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
+            .ok_or("unmap): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
         );
 
         for page in self.pages.clone() {

@@ -340,6 +340,6 @@ impl LoadedSection {
 
 impl Drop for LoadedSection {
     fn drop(&mut self) {
-        trace!("### Dropped LoadedSection {}", self.name);
+        trace!("### Dropped LoadedSection {:?} {:?}", self.typ, self.name);
     }
 }
