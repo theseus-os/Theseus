@@ -257,77 +257,7 @@ impl Mapper {
         }
         ret    
     }
-
-
-    /// Change the permissions (`new_flags`) of the given `MappedPages`'s page table entries
-    pub fn remap(&mut self, pages: &MappedPages, new_flags: EntryFlags) -> Result<(), &'static str> {
-        use x86_64::instructions::tlb;
-
-        let broadcast_tlb_shootdown = try!(
-            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
-            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
-        );
-
-        for page in pages.pages.clone() {
-
-            let p1 = try!(self.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")
-            );
-            
-            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
-
-            tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            broadcast_tlb_shootdown(page.start_address());
-        }
-
-        Ok(())
-    }   
-
-
-    /// Remove the virtual memory mapping for the given `Page`s.
-    fn unmap<A>(&mut self, pages: PageIter, _allocator: &mut A) -> Result<(), &'static str> 
-        where A: FrameAllocator
-    {
-        let broadcast_tlb_shootdown = try!(
-            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
-            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
-        );
-
-        for page in pages {
-
-            use x86_64::instructions::tlb;
-
-            if self.translate_page(page).is_none() {
-                error!("unmap(): page {:?} was not mapped!", page);
-                return Err("unmap(): page was not mapped");
-            }
-            
-            let p1 = try!(self.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")
-            );
-            
-            let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
-            p1[page.p1_index()].set_unused();
-
-            tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            broadcast_tlb_shootdown(page.start_address());
-            
-            // TODO free p(1,2,3) table if empty
-            // allocator.deallocate_frame(frame);
-        }
-
-        Ok(())
-    }
 }
-
-
 
 
 
@@ -358,6 +288,7 @@ pub struct MappedPages {
 
 impl MappedPages {
 	/// Returns the start address of the first page. 
+    #[deprecated]
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
@@ -373,14 +304,19 @@ impl MappedPages {
         self.size_in_pages() * PAGE_SIZE
     }
 
+    /// Returns the flags that describe this `MappedPages` page table permissions.
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
     /// Returns the offset of a given virtual address into this mapping, 
     /// if contained within this mapping. 
     /// If not, returns None. 
     ///  
     /// # Examples
     /// If a `MappedPages` covered addresses `0x2000` to `0x4000`, then calling
-    /// `mapped_pages.offset_of(0x3500)` would return `Some(0x1500)`.
-    pub fn offset_of(&self, vaddr: VirtualAddress) -> Option<usize> {
+    /// `mapped_pages.offset_of_address(0x3500)` would return `Some(0x1500)`.
+    pub fn offset_of_address(&self, vaddr: VirtualAddress) -> Option<usize> {
         let start = self.pages.start_address();
         if (vaddr >= start) && (vaddr <= start + self.size_in_bytes()) {
             Some(vaddr - start)
@@ -390,10 +326,28 @@ impl MappedPages {
         }
     }
 
+    /// Returns the VirtualAddress of the given offset into this mapping, 
+    /// if contained within this mapping. 
+    /// If not, returns None. 
+    ///  
+    /// # Examples
+    /// If a `MappedPages` covered addresses `0x2000` to `0x4000`, then calling
+    /// `mapped_pages.address_at_offset(0x1500)` would return `Some(0x3500)`.
+    pub fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+        let start = self.pages.start_address();
+        if offset <= self.size_in_bytes() {
+            Some(start + offset)
+        }
+        else {
+            None
+        }
+    }
+
+
 
     /// Constructs a MappedPages object from an already existing mapping.
     /// Useful for creating idle task Stacks, for example. 
-    /// TODO FIXME: remove this ability, it's dangerous!!
+    // TODO FIXME: remove this function, it's dangerous!!
     pub fn from_existing(already_mapped_pages: PageIter, flags: EntryFlags) -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
@@ -401,6 +355,78 @@ impl MappedPages {
             allocated: None,
             flags: flags,
         }
+    }
+
+
+    
+    /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
+    pub fn remap(&mut self, active_table: &mut ActivePageTable, new_flags: EntryFlags) -> Result<(), &'static str> {
+        use x86_64::instructions::tlb;
+
+        if new_flags == self.flags {
+            trace!("remap(): new_flags were the same as existing flags, doing nothing.");
+            return Ok(());
+        }
+
+        let broadcast_tlb_shootdown = try!(
+            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
+            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
+        );
+
+        for page in self.pages.clone() {
+            let p1 = try!(active_table.p4_mut()
+                .next_table_mut(page.p4_index())
+                .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                .ok_or("mapping code does not support huge pages")
+            );
+            
+            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+
+            tlb::flush(x86_64::VirtualAddress(page.start_address()));
+            broadcast_tlb_shootdown(page.start_address());
+        }
+
+        self.flags = new_flags;
+        Ok(())
+    }   
+
+
+    /// Remove the virtual memory mapping for the given `Page`s.
+    /// This is NOT PUBLIC because it should only be invoked when a `MappedPages` object is dropped.
+    fn unmap<A>(&mut self, active_table: &mut ActivePageTable, _allocator: &mut A) -> Result<(), &'static str> 
+        where A: FrameAllocator
+    {
+        let broadcast_tlb_shootdown = try!(
+            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
+            .ok_or("unmap): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
+        );
+
+        for page in self.pages.clone() {
+            if active_table.translate_page(page).is_none() {
+                error!("unmap(): page {:?} was not mapped!", page);
+                return Err("unmap(): page was not mapped");
+            }
+            
+            let p1 = try!(active_table.p4_mut()
+                .next_table_mut(page.p4_index())
+                .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                .ok_or("mapping code does not support huge pages")
+            );
+            
+            let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
+            p1[page.p1_index()].set_unused();
+
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address()));
+            broadcast_tlb_shootdown(page.start_address());
+            
+            // TODO free p(1,2,3) table if empty
+            // allocator.deallocate_frame(frame);
+        }
+
+        Ok(())
     }
 
 
@@ -447,7 +473,7 @@ impl MappedPages {
     /// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_type_mut<T>(&self, offset: usize) -> Result<&mut T, &'static str> {
+    pub fn as_type_mut<T>(&mut self, offset: usize) -> Result<&mut T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
@@ -534,7 +560,7 @@ impl MappedPages {
     /// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. 
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_slice_mut<T>(&self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
+    pub fn as_slice_mut<T>(&mut self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
@@ -658,8 +684,7 @@ impl Drop for MappedPages {
         };
         
         let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
-
-        if let Err(e) = active_table.unmap(self.pages.clone(), frame_allocator.deref_mut()) {
+        if let Err(e) = self.unmap(&mut active_table, frame_allocator.deref_mut()) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

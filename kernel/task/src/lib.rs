@@ -33,6 +33,7 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+extern crate spin;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -48,6 +49,7 @@ use core::any::Any;
 use alloc::String;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
+use spin::RwLock;
 
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
@@ -188,7 +190,7 @@ pub struct Task {
     pub is_an_idle_task: bool,
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
     /// that contains the backing memory regions and sections for running this `Task`'s object file 
-    pub app_crate: Option<LoadedCrate>,
+    pub app_crate: Option<Arc<RwLock<LoadedCrate>>>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
 }

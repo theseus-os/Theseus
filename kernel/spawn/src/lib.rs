@@ -299,18 +299,26 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
     let app_crate = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::load_application_crate(module, kernel_mmi.deref_mut(), false)?
+        mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), false)?
     };
-    
-    let task_name = task_name.unwrap_or(app_crate.crate_name.clone());
+
+    let task_name = task_name.unwrap_or(app_crate.read().crate_name.clone());
+    // get the LoadedSection for the "main" function in the app_crate
+    let main_func_sec = {
+        app_crate.read()
+            .get_function_section("main")
+            .ok_or("spawn_application(): couldn't find \"main\" function!")?
+    };
 
     let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
     let main_func = {
-        // get the TextSection for the "main" function in the app_crate
-        let main_func_sec = app_crate.get_function_section("main").ok_or("spawn_application(): couldn't find \"main\" function!")?;
-        let mapped_pages = main_func_sec.mapped_pages.upgrade().ok_or("logic error: module's main_func text section was found but didn't have any mapped pages")?;
+        let offset = main_func_sec.lock().mapped_pages_offset;
+        let parent_crate_ref = main_func_sec.lock().parent_crate.upgrade().ok_or("couldn't get main function section's parent_crate")?;
+        let parent_crate = parent_crate_ref.read();
+        let mapped_pages = main_func_sec.lock().mapped_pages(&*parent_crate)
+            .ok_or("logic error: module's main_func text section was found but didn't have any mapped pages")?;
         debug!("spawn_application(): func mapped_pages: {:?}", mapped_pages);
-        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
+        mapped_pages.as_func::<MainFuncSignature>(offset, &mut space)?
     };
 
     let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
@@ -405,7 +413,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
                         )
                     };
 
-                    try!(mod_mgmt::parse_elf_executable(temp_module_mapping, module.size()))
+                    try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
                     
                     // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
                 };

@@ -16,14 +16,17 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     
     let matches = match opts.parse(&args) {
-        Ok(m) => { m }
-        Err(_f) => { println!("{} \n", _f);
-                    return -1; }
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{} \n", _f);
+            return -1; 
+        }
     };
     
     if matches.opt_present("h") {
-        return print_usage(opts)
+        return print_usage(opts);
     }
+
     for task_id_str in matches.free.iter() {
         match task_id_str.parse::<usize>(){
             Ok(task_id) => {

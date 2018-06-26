@@ -54,13 +54,6 @@ use memory::MappedPages;
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
-/// References to the kernel's text, rodata, and data mapped pages,
-/// which we hold here because if they were accidentally dropped, the OS would triple fault
-/// beacuse they contain the code/data currently being run.
-/// These aren't needed for regular proper operation, they're only a failsafe.
-static NANO_CORE_PAGES: Once<(Arc<MappedPages>, Arc<MappedPages>, Arc<MappedPages>)> = Once::new();
-
-
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
@@ -68,19 +61,19 @@ macro_rules! try_exit {
     ($expr:expr) => (match $expr {
         Ok(val) => val,
         Err(err_msg) => {
-            $crate::shutdown(err_msg);
+            $crate::shutdown(format_args!("{}", err_msg));
         }
     });
     ($expr:expr,) => (try!($expr));
 }
 
 
-/// Shuts down Theseus and prints the given string.
-fn shutdown(msg: &'static str) -> ! {
+/// Shuts down Theseus and prints the given formatted arguuments.
+fn shutdown(msg: core::fmt::Arguments) -> ! {
     warn!("Theseus is shutting down, msg: {}", msg);
 
     // TODO: handle shutdowns properly with ACPI commands
-    panic!(msg);
+    panic!("{}", msg);
 }
 
 
@@ -136,36 +129,35 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
-    // save references to the kernel's currently running text, rodata, and data sections
-    let text_mapped_pages   = Arc::new(text_mapped_pages);
-    let rodata_mapped_pages = Arc::new(rodata_mapped_pages);
-    let data_mapped_pages   = Arc::new(data_mapped_pages);
-    NANO_CORE_PAGES.call_once(|| (text_mapped_pages.clone(), rodata_mapped_pages.clone(), data_mapped_pages.clone()));
-
-
     // now that we have virtual memory, including a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
-    println_raw!("nano_core_start(): initialized state store."); 
-    
+    println_raw!("nano_core_start(): initialized state store.");     
 
-    // parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
-    // since we need it to load and run applications as crates in the kernel
-    {
-        println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-        let _num_nano_core_syms = try_exit!(mod_mgmt::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false));
-        // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _num_nano_core_syms, mod_mgmt::metadata::dump_symbol_map());
+    // Parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
+    // since we need it to load and run applications as crates in the kernel.
+    println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
+    match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
+        Ok(_new_syms) => {
+            // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
+        }
+        Err((msg, mapped_pages)) => {
+            // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
+            // we have to make sure these mapped_pages aren't dropped.
+            core::mem::forget(mapped_pages);
+            shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
+        }
     }
     
     // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
     #[cfg(feature = "loadable")] 
     {
         let core_module = try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module"));
-        let _num_libcore_syms = try_exit!(mod_mgmt::load_kernel_crate(core_module, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
         let captain_module = try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module"));
-        let _num_captain_syms = try_exit!(mod_mgmt::load_kernel_crate(captain_module, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
 
@@ -179,15 +171,18 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use memory::{MappedPages, MemoryManagementInfo};
 
         let section = try_exit!(
-            mod_mgmt::metadata::get_symbol_or_load("captain::init", kernel_mmi_ref.lock().deref_mut())
+            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", None, kernel_mmi_ref.lock().deref_mut(), false)
             .upgrade()
             .ok_or("no symbol: captain::init")
         );
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
+        let offset = section.lock().mapped_pages_offset;
+        let parent_crate_ref = try_exit!(section.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate"));
+        let parent_crate = parent_crate_ref.read();
         let func: &CaptainInitFunc = try_exit!( 
-            try_exit!(section.mapped_pages().ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
-            .as_func(section.mapped_pages_offset(), &mut space) 
+            try_exit!(section.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
+                .as_func(offset, &mut space)
         );
 
         try_exit!(
@@ -239,17 +234,23 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
         {
             type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
             let section = kernel_mmi_ref.and_then(|kernel_mmi| {
-                mod_mgmt::metadata::get_symbol_or_load("panic_handling::panic_wrapper", kernel_mmi.lock().deref_mut()).upgrade()
+                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_handling::panic_wrapper", None, kernel_mmi.lock().deref_mut(), false).upgrade()
             }).ok_or("Couldn't get symbol: \"panic_handling::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
-            section.and_then(|sec| sec.mapped_pages().ok_or("couldn't get mapped_pages for panic_wrapper LoadedSection")
-                .and_then(|mp| {
-                    mp.as_func::<PanicWrapperFunc>(sec.mapped_pages_offset(), &mut space)
-                        .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
+            section.and_then(|sec| {
+                let offset = sec.lock().mapped_pages_offset;
+                let parent_crate_ref = sec.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate");
+                parent_crate_ref.and_then(|parent_crate_ref| {
+                    let parent_crate = parent_crate_ref.read();
+                    let mapped_pages = sec.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get mapped_pages for panic_wrapper");
+                    mapped_pages.and_then(|mp| {
+                        mp.as_func::<PanicWrapperFunc>(offset, &mut space)
+                            .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
+                    })
                 })
-            )
+            })
         }
         #[cfg(not(feature = "loadable"))]
         {
