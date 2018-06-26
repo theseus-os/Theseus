@@ -254,6 +254,8 @@ impl FrameTextBuffer {
                 }
             }
         }
+
+        frame_buffer::display(line_num * CHARACTER_HEIGHT, CHARACTER_HEIGHT, &linebuffer);
         
     }
 }
