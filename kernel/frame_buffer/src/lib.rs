@@ -143,7 +143,7 @@ struct Drawer {
 impl Drawer {
     fn display(&mut self, start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
         //TODO: add size limitation
-        self.buffer().chars[start_line..end_line].clone_from_slice(buffer);
+        self.buffer().chars[start_line..end_line].copy_from_slice(buffer);
     }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
