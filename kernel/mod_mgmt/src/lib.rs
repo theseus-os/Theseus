@@ -1157,11 +1157,17 @@ pub fn parse_nano_core_symbol_file(mapped_pages: MappedPages,
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
                 error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
-            })?; 
-            let sec_size = usize::from_str_radix(sec_size, 10).map_err(|e| {
-                error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                "parse_nano_core_symbols(): couldn't parse size column"
-            })?; 
+            })?;
+            let sec_size = usize::from_str_radix(sec_size, 10)
+                .or_else(|e| {
+                    sec_size.get(2 ..).ok_or(e).and_then(|sec_size_hex| 
+                        usize::from_str_radix(sec_size_hex, 16)
+                    )
+                })
+                .map_err(|e| {
+                    error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                    "parse_nano_core_symbols(): couldn't parse size column"
+                })?; 
 
             // while vaddr and size are required, ndx could be valid or not. 
             let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
