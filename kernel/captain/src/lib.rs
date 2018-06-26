@@ -38,8 +38,6 @@ extern crate window_manager;
 extern crate scheduler;
 #[macro_use] extern crate console;
 extern crate exceptions_full;
-extern crate x86_64;
-
 
 
 #[cfg(target_feature = "sse2")]
@@ -58,6 +56,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+
 
 
 
@@ -213,6 +212,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
+
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run

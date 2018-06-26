@@ -39,7 +39,6 @@ static NUM_PMC: u32 = 4;
 /// performance monitoring is avaialable on the CPU (likely due to virtualization without hardware assistance).
 pub fn init() {
     let cpuid = CpuId::new();
-    debug!("Version ID is: {}", cpuid.get_performance_monitoring_info().unwrap().version_id());
     if let Some(perf_mon_info) = cpuid.get_performance_monitoring_info() {
         PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
         if let Some(pmu_ver) = PMU_VERSION.try() {  
