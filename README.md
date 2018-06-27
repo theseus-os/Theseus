@@ -69,12 +69,11 @@ To exit Theseus in QEMU, press `Ctrl+Alt`, which releases your keyboard focus fr
 To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`.    
 
 
-~~#### KVM Support
+### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
 To install KVM, run the following command:    
-`sudo apt-get install kvm`.  
-If you have KVM installed, it will automatically be enabled by our Makefile.~~    
-(Note: KVM support is currently disabled, as it causes problems.)
+`sudo apt-get install kvm`.     
+To enable KVM support, add `kvm=yes` to your make command, e.g., `make run kvm=yes`.
 
 
 ## Loading Theseus Through PXE
