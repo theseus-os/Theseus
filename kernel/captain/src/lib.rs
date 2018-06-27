@@ -34,8 +34,6 @@ extern crate interrupts;
 extern crate acpi;
 extern crate driver_init;
 extern crate e1000;
-extern crate e1000e;
-extern crate ixgbe;
 extern crate window_manager;
 extern crate scheduler;
 #[macro_use] extern crate console;
@@ -175,16 +173,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     /* if true {
         #[cfg(not(feature = "loadable"))]
         {
-            use e1000e::test_e1000e_driver::test_nic_driver_e1000e;
-            spawn::spawn_kthread(test_nic_driver_e1000e, None, String::from("test_nic_driver"), None)?;
-        }
-    } */
-
-    /* if true {
-        #[cfg(not(feature = "loadable"))]
-        {
-            use e1000e::rx_poll;
-            spawn::spawn_kthread(rx_poll, None, String::from("e1000e polling thread"), None)?;
+            use e1000::rx_poll;
+            spawn::spawn_kthread(rx_poll, None, String::from("e1000 polling thread"), None)?;
         }
     } */
 

@@ -191,10 +191,6 @@ $(iso): kernel applications
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(grub-isofiles)/boot/grub
 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
-<<<<<<< HEAD
-	@cp $(grub_cfg) $(grub-isofiles)/boot/grub
-	@grub-mkrescue -o $(iso) $(grub-isofiles) 
-=======
 # autogenerate the grub.cfg file
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
@@ -208,7 +204,6 @@ $(iso): kernel applications
 # # autogenerate the grub.cfg file
 #	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
 # 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
->>>>>>> e812d9587ef766b068af6331d6dabccb0c5d0035
 	
 
 
