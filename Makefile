@@ -176,6 +176,21 @@ boot: check_usb $(iso)
 	@sync
 	
 
+### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
+pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_serial"
+pxe: $(iso)
+ifdef $(netdev)
+ifdef $(ip)
+	@sudo ifconfig $(netdev) $(ip)
+endif
+	@sudo sudo ifconfig $(netdev) 192.168.1.105
+endif
+	
+	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+	@sudo systemctl restart isc-dhcp-server 
+	@sudo systemctl restart tftpd-hpa
+
+
 ###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
@@ -218,18 +233,6 @@ applications: check_rustc check_xargo
 ### TODO FIXME: not sure if it's correct to forcibly overwrite all module files with the applications' version (the cp line above),
 ### since sometimes the kernel is build in debug mode but applications are alwasy built in release mode right now 
 
-### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe: iso
-ifdef $(netdev)
-ifdef $(ip)
-	@sudo ifconfig $(netdev) $(ip)
-endif
-	@sudo sudo ifconfig $(netdev) 192.168.1.105
-endif
-	
-	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
-	@sudo systemctl restart isc-dhcp-server 
-	@sudo systemctl restart tftpd-hpa
 
 ### this builds all userspace programs
 userspace: 
@@ -300,6 +303,10 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "  pxe:"
+	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
+	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
+	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
 	@echo -e "  doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "  view-doc:"
