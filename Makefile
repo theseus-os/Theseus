@@ -218,6 +218,18 @@ applications: check_rustc check_xargo
 ### TODO FIXME: not sure if it's correct to forcibly overwrite all module files with the applications' version (the cp line above),
 ### since sometimes the kernel is build in debug mode but applications are alwasy built in release mode right now 
 
+### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
+pxe: iso
+ifdef $(netdev)
+ifdef $(ip)
+	@sudo ifconfig $(netdev) $(ip)
+endif
+	@sudo sudo ifconfig $(netdev) 192.168.1.105
+endif
+	
+	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+	@sudo systemctl restart isc-dhcp-server 
+	@sudo systemctl restart tftpd-hpa
 
 ### this builds all userspace programs
 userspace: 

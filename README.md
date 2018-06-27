@@ -103,6 +103,7 @@ Restart the TFTP server and check to see if it's running:
 `sudo systemctl restart tftpd-hpa`  
 `sudo systemctl status tftpd-hpa`
 
+If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has `TFTP_ADDRESS=":69"` to be equal to `6969` instead and restart the TFTP server. 
 
 ### Setting up the DHCP Server
 First, install package for DHCP server:   
@@ -114,6 +115,7 @@ Edit the `/etc/default/isc-dhcp-server` configuration file and add the ethernet 
 
 Configure an arbitrary IP address that will be used in the next step:   
 `sudo ifconfig [ethernet device name] 192.168.1.105` 
+This command might have to be done each time the computer being used as a server is restarted. 
 
 Edit the `/etc/dhcp/dhcpd.conf` file by uncommenting the line `authoritative;` and adding a subnet configuration such as the one below:
 ```
@@ -166,6 +168,10 @@ Finally, restart the DHCP server one more time and make sure it's running:
 `sudo systemctl status isc-dhcp-server`
 
 On the client computer, the computer which Theseus will be loaded on to, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the client computer is restarted, it should boot into a menu which displays booting into Theseus as an option. 
+
+###Subsequent PXE Uses
+After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, all it should take to load the new version of Theseus is a restart of the client computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
+`sudo ifconfig [ethernet device name] 192.168.1.105` 
 
 ## Debugging 
 GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
