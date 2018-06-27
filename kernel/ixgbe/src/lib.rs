@@ -53,7 +53,7 @@ const REG_AUTOC2:               u32 = 0x42A8;
 const REG_LINKS:                u32 = 0x42A4;
 
 const AUTOC_FLU:                u32 = 1;
-const AUTOC_LMS:                u32 = 4<<15; //KX/KX4//KR
+const AUTOC_LMS:                u32 = 6<<13; //KX/KX4//KR
 const AUTOC_10G_PMA_PMD_PAR:    u32 = 1<<7;
 const AUTOC2_10G_PMA_PMD_PAR:   u32 = 0<<8|0<<7; 
 const AUTOC_RESTART_AN:         u32 = 1<<12;
@@ -74,36 +74,19 @@ const REG_TDH:                  u32 = 0x6010;
 const REG_TDT:                  u32 = 0x6018;
 const REG_TXDCTL:               u32 = 0x6028;
 
+const REG_RDBAL:                u32 = 0x1000;
+const REG_RDBAH:                u32 = 0x1004;
+const REG_RDLEN:                u32 = 0x1008;
+const REG_RDH:                  u32 = 0x1010;
+const REG_RDT:                  u32 = 0x1018;
+const REG_RXDCTL:               u32 = 0x1028;
+const REG_SRRCTL:               u32 = 0x1014; //specify descriptor type
+const REG_RXCTRL:               u32 = 0x3000;
+const REG_FCTRL:                u32 = 0x5080;
+
+
 
 /******************/
-
-const REG_EEPROM:               u32 = 0x0014;
-const REG_CTRL_EXT:             u32 = 0x0018;
-const REG_IMASK:                u32 = 0x00D0;
-const REG_RCTRL:                u32 = 0x0100;
-const REG_RXDESCLO:             u32 = 0x2800;
-const REG_RXDESCHI:             u32 = 0x2804;
-const REG_RXDESCLEN:            u32 = 0x2808;
-const REG_RXDESCHEAD:           u32 = 0x2810;
-const REG_RXDESCTAIL:           u32 = 0x2818;
-
-const REG_TCTRL:                u32 = 0x0400;
-const REG_TXDESCLO:             u32 = 0x3800;
-const REG_TXDESCHI:             u32 = 0x3804;
-const REG_TXDESCLEN:            u32 = 0x3808;
-const REG_TXDESCHEAD:           u32 = 0x3810;
-const REG_TXDESCTAIL:           u32 = 0x3818;
-
-const REG_RDTR:                 u32 = 0x2820;    // RX Delay Timer Register
-const REG_RXDCTL:               u32 = 0x3828;    // RX Descriptor Control
-const REG_RADV:                 u32 = 0x282C;    // RX Int. Absolute Delay Timer
-const REG_RSRPD:                u32 = 0x2C00;    // RX Small Packet Detect Interrupt
- 
-const REG_MTA:                  u32 = 0x5200; 
-const REG_CRCERRS:              u32 = 0x4000;   
- 
-const REG_TIPG:                 u32 = 0x0410;      // Transmit Inter Packet Gap
-const ECTRL_SLU:                u32 = 0x40;        // set link up
 
 ///CTRL commands
 const CTRL_LRST:                u32 = (1<<3); 
@@ -173,7 +156,7 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_SIZE_RX_DESC:       usize = 16;
 const E1000_SIZE_TX_DESC:       usize = 16;
 
-const E1000_SIZE_RX_BUFFER:     usize = 2048;
+const E1000_SIZE_RX_BUFFER:     usize = 256;
 const E1000_SIZE_TX_BUFFER:     usize = 256;
 
 
@@ -426,7 +409,7 @@ impl Nic{
                 
                 let num_pages;
                 let num_frames;
-                let bytes_required = (E1000_NUM_RX_DESC*E1000_SIZE_RX_BUFFER) + (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + E1000_SIZE_RX_DESC; //add an additional desc so we can make sure its 16-byte aligned
+                let bytes_required = (E1000_NUM_RX_DESC*E1000_SIZE_RX_BUFFER) + (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + (E1000_NUM_TX_DESC * E1000_SIZE_TX_DESC) + (128*3); //to make sure its 128 byte aligned
                 if bytes_required % PAGE_SIZE == 0 {
                         num_pages =  bytes_required / PAGE_SIZE;
                         num_frames =  bytes_required / PAGE_SIZE;
@@ -506,6 +489,100 @@ impl Nic{
                         //return Ports::inportl(io_base + 4);*/
                 }
                 val
+
+        }
+
+        /// Initialize receive descriptors and rx buffers
+        pub fn rx_init(&mut self) -> Result<(), &'static str> {
+                const NO_BYTES : usize = 16*(E1000_NUM_RX_DESC) + 128;
+                
+                let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(NO_BYTES);
+                let ptr;
+                match dma_ptr{
+                        Some(_x) => ptr = dma_ptr.unwrap(),
+                        None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx descriptors"),
+                }
+
+                let ptr1 = ptr + (128-(ptr%128));
+                debug!("pointers: {:x}, {:x}",ptr, ptr1);
+
+                let raw_ptr = ptr1 as *mut e1000_rx_desc;
+                debug!("size of e1000_rx_desc: {}, e1000_tx_desc: {}", 
+                        ::core::mem::size_of::<e1000_rx_desc>(), ::core::mem::size_of::<e1000_tx_desc>());
+                
+                unsafe{ self.rx_descs = Vec::from_raw_parts(raw_ptr, 0, E1000_NUM_RX_DESC);}
+                //unsafe{debug!("Address of Rx desc: {:?}, value: {:?}",ptr, *pr1);}
+                debug!("rx_descs: {:?}, capacity: {}", self.rx_descs, self.rx_descs.capacity());
+
+                
+
+                for i in 0..E1000_NUM_RX_DESC
+                {
+                        let dma_ptr = self.nic_dma_allocator.allocate_dma_mem(E1000_SIZE_RX_BUFFER);
+                        match dma_ptr{
+                                Some(_x) => self.rx_buf_addr[i] = dma_ptr.unwrap(),
+                                None => return Err("e1000:rx_init Couldn't allocate DMA mem for rx buffer"),
+                        } 
+
+                        let buf_addr = try!(translate_v2p(self.rx_buf_addr[i]));
+                        let mut var = e1000_rx_desc {
+                                addr: buf_addr as u64,
+                                length: 0,
+                                checksum: 0,
+                                status: 0,
+                                errors: 0,
+                                special: 0,
+                        };
+                                        
+                        debug!("packet buffer: {:x}",var.addr);
+                        self.rx_descs.push(var);
+                
+                }
+                
+                
+                let slc = self.rx_descs.as_slice(); 
+                let slc_ptr = slc.as_ptr();
+                let v_addr = slc_ptr as usize;
+                debug!("v address of rx_desc: {:x}",v_addr);
+                
+                /* let t_ptr = translate_v2p(v_addr);
+                let ptr;
+                match t_ptr{
+                        Some(_x) =>  ptr = t_ptr.unwrap(),
+                        None => return Err("e1000:rx_init Couldn't translate address for rx descriptor"),
+                } */
+
+                //let ptr = (translate_v2p(v_addr)).unwrap();
+                let ptr = try!(translate_v2p(v_addr));
+                
+                debug!("p address of rx_desc: {:x}",ptr);
+                let ptr1 = (ptr & 0xFFFF_FFFF) as u32;
+                let ptr2 = (ptr>>32) as u32;
+
+                
+                self.write_command(REG_RDBAL, ptr1);//lowers bits of 64 bit descriptor base address, 16 byte aligned
+                self.write_command(REG_RDBAH, ptr2);//upper 32 bits
+                
+                self.write_command(REG_RDLEN, (E1000_NUM_RX_DESC as u32)* 16);//number of bytes allocated for descriptors, 128 byte aligned
+                
+                self.write_command(REG_RDH, 0);//head pointer for reeive descriptor buffer, points to 16B
+                self.write_command(REG_RDT, 0);//Tail pointer for receive descriptor buffer, point to 16B
+                self.rx_cur = 0;
+
+                let mut val = self.read_command(REG_SRRCTL);
+                val = val & 0xF1FF_FFE0;
+                self.write_command(REG_SRRCTL, val | 1);
+                self.write_command(REG_RXDCTL, self.read_command(REG_RXDCTL)|1<<25);
+
+                while self.read_command(REG_RXDCTL)& 1<<25 != 1<<25 {}
+                self.write_command(REG_RDT, E1000_NUM_RX_DESC as u32 -1);//Tail pointer for receive descriptor buffer, point to 16B
+                
+                self.write_command(REG_FCTRL,0x0000_0702);
+                self.write_command(REG_RXCTRL, self.read_command(REG_RXCTRL)|1);
+
+                //self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_2048);
+                //self.write_command(REG_RCTRL, RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC  | RCTL_BSIZE_256);
+                Ok(())
 
         }
 
@@ -631,6 +708,20 @@ impl Nic{
                 Ok(())
         }
 
+        /// Handle a packet reception.
+        pub fn handle_receive(&mut self) {
+                //print status of all packets until EoP
+                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
+                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
+                        self.rx_descs[self.rx_cur as usize].status = 0;
+                        let old_cur = self.rx_cur as u32;
+                        self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+                        self.write_command(REG_RDT, old_cur );
+                }
+        }
+
+        
+
 }
 
 /// static variable to represent the network card
@@ -710,20 +801,24 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         debug!("RDRXCTL: {:#X}",nic.read_command(REG_RDRXCTL)); //b3 should be 1
 
         //setup PHY and the link
+        debug!("AUTOC: {:#X}", nic.read_command(REG_AUTOC)); 
+
+        let mut val = nic.read_command(REG_AUTOC);
+        val = val & !(0x0000_E000) & !(0x0000_0200);
+        nic.write_command(REG_AUTOC, val|AUTOC_10G_PMA_PMD_PAR|AUTOC_FLU);
+
+        let mut val = nic.read_command(REG_AUTOC2);
+        val = val & !(0x0003_0000);
+        nic.write_command(REG_AUTOC2, val|1<<17);
+
         let val = nic.read_command(REG_AUTOC);
-        nic.write_command(REG_AUTOC, val|AUTOC_LMS|AUTOC_10G_PMA_PMD_PAR|AUTOC_FLU);
-
-        let val = nic.read_command(REG_AUTOC2);
-        nic.write_command(REG_AUTOC2, val|AUTOC2_10G_PMA_PMD_PAR);
-
-        let val = nic.read_command(REG_AUTOC);
-        nic.write_command(REG_AUTOC, val|AUTOC_RESTART_AN);
-
+        nic.write_command(REG_AUTOC, val|AUTOC_RESTART_AN); 
 
 
         debug!("STATUS: {:#X}", nic.read_command(REG_STATUS)); 
         debug!("CTRL: {:#X}", nic.read_command(REG_CTRL));
         debug!("LINKS: {:#X}", nic.read_command(REG_LINKS)); //b7 and b30 should be 1 for link up 
+        debug!("AUTOC: {:#X}", nic.read_command(REG_AUTOC)); 
 
         //Initialize statistics
 
@@ -732,6 +827,9 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
 
         try!(nic.tx_init());
         debug!("TXDCTL: {:#X}", nic.read_command(REG_TXDCTL)); //b25 should be 1 for tx queue enable
+
+        //initalize receive... legacy descriptors
+        try!(nic.rx_init());
 
         /*
         e1000_nc.detect_eeprom();
@@ -746,4 +844,24 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         //e1000_nc.tx_init().unwrap();
 
        Ok(())
+}
+
+pub fn rx_poll(_: Option<u64>){
+        //debug!("e1000e poll function");
+        loop {
+                let mut nic = NIC_82599.lock();
+
+        //detect if a packet has beem received
+        //debug!("E1000E_RX POLL");
+        /* for i in 0..E1000_NUM_RX_DESC {
+                debug!("rx desc status {}",self.rx_descs[i].status);
+        } */
+        //debug!("E1000E RCTL{:#X}",self.read_command(REG_RCTRL));
+        
+                if (nic.rx_descs[nic.rx_cur as usize].status&0xF) != 0 {    
+                        debug!("Packet received!");                    
+                        nic.handle_receive();
+                }
+        }
+        
 }

@@ -1,0 +1,1 @@
+{"rustc":16349303590983159748,"features":"[\"const_fn\", \"default\"]","target":15761532518036665823,"profile":7563321638953954158,"path":6697095739364899891,"deps":[["spin v0.4.8",4820665977431273236]],"local":[{"MtimeBased":[[1529964033,54807588],".fingerprint/irq_safety-dba28fa0317e68ce/dep-lib-irq_safety-dba28fa0317e68ce"]}],"rustflags":[],"edition":"Edition2015"}
