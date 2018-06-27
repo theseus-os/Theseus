@@ -83,7 +83,10 @@ pub struct Terminal {
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
-    console_input_string: String, 
+    console_input_string: String,
+    /// Stores the index of the last character in the console_input_string so that we can make sure
+    /// that the kernel prompt + anykeypresses will be the last thing on the buffer being displayed whenever the user types 
+    input_string_index: usize,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -166,6 +169,7 @@ impl Terminal {
             term_ref: ref_num,
             vga_buffer: VgaBuffer::new(),
             console_input_string: String::new(),
+            input_string_index: 0,
             command_history: Vec::new(),
             history_index: 0,
             console_buffer_string: String::new(),
@@ -185,7 +189,7 @@ impl Terminal {
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
-        TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);
+        {TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);}
         terminal.print_to_terminal(WELCOME_STRING.to_string())?; 
         let prompt_string = terminal.prompt_string.clone();
         if ref_num == 1 {
@@ -193,6 +197,7 @@ impl Terminal {
         } else {
             terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num, prompt_string))?;
         }
+        terminal.input_string_index = terminal.scrollback_buffer.len()-1; // updates the input string tracking variable
         terminal.vga_buffer.enable_cursor();
         // Spawns a terminal instance on a new thread
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
@@ -432,6 +437,33 @@ impl Terminal {
         let start_idx = self.calc_start_idx(new_end_idx);
         self.scroll_start_idx = start_idx;
     }
+    
+    /// Shifts the vga buffer up by making the previous first line the last line displayed on the vga buffer
+    fn page_up(&mut self) {
+        let mut new_end_idx = self.scroll_start_idx;
+        let new_start_idx = self.calc_start_idx(new_end_idx);
+        if new_start_idx <= 1 {
+            // if the user page ups near the top of the page so only gets a partial shift
+            new_end_idx = self.calc_end_idx(new_start_idx);
+        }
+        self.scroll_end_idx = new_end_idx;
+        self.scroll_start_idx = new_start_idx;
+    }
+
+    /// Shifts the vga buffer down by making the previous last line the first line displayed on the vga buffer
+    fn page_down(&mut self) {
+        let new_start_idx = self.scroll_end_idx;
+        let new_end_idx = self.calc_end_idx(new_start_idx);
+        if new_end_idx == self.scrollback_buffer.len() -1 {
+            // if the user page downs near the bottom of the page so only gets a partial shift
+            self.is_scroll_end = true;
+            self.vga_buffer.enable_cursor();
+            let _result = self.print_to_vga(new_end_idx);
+            return;
+        }
+        self.scroll_start_idx = new_start_idx;
+        self.scroll_end_idx = new_end_idx;
+    }
 
      /// Takes in a usize that corresponds to the end index of a string slice of the scrollback buffer that will be displayed on the vga buffer
     fn print_to_vga(&mut self, end_idx: usize) -> Result<(), &'static str> {
@@ -498,7 +530,8 @@ impl Terminal {
                                 
                                 self.console_input_string = temp;
                                 self.console_buffer_string.clear();
-                                }
+                            }
+                            self.input_string_index = self.scrollback_buffer.len() -1;
                         },
                         // None value indicates task has not yet finished so does nothing
                     None => {
@@ -558,40 +591,6 @@ impl Terminal {
             return Ok(());
         }
 
-        // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
-        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
-            && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-                if self.left_shift == 0 {
-                    if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-                        match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                            Some(c) => {
-                                // Appends to the temporary buffer string if the user types while a command is running
-                                if self.current_task_id != 0 {
-                                    self.console_buffer_string.push(c);
-                                    return Ok(());
-                                } else {
-                                    self.console_input_string.push(c);
-                                }
-                            },
-                            None => {
-                                return Err("Couldn't get key event");
-                            }
-                        }
-
-                    }
-                } else {
-                    // controls cursor movement and associated variables if the cursor is not at the end of the current line
-                    match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                        Some(c) => {
-                            let insert_idx: usize = self.console_input_string.len() - self.left_shift;
-                            self.console_input_string.insert(insert_idx, c);
-                        },
-                        None => {
-                            return Err("Couldn't get key event");
-                        }
-                    }
-                }
-        }
 
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
@@ -628,11 +627,13 @@ impl Terminal {
                         self.print_to_terminal(format!("\n{}: command not found\n\n{}",console_input_string, prompt_string))?;
                         self.console_input_string.clear();
                         self.left_shift = 0;
+                        self.input_string_index = self.scrollback_buffer.len() -1;
                         return Ok(());
                     } Err(&_) => {
                         self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
                         self.console_input_string.clear();
                         self.left_shift = 0;
+                        self.input_string_index = self.scrollback_buffer.len() - 1;
                         return Ok(())
                     }
                 }
@@ -663,14 +664,14 @@ impl Terminal {
             }
             return Ok(());
         }
-        if keyevent.keycode == Keycode::PageUp {
+        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_end_idx != 0 {
                 self.scroll_up_one_line();
                 self.vga_buffer.disable_cursor();                
             }
             return Ok(());
         }
-        if keyevent.keycode == Keycode::PageDown {
+        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
             if !self.is_scroll_end {
                 self.scroll_down_one_line();
             }
@@ -680,10 +681,30 @@ impl Terminal {
             return Ok(());
         }
 
+        if keyevent.keycode == Keycode::PageUp {
+            self.page_up();
+            self.is_scroll_end = false;
+            self.vga_buffer.disable_cursor();
+            return Ok(());
+        }
+
+        if keyevent.keycode == Keycode::PageDown {
+            if self.is_scroll_end {
+                return Ok(());
+            }
+            self.page_down();
+            return Ok(());
+        }
+
         // Cycles to the next previous command
         if  keyevent.keycode == Keycode::Up {
             if self.history_index == self.command_history.len() {
                 return Ok(());
+            }
+            if self.input_string_index != self.scrollback_buffer.len() -1 {
+                let prompt_string = self.prompt_string.clone();
+                self.print_to_terminal(prompt_string)?;
+                self.input_string_index = self.scrollback_buffer.len() -1;
             }
             self.left_shift = 0;
             let console_input = self.console_input_string.clone();
@@ -699,6 +720,7 @@ impl Terminal {
             let selected_command2 = selected_command.clone();
             self.console_input_string = selected_command;
             self.push_to_stdin(selected_command2);
+            self.input_string_index = self.scrollback_buffer.len() -1;
             return Ok(());
         }
         // Cycles to the next most recent command
@@ -734,6 +756,53 @@ impl Terminal {
                 return Ok(());
             }
         }
+
+        // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
+        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
+            && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+
+                if self.left_shift == 0 {
+                    if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+                        match keyevent.keycode.to_ascii(keyevent.modifiers) {
+                            Some(c) => {
+                                // Appends to the temporary buffer string if the user types while a command is running
+                                if self.current_task_id != 0 {
+                                    self.console_buffer_string.push(c);
+                                    return Ok(());
+                                } else {
+                                    self.console_input_string.push(c);
+                                }
+                            },
+                            None => {
+                                return Err("Couldn't get key event");
+                            }
+                        }
+
+                    }
+                } else {
+                    // controls cursor movement and associated variables if the cursor is not at the end of the current line
+                    match keyevent.keycode.to_ascii(keyevent.modifiers) {
+                        Some(c) => {
+                            let insert_idx: usize = self.console_input_string.len() - self.left_shift;
+                            self.console_input_string.insert(insert_idx, c);
+                        },
+                        None => {
+                            return Err("Couldn't get key event");
+                        }
+                    }
+                }
+
+                // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
+                if self.input_string_index != self.scrollback_buffer.len() -1 {
+                    // debug!("input string index {}, scrollback_buffer_len {}\n", self.input_string_index, self.scrollback_buffer.len());
+                    let prompt_string = self.prompt_string.clone();
+                    let mut console_input_string = self.console_input_string.clone();
+                    let _result = console_input_string.pop();
+                    self.print_to_terminal(prompt_string)?;
+                    self.print_to_terminal(console_input_string)?;
+                    self.input_string_index = self.scrollback_buffer.len() -1;
+                }
+        }
         
         // Pushes regular keypresses (ie ascii characters and non-meta characters) into the standard-in buffer
         match keyevent.keycode.to_ascii(keyevent.modifiers) {
@@ -741,8 +810,10 @@ impl Terminal {
                 // If the keypress is Enter
                 if c == '\u{8}' {
                     self.pop_from_stdin();
+                    self.input_string_index -= 1;
                 } else {
                     self.push_to_stdin(c.to_string());
+                    self.input_string_index += 1;
                 }
             }
             _ => { } 
@@ -808,6 +879,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                 _ => { },
             }
             print_event.mark_completed();
+
             continue;
         }
 
