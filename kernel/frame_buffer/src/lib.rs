@@ -125,8 +125,12 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub fn display(start_line:usize, height:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
+/*pub fn display(start_line:usize, height:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
     FRAME_DRAWER.lock().display(start_line, start_line+height, buffer);
+}*/
+
+pub fn display(pixel: ColorPixel, y:usize, sub_x:usize){
+    FRAME_DRAWER.lock().buffer().chars[y][sub_x..sub_x+3].copy_from_slice(&(pixel.color_code));
 }
 
 pub struct Point {
@@ -224,6 +228,11 @@ impl Drawer {
 struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
     chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+}
+
+
+pub struct ColorPixel {
+    pub color_code:[u8;3],
 }
 
 

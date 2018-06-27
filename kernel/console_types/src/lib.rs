@@ -8,10 +8,11 @@ use keycodes_ascii::{KeyEvent};
 use alloc::string::String;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConsoleEvent {
     InputEvent(ConsoleInputEvent),
     OutputEvent(ConsoleOutputEvent),
+    DisplayEvent,
     ExitEvent,
 }
 
@@ -20,15 +21,15 @@ impl ConsoleEvent {
         ConsoleEvent::InputEvent(ConsoleInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S, x: Option<usize>) -> ConsoleEvent where S: Into<String> {
+    pub fn new_output_event<S>(s: S) -> ConsoleEvent where S: Into<String> {
         // x: Option<usize> is the terminal reference number. Used so that this output event is outputted to the correct Terminal's VGA buffer
         // Matches with Terminal.term_ref
-        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(),x))
+        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()))
     }
 }
 
 /// use this to deliver input events (such as keyboard input) to the console.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConsoleInputEvent {
     pub key_event: KeyEvent,
 }
@@ -44,17 +45,15 @@ impl ConsoleInputEvent {
 
 
 /// use this to queue up a formatted string that should be printed to the console. 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConsoleOutputEvent {
     pub text: String,
-    pub term_num: Option<usize>,
 }
 
 impl ConsoleOutputEvent {
-    pub fn new(s: String, term_ref: Option<usize>) -> ConsoleOutputEvent {
+    pub fn new(s: String) -> ConsoleOutputEvent {
         ConsoleOutputEvent {
             text: s,
-            term_num: term_ref, 
         }
     }
 }

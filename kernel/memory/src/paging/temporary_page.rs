@@ -65,7 +65,7 @@ impl TemporaryPage {
         );
         
         let table: &mut Table<Level1> = try!( 
-            try!(self.mapped_page.as_ref().ok_or("mapped page error"))
+            try!(self.mapped_page.as_mut().ok_or("mapped page error"))
             .as_type_mut(0)  // no offset
         );
         Ok(table)
