@@ -79,7 +79,7 @@ To enable KVM support, add `kvm=yes` to your make command, e.g., `make run kvm=y
 ## Loading Theseus Through PXE
 The following instructions are a combination of [this](https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/) guide on OSTechNix to set up PXE for Ubuntu and [this](https://wellsie.net/p/286/) guide by Andrew Wells for using an arbitrary ISO with PXE.
 
-PXE can be used to load Rust onto a computer or virtual machine that is connected by LAN to the computer being developed on. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:   
+PXE can be used to load Rust onto a target computer that is connected by LAN to the host machine used for development. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:   
 `make iso`
 
 Then, you will need to set up a TFTP and DHCP server which the test machine will access.
@@ -108,23 +108,23 @@ If the TFTP server is unable to start and mentions an in-use socket, reopen the 
 First, install package for DHCP server:   
 `sudo apt-get install isc-dhcp-server`
 
-Then run `ifconfig` to view available networking devices and find ethernet device name. The ethernet device should be the one that begins with "en" – in my case, the name was "eno1".
+Then run `ifconfig` to view available networking devices and find the network device name, e.g., `eth0`.
 
-Edit the `/etc/default/isc-dhcp-server` configuration file and add the ethernet device name from the step above to "INTERFACES". For me, this looks like `INTERFACES="eno1"`.
+Edit the `/etc/default/isc-dhcp-server` configuration file and add the network device name from the step above to "INTERFACES". For me, this looks like `INTERFACES="eth0"`.
 
 Configure an arbitrary IP address that will be used in the next step:   
-`sudo ifconfig [ethernet device name] 192.168.1.105` 
+`sudo ifconfig <network-device-name> 192.168.1.105` 
 This command might have to be done each time the computer being used as a server is restarted. 
 
 Edit the `/etc/dhcp/dhcpd.conf` file by uncommenting the line `authoritative;` and adding a subnet configuration such as the one below:
 ```
 subnet 192.168.1.0 netmask 255.255.255.0 {
- range 192.168.1.20 192.168.1.30;
- option routers 192.168.1.1;
- option broadcast-address 192.168.1.255;
- default-lease-time 600;
- max-lease-time 7200;
- }
+  range 192.168.1.20 192.168.1.30;
+  option routers 192.168.1.1;
+  option broadcast-address 192.168.1.255;
+  default-lease-time 600;
+  max-lease-time 7200;
+}
 
 allow booting;
 allow bootp;
@@ -166,11 +166,11 @@ Finally, restart the DHCP server one more time and make sure it's running:
 `sudo systemctl restart isc-dhcp-server`   
 `sudo systemctl status isc-dhcp-server`
 
-On the client computer, the computer which Theseus will be loaded on to, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the client computer is restarted, it should boot into a menu which displays booting into Theseus as an option. 
+On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option. 
 
-###Subsequent PXE Uses
-After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, all it should take to load the new version of Theseus is a restart of the client computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
-`sudo ifconfig [ethernet device name] 192.168.1.105` 
+### Subsequent PXE Uses
+After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
+`sudo ifconfig <network-device-name> 192.168.1.105` 
 
 ## Debugging 
 GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
