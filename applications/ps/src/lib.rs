@@ -8,8 +8,7 @@ extern crate getopts;
 
 use getopts::Options;
 use alloc::{Vec, String};
-use self::task::TASKLIST;
-use task::RunState;
+use task::{TASKLIST, RunState};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -18,9 +17,11 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("b", "brief", "print only task id and name");
 
     let matches = match opts.parse(&args) {
-        Ok(m) => { m }
-        Err(_f) => { println!("{} \n", _f);
-                    return -1; }
+        Ok(m) => m,
+        Err(_f) => { 
+            println!("{} \n", _f);
+            return -1; 
+        }
     };
 
     if matches.opt_present("h") {

@@ -743,7 +743,7 @@ pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 /// which will invoke it as needed (on remap/unmap operations).
 pub fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
     if let Some(my_lapic) = get_my_apic() {
-        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
+        // trace!("broadcast_tlb_shootdown(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
         my_lapic.write().send_tlb_shootdown_ipi(vaddr);
     }
 }

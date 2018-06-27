@@ -1,0 +1,16 @@
+[package]
+name = "lsmod"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+[dependencies.console]
+path = "../../kernel/console"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"
+
+[dependencies.memory]
+path = "../../kernel/memory"

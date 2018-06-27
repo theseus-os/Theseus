@@ -277,15 +277,6 @@ pub fn init()-> Result<(), &'static str > {
                     FONT_PIXEL[i][y][x] = FONT_PIXEL[i][y][x] | (((char_font & bit)/bit) * 0xFFFFFF);
                     bit = bit >> 1;
                 }
-                                   
-                //FONT_PIXEL[i][y][1] = ((((char_font & 0x20)/0x20) * 0xFFFFFF) << 7*8) | ((((char_font & 0x10)/0x10) * 0xFFFFFF) << 4*8) | ((((char_font & 0x8)/0x8) * 0xFFFFFF) << 8) | ((((char_font & 0x4)/0x4) * 0xFFFFFF) >> 2*8);
-                //FONT_PIXEL[i][y][2] = ((((char_font & 0x4)/0x4) * 0xFFFFFF) << 6*8) | ((((char_font & 0x2)/0x2) * 0xFFFFFF) << 3*8) | ((char_font & 0x1) * 0xFFFFFF);
-
-                /*for x in 0..8 {
-                    if char_font & (0x80 >> x) !=0 {
-                        //FONT_PIXEL[i][y][x+1] = 1; 
-                    }
-                }*/
             }
         }
     }
