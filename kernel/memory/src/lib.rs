@@ -327,8 +327,13 @@ impl VirtualMemoryArea {
 
 
 
-static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(VirtualAddress)> = Once::new();
+static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
 
+/// Set the function callback that will be invoked every time a TLB shootdown is necessary,
+/// i.e., during page table remapping and unmapping operations.
+pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
+    BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
+}
 
 
 
@@ -338,15 +343,13 @@ static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(VirtualAddress)> = Once::new();
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation, tlb_shootdown_cb: fn(VirtualAddress)) 
+pub fn init(boot_info: BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
     assert_has_not_been_called!("memory::init must be called only once");
     // let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
     // debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
     
-    BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| tlb_shootdown_cb); // for use in remap/unmap
-
     let memory_map_tag = try!(boot_info.memory_map_tag().ok_or("Memory map tag not found"));
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("Elf sections tag not found"));
 
