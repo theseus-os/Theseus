@@ -11,7 +11,6 @@ extern crate apic;
 
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
-use core::sync::atomic::Ordering;
 
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -85,10 +84,10 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 /// exception 0x02, also used for TLB Shootdown IPIs
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
-    if vaddr != 0 {
+    let vaddrs = apic::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
+    if !vaddrs.is_empty() {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(vaddr);
+        apic::handle_tlb_shootdown_ipi(&vaddrs);
         return;
     }
     

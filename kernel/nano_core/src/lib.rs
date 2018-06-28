@@ -26,7 +26,6 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
-extern crate apic;
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_handling;
@@ -44,10 +43,7 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
-use alloc::arc::Arc;
-use spin::Once;
 use x86_64::structures::idt::LockedIdt;
-use memory::MappedPages;
 
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
@@ -124,9 +120,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
-    // TODO FIXME:  remove apic as a hard static dependency here. Register the tlb shootdown func elsewhere?
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
-        try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
     // now that we have virtual memory, including a heap, we can create basic things like state_store
