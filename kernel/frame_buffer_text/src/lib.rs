@@ -184,7 +184,10 @@ impl FrameTextBuffer {
         let mut pixel_column = 0;
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
         let index = 0;
-     
+        
+        let mut drawer = frame_buffer::FRAME_DRAWER.lock();
+        let mut buffer = drawer.buffer();
+
         for byte in slice.bytes() {
             if byte == b'\n' {
                 text_line += 1;
@@ -197,11 +200,12 @@ impl FrameTextBuffer {
                 pixel_line = text_line * font::CHARACTER_HEIGHT;            
                 for y in 0..font::CHARACTER_HEIGHT {
                     pixel_line += 1;
-                    pixel_column = text_column * CHARACTER_WIDTH;
+                    pixel_column = text_column * CHARACTER_WIDTH * 3;
                     for x in 0..font::CHARACTER_WIDTH {
-                        pixel_column += 1;
+                        pixel_column += 3;
                         let pixel = generate_pixel(byte, x, y, FONT_COLOR, BACKGROUND_COLOR);
-                        frame_buffer::display(pixel, pixel_line, pixel_column * 3);
+                        buffer.chars[pixel_line][pixel_column..pixel_column+3].copy_from_slice(&(pixel.color_code));
+                        //frame_buffer::display(pixel, pixel_line, pixel_column * 3);
                     }
                 }
                 text_column += 1;
@@ -291,3 +295,5 @@ fn generate_pixel(ascii:u8, x:usize, y:usize, fg_color:u32, bg_color:u32) -> Col
 //Lock the buffer and write directly
 //cursor position
 //scan every y lines?
+//blank lines
+//get dimenson

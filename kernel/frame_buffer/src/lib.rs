@@ -102,7 +102,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-static FRAME_DRAWER: Mutex<Drawer> = {
+pub static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
@@ -125,10 +125,6 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-/*pub fn display(start_line:usize, height:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
-    FRAME_DRAWER.lock().display(start_line, start_line+height, buffer);
-}*/
-
 pub fn display(pixel: ColorPixel, y:usize, sub_x:usize){
     FRAME_DRAWER.lock().buffer().chars[y][sub_x..sub_x+3].copy_from_slice(&(pixel.color_code));
 }
@@ -139,7 +135,7 @@ pub struct Point {
     pub color: usize,
 }
 
-struct Drawer {
+pub struct Drawer {
     start_address: usize,
     buffer: Unique<Buffer> ,
 }
@@ -210,7 +206,7 @@ impl Drawer {
     }
 
 
-    fn buffer(&mut self) -> &mut Buffer {
+    pub fn buffer(&mut self) -> &mut Buffer {
          unsafe { self.buffer.as_mut() }
     } 
 
@@ -225,9 +221,9 @@ impl Drawer {
     }  
 }
 
-struct Buffer {
+pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    pub chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
 }
 
 
