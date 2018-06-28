@@ -209,25 +209,6 @@ impl FrameTextBuffer {
         }
         pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
 
-        //let iterator = self.display_lines.len();
-        // Writes the lines to the vga buffer
-        /*unsafe {
-            use core::ptr::write_volatile;
-            for (i, line) in (0..iterator).enumerate() {
-                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                write_volatile(addr, self.display_lines[line]);
-            }
-
-            // fill the rest of the space, if any, with blank lines
-            if iterator < BUFFER_HEIGHT {
-                for i in iterator..BUFFER_HEIGHT {
-                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                    // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
-                    pixel_line = print_line(buffer, pixel_line, BLANK_LINE, FONT_COLOR, BACKGROUND_COLOR);
-                }
-            }
-        }*/
-        //self.display_lines = Vec::with_capacity(1000);
         Ok(cursor_pos)
     }
 
