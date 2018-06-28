@@ -19,7 +19,7 @@ use core::cmp::min;
 use spin::Mutex;
 use port_io::Port;
 use core::mem;
-use frame_buffer::{ColorPixel};
+use frame_buffer::{ColorPixel, Buffer};
 
 
 
@@ -52,9 +52,9 @@ pub enum DisplayPosition {
 }
 
 
-type Line = [ScreenChar; BUFFER_WIDTH];
+type Line = [u8; BUFFER_WIDTH];
 
-const BLANK_LINE: Line = [ScreenChar::new(b' ', 0); BUFFER_WIDTH];
+const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
     static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
     static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
     static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
@@ -178,77 +178,78 @@ impl FrameTextBuffer {
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
     pub fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
-        let mut text_line = 0;
+        let mut curr_column = 0;
+        let mut new_line = BLANK_LINE;
         let mut pixel_line = 0;
-        let mut text_column = 0;
-        let mut pixel_column = 0;
+        let mut cursor_pos = 0;
+
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
         let index = 0;
         
         let mut drawer = frame_buffer::FRAME_DRAWER.lock();
         let mut buffer = drawer.buffer();
 
+
         for byte in slice.bytes() {
             if byte == b'\n' {
-                text_line += 1;
-                text_column = 0;
+                pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+                new_line = BLANK_LINE;
+                cursor_pos += BUFFER_WIDTH - curr_column;
+                curr_column = 0;
             } else {
-                if text_column == BUFFER_WIDTH {
-                    text_line += 1;
-                    text_column = 0;
-                } 
-                pixel_line = text_line * font::CHARACTER_HEIGHT;            
-                for y in 0..font::CHARACTER_HEIGHT {
-                    pixel_line += 1;
-                    pixel_column = text_column * CHARACTER_WIDTH * 3;
-                    for x in 0..font::CHARACTER_WIDTH {
-                        pixel_column += 3;
-                        let pixel = generate_pixel(byte, x, y, FONT_COLOR, BACKGROUND_COLOR);
-                        buffer.chars[pixel_line][pixel_column..pixel_column+3].copy_from_slice(&(pixel.color_code));
-                        //frame_buffer::display(pixel, pixel_line, pixel_column * 3);
-                    }
+                if curr_column == BUFFER_WIDTH {
+                    curr_column = 0;
+                    pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+                    new_line = BLANK_LINE;
                 }
-                text_column += 1;
+                new_line[curr_column] = byte;
+                curr_column += 1;
+                cursor_pos += 1;
             }
         }
-        Ok(1)
+        pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+
+        //let iterator = self.display_lines.len();
+        // Writes the lines to the vga buffer
+        /*unsafe {
+            use core::ptr::write_volatile;
+            for (i, line) in (0..iterator).enumerate() {
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                write_volatile(addr, self.display_lines[line]);
+            }
+
+            // fill the rest of the space, if any, with blank lines
+            if iterator < BUFFER_HEIGHT {
+                for i in iterator..BUFFER_HEIGHT {
+                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                    // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
+                    pixel_line = print_line(buffer, pixel_line, BLANK_LINE, FONT_COLOR, BACKGROUND_COLOR);
+                }
+            }
+        }*/
+        //self.display_lines = Vec::with_capacity(1000);
+        Ok(cursor_pos)
     }
 
-   /* fn printline(&self, line_num:usize, line:Line, fg_color: ?? , bg_color: ??){
+    fn print_line(&self, buffer:&mut Buffer, mut pixel_line: usize, line:Line, fg_color:u32 , bg_color: u32) -> usize{
         
         let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
-
-        let font_color = parsecolor(FONT_COLOR);
-        let bg_color = parsecolor(BACKGROUND_COLOR);
-
         unsafe {// TODO
-            for b in str_slice.bytes() {}
             for y in 0..CHARACTER_HEIGHT {
-                let mut addr = 3;
+                let mut addr = 0;
                 for i in 0..BUFFER_WIDTH{
-                    // let ascii_code = line[i].ascii_character as usize;
-                    ascii_code = b
-                    for x in 0..font::CHARACTER_PIXELS_WIDTH {
-                        let mask:u64 = font::FONT_PIXEL[ascii_code][y][x];
-                        // let color = font_color & mask | bg_color & (!mask);
-                        let pixel = get_pixel(b, fg_color, bg_color, x, y)
-                        // let mut color_array: [u8;8] = unsafe {
-                        //         mem::transmute(color)
-                        // };
-                        // color_array.reverse();
-                        linebuffer[y][addr..addr+6].copy_from_slice(&color_array[2..8]);
-                        addr += 6;
-                        
+                    let ascii_code = line[i];
+                    for x in 0..font::CHARACTER_WIDTH {
+                       let pixel = generate_pixel(ascii_code, x, y, fg_color, bg_color);                      
+                       buffer.chars[pixel_line][addr..addr+3].copy_from_slice(&(pixel.color_code));
+                       addr += 3;
                     }
-                    addr += 3;
-
                 }
+                pixel_line += 1;
             }
         }
-
-        frame_buffer::display(line_num * CHARACTER_HEIGHT, CHARACTER_HEIGHT, &linebuffer);
-        
-    }*/
+        pixel_line       
+    }
 }
 
 
