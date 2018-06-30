@@ -3,7 +3,7 @@
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
 use core::ops::DerefMut;
-use alloc::{Vec, String};
+use alloc::{BTreeMap, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
 use spin::{Mutex, RwLock};
@@ -100,7 +100,7 @@ pub fn parse_nano_core(
         };
 
         let default_namespace = super::get_default_namespace();
-        let new_syms = default_namespace.add_symbols(&new_crate.read().sections, &crate_name, verbose_log);
+        let new_syms = default_namespace.add_symbols(new_crate.read().sections.values(), &crate_name, verbose_log);
         default_namespace.crate_tree.lock().insert(crate_name, new_crate);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
@@ -130,13 +130,15 @@ fn parse_nano_core_symbol_file(
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
-    let mut sections: Vec<StrongSectionRef> = Vec::new();
+    // because the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
+    let mut section_counter = 0;
+    let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
 
     // we create the new crate here so we can obtain references to it later
     let new_crate = Arc::new(RwLock::new(
         LoadedCrate {
             crate_name:   crate_name, 
-            sections:     Vec::new(),
+            sections:     BTreeMap::new(),
             text_pages:   None,
             rodata_pages: None,
             data_pages:   None,
@@ -317,12 +319,14 @@ fn parse_nano_core_symbol_file(
             // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
 
             if sec_ndx == text_shndx {
-                sections.push(
+                sections.insert(
+                    section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
                         SectionType::Text,
                         no_hash,
                         hash,
                         try_break!(text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result), 
+                        sec_vaddr,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -330,12 +334,14 @@ fn parse_nano_core_symbol_file(
                 );
             }
             else if sec_ndx == rodata_shndx {
-                sections.push(
+                sections.insert(
+                    section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
                         SectionType::Rodata,
                         no_hash,
                         hash,
                         try_break!(rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
+                        sec_vaddr,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -343,12 +349,14 @@ fn parse_nano_core_symbol_file(
                 );
             }
             else if sec_ndx == data_shndx {
-                sections.push(
+                sections.insert(
+                    section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
                         SectionType::Data,
                         no_hash,
                         hash,
                         try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                        sec_vaddr,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -356,12 +364,14 @@ fn parse_nano_core_symbol_file(
                 );
             }
             else if sec_ndx == bss_shndx {
-                sections.push(
+                sections.insert(
+                    section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
                         SectionType::Bss,
                         no_hash,
                         hash,
                         try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
+                        sec_vaddr,
                         sec_size,
                         true,
                         Arc::downgrade(&new_crate),
@@ -371,6 +381,8 @@ fn parse_nano_core_symbol_file(
             else {
                 trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
             }
+
+            section_counter += 1;
 
         } // end of loop over all lines
 
@@ -499,7 +511,7 @@ fn parse_nano_core_binary(
     let new_crate = Arc::new(RwLock::new(
         LoadedCrate {
             crate_name:   crate_name, 
-            sections:     Vec::new(),
+            sections:     BTreeMap::new(),
             text_pages:   None,
             rodata_pages: None,
             data_pages:   None,
@@ -510,7 +522,10 @@ fn parse_nano_core_binary(
 
     // iterate through the symbol table so we can find which sections are global (publicly visible)
     let loaded_sections = {
-        let mut sections: Vec<StrongSectionRef> = Vec::new();
+        // because the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
+        let mut section_counter = 0;
+        let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
+
         use xmas_elf::symbol_table::Entry;
         for entry in symtab.iter() {
             // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)
@@ -543,6 +558,7 @@ fn parse_nano_core_binary(
                                         demangled.no_hash,
                                         demangled.hash,
                                         try_break!(text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result),
+                                        sec_vaddr,
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -554,6 +570,7 @@ fn parse_nano_core_binary(
                                         demangled.no_hash,
                                         demangled.hash,
                                         try_break!(rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
+                                        sec_vaddr,
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -565,6 +582,7 @@ fn parse_nano_core_binary(
                                         demangled.no_hash,
                                         demangled.hash,
                                         try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                                        sec_vaddr,
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -576,6 +594,7 @@ fn parse_nano_core_binary(
                                         demangled.no_hash,
                                         demangled.hash,
                                         try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
+                                        sec_vaddr,
                                         sec_size,
                                         true,
                                         Arc::downgrade(&new_crate),
@@ -589,7 +608,8 @@ fn parse_nano_core_binary(
 
                             if let Some(sec) = new_section {
                                 // debug!("parse_nano_core: new section: {:?}", sec);
-                                sections.push(Arc::new(Mutex::new(sec)));
+                                sections.insert(section_counter, Arc::new(Mutex::new(sec)));
+                                section_counter += 1;
                             }
                         }
                     }
