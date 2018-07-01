@@ -23,6 +23,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.frame_buffer_text]
+path = "../frame_buffer_text"
+
 [dependencies.window_manager]
 path = "../window_manager"
 

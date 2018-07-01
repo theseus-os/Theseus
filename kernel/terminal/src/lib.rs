@@ -3,7 +3,7 @@
 // used by the vga buffer
 
 extern crate keycodes_ascii;
-extern crate vga_buffer;
+extern crate frame_buffer_text;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
@@ -21,7 +21,7 @@ extern crate console_types;
 
 
 use console_types::{ConsoleEvent};
-use vga_buffer::{VgaBuffer};
+use frame_buffer_text::{FrameTextBuffer};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;
@@ -78,8 +78,8 @@ struct CommandStruct {
 }
 
 pub struct Terminal {
-    /// The terminal's own vga buffer that it displays to
-    vga_buffer: VgaBuffer,
+    /// The terminal's own frame buffer that it displays to
+    frame_buffer: FrameTextBuffer,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -167,7 +167,7 @@ impl Terminal {
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            vga_buffer: VgaBuffer::new(),
+            frame_buffer:FrameTextBuffer::new(),
             console_input_string: String::new(),
             input_string_index: 0,
             command_history: Vec::new(),
@@ -198,7 +198,7 @@ impl Terminal {
             terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num, prompt_string))?;
         }
         terminal.input_string_index = terminal.scrollback_buffer.len()-1; // updates the input string tracking variable
-        terminal.vga_buffer.enable_cursor();
+        terminal.frame_buffer.enable_cursor();
         // Spawns a terminal instance on a new thread
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
         Ok(returned_input_producer)
@@ -244,7 +244,7 @@ impl Terminal {
     /// calculates the starting index so that when displayed on the vga buffer, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> usize{
-        let (buffer_width, buffer_height) = self.vga_buffer.get_dimensions();
+        let (buffer_width, buffer_height) = self.frame_buffer.get_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -267,7 +267,7 @@ impl Terminal {
 
             // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the vga buffer
             while total_lines < buffer_height {
-                // Operation finds the number of lines that a single "sentence" will occupy on the vga buffer through the operation length_of_sentence/vga_buffer_width + 1
+                // Operation finds the number of lines that a single "sentence" will occupy on the frame buffer through the operation length_of_sentence/frame_buffer + 1
                 if counter == new_line_indices.len() -1 {
                     return 0; // In  the case that an end index argument corresponded to a string slice that underfits the vga buffer
                 }
@@ -298,7 +298,7 @@ impl Terminal {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// vga buffer. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.vga_buffer.get_dimensions();
+        let (buffer_width,buffer_height) = self.frame_buffer.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -349,7 +349,7 @@ impl Terminal {
 
     /// Scrolls up by the vga buffer equivalent of one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.vga_buffer.get_dimensions().0;
+        let buffer_width = self.frame_buffer.get_dimensions().0;
         let prev_end_idx = self.scroll_end_idx;
         let mut start_idx = self.calc_start_idx(prev_end_idx);
         //indicates that the user has scrolled to the top of the page
@@ -391,7 +391,7 @@ impl Terminal {
 
     /// Scrolls down the vga buffer equivalent of one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.vga_buffer.get_dimensions().0;
+        let buffer_width = self.frame_buffer.get_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -457,8 +457,8 @@ impl Terminal {
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
-            self.vga_buffer.enable_cursor();
-            let _result = self.print_to_vga(new_end_idx);
+            self.frame_buffer.enable_cursor();
+            let _result = self.print_to_buffer(new_end_idx);
             return;
         }
         self.scroll_start_idx = new_start_idx;
@@ -466,14 +466,14 @@ impl Terminal {
     }
 
      /// Takes in a usize that corresponds to the end index of a string slice of the scrollback buffer that will be displayed on the vga buffer
-    fn print_to_vga(&mut self, end_idx: usize) -> Result<(), &'static str> {
+    fn print_to_buffer(&mut self, end_idx: usize) -> Result<(), &'static str> {
         // Calculates a starting index that will correspond to a slice of the scrollback buffer that will perfectly fit on the vga buffer
         let start_idx = self.calc_start_idx(end_idx);
         self.scroll_start_idx = start_idx;
         self.scroll_end_idx = end_idx;
         let result  = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
-            self.absolute_cursor_pos = self.vga_buffer.display_string(slice)?;
+            self.absolute_cursor_pos = self.frame_buffer.display_string(slice)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -545,7 +545,7 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
-        let buffer_width = self.vga_buffer.get_dimensions().0;
+        let buffer_width = self.frame_buffer.get_dimensions().0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -555,7 +555,7 @@ impl Terminal {
             new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        vga_buffer::update_cursor(new_x as u16, new_y as u16);
+        frame_buffer_text::update_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
@@ -650,7 +650,7 @@ impl Terminal {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
                 self.scroll_end_idx = self.calc_end_idx(0);
-                self.vga_buffer.disable_cursor();
+                self.frame_buffer.disable_cursor();
             }
             return Ok(());
         }
@@ -660,14 +660,14 @@ impl Terminal {
                 self.scroll_end_idx = self.scrollback_buffer.len();
                 let end_idx = self.scroll_end_idx;
                 self.scroll_start_idx = self.calc_start_idx(end_idx);
-                self.vga_buffer.enable_cursor();
+                self.frame_buffer.enable_cursor();
             }
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_end_idx != 0 {
                 self.scroll_up_one_line();
-                self.vga_buffer.disable_cursor();                
+                self.frame_buffer.disable_cursor();                
             }
             return Ok(());
         }
@@ -676,7 +676,7 @@ impl Terminal {
                 self.scroll_down_one_line();
             }
             if self.is_scroll_end {
-                self.vga_buffer.enable_cursor();
+                self.frame_buffer.enable_cursor();
             }
             return Ok(());
         }
@@ -684,7 +684,7 @@ impl Terminal {
         if keyevent.keycode == Keycode::PageUp {
             self.page_up();
             self.is_scroll_end = false;
-            self.vga_buffer.disable_cursor();
+            self.frame_buffer.disable_cursor();
             return Ok(());
         }
 
@@ -770,6 +770,7 @@ impl Terminal {
                                     self.console_buffer_string.push(c);
                                     return Ok(());
                                 } else {
+                                    trace!("Wenqiu:input {}", c);
                                     self.console_input_string.push(c);
                                 }
                             },
@@ -905,10 +906,10 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             &ConsoleEvent::DisplayEvent => {
                 let end_idx = terminal.scrollback_buffer.len();
                 if terminal.is_scroll_end {
-                    terminal.print_to_vga(end_idx)?;
+                    terminal.print_to_buffer(end_idx)?;
                 } else {
                     let scroll_end_idx = terminal.scroll_end_idx;
-                    terminal.print_to_vga(scroll_end_idx)?;
+                    terminal.print_to_buffer(scroll_end_idx)?;
                 }
                 // handles cursor movement
                 terminal.cursor_handler()?;

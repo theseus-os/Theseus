@@ -35,10 +35,10 @@ const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 //Size of VESA mode 0x4112
 
 ///The width of the screen
-pub const FRAME_BUFFER_WIDTH:usize = 640*3;
+pub const FRAME_BUFFER_WIDTH:usize = 640*4;
 
 ///The height of the screen
-pub const FRAME_BUFFER_HEIGHT:usize = 480;
+pub const FRAME_BUFFER_HEIGHT:usize = 400;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
@@ -102,7 +102,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-static FRAME_DRAWER: Mutex<Drawer> = {
+pub static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
@@ -125,8 +125,8 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub fn display(start_line:usize, height:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
-    FRAME_DRAWER.lock().display(start_line, start_line+height, buffer);
+pub fn display(pixel: ColorPixel, y:usize, sub_x:usize){
+    FRAME_DRAWER.lock().buffer().chars[y][sub_x..sub_x+3].copy_from_slice(&(pixel.color_code));
 }
 
 pub struct Point {
@@ -135,7 +135,7 @@ pub struct Point {
     pub color: usize,
 }
 
-struct Drawer {
+pub struct Drawer {
     start_address: usize,
     buffer: Unique<Buffer> ,
 }
@@ -206,7 +206,7 @@ impl Drawer {
     }
 
 
-    fn buffer(&mut self) -> &mut Buffer {
+    pub fn buffer(&mut self) -> &mut Buffer {
          unsafe { self.buffer.as_mut() }
     } 
 
@@ -221,9 +221,14 @@ impl Drawer {
     }  
 }
 
-struct Buffer {
+pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    pub chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+}
+
+
+pub struct ColorPixel {
+    pub color_code:[u8;3],
 }
 
 
