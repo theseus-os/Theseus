@@ -200,21 +200,6 @@ impl FrameTextBuffer {
         let mut drawer = frame_buffer::FRAME_DRAWER.lock();
         let mut buffer = drawer.buffer();
 
-        /*let mut a = 0;
-        let hpet_lock = acpi::get_hpet();
-        let start = hpet_lock.as_ref().unwrap().get_counter();
-                trace!("Wenqiu: time");
-                unsafe {
-                    let mut add = frame_buffer::address;
-                    for i in 0..640*400 {
-                        a=3;
-                       //buf[i] = 0xFFFFFF;
-                    }
-                }
-        let end =  hpet_lock.as_ref().unwrap().get_counter();
-        trace!("{}:{}", start, end);
-        */
-
         for byte in slice.bytes() {
             if byte == b'\n' {
                // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
@@ -229,18 +214,23 @@ impl FrameTextBuffer {
                     new_line = BLANK_LINE;
                     curr_line += 1;
                 }
-                let mut x = curr_column * font::CHARACTER_WIDTH;
+                let mut x = curr_column * font::CHARACTER_WIDTH + 1;
                 let mut y = curr_line * font::CHARACTER_HEIGHT;
+                let mut i = 0;
+                let mut j = 0;
 
                 unsafe {   
-                    for i in 0..font::CHARACTER_HEIGHT {
-                        for j in 0..font::CHARACTER_WIDTH {
-                            let mask:u32 = font::FONT_PIXEL[byte as usize][i][j];
-                            buffer.chars[y][x] = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
-                            x += 1;
+                    loop {
+                        let mask:u32 = font::FONT_PIXEL[byte as usize][i][j];
+                        buffer.chars[i+y][j+x] = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
+                        j += 1;
+                        if j == 8 {
+                            i += 1;
+                            if i == 16 {
+                                break;
+                            }
+                            j = 0;
                         }
-                        y += 1;
-                        x -= font::CHARACTER_WIDTH;
                     }
                 }
 
@@ -249,6 +239,7 @@ impl FrameTextBuffer {
                 cursor_pos += 1;
             }
         }
+
        // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
 
         Ok(cursor_pos)

@@ -55,35 +55,6 @@ const RIGHT_BIT_SHIFT: u8 = 8;
 const DISABLE_SEQ_1: u8 = 0x0A;
 const DISABLE_SEQ_2: u8 = 0x20;
 
-pub fn enable_cursor() {
-    unsafe {
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
-        CURSOR_PORT_END.lock().write(temp_read);
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
-        CURSOR_PORT_END.lock().write(temp_read2);
-    }
-}
-
-pub fn update_cursor(x: u16, y: u16) {
-    let pos: u16 = y * BUFFER_WIDTH as u16 + x;
-    unsafe {
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
-        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
-        CURSOR_PORT_END
-            .lock()
-            .write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
-    }
-}
-
-pub fn disable_cursor() {
-    unsafe {
-        CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
-        CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-    }
-}
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct VgaBuffer {
@@ -111,13 +82,11 @@ impl VgaBuffer {
     /// Enables the cursor by writing to four ports
     pub fn enable_cursor(&self) {
         unsafe {
-            let cursor_start = 0b00000001;
-            let cursor_end = 0b00010000;
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | cursor_start;
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
             CURSOR_PORT_END.lock().write(temp_read);
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
             CURSOR_PORT_END.lock().write(temp_read2);
         }
         return;
