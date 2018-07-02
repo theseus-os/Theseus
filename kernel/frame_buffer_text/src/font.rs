@@ -273,7 +273,7 @@ pub fn init()-> Result<(), &'static str > {
                 let mut bit = 0x80;
                 for x in 0..CHARACTER_WIDTH{
                     if char_font & (0x80 >> x) !=0 {
-                        FONT_PIXEL[i][y][x+1] = 0xFFFFFF; 
+                        FONT_PIXEL[i][y][x+1] = 0xFFFFFFFF; 
                     }
                 }
             }

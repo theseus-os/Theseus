@@ -7,7 +7,7 @@
 ; This file may not be copied, modified, or distributed
 ; except according to those terms.
 
-; Declare a multiboot header that marks the program as a kernel. These are magic
+; Declare a  that marks the program as a kernel. These are magic
 ; values that are documented in the multiboot standard. The bootloader will
 ; search for this signature in the first 8 KiB of the kernel file, aligned at a
 ; 32-bit boundary. The signature is in its own section so the header can be
@@ -22,6 +22,14 @@ header_start:
 	dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
 
 	;optional tags
+	;framebuffer tags
+	;dw 5
+	;dw 0
+	;dd 20
+	;dd 640
+	;dd 400
+	;dd 32
+
 
 	;end tags
 	dw 0	;type

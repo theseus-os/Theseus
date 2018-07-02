@@ -8,6 +8,7 @@
 #![feature(asm)]
 
 extern crate spin;
+extern crate acpi;
 
 extern crate volatile;
 #[macro_use] extern crate alloc;
@@ -35,12 +36,14 @@ const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 //Size of VESA mode 0x4112
 
 ///The width of the screen
-pub const FRAME_BUFFER_WIDTH:usize = 640*4;
+pub const FRAME_BUFFER_WIDTH:usize = 640;
 
 ///The height of the screen
 pub const FRAME_BUFFER_HEIGHT:usize = 400;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
+
+pub static mut address:usize = 0;
 
 /// try to unwrap an option. return error result if fails. 
 #[macro_export]
@@ -57,7 +60,7 @@ macro_rules! try_opt_err {
 pub fn init() -> Result<(), &'static str > {
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*4;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -79,6 +82,7 @@ pub fn init() -> Result<(), &'static str > {
             } 
 
             let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            let mut add = pages.start_address();
             if err.is_err() {
                 debug!("Fail to init frame buffer");
                 return err;
@@ -125,10 +129,6 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub fn display(pixel: ColorPixel, y:usize, sub_x:usize){
-    FRAME_DRAWER.lock().buffer().chars[y][sub_x..sub_x+3].copy_from_slice(&(pixel.color_code));
-}
-
 pub struct Point {
     pub x: usize,
     pub y: usize,
@@ -136,25 +136,21 @@ pub struct Point {
 }
 
 pub struct Drawer {
-    start_address: usize,
+    pub start_address: usize,
     buffer: Unique<Buffer> ,
 }
 
 impl Drawer {
-    fn display(&mut self, start_line:usize, end_line:usize, buffer:&[[u8;FRAME_BUFFER_WIDTH]]){
-        //TODO: add size limitation
-        self.buffer().chars[start_line..end_line].copy_from_slice(buffer);
-    }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
        
-        if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
+      /*  if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
             return Some("pixel is ont of bound");
         }
         self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
         self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
         self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
-    
+    */
         Some("End")
     }
 
@@ -213,6 +209,7 @@ impl Drawer {
     fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
             self.start_address = virtual_address;
+            unsafe { address = virtual_address;}
             self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
             trace!("Set frame buffer address {:#x}", virtual_address);
         }
@@ -223,7 +220,7 @@ impl Drawer {
 
 pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    pub chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    pub chars: [[u32; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
 }
 
 
@@ -231,4 +228,20 @@ pub struct ColorPixel {
     pub color_code:[u8;3],
 }
 
-
+pub fn test() {
+        let mut buf = [[0 as u32;640];400];
+        let hpet_lock = acpi::get_hpet();
+        let start = hpet_lock.as_ref().unwrap().get_counter();
+                trace!("Wenqiu: time");
+                unsafe {
+                    let mut add = address;
+                    for i in 0..640 {
+                        for j in 0..400 {
+                            buf[j][i] = 0xFFFF;
+                        }
+                    }
+                }
+        //FRAME_DRAWER.lock().buffer().chars.copy_from_slice(&buf);
+        let end =  hpet_lock.as_ref().unwrap().get_counter();
+        trace!("{}:{}", start, end);
+}

@@ -171,14 +171,14 @@ findmode:
     cmp byte [VBEModeInfo.xresolution], 600
     jb .searchmodes
 
-
 set_graphic_mode:
 ; bx 4___ is linear frame buffer
 
     cmp word [VBEModeInfo.yresolution], 480
     je gdt 
     mov ax, 0x4f02
-    mov bx, [current.mode] ; 0x4f41:640*400*32bit
+    ;mov bx, [current.mode] ; 0x4f41:640*400*32bit
+    mov bx, 0xf41
     int 0x10;
 
 

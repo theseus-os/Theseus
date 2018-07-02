@@ -18,6 +18,9 @@ version = "0.3.7"
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.acpi]
+path = "../acpi"
+
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "0.2.1"

@@ -5,6 +5,7 @@
 #![feature(unique)]
 #![feature(asm)]
 
+extern crate acpi;
 extern crate frame_buffer;
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
@@ -25,13 +26,16 @@ use frame_buffer::{ColorPixel, Buffer};
 
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_BASIC};
 
-const BUFFER_WIDTH:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
+const BUFFER_WIDTH:usize = (frame_buffer::FRAME_BUFFER_WIDTH)/CHARACTER_WIDTH;
 const BUFFER_HEIGHT:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 const BACKGROUND_COLOR:u32 = 0x000000;
 
 pub mod font;
+
+static mut buf:[u32;640*400] = [0;640*400];
+
 
 
 
@@ -178,53 +182,91 @@ impl FrameTextBuffer {
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
     pub fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
+
+
+
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
         let mut pixel_line = 0;
         let mut cursor_pos = 0;
+        let mut curr_line = 0;
 
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
         let index = 0;
         
+
+
+
         let mut drawer = frame_buffer::FRAME_DRAWER.lock();
         let mut buffer = drawer.buffer();
 
+        /*let mut a = 0;
+        let hpet_lock = acpi::get_hpet();
+        let start = hpet_lock.as_ref().unwrap().get_counter();
+                trace!("Wenqiu: time");
+                unsafe {
+                    let mut add = frame_buffer::address;
+                    for i in 0..640*400 {
+                        a=3;
+                       //buf[i] = 0xFFFFFF;
+                    }
+                }
+        let end =  hpet_lock.as_ref().unwrap().get_counter();
+        trace!("{}:{}", start, end);
+        */
 
         for byte in slice.bytes() {
             if byte == b'\n' {
-                pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+               // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
                 new_line = BLANK_LINE;
                 cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
+                curr_line += 1;
             } else {
                 if curr_column == BUFFER_WIDTH {
                     curr_column = 0;
-                    pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+                    //pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
                     new_line = BLANK_LINE;
+                    curr_line += 1;
                 }
+                let mut x = curr_column * font::CHARACTER_WIDTH;
+                let mut y = curr_line * font::CHARACTER_HEIGHT;
+
+                unsafe {   
+                    for i in 0..font::CHARACTER_HEIGHT {
+                        for j in 0..font::CHARACTER_WIDTH {
+                            let mask:u32 = font::FONT_PIXEL[byte as usize][i][j];
+                            buffer.chars[y][x] = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
+                            x += 1;
+                        }
+                        y += 1;
+                        x -= font::CHARACTER_WIDTH;
+                    }
+                }
+
                 new_line[curr_column] = byte;
                 curr_column += 1;
                 cursor_pos += 1;
             }
         }
-        pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+       // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
 
         Ok(cursor_pos)
     }
 
     fn print_line(&self, buffer:&mut Buffer, mut pixel_line: usize, line:Line, fg_color:u32 , bg_color: u32) -> usize{
-        
+        buffer.chars[159][0] = 0xFFFFFFFF;
+
         let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
         unsafe {// TODO
             for y in 0..CHARACTER_HEIGHT {
                 let mut addr = 0;
                 for i in 0..BUFFER_WIDTH{
-                    let ascii_code = line[i];
+                    let ascii_code = line[i] as usize;
                     for x in 0..font::CHARACTER_WIDTH {
-                        let pixel = generate_pixel(ascii_code, x, y, fg_color, bg_color);
-                        buffer.chars[0][0] = 0xff;
-                        //buffer.chars[pixel_line][addr..addr+3].copy_from_slice(&(pixel.color_code));
-                        //addr += 4;
+                        let mask:u32 = font::FONT_PIXEL[ascii_code][y][x];
+                        buffer.chars[pixel_line][addr] = fg_color & mask | bg_color & (!mask);
+                        addr += 1;
                     }
                 }
                 pixel_line += 1;
@@ -265,14 +307,11 @@ fn parsecolor(color:u32) -> u64 {
 }
 
 
-fn generate_pixel(ascii:u8, x:usize, y:usize, fg_color:u32, bg_color:u32) -> ColorPixel {
-     unsafe {
+fn generate_pixel(ascii:u8, x:usize, y:usize, fg_color:u32, bg_color:u32) -> u32 {
+    unsafe {
         let mask:u32 = font::FONT_PIXEL[ascii as usize][y][x];
-        let color = fg_color & mask | bg_color & (!mask);
-        ColorPixel {
-            color_code:[(color >> 16) as u8, ((color >> 8) & 255) as u8, (color & 255) as u8]
-        }
-     }
+        fg_color & mask | bg_color & (!mask)
+    }
 }
 
 //Lock the buffer and write directly
