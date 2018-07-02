@@ -42,12 +42,11 @@ lazy_static! {
 /// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
 /// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
 /// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
-pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
+pub fn print_to_console<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &'static str> {
     // Gets the task id of the task that called this print function
     let result = task::get_my_current_task_id();
     let mut selected_term = 1;
     if let Some(current_task_id) = result {
-            
             let terminal_task_ids_lock = TERMINAL_TASK_IDS.lock();
             for term in terminal_task_ids_lock.iter() {
                 // finds the corresponding terminal instance running the current task id
@@ -60,9 +59,14 @@ pub fn print_to_console<S: Into<String>>(s: S) -> Result<(), &'static str> {
     // Obtains the correct temrinal print producer and enqueues the print event, which will later be popped off
     // and handled by the infinite temrinal instance loop 
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
-    let result = print_map.get(& selected_term);
+    let result = print_map.get(&selected_term);
     if let Some(selected_term_producer) = result {
-        selected_term_producer.enqueue(ConsoleEvent::new_output_event(s));
+        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the vga buffer
+        if selected_term == focus_term{
+            selected_term_producer.enqueue(ConsoleEvent::new_output_event(s, true));
+        } else {
+            selected_term_producer.enqueue(ConsoleEvent::new_output_event(s, false));
+        }
     }
     Ok(())
 }
@@ -112,7 +116,7 @@ pub struct Terminal {
     scroll_start_idx: usize,
     /// The ending index of the scrollback buffer string slice that is currently being displayed on the vga buffer
     scroll_end_idx: usize,
-    /// Indicates the rightmost position of the cursor on the vga buffer (i.e. one more than the position of the last non_whitespace character
+    /// Indicates the rightmost position of the cursor ON THE VGA BUFFER, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
     /// being displayed on the vga buffer)
     absolute_cursor_pos: usize,
     /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
@@ -123,6 +127,8 @@ pub struct Terminal {
     /// The consumer for the Terminal's input dfqueue. It will dequeue input events from the terminal's dfqueue and handle them using
     /// the handle keypress function. 
     input_consumer: DFQueueConsumer<ConsoleEvent>,
+
+
 
 }
 
@@ -142,7 +148,7 @@ impl fmt::Debug for Terminal {
 /// 
 /// 2) The terminal input queue that handles input events from the input event handling crate
 ///     - Consumer is the main terminal loop
-///     - Producers are functions in the event handling crate that send DisplayEvents and
+///     - Producers are functions in the event handling crate that send 
 ///         Keyevents if the terminal is the one currently being focused on
 impl Terminal {
     /// Creates a new terminal object
@@ -156,6 +162,7 @@ impl Terminal {
         let terminal_print_dfq: DFQueue<ConsoleEvent>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
+        // let terminal_input_producer = terminal_input_consumer.obtain_producer();
 
         let prompt_string: String;
         if ref_num == 1 {
@@ -184,8 +191,9 @@ impl Terminal {
             is_scroll_end: true,
             absolute_cursor_pos: 0, 
             left_shift: 0,
+            print_consumer: terminal_print_consumer,
+            // print_producer: terminal_input_producer,
             input_consumer: terminal_input_consumer,
-            print_consumer: terminal_print_consumer,            
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -458,7 +466,7 @@ impl Terminal {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
             self.vga_buffer.enable_cursor();
-            let _result = self.print_to_vga(new_end_idx);
+            let _result = self.update_display(new_end_idx);
             return;
         }
         self.scroll_start_idx = new_start_idx;
@@ -466,7 +474,7 @@ impl Terminal {
     }
 
      /// Takes in a usize that corresponds to the end index of a string slice of the scrollback buffer that will be displayed on the vga buffer
-    fn print_to_vga(&mut self, end_idx: usize) -> Result<(), &'static str> {
+    fn update_display(&mut self, end_idx: usize) -> Result<(), &'static str> {
         // Calculates a starting index that will correspond to a slice of the scrollback buffer that will perfectly fit on the vga buffer
         let start_idx = self.calc_start_idx(end_idx);
         self.scroll_start_idx = start_idx;
@@ -555,7 +563,7 @@ impl Terminal {
             new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        vga_buffer::update_cursor(new_x as u16, new_y as u16);
+        self.vga_buffer.update_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
@@ -587,6 +595,7 @@ impl Terminal {
                 self.print_to_terminal("^C\n".to_string())?;
                 let prompt_string = self.prompt_string.clone();
                 self.print_to_terminal(prompt_string)?;
+                self.input_string_index = self.scrollback_buffer.len()-1;
             }
             return Ok(());
         }
@@ -618,6 +627,7 @@ impl Terminal {
                 let prompt_string = self.prompt_string.clone();
                 let console_input = self.console_input_string.clone();
                 self.command_history.push(console_input);
+                self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_id) => { 
@@ -739,6 +749,7 @@ impl Terminal {
             let selected_command2 = selected_command.clone();
             self.console_input_string = selected_command;
             self.push_to_stdin(selected_command2);
+            self.input_string_index = self.scrollback_buffer.len() -1; 
             return Ok(());
         }
 
@@ -794,7 +805,6 @@ impl Terminal {
 
                 // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
                 if self.input_string_index != self.scrollback_buffer.len() -1 {
-                    // debug!("input string index {}, scrollback_buffer_len {}\n", self.input_string_index, self.scrollback_buffer.len());
                     let prompt_string = self.prompt_string.clone();
                     let mut console_input_string = self.console_input_string.clone();
                     let _result = console_input_string.pop();
@@ -860,14 +870,20 @@ impl Terminal {
 /// is simply pushed to the scrollback buffer using the associated print_to_terminal method)
 /// 
 /// 2) The input queue handles any input events from the input event handling crate (currently still named
-/// the console crate but will change soon). This includes keypresses and DisplayEvents that signal to the
-/// terminal that it should print to the vga buffer.
+/// the console crate but will change soon)
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the vga buffer before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
+    // Refreshes the vga buffer with the default terminal upon boot, will fix once we refactor the terminal as an application
+    if terminal.term_ref == 1 {
+        let scrollback_buffer_len = terminal.scrollback_buffer.len();
+        terminal.update_display(scrollback_buffer_len)?;
+        terminal.cursor_handler()?;
+    }
     use core::ops::Deref;
+    let mut refresh_vga = false;
     loop {
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
@@ -875,16 +891,42 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             match print_event.deref() {
                 &ConsoleEvent::OutputEvent(ref s) => {
                     terminal.push_to_stdout(s.text.clone());
+                    if s.display == true {
+                        // Sets this bool to true so that on the next iteration the DisplayProvider will refresh AFTER the 
+                        // task_handler() function has cleaned up, which does its own printing to the console
+                        refresh_vga = true;
+                        let end_idx = terminal.scrollback_buffer.len();
+                        if terminal.is_scroll_end {
+                            terminal.update_display(end_idx)?;
+                        } else {
+                            let scroll_end_idx = terminal.scroll_end_idx;
+                            terminal.update_display(scroll_end_idx)?;
+                        }
+                        terminal.cursor_handler()?;
+                    }
                 },
                 _ => { },
             }
             print_event.mark_completed();
-
+            // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
             continue;
         }
 
+
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
+        // Refreshes the vga buffer if it is the one being displayed
+        if refresh_vga == true {
+            let end_idx = terminal.scrollback_buffer.len();
+            if terminal.is_scroll_end {
+                terminal.update_display(end_idx)?;
+            } else {
+                let scroll_end_idx = terminal.scroll_end_idx;
+                terminal.update_display(scroll_end_idx)?;
+            }
+            terminal.cursor_handler()?;
+            refresh_vga = false;
+        }
 
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
@@ -896,29 +938,23 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
-                let _result = print_to_console("\nSmoothly exiting console main loop.\n".to_string())?;
+                let _result = print_to_console("\nSmoothly exiting console main loop.\n".to_string(), 1)?;
                 return Ok(());
             }
-
-            // Signals to the terminal instance that it is being focused on and therefore needs
-            // to print to the vga buffer
-            &ConsoleEvent::DisplayEvent => {
-                let end_idx = terminal.scrollback_buffer.len();
-                if terminal.is_scroll_end {
-                    terminal.print_to_vga(end_idx)?;
-                } else {
-                    let scroll_end_idx = terminal.scroll_end_idx;
-                    terminal.print_to_vga(scroll_end_idx)?;
-                }
-                // handles cursor movement
-                terminal.cursor_handler()?;
-            }
+           
 
             &ConsoleEvent::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;
+                let end_idx = terminal.scrollback_buffer.len();
+                // display provider will always refresh after handling an input event 
+                if terminal.is_scroll_end {
+                    terminal.update_display(end_idx)?;
+                } else {
+                    let scroll_end_idx = terminal.scroll_end_idx;
+                    terminal.update_display(scroll_end_idx)?;
+                }
+                terminal.cursor_handler()?;
             }
-
-            // prints output events are handled by the print queue
             _ => { }
         }
         event.mark_completed();
