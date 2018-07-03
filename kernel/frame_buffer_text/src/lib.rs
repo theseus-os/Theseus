@@ -20,7 +20,7 @@ use core::cmp::min;
 use spin::Mutex;
 use port_io::Port;
 use core::mem;
-use frame_buffer::{ColorPixel, Buffer};
+use frame_buffer::{Buffer};
 
 
 
@@ -182,10 +182,10 @@ impl FrameTextBuffer {
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
     pub fn display_string(&self, slice: &str) -> Result<usize, &'static str> {
-        self.print_by_lines (slice)       
+        self.print_by_bytes (slice)       
     }
     
-    ///print a string and blank lines
+    ///print a string by lines
     fn print_by_lines (&self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
@@ -221,6 +221,14 @@ impl FrameTextBuffer {
  
         }
         self.print_line(buffer, curr_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+
+        /*loop {
+            curr_line += 1;
+            if curr_line == BUFFER_HEIGHT {
+                break;
+            }
+            self.print_line(buffer, curr_line, BLANK_LINE, FONT_COLOR, BACKGROUND_COLOR);
+        }*/
 
         Ok(cursor_pos)
     }
@@ -258,7 +266,7 @@ impl FrameTextBuffer {
 
     }
 
-    ///prints a string and ignore the blank lines
+    ///prints a string by bytes
     fn print_by_bytes(&self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
@@ -268,6 +276,13 @@ impl FrameTextBuffer {
         let mut buffer = drawer.buffer();
         for byte in slice.bytes() {
             if byte == b'\n' {
+                loop {
+                    if curr_column == BUFFER_WIDTH {
+                        break;
+                    }
+                    self.print_byte(buffer, b' ', FONT_COLOR, curr_column, curr_line);
+                    curr_column += 1;
+                }
                 cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -302,50 +317,5 @@ impl FrameTextBuffer {
             }
         }
     }
-    // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
 
 }
-
-
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-struct ScreenChar {
-    ascii_character: u8,
-    color_code: usize,
-}
-
-impl ScreenChar {
-    const fn new(ascii: u8, color: usize) -> ScreenChar {
-        ScreenChar {
-            ascii_character: ascii,
-            color_code: color,
-        }
-    }
-}
-
-/*fn parsecolor(color:u32) -> [u8;3] {
-    let red = (color >> 16) as u8;
-    let green = ((color >> 8) & 0xff) as u8;
-    let blue = (color & 0xff) as u8;
-    [red, green, blue]
-}*/
-
-fn parsecolor(color:u32) -> u64 {
-    let color64 = color as u64;
-    (color64 << 3 * 8) | color64
-}
-
-
-fn generate_pixel(ascii:u8, x:usize, y:usize, fg_color:u32, bg_color:u32) -> u32 {
-    unsafe {
-        let mask:u32 = font::FONT_PIXEL[ascii as usize][y][x];
-        fg_color & mask | bg_color & (!mask)
-    }
-}
-
-//Lock the buffer and write directly
-//cursor position
-//scan every y lines?
-//blank lines
-//get dimenson

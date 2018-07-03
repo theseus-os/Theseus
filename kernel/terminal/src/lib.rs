@@ -781,7 +781,6 @@ impl Terminal {
                                     self.console_buffer_string.push(c);
                                     return Ok(());
                                 } else {
-                                    trace!("Wenqiu:input {}", c);
                                     self.console_input_string.push(c);
                                 }
                             },

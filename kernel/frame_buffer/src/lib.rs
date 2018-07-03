@@ -129,8 +129,8 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
-pub fn set_background(color:u32) {
-    unsafe { FRAME_DRAWER.lock().set_background(color) }
+pub fn set_background(offset:usize, len:usize, color:u32) {
+    unsafe { FRAME_DRAWER.lock().set_background(offset, len, color)}
 }
 
 pub struct Point {
@@ -145,12 +145,11 @@ pub struct Drawer {
 }
 
 impl Drawer {
-    unsafe fn set_background(&mut self, color:u32) {
-        let len = FRAME_BUFFER_WIDTH * FRAME_BUFFER_HEIGHT;
+    unsafe fn set_background(&mut self, offset:usize, len:usize, color:u32) {
         asm!("cld
             rep stosd"
             :
-            : "{rdi}"(self.start_address), "{eax}"(color), "{rcx}"(len)
+            : "{rdi}"(self.start_address + offset), "{eax}"(color), "{rcx}"(len)
             : "cc", "memory", "rdi", "rcx"
             : "intel", "volatile");
     }
@@ -170,8 +169,7 @@ impl Drawer {
     fn draw_points(&mut self, points:Vec<Point>){
         for p in points{
             draw_pixel(p.x, p.y, p.color);
-        }
-      
+        }     
     }
 
     fn check_in_range(&mut self, x:usize, y:usize) -> bool {
@@ -179,6 +177,7 @@ impl Drawer {
     }
 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
+        //TODO use loop instead of for
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         if width.abs() > height.abs() {
@@ -202,6 +201,7 @@ impl Drawer {
     }
 
     fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
+        //TODO use loop instead of for
         let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH };
         let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -234,27 +234,4 @@ impl Drawer {
 pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
     pub chars: [[u32; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
-}
-
-
-pub struct ColorPixel {
-    pub color_code:[u8;3],
-}
-
-pub fn test() {
-        let mut buf = [[0 as u32;640];400];
-        let hpet_lock = acpi::get_hpet();
-        let start = hpet_lock.as_ref().unwrap().get_counter();
-                trace!("Wenqiu: time");
-                unsafe {
-                    let mut add = address;
-                    for i in 0..640 {
-                        for j in 0..400 {
-                            buf[j][i] = 0xFFFF;
-                        }
-                    }
-                }
-        //FRAME_DRAWER.lock().buffer().chars.copy_from_slice(&buf);
-        let end =  hpet_lock.as_ref().unwrap().get_counter();
-        trace!("{}:{}", start, end);
 }
