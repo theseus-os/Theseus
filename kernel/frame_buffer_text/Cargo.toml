@@ -3,29 +3,14 @@ name = "frame_buffer_text"
 version = "0.1.0"
 authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
 
-
 [dependencies]
 spin = "0.4.5"
 volatile = "0.1.0"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "0.2.1"
-
-[dependencies.port_io]
-path = "../../libs/port_io"
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 
 
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

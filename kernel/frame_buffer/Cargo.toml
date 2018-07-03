@@ -34,6 +34,9 @@ path = "../../libs/util"
 [dependencies.acpi]
 path = "../acpi"
 
+[dependencies.port_io]
+path = "../../libs/port_io"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

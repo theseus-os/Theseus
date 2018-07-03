@@ -2,8 +2,8 @@
 #![feature(alloc)]
 // used by the vga buffer
 
+extern crate frame_buffer;
 extern crate keycodes_ascii;
-extern crate frame_buffer_text;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
@@ -21,7 +21,7 @@ extern crate console_types;
 
 
 use console_types::{ConsoleEvent};
-use frame_buffer_text::{FrameTextBuffer};
+use frame_buffer::text_buffer::{FrameTextBuffer};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;

@@ -20,11 +20,8 @@ version = "1.0"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.frame_buffer_text]
-path = "../frame_buffer_text"
+[dependencies.frame_buffer]
+path = "../frame_buffer"
 
 [dependencies.window_manager]
 path = "../window_manager"

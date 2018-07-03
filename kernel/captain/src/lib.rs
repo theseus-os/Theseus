@@ -37,7 +37,6 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-extern crate frame_buffer_text;
 
 #[macro_use] extern crate console;
 extern crate exceptions_full;
@@ -59,6 +58,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use frame_buffer::text_buffer;
 
 
 
@@ -124,7 +124,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     //init font
     //TODO check framebuffer init before using it
-    let rs = frame_buffer_text::font::init();
+    let rs = frame_buffer::font::init();
     if rs.is_ok() {
          trace!("frame_buffer text initialized.");
     } else {
