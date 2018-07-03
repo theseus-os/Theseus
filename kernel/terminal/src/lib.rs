@@ -482,6 +482,9 @@ impl Terminal {
         let result  = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
             self.absolute_cursor_pos = self.frame_buffer.display_string(slice)?;
+
+            frame_buffer::draw_rectangle (3, 3, 10, 10, 0xFF00FF);
+
         } else {
             return Err("could not get slice of scrollback buffer string");
         }

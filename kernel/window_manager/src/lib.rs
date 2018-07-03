@@ -237,7 +237,7 @@ impl WindowObj{
     }
 
     /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:usize){
+    pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
         if x >= self.width - 2 || y >= self.height - 2 {
             return;
         }
@@ -246,7 +246,7 @@ impl WindowObj{
         }
 
     /// draw a line in a window
-    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize){
+    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32){
         if start_x > self.width - 2
             || start_y > self.height - 2
             || end_x > self.width - 2
@@ -260,13 +260,13 @@ impl WindowObj{
     }
 
     /// draw a square in a window
-    pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:usize){
+    pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
         if x + width > self.width - 2
             || y + height > self.height - 2 {
             return;
         }
         //frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, color, true);
-        frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 
+        frame_buffer::draw_rectangle(x + self.x + 1, y + self.y + 1, width, height, 
             color);
     }
 }

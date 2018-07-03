@@ -163,7 +163,7 @@ impl FrameTextBuffer {
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
     pub fn display_string(&self, slice: &str) -> Result<usize, &'static str> {
-        self.print_by_bytes (slice)       
+        self.print_by_bytes (slice)     
     }
     
     ///print a string by lines
@@ -206,7 +206,7 @@ impl FrameTextBuffer {
             }
             self.print_line(buffer, curr_line, BLANK_LINE, FONT_COLOR, BACKGROUND_COLOR);
         }*/
-
+        
         Ok(cursor_pos)
     }
 

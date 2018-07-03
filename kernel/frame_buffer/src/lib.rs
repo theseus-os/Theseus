@@ -44,8 +44,6 @@ pub const FRAME_BUFFER_HEIGHT:usize = 400;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
-pub static mut address:usize = 0;
-
 /// try to unwrap an option. return error result if fails. 
 #[macro_export]
 macro_rules! try_opt_err {
@@ -116,23 +114,23 @@ pub static FRAME_DRAWER: Mutex<Drawer> = {
 
 
 /// draw a pixel with coordinates and color
-pub fn draw_pixel(x:usize, y:usize, color:usize) {
+pub fn draw_pixel(x:usize, y:usize, color:u32) {
     FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
 
 /// draw a line with start and end coordinates and color
-pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
+pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
 /// draw a line with upper left coordinates, width, height and color
-pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
+pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
+    FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, color)
 }
 
-pub fn set_background(offset:usize, len:usize, color:u32) {
+/*pub fn set_background(offset:usize, len:usize, color:u32) {
     unsafe { FRAME_DRAWER.lock().set_background(offset, len, color)}
-}
+}*/
 
 pub struct Point {
     pub x: usize,
@@ -146,72 +144,83 @@ pub struct Drawer {
 }
 
 impl Drawer {
-    unsafe fn set_background(&mut self, offset:usize, len:usize, color:u32) {
+    /*unsafe fn set_background(&mut self, offset:usize, len:usize, color:u32) {
         asm!("cld
             rep stosd"
             :
             : "{rdi}"(self.start_address + offset), "{eax}"(color), "{rcx}"(len)
             : "cc", "memory", "rdi", "rcx"
             : "intel", "volatile");
-    }
+    }*/
 
-    fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
-       
-      /*  if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
-            return Some("pixel is ont of bound");
-        }
-        self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
-        self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
-        self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
-    */
-        Some("End")
-    }
-
-    fn draw_points(&mut self, points:Vec<Point>){
-        for p in points{
-            draw_pixel(p.x, p.y, p.color);
-        }     
+    fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
+        self.buffer().chars[y][x] = color;
     }
 
     fn check_in_range(&mut self, x:usize, y:usize) -> bool {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
-    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
-        //TODO use loop instead of for
+    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         if width.abs() > height.abs() {
             let mut y;
-            for x in start_x..end_x {
-                y = (x-start_x)*height/width+start_y;
-                if self.check_in_range(x as usize,y as usize) {
-                    self.draw_pixel(x as usize, y as usize, color);
+            let mut x = start_x;
+            let step = if width > 0 {1} else {-1};
+            loop {
+                if x == end_x {
+                    break;
                 }
+                y = ((x-start_x)*height/width+start_y);
+                if self.check_in_range(x as usize,y as usize) {
+                    self.buffer().chars[y as usize][x as usize] = color;
+                }
+                x += step;
             }
         }
         else {
             let mut x;
-            for y in start_y..end_y {
+            let mut y = start_y;
+            let step = if height > 0 {1} else {-1};
+            loop {
+                if y == end_y {
+                    break;
+                }
                 x = (y-start_y)*width/height+start_x;
                 if self.check_in_range(x as usize,y as usize) {
-                    self.draw_pixel(x as usize, y as usize, color);
-                }            
+                    self.buffer().chars[y as usize][x as usize] = color;
+                }
+                y += step;   
             }
         }
     }
 
-    fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
+    fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         //TODO use loop instead of for
-        let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH };
-        let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT };  
+        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
+            else { FRAME_BUFFER_WIDTH }} - 1;
+        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
+            else { FRAME_BUFFER_HEIGHT }} -1;  
 
-        for x in start_x..end_x{
-            for y in start_y..end_y{
-                self.draw_pixel(x, y, color);
+        let mut x = start_x;
+        loop {
+            if x > end_x {
+                break;
             }
+            self.buffer().chars[start_y][x] = color;
+            self.buffer().chars[end_y][x] = color;
+            x += 1;
+        }
+
+        let mut y = start_y;
+        loop {
+            if y > end_x {
+                break;
+            }
+            self.buffer().chars[y][start_x] = color;
+            self.buffer().chars[y][end_x] = color;
+            y += 1;
         }
     }
 
@@ -223,7 +232,6 @@ impl Drawer {
     fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
             self.start_address = virtual_address;
-            unsafe { address = virtual_address;}
             self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
             trace!("Set frame buffer address {:#x}", virtual_address);
         }
