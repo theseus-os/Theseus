@@ -1,8 +1,8 @@
+use super::{Mutex, DerefMut};
+
 pub const CHARACTER_WIDTH:usize = 9;
 pub const CHARACTER_HEIGHT:usize = 16;
 //pub const CHARACTER_PIXELS_WIDTH:usize = 4;
-
-pub static mut FONT_PIXEL:[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]=[[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256];
 
 pub const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -263,21 +263,22 @@ pub const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 ];
 
-pub fn init()-> Result<(), &'static str > {
+pub static FONT_PIXEL:Mutex<[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]> = Mutex::new([[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]);
 
-    for i in 0..FONT_BASIC.len(){
+pub fn init()-> Result<(), &'static str> {
 
-        unsafe {
-            for y in 0..CHARACTER_HEIGHT{
-                let char_font = FONT_BASIC[i][y] as u64;
-                let mut bit = 0x80;
-                for x in 0..CHARACTER_WIDTH{
-                    if char_font & (0x80 >> x) !=0 {
-                        FONT_PIXEL[i][y][x+1] = 0xFFFFFFFF; 
-                    }
+    let mut fonts_locked = FONT_PIXEL.lock();
+    let mut fonts = fonts_locked.deref_mut();
+
+    for index in 0..FONT_BASIC.len(){
+        for y in 0..CHARACTER_HEIGHT{
+            let char_font = FONT_BASIC[index][y] as u64;
+            for x in 0..CHARACTER_WIDTH{
+                if char_font & (0x80 >> x) !=0 {
+                    fonts[index][y][x+1] = 0xFFFFFFFF; 
                 }
             }
-        }
+        }   
     }
 
     Ok(())

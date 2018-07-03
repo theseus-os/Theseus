@@ -17,10 +17,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::cmp::min;
-use spin::Mutex;
+use spin::{Mutex, Once};
 use port_io::Port;
 use core::mem;
 use frame_buffer::{Buffer};
+use core::ops::{DerefMut};
 
 
 
@@ -210,10 +211,6 @@ impl FrameTextBuffer {
                     new_line = BLANK_LINE;
                     curr_line += 1;
                 }
-                let mut x = curr_column * font::CHARACTER_WIDTH + 1;
-                let mut y = curr_line * font::CHARACTER_HEIGHT;
-                let mut i = 0;
-                let mut j = 0;
                 new_line[curr_column] = byte;
                 curr_column += 1;
                 cursor_pos += 1;
@@ -242,8 +239,9 @@ impl FrameTextBuffer {
         let mut index = 0;
         let mut byte = line[index] as usize;
 
+        let fonts = font::FONT_PIXEL.lock();
         loop {
-            let mask = unsafe { font::FONT_PIXEL[byte][j][i] };            
+            let mask = fonts[byte][j][i];            
             buffer.chars[y][x + i] = fg_color & mask | bg_color & (!mask);
             i += 1;
             if i == CHARACTER_WIDTH {
@@ -303,9 +301,12 @@ impl FrameTextBuffer {
         let x = column * font::CHARACTER_WIDTH + 1;
         let y = line * font::CHARACTER_HEIGHT;
         let mut i = 0;
-        let mut j = 0;       
+        let mut j = 0;
+
+        let fonts = font::FONT_PIXEL.lock();
+   
         loop {
-            let mask:u32 =  unsafe { font::FONT_PIXEL[byte as usize][i][j] };
+            let mask:u32 = fonts[byte as usize][i][j];
             buffer.chars[i + y][j + x] = color & mask | BACKGROUND_COLOR & (!mask);
             j += 1;
             if j == font::CHARACTER_WIDTH {
