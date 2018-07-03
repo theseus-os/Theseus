@@ -178,14 +178,3 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
 
 }
 
-/*pub fn test_text(_: Option<u64>) -> Result<(), &'static str> {
-    use frame_buffer_text::CONSOLE_FRAME_TEXT_BUFFER;
-    use core::fmt::Write;
-
-    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("This is the first line\nThis is the second line\n").map_err(|_| "error in FrameBuffer's write_str()"));
-    try!(CONSOLE_FRAME_TEXT_BUFFER.lock().write_str("Start Theseus...\nThe end\n").map_err(|_| "error in FrameBuffer's write_str()"));
-    Ok(())
-
-}
-*/
-

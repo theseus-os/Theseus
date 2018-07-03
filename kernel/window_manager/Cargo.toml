@@ -42,9 +42,6 @@ path = "../frame_buffer"
 [dependencies.frame_buffer_3d]
 path = "../frame_buffer_3d"
 
-[dependencies.frame_buffer_text]
-path = "../frame_buffer_text"
-
 [dependencies.acpi]
 path = "../acpi"
 
