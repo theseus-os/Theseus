@@ -181,28 +181,24 @@ impl FrameTextBuffer {
     /// Requires that a str slice that will exactly fit the vga buffer
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
-    pub fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
-
-
-
-        let mut curr_column = 0;
-        let mut new_line = BLANK_LINE;
-        let mut pixel_line = 0;
-        let mut cursor_pos = 0;
+    pub fn display_string(&self, slice: &str) -> Result<usize, &'static str> {
+        self.print_by_lines (slice)       
+    }
+    
+    ///print a string and blank lines
+    fn print_by_lines (&self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_line = 0;
-
-        // iterates through the string slice and puts it into lines that will fit on the vga buffer
-        let index = 0;
+        let mut curr_column = 0;
+        let mut cursor_pos = 0;
+        let mut new_line = BLANK_LINE;
         
-
-
-
         let mut drawer = frame_buffer::FRAME_DRAWER.lock();
         let mut buffer = drawer.buffer();
 
         for byte in slice.bytes() {
+
             if byte == b'\n' {
-               // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+                self.print_line(buffer, curr_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
                 new_line = BLANK_LINE;
                 cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
@@ -210,7 +206,7 @@ impl FrameTextBuffer {
             } else {
                 if curr_column == BUFFER_WIDTH {
                     curr_column = 0;
-                    //pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+                    self.print_line(buffer, curr_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
                     new_line = BLANK_LINE;
                     curr_line += 1;
                 }
@@ -218,53 +214,96 @@ impl FrameTextBuffer {
                 let mut y = curr_line * font::CHARACTER_HEIGHT;
                 let mut i = 0;
                 let mut j = 0;
-
-                unsafe {   
-                    loop {
-                        let mask:u32 = font::FONT_PIXEL[byte as usize][i][j];
-                        buffer.chars[i+y][j+x] = FONT_COLOR & mask | BACKGROUND_COLOR & (!mask);
-                        j += 1;
-                        if j == 8 {
-                            i += 1;
-                            if i == 16 {
-                                break;
-                            }
-                            j = 0;
-                        }
-                    }
-                }
-
                 new_line[curr_column] = byte;
                 curr_column += 1;
                 cursor_pos += 1;
             }
+ 
         }
-
-       // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+        self.print_line(buffer, curr_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
 
         Ok(cursor_pos)
     }
 
-    fn print_line(&self, buffer:&mut Buffer, mut pixel_line: usize, line:Line, fg_color:u32 , bg_color: u32) -> usize{
-        buffer.chars[159][0] = 0xFFFFFFFF;
+    fn print_line(&self, buffer:&mut Buffer, curr_line: usize, line:Line, fg_color:u32 , bg_color: u32) {
+        let mut x = 0;
+        let mut y = curr_line * font::CHARACTER_HEIGHT;
+        let mut i = 0;
+        let mut j = 0;
 
-        let mut linebuffer = [[0 as u8; frame_buffer::FRAME_BUFFER_WIDTH]; CHARACTER_HEIGHT];
-        unsafe {// TODO
-            for y in 0..CHARACTER_HEIGHT {
-                let mut addr = 0;
-                for i in 0..BUFFER_WIDTH{
-                    let ascii_code = line[i] as usize;
-                    for x in 0..font::CHARACTER_WIDTH {
-                        let mask:u32 = font::FONT_PIXEL[ascii_code][y][x];
-                        buffer.chars[pixel_line][addr] = fg_color & mask | bg_color & (!mask);
-                        addr += 1;
+        let mut index = 0;
+        let mut byte = line[index] as usize;
+
+        loop {
+            let mask = unsafe { font::FONT_PIXEL[byte][j][i] };            
+            buffer.chars[y][x + i] = fg_color & mask | bg_color & (!mask);
+            i += 1;
+            if i == CHARACTER_WIDTH {
+                index += 1;
+                x += font::CHARACTER_WIDTH;
+                if index == BUFFER_WIDTH {
+                    index = 0;
+                    j += 1;
+                    if j == font::CHARACTER_HEIGHT {
+                        return
                     }
+                    y += 1;
+                    x = 0;
                 }
-                pixel_line += 1;
+                i = 0;
+                byte = line[index] as usize;
+            }
+
+        }
+
+    }
+
+    ///prints a string and ignore the blank lines
+    fn print_by_bytes(&self, slice: &str) -> Result<usize, &'static str> {
+        let mut curr_line = 0;
+        let mut curr_column = 0;
+        let mut cursor_pos = 0;
+        
+        let mut drawer = frame_buffer::FRAME_DRAWER.lock();
+        let mut buffer = drawer.buffer();
+        for byte in slice.bytes() {
+            if byte == b'\n' {
+                cursor_pos += BUFFER_WIDTH - curr_column;
+                curr_column = 0;
+                curr_line += 1;
+            } else {
+                if curr_column == BUFFER_WIDTH {
+                    curr_column = 0;
+                    curr_line += 1;
+                }
+                self.print_byte(buffer, byte, FONT_COLOR, curr_column, curr_line);
+                curr_column += 1;
+                cursor_pos += 1;
             }
         }
-        pixel_line       
+        Ok(cursor_pos)
     }
+
+    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, column:usize, line:usize) {
+        let x = column * font::CHARACTER_WIDTH + 1;
+        let y = line * font::CHARACTER_HEIGHT;
+        let mut i = 0;
+        let mut j = 0;       
+        loop {
+            let mask:u32 =  unsafe { font::FONT_PIXEL[byte as usize][i][j] };
+            buffer.chars[i + y][j + x] = color & mask | BACKGROUND_COLOR & (!mask);
+            j += 1;
+            if j == font::CHARACTER_WIDTH {
+                i += 1;
+                if i == font::CHARACTER_HEIGHT {
+                    break;
+                }
+                j = 0;
+            }
+        }
+    }
+    // pixel_line = self.print_line(buffer, pixel_line, new_line, FONT_COLOR, BACKGROUND_COLOR);
+
 }
 
 

@@ -129,6 +129,10 @@ pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, colo
     FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
 }
 
+pub fn set_background(color:u32) {
+    unsafe { FRAME_DRAWER.lock().set_background(color) }
+}
+
 pub struct Point {
     pub x: usize,
     pub y: usize,
@@ -136,11 +140,20 @@ pub struct Point {
 }
 
 pub struct Drawer {
-    pub start_address: usize,
+    start_address: usize,
     buffer: Unique<Buffer> ,
 }
 
 impl Drawer {
+    unsafe fn set_background(&mut self, color:u32) {
+        let len = FRAME_BUFFER_WIDTH * FRAME_BUFFER_HEIGHT;
+        asm!("cld
+            rep stosd"
+            :
+            : "{rdi}"(self.start_address), "{eax}"(color), "{rcx}"(len)
+            : "cc", "memory", "rdi", "rcx"
+            : "intel", "volatile");
+    }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
        
