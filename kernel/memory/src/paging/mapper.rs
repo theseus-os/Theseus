@@ -373,6 +373,8 @@ impl MappedPages {
     /// 
     /// The caller can optionally specify new flags for the duplicated mapping,
     /// otherwise, the same flags as the existing `MappedPages` will be used. 
+    /// This is useful for when you want to modify contents in the new pages,
+    /// since it avoids extra `remap()` operations.
     /// 
     /// Returns a new `MappedPages` object with the same in-memory contents
     /// as this object, but at a completely new memory region.
@@ -392,7 +394,7 @@ impl MappedPages {
         )?;
 
         // perform the actual copy of in-memory content
-        // TODO: there is probably a better way to do this, e.g., `rep stosq` or something
+        // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
         {
             let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
             let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;

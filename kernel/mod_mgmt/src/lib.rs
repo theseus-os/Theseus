@@ -17,7 +17,7 @@ extern crate rustc_demangle;
 extern crate owning_ref;
 
 
-use core::ops::DerefMut;
+use core::ops::{Deref, DerefMut};
 use alloc::{Vec, BTreeMap, BTreeSet, String};
 use alloc::string::ToString;
 use alloc::btree_map::Entry;
@@ -114,6 +114,7 @@ impl CrateNamespace {
         CrateNamespace {
             crate_tree: Mutex::new(BTreeMap::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
+
         }
     } 
 
@@ -140,9 +141,10 @@ impl CrateNamespace {
         crate_module: &ModuleArea, 
         kernel_mmi: &mut MemoryManagementInfo, 
         verbose_log: bool) 
-        -> Result<Arc<RwLock<LoadedCrate>>, &'static str> 
+        -> Result<StrongCrateRef, &'static str> 
     {
-        if !CrateType::is_application(crate_module.name()) {
+        let (crate_type, crate_name) = CrateType::from_module_name(crate_module.name())?;
+        if crate_type != CrateType::Application {
             error!("load_application_crate() cannot be used for crate \"{}\", only for application crate modules starting with \"{}\"",
                 crate_module.name(), CrateType::Application.prefix());
             return Err("load_application_crate() can only be used for application crate modules");
@@ -150,14 +152,12 @@ impl CrateNamespace {
         
         debug!("load_application_crate: trying to load \"{}\" application module", crate_module.name());
         let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-
-        let plc = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
+        
+        let (new_crate, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
-        let new_crate = self.perform_relocations(&plc.elf_file, plc.new_crate, plc.loaded_sections, None, kernel_mmi, verbose_log)?;
-        { 
-            let new_crate_locked = new_crate.read(); 
-            info!("loaded new application crate module: {}, num sections: {}", new_crate_locked.crate_name, new_crate_locked.sections.len());
-        }
+        let new_crate = self.perform_relocations(&elf_file, new_crate, None, kernel_mmi, verbose_log)?;
+
+        info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name.read().deref(), new_crate.sections.len());
         Ok(new_crate)
 
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
@@ -184,32 +184,49 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
-        debug!("load_kernel_crate: trying to load \"{}\" kernel module", crate_module.name());
+        let (crate_type, crate_name) = CrateType::from_module_name(crate_module.name())?;
+        if crate_type != CrateType::Kernel {
+            error!("load_kernel_crate() cannot be used for crate \"{}\", only for kernel crate modules starting with \"{}\"",
+                crate_module.name(), CrateType::Kernel.prefix());
+            return Err("load_kernel_crate() can only be used for kernel crate modules");
+        }
+
+        debug!("load_kernel_crate: trying to load \"{}\" kernel crate", crate_name);
         let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        let plc = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
-        let new_crate = self.perform_relocations(&plc.elf_file, plc.new_crate, plc.loaded_sections, backup_namespace, kernel_mmi, verbose_log)?;
-        let crate_name = new_crate.read().crate_name.clone();
-        let new_syms = self.add_symbols(new_crate.read().sections.values(), &crate_name, verbose_log);
-        self.crate_tree.lock().insert(crate_name, new_crate);
-        info!("loaded new crate module: {}, {} new symbols.", crate_module.name(), new_syms);
+        let (new_crate, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        let new_crate = self.perform_relocations(&elf_file, new_crate, backup_namespace, kernel_mmi, verbose_log)?;
+        let new_crate_name = new_crate.crate_name.read().clone();
+        let new_syms = self.add_symbols(new_crate.sections.values(), &new_crate_name, verbose_log);
+        info!("loaded module {:?} as new crate {:?}, {} new symbols.", crate_module.name(), new_crate_name, new_syms);
+        self.crate_tree.lock().insert(new_crate_name, new_crate);
         Ok(new_syms)
         
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
     }
 
 
-    /// Makes a deep copy of every single crate in this `CrateNamespace`, 
-    /// which involves 
-    /// and fully loads them all again into a new `CrateNamespace`, which is returned. 
-    pub fn clone_now(&self) -> CrateNamespace {
-        unimplemented!();
-    }
-
-
     /// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
-    /// but does not immediately 
-    pub fn clone_on_write(&self) -> CrateNamespace {
-        unimplemented!();
+    /// but simply marks each crate as copy-on-write rather than performing
+    /// a deep copy of every single crate proactively. 
+    /// 
+    /// In other words, crates in the new namespace returned by this fucntions 
+    /// are fully shared with crates in this namespace.
+    /// 
+    /// When modifying crates in the new namespace, such as with the funtions 
+    /// [`swap_crates`](#method.swap_crates), any crates in the new namespace
+    /// that are still shared with the old namespace will be deeply copied into a new crate,
+    /// and then that new crate will be modified in whichever way specified. 
+    /// For example, if you swapped one crate `A` in the new namespace returned from this function
+    /// and a loaded a new crate `A'` in its place,
+    /// and two other crates `B` and `C` depended on that new swapped `A`,
+    /// then `B` and `C` would be transparently deep copied before modifying them to depend on
+    /// the new crate `A'`, and you would be left with `B' and `C'` as deep copies of `B` and `C`,
+    /// that now depend on `A'` instead of `A`. 
+    /// The existing versions of `B` and `C` would still depend on `A`, 
+    /// but they would no longer be part of the new namespace. 
+    /// 
+    pub fn copy_on_write(&self) -> CrateNamespace {
+        unimplemented!()
     }
 
         
@@ -228,6 +245,11 @@ impl CrateNamespace {
     /// 
     /// Upon a successful return, this namespace (self) will have the new crates in place of the old ones,
     /// and the old crates will be completely removed from this namespace. 
+    /// 
+    /// # Note
+    /// This function currently makes no attempt to guarantee correct operation after a crate is swapped. 
+    /// For example, if the new crate changes a function or data structure, there is no guarantee that 
+    /// other crates will be swapped alongside that one -- that responsibility is currently left to the caller.
     pub fn swap_crates(
         &self,
         swap_pairs: Vec<(StrongCrateRef, &ModuleArea, Option<String>)>,
@@ -236,7 +258,7 @@ impl CrateNamespace {
     ) -> Result<(), &'static str> {
         // create a new CrateNamespace and load all of the new crate modules into it
         let swap_pairs = swap_pairs.into_iter();
-        let module_iter = swap_pairs.clone().map(|pair| pair.1);
+        let module_iter = swap_pairs.clone().map(|tup| tup.1);
         let new_namespace = load_crates_in_new_namespace(module_iter, self, kernel_mmi, verbose_log)?;
 
         // for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
@@ -252,19 +274,17 @@ impl CrateNamespace {
         // and fix up all of the relocations `WeakDependents` for each of the existing sections
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
-        for (old_crate_ref, new_module, override_new_crate_name) in swap_pairs {
+        for (old_crate, new_module, override_new_crate_name) in swap_pairs {
             let (_new_crate_type, new_crate_name) = CrateType::from_module_name(new_module.name())?;
-            let new_crate_ref = new_namespace.get_crate(new_crate_name)
-                .ok_or_else(|| "Couldn't get new crate from new namespace")?;
+            let new_crate = new_namespace.get_crate(new_crate_name).ok_or_else(|| "Couldn't get new crate from new namespace")?;
 
             // if requested, override the new crate's name and section prefixes and symbol prefixes
             let new_crate_name = if let Some(override_name) = override_new_crate_name {
                 debug!("Overriding new crate name \"{}\" with \"{}\"", new_crate_name, override_name);
-                let mut new_crate = new_crate_ref.write();
                 for new_sec_ref in new_crate.sections.values() {
                     let mut new_sec = new_sec_ref.lock();
                     // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
-                    if let Some(new_name) = replace_parent_crate_name(&new_sec.name, &new_crate.crate_name, &override_name) {
+                    if let Some(new_name) = replace_parent_crate_name(&new_sec.name, &new_crate.crate_name.read(), &override_name) {
                         debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
                         if new_sec.global {
                             new_namespace.replace_symbol_key(&new_sec.name, &new_name)?;
@@ -272,20 +292,17 @@ impl CrateNamespace {
                         new_sec.name = new_name;
                     }
                 }
-
-                new_crate.crate_name = override_name.clone();
+                *new_crate.crate_name.write() = override_name.clone();
                 override_name
             } else {
+                // if no override name was supplied, then the new crate's name is derived from its module name.
                 new_crate_name.to_string()
             };
 
-            let old_crate = old_crate_ref.read();
-
-
-            debug!("====================== Replacing old_crate \"{}\"  ===========================", old_crate.crate_name);
-            old_crate.text_pages.as_ref().map(|tp|   debug!("  text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
-            old_crate.rodata_pages.as_ref().map(|rp| debug!("  rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
-            old_crate.data_pages.as_ref().map(|dp|   debug!("  data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
+            debug!("====================== Replacing old_crate \"{}\"  ===========================", old_crate.crate_name.read().deref());
+            old_crate.text_pages.as_ref().map(|tp|   debug!("  text_pages  : {:#X} ({} pages)",     tp.read().start_address(), tp.read().size_in_pages()));
+            old_crate.rodata_pages.as_ref().map(|rp| debug!("  rodata_pages: {:#X} ({} pages)",     rp.read().start_address(), rp.read().size_in_pages()));
+            old_crate.data_pages.as_ref().map(|dp|   debug!("  data_pages  : {:#X} ({} pages)\n\n", dp.read().start_address(), dp.read().size_in_pages()));
 
             
             // debug!("  Dependent crates:");
@@ -308,7 +325,7 @@ impl CrateNamespace {
             //     }
             // }
 
-            debug!("Rewriting relocation dependencies for {} -> {}", old_crate.crate_name, new_crate_name);
+            debug!("Rewriting relocation dependencies for {} -> {}", old_crate.crate_name.read().deref(), new_crate_name);
 
             // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
             // and replace them by rewriting their relocation entries to point to that section in the new_crate.
@@ -317,37 +334,70 @@ impl CrateNamespace {
 
                 let mut old_sec = old_sec_ref.lock();
                 for weak_dep in &old_sec.sections_dependent_on_me {
-                    let target_sec = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+                    let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+                    let relocation_entry = weak_dep.relocation;
 
                     // Use the new namespace to find the new source_sec that old target_sec should point to.
                     // The new source_sec must have the same name as the old one (old_sec here),
                     // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
                     // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
                     // if not, the swapping action was never going to work and we shouldn't go through with it
-                    let source_sec = new_namespace.get_symbol(&old_sec.name).upgrade().ok_or_else(|| 
+                    let source_sec_ref = new_namespace.get_symbol(&old_sec.name).upgrade().ok_or_else(|| 
                         "couldn't find replacement source section in new namespace that the target section needs to point to, perhaps the target section must also be swapped?"
                     )?;
+                    let mut source_sec = source_sec_ref.lock();
 
-                    let res = write_relocation(weak_dep.relocation, &target_sec, None, &source_sec, kernel_mmi, true || verbose_log)?;
-                    let (new_strong_dep, new_weak_dep) = res.ok_or_else(|| "logic error: write_relocation() was successful, \
-                        but didn't return any new dependencies, meaning that the source_sec and target_sec \
-                        were in the same parent crate (which should never happen when fixing up relocations for weak dependencies"
-                    )?;
+                    // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+                    // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+                    let mut target_sec = target_sec_ref.lock();
+                    {
+                        let mut target_sec_mapped_pages = target_sec.mapped_pages.write();
+                        let target_sec_initial_flags = target_sec_mapped_pages.flags();
+                        if !target_sec_initial_flags.is_writable() {
+                            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                            }
+                            else {
+                                return Err("couldn't get kernel's active page table");
+                            }
+                        }
+
+                        write_relocation(
+                            relocation_entry, 
+                            &mut target_sec_mapped_pages, 
+                            target_sec.mapped_pages_offset, 
+                            source_sec.virt_addr(), 
+                            true || verbose_log
+                        )?;
+
+                        // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+                        if !target_sec_initial_flags.is_writable() {
+                            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                            }
+                            else {
+                                return Err("couldn't get kernel's active page table");
+                            }
+                        };
+                    }
 
                     // Tell the old source_sec that it no longer has the existing target_sec as a dependent
                         // this is performed all at once at the end of this loop: we clear the whole old_sec.sections_dependent_on_me
                     // Tell the new source_sec that the existing target_sec depends on it.
-                    source_sec.lock().sections_dependent_on_me.push(new_weak_dep);
+                    source_sec.sections_dependent_on_me.push(WeakDependent {
+                        section: Arc::downgrade(&target_sec_ref),
+                        relocation: relocation_entry,
+                    });
 
                     // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
                     // and that it now depends on the new source_sec.
-                    {
-                        let mut ts = target_sec.lock();
-                        let index = ts.find_strong_dependency(&old_sec_ref)
-                            .ok_or("Couldn't find/remove the target_sec's StrongDependency on the old crate section")?;
-                        ts.sections_i_depend_on.remove(index);
-                        ts.sections_i_depend_on.push(new_strong_dep);
-                    }
+                    let index = target_sec.find_strong_dependency(&old_sec_ref)
+                        .ok_or("Couldn't find/remove the target_sec's StrongDependency on the old crate section")?;
+                    target_sec.sections_i_depend_on.remove(index);
+                    target_sec.sections_i_depend_on.push(StrongDependency {
+                        section: Arc::clone(&source_sec_ref),
+                        relocation: relocation_entry,
+                    });      
                 }
 
                 // As described in the above loop, we must tell the old section (the one we're replacing)
@@ -358,38 +408,39 @@ impl CrateNamespace {
                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
                 // Currently, static variables (states) are only .bss sections
                 if old_sec.typ == SectionType::Bss {
-                    let mut new_crate = new_crate_ref.write();
                     let new_dest_sec = new_crate.find_section(|sec| sec.name == old_sec.name).ok_or_else(|| 
                         "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
                     )?;
-                    old_sec.copy_section_data_to(&old_crate, &mut new_dest_sec.lock(), &mut new_crate)?;
+                    old_sec.copy_section_data_to(&mut new_dest_sec.lock())?;
                 }
             }
             
             // remove the old crate from this namespace, and remove its sections' symbols too
             self.remove_symbols(old_crate.sections.values(), true);
-            if self.crate_tree.lock().remove(&old_crate.crate_name).is_some() {
-                info!("  Removed old crate {}", old_crate.crate_name);
+            if self.crate_tree.lock().remove(old_crate.crate_name.read().deref()).is_some() {
+                info!("  Removed old crate {}", old_crate.crate_name.read().deref());
             }
 
             // add the new crate and its sections' symbols to this namespace
-            self.add_symbols(new_crate_ref.read().sections.values(), &new_crate_name, verbose_log);
-            self.crate_tree.lock().insert(new_crate_name, new_crate_ref);
+            self.add_symbols(new_crate.sections.values(), &new_crate_name, verbose_log);
+            self.crate_tree.lock().insert(new_crate_name, new_crate);
 
         }
 
-
         Ok(())
 
-        // here, "new_namespace is dropped, but its crates have already been added 
+        // here, "new_namespace is dropped, but its crates have already been added to the current namespace 
     }
 
 
 
     /// The primary internal routine for parsing and loading all of the sections.
-    /// This does not perform any relocations or linking, so the crate is not yet ready to use after this function.
+    /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**.
+    /// Also, the sections in the returned `LoadedCrate` are incomplete -- their `parent_crate` weak references aren't yet set up. 
+    /// 
     /// However, it does add all of the newly-loaded crate sections to the symbol map (yes, even before relocation/linking),
     /// since we can use them to resolve missing symbols for relocations.
+    /// 
     /// Parses each section in the given `ElfFile` and copies the object file contents to each section.
     /// Returns a tuple of the new `LoadedCrate`, the list of newly `LoadedSection`s, and the crate's ELF file.
     /// The list of sections is actually a map from its section index (shndx) to the `LoadedSection` itself,
@@ -398,12 +449,11 @@ impl CrateNamespace {
         &self,
         mapped_pages: &'e MappedPages, 
         size_in_bytes: usize, 
-        module_name: &String, 
+        crate_name: &str, 
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool
-    ) -> Result<PartiallyLoadedCrate<'e>, &'static str> {
+    ) -> Result<(LoadedCrate, ElfFile<'e>), &'static str> {
         
-        let (_crate_type, crate_name) = CrateType::from_module_name(module_name)?;
         let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
         let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
 
@@ -415,10 +465,13 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
-        debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", module_name, size_in_bytes, size_in_bytes);
+        debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
-        let mut section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+        let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+        let text_pages   = section_pages.text_pages.map(|tp| Arc::new(RwLock::new(tp)));
+        let rodata_pages = section_pages.rodata_pages.map(|rp| Arc::new(RwLock::new(rp)));
+        let data_pages   = section_pages.data_pages.map(|dp| Arc::new(RwLock::new(dp)));
 
         // iterate through the symbol table so we can find which sections are global (publicly visible)
         // we keep track of them here in a list
@@ -446,18 +499,6 @@ impl CrateNamespace {
 
         // this maps section header index (shndx) to LoadedSection
         let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); 
-
-        // We create the new crate here so we can obtain references to it later.
-        // The latter fields will be filled in later.
-        let new_crate = Arc::new(RwLock::new(
-            LoadedCrate {
-                crate_name:   String::from(crate_name), 
-                sections:     BTreeMap::new(),
-                text_pages:   None,
-                rodata_pages: None,
-                data_pages:   None,
-            }
-        ));
 
         let mut text_offset:   usize = 0;
         let mut rodata_offset: usize = 0;
@@ -541,10 +582,11 @@ impl CrateNamespace {
                             return Err(".text section had wrong flags!");
                         }
 
-                        if let Some(ref mut tp) = section_pages.text_pages {
+                        if let Some(ref tp_ref) = text_pages {
                             // here: we're ready to copy the text section to the proper address
+                            let mut tp = tp_ref.write();
                             let dest_addr = tp.address_at_offset(text_offset)
-                                .ok_or_else(|| "fatal logic error: text_offset wasn't within text_mapped_pages")?;
+                                .ok_or_else(|| "BUG: text_offset wasn't within text_mapped_pages")?;
                             let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
                             if verbose_log { 
                                 trace!("       dest_addr: {:#X}, text_offset: {:#X}", dest_addr, text_offset); 
@@ -567,11 +609,12 @@ impl CrateNamespace {
                                     SectionType::Text,
                                     demangled.no_hash,
                                     demangled.hash,
+                                    Arc::clone(tp_ref),
                                     text_offset,
                                     dest_addr,
                                     sec_size,
                                     global_sections.contains(&shndx),
-                                    Arc::downgrade(&new_crate),
+                                    Weak::new(), // will be added later
                                 )))
                             );
 
@@ -596,10 +639,11 @@ impl CrateNamespace {
                             return Err(".rodata section had wrong flags!");
                         }
 
-                        if let Some(ref mut rp) = section_pages.rodata_pages {
+                        if let Some(ref rp_ref) = rodata_pages {
                             // here: we're ready to copy the rodata section to the proper address
+                            let mut rp = rp_ref.write();
                             let dest_addr = rp.address_at_offset(rodata_offset)
-                                .ok_or_else(|| "fatal logic error: rodata_offset wasn't within rodata_mapped_pages")?;
+                                .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                             let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
                             if verbose_log { 
                                 trace!("       dest_addr: {:#X}, rodata_offset: {:#X}", dest_addr, rodata_offset); 
@@ -622,11 +666,12 @@ impl CrateNamespace {
                                     SectionType::Rodata,
                                     demangled.no_hash,
                                     demangled.hash,
+                                    Arc::clone(rp_ref),
                                     rodata_offset,
                                     dest_addr,
                                     sec_size,
                                     global_sections.contains(&shndx),
-                                    Arc::downgrade(&new_crate),
+                                    Weak::new(), // will be added later
                                 )))
                             );
 
@@ -658,10 +703,11 @@ impl CrateNamespace {
                             return Err(".data section had wrong flags!");
                         }
                         
-                        if let Some(ref mut dp) = section_pages.data_pages {
+                        if let Some(ref dp_ref) = data_pages {
                             // here: we're ready to copy the data/bss section to the proper address
+                            let mut dp = dp_ref.write();
                             let dest_addr = dp.address_at_offset(data_offset)
-                                .ok_or_else(|| "fatal logic error: data_offset wasn't within data_pages")?;
+                                .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
                             let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                             if verbose_log { 
                                 trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); 
@@ -684,11 +730,12 @@ impl CrateNamespace {
                                     SectionType::Data,
                                     demangled.no_hash,
                                     demangled.hash,
+                                    Arc::clone(dp_ref),
                                     data_offset,
                                     dest_addr,
                                     sec_size,
                                     global_sections.contains(&shndx),
-                                    Arc::downgrade(&new_crate),
+                                    Weak::new(), // will be added later
                                 )))
                             );
 
@@ -714,10 +761,11 @@ impl CrateNamespace {
                         }
                         
                         // we still use DataSection to represent the .bss sections, since they have the same flags
-                        if let Some(ref mut dp) = section_pages.data_pages {
+                        if let Some(ref dp_ref) = data_pages {
                             // here: we're ready to fill the bss section with zeroes at the proper address
+                            let mut dp = dp_ref.write();
                             let dest_addr = dp.address_at_offset(data_offset)
-                                .ok_or_else(|| "fatal logic error: data_offset wasn't within data_pages")?;
+                                .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
                             let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
                             if verbose_log { 
                                 trace!("       dest_addr: {:#X}, data_offset: {:#X}", dest_addr, data_offset); 
@@ -731,11 +779,12 @@ impl CrateNamespace {
                                     SectionType::Bss,
                                     demangled.no_hash,
                                     demangled.hash,
+                                    Arc::clone(dp_ref),
                                     data_offset,
                                     dest_addr,
                                     sec_size,
                                     global_sections.contains(&shndx),
-                                    Arc::downgrade(&new_crate),
+                                    Weak::new(), // will be added later
                                 )))
                             );
 
@@ -761,18 +810,15 @@ impl CrateNamespace {
 
         // Now that we have loaded the section content above into the mapped pages, 
         // we can place them into the ownership of the `LoadedCrate`. 
-        {
-            let mut new_crate_locked = new_crate.write();
-            new_crate_locked.text_pages   = section_pages.text_pages;
-            new_crate_locked.rodata_pages = section_pages.rodata_pages;
-            new_crate_locked.data_pages   = section_pages.data_pages;
-        }
+        let new_crate = LoadedCrate {
+            crate_name:   RwLock::new(String::from(crate_name)),
+            sections:     loaded_sections,
+            text_pages:   text_pages,
+            rodata_pages: rodata_pages,
+            data_pages:   data_pages,
+        };
 
-        Ok(PartiallyLoadedCrate {
-            new_crate: new_crate,
-            loaded_sections: loaded_sections,
-            elf_file: elf_file,
-        })
+        Ok((new_crate, elf_file))
     }
 
         
@@ -782,14 +828,13 @@ impl CrateNamespace {
     fn perform_relocations(
         &self,
         elf_file: &ElfFile,
-        new_crate: StrongCrateRef,
-        loaded_sections: BTreeMap<usize, StrongSectionRef>,
+        new_crate: LoadedCrate,
         backup_namespace: Option<&CrateNamespace>,
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
 
-        if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.read().crate_name); }
+        if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name.read().deref()); }
         let symtab = find_symbol_table(&elf_file)?;
 
         // Fix up the sections that were just loaded, using proper relocation info.
@@ -804,10 +849,10 @@ impl CrateNamespace {
 
             // currently not using eh_frame, gcc, note, and debug sections
             if let Ok(name) = sec.get_name(&elf_file) {
-                if  name.starts_with(".rela.eh_frame")   || 
-                    name.starts_with(".rela.note")   ||   // ignore GNU note sections
-                    name.starts_with(".rela.gcc")    ||   // ignore gcc special sections for now
-                    name.starts_with(".rela.debug")       // ignore debug special sections for now
+                if  name.starts_with(".rela.eh_frame") || 
+                    name.starts_with(".rela.note")     ||   // ignore GNU note sections
+                    name.starts_with(".rela.gcc")      ||   // ignore gcc special sections for now
+                    name.starts_with(".rela.debug")         // ignore debug special sections for now
                 {
                     continue;
                 }
@@ -827,7 +872,8 @@ impl CrateNamespace {
             // The "info" field in the Rela section specifies which section is the target of the relocation.
                 
             // Get the target section (that we already loaded) for this rela_array Rela section.
-            let target_sec = loaded_sections.get(&(sec.info() as usize)).ok_or_else(|| {
+            let target_sec_shndx = sec.info() as usize;
+            let target_sec_ref = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
                 "target section was not loaded for Rela section"
             })?; 
@@ -835,115 +881,135 @@ impl CrateNamespace {
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
 
-            let target_sec_parent_crate_ref = target_sec.lock().parent_crate.upgrade().ok_or("Couldn't get target_sec's parent_crate")?;
+            let mut target_sec = target_sec_ref.lock();
+            {
+                let mut target_sec_mapped_pages = target_sec.mapped_pages.write();
 
-            // iterate through each relocation entry in the relocation array for the target_sec
-            for rela_entry in rela_array {
-                if verbose_log { 
-                    trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
-                        rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
-                }
+                // iterate through each relocation entry in the relocation array for the target_sec
+                for rela_entry in rela_array {
+                    if verbose_log { 
+                        trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                            rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
+                    }
 
-                let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-                let source_sec_shndx = source_sec_entry.shndx() as usize; 
-                if verbose_log { 
-                    let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                        .and_then(|s| s.get_name(&elf_file));
-                    trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
-                    // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
-                    //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
-                    //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
-                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
-                }
+                    let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+                    let source_sec_shndx = source_sec_entry.shndx() as usize; 
+                    if verbose_log { 
+                        let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                            .and_then(|s| s.get_name(&elf_file));
+                        trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
+                        // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                        //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                        //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                        //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                    }
+                    
+                    let mut source_and_target_have_same_parent_crate = false;
 
-                // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
-                let source_sec = match loaded_sections.get(&source_sec_shndx) {
-                    Some(ss) => Ok(ss.clone()),
+                    // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
+                    let source_sec_ref = match new_crate.sections.get(&source_sec_shndx) {
+                        Some(ss) => {
+                            source_and_target_have_same_parent_crate = true;
+                            Ok(ss.clone())
+                        }
 
-                    // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
-                    // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
-                    // At this point, there's no other way to search for the source section besides its name.
-                    None => {
-                        if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                            const DATARELRO: &'static str = ".data.rel.ro.";
-                            let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                source_sec_name.get(DATARELRO.len() ..)
-                                    .ok_or("Couldn't get name of .data.rel.ro. section")?
+                        // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
+                        // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
+                        // At this point, there's no other way to search for the source section besides its name.
+                        None => {
+                            if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                                const DATARELRO: &'static str = ".data.rel.ro.";
+                                let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                                    source_sec_name.get(DATARELRO.len() ..)
+                                        .ok_or("Couldn't get name of .data.rel.ro. section")?
+                                }
+                                else {
+                                    source_sec_name
+                                };
+                                let demangled = demangle_symbol(source_sec_name);
+
+                                // search for the symbol's demangled name in the kernel's symbol map
+                                self.get_symbol_or_load(&demangled.no_hash, backup_namespace, kernel_mmi, verbose_log)
+                                    .upgrade()
+                                    .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
                             else {
-                                source_sec_name
-                            };
-                            let demangled = demangle_symbol(source_sec_name);
+                                let _source_sec_header = source_sec_entry
+                                    .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                                    .and_then(|s| s.get_name(&elf_file));
+                                error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
+                                Err("Couldn't get source section's name, needed for non-local relocation entry")
+                            }
+                        }
+                    }?;
 
-                            // search for the symbol's demangled name in the kernel's symbol map
-                            self.get_symbol_or_load(&demangled.no_hash, backup_namespace, kernel_mmi, verbose_log)
-                                .upgrade()
-                                .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
-                        }
-                        else {
-                            let _source_sec_header = source_sec_entry
-                                .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                .and_then(|s| s.get_name(&elf_file));
-                            error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
-                            Err("Couldn't get source section's name, needed for non-local relocation entry")
-                        }
+                    let source_and_target_are_same_section = Arc::ptr_eq(&source_sec_ref, &target_sec_ref);
+                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+
+                    write_relocation(
+                        relocation_entry,
+                        &mut target_sec_mapped_pages,
+                        target_sec.mapped_pages_offset,
+                        if source_and_target_are_same_section { target_sec.virt_addr() } else { source_sec_ref.lock().virt_addr() },
+                        verbose_log
+                    )?;
+
+                    if source_and_target_have_same_parent_crate {
+                        // We keep track of relocation information so that we can be aware of and faithfully reconstruct 
+                        // inter-section dependencies even within the same crate.
+                        // This is necessary for doing a deep copy of the crate in memory, 
+                        // without having to re-parse that crate's ELF file (and requiring the ELF file to still exist)
+                        target_sec_internal_dependencies.push(InternalDependency::new(relocation_entry, source_sec_shndx))
                     }
-                }?;
-
-                let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
-                let deps = write_relocation(
-                    relocation_entry,
-                    target_sec,
-                    Some(target_sec_parent_crate_ref.clone()),
-                    &source_sec,
-                    kernel_mmi,
-                    verbose_log
-                )?;
-
-                if let Some((strong_dependency, weak_dependent)) = deps {
-                    // keep track of the target_sec's strong dependency on the source_sec in another crate
-                    target_sec_dependencies.push(strong_dependency);
-                    // tell the source_sec (in another crate) that the target section is dependent upon it
-                    source_sec.lock().sections_dependent_on_me.push(weak_dependent);
+                    else {
+                        // tell the source_sec that the target_sec is dependent upon it
+                        let weak_dep = WeakDependent {
+                            section: Arc::downgrade(&target_sec_ref),
+                            relocation: relocation_entry,
+                        };
+                        source_sec_ref.lock().sections_dependent_on_me.push(weak_dep);
+                        
+                        // tell the target_sec that it has a strong dependency on the source_sec
+                        let strong_dep = StrongDependency {
+                            section: Arc::clone(&source_sec_ref),
+                            relocation: relocation_entry,
+                        };
+                        target_sec_dependencies.push(strong_dep);          
+                    }
                 }
-                else {
-                    // We keep track of relocation information so that we can be aware of and faithfully reconstruct 
-                    // inter-section dependencies even within the same crate.
-                    // This is necessary for doing a deep copy of the crate in memory, 
-                    // without having to re-parse that crate's ELF file (and requiring the ELF file to still exist)
-                    target_sec_internal_dependencies.push(InternalDependency::new(relocation_entry, source_sec_shndx))
-                }
-
             }
+
             // add the target section's dependencies and relocation details all at once
-            { 
-                let mut ts = target_sec.lock();
-                ts.sections_i_depend_on.append(&mut target_sec_dependencies);
-                ts.internal_dependencies.append(&mut target_sec_internal_dependencies);
-            }
+            target_sec.sections_i_depend_on.append(&mut target_sec_dependencies);
+            target_sec.internal_dependencies.append(&mut target_sec_internal_dependencies);
         }
         // here, we're done with handling all the relocations in this entire crate
 
+
         // Two final remaining tasks before the new crate is ready to go:
         // 1) remapping each section's mapped pages to the proper permission bits, since we initially mapped them all as writable
-        // 2) give the new crate ownership of the loaded sections
         if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            let mut new_crate_locked = new_crate.write();
-            if let Some(ref mut tp) = new_crate_locked.text_pages { 
-                try!(tp.remap(active_table, TEXT_SECTION_FLAGS()));
+            if let Some(ref tp) = new_crate.text_pages { 
+                tp.write().remap(active_table, TEXT_SECTION_FLAGS())?;
             }
-            if let Some(ref mut rp) = new_crate_locked.rodata_pages { 
-                try!(rp.remap(active_table, RODATA_SECTION_FLAGS()));
+            if let Some(ref rp) = new_crate.rodata_pages {
+                rp.write().remap(active_table, RODATA_SECTION_FLAGS())?;
             }
             // data/bss sections are already mapped properly, since they're supposed to be writable
-
-            new_crate_locked.sections = loaded_sections;
         }
         else {
             return Err("couldn't get kernel's active page table");
         }
 
-        Ok(new_crate)
+        // 2) fix up all the sections' parent crate references
+        let new_crate_ref = Arc::new(new_crate);
+        let new_crate_weak_ref = Arc::downgrade(&new_crate_ref);
+        for sec in new_crate_ref.sections.values() {
+            let mut sec_locked = sec.lock();
+            sec_locked.parent_crate = new_crate_weak_ref.clone();
+        }
+
+        Ok(new_crate_ref)
     }
 
 
@@ -1091,8 +1157,8 @@ impl CrateNamespace {
             // We need to add a strong reference to that section's parent crate to this namespace as well, 
             // so it can't be dropped while this namespace is still relying on it.  
             if let Some(parent_crate) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
-                let crate_name = parent_crate.read().crate_name.clone();
-                self.add_symbols(parent_crate.read().sections.values(), &crate_name, verbose_log);
+                let crate_name = parent_crate.crate_name.read().clone();
+                self.add_symbols(parent_crate.sections.values(), &crate_name, verbose_log);
                 self.crate_tree.lock().insert(crate_name, parent_crate);
                 return weak_sec;
             }
@@ -1183,7 +1249,7 @@ fn get_parent_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> 
 }
 
 
-/// Same as [`get_parent_crate_name()`](#method.get_parent_crate_name),
+/// Similar to [`get_parent_crate_name()`](#method.get_parent_crate_name),
 /// but replaces the parent crate name with the given `new_crate_name`, 
 /// if it can be found, and if the parent crate name matches the `old_crate_name`. 
 /// If the parent crate name can be found but does not match the expected `old_crate_name`,
@@ -1217,14 +1283,6 @@ fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name:
         })
     })
 }
-
-
-struct PartiallyLoadedCrate<'e> {
-    loaded_sections: BTreeMap<usize, StrongSectionRef>,
-    elf_file: ElfFile<'e>,
-    new_crate: StrongCrateRef,
-}
-
 
 
 
@@ -1354,108 +1412,16 @@ fn map_crate_module(crate_module: &ModuleArea, mmi: &mut MemoryManagementInfo) -
 /// Write the actual relocation entry.
 /// # Arguments
 /// * `rela_entry`: the relocation entry from the ELF file that specifies which relocation action to perform.
-/// * `target_sec`: the target section of the relocation, i.e., the section where the relocation data will be written to.
-/// * `target_sec_parent_crate`: the parent crate of the `target_sec`, which is an optional performance enhancement 
-///    that prevents this function from having to find the `target_sec`'s parent crate every time.
+/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
+/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
 /// * `source_sec`: the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
-/// * `kernel_mmi`: the `MemoryManagementInfo`  
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
-/// 
-/// # Returns
-/// If the `target_sec` and `source_sec` are from the same parent `LoadedCrate`, then `None` is returned.
-/// 
-/// If they are from different parent crates, then a tuple of a `StrongDependency` and a `WeakDependent` is returned.
-/// The `StrongDependency` should be added to the `target_sec.sections_i_depend_on`, 
-/// whereas the `WeakDependent` should be added to the `source_sec.sections_dependent_on_me`.
 fn write_relocation(
-    relocation_entry: RelocationEntry, 
-    target_sec: &StrongSectionRef,
-    target_sec_parent_crate: Option<StrongCrateRef>,
-    source_sec: &StrongSectionRef,
-    kernel_mmi: &mut MemoryManagementInfo,
-    verbose_log: bool
-) -> Result<Option<(StrongDependency, WeakDependent)>, &'static str>
-{
-    let target_sec_parent_crate = match target_sec_parent_crate {
-        Some(pc) => pc,
-        _ => target_sec.lock().parent_crate.upgrade().ok_or("Couldn't get target_sec's parent_crate")?,
-    };
-
-    let (source_sec_parent_crate, source_sec_vaddr) = {
-        let ss = source_sec.lock();
-        (ss.parent_crate.upgrade().ok_or("Couldn't get source_sec's parent_crate")?, ss.virt_addr())
-    };
-    let source_and_target_have_same_parent_crate = Arc::ptr_eq(&target_sec_parent_crate, &source_sec_parent_crate);
-
-    let mut target_sec_parent_crate_locked = target_sec_parent_crate.write();
-    let (target_sec_mapped_pages, target_sec_mapped_pages_offset) = {
-        let mut locked_target = target_sec.lock();
-        (
-            locked_target.mapped_pages_mut(&mut target_sec_parent_crate_locked).ok_or("couldn't get target_sec's MappedPages for relocation")?,
-            locked_target.mapped_pages_offset
-        )
-    };
-
-    // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
-    // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
-    let target_sec_initial_flags = target_sec_mapped_pages.flags();
-    if !target_sec_initial_flags.is_writable() {
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
-        }
-        else {
-            return Err("couldn't get kernel's active page table");
-        }
-    }
-
-    write_relocation_internal_locked(
-        relocation_entry, 
-        target_sec_mapped_pages, 
-        target_sec_mapped_pages_offset, 
-        source_sec_vaddr, 
-        verbose_log
-    )?;
-
-    // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
-    if !target_sec_initial_flags.is_writable() {
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-        }
-        else {
-            return Err("couldn't get kernel's active page table");
-        }
-    }
-
-    // We only care about recording dependency information if the source and target sections are in different crates
-    if source_and_target_have_same_parent_crate {
-        Ok(None)
-    }
-    else {
-        // tell the source_sec that the target_sec is dependent upon it
-        let weak_dependent = WeakDependent {
-            section: Arc::downgrade(target_sec),
-            relocation: relocation_entry,
-        };
-        
-        // tell the target_sec that it has a strong dependency on the source_sec
-        let strong_dependency = StrongDependency {
-            section: source_sec.clone(),
-            relocation: relocation_entry,
-        };          
-
-        Ok(Some((strong_dependency, weak_dependent)))
-    }
-}
-
-
-
-
-fn write_relocation_internal_locked(
-    relocation_entry: RelocationEntry, 
+    relocation_entry: RelocationEntry,
     target_sec_mapped_pages: &mut MappedPages,
     target_sec_mapped_pages_offset: usize,
     source_sec_vaddr: VirtualAddress,
-    _verbose_log: bool
+    verbose_log: bool
 ) -> Result<(), &'static str>
 {
     // Calculate exactly where we should write the relocation data to.
@@ -1468,25 +1434,25 @@ fn write_relocation_internal_locked(
         R_X86_64_32 => {
             let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
             let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
-            // if _verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_64 => {
             let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
             let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
-            // if _verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         R_X86_64_PC32 => {
             let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
             let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            // if _verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_PC64 => {
             let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
             let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            // if _verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} ({:?})", target_ref as *mut _ as usize, source_val, source_sec.lock().name); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         // R_X86_64_GOTPCREL => { 
@@ -1502,14 +1468,12 @@ fn write_relocation_internal_locked(
 }
 
 
-
 #[allow(dead_code)]
 fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 	for weak_crate_ref in krate.crates_dependent_on_me() {
-		let strong_crate_ref = weak_crate_ref.upgrade().unwrap();
-		let locked_crate = strong_crate_ref.read();
-		debug!("{}{}", prefix, locked_crate.crate_name);
-		dump_dependent_crates(&*locked_crate, format!("{}  ", prefix));
+		let strong_crate = weak_crate_ref.upgrade().unwrap();
+		debug!("{}{}", prefix, strong_crate.crate_name.read().deref());
+		dump_dependent_crates(&*strong_crate, format!("{}  ", prefix));
 	}
 }
 
@@ -1543,6 +1507,9 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 /// linking against existing symbols in this namespace, so this namespace serves as the `backup_namespace`. 
 /// It is this isolated preloading of crate sections that allows us to create a package of crates
 /// that are all new and can be swapped as a single unit. 
+/// 
+/// The `new_modules` argument is an iterator over tuples of `(&ModuleArea, String)`,
+/// in which the `String` is the name of the crate, allowing us the override the `ModuleArea`'s name.
 fn load_crates_in_new_namespace<'m, I>(
 	new_modules: I,
 	backup_namespace: &CrateNamespace,
@@ -1562,20 +1529,26 @@ fn load_crates_in_new_namespace<'m, I>(
 
 	// create a new empty namespace so we can add symbols to it before performing the relocations
 	let new_namespace = CrateNamespace::new();
-	let mut partially_loaded_crates: Vec<PartiallyLoadedCrate> = Vec::with_capacity(mappings.len()); 
+	let mut partially_loaded_crates: Vec<(LoadedCrate, ElfFile)> = Vec::with_capacity(mappings.len()); 
 
 	// first we do all of the section parsing and loading
 	for (i, crate_module) in new_modules.clone().enumerate() {
-		let temp_module_mapping = mappings.get(i).ok_or("Fatal logic error: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
-		let plc = new_namespace.load_crate_sections(temp_module_mapping, crate_module.size(), crate_module.name(), kernel_mmi, verbose_log)?;
-		let _new_syms = new_namespace.add_symbols(plc.loaded_sections.values(), &plc.new_crate.read().crate_name.clone(), verbose_log);
-		partially_loaded_crates.push(plc);
+		let temp_module_mapping = mappings.get(i).ok_or("BUG: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
+		let (new_crate, elf_file) = new_namespace.load_crate_sections(
+            temp_module_mapping, 
+            crate_module.size(),
+            CrateType::from_module_name(crate_module.name())?.1,
+            kernel_mmi, 
+            verbose_log
+        )?;
+		let _new_syms = new_namespace.add_symbols(new_crate.sections.values(), &new_crate.crate_name.read(), verbose_log);
+		partially_loaded_crates.push((new_crate, elf_file));
 	}
 	
 	// then we do all of the relocations 
-	for plc in partially_loaded_crates {
-		let new_crate = new_namespace.perform_relocations(&plc.elf_file, plc.new_crate, plc.loaded_sections, Some(backup_namespace), kernel_mmi, verbose_log)?;
-		let name = new_crate.read().crate_name.clone();
+	for (new_crate, elf_file) in partially_loaded_crates {
+		let new_crate = new_namespace.perform_relocations(&elf_file, new_crate, Some(backup_namespace), kernel_mmi, verbose_log)?;
+		let name = new_crate.crate_name.read().clone();
 		new_namespace.crate_tree.lock().insert(name, new_crate);
 	}
 

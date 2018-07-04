@@ -4,7 +4,7 @@
 
 use core::ops::DerefMut;
 use alloc::{BTreeMap, String};
-use alloc::arc::Arc;
+use alloc::arc::{Arc, Weak};
 use alloc::string::ToString;
 use spin::{Mutex, RwLock};
 
@@ -59,7 +59,11 @@ pub fn parse_nano_core(
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
     verbose_log: bool
-) -> Result<usize, (&'static str, [MappedPages; 3])> {
+) -> Result<usize, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
+
+    let text_pages = Arc::new(RwLock::new(text_pages));
+    let rodata_pages = Arc::new(RwLock::new(rodata_pages));
+    let data_pages = Arc::new(RwLock::new(data_pages));
 
     let crate_name = String::from("nano_core");
     debug!("parse_nano_core: trying to load and parse the nano_core file");
@@ -100,7 +104,7 @@ pub fn parse_nano_core(
         };
 
         let default_namespace = super::get_default_namespace();
-        let new_syms = default_namespace.add_symbols(new_crate.read().sections.values(), &crate_name, verbose_log);
+        let new_syms = default_namespace.add_symbols(new_crate.sections.values(), &crate_name, verbose_log);
         default_namespace.crate_tree.lock().insert(crate_name, new_crate);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
@@ -121,11 +125,11 @@ pub fn parse_nano_core(
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
 fn parse_nano_core_symbol_file(
     mut mapped_pages: MappedPages,
-    text_pages:   MappedPages,
-    rodata_pages: MappedPages,
-    data_pages:   MappedPages,
+    text_pages:   Arc<RwLock<MappedPages>>,
+    rodata_pages: Arc<RwLock<MappedPages>>,
+    data_pages:   Arc<RwLock<MappedPages>>,
     size: usize
-) -> Result<Arc<RwLock<LoadedCrate>>, (&'static str, [MappedPages; 3])> {
+) -> Result<Arc<LoadedCrate>, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -134,17 +138,6 @@ fn parse_nano_core_symbol_file(
     let mut section_counter = 0;
     let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
 
-    // we create the new crate here so we can obtain references to it later
-    let new_crate = Arc::new(RwLock::new(
-        LoadedCrate {
-            crate_name:   crate_name, 
-            sections:     BTreeMap::new(),
-            text_pages:   None,
-            rodata_pages: None,
-            data_pages:   None,
-        }
-    ));
-    
     // ensure that there's a null byte at the end
     {
         let null_byte: &mut u8 = try_mp!(mapped_pages.as_type_mut(size - 1), text_pages, rodata_pages, data_pages);
@@ -232,172 +225,189 @@ fn parse_nano_core_symbol_file(
         // an error that might occur during the loop below
         let mut loop_result: Result<(), &'static str> = Ok(());
 
-        // third, parse each symbol table entry, which should all have "GLOBAL" bindings
-        for (_line_num, line) in file_iterator {
-            if line.is_empty() { continue; }
-            
-            // we need the following items from a symbol table entry:
-            // * Value (address),      column 1
-            // * Size,                 column 2
-            // * Ndx,                  column 6
-            // * DemangledName#hash    column 7 to end
+        {
+            let text_pages_locked = text_pages.read();
+            let rodata_pages_locked = rodata_pages.read();
+            let data_pages_locked = data_pages.read();
 
-            // Can't use split_whitespace() here, because we need to splitn and then get the remainder of the line
-            // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.\
-            // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
-            let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
-            let mut parts = line.splitn(8, |c: char| {
-                if c.is_whitespace() {
-                    if prev_whitespace {
-                        false
+            // third, parse each symbol table entry, which should all have "GLOBAL" bindings
+            for (_line_num, line) in file_iterator {
+                if line.is_empty() { continue; }
+                
+                // we need the following items from a symbol table entry:
+                // * Value (address),      column 1
+                // * Size,                 column 2
+                // * Ndx,                  column 6
+                // * DemangledName#hash    column 7 to end
+
+                // Can't use split_whitespace() here, because we need to splitn and then get the remainder of the line
+                // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.\
+                // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
+                let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
+                let mut parts = line.splitn(8, |c: char| {
+                    if c.is_whitespace() {
+                        if prev_whitespace {
+                            false
+                        } else {
+                            prev_whitespace = true;
+                            true
+                        }
                     } else {
-                        prev_whitespace = true;
-                        true
+                        prev_whitespace = false;
+                        false
                     }
-                } else {
-                    prev_whitespace = false;
-                    false
+                }).map(str::trim);
+
+                let _num      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 0 'Num'"),   loop_result);
+                let sec_vaddr = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 1 'Value'"), loop_result);
+                let sec_size  = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 2 'Size'"),  loop_result);
+                let _typ      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 3 'Type'"),  loop_result);
+                let _bind     = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 4 'Bind'"),  loop_result);
+                let _vis      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 5 'Vis'"),   loop_result);
+                let sec_ndx   = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 6 'Ndx'"),   loop_result);
+                let name_hash = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 7 'Name'"),  loop_result);
+
+                // According to the operation of the tool "demangle_readelf_file", the last 'Name' column
+                // consists of the already demangled name (which may have spaces) and then an optional hash,
+                // which looks like the following:  NAME#HASH.
+                // If there is no hash, then it will just be:   NAME
+                // Thus, we need to split "name_hash"  at the '#', if it exists
+                let (no_hash, hash) = {
+                    let mut tokens = name_hash.split("#");
+                    let no_hash = try_break!(tokens.next().ok_or("parse_nano_core_symbols(): 'Name' column had extraneous '#' characters."), loop_result);
+                    let hash = tokens.next();
+                    if tokens.next().is_some() {
+                        error!("parse_nano_core_symbols(): 'Name' column \"{}\" had multiple '#' characters, expected only one as the hash separator!", name_hash);
+                        try_break!(Err("parse_nano_core_symbols(): 'Name' column had multiple '#' characters, expected only one '#' as the hash separator!"), loop_result);
+                    }
+                    (no_hash.to_string(), hash.map(str::to_string))
+                };
+                
+                let sec_vaddr = try_break!(usize::from_str_radix(sec_vaddr, 16)
+                    .map_err(|e| {
+                        error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                        "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
+                    }),
+                    loop_result
+                );
+                let sec_size = try_break!(usize::from_str_radix(sec_size, 10)
+                    .or_else(|e| {
+                        sec_size.get(2 ..).ok_or(e).and_then(|sec_size_hex| 
+                            usize::from_str_radix(sec_size_hex, 16)
+                        )
+                    })
+                    .map_err(|e| {
+                        error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                        "parse_nano_core_symbols(): couldn't parse size column"
+                    }),
+                    loop_result
+                ); 
+
+                // while vaddr and size are required, ndx could be valid or not. 
+                let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
+                    // If ndx is a valid number, proceed on. 
+                    Ok(ndx) => ndx,
+                    // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line). 
+                    _ => {
+                        trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num + 1, line);
+                        continue;
+                    }
+                };
+
+                // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
+
+                if sec_ndx == text_shndx {
+                    sections.insert(
+                        section_counter,
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::Text,
+                            no_hash,
+                            hash,
+                            Arc::clone(&text_pages),
+                            try_break!(text_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result), 
+                            sec_vaddr,
+                            sec_size,
+                            true,
+                            Weak::new(), 
+                        )))
+                    );
                 }
-            }).map(str::trim);
-
-            let _num      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 0 'Num'"),   loop_result);
-            let sec_vaddr = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 1 'Value'"), loop_result);
-            let sec_size  = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 2 'Size'"),  loop_result);
-            let _typ      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 3 'Type'"),  loop_result);
-            let _bind     = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 4 'Bind'"),  loop_result);
-            let _vis      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 5 'Vis'"),   loop_result);
-            let sec_ndx   = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 6 'Ndx'"),   loop_result);
-            let name_hash = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 7 'Name'"),  loop_result);
-
-            // According to the operation of the tool "demangle_readelf_file", the last 'Name' column
-            // consists of the already demangled name (which may have spaces) and then an optional hash,
-            // which looks like the following:  NAME#HASH.
-            // If there is no hash, then it will just be:   NAME
-            // Thus, we need to split "name_hash"  at the '#', if it exists
-            let (no_hash, hash) = {
-                let mut tokens = name_hash.split("#");
-                let no_hash = try_break!(tokens.next().ok_or("parse_nano_core_symbols(): 'Name' column had extraneous '#' characters."), loop_result);
-                let hash = tokens.next();
-                if tokens.next().is_some() {
-                    error!("parse_nano_core_symbols(): 'Name' column \"{}\" had multiple '#' characters, expected only one as the hash separator!", name_hash);
-                    try_break!(Err("parse_nano_core_symbols(): 'Name' column had multiple '#' characters, expected only one '#' as the hash separator!"), loop_result);
+                else if sec_ndx == rodata_shndx {
+                    sections.insert(
+                        section_counter,
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::Rodata,
+                            no_hash,
+                            hash,
+                            Arc::clone(&rodata_pages),
+                            try_break!(rodata_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
+                            sec_vaddr,
+                            sec_size,
+                            true,
+                            Weak::new(),
+                        )))
+                    );
                 }
-                (no_hash.to_string(), hash.map(str::to_string))
-            };
-            
-            let sec_vaddr = try_break!(usize::from_str_radix(sec_vaddr, 16)
-                .map_err(|e| {
-                    error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                    "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
-                }),
-                loop_result
-            );
-            let sec_size = try_break!(usize::from_str_radix(sec_size, 10)
-                .or_else(|e| {
-                    sec_size.get(2 ..).ok_or(e).and_then(|sec_size_hex| 
-                        usize::from_str_radix(sec_size_hex, 16)
-                    )
-                })
-                .map_err(|e| {
-                    error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                    "parse_nano_core_symbols(): couldn't parse size column"
-                }),
-                loop_result
-            ); 
-
-            // while vaddr and size are required, ndx could be valid or not. 
-            let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
-                // If ndx is a valid number, proceed on. 
-                Ok(ndx) => ndx,
-                // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line). 
-                _ => {
-                    trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num + 1, line);
-                    continue;
+                else if sec_ndx == data_shndx {
+                    sections.insert(
+                        section_counter,
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::Data,
+                            no_hash,
+                            hash,
+                            Arc::clone(&data_pages),
+                            try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                            sec_vaddr,
+                            sec_size,
+                            true,
+                            Weak::new(),
+                        )))
+                    );
                 }
-            };
+                else if sec_ndx == bss_shndx {
+                    sections.insert(
+                        section_counter,
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::Bss,
+                            no_hash,
+                            hash,
+                            Arc::clone(&data_pages),
+                            try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
+                            sec_vaddr,
+                            sec_size,
+                            true,
+                            Weak::new(),
+                        )))
+                    );
+                }
+                else {
+                    trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
+                }
 
-            // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
+                section_counter += 1;
 
-            if sec_ndx == text_shndx {
-                sections.insert(
-                    section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
-                        SectionType::Text,
-                        no_hash,
-                        hash,
-                        try_break!(text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result), 
-                        sec_vaddr,
-                        sec_size,
-                        true,
-                        Arc::downgrade(&new_crate),
-                    )))
-                );
-            }
-            else if sec_ndx == rodata_shndx {
-                sections.insert(
-                    section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
-                        SectionType::Rodata,
-                        no_hash,
-                        hash,
-                        try_break!(rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
-                        sec_vaddr,
-                        sec_size,
-                        true,
-                        Arc::downgrade(&new_crate),
-                    )))
-                );
-            }
-            else if sec_ndx == data_shndx {
-                sections.insert(
-                    section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
-                        SectionType::Data,
-                        no_hash,
-                        hash,
-                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
-                        sec_vaddr,
-                        sec_size,
-                        true,
-                        Arc::downgrade(&new_crate),
-                    )))
-                );
-            }
-            else if sec_ndx == bss_shndx {
-                sections.insert(
-                    section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
-                        SectionType::Bss,
-                        no_hash,
-                        hash,
-                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
-                        sec_vaddr,
-                        sec_size,
-                        true,
-                        Arc::downgrade(&new_crate),
-                    )))
-                );
-            }
-            else {
-                trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
-            }
-
-            section_counter += 1;
-
-        } // end of loop over all lines
+            } // end of loop over all lines
+        }
 
         // check to see if we had an error in the above loop
         try_mp!(loop_result, text_pages, rodata_pages, data_pages);
 
     } // drops the borrow of `bytes` (and mapped_pages)
 
-    {
-        let mut new_crate_locked = new_crate.write();
-        new_crate_locked.sections     = sections;
-        new_crate_locked.text_pages   = Some(text_pages);
-        new_crate_locked.rodata_pages = Some(rodata_pages);
-        new_crate_locked.data_pages   = Some(data_pages);
+    let new_crate = Arc::new(LoadedCrate {
+        crate_name:   RwLock::new(String::from(crate_name)), 
+        sections:     sections,
+        text_pages:   Some(text_pages),
+        rodata_pages: Some(rodata_pages),
+        data_pages:   Some(data_pages),
+    });
+    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+
+    // fix up all the sections' parent crate references
+    for sec in new_crate.sections.values() {
+        sec.lock().parent_crate = new_crate_weak_ref.clone();
     }
+
     Ok(new_crate)
 }
 
@@ -410,11 +420,11 @@ fn parse_nano_core_symbol_file(
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
 fn parse_nano_core_binary(
     mapped_pages: MappedPages, 
-    text_pages:   MappedPages, 
-    rodata_pages: MappedPages, 
-    data_pages:   MappedPages, 
+    text_pages:   Arc<RwLock<MappedPages>>, 
+    rodata_pages: Arc<RwLock<MappedPages>>, 
+    data_pages:   Arc<RwLock<MappedPages>>, 
     size_in_bytes: usize
-) -> Result<Arc<RwLock<LoadedCrate>>, (&'static str, [MappedPages; 3])> {
+) -> Result<Arc<LoadedCrate>, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -507,22 +517,15 @@ fn parse_nano_core_binary(
     let data_shndx   = try_mp!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"), text_pages, rodata_pages, data_pages);
     let bss_shndx    = try_mp!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"), text_pages, rodata_pages, data_pages);
 
-    // we create the new crate here so we can obtain references to it later
-    let new_crate = Arc::new(RwLock::new(
-        LoadedCrate {
-            crate_name:   crate_name, 
-            sections:     BTreeMap::new(),
-            text_pages:   None,
-            rodata_pages: None,
-            data_pages:   None,
-        }
-    ));
-
     let mut loop_result: Result<(), &'static str> = Ok(());
+    
+    let sections = {
+        let text_pages_locked = text_pages.read();
+        let rodata_pages_locked = rodata_pages.read();
+        let data_pages_locked = data_pages.read();
 
-    // iterate through the symbol table so we can find which sections are global (publicly visible)
-    let loaded_sections = {
-        // because the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
+        // Iterate through the symbol table so we can find which sections are global (publicly visible).
+        // As the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter.
         let mut section_counter = 0;
         let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
 
@@ -557,11 +560,12 @@ fn parse_nano_core_binary(
                                         SectionType::Text,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        try_break!(text_pages.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result),
+                                        Arc::clone(&text_pages),
+                                        try_break!(text_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result),
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Arc::downgrade(&new_crate),
+                                        Weak::new(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
@@ -569,11 +573,12 @@ fn parse_nano_core_binary(
                                         SectionType::Rodata,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        try_break!(rodata_pages.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
+                                        Arc::clone(&rodata_pages),
+                                        try_break!(rodata_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Arc::downgrade(&new_crate),
+                                        Weak::new(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == data_shndx {
@@ -581,11 +586,12 @@ fn parse_nano_core_binary(
                                         SectionType::Data,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                                        Arc::clone(&data_pages),
+                                        try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Arc::downgrade(&new_crate),
+                                        Weak::new(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == bss_shndx {
@@ -593,11 +599,12 @@ fn parse_nano_core_binary(
                                         SectionType::Bss,
                                         demangled.no_hash,
                                         demangled.hash,
-                                        try_break!(data_pages.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
+                                        Arc::clone(&data_pages),
+                                        try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Arc::downgrade(&new_crate),
+                                        Weak::new(),
                                     ))
                                 }
                                 else {
@@ -615,19 +622,28 @@ fn parse_nano_core_binary(
                     }
                 }
             }
-        }   
+        }
         sections 
     };
 
     // check if there was an error in the loop above
     try_mp!(loop_result, text_pages, rodata_pages, data_pages);
 
-    {
-        let mut new_crate_locked = new_crate.write();
-        new_crate_locked.sections     = loaded_sections;
-        new_crate_locked.text_pages   = Some(text_pages);
-        new_crate_locked.rodata_pages = Some(rodata_pages);
-        new_crate_locked.data_pages   = Some(data_pages);
+    let new_crate = Arc::new(
+        LoadedCrate {
+            crate_name:   RwLock::new(crate_name), 
+            sections:     sections,
+            text_pages:   Some(text_pages),
+            rodata_pages: Some(rodata_pages),
+            data_pages:   Some(data_pages),
+        }
+    );
+    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+
+    // fix up all the sections' parent crate references
+    for sec in new_crate.sections.values() {
+        sec.lock().parent_crate = new_crate_weak_ref.clone();
     }
+
     Ok(new_crate)
 }
