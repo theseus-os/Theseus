@@ -8,13 +8,17 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
+extern crate vga_buffer;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 extern crate terminal;
+extern crate display_provider;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 
+use display_provider::DisplayProvider;
+use vga_buffer::VgaBuffer;
 use console_types::{ConsoleEvent};
 use keycodes_ascii::Keycode;
 use alloc::string::ToString;
@@ -70,8 +74,9 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let event_handling_queue: DFQueue<ConsoleEvent> = DFQueue::new();
     let event_handling_consumer = event_handling_queue.into_consumer();
     let returned_producer = event_handling_consumer.obtain_producer();
+    let vga_buffer = VgaBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the display provider
     // Initializes the default kernel terminal
-    let kernel_producer = terminal::Terminal::init(1)?;
+    let kernel_producer = terminal::Terminal::init(vga_buffer, 1)?;
     TERMINAL_INPUT_PRODUCERS.lock().insert(1, kernel_producer);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
@@ -97,7 +102,7 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
         };
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
-                return Ok(());
+                return Ok(()); 
             }
 
             &ConsoleEvent::InputEvent(ref input_event) => {
@@ -107,7 +112,8 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     num_running += 1;
                     // Switches focus to this terminal
                     CURRENT_TERMINAL_NUM.store(num_running, Ordering::SeqCst);
-                    let terminal_producer = terminal::Terminal::init(num_running)?;
+                    let vga_buffer = VgaBuffer::new();
+                    let terminal_producer = terminal::Terminal::init(vga_buffer, num_running)?;
                     TERMINAL_INPUT_PRODUCERS.lock().insert(num_running, terminal_producer);
                     meta_keypress = true;
                     event.mark_completed();
@@ -147,7 +153,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     event.mark_completed();
                     meta_keypress = true;
                 }
-
             }
             _ => { }
         }

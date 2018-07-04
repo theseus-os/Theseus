@@ -14,7 +14,9 @@ extern crate serial_port;
 extern crate spin;
 extern crate volatile;
 extern crate log;
+extern crate display_provider;
 
+use display_provider::DisplayProvider;
 use core::fmt;
 use core::ptr::Unique;
 use alloc::Vec;
@@ -62,25 +64,13 @@ pub struct VgaBuffer {
     display_lines: Vec<Line>,
 }
 
-impl VgaBuffer {
+impl DisplayProvider for VgaBuffer {
     /// Create a new VgaBuffer.
-    pub fn new() -> VgaBuffer {
+    fn new() -> VgaBuffer {
         VgaBuffer::with_capacity(1000)
     }
-
-    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines.
-    pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
-        let first_line = BLANK_LINE;
-        let mut lines = Vec::with_capacity(num_initial_lines);
-        lines.push(first_line);
-        let display_lines = Vec::with_capacity(num_initial_lines);
-        VgaBuffer {
-            display_lines: display_lines,
-        }
-    }
-
-    /// Enables the cursor by writing to four ports
-    pub fn enable_cursor(&self) {
+        /// Enables the cursor by writing to four ports
+    fn enable_cursor(&self) {
         unsafe {
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
             let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
@@ -96,7 +86,7 @@ impl VgaBuffer {
     /// which correspond to the column and row (line) respectively
     /// Note that the coordinates must correspond to the absolute coordinates the cursor should be
     /// displayed onto the buffer, not the coordinates relative to the 80x24 grid
-    pub fn update_cursor(&self, x: u16, y: u16) {
+    fn update_cursor(&self, x: u16, y: u16) {
         let pos: u16 = y * BUFFER_WIDTH as u16 + x;
         unsafe {
             CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
@@ -111,7 +101,7 @@ impl VgaBuffer {
 
     /// Disables the cursor
     /// Still maintains the cursor's position
-    pub fn disable_cursor(&self) {
+    fn disable_cursor(&self) {
         unsafe {
             CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
             CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
@@ -119,14 +109,14 @@ impl VgaBuffer {
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
-    pub fn get_dimensions(&self) -> (usize, usize) {
+    fn get_dimensions(&self) -> (usize, usize) {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
 
     /// Requires that a str slice that will exactly fit the vga buffer
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
-    pub fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
+    fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
         let mut cursor_pos = 0;
@@ -171,6 +161,22 @@ impl VgaBuffer {
         self.display_lines = Vec::with_capacity(1000);
         Ok(cursor_pos)
     }
+}
+
+impl VgaBuffer {
+
+
+    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines.
+    pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
+        let first_line = BLANK_LINE;
+        let mut lines = Vec::with_capacity(num_initial_lines);
+        lines.push(first_line);
+        let display_lines = Vec::with_capacity(num_initial_lines);
+        VgaBuffer {
+            display_lines: display_lines,
+        }
+    }
+
 }
 
 #[allow(dead_code)]
