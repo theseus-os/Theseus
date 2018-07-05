@@ -246,6 +246,8 @@ impl FrameTextBuffer {
 
     ///prints a string by bytes
     fn print_by_bytes(&self, slice: &str) -> Result<usize, &'static str> {
+        use super::fill_rectangle;
+
         let mut curr_line = 0;
         let mut curr_column = 0;
         let mut cursor_pos = 0;
@@ -254,13 +256,8 @@ impl FrameTextBuffer {
         let mut buffer = drawer.buffer();
         for byte in slice.bytes() {
             if byte == b'\n' {
-                loop {
-                    if curr_column == BUFFER_WIDTH {
-                        break;
-                    }
-                    self.print_byte(buffer, b' ', FONT_COLOR, curr_column, curr_line);
-                    curr_column += 1;
-                }
+                let bottom = (curr_line + 1) * CHARACTER_HEIGHT;
+                self.fill_blank (buffer, curr_line, curr_column, bottom, BACKGROUND_COLOR);
                 cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -269,16 +266,18 @@ impl FrameTextBuffer {
                     curr_column = 0;
                     curr_line += 1;
                 }
-                self.print_byte(buffer, byte, FONT_COLOR, curr_column, curr_line);
+                self.print_byte(buffer, byte, FONT_COLOR, curr_line, curr_column);
                 curr_column += 1;
                 cursor_pos += 1;
             }
         }
+        self.fill_blank (buffer, curr_line + 1, 0, FRAME_BUFFER_HEIGHT, BACKGROUND_COLOR);
+
         Ok(cursor_pos)
     }
 
-    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, column:usize, line:usize) {
-        let x = column * CHARACTER_WIDTH + 1;
+    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, line:usize, column:usize) {
+        let x = column * CHARACTER_WIDTH;
         let y = line * CHARACTER_HEIGHT;
         let mut i = 0;
         let mut j = 0;
@@ -299,4 +298,19 @@ impl FrameTextBuffer {
         }
     }
 
+    fn fill_blank(&self, buffer:&mut Buffer, line:usize, column:usize, bottom:usize, color:u32){
+        let mut x = column * CHARACTER_WIDTH;
+        let mut y = line * CHARACTER_HEIGHT;
+        loop {
+            if x == FRAME_BUFFER_WIDTH {
+                y += 1;
+                x = column * CHARACTER_WIDTH;
+            }
+            if y == bottom {
+                break;
+            }
+            buffer.chars[y][x] = color;
+            x += 1;
+        }
+    }
 }

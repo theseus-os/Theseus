@@ -128,9 +128,10 @@ pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, c
     FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, color)
 }
 
-/*pub fn set_background(offset:usize, len:usize, color:u32) {
-    unsafe { FRAME_DRAWER.lock().set_background(offset, len, color)}
-}*/
+/// draw a line with upper left coordinates, width, height and color
+pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
+    FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, color)
+}
 
 pub struct Point {
     pub x: usize,
@@ -199,30 +200,53 @@ impl Drawer {
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         //TODO use loop instead of for
         let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH }} - 1;
+            else { FRAME_BUFFER_WIDTH }};
         let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT }} -1;  
+            else { FRAME_BUFFER_HEIGHT }};  
 
         let mut x = start_x;
         loop {
-            if x > end_x {
+            if x == end_x {
                 break;
             }
             self.buffer().chars[start_y][x] = color;
-            self.buffer().chars[end_y][x] = color;
+            self.buffer().chars[end_y-1][x] = color;
             x += 1;
         }
 
         let mut y = start_y;
         loop {
-            if y > end_x {
+            if y == end_x {
                 break;
             }
             self.buffer().chars[y][start_x] = color;
-            self.buffer().chars[y][end_x] = color;
+            self.buffer().chars[y][end_x-1] = color;
             y += 1;
         }
     }
+
+    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+        //TODO use loop instead of for
+        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
+            else { FRAME_BUFFER_WIDTH }};
+        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
+            else { FRAME_BUFFER_HEIGHT }};  
+
+        let mut x = start_x;
+        let mut y = start_y;
+        loop {
+            if x == end_x {
+                y += 1;
+                if y == end_y {
+                    break;
+                }
+                x = start_x;
+            }
+            self.buffer().chars[y][x] = color;
+            x += 1;
+        }
+    }
+
 
 
     pub fn buffer(&mut self) -> &mut Buffer {
