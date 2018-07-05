@@ -14,9 +14,11 @@ extern crate display_provider;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 
+
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+
 
 use display_provider::DisplayProvider;
 use console_types::{ConsoleEvent};
@@ -25,7 +27,6 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::btree_map::BTreeMap;
 use alloc::arc::Arc;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -44,7 +45,7 @@ lazy_static! {
 pub fn print_to_console<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &'static str> {
     // Gets the task id of the task that called this print function
     let result = task::get_my_current_task_id();
-    let mut selected_term = 1;
+    let mut selected_term = 0; // default to kernel terminal
     if let Some(current_task_id) = result {
             let terminal_task_ids_lock = TERMINAL_TASK_IDS.lock();
             for term in terminal_task_ids_lock.iter() {
@@ -80,10 +81,10 @@ struct CommandStruct {
     arguments: Vec<String>
 }
 
-pub struct Terminal {
+pub struct Terminal<D: DisplayProvider> {
     /// The terminal's own Display Provider that it outputs text to
     /// Implemented as a pointer to a trait object that implements DisplayProvider (ex. vga buffer)
-    display_provider: Box<DisplayProvider>,
+    display_provider: D,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -132,7 +133,7 @@ pub struct Terminal {
 
 /// Manual implementation of debug just prints out the terminal reference number
 use core::fmt;
-impl fmt::Debug for Terminal {
+impl<D> fmt::Debug for Terminal<D> where D:DisplayProvider {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Point {{ terminal reference number: {} }}", self.term_ref)
     }
@@ -148,11 +149,11 @@ impl fmt::Debug for Terminal {
 ///     - Consumer is the main terminal loop
 ///     - Producers are functions in the event handling crate that send 
 ///         Keyevents if the terminal is the one currently being focused on
-impl Terminal {
+impl<D> Terminal<D> where D: DisplayProvider {
     /// Creates a new terminal object
     /// display provider: T => any concrete type that implements the DisplayProvider trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init<T>(display_provider: T, ref_num: usize) -> Result<DFQueueProducer<ConsoleEvent>, &'static str> where T: DisplayProvider + 'static {
+    pub fn init(display_provider: D, ref_num: usize) -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
         // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
         let terminal_input_queue: DFQueue<ConsoleEvent>  = DFQueue::new();
         let terminal_input_consumer = terminal_input_queue.into_consumer();
@@ -162,23 +163,18 @@ impl Terminal {
         let terminal_print_dfq: DFQueue<ConsoleEvent>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        // let terminal_input_producer = terminal_input_consumer.obtain_producer();
-
-        // fix: for now, we are instantiating a vga buffer from within the init function though this will probably be passed in later
-        let terminal_display_provider: Box<DisplayProvider> = Box::new(display_provider);
-
 
         let prompt_string: String;
-        if ref_num == 1 {
+        if ref_num == 0 {
             prompt_string = "kernel:~$ ".to_string();
         } else {
-            prompt_string = format!("terminal_{}:~$ ", ref_num);
+            prompt_string = format!("terminal_{}:~$ ", ref_num + 1); // ref numbers are 0-indexed
         }
         // creates a new terminal object
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            display_provider: terminal_display_provider,
+            display_provider: display_provider,
             console_input_string: String::new(),
             correct_prompt_position: true,
             command_history: Vec::new(),
@@ -203,10 +199,10 @@ impl Terminal {
         {TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);}
         terminal.print_to_terminal(WELCOME_STRING.to_string())?; 
         let prompt_string = terminal.prompt_string.clone();
-        if ref_num == 1 {
+        if ref_num == 0 {
             terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
         } else {
-            terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num, prompt_string))?;
+            terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num + 1, prompt_string))?;
         }
         terminal.display_provider.enable_cursor();
         // Spawns a terminal instance on a new thread
@@ -464,23 +460,11 @@ impl Terminal {
         self.scroll_start_idx = new_start_idx;
     }
 
-     /// string_idx: usize => that corresponds to the end index of a string slice of the scrollback buffer that will be displayed on the display provider
-     /// display_from_start_idx: bool => if the caller wants to display a string slice starting from the index, pass the function true. 
-     ///                                If the caller wants to display a string slice end at the index, pass the function false
-    fn update_display(&mut self, string_idx: usize, display_from_start_idx: bool) -> Result<(), &'static str> {
-        // Calculates a starting index that will correspond to a slice of the scrollback buffer that will perfectly fit on the display provider
-        let result;
-        if display_from_start_idx {
-            let start_idx = string_idx;
-            let end_idx = self.calc_end_idx(start_idx) + 1; // Adding one to account for the fact that grabbing slice grabs only up to the end index, not including it
-            self.scroll_start_idx = start_idx;
-            result  = self.scrollback_buffer.get(start_idx..end_idx);
-        } else {
-            let end_idx = string_idx;
-            let start_idx = self.calc_start_idx(end_idx);
-            self.scroll_start_idx = start_idx;
-            result = self.scrollback_buffer.get(start_idx..end_idx);
-        }
+    /// Updates the display provider by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
+    fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
+        let end_idx = self.calc_end_idx(start_idx); 
+        self.scroll_start_idx = start_idx;
+        let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
             self.absolute_cursor_pos = self.display_provider.display_string(slice)?;
         } else {
@@ -488,6 +472,20 @@ impl Terminal {
         }
         Ok(())
     }
+
+
+    /// Updates the display provider by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
+    fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
+    let start_idx = self.calc_start_idx(end_idx);
+    self.scroll_start_idx = start_idx;
+    let result = self.scrollback_buffer.get(start_idx..end_idx);
+    if let Some(slice) = result {
+        self.absolute_cursor_pos = self.display_provider.display_string(slice)?;
+    } else {
+        return Err("could not get slice of scrollback buffer string");
+    }
+    Ok(())
+}
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
@@ -656,7 +654,7 @@ impl Terminal {
         }
 
         // home, end, page up, page down, up arrow, down arrow for the console
-        if keyevent.keycode == Keycode::Home {
+        if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
             // Home command only registers if the display provider has the ability to scroll
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
@@ -665,7 +663,7 @@ impl Terminal {
             }
             return Ok(());
         }
-        if keyevent.keycode == Keycode::End {
+        if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
             if !self.is_scroll_end {
                 self.is_scroll_end = true;
                 let buffer_len = self.scrollback_buffer.len();
@@ -691,7 +689,7 @@ impl Terminal {
             return Ok(());
         }
 
-        if keyevent.keycode == Keycode::PageUp {
+        if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
             if self.scroll_start_idx <= 1 {
                 return Ok(())
             }
@@ -701,7 +699,7 @@ impl Terminal {
             return Ok(());
         }
 
-        if keyevent.keycode == Keycode::PageDown {
+        if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
             if self.is_scroll_end {
                 return Ok(());
             }
@@ -755,6 +753,17 @@ impl Terminal {
             self.correct_prompt_position = true;
             return Ok(());
         }
+
+        // Jumps to the beginning of the input string
+        if keyevent.keycode == Keycode::Home {
+            self.left_shift = self.console_input_string.len();
+            return Ok(());
+        }
+
+        // Jumps to the end of the input string
+        if keyevent.keycode == Keycode::End {
+            self.left_shift = 0;
+        }   
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
@@ -875,32 +884,33 @@ impl Terminal {
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the display provider before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
-fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
+fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: DisplayProvider { 
     // Refreshes the display provider with the default terminal upon boot, will fix once we refactor the terminal as an application
-    if terminal.term_ref == 1 {
-        terminal.update_display(0, true)?;
+    if terminal.term_ref == 0 {
+        terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
         terminal.cursor_handler()?;
         
     }
     use core::ops::Deref;
-    let mut refresh_vga = false;
+    let mut refresh_display = false;
     loop {
+        
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
                 &ConsoleEvent::OutputEvent(ref s) => {
                     terminal.push_to_stdout(s.text.clone());
-                    if s.display == true {
+                    if s.display {
                         // Sets this bool to true so that on the next iteration the DisplayProvider will refresh AFTER the 
                         // task_handler() function has cleaned up, which does its own printing to the console
-                        refresh_vga = true;
+                        refresh_display = true;
                         let start_idx = terminal.scroll_start_idx;
                         if terminal.is_scroll_end {
                             let buffer_len = terminal.scrollback_buffer.len();
-                            terminal.update_display(buffer_len , false)?;
+                            terminal.update_display_backwards(buffer_len)?;
                         } else {
-                            terminal.update_display(start_idx, true)?;
+                            terminal.update_display_forwards(start_idx)?;
                         }
                         terminal.cursor_handler()?;
                     }
@@ -917,16 +927,16 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
         // Refreshes the display provider if it is the one being displayed
-        if refresh_vga == true {
+        if refresh_display == true {
             let start_idx = terminal.scroll_start_idx;
             if terminal.is_scroll_end {
                 let buffer_len = terminal.scrollback_buffer.len();
-                terminal.update_display(buffer_len , false)?;
+                terminal.update_display_backwards(buffer_len)?;
             } else {
-                terminal.update_display(start_idx, true)?;
+                terminal.update_display_forwards(start_idx)?;
             }
             terminal.cursor_handler()?;
-            refresh_vga = false;
+            refresh_display = false;
         }
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
@@ -950,9 +960,9 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                 // Only refreshes the display on a keypress
                 if terminal.is_scroll_end { 
                     let buffer_len = terminal.scrollback_buffer.len();
-                    terminal.update_display(buffer_len , false)?; // So we don't have to recalculate the starting index every time
+                    terminal.update_display_backwards(buffer_len)?; // So we don't have to recalculate the starting index every time
                 } else {
-                    terminal.update_display(start_idx, true)?;
+                    terminal.update_display_forwards(start_idx)?;
                 }
                 terminal.cursor_handler()?;
             }

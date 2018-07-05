@@ -59,15 +59,12 @@ const DISABLE_SEQ_2: u8 = 0x20;
 
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
-pub struct VgaBuffer {
-    /// represents the passed-in string into the form of lines that can fit on the vga buffer
-    display_lines: Vec<Line>,
-}
+pub struct VgaBuffer { }
 
 impl DisplayProvider for VgaBuffer {
     /// Create a new VgaBuffer.
     fn new() -> VgaBuffer {
-        VgaBuffer::with_capacity(1000)
+        VgaBuffer { }
     }
         /// Enables the cursor by writing to four ports
     fn enable_cursor(&self) {
@@ -120,17 +117,19 @@ impl DisplayProvider for VgaBuffer {
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
         let mut cursor_pos = 0;
+        let mut display_lines = Vec::new();
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
+
         for byte in slice.bytes() {
             if byte == b'\n' {
-                self.display_lines.push(new_line);
+                display_lines.push(new_line);
                 new_line = BLANK_LINE;
                 cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
             } else {
                 if curr_column == BUFFER_WIDTH {
                     curr_column = 0;
-                    self.display_lines.push(new_line);
+                    display_lines.push(new_line);
                     new_line = BLANK_LINE;
                 }
                 new_line[curr_column] = ScreenChar::new(byte, ColorCode::default());
@@ -138,15 +137,15 @@ impl DisplayProvider for VgaBuffer {
                 cursor_pos += 1;
             }
         }
-        self.display_lines.push(new_line);
+        display_lines.push(new_line);
 
-        let iterator = self.display_lines.len();
+        let iterator = display_lines.len();
         // Writes the lines to the vga buffer
         unsafe {
             use core::ptr::write_volatile;
             for (i, line) in (0..iterator).enumerate() {
                 let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                write_volatile(addr, self.display_lines[line]);
+                write_volatile(addr, display_lines[line]);
             }
 
             // fill the rest of the space, if any, with blank lines
@@ -158,26 +157,11 @@ impl DisplayProvider for VgaBuffer {
                 }
             }
         }
-        self.display_lines = Vec::with_capacity(1000);
         Ok(cursor_pos)
     }
 }
 
-impl VgaBuffer {
 
-
-    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines.
-    pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
-        let first_line = BLANK_LINE;
-        let mut lines = Vec::with_capacity(num_initial_lines);
-        lines.push(first_line);
-        let display_lines = Vec::with_capacity(num_initial_lines);
-        VgaBuffer {
-            display_lines: display_lines,
-        }
-    }
-
-}
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
