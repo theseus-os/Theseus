@@ -105,7 +105,7 @@ pub fn parse_nano_core(
 
         let default_namespace = super::get_default_namespace();
         trace!("parse_nano_core(): starting to add_symbols_and_set_parent_crate...");
-        let new_syms = default_namespace.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
+        let new_syms = default_namespace.add_symbols_and_set_parent_crate(new_crate.sections.read().values(), &new_crate, verbose_log);
         trace!("parse_nano_core(): finished with add_symbols_and_set_parent_crate.");
         default_namespace.crate_tree.lock().insert(crate_name, new_crate);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
@@ -399,7 +399,7 @@ fn parse_nano_core_symbol_file(
 
     let new_crate = Arc::new(LoadedCrate {
         crate_name:   RwLock::new(String::from(crate_name)), 
-        sections:     sections,
+        sections:     RwLock::new(sections),
         text_pages:   Some(text_pages),
         rodata_pages: Some(rodata_pages),
         data_pages:   Some(data_pages),
@@ -629,7 +629,7 @@ fn parse_nano_core_binary(
     let new_crate = Arc::new(
         LoadedCrate {
             crate_name:   RwLock::new(crate_name), 
-            sections:     sections,
+            sections:     RwLock::new(sections),
             text_pages:   Some(text_pages),
             rodata_pages: Some(rodata_pages),
             data_pages:   Some(data_pages),

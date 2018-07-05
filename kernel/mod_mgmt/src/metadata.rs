@@ -95,7 +95,7 @@ pub struct LoadedCrate {
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
     /// as the key because it helps us quickly handle relocations and crate swapping.
-    pub sections: BTreeMap<usize, StrongSectionRef>,
+    pub sections: RwLock<BTreeMap<usize, StrongSectionRef>>,
     /// The `MappedPages` that include the text sections for this crate,
     /// i.e., sections that are readable and executable, but not writable.
     pub text_pages: Option<Arc<RwLock<MappedPages>>>,
@@ -131,7 +131,7 @@ impl LoadedCrate {
     pub fn find_section<F>(&self, predicate: F) -> Option<StrongSectionRef> 
         where F: Fn(&LoadedSection) -> bool
     {
-        self.sections.values().filter(|sec_ref| {
+        self.sections.read().values().filter(|sec_ref| {
             let sec = sec_ref.lock();
             predicate(&sec)
         }).next().cloned()
@@ -146,7 +146,7 @@ impl LoadedCrate {
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
 
-        for sec in self.sections.values() {
+        for sec in self.sections.read().values() {
             let sec_locked = sec.lock();
             for dep_sec in &sec_locked.sections_dependent_on_me {
                 if let Some(dep_sec) = dep_sec.section.upgrade() {
@@ -205,7 +205,7 @@ impl LoadedCrate {
         };
 
         // deep copy the list of sections
-        let new_sections = self.sections.clone();
+        let new_sections = self.sections.read().clone();
 
         // Now that we cloned the actual map of sections, we need to go back through it
         // and fix up the things in each `LoadedSection` that don't make sense to just "clone": 
@@ -292,7 +292,7 @@ impl LoadedCrate {
 
         let new_crate = Arc::new(LoadedCrate {
             crate_name: RwLock::new(self.crate_name.read().clone()),
-            sections: new_sections,
+            sections: RwLock::new(new_sections),
             text_pages: new_text_pages.clone(),
             rodata_pages: new_rodata_pages.clone(),
             data_pages: new_data_pages.clone(),
@@ -301,7 +301,7 @@ impl LoadedCrate {
         // Update the sections to point to their new parent crate
         // and to point to their new MappedPages 
         let new_crate_weak_ref = Arc::downgrade(&new_crate);
-        for sec in new_crate.sections.values() {
+        for sec in new_crate.sections.read().values() {
             let mut sec_locked = sec.lock();
             sec_locked.parent_crate = new_crate_weak_ref.clone();
             sec_locked.mapped_pages = match sec_locked.typ {

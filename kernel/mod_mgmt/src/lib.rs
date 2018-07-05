@@ -157,7 +157,7 @@ impl CrateNamespace {
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
         let new_crate = self.perform_relocations(&elf_file, new_crate, None, kernel_mmi, verbose_log)?;
 
-        info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name.read().deref(), new_crate.sections.len());
+        info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name.read().deref(), new_crate.sections.read().len());
         Ok(new_crate)
 
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
@@ -196,7 +196,7 @@ impl CrateNamespace {
         let (new_crate, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         let new_crate = self.perform_relocations(&elf_file, new_crate, backup_namespace, kernel_mmi, verbose_log)?;
         let new_crate_name = new_crate.crate_name.read().clone();
-        let new_syms = self.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
+        let new_syms = self.add_symbols_and_set_parent_crate(new_crate.sections.read().values(), &new_crate, verbose_log);
         info!("loaded module {:?} as new crate {:?}, {} new symbols.", crate_module.name(), new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name, new_crate);
         Ok(new_syms)
@@ -281,7 +281,7 @@ impl CrateNamespace {
             // if requested, override the new crate's name and section prefixes and symbol prefixes
             let new_crate_name = if let Some(override_name) = override_new_crate_name {
                 debug!("Overriding new crate name \"{}\" with \"{}\"", new_crate_name, override_name);
-                for new_sec_ref in new_crate.sections.values() {
+                for new_sec_ref in new_crate.sections.read().values() {
                     let mut new_sec = new_sec_ref.lock();
                     // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
                     if let Some(new_name) = replace_containing_crate_name(&new_sec.name, &new_crate.crate_name.read(), &override_name) {
@@ -330,7 +330,7 @@ impl CrateNamespace {
             // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
             // and replace them by rewriting their relocation entries to point to that section in the new_crate.
             // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
-            for old_sec_ref in old_crate.sections.values() {
+            for old_sec_ref in old_crate.sections.read().values() {
 
                 let mut old_sec = old_sec_ref.lock();
                 for weak_dep in &old_sec.sections_dependent_on_me {
@@ -416,13 +416,13 @@ impl CrateNamespace {
             }
             
             // remove the old crate from this namespace, and remove its sections' symbols too
-            self.remove_symbols(old_crate.sections.values(), true);
+            self.remove_symbols(old_crate.sections.read().values(), true);
             if self.crate_tree.lock().remove(old_crate.crate_name.read().deref()).is_some() {
                 info!("  Removed old crate {}", old_crate.crate_name.read().deref());
             }
 
             // add the new crate and its sections' symbols to this namespace
-            self.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
+            self.add_symbols_and_set_parent_crate(new_crate.sections.read().values(), &new_crate, verbose_log);
             self.crate_tree.lock().insert(new_crate_name, new_crate);
 
         }
@@ -812,7 +812,7 @@ impl CrateNamespace {
         // we can place them into the ownership of the `LoadedCrate`. 
         let new_crate = LoadedCrate {
             crate_name:   RwLock::new(String::from(crate_name)),
-            sections:     loaded_sections,
+            sections:     RwLock::new(loaded_sections),
             text_pages:   text_pages,
             rodata_pages: rodata_pages,
             data_pages:   data_pages,
@@ -876,7 +876,8 @@ impl CrateNamespace {
                 
             // Get the target section (that we already loaded) for this rela_array Rela section.
             let target_sec_shndx = sec.info() as usize;
-            let target_sec_ref = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
+            let new_crate_sections = new_crate.sections.read();
+            let target_sec_ref = new_crate_sections.get(&target_sec_shndx).ok_or_else(|| {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
                 "target section was not loaded for Rela section"
             })?; 
@@ -910,7 +911,7 @@ impl CrateNamespace {
                     let mut source_and_target_in_same_crate = false;
 
                     // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
-                    let source_sec_ref = match new_crate.sections.get(&source_sec_shndx) {
+                    let source_sec_ref = match new_crate_sections.get(&source_sec_shndx) {
                         Some(ss) => {
                             source_and_target_in_same_crate = true;
                             Ok(ss.clone())
@@ -1207,7 +1208,7 @@ impl CrateNamespace {
             // so it can't be dropped while this namespace is still relying on it.  
             if let Some(parent_crate) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
                 let crate_name = parent_crate.crate_name.read().clone();
-                self.add_symbols(parent_crate.sections.values());
+                self.add_symbols(parent_crate.sections.read().values());
                 self.crate_tree.lock().insert(crate_name, parent_crate);
                 return weak_sec;
             }
@@ -1590,7 +1591,7 @@ fn load_crates_in_new_namespace<'m, I>(
             kernel_mmi, 
             verbose_log
         )?;
-		let _new_syms = new_namespace.add_symbols(new_crate.sections.values());
+		let _new_syms = new_namespace.add_symbols(new_crate.sections.read().values());
 		partially_loaded_crates.push((new_crate, elf_file));
 	}
 	
