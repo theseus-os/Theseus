@@ -122,15 +122,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
 
-    //init font
-    //TODO check framebuffer init before using it
-    let rs = frame_buffer::font::init();
-    if rs.is_ok() {
-         trace!("frame_buffer text initialized.");
-    } else {
-         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    }
-
     // //init frame_buffer
     let rs = frame_buffer::init();
     if rs.is_ok() {

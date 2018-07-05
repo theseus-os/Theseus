@@ -57,6 +57,14 @@ macro_rules! try_opt_err {
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
+    
+    let rs = font::init();
+    if rs.is_ok() {
+         trace!("frame_buffer text initialized.");
+    } else {
+         debug!("frame_buffer::init(): {}", rs.unwrap_err());
+    }
+
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*4;
@@ -105,7 +113,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-pub static FRAME_DRAWER: Mutex<Drawer> = {
+static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
@@ -123,12 +131,12 @@ pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
-/// draw a line with upper left coordinates, width, height and color
+/// draw a rectangle with upper left coordinates, width, height and color
 pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
     FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, color)
 }
 
-/// draw a line with upper left coordinates, width, height and color
+/// fill a rectangle with upper left coordinates, width, height and color
 pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
     FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, color)
 }
@@ -198,7 +206,6 @@ impl Drawer {
     }
 
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        //TODO use loop instead of for
         let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH }};
         let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -226,7 +233,6 @@ impl Drawer {
     }
 
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        //TODO use loop instead of for
         let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
             else { FRAME_BUFFER_WIDTH }};
         let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
@@ -247,9 +253,7 @@ impl Drawer {
         }
     }
 
-
-
-    pub fn buffer(&mut self) -> &mut Buffer {
+    fn buffer(&mut self) -> &mut Buffer {
          unsafe { self.buffer.as_mut() }
     } 
 

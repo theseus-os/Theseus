@@ -40,9 +40,9 @@ pub enum DisplayPosition {
 type Line = [u8; BUFFER_WIDTH];
 
 const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
-    static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
-    static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
-    static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
+static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
+static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
+static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
 const UNLOCK_SEQ_1:u8  = 0x0A;
 const UNLOCK_SEQ_2:u8 = 0x0B;
@@ -57,43 +57,39 @@ const RIGHT_BIT_SHIFT: u8 = 8;
 const DISABLE_SEQ_1: u8 = 0x0A;
 const DISABLE_SEQ_2: u8 = 0x20;
 
+//TODO
 pub fn enable_cursor() {
-    unsafe {
+    /*unsafe {
         CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
         let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
         CURSOR_PORT_END.lock().write(temp_read);
         CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
         let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
         CURSOR_PORT_END.lock().write(temp_read2);
-    }
+    }*/
 }
 
+//TODO
 pub fn update_cursor (x: u16, y:u16) { 
-    let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
+    /*let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
     unsafe {
         CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
         CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
         CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
         CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
-    }
+    }*/
 }
 
+//TODO
 pub fn disable_cursor () {
-    unsafe {
+    /*unsafe {
         CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
         CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-    }
+    }*/
 }
 
 /// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
-    /// the index of the line that is currently being displayed
-    //pub display_line: usize,
-    /// whether the display is locked to scroll with the end and show new lines as printed
-    //display_scroll_end: bool,
-    /// the column position in the last line where the next character will go
-    //pub column: usize,
-    /// the actual buffer memory that can be written to the frame memory
     display_lines: Vec<Line>,
 }
 
@@ -103,7 +99,7 @@ impl FrameTextBuffer {
         FrameTextBuffer::with_capacity(1000)
     }
 
-    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines.
+    /// Create a new FrameBuffer with the given initial capacity, specified in number of lines.
     pub fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
         let first_line = BLANK_LINE;
         let mut lines = Vec::with_capacity(num_initial_lines);
@@ -115,7 +111,7 @@ impl FrameTextBuffer {
     }
 
 
- /// Enables the cursor by writing to four ports
+    /// Enables the cursor by writing to four ports
     pub fn enable_cursor(&self) {
         unsafe {
             let cursor_start = 0b00000001;
@@ -130,7 +126,7 @@ impl FrameTextBuffer {
         return;
     }
 
-
+    /// Update the cursor
     pub fn update_cursor(&self, x: u16, y: u16) {
         let pos: u16 = y * BUFFER_WIDTH as u16 + x;
         unsafe {
@@ -159,14 +155,14 @@ impl FrameTextBuffer {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
 
-    /// Requires that a str slice that will exactly fit the vga buffer
-    /// The calculation is done inside the console crate by the print_to_vga function and associated methods
-    /// Parses the string into line objects and then prints them onto the vga buffer
+    /// Requires that a str slice that will exactly fit the frame buffer
+    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
+    /// Print every byte and fill the blank with background color
     pub fn display_string(&self, slice: &str) -> Result<usize, &'static str> {
         self.print_by_bytes (slice)     
     }
     
-    ///print a string by lines
+    ///print a string by lines. This is no longer used
     fn print_by_lines (&self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
@@ -244,7 +240,7 @@ impl FrameTextBuffer {
 
     }
 
-    ///prints a string by bytes
+    ///print a string by bytes
     fn print_by_bytes(&self, slice: &str) -> Result<usize, &'static str> {
         use super::fill_rectangle;
 
