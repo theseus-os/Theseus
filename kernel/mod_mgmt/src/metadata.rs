@@ -89,7 +89,7 @@ impl CrateType {
 
 /// Represents a single crate object file that has been loaded into the system.
 pub struct LoadedCrate {
-    /// The name of this crate. Wrapped in a RwLock to support overriding the name later.
+    /// The name of this crate, wrapped in a RwLock to support overriding the name later.
     pub crate_name: RwLock<String>,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
@@ -105,8 +105,6 @@ pub struct LoadedCrate {
     /// The `MappedPages` that include the data and bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<RwLock<MappedPages>>>,
-
-    // crate_dependencies: Vec<LoadedCrate>,
 }
 
 use core::fmt;
@@ -175,7 +173,9 @@ impl LoadedCrate {
     /// 
     /// Also, there is currently no way to deep copy a single `LoadedSection` in isolation,
     /// because a single section has dependencies on many other sections, i.e., due to relocations,
-    /// and that would result in weird inconsistencies that violate thos dependencies.
+    /// and that would result in weird inconsistencies that violate those dependencies.
+    /// In addition, multiple `LoadedSection`s share a given `MappedPages` memory range,
+    /// so they all have to be duplicated at once into a new `MappedPages` range at the crate level.
     pub fn deep_copy<A: FrameAllocator>(
         &self, 
         kernel_mmi: &mut MemoryManagementInfo, 
@@ -317,15 +317,6 @@ impl LoadedCrate {
 }
 
 
-/// Returns a map containing all of the global symbols 
-/// in the given section iterator (if Some), otherwise in this crate's sections list.
-pub fn global_symbol_map<'a, I>(sections: I, crate_name: &str) -> SymbolMap 
-    where I: IntoIterator<Item = &'a StrongSectionRef> 
-{
-    symbol_map(sections, crate_name, |sec| sec.global)
-}
-
-
 /// Returns a map containing all symbols,
 /// filtered to include only `LoadedSection`s that satisfy the given predicate
 /// (if the predicate returns true for a given section, then it is included in the map).
@@ -388,7 +379,7 @@ pub struct LoadedSection {
     pub hash: Option<String>,
     /// The `MappedPages` that cover this section.
     pub mapped_pages: Arc<RwLock<MappedPages>>, 
-    /// The offset into the `parent_crate`'s `MappedPages` where this section starts
+    /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
     /// The `VirtualAddress` of this section, cached here as a performance optimization
     /// so we can avoid doing the calculation based on this section's mapped_pages and mapped_pages_offset.
@@ -452,36 +443,6 @@ impl LoadedSection {
             typ, name, hash, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me, internal_dependencies
         }
     }
-
-    // /// Returns a reference to the `MappedPages` that covers this `LoadedSection`.
-    // /// Because that `MappedPages` object is owned by this `LoadedSection`'s `parent_crate`,
-    // /// the lifetime of the returned `MappedPages` reference is tied to the lifetime 
-    // /// of the given `LoadedCrate` parent crate object.
-    // /// The given `parent_crate` reference should be obtained by invoking 
-    // /// the [`parent_crate()`](#method.parent_crate) method. 
-    // pub fn mapped_pages<'a>(&self, parent_crate: &'a LoadedCrate) -> Option<&'a MappedPages> {
-    //     match self.typ {
-    //         SectionType::Text   => parent_crate.text_pages.as_ref(),
-    //         SectionType::Rodata => parent_crate.rodata_pages.as_ref(),
-    //         SectionType::Data |
-    //         SectionType::Bss    => parent_crate.data_pages.as_ref(),
-    //     }
-    // }
-
-    // /// Returns a mutable reference to the `MappedPages` that covers this `LoadedSection`.
-    // /// Because that `MappedPages` object is owned by this `LoadedSection`'s `parent_crate`,
-    // /// the lifetime of the returned `MappedPages` reference is tied to the lifetime 
-    // /// of the given `LoadedCrate` parent crate object. 
-    // /// The given `parent_crate` reference should be obtained by invoking 
-    // /// the [`parent_crate_mut()`](#method.parent_crate_mut) method.
-    // pub fn mapped_pages_mut<'a>(&self, parent_crate: &'a mut LoadedCrate) -> Option<&'a mut MappedPages> {
-    //     match self.typ {
-    //         SectionType::Text   => parent_crate.text_pages.as_mut(),
-    //         SectionType::Rodata => parent_crate.rodata_pages.as_mut(),
-    //         SectionType::Data |
-    //         SectionType::Bss    => parent_crate.data_pages.as_mut(),
-    //     }
-    // }
 
     /// Returns the starting `VirtualAddress` of where this section is loaded into memory. 
     pub fn virt_addr(&self) -> VirtualAddress {

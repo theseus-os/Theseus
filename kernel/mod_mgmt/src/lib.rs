@@ -196,7 +196,7 @@ impl CrateNamespace {
         let (new_crate, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         let new_crate = self.perform_relocations(&elf_file, new_crate, backup_namespace, kernel_mmi, verbose_log)?;
         let new_crate_name = new_crate.crate_name.read().clone();
-        let new_syms = self.add_symbols(new_crate.sections.values(), &new_crate_name, verbose_log);
+        let new_syms = self.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
         info!("loaded module {:?} as new crate {:?}, {} new symbols.", crate_module.name(), new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name, new_crate);
         Ok(new_syms)
@@ -284,7 +284,7 @@ impl CrateNamespace {
                 for new_sec_ref in new_crate.sections.values() {
                     let mut new_sec = new_sec_ref.lock();
                     // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
-                    if let Some(new_name) = replace_parent_crate_name(&new_sec.name, &new_crate.crate_name.read(), &override_name) {
+                    if let Some(new_name) = replace_containing_crate_name(&new_sec.name, &new_crate.crate_name.read(), &override_name) {
                         debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
                         if new_sec.global {
                             new_namespace.replace_symbol_key(&new_sec.name, &new_name)?;
@@ -422,7 +422,7 @@ impl CrateNamespace {
             }
 
             // add the new crate and its sections' symbols to this namespace
-            self.add_symbols(new_crate.sections.values(), &new_crate_name, verbose_log);
+            self.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
             self.crate_tree.lock().insert(new_crate_name, new_crate);
 
         }
@@ -435,8 +435,8 @@ impl CrateNamespace {
 
 
     /// The primary internal routine for parsing and loading all of the sections.
-    /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**.
-    /// Also, the sections in the returned `LoadedCrate` are incomplete -- their `parent_crate` weak references aren't yet set up. 
+    /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,
+    /// since its sections are totally incomplete and non-executable.
     /// 
     /// However, it does add all of the newly-loaded crate sections to the symbol map (yes, even before relocation/linking),
     /// since we can use them to resolve missing symbols for relocations.
@@ -825,6 +825,9 @@ impl CrateNamespace {
     /// The second stage of parsing and loading a new kernel crate, 
     /// filling in the missing relocation information in the already-loaded sections. 
     /// It also remaps the `new_crate`'s MappedPages according to each of their section permissions.
+    /// 
+    /// # Note
+    /// The sections in the returned `LoadedCrate` are somewhat incomplete -- their `parent_crate` weak references aren't yet set up. 
     fn perform_relocations(
         &self,
         elf_file: &ElfFile,
@@ -904,12 +907,12 @@ impl CrateNamespace {
                         //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                     }
                     
-                    let mut source_and_target_have_same_parent_crate = false;
+                    let mut source_and_target_in_same_crate = false;
 
                     // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
                     let source_sec_ref = match new_crate.sections.get(&source_sec_shndx) {
                         Some(ss) => {
-                            source_and_target_have_same_parent_crate = true;
+                            source_and_target_in_same_crate = true;
                             Ok(ss.clone())
                         }
 
@@ -954,7 +957,7 @@ impl CrateNamespace {
                         verbose_log
                     )?;
 
-                    if source_and_target_have_same_parent_crate {
+                    if source_and_target_in_same_crate {
                         // We keep track of relocation information so that we can be aware of and faithfully reconstruct 
                         // inter-section dependencies even within the same crate.
                         // This is necessary for doing a deep copy of the crate in memory, 
@@ -986,8 +989,8 @@ impl CrateNamespace {
         // here, we're done with handling all the relocations in this entire crate
 
 
-        // Two final remaining tasks before the new crate is ready to go:
-        // 1) remapping each section's mapped pages to the proper permission bits, since we initially mapped them all as writable
+        // Finally, remap each section's mapped pages to the proper permission bits, 
+        // since we initially mapped them all as writable
         if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
             if let Some(ref tp) = new_crate.text_pages { 
                 tp.write().remap(active_table, TEXT_SECTION_FLAGS())?;
@@ -1001,67 +1004,113 @@ impl CrateNamespace {
             return Err("couldn't get kernel's active page table");
         }
 
-        // 2) fix up all the sections' parent crate references
-        let new_crate_ref = Arc::new(new_crate);
-        let new_crate_weak_ref = Arc::downgrade(&new_crate_ref);
-        for sec in new_crate_ref.sections.values() {
-            let mut sec_locked = sec.lock();
-            sec_locked.parent_crate = new_crate_weak_ref.clone();
-        }
-
-        Ok(new_crate_ref)
+        Ok(Arc::new(new_crate))
     }
 
+    
+    /// Adds the given symbol to this namespace's symbol map.
+    /// If the symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
+    /// Returns true if the symbol was added, and false if it already existed and thus was not added.
+    fn add_symbol(
+        existing_symbol_map: &mut SymbolMap,
+        new_section_key: String,
+        new_section_ref: &StrongSectionRef
+    ) -> bool {
+        match existing_symbol_map.entry(new_section_key) {
+            Entry::Occupied(_old_val) => {
+                false
+                // if log_replacements {
+                //     if sec.name.ends_with("_LOC") || crate_name == "nano_core" {
+                //         // ignoring these special cases currently
+                //     }
+                //     else {
+                //         if let Some(old_sec) = _old_val.get().upgrade() {
+                //             let new_sec_size = sec.size;
+                //             let old_sec_size = old_sec.lock().size;
+                //             if old_sec_size == new_sec_size {
+                //                 info!("       add_symbols \"{}\": Ignoring new symbol already present: {}", crate_name, sec.name);
+                //             }
+                //             else {
+                //                 warn!("       add_symbols \"{}\": unexpected: different section sizes (old={}, new={}), ignoring new symbol: {}", 
+                //                     crate_name, old_sec_size, new_sec_size, sec.name);
+                //             }
+                //         }
+                //     }
+                // }
+            }
+            Entry::Vacant(new_entry) => {
+                new_entry.insert(Arc::downgrade(new_section_ref));
+                true
+            }
+        }
+    }
 
     /// Adds any global symbols in the given list of `sections` to this namespace's symbol map.
+    /// 
     /// Returns the number of *new* unique global symbols added.
     /// 
     /// # Note
-    /// If a symbol already exists in the symbol map, this leaves it intact and *does not* replace it.
+    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
     fn add_symbols<'a, I>(
         &self, 
         sections: I,
-        crate_name: &str,
-        log_replacements: bool
-    ) -> usize 
-        where I: IntoIterator<Item = &'a StrongSectionRef> 
+    ) -> usize
+        where I: IntoIterator<Item = &'a StrongSectionRef>,
     {
         let mut existing_map = self.symbol_map.lock();
-        let new_map = metadata::global_symbol_map(sections, crate_name);
-
-        // We *could* just use `append()` here, but that wouldn't let us know which entries
-        // in the symbol map were being overwritten, which is currently a valuable bit of debugging info that we need.
-        // Proper way for the future:  existing_map.append(&mut new_map);
 
         // add all the global symbols to the symbol map, in a way that lets us inspect/log each one
         let mut count = 0;
-        for (key, new_sec) in new_map {
-            // instead of blindly replacing old symbols with their new version, we leave all old versions intact 
-            // TODO NOT SURE IF THIS IS THE CORRECT WAY, but blindly replacing them all is definitely wrong
-            // The correct way is probably to use the hash values to disambiguate, but then we have to ensure deterministic/persistent hashes across different compilations
-            let entry = existing_map.entry(key.clone());
-            match entry {
-                Entry::Occupied(old_val) => {
-                    if let (Some(new_sec), Some(old_sec)) = (new_sec.upgrade(), old_val.get().upgrade()) {
-                        let new_sec_size = new_sec.lock().size;
-                        let old_sec_size = old_sec.lock().size;
-                        if old_sec_size == new_sec_size {
-                            if log_replacements { info!("       add_symbols \"{}\": Ignoring new symbol already present: {}", crate_name, key); }
-                        }
-                        else {
-                            if log_replacements { 
-                                warn!("       add_symbols \"{}\": unexpected: different section sizes (old={}, new={}), ignoring new symbol: {}", 
-                                    crate_name, old_sec_size, new_sec_size, key);
-                            }
-                        }
-                    }
-                }
-                Entry::Vacant(new) => {
-                    new.insert(new_sec);
+        for sec_ref in sections.into_iter() {
+            let mut sec = sec_ref.lock();
+            
+            if sec.global {
+                let added = CrateNamespace::add_symbol(&mut existing_map, sec.name.clone(), sec_ref);
+                if added {
                     count += 1;
                 }
             }
         }
+        
+        count
+    }
+
+
+    /// Adds any global symbols in the given list of `sections` to this namespace's symbol map.
+    /// 
+    /// Also, it sets each `section`'s `parent_crate` reference to the given `crate_ref`. 
+    /// Combining these two steps into one avoids iterating over the list of sections multiple times.
+    /// 
+    /// Returns the number of *new* unique global symbols added.
+    /// 
+    /// # Note
+    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
+    fn add_symbols_and_set_parent_crate<'a, I/*, F*/>(
+        &self, 
+        sections: I,
+        crate_ref: &StrongCrateRef,
+        // predicate: F,
+        _log_replacements: bool
+    ) -> usize
+        where I: IntoIterator<Item = &'a StrongSectionRef>,
+            //   F: Fn(&LoadedSection) -> bool, 
+    {
+        let mut existing_map = self.symbol_map.lock();
+
+        // add all the global symbols to the symbol map, in a way that lets us inspect/log each one
+        let mut count = 0;
+        for sec_ref in sections.into_iter() {
+            let mut sec = sec_ref.lock();
+            sec.parent_crate = Arc::downgrade(&crate_ref);
+            
+            if sec.global {
+                let added = CrateNamespace::add_symbol(&mut existing_map, sec.name.clone(), sec_ref);
+                if added {
+                    count += 1;
+                }
+            }
+        }
+        
         count
     }
 
@@ -1158,7 +1207,7 @@ impl CrateNamespace {
             // so it can't be dropped while this namespace is still relying on it.  
             if let Some(parent_crate) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
                 let crate_name = parent_crate.crate_name.read().clone();
-                self.add_symbols(parent_crate.sections.values(), &crate_name, verbose_log);
+                self.add_symbols(parent_crate.sections.values());
                 self.crate_tree.lock().insert(crate_name, parent_crate);
                 return weak_sec;
             }
@@ -1173,7 +1222,7 @@ impl CrateNamespace {
         // We are only able to do this for mangled symbols, those that have a leading crate name,
         // such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load. 
-        if let Some(crate_dependency_name) = get_parent_crate_name(demangled_full_symbol) {
+        if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
             info!("Symbol \"{}\" not initially found, attemping to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             
@@ -1240,7 +1289,7 @@ fn is_valid_crate_name_char(c: char) -> bool {
 /// <alloc::boxed::Box<T>>::into_unique   -->  alloc
 /// keyboard::init                        -->  keyboard
 /// ```
-fn get_parent_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
+fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
     demangled_full_symbol.split("::").next().and_then(|s| {
         // Get the last word right before the first "::"
         s.rsplit(|c| !is_valid_crate_name_char(c))
@@ -1249,7 +1298,7 @@ fn get_parent_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> 
 }
 
 
-/// Similar to [`get_parent_crate_name()`](#method.get_parent_crate_name),
+/// Similar to [`get_containing_crate_name()`](#method.get_containing_crate_name),
 /// but replaces the parent crate name with the given `new_crate_name`, 
 /// if it can be found, and if the parent crate name matches the `old_crate_name`. 
 /// If the parent crate name can be found but does not match the expected `old_crate_name`,
@@ -1259,12 +1308,12 @@ fn get_parent_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> 
 /// because the `new_crate_name` might be a different length than the original crate name.
 /// # Examples
 /// `keyboard::init  -->  keyboard_new::init`
-fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
-    // debug!("replace_parent_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
+fn replace_containing_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
+    // debug!("replace_containing_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
     demangled_full_symbol.match_indices("::").next().and_then(|(index_of_first_double_colon, _substr)| {
         // Get the last word right before the first "::"
         demangled_full_symbol.get(.. index_of_first_double_colon).and_then(|substr| {
-            // debug!("  replace_parent_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
+            // debug!("  replace_containing_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
             let start_idx = substr.rmatch_indices(|c| !is_valid_crate_name_char(c))
                 .next() // the first element right before the crate name starts
                 .map(|(index_right_before_parent_crate_name, _substr)| { index_right_before_parent_crate_name + 1 }) // advance to the actual start 
@@ -1273,7 +1322,7 @@ fn replace_parent_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name:
             demangled_full_symbol.get(start_idx .. index_of_first_double_colon)
                 .filter(|&parent_crate_name| { parent_crate_name == old_crate_name })
                 .and_then(|_parent_crate_name| {
-                    // debug!("    replace_parent_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, _parent_crate_name, start_idx, index_of_first_double_colon);
+                    // debug!("    replace_containing_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, _parent_crate_name, start_idx, index_of_first_double_colon);
                     demangled_full_symbol.get(.. start_idx).and_then(|before_crate_name| {
                         demangled_full_symbol.get(index_of_first_double_colon ..).map(|after_crate_name| {
                             format!("{}{}{}", before_crate_name, new_crate_name, after_crate_name)
@@ -1541,7 +1590,7 @@ fn load_crates_in_new_namespace<'m, I>(
             kernel_mmi, 
             verbose_log
         )?;
-		let _new_syms = new_namespace.add_symbols(new_crate.sections.values(), &new_crate.crate_name.read(), verbose_log);
+		let _new_syms = new_namespace.add_symbols(new_crate.sections.values());
 		partially_loaded_crates.push((new_crate, elf_file));
 	}
 	

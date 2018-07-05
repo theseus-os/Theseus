@@ -104,7 +104,9 @@ pub fn parse_nano_core(
         };
 
         let default_namespace = super::get_default_namespace();
-        let new_syms = default_namespace.add_symbols(new_crate.sections.values(), &crate_name, verbose_log);
+        trace!("parse_nano_core(): starting to add_symbols_and_set_parent_crate...");
+        let new_syms = default_namespace.add_symbols_and_set_parent_crate(new_crate.sections.values(), &new_crate, verbose_log);
+        trace!("parse_nano_core(): finished with add_symbols_and_set_parent_crate.");
         default_namespace.crate_tree.lock().insert(crate_name, new_crate);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
@@ -222,7 +224,7 @@ fn parse_nano_core_symbol_file(
             // trace!("SKIPPING LINE {}: {}", _num + 1, _line);
         }
 
-        // an error that might occur during the loop below
+        // a placeholder for any error that might occur during the loop below
         let mut loop_result: Result<(), &'static str> = Ok(());
 
         {
@@ -391,6 +393,7 @@ fn parse_nano_core_symbol_file(
 
         // check to see if we had an error in the above loop
         try_mp!(loop_result, text_pages, rodata_pages, data_pages);
+        trace!("parse_nano_core_symbol_file(): finished looping over symtab.");
 
     } // drops the borrow of `bytes` (and mapped_pages)
 
@@ -401,13 +404,7 @@ fn parse_nano_core_symbol_file(
         rodata_pages: Some(rodata_pages),
         data_pages:   Some(data_pages),
     });
-    let new_crate_weak_ref = Arc::downgrade(&new_crate);
-
-    // fix up all the sections' parent crate references
-    for sec in new_crate.sections.values() {
-        sec.lock().parent_crate = new_crate_weak_ref.clone();
-    }
-
+    
     Ok(new_crate)
 }
 
@@ -638,12 +635,6 @@ fn parse_nano_core_binary(
             data_pages:   Some(data_pages),
         }
     );
-    let new_crate_weak_ref = Arc::downgrade(&new_crate);
-
-    // fix up all the sections' parent crate references
-    for sec in new_crate.sections.values() {
-        sec.lock().parent_crate = new_crate_weak_ref.clone();
-    }
 
     Ok(new_crate)
 }

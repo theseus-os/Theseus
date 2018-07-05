@@ -290,7 +290,7 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 /// 
 /// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
 /// * `args`: the arguments that will be passed to the `main` function of the application. 
-/// * `task_name`: the String name of the new task. If None, the `module`'s name will be used. 
+/// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
 /// 
 pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
