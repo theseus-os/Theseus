@@ -20,7 +20,7 @@ extern crate display_provider;
 use display_provider::DisplayProvider;
 use vga_buffer::VgaBuffer;
 use console_types::{ConsoleEvent};
-use keycodes_ascii::Keycode;
+use keycodes_ascii::{Keycode, KeyAction};
 use alloc::string::ToString;
 use alloc::arc::Arc;
 use alloc::btree_map::BTreeMap;
@@ -87,7 +87,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
 fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> {
     // variable to track which terminal the user is currently focused on
     // terminal objects have a field term_ref that can be used for this purpose
-    let mut num_running: usize = 1;
+    let mut terminal_id_counter: usize = 1;
     // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
     let mut meta_keypress = false;
     loop {
@@ -107,18 +107,19 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             &ConsoleEvent::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
                 // Ctrl + T makes a new terminal tab
-                if key_input.modifiers.control && key_input.keycode == Keycode::T && num_running < MAX_TERMS {
-                    num_running += 1;
+                if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed 
+                && terminal_id_counter < MAX_TERMS {
                     // Switches focus to this terminal
-                    CURRENT_TERMINAL_NUM.store(num_running -1 , Ordering::SeqCst); // -1 for 0-indexing
+                    CURRENT_TERMINAL_NUM.store(terminal_id_counter , Ordering::SeqCst); // -1 for 0-indexing
                     let vga_buffer = VgaBuffer::new();
-                    let terminal_producer = terminal::Terminal::init(vga_buffer, num_running -1)?;
-                    TERMINAL_INPUT_PRODUCERS.lock().insert(num_running -1 , terminal_producer);
+                    let terminal_producer = terminal::Terminal::init(vga_buffer, terminal_id_counter)?;
+                    TERMINAL_INPUT_PRODUCERS.lock().insert(terminal_id_counter , terminal_producer);
                     meta_keypress = true;
+                    terminal_id_counter += 1;
                     event.mark_completed();
                 }
                 // Ctrl + num switches between existing terminal tabs
-                if key_input.modifiers.control && (
+                if key_input.modifiers.control && key_input.action == KeyAction::Pressed &&(
                     key_input.keycode == Keycode::Num1 ||
                     key_input.keycode == Keycode::Num2 ||
                     key_input.keycode == Keycode::Num3 ||
@@ -146,7 +147,7 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                         },
                     }
                     // Prevents user from switching to terminal tab that doesn't yet exist
-                    if selected_num > num_running as u32 { // does nothing
+                    if selected_num > terminal_id_counter as u32 { // does nothing
                     } else { 
                         CURRENT_TERMINAL_NUM.store((selected_num -1) as usize, Ordering::SeqCst); 
                     }
@@ -155,9 +156,9 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                 }
 
                 // Cycles forward one terminal
-                if key_input.modifiers.control && key_input.keycode == Keycode::PageUp {
+                if key_input.modifiers.control && key_input.keycode == Keycode::PageUp && key_input.action == KeyAction::Pressed {
                     let mut current_num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
-                    if current_num  < num_running -1 {
+                    if current_num  < terminal_id_counter {
                         current_num += 1; 
                         CURRENT_TERMINAL_NUM.store(current_num, Ordering::SeqCst);
                     } else {
@@ -165,13 +166,13 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     }
                 }
                 // Cycles backwards one terminl
-                if key_input.modifiers.control && key_input.keycode == Keycode::PageDown {
+                if key_input.modifiers.control && key_input.keycode == Keycode::PageDown && key_input.action == KeyAction::Pressed {
                     let mut current_num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
                     if current_num  > 0 {
                         current_num -= 1; 
                         CURRENT_TERMINAL_NUM.store(current_num, Ordering::SeqCst);
                     } else {
-                        CURRENT_TERMINAL_NUM.store(num_running -1, Ordering::SeqCst);
+                        CURRENT_TERMINAL_NUM.store(terminal_id_counter, Ordering::SeqCst);
                     }
                 }
 

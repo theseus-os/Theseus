@@ -204,7 +204,6 @@ impl<D> Terminal<D> where D: DisplayProvider {
         } else {
             terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num + 1, prompt_string))?;
         }
-        terminal.display_provider.enable_cursor();
         // Spawns a terminal instance on a new thread
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
         Ok(returned_input_producer)
@@ -454,7 +453,6 @@ impl<D> Terminal<D> where D: DisplayProvider {
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
-            self.display_provider.enable_cursor();
             return;
         }
         self.scroll_start_idx = new_start_idx;
@@ -563,7 +561,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
             new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        self.display_provider.update_cursor(new_x as u16, new_y as u16);
+        self.display_provider.set_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
@@ -668,7 +666,6 @@ impl<D> Terminal<D> where D: DisplayProvider {
                 self.is_scroll_end = true;
                 let buffer_len = self.scrollback_buffer.len();
                 self.scroll_start_idx = self.calc_start_idx(buffer_len);
-                self.display_provider.enable_cursor();
             }
             return Ok(());
         }
@@ -682,9 +679,6 @@ impl<D> Terminal<D> where D: DisplayProvider {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
             if !self.is_scroll_end {
                 self.scroll_down_one_line();
-            }
-            if self.is_scroll_end {
-                self.display_provider.enable_cursor();
             }
             return Ok(());
         }
@@ -909,10 +903,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
                         if terminal.is_scroll_end {
                             let buffer_len = terminal.scrollback_buffer.len();
                             terminal.update_display_backwards(buffer_len)?;
+                            terminal.cursor_handler()?;
                         } else {
                             terminal.update_display_forwards(start_idx)?;
                         }
-                        terminal.cursor_handler()?;
                     }
                     terminal.correct_prompt_position = false;
                 },
@@ -932,10 +926,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
             if terminal.is_scroll_end {
                 let buffer_len = terminal.scrollback_buffer.len();
                 terminal.update_display_backwards(buffer_len)?;
+                terminal.cursor_handler()?;
             } else {
                 terminal.update_display_forwards(start_idx)?;
             }
-            terminal.cursor_handler()?;
             refresh_display = false;
         }
         // Looks at the input queue. 
@@ -961,10 +955,11 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
                 if terminal.is_scroll_end { 
                     let buffer_len = terminal.scrollback_buffer.len();
                     terminal.update_display_backwards(buffer_len)?; // So we don't have to recalculate the starting index every time
+                    terminal.cursor_handler()?;
                 } else {
                     terminal.update_display_forwards(start_idx)?;
                 }
-                terminal.cursor_handler()?;
+                
             }
             _ => { }
         }

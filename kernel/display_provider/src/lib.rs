@@ -8,10 +8,8 @@ pub trait DisplayProvider {
     fn display_string(&mut self, slice: &str) -> Result<usize, &'static str>;
     // Gets the dimensions of the text area to display
     fn get_dimensions(&self) -> (usize, usize);
-    // Function to enable a cursor on the display
-    fn enable_cursor(&self);
-    // Updates the cursor to a specified (x,y) position within the dimensions specified by the get_dimensions() function
-    fn update_cursor(&self, x: u16, y: u16); 
+    // Function to set a cursor on the display at an (x,y) position
+    fn set_cursor(&self, x: u16, y: u16); 
     // Take the cursor off the display
     fn disable_cursor(&self);  
 }
