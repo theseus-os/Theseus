@@ -160,7 +160,6 @@ impl LoadedCrate {
         results
     }
 
-    /*
     /// Creates a new copy of this `LoadedCrate`, which is a relatively slow process
     /// because it must do the following:    
     /// * Deep copy all of the MappedPages into completely new memory regions.
@@ -182,20 +181,20 @@ impl LoadedCrate {
         kernel_mmi: &mut MemoryManagementInfo, 
         allocator: &mut A
     ) -> Result<StrongCrateRef, &'static str> {
-        // deep copy all of the memory regions.
-        // we initially map the as writable because we'll have to copy things into them
-        let (mut new_text_pages, mut new_rodata_pages, mut new_data_pages) = {
+        // First, deep copy all of the memory regions.
+        // We initially map the as writable because we'll have to copy things into them
+        let (new_text_pages, new_rodata_pages, new_data_pages) = {
             if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                let new_text_pages = match self.text_pages.try() {
-                    Some(ref tp) => Some(tp.read().deep_copy(Some(TEXT_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
+                let new_text_pages = match self.text_pages {
+                    Some(ref tp) => Some(tp.lock().deep_copy(Some(TEXT_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
                     None => None,
                 };
-                let new_rodata_pages = match self.rodata_pages.try() {
-                    Some(ref rp) => Some(rp.read().deep_copy(Some(RODATA_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
+                let new_rodata_pages = match self.rodata_pages {
+                    Some(ref rp) => Some(rp.lock().deep_copy(Some(RODATA_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
                     None => None,
                 };
-                let new_data_pages = match self.data_pages.try() {
-                    Some(ref dp) => Some(dp.read().deep_copy(Some(DATA_BSS_SECTION_FLAGS()), active_table, allocator)?),
+                let new_data_pages = match self.data_pages {
+                    Some(ref dp) => Some(dp.lock().deep_copy(Some(DATA_BSS_SECTION_FLAGS()), active_table, allocator)?),
                     None => None,
                 };
                 (new_text_pages, new_rodata_pages, new_data_pages)
@@ -205,42 +204,81 @@ impl LoadedCrate {
             }
         };
 
-        // deep copy the list of sections
-        let new_sections = self.sections.read().clone();
+        let new_text_pages_ref   = new_text_pages  .map(|mp| Arc::new(Mutex::new(mp)));
+        let new_rodata_pages_ref = new_rodata_pages.map(|mp| Arc::new(Mutex::new(mp)));
+        let new_data_pages_ref   = new_data_pages  .map(|mp| Arc::new(Mutex::new(mp)));
 
-        let new_crate = Arc::new(LoadedCrate {
-            crate_name: RwLock::new(self.crate_name.read().clone()),
-            sections: RwLock::new(BTreeMap::new()),
-            text_pages: Once::new(), new_text_pages.clone(),
-            rodata_pages: new_rodata_pages.clone(),
-            data_pages: new_data_pages.clone(),
-        });
+        let mut new_text_pages_locked   = new_text_pages_ref  .as_ref().map(|tp| tp.lock());
+        let mut new_rodata_pages_locked = new_rodata_pages_ref.as_ref().map(|rp| rp.lock());
+        let mut new_data_pages_locked   = new_data_pages_ref  .as_ref().map(|dp| dp.lock());
 
-        // Now that we cloned the actual map of sections, we need to go back through it
-        // and fix up the things in each `LoadedSection` that don't make sense to just "clone": 
+        let new_crate = Arc::new(Mutex::new(LoadedCrate {
+            crate_name:   self.crate_name.clone(),
+            sections:     BTreeMap::new(),
+            text_pages:   new_text_pages_ref.clone(),
+            rodata_pages: new_rodata_pages_ref.clone(),
+            data_pages:   new_data_pages_ref.clone(),
+        }));
+        let new_crate_weak_ref = Arc::downgrade(&new_crate);
+
+        // Second, deep copy the entire list of sections and fix things that don't make sense to directly clone:
         // 1) The parent_crate reference itself, since we're replacing that with a new one,
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
-        // 3) The section's virt_addr, which is a performance optimization that simply caches 
-        //    the virtual address value calculated from its mapped_pages and mapped_pages_offset,
+        // 3) The section's virt_addr, which is based on its new mapped_pages
+        let mut new_sections = BTreeMap::new();
+        for (shndx, old_sec_ref) in self.sections.iter() {
+            let old_sec = old_sec_ref.lock();
+            let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
+            let (new_sec_mapped_pages_ref, new_sec_virt_addr) = match old_sec.typ {
+                SectionType::Text => (
+                    new_text_pages_ref.clone().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                    new_text_pages_locked.as_ref().and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
+                ),
+                SectionType::Rodata => (
+                    new_rodata_pages_ref.clone().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                    new_rodata_pages_locked.as_ref().and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
+                ),
+                SectionType::Data |
+                SectionType::Bss => (
+                    new_data_pages_ref.clone().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                    new_data_pages_locked.as_ref().and_then(|dp| dp.address_at_offset(new_sec_mapped_pages_offset)),
+                ),
+            };
+            let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
+
+            let new_sec = LoadedSection::with_dependencies(
+                old_sec.typ,                            // section type is the same
+                old_sec.name.clone(),                   // name is the same
+                old_sec.hash.clone(),                   // hash is the same
+                new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
+                new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
+                new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
+                old_sec.size,                           // size is the same
+                old_sec.global,                         // globalness is the same
+                new_crate_weak_ref.clone(),             // parent_crate is different, points to the newly-copied crate
+                old_sec.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
+                Vec::new(),                             // no sections can possibly depend on this one, since we just created it
+                old_sec.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
+            );
+
+            new_sections.insert(shndx, Arc::new(Mutex::new(new_sec)));
+        }
+
+
+        // Now we can go through the list again and fix up the rest of the elements in each section.
+        // The foreign sections dependencies (sections_i_depend_on) are the same, 
+        // but all relocation entries must be rewritten because the sections' virtual addresses have changed.
         for new_sec_ref in new_sections.values() {
             let mut new_sec = new_sec_ref.lock();
             let new_sec_mapped_pages = match new_sec.typ {
-                SectionType::Text   => new_text_pages.as_mut().ok_or_else(|| "missing text pages in newly-copied crate")?,
-                SectionType::Rodata => new_rodata_pages.as_mut().ok_or_else(|| "missing rodata pages in newly-copied crate")?,
+                SectionType::Text   => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                SectionType::Rodata => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                 SectionType::Data |
-                SectionType::Bss    => new_data_pages.as_mut().ok_or_else(|| "missing data pages in newly-copied crate")?,
+                SectionType::Bss    => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
-            // no sections can possibly depend on this one, since we just created it
-            new_sec.sections_dependent_on_me.clear();
-        }
-
-        // 3) The foreign sections dependencies (sections_i_depend_on and sections_dependent_on_me),
-        // 4) Every relocation entry needs to be rewritten because all of the virtual addresses have changed.
-        for new_sec_ref in new_sections.values() {
-            let mut new_sec = new_sec_ref.lock();
-            // This crate still depends on the same sections, so we keep those as is, 
+            // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
             for mut strong_dep in new_sec.sections_i_depend_on.iter_mut() {
                 // we can skip modifying "absolute" relocations, since those only depend on the source section,
@@ -271,10 +309,18 @@ impl LoadedCrate {
             // because they are based on crate-specific section shndx values, 
             // which are completely safe to clone without needing any fix ups. 
             for internal_dep in &new_sec.internal_dependencies {
-                let source_sec_vaddr = new_sections.get(&internal_dep.source_sec_shndx)
-                    .ok_or_else(|| "Couldn't get new section specified by an internal dependency's source_sec_shndx")?
-                    .lock()
-                    .virt_addr();
+                let source_sec_ref = new_sections.get(&internal_dep.source_sec_shndx)
+                    .ok_or_else(|| "Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
+
+                // The source and target (new_sec) sections might be the same, so we need to check first
+                // to ensure that we don't cause deadlock by trying to lock the same section twice.
+                let source_sec_vaddr = if Arc::ptr_eq(source_sec_ref, new_sec_ref) {
+                    // here: the source_sec and new_sec are the same, so just use the already-locked new_sec
+                    new_sec.virt_addr()
+                } else {
+                    // here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
+                    source_sec_ref.lock().virt_addr()
+                };
                 super::write_relocation(
                     internal_dep.relocation, 
                     new_sec_mapped_pages, 
@@ -287,10 +333,10 @@ impl LoadedCrate {
 
         // since we mapped all the new MappedPages as writable, we need to properly remap them
         if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            if let Some(ref mut tp) = new_text_pages { 
+            if let Some(ref mut tp) = new_text_pages_locked { 
                 try!(tp.remap(active_table, TEXT_SECTION_FLAGS()));
             }
-            if let Some(ref mut rp) = new_rodata_pages { 
+            if let Some(ref mut rp) = new_rodata_pages_locked { 
                 try!(rp.remap(active_table, RODATA_SECTION_FLAGS()));
             }
             // data/bss sections are already mapped properly, since they're supposed to be writable
@@ -299,29 +345,8 @@ impl LoadedCrate {
             return Err("couldn't get kernel's active page table");
         }
 
-        let new_text_pages = new_text_pages.map(|mp| Arc::new(RwLock::new(mp)));
-        let new_rodata_pages = new_rodata_pages.map(|mp| Arc::new(RwLock::new(mp)));
-        let new_data_pages = new_data_pages.map(|mp| Arc::new(RwLock::new(mp)));
-
-        
-
-        // Update the sections to point to their new parent crate
-        // and to point to their new MappedPages 
-        let new_crate_weak_ref = Arc::downgrade(&new_crate);
-        for sec in new_crate.sections.read().values() {
-            let mut sec_locked = sec.lock();
-            sec_locked.parent_crate = new_crate_weak_ref.clone();
-            sec_locked.mapped_pages = match sec_locked.typ {
-                SectionType::Text   => new_text_pages.clone().ok_or_else(|| "missing text pages in newly-copied crate")?,
-                SectionType::Rodata => new_rodata_pages.clone().ok_or_else(|| "missing text pages in newly-copied crate")?,
-                SectionType::Data |
-                SectionType::Bss    => new_data_pages.clone().ok_or_else(|| "missing data pages in newly-copied crate")?,
-            }
-        }
-
         Ok(new_crate)
     }
-    */
 }
 
 
@@ -391,7 +416,7 @@ pub struct LoadedSection {
     pub mapped_pages_offset: usize,
     /// The `VirtualAddress` of this section, cached here as a performance optimization
     /// so we can avoid doing the calculation based on this section's mapped_pages and mapped_pages_offset.
-    /// This address value should not be used for accessing this section's data through an unsafe dereference,
+    /// This address value should not be used for accessing this section's data through a non-safe dereference,
     /// rather it's just here to help speed up and simply relocations.
     virt_addr: VirtualAddress, 
     /// The size in bytes of this section
