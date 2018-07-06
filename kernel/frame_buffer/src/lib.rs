@@ -11,7 +11,6 @@ extern crate spin;
 extern crate acpi;
 
 extern crate volatile;
-#[macro_use] extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
@@ -20,7 +19,6 @@ extern crate util;
 
 use core::ptr::Unique;
 use spin::Mutex;
-use alloc::vec::Vec;
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
@@ -89,7 +87,6 @@ pub fn init() -> Result<(), &'static str > {
             } 
 
             let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-            let mut add = pages.start_address();
             if err.is_err() {
                 debug!("Fail to init frame buffer");
                 return err;
@@ -181,7 +178,7 @@ impl Drawer {
                 if x == end_x {
                     break;
                 }
-                y = ((x-start_x)*height/width+start_y);
+                y = (x - start_x) * height / width + start_y;
                 if self.check_in_range(x as usize,y as usize) {
                     self.buffer().chars[y as usize][x as usize] = color;
                 }
@@ -196,7 +193,7 @@ impl Drawer {
                 if y == end_y {
                     break;
                 }
-                x = (y-start_y)*width/height+start_x;
+                x = (y - start_y) * width / height + start_x;
                 if self.check_in_range(x as usize,y as usize) {
                     self.buffer().chars[y as usize][x as usize] = color;
                 }

@@ -48,9 +48,6 @@ path  = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.tsc]
-path = "../tsc"
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

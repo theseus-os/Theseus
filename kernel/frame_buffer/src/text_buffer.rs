@@ -1,27 +1,15 @@
-#![no_std]
-#![feature(alloc)]
-#![feature(const_fn)]
-#![feature(unique)]
-#![feature(asm)]
-
-extern crate port_io;
 extern crate tsc;
 
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
-use super::{Vec, Mutex};
 
 use self::tsc::{tsc_ticks, TscTicks};
-use self::port_io::Port;
 
-const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH/CHARACTER_WIDTH;
-const BUFFER_HEIGHT:usize = FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
+const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH / CHARACTER_WIDTH;
+const BUFFER_HEIGHT:usize = FRAME_BUFFER_HEIGHT / CHARACTER_HEIGHT;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 const BACKGROUND_COLOR:u32 = 0x000000;
-
-static mut buf:[u32;640*400] = [0;640*400];
-
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
@@ -39,47 +27,24 @@ pub enum DisplayPosition {
 }
 
 
-type Line = [u8; BUFFER_WIDTH];
+//type Line = [u8; BUFFER_WIDTH];
 
-const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
-
-const UNLOCK_SEQ_1:u8  = 0x0A;
-const UNLOCK_SEQ_2:u8 = 0x0B;
-const UNLOCK_SEQ_3:u8 = 0xC0;
-const UNLOCK_SEQ_4:u8 = 0xE0;
-const UPDATE_SEQ_1: u8 = 0x0E;
-const UPDATE_SEQ_2: u8 = 0x0F;
-const UPDATE_SEQ_3: u16 = 0xFF;
-const CURSOR_START:u8 =  0b00000001;
-const CURSOR_END:u8 = 0b00010000;
-const RIGHT_BIT_SHIFT: u8 = 8;
-const DISABLE_SEQ_1: u8 = 0x0A;
-const DISABLE_SEQ_2: u8 = 0x20;
+//const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
 
 /// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
-    display_lines: Vec<Line>,
+    //display_lines: Vec<Line>,
+    //The cursor of the terminal. Contaning the position and enabled flag.
+    //cursor: Cursor,
 }
 
 impl FrameTextBuffer {
-    /// Create a new FrameBuffer.
+    /// Create a new FrameBuffer. 
     pub fn new() -> FrameTextBuffer {
-        FrameTextBuffer::with_capacity(1000)
+        FrameTextBuffer{}
     }
 
-    /// Create a new FrameBuffer with the given initial capacity, specified in number of lines.
-    pub fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
-        let first_line = BLANK_LINE;
-        let mut lines = Vec::with_capacity(num_initial_lines);
-        lines.push(first_line);
-        let display_lines = Vec::with_capacity(num_initial_lines);
-        FrameTextBuffer {
-            display_lines: display_lines,
-        }
-    }
-
-
-    /// Enables the cursor by writing to four ports
+    /*// Enables the cursor by writing to four ports
     pub fn enable_cursor(&self) {
         /*unsafe {
             let cursor_start = 0b00000001;
@@ -116,7 +81,7 @@ impl FrameTextBuffer {
             CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
             CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
         }*/
-    }
+    }*/
 
     /// Returns a tuple containing (buffer height, buffer width)
     pub fn get_dimensions(&self) -> (usize, usize) {
@@ -131,7 +96,7 @@ impl FrameTextBuffer {
     }
     
     ///print a string by lines. This is no longer used
-    fn print_by_lines (&self, slice: &str) -> Result<usize, &'static str> {
+    /*fn print_by_lines (&self, slice: &str) -> Result<usize, &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
         let mut cursor_pos = 0;
@@ -206,18 +171,16 @@ impl FrameTextBuffer {
 
         }
 
-    }
+    }*/
 
     ///print a string by bytes
     fn print_by_bytes(&self, slice: &str) -> Result<usize, &'static str> {
-        use super::fill_rectangle;
-
         let mut curr_line = 0;
         let mut curr_column = 0;
         let mut cursor_pos = 0;
         
         let mut drawer = FRAME_DRAWER.lock();
-        let mut buffer = drawer.buffer();
+        let buffer = drawer.buffer();
         for byte in slice.bytes() {
             if byte == b'\n' {
                 let bottom = (curr_line + 1) * CHARACTER_HEIGHT;

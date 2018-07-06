@@ -34,9 +34,6 @@ path = "../../libs/util"
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.port_io]
-path = "../../libs/port_io"
-
 [dependencies.tsc]
 path = "../tsc"
 

@@ -11,7 +11,6 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
-extern crate tsc;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 
@@ -30,8 +29,6 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use tsc::{tsc_ticks, TscTicks};
-
 
 lazy_static! {
     // maps the terminal reference number to the current task id
@@ -892,7 +889,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         terminal.cursor.display();
-
+        
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
                 &ConsoleEvent::OutputEvent(ref s) => {

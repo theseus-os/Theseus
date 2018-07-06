@@ -271,7 +271,7 @@ pub static FONT_PIXEL:Mutex<[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]> = Mu
 ///init the font mask array
 pub fn init()-> Result<(), &'static str> {
     let mut fonts_locked = FONT_PIXEL.lock();
-    let mut fonts = fonts_locked.deref_mut();
+    let fonts = fonts_locked.deref_mut();
 
     for index in 0..FONT_BASIC.len(){
         for y in 0..CHARACTER_HEIGHT{
