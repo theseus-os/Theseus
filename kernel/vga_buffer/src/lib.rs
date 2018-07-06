@@ -59,13 +59,15 @@ const DISABLE_SEQ_2: u8 = 0x20;
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct VgaBuffer { }
-
-impl DisplayProvider for VgaBuffer {
-    /// Create a new VgaBuffer.
-    fn new() -> VgaBuffer {
+impl VgaBuffer {
+    pub fn new() -> VgaBuffer {
         VgaBuffer { }
     }
+}
 
+
+// Implements Display Provider trait for vga buffer
+impl DisplayProvider for VgaBuffer {
     /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
     /// which correspond to the column and row (line) respectively 
     /// Note that the coordinates must correspond to the absolute coordinates the cursor should be
