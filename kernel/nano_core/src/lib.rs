@@ -176,7 +176,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             (section.mapped_pages.clone(), section.mapped_pages_offset)
         };
         let func: &CaptainInitFunc = {
-            try_exit!(mapped_pages.read().as_func(mapped_pages_offset, &mut space))
+            try_exit!(mapped_pages.lock().as_func(mapped_pages_offset, &mut space))
         };
 
         try_exit!(
@@ -238,7 +238,7 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
                     let section = section_ref.lock();
                     (section.mapped_pages.clone(), section.mapped_pages_offset)
                 };
-                let mapped_pages_locked = mapped_pages.read();
+                let mapped_pages_locked = mapped_pages.lock();
                 mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
                     .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
             })

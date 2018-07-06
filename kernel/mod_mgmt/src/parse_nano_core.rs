@@ -4,9 +4,9 @@
 
 use core::ops::DerefMut;
 use alloc::{BTreeMap, String};
-use alloc::arc::{Arc, Weak};
+use alloc::arc::Arc;
 use alloc::string::ToString;
-use spin::{Mutex, RwLock};
+use spin::Mutex;
 
 use xmas_elf;
 use xmas_elf::ElfFile;
@@ -59,11 +59,11 @@ pub fn parse_nano_core(
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
     verbose_log: bool
-) -> Result<usize, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
+) -> Result<usize, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
 
-    let text_pages = Arc::new(RwLock::new(text_pages));
-    let rodata_pages = Arc::new(RwLock::new(rodata_pages));
-    let data_pages = Arc::new(RwLock::new(data_pages));
+    let text_pages   = Arc::new(Mutex::new(text_pages));
+    let rodata_pages = Arc::new(Mutex::new(rodata_pages));
+    let data_pages   = Arc::new(Mutex::new(data_pages));
 
     let crate_name = String::from("nano_core");
     debug!("parse_nano_core: trying to load and parse the nano_core file");
@@ -97,17 +97,17 @@ pub fn parse_nano_core(
             ), text_pages, rodata_pages, data_pages)
         };
 
-        let new_crate = if PARSE_NANO_CORE_SYMBOL_FILE {
+        let new_crate_ref = if PARSE_NANO_CORE_SYMBOL_FILE {
             parse_nano_core_symbol_file(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
         } else {
             parse_nano_core_binary(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
         };
 
         let default_namespace = super::get_default_namespace();
-        trace!("parse_nano_core(): starting to add_symbols_and_set_parent_crate...");
-        let new_syms = default_namespace.add_symbols_and_set_parent_crate(new_crate.sections.read().values(), &new_crate, verbose_log);
-        trace!("parse_nano_core(): finished with add_symbols_and_set_parent_crate.");
-        default_namespace.crate_tree.lock().insert(crate_name, new_crate);
+        trace!("parse_nano_core(): adding symbols to namespace...");
+        let new_syms = default_namespace.add_symbols(new_crate_ref.lock().sections.values(), verbose_log);
+        trace!("parse_nano_core(): finished adding symbols.");
+        default_namespace.crate_tree.lock().insert(crate_name, new_crate_ref);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
 
@@ -127,11 +127,11 @@ pub fn parse_nano_core(
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
 fn parse_nano_core_symbol_file(
     mut mapped_pages: MappedPages,
-    text_pages:   Arc<RwLock<MappedPages>>,
-    rodata_pages: Arc<RwLock<MappedPages>>,
-    data_pages:   Arc<RwLock<MappedPages>>,
+    text_pages:   Arc<Mutex<MappedPages>>,
+    rodata_pages: Arc<Mutex<MappedPages>>,
+    data_pages:   Arc<Mutex<MappedPages>>,
     size: usize
-) -> Result<Arc<LoadedCrate>, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
+) -> Result<Arc<Mutex<LoadedCrate>>, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -146,16 +146,25 @@ fn parse_nano_core_symbol_file(
         *null_byte = 0u8;
     }
 
+    let new_crate = Arc::new(Mutex::new(LoadedCrate {
+        crate_name:   crate_name, 
+        sections:     BTreeMap::new(),
+        text_pages:   Some(text_pages.clone()),
+        rodata_pages: Some(rodata_pages.clone()),
+        data_pages:   Some(data_pages.clone()),
+    }));
+    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+
     // scoped to drop the borrow on mapped_pages through `bytes`
     {
         use util::c_str::CStr;
         let bytes = try_mp!(mapped_pages.as_slice_mut(0, size), text_pages, rodata_pages, data_pages);
         let symbol_cstr = try_mp!(CStr::from_bytes_with_nul(bytes).map_err(|e| {
-            error!("parse_nano_core_symbols(): error casting memory to CStr: {:?}", e);
+            error!("parse_nano_core_symbol_file(): error casting memory to CStr: {:?}", e);
             "FromBytesWithNulError occurred when casting nano_core symbol memory to CStr"
         }), text_pages, rodata_pages, data_pages);
         let symbol_str = try_mp!(symbol_cstr.to_str().map_err(|e| {
-            error!("parse_nano_core_symbols(): error with CStr::to_str(): {:?}", e);
+            error!("parse_nano_core_symbol_file(): error with CStr::to_str(): {:?}", e);
             "Utf8Error occurred when parsing nano_core symbols CStr"
         }), text_pages, rodata_pages, data_pages);
 
@@ -205,10 +214,10 @@ fn parse_nano_core_symbol_file(
             }
         }
 
-        let text_shndx   = try_mp!(text_shndx  .ok_or("parse_nano_core_symbols(): couldn't find .text section index"),   text_pages, rodata_pages, data_pages);
-        let rodata_shndx = try_mp!(rodata_shndx.ok_or("parse_nano_core_symbols(): couldn't find .rodata section index"), text_pages, rodata_pages, data_pages);
-        let data_shndx   = try_mp!(data_shndx  .ok_or("parse_nano_core_symbols(): couldn't find .data section index"),   text_pages, rodata_pages, data_pages);
-        let bss_shndx    = try_mp!(bss_shndx   .ok_or("parse_nano_core_symbols(): couldn't find .bss section index"),    text_pages, rodata_pages, data_pages);
+        let text_shndx   = try_mp!(text_shndx  .ok_or("parse_nano_core_symbol_file(): couldn't find .text section index"),   text_pages, rodata_pages, data_pages);
+        let rodata_shndx = try_mp!(rodata_shndx.ok_or("parse_nano_core_symbol_file(): couldn't find .rodata section index"), text_pages, rodata_pages, data_pages);
+        let data_shndx   = try_mp!(data_shndx  .ok_or("parse_nano_core_symbol_file(): couldn't find .data section index"),   text_pages, rodata_pages, data_pages);
+        let bss_shndx    = try_mp!(bss_shndx   .ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index"),    text_pages, rodata_pages, data_pages);
 
 
         // second, skip ahead to the start of the symbol table 
@@ -228,9 +237,9 @@ fn parse_nano_core_symbol_file(
         let mut loop_result: Result<(), &'static str> = Ok(());
 
         {
-            let text_pages_locked = text_pages.read();
-            let rodata_pages_locked = rodata_pages.read();
-            let data_pages_locked = data_pages.read();
+            let text_pages_locked = text_pages.lock();
+            let rodata_pages_locked = rodata_pages.lock();
+            let data_pages_locked = data_pages.lock();
 
             // third, parse each symbol table entry, which should all have "GLOBAL" bindings
             for (_line_num, line) in file_iterator {
@@ -260,14 +269,14 @@ fn parse_nano_core_symbol_file(
                     }
                 }).map(str::trim);
 
-                let _num      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 0 'Num'"),   loop_result);
-                let sec_vaddr = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 1 'Value'"), loop_result);
-                let sec_size  = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 2 'Size'"),  loop_result);
-                let _typ      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 3 'Type'"),  loop_result);
-                let _bind     = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 4 'Bind'"),  loop_result);
-                let _vis      = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 5 'Vis'"),   loop_result);
-                let sec_ndx   = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 6 'Ndx'"),   loop_result);
-                let name_hash = try_break!(parts.next().ok_or("parse_nano_core_symbols(): couldn't get column 7 'Name'"),  loop_result);
+                let _num      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 0 'Num'"),   loop_result);
+                let sec_vaddr = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 1 'Value'"), loop_result);
+                let sec_size  = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 2 'Size'"),  loop_result);
+                let _typ      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 3 'Type'"),  loop_result);
+                let _bind     = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 4 'Bind'"),  loop_result);
+                let _vis      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 5 'Vis'"),   loop_result);
+                let sec_ndx   = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 6 'Ndx'"),   loop_result);
+                let name_hash = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'"),  loop_result);
 
                 // According to the operation of the tool "demangle_readelf_file", the last 'Name' column
                 // consists of the already demangled name (which may have spaces) and then an optional hash,
@@ -276,19 +285,19 @@ fn parse_nano_core_symbol_file(
                 // Thus, we need to split "name_hash"  at the '#', if it exists
                 let (no_hash, hash) = {
                     let mut tokens = name_hash.split("#");
-                    let no_hash = try_break!(tokens.next().ok_or("parse_nano_core_symbols(): 'Name' column had extraneous '#' characters."), loop_result);
+                    let no_hash = try_break!(tokens.next().ok_or("parse_nano_core_symbol_file(): 'Name' column had extraneous '#' characters."), loop_result);
                     let hash = tokens.next();
                     if tokens.next().is_some() {
-                        error!("parse_nano_core_symbols(): 'Name' column \"{}\" had multiple '#' characters, expected only one as the hash separator!", name_hash);
-                        try_break!(Err("parse_nano_core_symbols(): 'Name' column had multiple '#' characters, expected only one '#' as the hash separator!"), loop_result);
+                        error!("parse_nano_core_symbol_file(): 'Name' column \"{}\" had multiple '#' characters, expected only one as the hash separator!", name_hash);
+                        try_break!(Err("parse_nano_core_symbol_file(): 'Name' column had multiple '#' characters, expected only one '#' as the hash separator!"), loop_result);
                     }
                     (no_hash.to_string(), hash.map(str::to_string))
                 };
                 
                 let sec_vaddr = try_break!(usize::from_str_radix(sec_vaddr, 16)
                     .map_err(|e| {
-                        error!("parse_nano_core_symbols(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                        "parse_nano_core_symbols(): couldn't parse virtual address (value column)"
+                        error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                        "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
                     }),
                     loop_result
                 );
@@ -299,8 +308,8 @@ fn parse_nano_core_symbol_file(
                         )
                     })
                     .map_err(|e| {
-                        error!("parse_nano_core_symbols(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
-                        "parse_nano_core_symbols(): couldn't parse size column"
+                        error!("parse_nano_core_symbol_file(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                        "parse_nano_core_symbol_file(): couldn't parse size column"
                     }),
                     loop_result
                 ); 
@@ -311,12 +320,12 @@ fn parse_nano_core_symbol_file(
                     Ok(ndx) => ndx,
                     // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line). 
                     _ => {
-                        trace!("parse_nano_core_symbols(): skipping line {}: {}", _line_num + 1, line);
+                        trace!("parse_nano_core_symbol_file(): skipping line {}: {}", _line_num + 1, line);
                         continue;
                     }
                 };
 
-                // debug!("parse_nano_core_symbols(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
+                // debug!("parse_nano_core_symbol_file(): name: {}, hash: {:?}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", no_hash, hash, sec_vaddr, sec_size, sec_ndx);
 
                 if sec_ndx == text_shndx {
                     sections.insert(
@@ -330,7 +339,7 @@ fn parse_nano_core_symbol_file(
                             sec_vaddr,
                             sec_size,
                             true,
-                            Weak::new(), 
+                            new_crate_weak_ref.clone(), 
                         )))
                     );
                 }
@@ -346,7 +355,7 @@ fn parse_nano_core_symbol_file(
                             sec_vaddr,
                             sec_size,
                             true,
-                            Weak::new(),
+                            new_crate_weak_ref.clone(),
                         )))
                     );
                 }
@@ -362,7 +371,7 @@ fn parse_nano_core_symbol_file(
                             sec_vaddr,
                             sec_size,
                             true,
-                            Weak::new(),
+                            new_crate_weak_ref.clone(),
                         )))
                     );
                 }
@@ -378,12 +387,12 @@ fn parse_nano_core_symbol_file(
                             sec_vaddr,
                             sec_size,
                             true,
-                            Weak::new(),
+                            new_crate_weak_ref.clone(),
                         )))
                     );
                 }
                 else {
-                    trace!("parse_nano_core_symbols(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
+                    trace!("parse_nano_core_symbol_file(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, no_hash, sec_vaddr, sec_size);
                 }
 
                 section_counter += 1;
@@ -396,14 +405,8 @@ fn parse_nano_core_symbol_file(
         trace!("parse_nano_core_symbol_file(): finished looping over symtab.");
 
     } // drops the borrow of `bytes` (and mapped_pages)
-
-    let new_crate = Arc::new(LoadedCrate {
-        crate_name:   RwLock::new(String::from(crate_name)), 
-        sections:     RwLock::new(sections),
-        text_pages:   Some(text_pages),
-        rodata_pages: Some(rodata_pages),
-        data_pages:   Some(data_pages),
-    });
+    
+    new_crate.lock().sections = sections;
     
     Ok(new_crate)
 }
@@ -417,11 +420,11 @@ fn parse_nano_core_symbol_file(
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
 fn parse_nano_core_binary(
     mapped_pages: MappedPages, 
-    text_pages:   Arc<RwLock<MappedPages>>, 
-    rodata_pages: Arc<RwLock<MappedPages>>, 
-    data_pages:   Arc<RwLock<MappedPages>>, 
+    text_pages:   Arc<Mutex<MappedPages>>, 
+    rodata_pages: Arc<Mutex<MappedPages>>, 
+    data_pages:   Arc<Mutex<MappedPages>>, 
     size_in_bytes: usize
-) -> Result<Arc<LoadedCrate>, (&'static str, [Arc<RwLock<MappedPages>>; 3])> {
+) -> Result<Arc<Mutex<LoadedCrate>>, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -450,7 +453,7 @@ fn parse_nano_core_binary(
     let mut bss_shndx:    Option<usize> = None;
 
     let mut loop_result: Result<(), &'static str> = Ok(());
-
+    
     for (shndx, sec) in elf_file.section_iter().enumerate() {
         // trace!("parse_nano_core_binary(): looking at sec[{}]: {:?}", shndx, sec);
         // the PROGBITS sections are the bulk of what we care about, i.e., .text & data sections
@@ -514,12 +517,23 @@ fn parse_nano_core_binary(
     let data_shndx   = try_mp!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"), text_pages, rodata_pages, data_pages);
     let bss_shndx    = try_mp!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"), text_pages, rodata_pages, data_pages);
 
+    let new_crate = Arc::new(Mutex::new(
+        LoadedCrate {
+            crate_name:   crate_name, 
+            sections:     BTreeMap::new(),
+            text_pages:   Some(text_pages.clone()),
+            rodata_pages: Some(rodata_pages.clone()),
+            data_pages:   Some(data_pages.clone()),
+        }
+    ));
+    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+
     let mut loop_result: Result<(), &'static str> = Ok(());
     
     let sections = {
-        let text_pages_locked = text_pages.read();
-        let rodata_pages_locked = rodata_pages.read();
-        let data_pages_locked = data_pages.read();
+        let text_pages_locked = text_pages.lock();
+        let rodata_pages_locked = rodata_pages.lock();
+        let data_pages_locked = data_pages.lock();
 
         // Iterate through the symbol table so we can find which sections are global (publicly visible).
         // As the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter.
@@ -562,7 +576,7 @@ fn parse_nano_core_binary(
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Weak::new(),
+                                        new_crate_weak_ref.clone(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
@@ -575,7 +589,7 @@ fn parse_nano_core_binary(
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Weak::new(),
+                                        new_crate_weak_ref.clone(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == data_shndx {
@@ -588,7 +602,7 @@ fn parse_nano_core_binary(
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Weak::new(),
+                                        new_crate_weak_ref.clone(),
                                     ))
                                 }
                                 else if entry.shndx() as usize == bss_shndx {
@@ -601,7 +615,7 @@ fn parse_nano_core_binary(
                                         sec_vaddr,
                                         sec_size,
                                         true,
-                                        Weak::new(),
+                                        new_crate_weak_ref.clone(),
                                     ))
                                 }
                                 else {
@@ -626,15 +640,7 @@ fn parse_nano_core_binary(
     // check if there was an error in the loop above
     try_mp!(loop_result, text_pages, rodata_pages, data_pages);
 
-    let new_crate = Arc::new(
-        LoadedCrate {
-            crate_name:   RwLock::new(crate_name), 
-            sections:     RwLock::new(sections),
-            text_pages:   Some(text_pages),
-            rodata_pages: Some(rodata_pages),
-            data_pages:   Some(data_pages),
-        }
-    );
+    new_crate.lock().sections = sections;
 
     Ok(new_crate)
 }

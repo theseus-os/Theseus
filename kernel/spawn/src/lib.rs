@@ -296,26 +296,26 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
     -> Result<TaskRef, &'static str> 
 {
-    let app_crate = {
+    let app_crate_ref = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), false)?
     };
 
-    let task_name = task_name.unwrap_or(app_crate.crate_name.read().clone());
     // get the LoadedSection for the "main" function in the app_crate
-    let main_func_sec_ref = app_crate.get_function_section("main")
+    let main_func_sec_ref = app_crate_ref.lock().get_function_section("main")
         .ok_or("spawn_application(): couldn't find \"main\" function!")?;
 
     let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
     let main_func = {
         let main_func_sec = main_func_sec_ref.lock();
-        let mapped_pages = main_func_sec.mapped_pages.read();
+        let mapped_pages = main_func_sec.mapped_pages.lock();
         mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
     };
 
+    let task_name = task_name.unwrap_or_else(|| app_crate_ref.lock().crate_name.clone());
     let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
-    app_task.write().app_crate = Some(app_crate);
+    app_task.write().app_crate = Some(app_crate_ref);
 
     Ok(app_task)
 }
