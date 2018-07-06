@@ -123,7 +123,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 			}
 
 			// here: we have the chunk and we need to split it up into two chunks
-			assert!(c.allocated == false, "Logic error: an already-allocated chunk is going to be split!");
+			assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
 			
 			// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
 			c.size_in_pages = remaining_size;
