@@ -11,6 +11,7 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
+extern crate tsc;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 
@@ -19,9 +20,8 @@ extern crate console_types;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-
 use console_types::{ConsoleEvent};
-use frame_buffer::text_buffer::{FrameTextBuffer};
+use frame_buffer::text_buffer::{FrameTextBuffer, Cursor};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;
@@ -30,6 +30,7 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use tsc::{tsc_ticks, TscTicks};
 
 
 lazy_static! {
@@ -127,9 +128,8 @@ pub struct Terminal {
     /// The consumer for the Terminal's input dfqueue. It will dequeue input events from the terminal's dfqueue and handle them using
     /// the handle keypress function. 
     input_consumer: DFQueueConsumer<ConsoleEvent>,
-
-
-
+    ///The cursor of the terminal. Contaning the position and enabled flag.
+    cursor: Cursor,
 }
 
 /// Manual implementation of debug just prints out the terminal reference number
@@ -194,6 +194,7 @@ impl Terminal {
             print_consumer: terminal_print_consumer,
             // print_producer: terminal_input_producer,
             input_consumer: terminal_input_consumer,
+            cursor: Cursor::new(0, 0, false),
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -206,7 +207,7 @@ impl Terminal {
             terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num, prompt_string))?;
         }
         terminal.input_string_index = terminal.scrollback_buffer.len()-1; // updates the input string tracking variable
-        terminal.frame_buffer.enable_cursor();
+        terminal.cursor.enable();
         // Spawns a terminal instance on a new thread
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
         Ok(returned_input_producer)
@@ -465,7 +466,7 @@ impl Terminal {
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
-            self.frame_buffer.enable_cursor();
+            self.cursor.enable();
             let _result = self.update_display(new_end_idx);
             return;
         }
@@ -563,7 +564,7 @@ impl Terminal {
             new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        self.frame_buffer.update_cursor(new_x as u16, new_y as u16);
+        self.cursor.update(new_y, new_x);
         return Ok(());
     }
 
@@ -660,7 +661,7 @@ impl Terminal {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
                 self.scroll_end_idx = self.calc_end_idx(0);
-                self.frame_buffer.disable_cursor();
+                self.cursor.disable();
             }
             return Ok(());
         }
@@ -670,14 +671,14 @@ impl Terminal {
                 self.scroll_end_idx = self.scrollback_buffer.len();
                 let end_idx = self.scroll_end_idx;
                 self.scroll_start_idx = self.calc_start_idx(end_idx);
-                self.frame_buffer.enable_cursor();
+                self.cursor.enable();
             }
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_end_idx != 0 {
                 self.scroll_up_one_line();
-                self.frame_buffer.disable_cursor();                
+                self.cursor.disable();                
             }
             return Ok(());
         }
@@ -686,7 +687,7 @@ impl Terminal {
                 self.scroll_down_one_line();
             }
             if self.is_scroll_end {
-                self.frame_buffer.enable_cursor();
+                self.cursor.enable();
             }
             return Ok(());
         }
@@ -694,7 +695,7 @@ impl Terminal {
         if keyevent.keycode == Keycode::PageUp {
             self.page_up();
             self.is_scroll_end = false;
-            self.frame_buffer.disable_cursor();
+            self.cursor.disable();
             return Ok(());
         }
 
@@ -882,11 +883,16 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         terminal.update_display(scrollback_buffer_len)?;
         terminal.cursor_handler()?;
     }
+
     use core::ops::Deref;
     let mut refresh_vga = false;
+
+
     loop {
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
+        terminal.cursor.display();
+
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
                 &ConsoleEvent::OutputEvent(ref s) => {

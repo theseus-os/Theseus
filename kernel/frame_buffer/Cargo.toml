@@ -37,6 +37,9 @@ path = "../acpi"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
+[dependencies.tsc]
+path = "../tsc"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

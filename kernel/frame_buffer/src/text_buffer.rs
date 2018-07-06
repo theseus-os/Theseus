@@ -5,11 +5,13 @@
 #![feature(asm)]
 
 extern crate port_io;
+extern crate tsc;
 
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER};
+use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
 use super::{Vec, Mutex};
 
+use self::tsc::{tsc_ticks, TscTicks};
 use self::port_io::Port;
 
 const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH/CHARACTER_WIDTH;
@@ -40,9 +42,6 @@ pub enum DisplayPosition {
 type Line = [u8; BUFFER_WIDTH];
 
 const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
-static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D4) );
-static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new( Port::new(0x3D5) );
-static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new( Port::new(0x3E0) );
 
 const UNLOCK_SEQ_1:u8  = 0x0A;
 const UNLOCK_SEQ_2:u8 = 0x0B;
@@ -56,37 +55,6 @@ const CURSOR_END:u8 = 0b00010000;
 const RIGHT_BIT_SHIFT: u8 = 8;
 const DISABLE_SEQ_1: u8 = 0x0A;
 const DISABLE_SEQ_2: u8 = 0x20;
-
-//TODO
-pub fn enable_cursor() {
-    /*unsafe {
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
-        CURSOR_PORT_END.lock().write(temp_read);
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
-        CURSOR_PORT_END.lock().write(temp_read2);
-    }*/
-}
-
-//TODO
-pub fn update_cursor (x: u16, y:u16) { 
-    /*let pos: u16 =  y*BUFFER_WIDTH as u16  + x;
-    unsafe {
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
-        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
-        CURSOR_PORT_END.lock().write(((pos>>RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
-    }*/
-}
-
-//TODO
-pub fn disable_cursor () {
-    /*unsafe {
-        CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
-        CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-    }*/
-}
 
 /// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
@@ -113,7 +81,7 @@ impl FrameTextBuffer {
 
     /// Enables the cursor by writing to four ports
     pub fn enable_cursor(&self) {
-        unsafe {
+        /*unsafe {
             let cursor_start = 0b00000001;
             let cursor_end = 0b00010000;
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
@@ -123,12 +91,12 @@ impl FrameTextBuffer {
             let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
             CURSOR_PORT_END.lock().write(temp_read2);
         }
-        return;
+        return;*/
     }
 
     /// Update the cursor
     pub fn update_cursor(&self, x: u16, y: u16) {
-        let pos: u16 = y * BUFFER_WIDTH as u16 + x;
+        /*let pos: u16 = y * BUFFER_WIDTH as u16 + x;
         unsafe {
             CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
             CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
@@ -137,17 +105,17 @@ impl FrameTextBuffer {
                 .lock()
                 .write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
         }
-        return;
+        return;*/
     }
 
 
     /// Disables the cursor
     /// Still maintains the cursor's position
     pub fn disable_cursor(&self) {
-        unsafe {
+        /*unsafe {
             CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
             CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-        }
+        }*/
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
@@ -307,6 +275,69 @@ impl FrameTextBuffer {
             }
             buffer.chars[y][x] = color;
             x += 1;
+        }
+    }
+}
+
+///A cursor struct. It contains the position of a cursor, whether it is enabled, 
+///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
+pub struct Cursor {
+    line:usize,
+    column:usize,
+    enabled:bool,
+    freq:u64,
+    time:TscTicks,
+    show:bool,
+}
+
+impl Cursor {
+    ///create a new cursor struct
+    pub fn new(li:usize, col:usize, ena:bool) -> Cursor {
+        Cursor {
+            line:li,
+            column:col,
+            enabled:ena,
+            freq:500000000,
+            time:tsc_ticks(),
+            show:true,
+        }
+    }
+
+    ///update the cursor position
+    pub fn update(&mut self, line:usize, column:usize) {
+        self.line = line;
+        self.column = column;
+        self.show = true;
+    }
+
+    ///enable a cursor
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    ///disable a cursor
+    pub fn disable(&mut self) {
+        self.enabled = false;
+        //fill_rectangle(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+    }
+
+    ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
+    pub fn display(&mut self) {
+        let time = tsc_ticks();
+        
+        if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
+            self.time = time;
+            self.show = !self.show;
+        }
+
+        if self.enabled  {
+            if self.show {
+                fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);    
+            } else {
+                fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+            }
         }
     }
 }
