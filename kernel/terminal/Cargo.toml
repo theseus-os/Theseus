@@ -45,8 +45,8 @@ path  = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.display_provider]
-path = "../display_provider"
+[dependencies.text_display]
+path = "../text_display"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

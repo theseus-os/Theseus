@@ -52,8 +52,8 @@ path = "../mod_mgmt"
 [dependencies.terminal]
 path = "../terminal"
 
-[dependencies.display_provider]
-path = "../display_provider"
+[dependencies.text_display]
+path = "../text_display"
 
 
 [lib]

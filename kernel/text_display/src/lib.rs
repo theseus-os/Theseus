@@ -1,6 +1,6 @@
 #![no_std]
-/// Defines the methods that a DisplayProvider must have
-pub trait DisplayProvider {
+/// Defines the methods that a TextDisplay must have
+pub trait TextDisplay {
     fn display_string(&mut self, slice: &str) -> Result<usize, &'static str>;
     // Gets the dimensions of the text area to display
     fn get_dimensions(&self) -> (usize, usize);

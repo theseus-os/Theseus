@@ -1,6 +1,6 @@
 #![no_std]
 #![feature(alloc)]
-// used by the display provider
+// used by the text display
 
 extern crate keycodes_ascii;
 extern crate spin;
@@ -10,7 +10,7 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
-extern crate display_provider;
+extern crate text_display;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 
@@ -20,7 +20,7 @@ extern crate console_types;
 #[macro_use] extern crate log;
 
 
-use display_provider::DisplayProvider;
+use text_display::TextDisplay;
 use console_types::{ConsoleEvent};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
@@ -38,7 +38,7 @@ lazy_static! {
     // maps the terminal's reference number to its print producer
     static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<ConsoleEvent>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }
-/// Currently, println! and print! macros will call this function to print to the display provider from the console crate. 
+/// Currently, println! and print! macros will call this function to print to the text display from the console crate. 
 /// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
 /// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
 /// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
@@ -61,7 +61,7 @@ pub fn print_to_console<S: Into<String>>(s: S, focus_term: usize) -> Result<(), 
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
     let result = print_map.get(&selected_term);
     if let Some(selected_term_producer) = result {
-        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the display provider
+        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the text display
         if selected_term == focus_term{
             selected_term_producer.enqueue(ConsoleEvent::new_output_event(s, true));
         } else {
@@ -81,10 +81,10 @@ struct CommandStruct {
     arguments: Vec<String>
 }
 
-pub struct Terminal<D: DisplayProvider> {
-    /// The terminal's own Display Provider that it outputs text to
-    /// Implemented as a pointer to a trait object that implements DisplayProvider (ex. vga buffer)
-    display_provider: D,
+pub struct Terminal<D: TextDisplay> {
+    /// The terminal's own text display that it outputs text to
+    /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
+    text_display: D,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -109,17 +109,17 @@ pub struct Terminal<D: DisplayProvider> {
     stdin_buffer: String,
     /// The console's standard error buffer to store any errors logged by the program
     stderr_buffer: String,
-    /// The terminal's scrollback buffer which stores a string to be displayed by the display provider
+    /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
-    /// Indicates whether the display provider is displaying the last part of the scrollback buffer slice
+    /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
     is_scroll_end: bool,
-    /// The starting index of the scrollback buffer string slice that is currently being displayed on the display provider
+    /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
-    /// Indicates the rightmost position of the cursor ON THE DISPLAY PROVIDER, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
-    /// being displayed on the display provider)
+    /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
+    /// being displayed on the text display)
     absolute_cursor_pos: usize,
     /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
-    /// absolute_cursor_pos - left shift will be the position on the display provider where the cursor will be displayed
+    /// absolute_cursor_pos - left shift will be the position on the text display where the cursor will be displayed
     left_shift: usize,
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<ConsoleEvent>,
@@ -133,7 +133,7 @@ pub struct Terminal<D: DisplayProvider> {
 
 /// Manual implementation of debug just prints out the terminal reference number
 use core::fmt;
-impl<D> fmt::Debug for Terminal<D> where D:DisplayProvider {
+impl<D> fmt::Debug for Terminal<D> where D:TextDisplay {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Point {{ terminal reference number: {} }}", self.term_ref)
     }
@@ -149,11 +149,11 @@ impl<D> fmt::Debug for Terminal<D> where D:DisplayProvider {
 ///     - Consumer is the main terminal loop
 ///     - Producers are functions in the event handling crate that send 
 ///         Keyevents if the terminal is the one currently being focused on
-impl<D> Terminal<D> where D: DisplayProvider {
+impl<D> Terminal<D> where D: TextDisplay {
     /// Creates a new terminal object
-    /// display provider: T => any concrete type that implements the DisplayProvider trait (i.e. Vga buffer, etc.)
+    /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(display_provider: D, ref_num: usize) -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
+    pub fn init(text_display: D, ref_num: usize) -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
         // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
         let terminal_input_queue: DFQueue<ConsoleEvent>  = DFQueue::new();
         let terminal_input_consumer = terminal_input_queue.into_consumer();
@@ -174,7 +174,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            display_provider: display_provider,
+            text_display: text_display,
             console_input_string: String::new(),
             correct_prompt_position: true,
             command_history: Vec::new(),
@@ -244,12 +244,12 @@ impl<D> Terminal<D> where D: DisplayProvider {
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
-    /// display provider. 
-    /// If the display provider's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
-    /// calculates the starting index so that when displayed on the display provider, it preserves that line so that it looks the same
+    /// text display. 
+    /// If the text display's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
+    /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> usize{
-        let (buffer_width, buffer_height) = self.display_provider.get_dimensions();
+        let (buffer_width, buffer_height) = self.text_display.get_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -270,11 +270,11 @@ impl<D> Terminal<D> where D: DisplayProvider {
                 total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
             }
 
-            // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the display provider
+            // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the text display
             while total_lines < buffer_height {
-                // Operation finds the number of lines that a single "sentence" will occupy on the display provider through the operation length_of_sentence/display_provider_width + 1
+                // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/text_display_width + 1
                 if counter == new_line_indices.len() -1 {
-                    return 0; // In  the case that an end index argument corresponded to a string slice that underfits the display provider
+                    return 0; // In  the case that an end index argument corresponded to a string slice that underfits the text display
                 }
                 // finds  the number of characters between newlines and thereby the number of lines those will take up
                 let num_chars = new_line_indices[counter].0 - new_line_indices[counter+1].0;
@@ -301,9 +301,9 @@ impl<D> Terminal<D> where D: DisplayProvider {
 
    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
-    /// display provider. 
+    /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.display_provider.get_dimensions();
+        let (buffer_width,buffer_height) = self.text_display.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -325,7 +325,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
                     total_lines += new_line_indices[0].0/buffer_width + 1;
                 }
 
-                // Calculates the end index so that the string slice between the start and end index will fit into the display provider within at most 
+                // Calculates the end index so that the string slice between the start and end index will fit into the text display within at most 
                 // one newline
                 while total_lines < buffer_height {
                     if counter+1 == new_line_indices.len() {
@@ -352,9 +352,9 @@ impl<D> Terminal<D> where D: DisplayProvider {
             }
     }
 
-    /// Scrolls up by the display provider equivalent of one line
+    /// Scrolls up by the text display equivalent of one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.display_provider.get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -391,9 +391,9 @@ impl<D> Terminal<D> where D: DisplayProvider {
         self.is_scroll_end = false;
     }
 
-    /// Scrolls down the display provider equivalent of one line
+    /// Scrolls down the text display equivalent of one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.display_provider.get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -414,7 +414,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
         {
             let result;
             let slice_len; // specifies the length of the grabbed slice
-            // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the display provider
+            // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display
             if self.scrollback_buffer.len() > end_idx + buffer_width {
                 slice_len = buffer_width;
                 result = self.scrollback_buffer.as_str().get(end_idx .. end_idx + buffer_width);
@@ -438,14 +438,14 @@ impl<D> Terminal<D> where D: DisplayProvider {
         self.scroll_start_idx = start_idx;
     }
     
-    /// Shifts the display provider up by making the previous first line the last line displayed on the display provider
+    /// Shifts the text display up by making the previous first line the last line displayed on the text display
     fn page_up(&mut self) {
         let new_end_idx = self.scroll_start_idx;
         let new_start_idx = self.calc_start_idx(new_end_idx);
         self.scroll_start_idx = new_start_idx;
     }
 
-    /// Shifts the display provider down by making the previous last line the first line displayed on the display provider
+    /// Shifts the text display down by making the previous last line the first line displayed on the text display
     fn page_down(&mut self) {
         let start_idx = self.scroll_start_idx;
         let new_start_idx = self.calc_end_idx(start_idx);
@@ -458,13 +458,13 @@ impl<D> Terminal<D> where D: DisplayProvider {
         self.scroll_start_idx = new_start_idx;
     }
 
-    /// Updates the display provider by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
+    /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
         let end_idx = self.calc_end_idx(start_idx); 
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            self.absolute_cursor_pos = self.display_provider.display_string(slice)?;
+            self.absolute_cursor_pos = self.text_display.display_string(slice)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -472,13 +472,13 @@ impl<D> Terminal<D> where D: DisplayProvider {
     }
 
 
-    /// Updates the display provider by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
+    /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
     let start_idx = self.calc_start_idx(end_idx);
     self.scroll_start_idx = start_idx;
     let result = self.scrollback_buffer.get(start_idx..end_idx);
     if let Some(slice) = result {
-        self.absolute_cursor_pos = self.display_provider.display_string(slice)?;
+        self.absolute_cursor_pos = self.text_display.display_string(slice)?;
     } else {
         return Err("could not get slice of scrollback buffer string");
     }
@@ -551,7 +551,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
-        let buffer_width = self.display_provider.get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -561,7 +561,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
             new_x = buffer_width  + new_x - self.left_shift;
             new_y -=1;
         }
-        self.display_provider.set_cursor(new_x as u16, new_y as u16);
+        self.text_display.set_cursor(new_x as u16, new_y as u16);
         return Ok(());
     }
 
@@ -653,11 +653,11 @@ impl<D> Terminal<D> where D: DisplayProvider {
 
         // home, end, page up, page down, up arrow, down arrow for the console
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            // Home command only registers if the display provider has the ability to scroll
+            // Home command only registers if the text display has the ability to scroll
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
-                self.display_provider.disable_cursor();
+                self.text_display.disable_cursor();
             }
             return Ok(());
         }
@@ -672,7 +672,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line();
-                self.display_provider.disable_cursor();                
+                self.text_display.disable_cursor();                
             }
             return Ok(());
         }
@@ -689,7 +689,7 @@ impl<D> Terminal<D> where D: DisplayProvider {
             }
             self.page_up();
             self.is_scroll_end = false;
-            self.display_provider.disable_cursor();
+            self.text_display.disable_cursor();
             return Ok(());
         }
 
@@ -876,10 +876,10 @@ impl<D> Terminal<D> where D: DisplayProvider {
 /// the console crate but will change soon)
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
-/// queue will always be printed to the display provider before input events or any other managerial functions are handled. 
+/// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
-fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: DisplayProvider { 
-    // Refreshes the display provider with the default terminal upon boot, will fix once we refactor the terminal as an application
+fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay { 
+    // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
         terminal.cursor_handler()?;
@@ -896,7 +896,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
                 &ConsoleEvent::OutputEvent(ref s) => {
                     terminal.push_to_stdout(s.text.clone());
                     if s.display {
-                        // Sets this bool to true so that on the next iteration the DisplayProvider will refresh AFTER the 
+                        // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                         // task_handler() function has cleaned up, which does its own printing to the console
                         refresh_display = true;
                         let start_idx = terminal.scroll_start_idx;
@@ -920,7 +920,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
-        // Refreshes the display provider if it is the one being displayed
+        // Refreshes the text display if it is the one being displayed
         if refresh_display == true {
             let start_idx = terminal.scroll_start_idx;
             if terminal.is_scroll_end {

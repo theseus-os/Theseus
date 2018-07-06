@@ -12,12 +12,10 @@ extern crate vga_buffer;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 extern crate terminal;
-extern crate display_provider;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 
-use display_provider::DisplayProvider;
 use vga_buffer::VgaBuffer;
 use console_types::{ConsoleEvent};
 use keycodes_ascii::{Keycode, KeyAction};
@@ -73,7 +71,7 @@ pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
     let keyboard_event_handling_queue: DFQueue<ConsoleEvent> = DFQueue::new();
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-    let vga_buffer = VgaBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the display provider
+    let vga_buffer = VgaBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
     // Initializes the default kernel terminal
     let kernel_producer = terminal::Terminal::init(vga_buffer, 0)?;
     TERMINAL_INPUT_PRODUCERS.lock().insert(0, kernel_producer);

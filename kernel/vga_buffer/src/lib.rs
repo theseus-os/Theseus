@@ -14,9 +14,9 @@ extern crate serial_port;
 extern crate spin;
 extern crate volatile;
 extern crate log;
-extern crate display_provider;
+extern crate text_display;
 
-use display_provider::DisplayProvider;
+use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
 use alloc::Vec;
@@ -67,7 +67,7 @@ impl VgaBuffer {
 
 
 // Implements Display Provider trait for vga buffer
-impl DisplayProvider for VgaBuffer {
+impl TextDisplay for VgaBuffer {
     /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
     /// which correspond to the column and row (line) respectively 
     /// Note that the coordinates must correspond to the absolute coordinates the cursor should be
