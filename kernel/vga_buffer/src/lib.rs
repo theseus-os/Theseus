@@ -13,8 +13,9 @@ extern crate port_io;
 extern crate serial_port;
 extern crate spin;
 extern crate volatile;
-extern crate log;
 extern crate text_display;
+
+#[macro_use] extern crate log;
 
 use text_display::TextDisplay;
 use core::fmt;
@@ -66,12 +67,11 @@ impl VgaBuffer {
 }
 
 
-// Implements Display Provider trait for vga buffer
+/// Implements TextDisplay trait for vga buffer.
+/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
 impl TextDisplay for VgaBuffer {
     /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
     /// which correspond to the column and row (line) respectively 
-    /// Note that the coordinates must correspond to the absolute coordinates the cursor should be
-    /// displayed onto the buffer, not the coordinates relative to the 80x24 grid
     fn set_cursor(&self, x: u16, y: u16) {
         let pos: u16 = y * BUFFER_WIDTH as u16 + x;
 
@@ -109,7 +109,7 @@ impl TextDisplay for VgaBuffer {
     /// Requires that a str slice that will exactly fit the vga buffer
     /// The calculation is done inside the console crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
-    fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
+    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
         let mut cursor_pos = 0;
@@ -150,7 +150,7 @@ impl TextDisplay for VgaBuffer {
                 unsafe { write_volatile(addr, BLANK_LINE); }
             }
         }
-        Ok(cursor_pos)
+        Ok(())
     }
 }
 

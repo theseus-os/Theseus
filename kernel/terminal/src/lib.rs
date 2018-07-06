@@ -464,7 +464,9 @@ impl<D> Terminal<D> where D: TextDisplay {
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            self.absolute_cursor_pos = self.text_display.display_string(slice)?;
+            self.text_display.display_string(slice)?;
+            let cursor_pos = self.calc_cursor_pos(slice);
+            self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -478,12 +480,37 @@ impl<D> Terminal<D> where D: TextDisplay {
     self.scroll_start_idx = start_idx;
     let result = self.scrollback_buffer.get(start_idx..end_idx);
     if let Some(slice) = result {
-        self.absolute_cursor_pos = self.text_display.display_string(slice)?;
+        self.text_display.display_string(slice)?;
+        let cursor_pos = self.calc_cursor_pos(slice);
+        self.absolute_cursor_pos = cursor_pos;
     } else {
         return Err("could not get slice of scrollback buffer string");
     }
     Ok(())
-}
+    }
+
+    /// Calculates the cursor position based on the string that is displayed to the buffer
+    fn calc_cursor_pos(&self, slice: &str) -> usize  {
+        let buffer_width = self.text_display.get_dimensions().0;
+        let mut total_lines = 0;
+        let mut num_chars = 0;
+        let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
+        // before first new_line
+        total_lines =  (new_line_indices[0].0 - 0) / buffer_width + 1;
+        for i in 0..new_line_indices.len() - 2 {
+            total_lines += (new_line_indices[i+1].0 - new_line_indices[i].0 -1) / buffer_width + 1;
+        }
+        // last line
+        if new_line_indices[new_line_indices.len() -1].0 != slice.len() -1 {
+            total_lines += (slice.len() - 1 - new_line_indices[new_line_indices.len() -1].0) / buffer_width + 1;
+            num_chars = (slice.len() - 1 - new_line_indices[new_line_indices.len() -1].0) % buffer_width;
+        } else {
+            num_chars = buffer_width;
+        }  
+        return total_lines * buffer_width + num_chars;
+    } 
+    
+
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
