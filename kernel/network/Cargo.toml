@@ -1,0 +1,38 @@
+[package]
+authors = ["Nisal Menuka <nisalmenuka@gmail.com>"]
+name = "network"
+description = "Network stack in theseus"
+version = "0.1.0"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.smoltcp]
+path = "../../libs/smoltcp"
+default-features = false
+features = ["log","alloc"]
+
+[dependencies.e1000]
+path = "../e1000"
+
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "0.2.1"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
+[dependencies]
+spin = "0.4.5"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+

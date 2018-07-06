@@ -88,6 +88,8 @@ path = "../scheduler"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.network]
+path = "../network"
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
 [target.'cfg(target_feature = "sse2")'.dependencies.simd_test]

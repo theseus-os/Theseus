@@ -38,6 +38,7 @@ extern crate window_manager;
 extern crate scheduler;
 #[macro_use] extern crate console;
 extern crate exceptions_full;
+extern crate network;
 
 
 #[cfg(target_feature = "sse2")]
@@ -124,6 +125,19 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // initialize the rest of our drivers
     driver_init::init(console_queue_producer)?;
+
+    // Initialize the udp server
+    if true {
+
+        #[cfg(not(feature = "loadable"))]
+        {
+            use network::server::server_init;
+            spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
+
+        }
+    }  
+
+    debug!("test");
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
@@ -146,7 +160,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
         }
     }
-
 
     // //init frame_buffer
     // let rs = frame_buffer::init();
