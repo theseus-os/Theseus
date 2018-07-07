@@ -42,6 +42,10 @@ impl AllocatedPages {
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
+
+	pub fn size_in_pages(&self) -> usize {
+		self.pages.size_in_pages()
+	}
 }
 // use core::ops::Deref;
 // impl Deref for AllocatedPages {
