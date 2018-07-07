@@ -303,13 +303,12 @@ impl MappedPages {
 
     /// Returns the size of this mapping in number of [`Page`]s.
     pub fn size_in_pages(&self) -> usize {
-        // add 1 because it's an inclusive range
-        self.pages.end.number - self.pages.start.number + 1 
+        self.pages.size_in_pages()
     }
 
     /// Returns the size of this mapping in number of bytes.
     pub fn size_in_bytes(&self) -> usize {
-        self.size_in_pages() * PAGE_SIZE
+        self.pages.size_in_pages() * PAGE_SIZE
     }
 
     /// Returns the flags that describe this `MappedPages` page table permissions.
@@ -365,6 +364,101 @@ impl MappedPages {
             flags: flags,
         }
     }
+
+
+    /// Merges the given `MappedPages` objects into a single `MappedPages` object.
+    /// 
+    /// Each of the `MappedPages` objects in `mappings` must be contiguous in virtual memory
+    /// and have addresses that sequentially follow each other, in the same order as the vector `mappings`. 
+    ///
+    /// For example, if you have the following three `MappedPages` objects:    
+    /// * first, with a page range including two pages at 0x3000 and 0x4000
+    /// * second, with a page range including just one page at 0x5000
+    /// * third, with a page range including three pages at 0x6000, 0x7000, 0x8000
+    /// Then the returned `MappedPages` object will cover six pages from `[0x3000:0x8000]` inclusive.
+    /// 
+    /// In addition, each of the `MappedPages` objects must have the same flags and page table root frame
+    /// (i.e., they must have all been mapped using the same set of page tables).
+    /// 
+    /// In addition, the `MappedPages` objects must either all have AllocatedPages or all have no AllocatedPages.
+    /// `MappedPages` that were mapped to allocated virtual pages cannot be merged with those that weren't mapped to allocated pages.
+    /// 
+    /// If an error occurs, such as the `mappings` not being contiguous or having different flags, 
+    /// then a tuple including an error message and the original `mappings` Vec will be returned,
+    /// which prevents the `mappings` from being dropped. 
+    /// 
+    /// # Note
+    /// No remapping actions or page reallocations will occur on either a failure or a success.
+    pub fn merge(mappings: Vec<MappedPages>) -> Result<MappedPages, (&'static str, Vec<MappedPages>)> {
+        if mappings.len() <= 1 {
+            return Err(("cannot merge one or fewer mappings, nothing to do", mappings));
+        };
+
+        let first_mapping = mappings.get(0).map(|first| {
+            (first.page_table_p4.clone(), first.flags, first.allocated.is_some(), first.pages.clone())
+        });        
+        let (p4, flags, has_allocated, first_pages) = match first_mapping {
+            Some(fm) => fm,
+            _ => return Err(("BUG: couldn't get the first MappedPages element", mappings)),
+        };
+
+        let mut previous_end: Page = first_pages.end; // start at the end of the first mapping
+
+        // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
+        let mut err: Option<&'static str> = None;
+        for mp in &mappings[1..] {
+            if mp.page_table_p4 != p4 {
+                error!("MappedPages::merge(): mappings weren't mapped using the same page table: {:?} vs. {:?}",
+                    mp.page_table_p4, p4);
+                err = Some("mappings were mapped with different page tables");
+                break;
+            }
+            if mp.flags != flags {
+                error!("MappedPages::merge(): mappings had different flags: {:?} vs. {:?}",
+                    mp.flags, flags);
+                err = Some("mappings were mapped with different flags");
+                break;
+            }
+            if mp.pages.start != previous_end + 1 {
+                error!("MappedPages::merge(): mappings weren't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
+                    previous_end, mp.pages.start);
+                err = Some("mappings were not contiguous in virtual memory");
+                break;
+            } 
+            if has_allocated != mp.allocated.is_some() {
+                error!("MappedPages::merge(): some mapping were mapped to AllocatedPages, while others were not.");
+                err = Some("some mappings were mapped to AllocatedPages, while others were not");
+                break;
+            }
+            previous_end = mp.pages.end.clone();
+        }
+        if let Some(e) = err {
+            return Err((e, mappings));
+        }
+
+        // Here, all of our conditions were met, so we can create the merged MappedPages object
+        // that goes from the first start page to the last end page.
+        for mp in mappings.into_iter() {
+            // to ensure the existing mappings don't run their drop handler and unmap those pages
+            mem::forget(mp); 
+        }
+        let new_page_range = Page::range_inclusive(first_pages.start, previous_end);
+        let new_alloc_pages = if has_allocated {
+            Some(AllocatedPages{
+                pages: new_page_range.clone()
+            })
+        } else {
+            None
+        };
+        
+        Ok(MappedPages {
+            page_table_p4: p4,
+            pages: new_page_range,
+            allocated: new_alloc_pages,
+            flags: flags,
+        })
+    }
+
     
 
     /// Creates a deep copy of this `MappedPages` memory region,
