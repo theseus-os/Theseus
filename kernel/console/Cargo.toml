@@ -52,6 +52,9 @@ path = "../mod_mgmt"
 [dependencies.terminal]
 path = "../terminal"
 
+[dependencies.text_display]
+path = "../text_display"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

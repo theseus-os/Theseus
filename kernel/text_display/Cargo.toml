@@ -1,0 +1,9 @@
+[package]
+name = "text_display"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>"]
+
+
+
+[lib]
+crate-type = ["lib"] # "lib" does the same thing I think
