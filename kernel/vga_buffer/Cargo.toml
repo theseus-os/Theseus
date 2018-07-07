@@ -13,6 +13,9 @@ features = ["const_fn"]
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.text_display]
+path = "../text_display"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 
@@ -22,8 +25,6 @@ path = "../../libs/port_io"
 [dependencies.log]
 default-features = false
 version = "0.3.7"
-
-
 
 [lib]
 crate-type = ["lib"] # "lib" does the same thing I think
