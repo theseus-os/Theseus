@@ -28,7 +28,6 @@ use kernel_config::memory::KERNEL_OFFSET;
 pub mod text_buffer;
 pub mod font;
 
-
 //const VGA_BUFFER_ADDR: usize = 0xa0000;
 const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 

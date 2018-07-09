@@ -1,4 +1,3 @@
-
 ABSOLUTE 0x5000
 VBECardInfo:
 	.signature resb 4
@@ -57,7 +56,6 @@ current:
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
 
-
 global ap_start_realmode
 
 ap_start_realmode:
@@ -93,47 +91,12 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
-; set graphic mode
-; bx 4___ is linear frame buffer
-    ;mov ax, 0x4f02
-    ;mov bx, 0x4129
-    ;int 0x10;
-
-
-    ;push ds
-    ;push es
-    ;mov ax,0x1103
-    ;mov  bh,6
-    ;int 0x10
-    ;push es
-    ;pop ds
-    ;pop es
-    ;mov si,bp
-    ;mov cx,256*16/4
-    ;rep movsd
-    ;pop ds
-
-    ;test code to find lfb address
-    ;mov ax, 0xb
-    ;mov es, ax
-    ;mov ax, 0x8000
-    ;mov di, ax
-    ;mov ax, 0x4f01
-    ;mov cx, 0x4112    
-    ;int 0x10
-
-    ;mov ax, [es:di+0x2b]
-
-    ;mov ah, 0x00
-    ;cmp ax, 0x00fd
-    ;je next
-    ;mov ah, 0x13
-    ;next:
-
-    ;mov al, ah
-    ;mov ah, 0x00
-    ;int 0x10
-
+    mov ax, 0
+    mov es, ax
+    mov di, 0x900
+    mov ax, [es:di]
+    cmp ax, 5
+    je gdt
 
 getcardinfo:
     mov ax, 0x4F00
@@ -173,12 +136,11 @@ findmode:
 
 set_graphic_mode:
 ; bx 4___ is linear frame buffer
-
     cmp word [VBEModeInfo.yresolution], 480
     je gdt 
     mov ax, 0x4f02
-    ;mov bx, [current.mode] ; 0x4f41:640*400*32bit
-    mov bx, 0xf41
+    mov bx, [current.mode] ; 0x4f41:640*400*32bit
+    ;mov bx, 0xf41
     int 0x10;
 
 
@@ -194,28 +156,11 @@ set_graphic_mode:
     mov cx,256*16/4
     rep movsd
     pop ds
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    mov ax, 0
+    mov es, ax
+    mov di, 0x900
+    mov byte [es:di], 5
 
 gdt:
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
