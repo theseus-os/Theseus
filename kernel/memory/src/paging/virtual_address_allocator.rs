@@ -42,6 +42,10 @@ impl AllocatedPages {
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
+
+	pub fn size_in_pages(&self) -> usize {
+		self.pages.size_in_pages()
+	}
 }
 // use core::ops::Deref;
 // impl Deref for AllocatedPages {
@@ -123,7 +127,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 			}
 
 			// here: we have the chunk and we need to split it up into two chunks
-			assert!(c.allocated == false, "Logic error: an already-allocated chunk is going to be split!");
+			assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
 			
 			// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
 			c.size_in_pages = remaining_size;

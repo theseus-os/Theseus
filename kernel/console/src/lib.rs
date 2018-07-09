@@ -11,12 +11,14 @@ extern crate memory;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
 extern crate terminal;
+extern crate frame_buffer;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 
+use frame_buffer::text_buffer::FrameTextBuffer;
 use console_types::{ConsoleEvent};
-use keycodes_ascii::Keycode;
+use keycodes_ascii::{Keycode, KeyAction};
 use alloc::string::ToString;
 use alloc::arc::Arc;
 use alloc::btree_map::BTreeMap;
@@ -47,7 +49,7 @@ lazy_static! {
     /// More info about terminal queues located in the Temrinal crate
     static ref TERMINAL_INPUT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<ConsoleEvent>>>> = Arc::new(Mutex::new(BTreeMap::new()));
     // Tracks which terminal is currently being focused on
-    static ref CURRENT_TERMINAL_NUM: AtomicUsize  = AtomicUsize::new(1);
+    static ref CURRENT_TERMINAL_NUM: AtomicUsize  = AtomicUsize::new(0);
 }
 
 use core::fmt;
@@ -67,23 +69,24 @@ const MAX_TERMS: usize = 9;
 /// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
 /// This allows other modules to push console events onto the queue. 
 pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
-    let event_handling_queue: DFQueue<ConsoleEvent> = DFQueue::new();
-    let event_handling_consumer = event_handling_queue.into_consumer();
-    let returned_producer = event_handling_consumer.obtain_producer();
+    let keyboard_event_handling_queue: DFQueue<ConsoleEvent> = DFQueue::new();
+    let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
+    let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
+    let frame_buffer = FrameTextBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
     // Initializes the default kernel terminal
-    let kernel_producer = terminal::Terminal::init(1)?;
-    TERMINAL_INPUT_PRODUCERS.lock().insert(1, kernel_producer);
+    let kernel_producer = terminal::Terminal::init(frame_buffer, 0)?;
+    TERMINAL_INPUT_PRODUCERS.lock().insert(0, kernel_producer);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
-    spawn::spawn_kthread(input_event_loop, event_handling_consumer, "main input event handling loop".to_string(), None)?;
-    Ok(returned_producer)
+    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
+    Ok(returned_keyboard_producer)
 }
 
 /// Main infinite loop that handles DFQueue input and output events
 fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> {
     // variable to track which terminal the user is currently focused on
     // terminal objects have a field term_ref that can be used for this purpose
-    let mut num_running: usize = 1;
+    let mut terminal_id_counter: usize = 1;
     // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
     let mut meta_keypress = false;
     loop {
@@ -97,23 +100,25 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
         };
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
-                return Ok(());
+                return Ok(()); 
             }
 
             &ConsoleEvent::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
                 // Ctrl + T makes a new terminal tab
-                if key_input.modifiers.control && key_input.keycode == Keycode::T && num_running < MAX_TERMS {
-                    num_running += 1;
+                if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed 
+                && terminal_id_counter < MAX_TERMS {
                     // Switches focus to this terminal
-                    CURRENT_TERMINAL_NUM.store(num_running, Ordering::SeqCst);
-                    let terminal_producer = terminal::Terminal::init(num_running)?;
-                    TERMINAL_INPUT_PRODUCERS.lock().insert(num_running, terminal_producer);
+                    CURRENT_TERMINAL_NUM.store(terminal_id_counter , Ordering::SeqCst); // -1 for 0-indexing
+                    let frame_buffer = FrameTextBuffer::new();
+                    let terminal_producer = terminal::Terminal::init(frame_buffer, terminal_id_counter)?;
+                    TERMINAL_INPUT_PRODUCERS.lock().insert(terminal_id_counter , terminal_producer);
                     meta_keypress = true;
+                    terminal_id_counter += 1;
                     event.mark_completed();
                 }
                 // Ctrl + num switches between existing terminal tabs
-                if key_input.modifiers.control && (
+                if key_input.modifiers.control && key_input.action == KeyAction::Pressed &&(
                     key_input.keycode == Keycode::Num1 ||
                     key_input.keycode == Keycode::Num2 ||
                     key_input.keycode == Keycode::Num3 ||
@@ -122,7 +127,8 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     key_input.keycode == Keycode::Num6 ||
                     key_input.keycode == Keycode::Num7 ||
                     key_input.keycode == Keycode::Num8 ||
-                    key_input.keycode == Keycode::Num9 ) {
+                    key_input.keycode == Keycode::Num9 ) 
+                {
                     let selected_num;
                     match key_input.keycode.to_ascii(key_input.modifiers) {
                         Some(key) => {
@@ -140,13 +146,36 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                         },
                     }
                     // Prevents user from switching to terminal tab that doesn't yet exist
-                    if selected_num > num_running as u32 { // does nothing
-                    } else {
-                        CURRENT_TERMINAL_NUM.store(selected_num as usize, Ordering::SeqCst);
+                    if selected_num > terminal_id_counter as u32 { // does nothing
+                    } else { 
+                        CURRENT_TERMINAL_NUM.store((selected_num -1) as usize, Ordering::SeqCst); 
                     }
                     event.mark_completed();
                     meta_keypress = true;
                 }
+
+                // Cycles forward one terminal
+                if key_input.modifiers.control && key_input.keycode == Keycode::PageUp && key_input.action == KeyAction::Pressed {
+                    let mut current_num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
+                    if current_num  < terminal_id_counter {
+                        current_num += 1; 
+                        CURRENT_TERMINAL_NUM.store(current_num, Ordering::SeqCst);
+                    } else {
+                        CURRENT_TERMINAL_NUM.store(0, Ordering::SeqCst);
+                    }
+                }
+                // Cycles backwards one terminl
+                if key_input.modifiers.control && key_input.keycode == Keycode::PageDown && key_input.action == KeyAction::Pressed {
+                    let mut current_num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
+                    if current_num  > 0 {
+                        current_num -= 1; 
+                        CURRENT_TERMINAL_NUM.store(current_num, Ordering::SeqCst);
+                    } else {
+                        CURRENT_TERMINAL_NUM.store(terminal_id_counter, Ordering::SeqCst);
+                    }
+                }
+
+
 
             }
             _ => { }

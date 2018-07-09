@@ -290,39 +290,32 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 /// 
 /// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
 /// * `args`: the arguments that will be passed to the `main` function of the application. 
-/// * `task_name`: the String name of the new task. If None, the `module`'s name will be used. 
+/// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
 /// 
 pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
     -> Result<TaskRef, &'static str> 
 {
-    let app_crate = {
+    let app_crate_ref = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), false)?
     };
 
-    let task_name = task_name.unwrap_or(app_crate.read().crate_name.clone());
     // get the LoadedSection for the "main" function in the app_crate
-    let main_func_sec = {
-        app_crate.read()
-            .get_function_section("main")
-            .ok_or("spawn_application(): couldn't find \"main\" function!")?
-    };
+    let main_func_sec_ref = app_crate_ref.lock().get_function_section("main")
+        .ok_or("spawn_application(): couldn't find \"main\" function!")?;
 
     let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
     let main_func = {
-        let offset = main_func_sec.lock().mapped_pages_offset;
-        let parent_crate_ref = main_func_sec.lock().parent_crate.upgrade().ok_or("couldn't get main function section's parent_crate")?;
-        let parent_crate = parent_crate_ref.read();
-        let mapped_pages = main_func_sec.lock().mapped_pages(&*parent_crate)
-            .ok_or("logic error: module's main_func text section was found but didn't have any mapped pages")?;
-        debug!("spawn_application(): func mapped_pages: {:?}", mapped_pages);
-        mapped_pages.as_func::<MainFuncSignature>(offset, &mut space)?
+        let main_func_sec = main_func_sec_ref.lock();
+        let mapped_pages = main_func_sec.mapped_pages.lock();
+        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
     };
 
+    let task_name = task_name.unwrap_or_else(|| app_crate_ref.lock().crate_name.clone());
     let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
-    app_task.write().app_crate = Some(app_crate);
+    app_task.write().app_crate = Some(app_crate_ref);
 
     Ok(app_task)
 }
@@ -534,11 +527,11 @@ pub fn remove_task(_id: usize) -> Option<TaskRef> {
 pub fn join(task: &TaskRef) -> Result<(), &'static str> {
     let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
     if Arc::ptr_eq(task, curr_task) {
-        return Err("logic error: cannot call join() on yourself (the current task).");
+        return Err("BUG: cannot call join() on yourself (the current task).");
     }
 
     if !interrupts_enabled() {
-        return Err("logic error: cannot call join() with interrupts disabled; it will cause deadlock.")
+        return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
     }
 
     

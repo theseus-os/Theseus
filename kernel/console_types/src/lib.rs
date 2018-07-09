@@ -45,7 +45,7 @@ impl ConsoleInputEvent {
 #[derive(Debug, Clone)]
 pub struct ConsoleOutputEvent {
     pub text: String,
-    // indicates whether or not the terminal/application should refresh its DisplayProvider when it handles this output event
+    // indicates whether or not the terminal/application should refresh its TextDisplay when it handles this output event
     pub display: bool,
 }
 

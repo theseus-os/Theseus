@@ -40,6 +40,7 @@
 
 use xmas_elf;
 use metadata::{StrongSectionRef, WeakSectionRef};
+use goblin::elf::reloc::*;
 
 /// A representation that the owner `A` of (a `LoadedSection` object containing) this struct
 /// depends on the given `section` `B` in this struct.
@@ -50,7 +51,7 @@ use metadata::{StrongSectionRef, WeakSectionRef};
 /// because that other section `B` shouldn't be removed as long as there are still sections (`A`) that depend on it.
 /// 
 /// This is the inverse of the [`WeakDependency`](#struct.WeakDependency) type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StrongDependency {
     /// A strong reference to the `LoadedSection` `B` that the owner of this struct (`A`) depends on.
     pub section: StrongSectionRef,
@@ -70,7 +71,7 @@ pub struct StrongDependency {
 /// This design allows for `A` to be dropped before `B`, because there is no dependency ordering violation there.
 /// 
 /// This is the inverse of the [`StrongDependency`](#struct.StrongDependency) type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WeakDependent {
     /// A weak reference to the `LoadedSection` `A` that depends on the owner `B` of this struct.
     pub section: WeakSectionRef,
@@ -100,6 +101,35 @@ impl RelocationEntry {
             typ: rela_entry.get_type(),
             addend: rela_entry.get_addend() as usize,
             offset: rela_entry.get_offset() as usize,
+        }
+    }
+
+    /// Returns true if the relocation type results in a relocation calculation
+    /// in which the source value written into the target section 
+    /// does NOT depend on the target section's address itself in any way 
+    /// (i.e., it only depends on the source section)
+    pub fn is_absolute(&self) -> bool {
+        match self.typ {
+            R_X86_64_32 | 
+            R_X86_64_64 => true,
+            _ => false,
+        }
+    }
+}
+
+
+/// A representation that the section that owns this struct 
+/// has a dependency on the given `source_sec`, *in the same crate*.
+/// The dependency itself is specified via the other section's shndx.
+#[derive(Debug, Clone)]
+pub struct InternalDependency {
+    pub relocation: RelocationEntry,
+    pub source_sec_shndx: usize,
+}
+impl InternalDependency {
+    pub fn new(relocation: RelocationEntry, source_sec_shndx: usize) -> InternalDependency {
+        InternalDependency {
+            relocation, source_sec_shndx
         }
     }
 }

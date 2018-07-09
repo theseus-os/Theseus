@@ -37,6 +37,9 @@ path = "../acpi"
 [dependencies.tsc]
 path = "../tsc"
 
+[dependencies.text_display]
+path = "../text_display"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

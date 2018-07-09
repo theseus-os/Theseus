@@ -20,9 +20,6 @@ version = "1.0"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
-
 [dependencies.window_manager]
 path = "../window_manager"
 
@@ -47,6 +44,12 @@ path  = "../memory"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.text_display]
+path = "../text_display"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
