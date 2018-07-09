@@ -75,8 +75,6 @@ endif ## BYPASS_XARGO_CHECK
 ###################################################################################################
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
-## the most recent CPU model supported by QEMU 2.5.0
-QEMU_FLAGS += -cpu Broadwell
 ## multicore 
 QEMU_FLAGS += -smp 4
 
@@ -86,14 +84,18 @@ QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vl
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
 
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396 
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
+ifeq ($(host),yes)
+	QEMU_FLAGS += -cpu host -enable-kvm
+else
+	QEMU_FLAGS += -cpu Broadwell
+endif
 ifeq ($(kvm),yes)
-#### We're disabling KVM for the time being because it breaks some features, like RDMSR used for TSC
-	#QEMU_FLAGS += -enable-kvm
+	QEMU_FLAGS += -enable-kvm
 endif
 
 
@@ -173,6 +175,21 @@ boot: check_usb $(iso)
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
 	@sync
 	
+
+### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
+pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_serial"
+pxe: $(iso)
+ifdef $(netdev)
+ifdef $(ip)
+	@sudo ifconfig $(netdev) $(ip)
+endif
+	@sudo sudo ifconfig $(netdev) 192.168.1.105
+endif
+	
+	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+	@sudo systemctl restart isc-dhcp-server 
+	@sudo systemctl restart tftpd-hpa
+
 
 ###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
@@ -286,6 +303,10 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "  pxe:"
+	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
+	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
+	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
 	@echo -e "  doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "  view-doc:"

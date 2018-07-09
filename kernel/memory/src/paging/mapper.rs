@@ -17,6 +17,7 @@ use paging::{PageIter, get_current_p4, ActivePageTable};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use alloc::Vec;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -260,6 +261,9 @@ impl Mapper {
 }
 
 
+// optional performance optimization: temporary pages are not shared across cores, so skip those
+const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
+
 
 /// Represents a contiguous range of virtual memory pages that are currently mapped. 
 /// A `MappedPages` object can only have a single range of contiguous pages, not multiple disjoint ranges.
@@ -361,17 +365,17 @@ impl MappedPages {
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     pub fn remap(&mut self, active_table: &mut ActivePageTable, new_flags: EntryFlags) -> Result<(), &'static str> {
-        use x86_64::instructions::tlb;
-
         if new_flags == self.flags {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
         }
 
-        let broadcast_tlb_shootdown = try!(
-            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
-            .ok_or("remap(): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
-        );
+        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
+        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
+            Vec::with_capacity(self.size_in_pages())
+        } else {
+            Vec::new() // avoids allocation if we're not going to use it
+        };
 
         for page in self.pages.clone() {
             let p1 = try!(active_table.p4_mut()
@@ -384,8 +388,15 @@ impl MappedPages {
             let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-            tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            broadcast_tlb_shootdown(page.start_address());
+            let vaddr = page.start_address();
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+                vaddrs.push(vaddr);
+            }
+        }
+        
+        if let Some(func) = broadcast_tlb_shootdown {
+            func(vaddrs);
         }
 
         self.flags = new_flags;
@@ -398,10 +409,12 @@ impl MappedPages {
     fn unmap<A>(&mut self, active_table: &mut ActivePageTable, _allocator: &mut A) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
-        let broadcast_tlb_shootdown = try!(
-            BROADCAST_TLB_SHOOTDOWN_FUNC.try()
-            .ok_or("unmap): TLB shootdown function callback wasn't set yet! Call memory::init() first!")
-        );
+        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
+        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
+            Vec::with_capacity(self.size_in_pages())
+        } else {
+            Vec::new() // avoids allocation if we're not going to use it
+        };
 
         for page in self.pages.clone() {
             if active_table.translate_page(page).is_none() {
@@ -419,11 +432,18 @@ impl MappedPages {
             let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
             p1[page.p1_index()].set_unused();
 
+            let vaddr = page.start_address();
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            broadcast_tlb_shootdown(page.start_address());
+            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+                vaddrs.push(vaddr);
+            }
             
             // TODO free p(1,2,3) table if empty
             // allocator.deallocate_frame(frame);
+        }
+
+        if let Some(func) = broadcast_tlb_shootdown {
+            func(vaddrs);
         }
 
         Ok(())

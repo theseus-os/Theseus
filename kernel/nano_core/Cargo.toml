@@ -24,12 +24,6 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-# [dependencies.frame_buffer]
-# path = "../frame_buffer"
-
-# [dependencies.frame_buffer_3d]
-# path = "../frame_buffer_3d"
-
 [dependencies.logger]
 path = "../logger"
 
@@ -42,17 +36,11 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.exceptions_early]
 path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
-
-[dependencies.task]
-path = "../task"
 
 [dependencies.panic_handling]
 path = "../panic_handling"
