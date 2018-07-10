@@ -48,6 +48,7 @@ path = "../../kernel/mod_mgmt"
 [dependencies.text_display]
 path = "../../kernel/text_display"
 
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

@@ -137,6 +137,7 @@ pub struct PageIter {
 }
 
 impl PageIter {
+    /// Same as `Page::range_inclusive(start, end)`.
     pub fn new(start: Page, end: Page) -> PageIter {
         PageIter {
             start: start,
@@ -145,6 +146,7 @@ impl PageIter {
         }
     }
 
+    /// Returns a PageIter that will always yield `None`.
     pub fn empty() -> PageIter {
         PageIter::new(Page { number: 1 }, Page { number: 0 })
     }
@@ -162,6 +164,13 @@ impl PageIter {
 
     pub fn start_address(&self) -> VirtualAddress {
         self.start.start_address()
+    }
+
+    /// Returns the number of pages covered by this iterator. 
+    /// This is instantly fast, because it doesn't need to iterate over each entry, unlike normal iterators.
+    pub fn size_in_pages(&self) -> usize {
+        // add 1 because it's an inclusive range
+        self.end.number - self.start.number + 1 
     }
 }
 

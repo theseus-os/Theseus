@@ -1,0 +1,40 @@
+[package]
+authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
+name = "pmu_x86"
+description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86 Nehalem and above."
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.5"
+x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+#x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.0"
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.raw-cpuid]
+version = "4.0.0"
+features = [ "use_arch" ]
+
+[lib]
+crate-type = ["rlib"]

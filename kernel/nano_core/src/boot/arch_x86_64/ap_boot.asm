@@ -113,8 +113,7 @@ long_mode_start_ap:
 
 
 	; Load the new GDT
-	; lgdt [rel GDT_AP.ptr]
-	lgdt [GDT_AP.ptr]
+	lgdt [rel GDT_AP.ptr]
 
 
 	; mov rsp, 0xFC00
@@ -177,38 +176,12 @@ start_high_ap:
 	jmp rax
 
 
-
-; 	; Save the multiboot address
-; 	push rdi
-; 	; Load puts arguments
-; 	mov rdi, strings.long_start
-; 	mov si, 0x0f
-; 	call puts
-; 	pop rdi
-
-; 	; Give rust the higher half address to the multiboot2 information structure
-; 	add rdi, KERNEL_OFFSET
-	
-; 	call nano_core_start
-
-; 	; rust main returned, print `OS returned!`
-
-; 	; If the system has nothing more to do, put the core into an
-; 	; infinite loop. To do that:
-; 	; 1) Disable interrupts with cli (clear interrupt enable in eflags).
-; 	;    They are already disabled by the bootloader, so this is not needed.
-; 	;    Mind that you might later enable interrupts and return from
-; 	;    kernel_main (which is sort of nonsensical to do).
-; 	; 2) Wait for the next interrupt to arrive with hlt (halt instruction).
-; 	;    Since they are disabled, this will lock up the computer.
-; 	; 3) Jump to the hlt instruction if it ever wakes up due to a
-; 	;    non-maskable interrupt occurring or due to system management mode.
-; global KEXIT
-; KEXIT:
-; 	cli
-; .loop:
-; 	hlt
-; 	jmp .loop
+	; If the Rust code returned, which is an error, 
+	; then put the core into an infinite loop.
+	cli
+.loop:
+	hlt
+	jmp .loop
 
 
 ; One would expect the GDT to be in rodata, since you shouldn't need to write to it.

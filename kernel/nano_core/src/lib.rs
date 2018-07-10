@@ -26,7 +26,6 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
-extern crate apic;
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_handling;
@@ -44,10 +43,7 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
-use alloc::arc::Arc;
-use spin::Once;
 use x86_64::structures::idt::LockedIdt;
-use memory::MappedPages;
 
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
@@ -124,9 +120,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     // this consumes boot_info
-    // TODO FIXME:  remove apic as a hard static dependency here. Register the tlb shootdown func elsewhere?
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = 
-        try_exit!(memory::init(boot_info, apic::broadcast_tlb_shootdown));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
     // now that we have virtual memory, including a heap, we can create basic things like state_store
@@ -170,20 +164,20 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use irq_safety::MutexIrqSafe;
         use memory::{MappedPages, MemoryManagementInfo};
 
-        let section = try_exit!(
+        let section_ref = try_exit!(
             mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", None, kernel_mmi_ref.lock().deref_mut(), false)
             .upgrade()
             .ok_or("no symbol: captain::init")
         );
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
         let mut space = 0;
-        let offset = section.lock().mapped_pages_offset;
-        let parent_crate_ref = try_exit!(section.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate"));
-        let parent_crate = parent_crate_ref.read();
-        let func: &CaptainInitFunc = try_exit!( 
-            try_exit!(section.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get section's mapped_pages for \"captain::init\""))
-                .as_func(offset, &mut space)
-        );
+        let (mapped_pages, mapped_pages_offset) = { 
+            let section = section_ref.lock();
+            (section.mapped_pages.clone(), section.mapped_pages_offset)
+        };
+        let func: &CaptainInitFunc = {
+            try_exit!(mapped_pages.lock().as_func(mapped_pages_offset, &mut space))
+        };
 
         try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, 
@@ -233,23 +227,20 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
         #[cfg(feature = "loadable")]
         {
             type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
-            let section = kernel_mmi_ref.and_then(|kernel_mmi| {
+            let section_ref = kernel_mmi_ref.and_then(|kernel_mmi| {
                 mod_mgmt::get_default_namespace().get_symbol_or_load("panic_handling::panic_wrapper", None, kernel_mmi.lock().deref_mut(), false).upgrade()
             }).ok_or("Couldn't get symbol: \"panic_handling::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
-            section.and_then(|sec| {
-                let offset = sec.lock().mapped_pages_offset;
-                let parent_crate_ref = sec.lock().parent_crate.upgrade().ok_or("couldn't get \"captain::init\" section's parent_crate");
-                parent_crate_ref.and_then(|parent_crate_ref| {
-                    let parent_crate = parent_crate_ref.read();
-                    let mapped_pages = sec.lock().mapped_pages(&*parent_crate).ok_or("Couldn't get mapped_pages for panic_wrapper");
-                    mapped_pages.and_then(|mp| {
-                        mp.as_func::<PanicWrapperFunc>(offset, &mut space)
-                            .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
-                    })
-                })
+            section_ref.and_then(|section_ref| {
+                let (mapped_pages, mapped_pages_offset) = { 
+                    let section = section_ref.lock();
+                    (section.mapped_pages.clone(), section.mapped_pages_offset)
+                };
+                let mapped_pages_locked = mapped_pages.lock();
+                mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
+                    .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
             })
         }
         #[cfg(not(feature = "loadable"))]
