@@ -30,6 +30,9 @@ git = "https://github.com/kevinaboos/owning-ref-rs.git"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
+[dependencies.debugit]
+path = "../../libs/debugit"
+
 [dependencies.memory]
 path = "../memory"
 

@@ -12,7 +12,6 @@ use alloc::string::String;
 pub enum ConsoleEvent {
     InputEvent(ConsoleInputEvent),
     OutputEvent(ConsoleOutputEvent),
-    DisplayEvent,
     ExitEvent,
 }
 
@@ -21,10 +20,8 @@ impl ConsoleEvent {
         ConsoleEvent::InputEvent(ConsoleInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S) -> ConsoleEvent where S: Into<String> {
-        // x: Option<usize> is the terminal reference number. Used so that this output event is outputted to the correct Terminal's VGA buffer
-        // Matches with Terminal.term_ref
-        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into()))
+    pub fn new_output_event<S>(s: S, display: bool) -> ConsoleEvent where S: Into<String> {
+        ConsoleEvent::OutputEvent(ConsoleOutputEvent::new(s.into(), display))
     }
 }
 
@@ -48,12 +45,15 @@ impl ConsoleInputEvent {
 #[derive(Debug, Clone)]
 pub struct ConsoleOutputEvent {
     pub text: String,
+    // indicates whether or not the terminal/application should refresh its TextDisplay when it handles this output event
+    pub display: bool,
 }
 
 impl ConsoleOutputEvent {
-    pub fn new(s: String) -> ConsoleOutputEvent {
+    pub fn new(s: String, display: bool) -> ConsoleOutputEvent {
         ConsoleOutputEvent {
             text: s,
+            display: display
         }
     }
 }

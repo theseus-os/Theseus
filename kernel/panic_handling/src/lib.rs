@@ -52,9 +52,11 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
         memory::stack_trace();
     }
 
-    // kill the offending task (the current task)
-    error!("Killing panicked task \"{}\"", curr_task_name);
-    curr_task.write().kill(KillReason::Panic(panic_info));
+    if !curr_task.read().is_an_idle_task() {
+        // kill the offending task (the current task)
+        error!("Killing panicked task \"{}\"", curr_task_name);
+        curr_task.write().kill(KillReason::Panic(panic_info));
+    }
     
     // scheduler::schedule(); // yield the current task after it's done
 
