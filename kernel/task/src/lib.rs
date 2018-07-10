@@ -49,7 +49,6 @@ use core::any::Any;
 use alloc::String;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
-use spin::RwLock;
 
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
