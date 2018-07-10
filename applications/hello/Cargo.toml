@@ -11,8 +11,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.input_event_manager]
+path = "../../kernel/input_event_manager"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

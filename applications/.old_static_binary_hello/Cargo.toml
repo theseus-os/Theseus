@@ -12,8 +12,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.input_event_manager]
+path = "../../kernel/input_event_manager"
 
 # [lib]
 # crate-type = ["rlib"] # "lib" does the same thing I think

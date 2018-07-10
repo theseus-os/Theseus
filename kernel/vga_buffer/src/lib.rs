@@ -20,7 +20,6 @@ extern crate text_display;
 use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
-use alloc::Vec;
 use core::mem;
 use kernel_config::memory::KERNEL_OFFSET;
 use port_io::Port;
@@ -107,12 +106,11 @@ impl TextDisplay for VgaBuffer {
     }
 
     /// Requires that a str slice that will exactly fit the vga buffer
-    /// The calculation is done inside the console crate by the print_to_vga function and associated methods
+    /// The calculation is done inside the input_event_manager crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
-        let mut cursor_pos = 0;
         let mut i = 0;
         use core::ptr::write_volatile;
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
@@ -121,7 +119,6 @@ impl TextDisplay for VgaBuffer {
                 let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
                 unsafe { write_volatile(addr, new_line); }
                 new_line = BLANK_LINE;
-                cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
                 i += 1;
             } else { // if we reach the end of the line with no line break
@@ -134,7 +131,6 @@ impl TextDisplay for VgaBuffer {
                 }
                 new_line[curr_column] = ScreenChar::new(byte, ColorCode::default());
                 curr_column += 1;
-                cursor_pos += 1;
             }
         }
 

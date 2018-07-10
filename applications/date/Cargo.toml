@@ -6,8 +6,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 [dependencies]
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.input_event_manager]
+path = "../../kernel/input_event_manager"
 
 [dependencies.rtc]
 path = "../../kernel/rtc"

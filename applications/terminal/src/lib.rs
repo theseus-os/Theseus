@@ -12,7 +12,7 @@ extern crate task;
 extern crate memory;
 extern crate text_display;
 // temporary, should remove this once we fix crate system
-extern crate console_types; 
+extern crate input_event_types; 
 
 
 #[macro_use] extern crate lazy_static;
@@ -21,7 +21,7 @@ extern crate console_types;
 
 
 use text_display::TextDisplay;
-use console_types::{ConsoleEvent};
+use input_event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
 use alloc::string::ToString;
@@ -36,13 +36,13 @@ lazy_static! {
     // maps the terminal reference number to the current task id
     static ref TERMINAL_TASK_IDS: Arc<Mutex<BTreeMap<usize, usize>>> = Arc::new(Mutex::new(BTreeMap::new()));
     // maps the terminal's reference number to its print producer
-    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<ConsoleEvent>>>> = Arc::new(Mutex::new(BTreeMap::new()));
+    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }
-/// Currently, println! and print! macros will call this function to print to the text display from the console crate. 
+/// Currently, println! and print! macros will call this function to print to the display provider from the input_event_manager crate. 
 /// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
 /// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
 /// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
-pub fn print_to_console<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &'static str> {
+pub fn print_to_stdout<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &'static str> {
     // Gets the task id of the task that called this print function
     let result = task::get_my_current_task_id();
     let mut selected_term = 0; // default to kernel terminal
@@ -61,11 +61,11 @@ pub fn print_to_console<S: Into<String>>(s: S, focus_term: usize) -> Result<(), 
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
     let result = print_map.get(&selected_term);
     if let Some(selected_term_producer) = result {
-        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the text display
-        if selected_term == focus_term{
-            selected_term_producer.enqueue(ConsoleEvent::new_output_event(s, true));
+        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the display provider
+        if selected_term == focus_term {
+            selected_term_producer.enqueue(Event::new_output_event(s, true));
         } else {
-            selected_term_producer.enqueue(ConsoleEvent::new_output_event(s, false));
+            selected_term_producer.enqueue(Event::new_output_event(s, false));
         }
     }
     Ok(())
@@ -88,7 +88,7 @@ pub struct Terminal<D: TextDisplay> {
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
-    console_input_string: String,
+    input_string: String,
     /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
     /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
     correct_prompt_position: bool,
@@ -98,16 +98,16 @@ pub struct Terminal<D: TextDisplay> {
     /// ex. if the user has pressed up twice and down once, then command shift = # ups - # downs = 1 (cannot be negative)
     history_index: usize,
     /// The string that stores the user's keypresses if a command is currently running
-    console_buffer_string: String,
+    buffer_string: String,
     /// Variable that stores the task id of any application manually spawned from the terminal
     current_task_id: usize,
     /// The string that is prompted to the user (ex. kernel_term~$)
     prompt_string: String,
-    /// The console's standard output buffer to store what the terminal instance and its child processes output
+    /// The input_event_manager's standard output buffer to store what the terminal instance and its child processes output
     stdout_buffer: String,
-    /// The console's standard input buffer to store what the user inputs into the terminal application
+    /// The input_event_manager's standard input buffer to store what the user inputs into the terminal application
     stdin_buffer: String,
-    /// The console's standard error buffer to store any errors logged by the program
+    /// The input_event_manager's standard error buffer to store any errors logged by the program
     stderr_buffer: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
@@ -122,10 +122,10 @@ pub struct Terminal<D: TextDisplay> {
     /// absolute_cursor_pos - left shift will be the position on the text display where the cursor will be displayed
     left_shift: usize,
     /// The consumer to the terminal's print dfqueue
-    print_consumer: DFQueueConsumer<ConsoleEvent>,
+    print_consumer: DFQueueConsumer<Event>,
     /// The consumer for the Terminal's input dfqueue. It will dequeue input events from the terminal's dfqueue and handle them using
     /// the handle keypress function. 
-    input_consumer: DFQueueConsumer<ConsoleEvent>,
+    input_consumer: DFQueueConsumer<Event>,
 
 
 
@@ -153,14 +153,14 @@ impl<D> Terminal<D> where D: TextDisplay {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(text_display: D, ref_num: usize) -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
-        // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
-        let terminal_input_queue: DFQueue<ConsoleEvent>  = DFQueue::new();
+    pub fn init(text_display: D, ref_num: usize) -> Result<DFQueueProducer<Event>, &'static str> {
+        // initialize a dfqueue for the terminal object for input events to be fed into from the input event handling crate loop
+        let terminal_input_queue: DFQueue<Event>  = DFQueue::new();
         let terminal_input_consumer = terminal_input_queue.into_consumer();
         let returned_input_producer = terminal_input_consumer.obtain_producer();
 
         // initialize another dfqueue for the terminal object to handle printing from applications
-        let terminal_print_dfq: DFQueue<ConsoleEvent>  = DFQueue::new();
+        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
 
@@ -175,11 +175,11 @@ impl<D> Terminal<D> where D: TextDisplay {
             // internal number used to track the terminal object 
             term_ref: ref_num,
             text_display: text_display,
-            console_input_string: String::new(),
+            input_string: String::new(),
             correct_prompt_position: true,
             command_history: Vec::new(),
             history_index: 0,
-            console_buffer_string: String::new(),
+            buffer_string: String::new(),
             current_task_id: 0,              
             prompt_string: prompt_string,
             stdout_buffer: String::new(),
@@ -191,7 +191,6 @@ impl<D> Terminal<D> where D: TextDisplay {
             absolute_cursor_pos: 0, 
             left_shift: 0,
             print_consumer: terminal_print_consumer,
-            // print_producer: terminal_input_producer,
             input_consumer: terminal_input_consumer,
         };
         
@@ -200,11 +199,11 @@ impl<D> Terminal<D> where D: TextDisplay {
         terminal.print_to_terminal(WELCOME_STRING.to_string())?; 
         let prompt_string = terminal.prompt_string.clone();
         if ref_num == 0 {
-            terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
+            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
         } else {
-            terminal.print_to_terminal(format!("Console says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num + 1, prompt_string))?;
+            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num + 1, prompt_string))?;
         }
-        // Spawns a terminal instance on a new thread
+        terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
         Ok(returned_input_producer)
     }
@@ -264,7 +263,6 @@ impl<D> Terminal<D> where D: TextDisplay {
             let new_line_indices: Vec<(usize, &str)> = slice.rmatch_indices('\n').collect();
             let mut counter = 0;
             let mut last_line_chars = 0;
-            // let mut num_chars = 0;
             // Case where the last newline does not occur at the end of the slice
             if new_line_indices[0].0 != slice.len() - 1 {
                 start_idx -= slice.len() -1 - new_line_indices[0].0;
@@ -288,7 +286,7 @@ impl<D> Terminal<D> where D: TextDisplay {
                 total_lines += num_lines;
                 counter += 1;
             }
-            
+
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
             if total_lines > buffer_height {
                 start_idx += (total_lines - buffer_height) * buffer_width;
@@ -298,62 +296,59 @@ impl<D> Terminal<D> where D: TextDisplay {
 
         } else {
             return (0,0);
-        }
-             
+        }         
     }
 
    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize) -> (usize, usize) {
+    fn calc_end_idx(&mut self, start_idx: usize) -> usize {
         let (buffer_width,buffer_height) = self.text_display.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
-        let mut num_chars = 0;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
         if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
             result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
         } else {
             result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
         }
-            // calculate the starting index for the slice
-            if let Some(slice) = result {
-                let mut total_lines = 0;
-                // Obtains a vector of the indices of the slice where newlines occur in ascending order
-                let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
-                let mut counter = 0;
-                // Covers the case where the start idx argument corresponds to a string that does not start on a newline 
-                if new_line_indices[0].0 != 0 {
-                    end_idx += new_line_indices[0].0;
-                    total_lines += new_line_indices[0].0/buffer_width + 1;
-                }
-
-                // Calculates the end index so that the string slice between the start and end index will fit into the text display within at most 
-                // one newline
-                while total_lines < buffer_height {
-                    if counter+1 == new_line_indices.len() {
-                        return (self.scrollback_buffer.len()-1, total_lines * buffer_width + num_chars);
-                    }
-                    num_chars = new_line_indices[counter+1].0 - new_line_indices[counter].0;
-                    let num_lines = num_chars/buffer_width + 1;
-                    end_idx += num_chars;
-                    total_lines += num_lines;
-                    counter += 1;
-                }
-
-                // If the last line is longer than the buffer width,
-                // we simply subtract off the line from the end_idx and add the buffer width to the end idx
-                if total_lines > buffer_height {
-                    let num_chars = new_line_indices[counter].0 - new_line_indices[counter -1].0;
-                    end_idx -= num_chars;
-                    end_idx += buffer_width;
-
-                }
-                    return (end_idx, total_lines * buffer_width + num_chars);
-            } else {
-                return (self.scrollback_buffer.len()-1, buffer_height * buffer_width + num_chars); 
+        // calculate the starting index for the slice
+        if let Some(slice) = result {
+            let mut total_lines = 0;
+            // Obtains a vector of the indices of the slice where newlines occur in ascending order
+            let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
+            let mut counter = 0;
+            // Covers the case where the start idx argument corresponds to a string that does not start on a newline 
+            if new_line_indices[0].0 != 0 {
+                end_idx += new_line_indices[0].0;
+                total_lines += new_line_indices[0].0/buffer_width + 1;
             }
+
+            // Calculates the end index so that the string slice between the start and end index will fit into the text display within at most 
+            // one newline
+            while total_lines < buffer_height {
+                if counter+1 == new_line_indices.len() {
+                    return self.scrollback_buffer.len()-1;
+                }
+                let num_chars = new_line_indices[counter+1].0 - new_line_indices[counter].0;
+                let num_lines = num_chars/buffer_width + 1;
+                end_idx += num_chars;
+                total_lines += num_lines;
+                counter += 1;
+            }
+
+            // If the last line is longer than the buffer width,
+            // we simply subtract off the line from the end_idx and add the buffer width to the end idx
+            if total_lines > buffer_height {
+                let num_chars = new_line_indices[counter].0 - new_line_indices[counter -1].0;
+                end_idx -= num_chars;
+                end_idx += buffer_width;
+            }
+                return end_idx;
+        } else {
+            return self.scrollback_buffer.len()-1; 
+        }
     }
 
     /// Scrolls up by the text display equivalent of one line
@@ -366,30 +361,26 @@ impl<D> Terminal<D> where D: TextDisplay {
         } else {
             start_idx -= 1;
         }
-
         let new_start_idx;
-        {
-            let result;
-            let slice_len;
-            if buffer_width < start_idx {
-                result = self.scrollback_buffer.as_str().get(start_idx - buffer_width .. start_idx);
-                slice_len = buffer_width;
-            } else {
-                result = self.scrollback_buffer.as_str().get(0 .. start_idx);
-                slice_len = start_idx;
-            }
-            // Searches this slice for a newline
-            if let Some(slice) = result {
-                let index = slice.rfind('\n');   
-                new_start_idx = match index {
-                    Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
-                    None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
-                }; 
-            } else {
-                return
-            }
+        let result;
+        let slice_len;
+        if buffer_width < start_idx {
+            result = self.scrollback_buffer.as_str().get(start_idx - buffer_width .. start_idx);
+            slice_len = buffer_width;
+        } else {
+            result = self.scrollback_buffer.as_str().get(0 .. start_idx);
+            slice_len = start_idx;
         }
-
+        // Searches this slice for a newline
+        if let Some(slice) = result {
+            let index = slice.rfind('\n');   
+            new_start_idx = match index {
+                Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
+                None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
+            }; 
+        } else {
+            return
+        }   
         self.scroll_start_idx = new_start_idx;
         // Recalculates the end index after the new starting index is found
         self.is_scroll_end = false;
@@ -405,7 +396,7 @@ impl<D> Terminal<D> where D: TextDisplay {
         } else {
             prev_start_idx = self.scroll_start_idx;
         }
-        let mut end_idx = self.calc_end_idx(prev_start_idx).0;
+        let mut end_idx = self.calc_end_idx(prev_start_idx);
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
@@ -452,8 +443,8 @@ impl<D> Terminal<D> where D: TextDisplay {
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
     fn page_down(&mut self) {
         let start_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_end_idx(start_idx).0;
-        let new_end_idx = self.calc_end_idx(new_start_idx).0;
+        let new_start_idx = self.calc_end_idx(start_idx);
+        let new_end_idx = self.calc_end_idx(new_start_idx);
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
@@ -464,13 +455,11 @@ impl<D> Terminal<D> where D: TextDisplay {
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
-        let (end_idx, cursor_pos) = self.calc_end_idx(start_idx); 
+        let end_idx = self.calc_end_idx(start_idx); 
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
             self.text_display.display_string(slice)?;
-            // let cursor_pos = self.calc_cursor_pos(slice);
-            self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -485,35 +474,12 @@ impl<D> Terminal<D> where D: TextDisplay {
     let result = self.scrollback_buffer.get(start_idx..end_idx);
     if let Some(slice) = result {
         self.text_display.display_string(slice)?;
-        // let cursor_pos = self.calc_cursor_pos(slice);
         self.absolute_cursor_pos = cursor_pos;
     } else {
         return Err("could not get slice of scrollback buffer string");
     }
     Ok(())
     }
-
-
-    fn calc_cursor_pos(&self, slice: &str) -> usize  {
-        let buffer_width = self.text_display.get_dimensions().0;
-        let mut total_lines = 0;
-        let mut num_chars = 0;
-        let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
-        // before first new_line
-        total_lines =  (new_line_indices[0].0 - 0) / buffer_width + 1;
-        for i in 0..new_line_indices.len() - 2 {
-            total_lines += (new_line_indices[i+1].0 - new_line_indices[i].0 -1) / buffer_width + 1;
-        }
-        // last line
-        if new_line_indices[new_line_indices.len() -1].0 != slice.len() -1 {
-            total_lines += (slice.len() - 1 - new_line_indices[new_line_indices.len() -1].0) / buffer_width + 1;
-            num_chars = (slice.len() - 1 - new_line_indices[new_line_indices.len() -1].0) % buffer_width;
-        } else {
-            num_chars = buffer_width;
-        }  
-        return total_lines * buffer_width + num_chars;
-    } 
-    
 
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
@@ -559,13 +525,13 @@ impl<D> Terminal<D> where D: TextDisplay {
                             let prompt_string = self.prompt_string.clone();
                             self.print_to_terminal(prompt_string)?;
 
-                            // Pushes the keypresses onto the console that were tracked whenever another command was running
-                            if self.console_buffer_string.len() > 0 {
-                                let temp = self.console_buffer_string.clone();
+                            // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
+                            if self.buffer_string.len() > 0 {
+                                let temp = self.buffer_string.clone();
                                 self.print_to_terminal(temp.clone())?;
                                 
-                                self.console_input_string = temp;
-                                self.console_buffer_string.clear();
+                                self.input_string = temp;
+                                self.buffer_string.clear();
                             }
                             // Resets the bool to true once the print prompt has been redisplayed
                             self.correct_prompt_position = true;
@@ -619,8 +585,8 @@ impl<D> Terminal<D> where D: TextDisplay {
                     let _result = curr_task.write().kill(task::KillReason::Requested);
                 }
             } else {
-                self.console_input_string.clear();
-                self.console_buffer_string.clear();
+                self.input_string.clear();
+                self.buffer_string.clear();
                 self.print_to_terminal("^C\n".to_string())?;
                 let prompt_string = self.prompt_string.clone();
                 self.print_to_terminal(prompt_string)?;
@@ -633,29 +599,29 @@ impl<D> Terminal<D> where D: TextDisplay {
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
             // Prevents user from moving cursor to the left of the typing bounds
-            if self.console_input_string.len() == 0 || self.console_input_string.len() - self.left_shift == 0 { 
+            if self.input_string.len() == 0 || self.input_string.len() - self.left_shift == 0 { 
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                let remove_idx: usize =  self.console_input_string.len() - self.left_shift -1;
-                self.console_input_string.remove(remove_idx);
+                let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
+                self.input_string.remove(remove_idx);
             }
         }
 
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             // Does nothing if the user presses enter without any command
-            if self.console_input_string.len() == 0 {
+            if self.input_string.len() == 0 {
                 return Ok(());
             } else if self.current_task_id != 0 { // prevents the user from trying to execute a new command while one is currently running
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
             } else {
                 // Calls the parse_input function to see if the command exists in the command table and obtains a command struct
-                let console_input_string = self.console_input_string.clone();
-                let command_structure = self.parse_input(&console_input_string);
+                let input_string = self.input_string.clone();
+                let command_structure = self.parse_input(&input_string);
                 let prompt_string = self.prompt_string.clone();
-                let console_input = self.console_input_string.clone();
-                self.command_history.push(console_input);
+                let current_input = self.input_string.clone();
+                self.command_history.push(current_input);
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
@@ -663,14 +629,14 @@ impl<D> Terminal<D> where D: TextDisplay {
                         self.current_task_id = new_task_id;
                         TERMINAL_TASK_IDS.lock().insert(self.term_ref, self.current_task_id);
                     } Err("Error: no module with this name found!") => {
-                        self.print_to_terminal(format!("\n{}: command not found\n\n{}",console_input_string, prompt_string))?;
-                        self.console_input_string.clear();
+                        self.print_to_terminal(format!("\n{}: command not found\n\n{}",input_string, prompt_string))?;
+                        self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(());
                     } Err(&_) => {
                         self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
-                        self.console_input_string.clear();
+                        self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(())
@@ -678,11 +644,11 @@ impl<D> Terminal<D> where D: TextDisplay {
                 }
             };
             // Clears the buffer for another command once current command is finished executing
-            self.console_input_string.clear();
+            self.input_string.clear();
             self.left_shift = 0;
         }
 
-        // home, end, page up, page down, up arrow, down arrow for the console
+        // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
             // Home command only registers if the text display has the ability to scroll
             if self.scroll_start_idx != 0 {
@@ -743,18 +709,18 @@ impl<D> Terminal<D> where D: TextDisplay {
                 self.correct_prompt_position  = true;
             }
             self.left_shift = 0;
-            let console_input = self.console_input_string.clone();
-            for _i in 0..console_input.len() {
+            let previous_input = self.input_string.clone();
+            for _i in 0..previous_input.len() {
                 self.pop_from_stdin();
             }
-            if self.history_index == 0 && self.console_input_string.len() != 0 {
-                self.command_history.push(console_input);
+            if self.history_index == 0 && self.input_string.len() != 0 {
+                self.command_history.push(previous_input);
                 self.history_index += 1;
             } 
             self.history_index += 1;
             let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
-            self.console_input_string = selected_command;
+            self.input_string = selected_command;
             self.push_to_stdin(selected_command2);
             self.correct_prompt_position = true;
             return Ok(());
@@ -765,15 +731,15 @@ impl<D> Terminal<D> where D: TextDisplay {
                 return Ok(());
             }
             self.left_shift = 0;
-            let console_input = self.console_input_string.clone();
-            for _i in 0..console_input.len() {
+            let previous_input = self.input_string.clone();
+            for _i in 0..previous_input.len() {
                 self.pop_from_stdin();
             }
             self.history_index -=1;
             if self.history_index == 0 {return Ok(())}
             let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
-            self.console_input_string = selected_command;
+            self.input_string = selected_command;
             self.push_to_stdin(selected_command2);
             self.correct_prompt_position = true;
             return Ok(());
@@ -781,7 +747,7 @@ impl<D> Terminal<D> where D: TextDisplay {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.left_shift = self.console_input_string.len();
+            self.left_shift = self.input_string.len();
             return Ok(());
         }
 
@@ -792,7 +758,7 @@ impl<D> Terminal<D> where D: TextDisplay {
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            if self.left_shift < self.console_input_string.len() {
+            if self.left_shift < self.input_string.len() {
                 self.left_shift += 1;
             }
                 return Ok(());
@@ -814,10 +780,10 @@ impl<D> Terminal<D> where D: TextDisplay {
                             Some(c) => {
                                 // Appends to the temporary buffer string if the user types while a command is running
                                 if self.current_task_id != 0 {
-                                    self.console_buffer_string.push(c);
+                                    self.buffer_string.push(c);
                                     return Ok(());
                                 } else {
-                                    self.console_input_string.push(c);
+                                    self.input_string.push(c);
                                 }
                             },
                             None => {
@@ -830,8 +796,8 @@ impl<D> Terminal<D> where D: TextDisplay {
                     // controls cursor movement and associated variables if the cursor is not at the end of the current line
                     match keyevent.keycode.to_ascii(keyevent.modifiers) {
                         Some(c) => {
-                            let insert_idx: usize = self.console_input_string.len() - self.left_shift;
-                            self.console_input_string.insert(insert_idx, c);
+                            let insert_idx: usize = self.input_string.len() - self.left_shift;
+                            self.input_string.insert(insert_idx, c);
                         },
                         None => {
                             return Err("Couldn't get key event");
@@ -842,10 +808,10 @@ impl<D> Terminal<D> where D: TextDisplay {
                 // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
                 if !self.correct_prompt_position{
                     let prompt_string = self.prompt_string.clone();
-                    let mut console_input_string = self.console_input_string.clone();
-                    let _result = console_input_string.pop();
+                    let mut input_string = self.input_string.clone();
+                    let _result = input_string.pop();
                     self.print_to_terminal(prompt_string)?;
-                    self.print_to_terminal(console_input_string)?;
+                    self.print_to_terminal(input_string)?;
                     self.correct_prompt_position = true;
                 }
         }
@@ -866,8 +832,8 @@ impl<D> Terminal<D> where D: TextDisplay {
     }
     
     /// Parses the string that the user inputted when Enter is pressed and populates the CommandStruct
-    fn parse_input(&self, console_input_string: &String) -> CommandStruct {
-        let mut words: Vec<String> = console_input_string.split_whitespace().map(|s| s.to_string()).collect();
+    fn parse_input(&self, input_string: &String) -> CommandStruct {
+        let mut words: Vec<String> = input_string.split_whitespace().map(|s| s.to_string()).collect();
         // This will never panic because pressing the enter key does not register if she has not entered anything
         let mut command_string = words.remove(0);
         // Formats the string into the application module syntax
@@ -904,7 +870,7 @@ impl<D> Terminal<D> where D: TextDisplay {
 /// is simply pushed to the scrollback buffer using the associated print_to_terminal method)
 /// 
 /// 2) The input queue handles any input events from the input event handling crate (currently still named
-/// the console crate but will change soon)
+/// the input_event_manager crate but will change soon)
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
@@ -917,18 +883,18 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         
     }
     use core::ops::Deref;
-    let mut refresh_display = false;
+    let mut refresh_display = true;
     loop {
         
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
-                &ConsoleEvent::OutputEvent(ref s) => {
+                &Event::OutputEvent(ref s) => {
                     terminal.push_to_stdout(s.text.clone());
                     if s.display {
-                        // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
-                        // task_handler() function has cleaned up, which does its own printing to the console
+                        // Sets this bool to true so that on the next iteration the DisplayProvider will refresh AFTER the 
+                        // task_handler() function has cleaned up, which does its own printing to the input_event_manager
                         refresh_display = true;
                         let start_idx = terminal.scroll_start_idx;
                         if terminal.is_scroll_end {
@@ -974,12 +940,12 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         };
 
         match event.deref() {
-            &ConsoleEvent::ExitEvent => {
-                let _result = print_to_console("\nSmoothly exiting console main loop.\n".to_string(), 1)?;
+            &Event::ExitEvent => {
+                let _result = print_to_stdout("\nSmoothly exiting input_event_manager main loop.\n".to_string(), 1)?;
                 return Ok(());
             }
 
-            &ConsoleEvent::InputEvent(ref input_event) => {
+            &Event::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;
                 let start_idx = terminal.scroll_start_idx;
                 // Only refreshes the display on a keypress

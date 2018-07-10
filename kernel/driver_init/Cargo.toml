@@ -14,8 +14,8 @@ version = "0.3.7"
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_types]
+path = "../input_event_types"
 
 [dependencies.ata_pio]
 path = "../ata_pio"

@@ -7,7 +7,7 @@ extern crate x86_64;
 extern crate task;
 extern crate apic;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate console; // for regular println!()
+#[macro_use] extern crate input_event_manager; // for regular println!()
 
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};

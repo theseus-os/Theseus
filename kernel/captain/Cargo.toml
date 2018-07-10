@@ -40,8 +40,8 @@ path = "../window_manager"
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_types]
+path = "../input_event_types"
 
 [dependencies.memory]
 path = "../memory"
@@ -76,8 +76,8 @@ path = "../driver_init"
 [dependencies.e1000]
 path = "../e1000"
 
-[dependencies.console]
-path = "../console"
+[dependencies.input_event_manager]
+path = "../input_event_manager"
 
 [dependencies.task]
 path = "../task"
