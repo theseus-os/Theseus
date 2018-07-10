@@ -126,6 +126,7 @@ impl TextDisplay for FrameTextBuffer {
     }
 
     fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
+        self.cursor.enabled = true;
         self.cursor.update(line as usize, column as usize, reset);
     }
 
@@ -188,7 +189,8 @@ impl Cursor {
     ///disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
-        //fill_rectangle(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+        fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
     }
 
     ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop

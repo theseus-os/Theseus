@@ -23,7 +23,7 @@ extern crate acpi;
 
 use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
-use alloc::{LinkedList};
+use alloc::{VecDeque};
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
@@ -45,7 +45,7 @@ static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 struct WindowAllocator {
-    allocated: LinkedList<Arc<Mutex<WindowObj>>>, //The last one is active
+    allocated: VecDeque<Arc<Mutex<WindowObj>>>, //The last one is active
 }
 
 /// switch the active window
@@ -72,23 +72,20 @@ pub fn window_switch() -> Option<&'static str>{
 pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
+        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
     });
 
 
     allocator.lock().deref_mut().allocate(x,y,width,height)
 }
 
-/*
-pub fn print_all() {
-
+/// new a window object and return it
+pub fn delete_window<'a>(window:Arc<Mutex<WindowObj>>) {
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(WindowAllocator{allocated:LinkedList::new()})
+        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
     });
-
-
-    allocator.lock().deref_mut().print();
-}*/
+    allocator.lock().deref_mut().delete(window)
+}
 
 
 impl WindowAllocator{
@@ -155,6 +152,20 @@ impl WindowAllocator{
         }
 
         Some("End")
+    }
+
+    fn delete(&mut self, window:Arc<Mutex<WindowObj>>){
+        let mut i = 0;
+        let len = self.allocated.len();
+        for item in self.allocated.iter(){
+            if Arc::ptr_eq(item, &window) {
+                break;
+            }
+            i += 1;
+        }
+        if i < len {
+            self.allocated.remove(i);
+        }
     }
 
 }

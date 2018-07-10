@@ -463,6 +463,8 @@ impl<D> Terminal<D> where D: TextDisplay {
         if let Some(slice) = result {
             self.text_display.display_string(slice)?;
             let cursor_pos = self.calc_cursor_pos(slice);
+                    trace!("Wenqiu:cursor_pos {}", cursor_pos);
+
             self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -473,17 +475,17 @@ impl<D> Terminal<D> where D: TextDisplay {
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
-    let start_idx = self.calc_start_idx(end_idx);
-    self.scroll_start_idx = start_idx;
-    let result = self.scrollback_buffer.get(start_idx..end_idx);
-    if let Some(slice) = result {
-        self.text_display.display_string(slice)?;
-        let cursor_pos = self.calc_cursor_pos(slice);
-        self.absolute_cursor_pos = cursor_pos;
-    } else {
-        return Err("could not get slice of scrollback buffer string");
-    }
-    Ok(())
+        let start_idx = self.calc_start_idx(end_idx);
+        self.scroll_start_idx = start_idx;
+        let result = self.scrollback_buffer.get(start_idx..end_idx);
+        if let Some(slice) = result {
+            self.text_display.display_string(slice)?;
+            let cursor_pos = self.calc_cursor_pos(slice);
+            self.absolute_cursor_pos = cursor_pos;
+        } else {
+            return Err("could not get slice of scrollback buffer string");
+        }
+        Ok(())
     }
 
     /// Calculates the cursor position based on the string that is displayed to the buffer
@@ -576,6 +578,7 @@ impl<D> Terminal<D> where D: TextDisplay {
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
         let buffer_width = self.text_display.get_dimensions().0;
+        trace!("Wenqiu:pos {}", self.absolute_cursor_pos);
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -631,6 +634,7 @@ impl<D> Terminal<D> where D: TextDisplay {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
+                self.text_display.disable_cursor();
                 let remove_idx: usize =  self.console_input_string.len() - self.left_shift -1;
                 self.console_input_string.remove(remove_idx);
             }
@@ -907,9 +911,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
-        terminal.cursor_handler()?;
-        
+        trace!("Wenqiu:{}", terminal.absolute_cursor_pos);
+        terminal.cursor_handler()?;        
     }
+
     use core::ops::Deref;
     let mut refresh_display = false;
     loop {
