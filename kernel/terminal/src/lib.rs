@@ -81,7 +81,7 @@ struct CommandStruct {
     arguments: Vec<String>
 }
 
-pub struct Terminal<D: TextDisplay> {
+pub struct Terminal<D: TextDisplay + Send + 'static> {
     /// The terminal's own text display that it outputs text to
     /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
     text_display: D,
@@ -133,7 +133,7 @@ pub struct Terminal<D: TextDisplay> {
 
 /// Manual implementation of debug just prints out the terminal reference number
 use core::fmt;
-impl<D> fmt::Debug for Terminal<D> where D:TextDisplay {
+impl<D> fmt::Debug for Terminal<D> where D: TextDisplay + Send + 'static {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Point {{ terminal reference number: {} }}", self.term_ref)
     }
@@ -149,7 +149,7 @@ impl<D> fmt::Debug for Terminal<D> where D:TextDisplay {
 ///     - Consumer is the main terminal loop
 ///     - Producers are functions in the event handling crate that send 
 ///         Keyevents if the terminal is the one currently being focused on
-impl<D> Terminal<D> where D: TextDisplay {
+impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
@@ -905,7 +905,7 @@ impl<D> Terminal<D> where D: TextDisplay {
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
-fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay { 
+fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay + Send + 'static { 
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer

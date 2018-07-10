@@ -13,9 +13,10 @@ extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
 extern crate owning_ref;
+#[macro_use] extern crate debugit;
 
-use core::fmt;
 use core::mem;
+use core::marker::PhantomData;
 use core::ops::DerefMut;
 use core::sync::atomic::{Ordering, AtomicBool, compiler_fence};
 use alloc::{Vec, String};
@@ -186,17 +187,19 @@ impl Context {
 
 
 #[derive(Debug)]
-struct KthreadCall<A, R> {
+struct KthreadCall<A, R, F> {
     /// comes from Box::into_raw(Box<A>)
     pub arg: *mut A,
-    pub func: fn(arg: A) -> R,
+    pub func: F,
+    _rettype: PhantomData<R>,
 }
 
-impl<A, R> KthreadCall<A, R> {
-    fn new(a: A, f: fn(arg: A) -> R) -> KthreadCall<A, R> {
+impl<A, R, F> KthreadCall<A, R, F> {
+    fn new(a: A, f: F) -> KthreadCall<A, R, F> where F: FnOnce(A) -> R {
         KthreadCall {
             arg: Box::into_raw(Box::new(a)),
             func: f,
+            _rettype: PhantomData,
         }
     }
 }
@@ -209,14 +212,17 @@ impl<A, R> KthreadCall<A, R> {
 /// 
 /// # Arguments
 /// 
-/// * `func`: the function that will be invoked in the new task (TODO FIXME make this a FnMut closure, which also accepts a regular fn)    
-/// * `arg`: the argument to the function `func`
-/// * `thread_name`: the String name of the new task
+/// * `func`: the function or closure that will be invoked in the new task.
+/// * `arg`: the argument to the function `func`. It must be a type that implements the Send trait, i.e., not a borrowed reference.
+/// * `thread_name`: the String name of the new task.
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
 /// 
 #[inline(never)]
-pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug + 'static>(func: fn(arg: A) -> R, arg: A, thread_name: String, pin_on_core: Option<u8>)
+pub fn spawn_kthread<A, R, F>(func: F, arg: A, thread_name: String, pin_on_core: Option<u8>)
     -> Result<TaskRef, &'static str> 
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
 {
     let mut new_task = Task::new();
     new_task.set_name(thread_name);
@@ -235,21 +241,21 @@ pub fn spawn_kthread<A: fmt::Debug, R: fmt::Debug + 'static>(func: fn(arg: A) ->
     // So we need to allocate space for the saved context registers to be popped off when this task is switch to.
     let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
     unsafe {
-        *new_context_ptr = Context::new(kthread_wrapper::<A, R> as usize);
+        *new_context_ptr = Context::new(kthread_wrapper::<A, R, F> as usize);
         new_task.saved_sp = new_context_ptr as usize; 
     }
 
     // set up the kthread stuff
     let kthread_call = Box::new( KthreadCall::new(arg, func) );
-    debug!("Creating kthread_call: {:?}", kthread_call);
+    debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
 
 
     // currently we're using the very bottom of the kstack for kthread arguments
     let arg_ptr = kstack.bottom();
-    let kthread_ptr: *mut KthreadCall<A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
+    let kthread_ptr: *mut KthreadCall<A, R, F> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
     unsafe {
         *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
-        debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, *kthread_ptr);
+        debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
     }
 
 
@@ -554,44 +560,48 @@ pub fn join(task: &TaskRef) -> Result<(), &'static str> {
 
 
 /// The entry point for all new kernel `Task`s. This does not return!
-fn kthread_wrapper<A: fmt::Debug, R: fmt::Debug + 'static>() -> ! {
+fn kthread_wrapper<A, R, F>() -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
     let curr_task_ref = get_my_current_task().expect("kthread_wrapper(): couldn't get_my_current_task().");
     let curr_task_name = curr_task_ref.read().name.clone();
 
-    let kthread_call_stack_ptr: *mut KthreadCall<A, R> = {
+    let kthread_call_stack_ptr: *mut KthreadCall<A, R, F> = {
         let t = curr_task_ref.read();
         let kstack = t.kstack.as_ref().expect("kthread_wrapper(): failed to get current task's kstack.");
         // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            *(kstack.bottom() as *mut *mut KthreadCall<A, R>) as *mut KthreadCall<A, R>
+            *(kstack.bottom() as *mut *mut KthreadCall<A, R, F>) as *mut KthreadCall<A, R, F>
         }
     };
 
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
-    let kthread_call: Box<KthreadCall<A, R>> = unsafe {
+    let kthread_call: Box<KthreadCall<A, R, F>> = unsafe {
         Box::from_raw(kthread_call_stack_ptr)
     };
-    let kthread_call_val: KthreadCall<A, R> = *kthread_call;
+    let kthread_call_val: KthreadCall<A, R, F> = *kthread_call;
 
     let arg: Box<A> = unsafe {
         Box::from_raw(kthread_call_val.arg)
     };
-    let func: fn(arg: A) -> R = kthread_call_val.func;
+    let func = kthread_call_val.func;
     let arg: A = *arg; 
 
     
     enable_interrupts();
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
-    debug!("kthread_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, func, arg, interrupts_enabled());
+    debug!("kthread_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
 
     // actually invoke the function spawned in this kernel thread
     let exit_value = func(arg);
 
     // cleanup current thread: put it into non-runnable mode, save exit status
 
-    debug!("kthread_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, exit_value);
+    debug!("kthread_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
 
     if curr_task_ref.write().exit(Box::new(exit_value)).is_err() {
         warn!("kthread_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
