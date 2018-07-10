@@ -45,7 +45,7 @@ pub fn init() {
             if pmu_ver > &0 {
                 unsafe{
                     //clear values in counters and their settings
-                    wrmsr(MSR_PERF_GLOBAL_CTRL, 0);
+                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
                     wrmsr(IA32_PMC0, 0);
                     wrmsr(IA32_PMC1, 0);
                     wrmsr(IA32_PMC2, 0);
@@ -221,4 +221,13 @@ pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static
     
     let count = rdpmc(msr_mask);
     return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
+}
+
+pub fn test() {
+    unsafe{
+    wrmsr(IA32_PMC0, 0xf0ffffff);
+    wrmsr(IA32_PERFEVTSEL0, BR_INST_RETIRED_MASK | 1 << 22 | 1 << 20 );
+    debug!("{}", rdmsr(IA32_PERF_GLOBAL_STAUS));
+    debug!("TESTTESTTEST: \n{}", rdmsr(IA32_PMC0));
+    }
 }

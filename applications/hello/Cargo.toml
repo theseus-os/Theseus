@@ -14,5 +14,8 @@ version = "0.3.7"
 [dependencies.console]
 path = "../../kernel/console"
 
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"
+
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

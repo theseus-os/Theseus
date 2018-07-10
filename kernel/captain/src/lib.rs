@@ -38,6 +38,7 @@ extern crate window_manager;
 extern crate scheduler;
 #[macro_use] extern crate console;
 extern crate exceptions_full;
+extern crate pmu_x86;
 
 
 #[cfg(target_feature = "sse2")]
@@ -55,7 +56,7 @@ use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts};
+use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
 
 
 
@@ -213,11 +214,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         
     }
 
+
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    debug!("{}", interrupts_enabled());
+    pmu_x86::init();
+    pmu_x86::test();
     enable_interrupts();
+    debug!("{}", interrupts_enabled());
+
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
-    
 
     loop { 
         spin_loop_hint();

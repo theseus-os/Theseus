@@ -88,6 +88,9 @@ path = "../scheduler"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.pmu_x86]
+path = "../pmu_x86"
+
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
 [target.'cfg(target_feature = "sse2")'.dependencies.simd_test]
