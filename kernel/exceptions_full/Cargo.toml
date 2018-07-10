@@ -21,6 +21,9 @@ path = "../apic"
 [dependencies.task]
 path = "../task"
 
+[dependencies.pmu_x86]
+path = "../pmu_x86"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"

@@ -1,6 +1,7 @@
 //! Support for Performance Monitoring Unit readouts.
 
 #![no_std]
+#![feature(integer_atomics)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -16,14 +17,22 @@ use raw_cpuid::*;
 use spin::Once;
 use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
+use core::sync::atomic::{AtomicU32, Ordering};
+
 
 pub static PMU_VERSION: Once<u16> = Once::new();
-
+pub static SAMPLE_START_VALUE: AtomicU32 = AtomicU32::new(0);
+pub static SAMPLE_EVENT_TYPE_MASK: AtomicU32 = AtomicU32::new(0);
 static RDPMC_FFC0: u32 = 1 << 30;
 static RDPMC_FFC1: u32 = (1 << 30) + 1;
 static RDPMC_FFC2: u32 = (1 << 30) + 2;
 
+
 static PMC_ENABLE: u64 = 0x01 << 22;
+static INTERRUPT_ENABLE: u64 = 0x01 << 20;
+static UNHALTED_CYCLE_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0x3C;
+static INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC0;
+static UNHALTED_REF_CYCLE_MASK: u64 = (0x03 << 16) | (0x01 << 8) | 0x3C;
 static LLC_REF_MASK: u64 = (0x03 << 16) | (0x4F << 8) | 0x2E;
 static LLC_MISS_MASK: u64 = (0x03 << 16) | (0x41 << 8) | 0x2E;
 static BR_INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC4;
@@ -223,11 +232,36 @@ pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static
     return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
 }
 
-pub fn test() {
+/// Function to start interrupt process in order to take samples using PMU. 
+pub fn start_samples(event_type: &'static str, event_per_sample: u32) {    
+    let start_value = 0xffffffff - event_per_sample;
+    
+    //TODO: some sort of check to make sure a valid event_type
+    let event_mask = match event_type {
+        "INST_RETIRED.ANY" => UNHALTED_CYCLE_MASK,
+        "CPU_CLK_UNHALTED.THREAD" => INST_RETIRED_MASK,
+        "CPU_CLK_UNHALTED.REF" => UNHALTED_REF_CYCLE_MASK,
+        "LONGEST_LAT_CACHE.REFERENCE" => LLC_REF_MASK,
+        "LONGEST_LAT_CACHE.MISS" => LLC_MISS_MASK,
+        "BR_INST_RETIRED.ALL_BRANCHES" => BR_INST_RETIRED_MASK,
+        "BR_MISP_RETIRED.ALL_BRANCHES" => BR_MISS_RETIRED_MASK,	
+        _ => UNHALTED_CYCLE_MASK,
+    } | PMC_ENABLE | INTERRUPT_ENABLE;
+    SAMPLE_START_VALUE.store(start_value, Ordering::SeqCst);
+    SAMPLE_EVENT_TYPE_MASK.store(event_mask as u32, Ordering::SeqCst);
     unsafe{
-    wrmsr(IA32_PMC0, 0xf0ffffff);
-    wrmsr(IA32_PERFEVTSEL0, BR_INST_RETIRED_MASK | 1 << 22 | 1 << 20 );
-    debug!("{}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-    debug!("TESTTESTTEST: \n{}", rdmsr(IA32_PMC0));
+    wrmsr(IA32_PMC0, start_value as u64);
+    wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+    }
+}
+
+/// Function to stop the sampling interrupts. 
+pub fn stop_samples() {
+    unsafe{
+        wrmsr(IA32_PERFEVTSEL0, 0);
+        wrmsr(IA32_PMC0, 0);
+        SAMPLE_EVENT_TYPE_MASK.store(0, Ordering::SeqCst);
+        SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
+
     }
 }

@@ -2,10 +2,12 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(integer_atomics)]
 
 extern crate x86_64;
 extern crate task;
 extern crate apic;
+extern crate pmu_x86;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate console; // for regular println!()
 #[macro_use] extern crate log;
@@ -13,7 +15,8 @@ extern crate apic;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-
+use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE};
+use core::sync::atomic::Ordering;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -89,10 +92,12 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
         debug!("OVERFLOW DETECTED");
         debug!("{}", rdmsr(IA32_PERF_GLOBAL_CTRL));
         unsafe {
+            wrmsr(IA32_PERFEVTSEL0, 0);
             wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
-            wrmsr(IA32_PMC0, 0xfffffff2);
-            wrmsr(IA32_PERFEVTSEL0, (0x03 << 16) | (0x00 << 8) | 0xC4 | 1 << 22 | 1 << 20 );
-            wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
+            wrmsr(IA32_PMC0, SAMPLE_START_VALUE.load(Ordering::SeqCst) as u64);
+            debug!("Before it's enabled: {:#x}", rdmsr(IA32_PMC0));
+            wrmsr(IA32_PERFEVTSEL0, SAMPLE_EVENT_TYPE_MASK.load(Ordering::SeqCst) as u64);
+            debug!("After it's enabled: {:#x}", rdmsr(IA32_PMC0));
 
         }
 

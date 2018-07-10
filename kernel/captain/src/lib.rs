@@ -218,7 +218,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     debug!("{}", interrupts_enabled());
     pmu_x86::init();
-    pmu_x86::test();
+    pmu_x86::start_samples("CPU_CLK_UNHALTED.REF", 0xFFFFFF);
     enable_interrupts();
     debug!("{}", interrupts_enabled());
 

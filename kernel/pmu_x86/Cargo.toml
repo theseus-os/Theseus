@@ -32,6 +32,7 @@ path = "../../libs/atomic_linked_list"
 [dependencies.task]
 path = "../task"
 
+
 [dependencies.raw-cpuid]
 version = "4.0.0"
 features = [ "use_arch" ]
