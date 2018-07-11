@@ -3,7 +3,7 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate console_types;
+extern crate input_event_types;
 extern crate ps2;
 #[macro_use] extern crate log;
 
@@ -11,7 +11,7 @@ extern crate ps2;
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
 use dfqueue::DFQueueProducer;
-use console_types::ConsoleEvent;
+use input_event_types::Event;
 use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardType};
 
 
@@ -19,7 +19,7 @@ use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardTyp
 static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 
 
-static CONSOLE_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
+static KEYBOARD_PRODUCER: Once<DFQueueProducer<Event>> = Once::new();
 
 /// Bitmask for the Scroll Lock keyboard LED
 const SCROLL_LED: u8 = 0b001;
@@ -30,7 +30,7 @@ const CAPS_LED: u8 = 0b100;
 
 /// Initialize the keyboard driver. 
 /// Arguments: a reference to a queue onto which keyboard events should be enqueued. 
-pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) { 
+pub fn init(keyboard_queue_producer: DFQueueProducer<Event>) { 
     // set keyboard to scancode set 1
 
     //init the first ps2 port for keyboard
@@ -49,8 +49,8 @@ pub fn init(console_queue_producer: DFQueueProducer<ConsoleEvent>) {
             }
         }
     }
-    CONSOLE_PRODUCER.call_once(|| {
-        console_queue_producer
+    KEYBOARD_PRODUCER.call_once(|| {
+        keyboard_queue_producer
     });
 }
 
@@ -109,13 +109,13 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    let event = ConsoleEvent::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
-                    if let Some(producer) = CONSOLE_PRODUCER.try() {
+                    let event = Event::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
+                    if let Some(producer) = KEYBOARD_PRODUCER.try() {
                         producer.enqueue(event);
                         Ok(()) // successfully queued up KeyEvent 
                     }
                     else {
-                        warn!("handle_keyboard_input(): CONSOLE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
+                        warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
                         Err("keyboard event queue not ready")
                     }
                 }
