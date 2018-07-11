@@ -380,7 +380,7 @@ impl FrameTextBuffer {
 
     }
 
-    ///Write string to input_event_manager with color
+    ///Write string to console with color
     pub fn write_string_with_color(&mut self, s: &String, color: usize) {
         self.write_str_with_color(s.as_str(), color);
     }

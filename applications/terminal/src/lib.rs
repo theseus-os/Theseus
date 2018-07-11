@@ -71,16 +71,6 @@ pub fn print_to_stdout<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &
     Ok(())
 }
 
-
-#[derive(Debug)] 
-// Struct contains the command string and its arguments
-struct CommandStruct {
-    /// String that contains the command keyword
-    command_str: String,
-    /// Vector of strings that contain any arguments to the command, though support for this is not fully developed yet
-    arguments: Vec<String>
-}
-
 pub struct Terminal<D: TextDisplay + Send + 'static> {
     /// The terminal's own text display that it outputs text to
     /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
@@ -833,8 +823,8 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         Ok(())
     }
     
-    /// Parses the string that the user inputted when Enter is pressed and populates the CommandStruct
-    fn parse_input(&self, input_string: &String) -> CommandStruct {
+    /// Parses the string that the user inputted when Enter is pressed into the form of command (String) + arguments (Vec<String>)
+    fn parse_input(&self, input_string: &String) -> (String, Vec<String>) {
         let mut words: Vec<String> = input_string.split_whitespace().map(|s| s.to_string()).collect();
         // This will never panic because pressing the enter key does not register if she has not entered anything
         let mut command_string = words.remove(0);
@@ -843,20 +833,14 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         command_string.insert(0, 'a');
         command_string.insert(0, '_');
         command_string.insert(0, '_');
-        // Forms command structure to pass to the function that runs command on the new thread
-        let command_structure = CommandStruct {
-            command_str: command_string.to_string(),
-            arguments: words
-        };
-        return command_structure;
+        return (command_string.to_string(), words);
     }
 
 
     /// Execute the command on a new thread 
-    fn run_command_new_thread(&mut self, command_structure: CommandStruct) -> Result<usize, &'static str> {
-        let module = memory::get_module(&command_structure.command_str).ok_or("Error: no module with this name found!")?;
-        let args = command_structure.arguments; 
-        let taskref = spawn::spawn_application(module, args, None, None)?;
+    fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<usize, &'static str> {
+        let module = memory::get_module(&command_string).ok_or("Error: no module with this name found!")?;
+        let taskref = spawn::spawn_application(module, arguments, None, None)?;
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         let new_task_id = taskref.read().id;
         return Ok(new_task_id);

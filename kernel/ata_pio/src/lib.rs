@@ -387,7 +387,7 @@ impl Default for AtaDevices{
 }
 
 
-//used to print ATAIdentifyData information to input_event_manager
+//used to print ATAIdentifyData information to console
 impl ::core::fmt::Display for AtaIdentifyData {
 	fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result
 	{
@@ -416,7 +416,7 @@ fn flip_bytes(bytes: &mut [u8]) {
 	}
 }
 
-//prints basic ASCII characters to the input_event_manager
+//prints basic ASCII characters to the console
 pub struct RawString<'a>(pub &'a [u8]);
 impl<'a> ::core::fmt::Debug for RawString<'a>
 {

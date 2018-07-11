@@ -42,15 +42,6 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
 // Defines the max number of terminals that can be running 
 const MAX_TERMS: usize = 9;
 
-#[derive(Debug)]
-//contains the args necessary to pass to input event loop
-struct InputEventLoopArgs {
-    // consumes events from the keyboard queue
-    keyboard_consumer: DFQueueConsumer<Event>,
-    // Maps the terminal reference number to its input event queue (more info in the terminal crate)
-    terminal_input_producers: BTreeMap<usize, DFQueueProducer<Event>>,
-
-}
 /// Initializes the input_event_manager by spawning a new thread to handle all input_event_manager events, and creates a new event queue. 
 /// This event queue's consumer is given to that input_event_manager thread, and a producer reference to that queue is returned. 
 /// This allows other modules to push input_event_manager events onto the queue. 
@@ -64,23 +55,18 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let mut terminal_input_producers = BTreeMap::new();
     // populates a struct with the args needed for input_event_loop
     terminal_input_producers.insert(0, kernel_producer);
-    let input_event_loop_args = InputEventLoopArgs {
-        keyboard_consumer: keyboard_event_handling_consumer,
-        terminal_input_producers: terminal_input_producers,
-    };
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
+    let input_event_loop_args = (keyboard_event_handling_consumer, terminal_input_producers);
     spawn::spawn_kthread(input_event_loop, input_event_loop_args , "main input event handling loop".to_string(), None)?;
     Ok(returned_keyboard_producer)
 }
 
 /// Main infinite loop that handles DFQueue input and output events
-fn input_event_loop(args: InputEventLoopArgs) -> Result<(), &'static str> {
+fn input_event_loop((mut consumer, mut terminal_input_producers): (DFQueueConsumer<Event>, BTreeMap<usize, DFQueueProducer<Event>>)) -> Result<(), &'static str> {
     // variable to track which terminal the user is currently focused on
     // terminal objects have a field term_ref that can be used for this purpose
     let mut terminal_id_counter: usize = 1;
-    let consumer = args.keyboard_consumer;
-    let mut terminal_input_producers = args.terminal_input_producers;
     // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
     let mut meta_keypress = false;
     loop {

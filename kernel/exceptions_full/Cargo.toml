@@ -15,9 +15,6 @@ path = "../vga_buffer"
 [dependencies.print]
 path = "../print"
 
-[dependencies.input_event_manager]
-path = "../input_event_manager"
-
 [dependencies.apic]
 path = "../apic"
 
