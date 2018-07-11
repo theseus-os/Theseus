@@ -69,27 +69,33 @@ pub fn window_switch() -> Option<&'static str>{
 }
 
 /// new a window object and return it
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<WindowObj>>, &'static str>{
 
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
     });
 
-
     allocator.lock().deref_mut().allocate(x,y,width,height)
 }
 
 /// new a window object and return it
-pub fn delete_window<'a>(window:Arc<Mutex<WindowObj>>) {
+pub fn delete_window<'a>(window:&Arc<Mutex<WindowObj>>) {
     let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
     });
     allocator.lock().deref_mut().delete(window)
 }
 
+pub fn check_reference() {
+    let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
+    });
+    allocator.lock().check_reference();
+}
+
 
 impl WindowAllocator{
-    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Weak<Mutex<WindowObj>>, &'static str>{
+    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<WindowObj>>, &'static str>{
         if width < 2 || height < 2 {
             return Err("Window size must be greater than 2");
         }
@@ -103,19 +109,40 @@ impl WindowAllocator{
 
         //window.resize(x,y,width,height);
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
+        //let overlapped = self.check_overlap(&window);
         let mut overlapped = false;
-        for item in self.allocated.iter() {
-            let allocated_window = item.lock();
-            if window.is_overlapped(&(*allocated_window)) {
-                overlapped = true;
-                break;
+        let mut len = self.allocated.len();
+        let mut i = 0;
+        while i < len {
+            let mut remove = false;
+            {   
+
+
+                let item = self.allocated.get(i).unwrap();
+                trace!("Wenqiu: reference number {}",Arc::strong_count(item));
+
+                let allocated_window = item.lock();
+                if window.is_overlapped(&(*allocated_window)) {
+                    if Arc::weak_count(item) > 1 {
+                        overlapped = true;
+                    } else {
+                        remove = true;
+                    }
+                }
+            }
+            if remove {
+                self.allocated.remove(i);
+                len -= 1;
+            } else {
+                i += 1;
             }
         }
+
         if overlapped  {
             trace!("Request area is already allocated");
             return Err("Request area is already allocated");
         }
-        for item in  self.allocated.iter_mut(){
+        for item in self.allocated.iter_mut(){
             let mut allocated_window = item.lock();
             (*allocated_window).active(false);
         }
@@ -123,10 +150,12 @@ impl WindowAllocator{
 
         window.consumer = Some(consumer);
         window.draw_border();
-        self.allocated.push_back(Arc::new(Mutex::new(window)));
-
-        let reference = Arc::downgrade(try_opt_err!(self.allocated.back(), "WindowAllocator fails to get new window reference")); 
-        
+        let reference = Arc::new(Mutex::new(window));
+        trace!("wenqiu:reference number:{}", Arc::strong_count(&reference));
+        self.allocated.push_back(reference.clone());
+        trace!("wenqiu:reference number:{}", Arc::strong_count(&reference));
+        self.check_reference();
+        //let reference = self.allocated.back(), "WindowAllocator fails to get new window reference")); 
         Ok(reference)
     
     }
@@ -154,11 +183,11 @@ impl WindowAllocator{
         Some("End")
     }
 
-    fn delete(&mut self, window:Arc<Mutex<WindowObj>>){
+    fn delete(&mut self, window:&Arc<Mutex<WindowObj>>){
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
-            if Arc::ptr_eq(item, &window) {
+            if Arc::ptr_eq(item, window) {
                 break;
             }
             i += 1;
@@ -166,6 +195,41 @@ impl WindowAllocator{
         if i < len {
             self.allocated.remove(i);
         }
+    }
+
+    fn check_overlap(&mut self, window:&WindowObj) -> bool {
+        let mut len = self.allocated.len();
+        let mut i = 0;
+        while i < len {
+            let mut remove = false;
+            {   
+                let item = self.allocated.get(i).unwrap();
+                let allocated_window = item.lock();
+                if window.is_overlapped(&(*allocated_window)) {
+                    if Arc::weak_count(item) > 1 {
+                        return true;
+                    } else {
+                        remove = true;
+                    }
+                }
+            }
+            if remove {
+                self.allocated.remove(i);
+                len -= 1;
+            } else {
+                i += 1;
+            }
+        }
+        false
+    }
+
+    fn check_reference(&mut self) -> bool {
+        if self.allocated.len() == 0{
+            return false;
+        }
+        let item = self.allocated.get(0).unwrap();
+        trace!("Wenqiu: reference number {}",Arc::strong_count(item));
+        return false;
     }
 
 }

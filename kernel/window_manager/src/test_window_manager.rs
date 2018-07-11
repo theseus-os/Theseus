@@ -5,7 +5,7 @@ use frame_buffer_3d;
 use acpi::get_hpet;  
 
 pub fn test_cursor(_: Option<u64>) -> Option<&'static str> {
-    let mut x=20;
+    /*let mut x=20;
     let mut y=20;
     let width=200;
     let height=150;
@@ -85,13 +85,14 @@ pub fn test_cursor(_: Option<u64>) -> Option<&'static str> {
             
             _ => {}
         }
-    }       
-    
+    }*/
+
+    None    
 }
 
 pub fn test_draw(_: Option<u64>) -> Option<&'static str>{
     
-    let width=300;
+    /*let width=300;
     let height=200;
     let mut x=width/2;
     let mut y=height/2;
@@ -133,7 +134,9 @@ pub fn test_draw(_: Option<u64>) -> Option<&'static str>{
         }
         window.draw_pixel(x, y, color);
     
-    }       
+    }    */
+
+    None 
 
 }
 

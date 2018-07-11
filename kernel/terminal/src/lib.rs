@@ -14,6 +14,7 @@ extern crate memory;
 extern crate text_display;
 // temporary, should remove this once we fix crate system
 extern crate console_types; 
+extern crate window_manager;
 
 
 #[macro_use] extern crate lazy_static;
@@ -463,8 +464,6 @@ impl<D> Terminal<D> where D: TextDisplay {
         if let Some(slice) = result {
             self.text_display.display_string(slice)?;
             let cursor_pos = self.calc_cursor_pos(slice);
-                    trace!("Wenqiu:cursor_pos {}", cursor_pos);
-
             self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -578,11 +577,10 @@ impl<D> Terminal<D> where D: TextDisplay {
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> {    
         let buffer_width = self.text_display.get_dimensions().0;
-        trace!("Wenqiu:pos {}", self.absolute_cursor_pos);
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x > self.left_shift  {
+        if new_x >= self.left_shift  {
             new_x -= self.left_shift;
         } else {
             new_x = buffer_width  + new_x - self.left_shift;
@@ -911,7 +909,6 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
-        trace!("Wenqiu:{}", terminal.absolute_cursor_pos);
         terminal.cursor_handler()?;        
     }
 

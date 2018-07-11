@@ -435,28 +435,40 @@ pub fn init() -> Result<(), &'static str>{
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    let mut times = 100000;
+    trace!("Wenqiu : drawer 1");
+    let mut times = -1;
 
     if _args.len() > 0 {
         times = _args[0].parse().unwrap();
     }
 
-    let rs= get_window_obj(100, 10, 300, 200);
+   
+    {
+        let rs= get_window_obj(100, 10, 300, 380);
+        trace!("Wenqiu : drawer 2");
+        if rs.is_err() {
+            return -1;
+        }
 
-    if rs.is_err() {
-        return -1;
+        //let window_mutex_opt= rs.ok().expect("Fail to get window object");
+        //let window_arc = window_mutex_opt.upgrade().unwrap();
+        let window_arc = rs.ok().expect("Fail to get window object");
+        let window = window_arc.lock();
+
+
+        let window = &(*window);
+        window.draw_line(30, 60, 50, 90, 0x000000);
     }
-
-    let window_mutex_opt= rs.ok().expect("Fail to get window object");
-    let window_arc = window_mutex_opt.upgrade().unwrap();
-    let window = window_arc.lock();
+    //let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
+    
+    window_manager::check_reference();
 
     let mut a = 0;
-    let window = &(*window);
-    window.draw_line(30, 60, 50, 90, 0x000000);
     loop {
-        
-        a += 1;
+        if times > 0 {
+            a += 1;
+        }
+ 
         /*let point = Graph::Point(Point{x:300, y:200});
         draw_graph(point, 10, 0x00FFFF);
 
@@ -485,7 +497,6 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     }
 
-    delete_window(window_arc);
 
     println!("Hello World");
 
