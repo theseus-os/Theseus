@@ -5,7 +5,7 @@
 //! In the output file, each mangled symbol is replaced by 
 //! its demangled symbol and the trailing hash value, separated by a space.
 //! For example, an input of "_ZN7console4init17h71243d883671cb51E"
-//! produces an output of "input_event_manager::init h71243d883671cb51E".
+//! produces an output of "console::init h71243d883671cb51E".
 
 extern crate rustc_demangle;
 extern crate getopts; 

@@ -554,7 +554,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x > self.left_shift  {
+        if new_x >= self.left_shift  {
             new_x -= self.left_shift;
         } else {
             new_x = buffer_width  + new_x - self.left_shift;

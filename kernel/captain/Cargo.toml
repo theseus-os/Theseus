@@ -40,6 +40,9 @@ path = "../window_manager"
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
 
+[dependencies.input_event_manager]
+path = "../input_event_manager"
+
 [dependencies.input_event_types]
 path = "../input_event_types"
 
@@ -76,9 +79,6 @@ path = "../driver_init"
 [dependencies.e1000]
 path = "../e1000"
 
-[dependencies.input_event_manager]
-path = "../input_event_manager"
-
 [dependencies.task]
 path = "../task"
 
@@ -87,6 +87,9 @@ path = "../scheduler"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
+
+[dependencies.print]
+path = "../print"
 
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies

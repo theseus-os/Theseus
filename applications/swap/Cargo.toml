@@ -10,8 +10,8 @@ getopts = { git = "https://github.com/kevinaboos/getopts" }
 version = "0.7.8"
 default-features = false
 
-[dependencies.input_event_manager]
-path = "../../kernel/input_event_manager"
+[dependencies.print]
+path = "../../kernel/print"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"

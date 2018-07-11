@@ -36,7 +36,8 @@ extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
-#[macro_use] extern crate input_event_manager;
+#[macro_use] extern crate print;
+extern crate input_event_manager;
 extern crate exceptions_full;
 
 

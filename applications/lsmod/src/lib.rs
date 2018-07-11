@@ -3,7 +3,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate input_event_manager;
+#[macro_use] extern crate print;
 
 extern crate getopts;
 extern crate memory;
