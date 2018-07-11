@@ -18,6 +18,7 @@ extern crate frame_buffer;
 #[macro_use] extern crate util;
 
 extern crate acpi;
+extern crate text_display;
 
 
 
@@ -28,6 +29,10 @@ use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
+use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use frame_buffer::text_buffer::{BACKGROUND_COLOR, FrameTextBuffer};
+use text_display::TextDisplay;
+
 //use acpi::get_hpet;
 
 
@@ -105,7 +110,16 @@ impl WindowAllocator{
         }
 
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
-        let mut window:WindowObj = WindowObj{x:x,y:y,width:width,height:height,active:true, consumer:None};
+        let mut window:WindowObj = WindowObj{
+            x:x,
+            y:y,
+            width:width,
+            height:height,
+            active:true, 
+            consumer:None,
+            margin:2,
+            text_buffer:FrameTextBuffer::new(),
+        };
 
         //window.resize(x,y,width,height);
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
@@ -149,7 +163,9 @@ impl WindowAllocator{
         //window.fill(0xffffff);
 
         window.consumer = Some(consumer);
+        window.clean(BACKGROUND_COLOR);
         window.draw_border();
+
         let reference = Arc::new(Mutex::new(window));
         trace!("wenqiu:reference number:{}", Arc::strong_count(&reference));
         self.allocated.push_back(reference.clone());
@@ -184,6 +200,8 @@ impl WindowAllocator{
     }
 
     fn delete(&mut self, window:&Arc<Mutex<WindowObj>>){
+        //TODO clean contents in window
+        
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
@@ -195,6 +213,7 @@ impl WindowAllocator{
         if i < len {
             self.allocated.remove(i);
         }
+
     }
 
     fn check_overlap(&mut self, window:&WindowObj) -> bool {
@@ -248,6 +267,8 @@ pub struct WindowObj {
     active:bool,
     /// a consumer of key input events
     consumer: Option<&'static DFQueueConsumer<Keycode>>,
+    margin:usize,
+    text_buffer:FrameTextBuffer,
 }
 
 
@@ -299,6 +320,10 @@ impl WindowObj{
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 
+    fn clean(&self, color:u32) {
+        frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, color);
+    }
+
     fn get_key_code(&self) -> Option<Keycode> {
         if self.consumer.is_some() {
 
@@ -335,7 +360,7 @@ impl WindowObj{
     }
 
     /// draw a square in a window
-    pub fn draw_square(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
+    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
         if x + width > self.width - 2
             || y + height > self.height - 2 {
             return;
@@ -343,6 +368,38 @@ impl WindowObj{
         //frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, color, true);
         frame_buffer::draw_rectangle(x + self.x + 1, y + self.y + 1, width, height, 
             color);
+    }
+}
+
+/// Implements TextDisplay trait for vga buffer.
+/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
+impl TextDisplay for WindowObj {
+
+    fn disable_cursor(&mut self) {
+        //self.cursor.disable();
+    }
+
+    fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
+        //self.cursor.enabled = true;
+        //self.cursor.update(line as usize, column as usize, reset);
+    }
+
+    fn cursor_blink(&mut self) {
+        //self.cursor.blink ();     
+    }
+
+    /// Returns a tuple containing (buffer height, buffer width)
+    fn get_dimensions(&self) -> (usize, usize) {
+        (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
+    }
+
+    /// Requires that a str slice that will exactly fit the frame buffer
+    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
+    /// Print every byte and fill the blank with background color
+    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
+        self.text_buffer.print_by_bytes(self.x + self.margin, self.y + self.margin, 
+                                        self.width - 2 * self.margin, self.height - 2 * self.margin, 
+                                        slice)     
     }
 }
 

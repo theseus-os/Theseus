@@ -48,6 +48,9 @@ path = "../acpi"
 [dependencies.util]
 path = "../../libs/util"
 
+[dependencies.text_display]
+path = "../text_display"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

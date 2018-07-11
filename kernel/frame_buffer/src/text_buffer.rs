@@ -12,7 +12,7 @@ const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH / CHARACTER_WIDTH;
 const BUFFER_HEIGHT:usize = FRAME_BUFFER_HEIGHT / CHARACTER_HEIGHT;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
-const BACKGROUND_COLOR:u32 = 0x000000;
+pub const BACKGROUND_COLOR:u32 = 0x000000;
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
@@ -47,39 +47,48 @@ impl FrameTextBuffer {
         }
     }
 
-        ///print a string by bytes
-    fn print_by_bytes(&self, slice: &str) -> Result<(), &'static str> {
+    ///print a string by bytes
+    pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, slice: &str) -> Result<(), &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
         let mut cursor_pos = 0;
+
+        let buffer_width = width/CHARACTER_WIDTH;
+        let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
         let buffer = drawer.buffer();
         for byte in slice.bytes() {
             if byte == b'\n' {
-                let bottom = (curr_line + 1) * CHARACTER_HEIGHT;
-                self.fill_blank (buffer, curr_line, curr_column, bottom, BACKGROUND_COLOR);
-                cursor_pos += BUFFER_WIDTH - curr_column;
+                self.fill_blank (buffer, 
+                    x + curr_column * CHARACTER_WIDTH,
+                    y + curr_line * CHARACTER_HEIGHT,
+                    x + width, 
+                    y + (curr_line + 1 )* CHARACTER_HEIGHT, 
+                    BACKGROUND_COLOR);
+                cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
             } else {
-                if curr_column == BUFFER_WIDTH {
+                if curr_column == buffer_width {
                     curr_column = 0;
                     curr_line += 1;
                 }
-                self.print_byte(buffer, byte, FONT_COLOR, curr_line, curr_column);
+                self.print_byte(buffer, byte, FONT_COLOR, x, y, curr_line, curr_column);
                 curr_column += 1;
                 cursor_pos += 1;
             }
         }
-        self.fill_blank (buffer, curr_line + 1, 0, FRAME_BUFFER_HEIGHT, BACKGROUND_COLOR);
+        self.fill_blank (buffer, 
+            x, (y + curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
+            BACKGROUND_COLOR);
 
         Ok(())
     }
 
-    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, line:usize, column:usize) {
-        let x = column * CHARACTER_WIDTH;
-        let y = line * CHARACTER_HEIGHT;
+    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, left:usize, top:usize, line:usize, column:usize) {
+        let x = left + column * CHARACTER_WIDTH;
+        let y = top + line * CHARACTER_HEIGHT;
         let mut i = 0;
         let mut j = 0;
 
@@ -99,13 +108,13 @@ impl FrameTextBuffer {
         }
     }
 
-    fn fill_blank(&self, buffer:&mut Buffer, line:usize, column:usize, bottom:usize, color:u32){
-        let mut x = column * CHARACTER_WIDTH;
-        let mut y = line * CHARACTER_HEIGHT;
+    fn fill_blank(&self, buffer:&mut Buffer, left:usize, top:usize, right:usize, bottom:usize, color:u32){
+        let mut x = left;
+        let mut y = top;
         loop {
-            if x == FRAME_BUFFER_WIDTH {
+            if x == right {
                 y += 1;
-                x = column * CHARACTER_WIDTH;
+                x = left;
             }
             if y == bottom {
                 break;
@@ -114,6 +123,7 @@ impl FrameTextBuffer {
             x += 1;
         }
     }
+    
 }
 
 
@@ -143,7 +153,7 @@ impl TextDisplay for FrameTextBuffer {
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-        self.print_by_bytes (slice)     
+        self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
 }
 

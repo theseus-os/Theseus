@@ -31,6 +31,7 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use window_manager::get_window_obj;
 
 lazy_static! {
     // maps the terminal reference number to the current task id
@@ -914,6 +915,13 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
     use core::ops::Deref;
     let mut refresh_display = false;
+
+    let window_ref= get_window_obj(100, 10, 300, 380)?;
+    
+    let mut window = window_ref.lock();
+    window.display_string("This is a new window")?;
+    window_manager::delete_window(&window_ref);
+
     loop {
         
         // Handles events from the print queue. The queue is "empty" is peek() returns None
