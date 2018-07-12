@@ -40,8 +40,11 @@ path = "../window_manager"
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_manager]
+path = "../input_event_manager"
+
+[dependencies.input_event_types]
+path = "../input_event_types"
 
 [dependencies.memory]
 path = "../memory"
@@ -77,9 +80,6 @@ path = "../driver_init"
 path = "../e1000"
 features = ["udp_server"]
 
-[dependencies.console]
-path = "../console"
-
 [dependencies.task]
 path = "../task"
 
@@ -91,6 +91,10 @@ path = "../../libs/keycodes_ascii"
 
 [dependencies.network]
 path = "../network"
+
+[dependencies.print]
+path = "../print"
+
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
 [target.'cfg(target_feature = "sse2")'.dependencies.simd_test]

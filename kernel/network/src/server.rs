@@ -53,7 +53,6 @@ pub fn server_init(_: Option<u64>) {
 
     let mut tcp_6970_active = false;
 
-
     let device = EthernetDevice{
         tx_next: 0,
         rx_next: 0,

@@ -1,0 +1,8 @@
+[package]
+name = "print"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>"]
+
+[dependencies]
+[dependencies.input_event_manager]
+path = "../input_event_manager"

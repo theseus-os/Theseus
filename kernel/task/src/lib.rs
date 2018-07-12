@@ -49,14 +49,13 @@ use core::any::Any;
 use alloc::String;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
-use spin::RwLock;
 
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
-use mod_mgmt::metadata::LoadedCrate;
+use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
 
 
@@ -190,7 +189,7 @@ pub struct Task {
     pub is_an_idle_task: bool,
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
     /// that contains the backing memory regions and sections for running this `Task`'s object file 
-    pub app_crate: Option<Arc<RwLock<LoadedCrate>>>,
+    pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
 }

@@ -1,7 +1,7 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate console_types;
+extern crate input_event_types;
 extern crate ata_pio;
 extern crate e1000;
 extern crate memory;
@@ -14,7 +14,7 @@ extern crate mouse;
 
 
 use dfqueue::DFQueueProducer;
-use console_types::ConsoleEvent;
+use input_event_types::Event;
 use memory::{MemoryManagementInfo, PageTable};
 use pci::get_pci_device_vd;
 
@@ -47,8 +47,8 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
 
 
 
-pub fn init(console_producer: DFQueueProducer<ConsoleEvent>) -> Result<(), &'static str>  {
-    keyboard::init(console_producer);
+pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
+    keyboard::init(keyboard_producer);
     mouse::init();
 
     

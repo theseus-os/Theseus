@@ -27,7 +27,7 @@
 //! KAB:  yeah, agreed. What about something ship-themed? I really like "plank"? Or maybe there's a more modern word for "ship part"?
 //! 
 //! The `captain` steers the ship of Theseus, meaning that it contains the logic that initializes and connects all the other module crates in the proper order and with the proper flow of data between modules. 
-//! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a console thread and createsa queue to send keyboard presses to the console, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test Tasks (liable to change).     
+//! Currently, the default `captain` in Theseus loads a bunch of crates, then initializes ACPI and APIC to discover multicore configurations, sets up interrupt handlers, spawns a input_event_manager thread and createsa queue to send keyboard presses to the input_event_manager, boots up other cores (APs), unmaps the initial identity-mapped pages, and then finally spawns some test Tasks (liable to change).     
 //! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. It then falls into an idle loop that does nothing except yields the processor to another Task.    
 //!
 
@@ -40,8 +40,8 @@
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-//! * `console`: A console implementation that allows simple printing to the screen.
-//! * `console_types`: A temporary way to move the console typedefs out of the console crate.
+//! * `input_event_manager`: A input_event_manager implementation that allows simple printing to the screen.
+//! * `input_event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `driver_init`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.

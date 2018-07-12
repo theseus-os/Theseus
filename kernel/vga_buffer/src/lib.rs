@@ -13,11 +13,13 @@ extern crate port_io;
 extern crate serial_port;
 extern crate spin;
 extern crate volatile;
-extern crate log;
+extern crate text_display;
 
+#[macro_use] extern crate log;
+
+use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
-use alloc::Vec;
 use core::mem;
 use kernel_config::memory::KERNEL_OFFSET;
 use port_io::Port;
@@ -32,7 +34,6 @@ const BUFFER_HEIGHT: usize = 25;
 /// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
 
-// #[macro_export] pub mod raw;
 pub mod raw;
 
 type Line = [ScreenChar; BUFFER_WIDTH];
@@ -55,94 +56,44 @@ const RIGHT_BIT_SHIFT: u8 = 8;
 const DISABLE_SEQ_1: u8 = 0x0A;
 const DISABLE_SEQ_2: u8 = 0x20;
 
-pub fn enable_cursor() {
-    unsafe {
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-        let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
-        CURSOR_PORT_END.lock().write(temp_read);
-        CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-        let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
-        CURSOR_PORT_END.lock().write(temp_read2);
-    }
-}
-
-pub fn update_cursor(x: u16, y: u16) {
-    let pos: u16 = y * BUFFER_WIDTH as u16 + x;
-    unsafe {
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
-        CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
-        CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
-        CURSOR_PORT_END
-            .lock()
-            .write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
-    }
-}
-
-pub fn disable_cursor() {
-    unsafe {
-        CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
-        CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-    }
-}
 
 /// An instance of a VGA text buffer which can be displayed to the screen.
-pub struct VgaBuffer {
-    /// represents the passed-in string into the form of lines that can fit on the vga buffer
-    display_lines: Vec<Line>,
+pub struct VgaBuffer { }
+impl VgaBuffer {
+    pub fn new() -> VgaBuffer {
+        VgaBuffer { }
+    }
 }
 
-impl VgaBuffer {
-    /// Create a new VgaBuffer.
-    pub fn new() -> VgaBuffer {
-        VgaBuffer::with_capacity(1000)
-    }
 
-    /// Create a new VgaBuffer with the given initial capacity, specified in number of lines.
-    pub fn with_capacity(num_initial_lines: usize) -> VgaBuffer {
-        let first_line = BLANK_LINE;
-        let mut lines = Vec::with_capacity(num_initial_lines);
-        lines.push(first_line);
-        let display_lines = Vec::with_capacity(num_initial_lines);
-        VgaBuffer {
-            display_lines: display_lines,
-        }
-    }
+/// Implements TextDisplay trait for vga buffer.
+/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
+impl TextDisplay for VgaBuffer {
+    /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
+    /// which correspond to the column and row (line) respectively 
+    fn set_cursor(&self, x: u16, y: u16) {
+        let pos: u16 = y * BUFFER_WIDTH as u16 + x;
 
-    /// Enables the cursor by writing to four ports
-    pub fn enable_cursor(&self) {
         unsafe {
-            let cursor_start = 0b00000001;
-            let cursor_end = 0b00010000;
+            // enables cursor 
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | cursor_start;
+            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
             CURSOR_PORT_END.lock().write(temp_read);
             CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | cursor_end;
+            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
             CURSOR_PORT_END.lock().write(temp_read2);
-        }
-        return;
-    }
-
-    /// Update the cursor based on the given x and y coordinates,
-    /// which correspond to the column and row (line) respectively
-    /// Note that the coordinates must correspond to the absolute coordinates the cursor should be
-    /// displayed onto the buffer, not the coordinates relative to the 80x24 grid
-    pub fn update_cursor(&self, x: u16, y: u16) {
-        let pos: u16 = y * BUFFER_WIDTH as u16 + x;
-        unsafe {
+            // updates cursor 
             CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
             CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
             CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
-            CURSOR_PORT_END
-                .lock()
-                .write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
+            CURSOR_PORT_END.lock().write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
         }
         return;
     }
 
     /// Disables the cursor
     /// Still maintains the cursor's position
-    pub fn disable_cursor(&self) {
+    fn disable_cursor(&self) {
         unsafe {
             CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
             CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
@@ -150,59 +101,55 @@ impl VgaBuffer {
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
-    pub fn get_dimensions(&self) -> (usize, usize) {
+    fn get_dimensions(&self) -> (usize, usize) {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
 
     /// Requires that a str slice that will exactly fit the vga buffer
-    /// The calculation is done inside the console crate by the print_to_vga function and associated methods
+    /// The calculation is done inside the input_event_manager crate by the print_to_vga function and associated methods
     /// Parses the string into line objects and then prints them onto the vga buffer
-    pub fn display_string(&mut self, slice: &str) -> Result<usize, &'static str> {
+    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         let mut curr_column = 0;
         let mut new_line = BLANK_LINE;
-        let mut cursor_pos = 0;
+        let mut i = 0;
+        use core::ptr::write_volatile;
         // iterates through the string slice and puts it into lines that will fit on the vga buffer
         for byte in slice.bytes() {
-            if byte == b'\n' {
-                self.display_lines.push(new_line);
+            if byte == b'\n' { // if we reach a line break
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                unsafe { write_volatile(addr, new_line); }
                 new_line = BLANK_LINE;
-                cursor_pos += BUFFER_WIDTH - curr_column;
                 curr_column = 0;
-            } else {
+                i += 1;
+            } else { // if we reach the end of the line with no line break
                 if curr_column == BUFFER_WIDTH {
                     curr_column = 0;
-                    self.display_lines.push(new_line);
+                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+                    unsafe { write_volatile(addr, new_line); }
+                    i += 1;
                     new_line = BLANK_LINE;
                 }
                 new_line[curr_column] = ScreenChar::new(byte, ColorCode::default());
                 curr_column += 1;
-                cursor_pos += 1;
             }
         }
-        self.display_lines.push(new_line);
 
-        let iterator = self.display_lines.len();
-        // Writes the lines to the vga buffer
-        unsafe {
-            use core::ptr::write_volatile;
-            for (i, line) in (0..iterator).enumerate() {
-                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                write_volatile(addr, self.display_lines[line]);
-            }
+        // writes the last line not covered in the loop
+        let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
+        unsafe { write_volatile(addr, new_line); }
 
-            // fill the rest of the space, if any, with blank lines
-            if iterator < BUFFER_HEIGHT {
-                for i in iterator..BUFFER_HEIGHT {
-                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                    // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
-                    write_volatile(addr, BLANK_LINE);
-                }
+        // fills the remainder of the vga buffer with blank lines if there any unfilled ones
+        if i < BUFFER_HEIGHT -1 {
+            for j in i+1..BUFFER_HEIGHT {
+                let addr = (VGA_BUFFER_VIRTUAL_ADDR + j * mem::size_of::<Line>()) as *mut Line;
+                // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
+                unsafe { write_volatile(addr, BLANK_LINE); }
             }
         }
-        self.display_lines = Vec::with_capacity(1000);
-        Ok(cursor_pos)
+        Ok(())
     }
 }
+
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
