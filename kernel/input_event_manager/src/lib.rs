@@ -9,81 +9,68 @@ extern crate spawn;
 extern crate task;
 extern crate memory;
 // temporary, should remove this once we fix crate system
-extern crate console_types; 
+extern crate input_event_types; 
 extern crate terminal;
 extern crate frame_buffer;
+extern crate window_manager;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 
 use frame_buffer::text_buffer::FrameTextBuffer;
-use console_types::{ConsoleEvent};
+use input_event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
 use alloc::string::ToString;
-use alloc::arc::Arc;
 use alloc::btree_map::BTreeMap;
-use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
-// / Calls `print!()` with an extra newilne ('\n') appended to the end. 
-#[macro_export]
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-
-}
-
-/// The main printing macro, which simply pushes an output event to the console's event queue. 
-/// This ensures that only one thread (the console acting as a consumer) ever accesses the GUI.
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ({
-        $crate::print_to_console_args(format_args!($($arg)*));
-    });
-}
-
-
 lazy_static! {
-    /// Global map that maps the terminal reference number to a producer for its input queue
-    /// More info about terminal queues located in the Temrinal crate
-    static ref TERMINAL_INPUT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<ConsoleEvent>>>> = Arc::new(Mutex::new(BTreeMap::new()));
     // Tracks which terminal is currently being focused on
     static ref CURRENT_TERMINAL_NUM: AtomicUsize  = AtomicUsize::new(0);
 }
 
 use core::fmt;
-/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the console.
-pub fn print_to_console_args(fmt_args: fmt::Arguments) {
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the input_event_manager. FIX THIS
+/// This function is currently in the input_event_manager crate because this crate is the only one that is aware of the focused terminal window
+pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     let num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
     // Passes the current terminal number (the one being focused on) to whoever is printing so it knows whether or not to refresh its display
-    let _result = terminal::print_to_console(format!("{}", fmt_args), num);
+    let _result = terminal::print_to_stdout(format!("{}", fmt_args), num);
 }
 
 
 // Defines the max number of terminals that can be running 
 const MAX_TERMS: usize = 9;
 
-
-/// Initializes the console by spawning a new thread to handle all console events, and creates a new event queue. 
-/// This event queue's consumer is given to that console thread, and a producer reference to that queue is returned. 
-/// This allows other modules to push console events onto the queue. 
-pub fn init() -> Result<DFQueueProducer<ConsoleEvent>, &'static str> {
-    let keyboard_event_handling_queue: DFQueue<ConsoleEvent> = DFQueue::new();
+/// Initializes the input_event_manager by spawning a new thread to handle all input_event_manager events, and creates a new event queue. 
+/// This event queue's consumer is given to that input_event_manager thread, and a producer reference to that queue is returned. 
+/// This allows other modules to push input_event_manager events onto the queue. 
+pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
+    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-    let frame_buffer = FrameTextBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
+    // let frame_buffer = FrameTextBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
     // Initializes the default kernel terminal
-    let kernel_producer = terminal::Terminal::init(frame_buffer, 0)?;
-    TERMINAL_INPUT_PRODUCERS.lock().insert(0, kernel_producer);
+
+
+    // FIX: don't use unwrap here and 50 lines down
+    use core::ops::Deref;
+    let window_object = window_manager::get_window_obj(20, 20, 200, 150).unwrap();
+
+    let kernel_producer = terminal::Terminal::init(window_object, 0)?;
+    let mut terminal_input_producers = BTreeMap::new();
+    // populates a struct with the args needed for input_event_loop
+    terminal_input_producers.insert(0, kernel_producer);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
-    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
+    let input_event_loop_args = (keyboard_event_handling_consumer, terminal_input_producers);
+    spawn::spawn_kthread(input_event_loop, input_event_loop_args , "main input event handling loop".to_string(), None)?;
     Ok(returned_keyboard_producer)
 }
 
 /// Main infinite loop that handles DFQueue input and output events
-fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str> {
+fn input_event_loop((mut consumer, mut terminal_input_producers): (DFQueueConsumer<Event>, BTreeMap<usize, DFQueueProducer<Event>>)) -> Result<(), &'static str> {
     // variable to track which terminal the user is currently focused on
     // terminal objects have a field term_ref that can be used for this purpose
     let mut terminal_id_counter: usize = 1;
@@ -99,26 +86,28 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
             _ => { continue; }
         };
         match event.deref() {
-            &ConsoleEvent::ExitEvent => {
+            &Event::ExitEvent => {
                 return Ok(()); 
             }
 
-            &ConsoleEvent::InputEvent(ref input_event) => {
+            &Event::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
                 // Ctrl + T makes a new terminal tab
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed 
                 && terminal_id_counter < MAX_TERMS {
                     // Switches focus to this terminal
                     CURRENT_TERMINAL_NUM.store(terminal_id_counter , Ordering::SeqCst); // -1 for 0-indexing
-                    let frame_buffer = FrameTextBuffer::new();
-                    let terminal_producer = terminal::Terminal::init(frame_buffer, terminal_id_counter)?;
-                    TERMINAL_INPUT_PRODUCERS.lock().insert(terminal_id_counter , terminal_producer);
+                    // let vga_buffer = VgaBuffer::new();
+
+                    let window_object = window_manager::get_window_obj(20, 450, 200, 150).unwrap();
+                    let terminal_producer = terminal::Terminal::init(window_object, terminal_id_counter)?;
+                    terminal_input_producers.insert(terminal_id_counter , terminal_producer);
                     meta_keypress = true;
                     terminal_id_counter += 1;
                     event.mark_completed();
                 }
                 // Ctrl + num switches between existing terminal tabs
-                if key_input.modifiers.control && key_input.action == KeyAction::Pressed &&(
+                if key_input.modifiers.control && key_input.action == KeyAction::Pressed && (
                     key_input.keycode == Keycode::Num1 ||
                     key_input.keycode == Keycode::Num2 ||
                     key_input.keycode == Keycode::Num3 ||
@@ -175,8 +164,6 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
                     }
                 }
 
-
-
             }
             _ => { }
         }
@@ -184,15 +171,14 @@ fn input_event_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'sta
         // If the keyevent was not for control of the terminal windows
         if !meta_keypress {
             // Clones the input keypress event
-            let console_event = event.deref().clone();
-            let terminal_input_producers_lock = TERMINAL_INPUT_PRODUCERS.lock(); 
+            let input_event = event.deref().clone();
             // Gets the input event producer for the terminal that's currently being focused on
             let current_terminal_num = CURRENT_TERMINAL_NUM.load(Ordering::SeqCst);
-            let result = terminal_input_producers_lock.get(&current_terminal_num);
+            let result = terminal_input_producers.get(&current_terminal_num);
             if let Some(term_input_producer) = result {
                 // Enqueues the copied input key event as well as a display event to signal 
                 // that the terminal should refresh and display to the vga buffer
-                term_input_producer.enqueue(console_event);
+                term_input_producer.enqueue(input_event);
                 event.mark_completed();
             }
         }

@@ -21,7 +21,7 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-extern crate console_types; // a temporary way to use console types 
+extern crate input_event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
@@ -38,7 +38,8 @@ extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
 
-#[macro_use] extern crate console;
+#[macro_use] extern crate print;
+extern crate input_event_manager;
 extern crate exceptions_full;
 
 
@@ -63,7 +64,7 @@ use frame_buffer::text_buffer;
 
 
 
-/// the callback use in the logger crate for mirroring log functions to the console
+/// the callback use in the logger crate for mirroring log functions to the input_event_manager
 pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
     println!("{} {}", prefix, args);
 }
@@ -131,11 +132,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    // initialize the kernel console
-    let console_queue_producer = console::init()?;
+    // initialize the kernel input_event_manager
+    let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers
-    driver_init::init(console_queue_producer)?;
+    driver_init::init(input_event_queue_producer)?;
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;

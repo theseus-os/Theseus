@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "console"
-description = "A console (terminal emulator) implementation"
+name = "input_event_manager"
+description = "A input_event_manager (terminal emulator) implementation"
 version = "0.1.0"
 
 
@@ -31,8 +31,8 @@ version = "0.1.0"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_types]
+path = "../input_event_types"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -47,7 +47,7 @@ path  = "../memory"
 path = "../mod_mgmt"
 
 [dependencies.terminal]
-path = "../terminal"
+path = "../../applications/terminal"
 
 [dependencies.text_display]
 path = "../text_display"

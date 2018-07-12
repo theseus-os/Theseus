@@ -21,7 +21,7 @@ version = "1.0"
 path = "../../libs/keycodes_ascii"
 
 [dependencies.window_manager]
-path = "../window_manager"
+path = "../../kernel/window_manager"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
@@ -30,26 +30,27 @@ version = "0.1.0"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_types]
+path = "../../kernel/input_event_types"
 
 [dependencies.spawn]
-path = "../spawn"
+path = "../../kernel/spawn"
 
 [dependencies.task]
-path = "../task"
+path = "../../kernel/task"
 
 [dependencies.memory]
-path  = "../memory"
+path  = "../../kernel/memory"
 
 [dependencies.mod_mgmt]
-path = "../mod_mgmt"
+path = "../../kernel/mod_mgmt"
 
 [dependencies.text_display]
-path = "../text_display"
+path = "../../kernel/text_display"
+
 
 [dependencies.frame_buffer]
-path = "../frame_buffer"
+path = "../../kernel/frame_buffer"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
