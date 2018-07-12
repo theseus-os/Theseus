@@ -111,6 +111,9 @@ impl FrameTextBuffer {
     fn fill_blank(&self, buffer:&mut Buffer, left:usize, top:usize, right:usize, bottom:usize, color:u32){
         let mut x = left;
         let mut y = top;
+        if left > right || top > bottom {
+            return
+        }
         loop {
             if x == right {
                 y += 1;

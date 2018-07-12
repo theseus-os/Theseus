@@ -50,7 +50,7 @@ static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
 
 
 struct WindowAllocator {
-    allocated: VecDeque<Arc<Mutex<WindowObj>>>, //The last one is active
+    allocated: VecDeque<Weak<Mutex<WindowObj>>>, //The last one is active
 }
 
 /// switch the active window
@@ -123,42 +123,19 @@ impl WindowAllocator{
 
         //window.resize(x,y,width,height);
         let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
-        //let overlapped = self.check_overlap(&window);
-        let mut overlapped = false;
-        let mut len = self.allocated.len();
-        let mut i = 0;
-        while i < len {
-            let mut remove = false;
-            {   
-
-
-                let item = self.allocated.get(i).unwrap();
-                trace!("Wenqiu: reference number {}",Arc::strong_count(item));
-
-                let allocated_window = item.lock();
-                if window.is_overlapped(&(*allocated_window)) {
-                    if Arc::weak_count(item) > 1 {
-                        overlapped = true;
-                    } else {
-                        remove = true;
-                    }
-                }
-            }
-            if remove {
-                self.allocated.remove(i);
-                len -= 1;
-            } else {
-                i += 1;
-            }
-        }
-
+        let overlapped = self.check_overlap(&window);
+        
         if overlapped  {
             trace!("Request area is already allocated");
             return Err("Request area is already allocated");
         }
         for item in self.allocated.iter_mut(){
-            let mut allocated_window = item.lock();
-            (*allocated_window).active(false);
+            let reference = item.upgrade();
+            if reference.is_some(){
+                let mut allocated_window = reference.unwrap();
+                let mut allocated_window = allocated_window.lock();
+                (*allocated_window).active(false);
+            }
         }
         //window.fill(0xffffff);
 
@@ -167,9 +144,7 @@ impl WindowAllocator{
         window.draw_border();
 
         let reference = Arc::new(Mutex::new(window));
-        trace!("wenqiu:reference number:{}", Arc::strong_count(&reference));
-        self.allocated.push_back(reference.clone());
-        trace!("wenqiu:reference number:{}", Arc::strong_count(&reference));
+        self.allocated.push_back(Arc::downgrade(&reference));
         self.check_reference();
         //let reference = self.allocated.back(), "WindowAllocator fails to get new window reference")); 
         Ok(reference)
@@ -180,20 +155,30 @@ impl WindowAllocator{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
 //            unsafe{ item.force_unlock();}
-            let mut window = item.lock();
-            if flag {
-                (*window).active(true);
-                flag = false;
-            } else if window.active {
-                (*window).active(false);
-                flag = true;
+            let reference = item.upgrade();
+            if reference.is_some() {
+                let mut window = reference.unwrap();
+                let mut window = window.lock();
+                if flag {
+                    (*window).active(true);
+                    flag = false;
+                } else if window.active {
+                    (*window).active(false);
+                    flag = true;
+                }
             }
         }
         if flag {
-            let item = try_opt!(self.allocated.front_mut());
- //           unsafe{ item.force_unlock();}
-            let mut window = item.lock();
-            (*window).active(true);
+            for item in self.allocated.iter_mut(){
+    //            unsafe{ item.force_unlock();}
+                let reference = item.upgrade();
+                if reference.is_some() {
+                    let mut window = reference.unwrap();
+                    let mut window = window.lock();
+                    (*window).active(true);
+                    break;
+                }
+            }
         }
 
         Some("End")
@@ -205,8 +190,11 @@ impl WindowAllocator{
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
-            if Arc::ptr_eq(item, window) {
-                break;
+            let reference = item.upgrade();
+            if reference.is_some() {
+                if Arc::ptr_eq(&(reference.unwrap()), window) {
+                    break;
+                }
             }
             i += 1;
         }
@@ -222,33 +210,30 @@ impl WindowAllocator{
         while i < len {
             let mut remove = false;
             {   
-                let item = self.allocated.get(i).unwrap();
-                let allocated_window = item.lock();
-                if window.is_overlapped(&(*allocated_window)) {
-                    if Arc::weak_count(item) > 1 {
+                let reference = self.allocated.get(i).unwrap().upgrade();
+                if reference.is_some() {
+                    let allocated_window = reference.unwrap();
+                    let allocated_window = allocated_window.lock();
+                    if window.is_overlapped(&(*allocated_window)) {
                         return true;
-                    } else {
-                        remove = true;
                     }
+                    i += 1;
+                } else {
+                    self.allocated.remove(i);
+                    len -= 1;
                 }
-            }
-            if remove {
-                self.allocated.remove(i);
-                len -= 1;
-            } else {
-                i += 1;
             }
         }
         false
     }
 
     fn check_reference(&mut self) -> bool {
-        if self.allocated.len() == 0{
+/*        if self.allocated.len() == 0{
             return false;
         }
         let item = self.allocated.get(0).unwrap();
         trace!("Wenqiu: reference number {}",Arc::strong_count(item));
-        return false;
+  */      return false;
     }
 
 }

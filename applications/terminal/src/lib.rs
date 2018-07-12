@@ -465,16 +465,17 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
-    let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
-    self.scroll_start_idx = start_idx;
-    let result = self.scrollback_buffer.get(start_idx..end_idx);
-    if let Some(slice) = result {
-        self.text_display.lock().display_string(slice)?;
-        self.absolute_cursor_pos = cursor_pos;
-    } else {
-        return Err("could not get slice of scrollback buffer string");
-    }
-    Ok(())
+    
+        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
+        self.scroll_start_idx = start_idx;
+        let result = self.scrollback_buffer.get(start_idx..end_idx);
+        if let Some(slice) = result {
+            self.text_display.lock().display_string(slice)?;
+            self.absolute_cursor_pos = cursor_pos;
+        } else {
+            return Err("could not get slice of scrollback buffer string");
+        }
+        Ok(())
     }
 
 
@@ -543,7 +544,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     
 
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self) -> Result<(), &'static str> {    
+    fn cursor_handler(&mut self) -> Result<(), &'static str> { 
         let buffer_width = self.text_display.lock().get_dimensions().0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
