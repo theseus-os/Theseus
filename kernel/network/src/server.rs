@@ -28,7 +28,7 @@ pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
 pub fn server_init(_: Option<u64>) {
 
     // For UDP
-
+    debug!("starting udp");
     // max sizes for the buffer - change if needed
     let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 1024])]);
     let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 1024])]);
@@ -86,7 +86,7 @@ pub fn server_init(_: Option<u64>) {
     UDP_TEST_SERVER.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
-
+    debug!("before loop");
     // Main loop for the server
     loop {
 

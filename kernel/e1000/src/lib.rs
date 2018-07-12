@@ -711,7 +711,8 @@ impl Nic{
 
         /// Send a packet, called by a function higher in the network stack
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
-        /*pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
+        #[cfg(not(feature = "udp_server"))]
+        pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 let t_ptr = translate_v2p(p_data);
@@ -746,7 +747,10 @@ impl Nic{
                 }  //bit 0 should be set when done
                 debug!("Packet is sent!");  
                 Ok(())
-        }*/
+        }
+
+        /// Send a packet function called by the udp server
+        #[cfg(feature = "udp_server")]
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {    
                 let t_ptr = translate_v2p(p_data);
                 let ptr;
@@ -764,32 +768,12 @@ impl Nic{
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
 
-                // Original code from Ramla's code, removed to improve the performance
+                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);  
 
-                // debug!("pre-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                // self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                // debug!("THD {}",self.read_command(REG_TXDESCHEAD));            
-                // debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
-                // debug!("Waiting for packet to send!");
- 
-
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
                 // below to commands are inserted to prevent some timing issues in the ethernet driver - hardware bugs
                 self.read_command(REG_TXDESCTAIL);
                 self.read_command(REG_TXDESCTAIL);
-
-                // Original code from Ramla's code, removed to improve the performance
-
-                // while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
-                //         //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                //         //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-                // }  //bit 0 should be set when done 
-                // debug!("Packet is sent!");  
-                
+    
                 Ok(())
         }
 

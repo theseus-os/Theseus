@@ -75,6 +75,7 @@ path = "../driver_init"
 
 [dependencies.e1000]
 path = "../e1000"
+features = ["udp_server"]
 
 [dependencies.console]
 path = "../console"
