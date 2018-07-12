@@ -97,13 +97,7 @@ impl Counter {
     /// If it's a PMC, writes the UMASK and Event Code to the relevant MSR, but leaves enable bit clear.  
     pub fn new(event: &'static str) -> Result<Counter, &'static str> {
         // ensures PMU available and initialized
-        if let Some(version) = PMU_VERSION.try() {
-            if version < &1 {
-                return Err("Version ID of 0: Performance monitoring not supported in this environment(likely either due to virtualization without hardware acceleration or old CPU).")
-            }
-        } else {
-            return Err("PMU not yet initialized.")
-        }
+        check_pmu_availability()?;
         
         match event {
             "INST_RETIRED.ANY" => return safe_rdpmc(RDPMC_FFC0),
@@ -209,22 +203,15 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 /// Calls the rdpmc function which is a wrapper for the x86 rdpmc instruction. This function ensures that performance monitoring is 
 /// initialized and enabled.    
 pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
+    check_pmu_availability()?;
+
     let my_core;
     if let Some(my_task) = get_my_current_task() {
         my_core = my_task.write().running_on_cpu as i32;
     } else {
         return Err("Task structure not yet started. Must be initialized before counting events.");
     }
-    // if performance monitoring has not been initialized or is unaivalable, returns an error, otherwise returns counter value
-    // ensures PMU available and initialized
-    if let Some(version) = PMU_VERSION.try() {
-        if version < &1 {
-            return Err("Version ID of 0: Performance monitoring not supported in this environment(likely either due to virtualization without hardware acceleration or old CPU).")
-        }
-    } else {
-        return Err("PMU not yet initialized.")
-    }
-    
+
     let count = rdpmc(msr_mask);
     return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: my_core});
 }
@@ -232,8 +219,14 @@ pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
 /// It's important to do the rdpmc as quickly as possible when it's called. 
 /// Calling get_my_current_task() and doing the calculations to unpack the result adds cycles, so I created a version where the core can be passed down.
 pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static str> {
-    // if performance monitoring has not been initialized or is unaivalable, returns an error, otherwise returns counter value
-    // ensures PMU available and initialized
+    check_pmu_availability()?;
+    
+    let count = rdpmc(msr_mask);
+    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
+}
+
+/// Checks to ensure that PMU has been initialized and that if the PMU has been initialized, the Version ID shows that the system has performance monitoring capabilities. 
+fn check_pmu_availability() -> Result<(), &'static str>  {
     if let Some(version) = PMU_VERSION.try() {
         if version < &1 {
             return Err("Version ID of 0: Performance monitoring not supported in this environment(likely either due to virtualization without hardware acceleration or old CPU).")
@@ -241,16 +234,18 @@ pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static
     } else {
         return Err("PMU not yet initialized.")
     }
-    
-    let count = rdpmc(msr_mask);
-    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
+
+    Ok(())
 }
 
-/// Function to start interrupt process in order to take samples using PMU. 
-pub fn start_samples(event_type: &'static str, event_per_sample: u32) {    
+/// Start interrupt process in order to take samples using PMU. IPs sampled are stored in IP_LIST
+pub fn start_samples(event_type: &'static str, event_per_sample: u32) -> Result<(),&'static str> {    
+    if event_per_sample >= 0xffffffff || event_per_sample <= 0 {
+        return Err("Number of events per sample invalid: must be within unsigned 32 bit");
+    }
     let start_value = 0xffffffff - event_per_sample;
-    
-    //TODO: some sort of check to make sure a valid event_type
+    check_pmu_availability()?;
+
     let event_mask = match event_type {
         "INST_RETIRED.ANY" => UNHALTED_CYCLE_MASK,
         "CPU_CLK_UNHALTED.THREAD" => INST_RETIRED_MASK,
@@ -259,17 +254,20 @@ pub fn start_samples(event_type: &'static str, event_per_sample: u32) {
         "LONGEST_LAT_CACHE.MISS" => LLC_MISS_MASK,
         "BR_INST_RETIRED.ALL_BRANCHES" => BR_INST_RETIRED_MASK,
         "BR_MISP_RETIRED.ALL_BRANCHES" => BR_MISS_RETIRED_MASK,	
-        _ => UNHALTED_CYCLE_MASK,
+        _ => return Err("Invalid event type"),
     } | PMC_ENABLE | INTERRUPT_ENABLE;
     SAMPLE_START_VALUE.store(start_value, Ordering::SeqCst);
     SAMPLE_EVENT_TYPE_MASK.store(event_mask as u32, Ordering::SeqCst);
+    
     unsafe{
-    wrmsr(IA32_PMC0, start_value as u64);
-    wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+        wrmsr(IA32_PMC0, start_value as u64);
+        wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
     }
+
+    Ok(())
 }
 
-/// Function to stop the sampling interrupts. 
+/// Function to manually stop the sampling interrupts. 
 pub fn stop_samples() {
     unsafe{
         wrmsr(IA32_PERFEVTSEL0, 0);
