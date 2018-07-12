@@ -80,7 +80,7 @@ impl FrameTextBuffer {
             }
         }
         self.fill_blank (buffer, 
-            x, (y + curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
+            x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
             BACKGROUND_COLOR);
 
         Ok(())
