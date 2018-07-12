@@ -15,7 +15,7 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE};
+use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT};
 use core::sync::atomic::Ordering;
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -89,18 +89,22 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 /// exception 0x02, also used for TLB Shootdown IPIs
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        debug!("OVERFLOW DETECTED");
-        debug!("{}", rdmsr(IA32_PERF_GLOBAL_CTRL));
+        
+        let event_mask = rdmsr(IA32_PERFEVTSEL0);
+        let current_count = SAMPLE_COUNT.load(Ordering::SeqCst);
+        if current_count == 0 {
+            pmu_x86::stop_samples();
+            return;
+        }
+
+        SAMPLE_COUNT.store(current_count - 1, Ordering::SeqCst);
+        IP_LIST.lock().push(stack_frame.instruction_pointer);
         unsafe {
             wrmsr(IA32_PERFEVTSEL0, 0);
             wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
             wrmsr(IA32_PMC0, SAMPLE_START_VALUE.load(Ordering::SeqCst) as u64);
-            debug!("Before it's enabled: {:#x}", rdmsr(IA32_PMC0));
-            wrmsr(IA32_PERFEVTSEL0, SAMPLE_EVENT_TYPE_MASK.load(Ordering::SeqCst) as u64);
-            debug!("After it's enabled: {:#x}", rdmsr(IA32_PMC0));
-
+            wrmsr(IA32_PERFEVTSEL0, event_mask);
         }
-
         return;
     }
 

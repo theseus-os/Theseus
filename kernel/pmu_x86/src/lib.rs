@@ -2,6 +2,8 @@
 
 #![no_std]
 #![feature(integer_atomics)]
+#![feature(asm)]
+#![feature(alloc)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -9,24 +11,32 @@ extern crate x86_64;
 extern crate raw_cpuid;
 extern crate atomic_linked_list;
 extern crate task;
+extern crate memory;
+extern crate irq_safety;
+extern crate alloc;
 #[macro_use] extern crate log;
 
 use x86_64::registers::msr::*;
-use x86_64::instructions::rdpmc;
+use x86_64::VirtualAddress;
 use raw_cpuid::*;
 use spin::Once;
 use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
 use core::sync::atomic::{AtomicU32, Ordering};
+use irq_safety::MutexIrqSafe;
+use alloc::vec::Vec;
 
+//the number of samples to be taken, each sample the Atomic SAMPLE_COUNT decrements by 1 and once it's 0, the performance counter causing the interrupts is stopped 
+const NUM_SAMPLES: u32 = 500; 
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicU32 = AtomicU32::new(0);
 pub static SAMPLE_EVENT_TYPE_MASK: AtomicU32 = AtomicU32::new(0);
+pub static SAMPLE_COUNT:AtomicU32 = AtomicU32::new(NUM_SAMPLES);
+
 static RDPMC_FFC0: u32 = 1 << 30;
 static RDPMC_FFC1: u32 = (1 << 30) + 1;
 static RDPMC_FFC2: u32 = (1 << 30) + 2;
-
 
 static PMC_ENABLE: u64 = 0x01 << 22;
 static INTERRUPT_ENABLE: u64 = 0x01 << 20;
@@ -39,6 +49,7 @@ static BR_INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC4;
 static BR_MISS_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC5;
 
 lazy_static!{
+    pub static ref IP_LIST: MutexIrqSafe<Vec<VirtualAddress>> = MutexIrqSafe::new(Vec::with_capacity(NUM_SAMPLES as usize));
     static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
 }
 static NUM_PMC: u32 = 4;
@@ -172,19 +183,22 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
     if let Some(my_task) = get_my_current_task() {
         my_core = my_task.write().running_on_cpu as i32;
         for (i, pmc) in PMC_LIST.iter().enumerate() {
-            //If counter i on this core has been used before (it's present in the AtomicMap) and is currently in use (it points to false), checks the next counter
-            if let Some(core_available) = pmc.get(&my_core) {
-                if !(core_available) {
-                    continue;
+            // Counter 0 is used for sampling. Currently just skipping that counter for regular counting and using the other three.
+            if i != 0 {
+                //If counter i on this core has been used before (it's present in the AtomicMap) and is currently in use (it points to false), checks the next counter
+                if let Some(core_available) = pmc.get(&my_core) {
+                    if !(core_available) {
+                        continue;
+                    }
                 }
+                //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
+                pmc.insert(my_core, false);
+                unsafe{
+                    wrmsr(IA32_PMC0 + (i as u32), 0);
+                    wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
+                }
+                return Ok(Counter{start_count: 0, msr_mask: i as u32, pmc: i as i32, core: my_core});
             }
-            //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
-            pmc.insert(my_core, false);
-            unsafe{
-                wrmsr(IA32_PMC0 + (i as u32), 0);
-                wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
-            }
-            return Ok(Counter{start_count: 0, msr_mask: i as u32, pmc: i as i32, core: my_core});
         }
             return Err("All programmable counters currently in use.");
 
@@ -264,4 +278,13 @@ pub fn stop_samples() {
         SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
 
     }
+}
+
+/// Read 64 bit PMC (performance monitor counter).
+pub fn rdpmc(msr: u32) -> u64 {
+    let (high, low): (u32, u32);
+    unsafe {
+        asm!("rdpmc": "={eax}" (low), "={edx}" (high): "{ecx}" (msr) : "memory" : "volatile");
+    }
+    ((high as u64) << 32) | (low as u64)
 }
