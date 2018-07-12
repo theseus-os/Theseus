@@ -135,33 +135,3 @@ pub fn server_init(_: Option<u64>) {
     }
 }
 
-// Setting up host machine if QEMU is used
-// sudo ip tuntap add name tap0 mode tap user $USER
-// sudo ip link set tap0 up
-// sudo ip addr add 192.168.69.100/24 dev tap0
-//
-// Sending UDP packet to using socat
-// socat stdio udp4-connect:192.168.66969 <<<"abcdefg"
-//
-// Sample test program that can be used from the connected machine to receive the udpo packets
-// use std::net::UdpSocket;
-// use std::str;
-// 
-// fn main() {  
-// 	let socket = UdpSocket::bind("192.168.69.100:5901").expect("couldn't bind to address");
-// 	let mut i = 0;
-// 	while i < 20 {
-// 		let mut buf = [0; 1000];
-// 		let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
-//		let filled_buf = &mut buf[..number_of_bytes];
-//
-//		let mut s = str::from_utf8(filled_buf);
-//		match s {
-//        	Result::Ok(s1) => println!("{}",s1),
-//           Result::Err(err) => (),
-//        }
-//
-//		i = i +1;
-// 	}
-// }
-// 
