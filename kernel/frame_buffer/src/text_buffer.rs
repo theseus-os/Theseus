@@ -141,7 +141,7 @@ impl TextDisplay for FrameTextBuffer {
     }
 
     fn cursor_blink(&mut self) {
-        self.cursor.blink ();     
+        self.cursor.blink(0, 0, 0);     
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
@@ -204,7 +204,7 @@ impl Cursor {
     }
 
     ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
-    pub fn blink(&mut self) {
+    pub fn blink(&mut self, x:usize, y:usize, margin:usize) {
         let time = tsc_ticks();
         
         if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
@@ -214,10 +214,12 @@ impl Cursor {
 
         if self.enabled  {
             if self.show {
-                fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
+                    y + margin + self.line * CHARACTER_HEIGHT, 
                     CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);    
             } else {
-                fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
+                    y + margin + self.line * CHARACTER_HEIGHT, 
                     CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
             }
         }

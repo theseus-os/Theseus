@@ -376,21 +376,21 @@ impl WindowObj{
 impl TextDisplay for WindowObj {
 
     fn disable_cursor(&mut self) {
-        //self.cursor.disable();
+        self.text_buffer.cursor.disable();
     }
 
     fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        //self.cursor.enabled = true;
-        //self.cursor.update(line as usize, column as usize, reset);
+        self.text_buffer.cursor.enable();
+        self.text_buffer.cursor.update(line as usize, column as usize, reset);
     }
 
     fn cursor_blink(&mut self) {
-        //self.cursor.blink ();     
+        self.text_buffer.cursor.blink(self.x, self.y, self.margin);     
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
     fn get_dimensions(&self) -> (usize, usize) {
-        (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
+        ((self.width-2*self.margin)/CHARACTER_WIDTH, (self.height-2*self.margin)/CHARACTER_HEIGHT)
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer

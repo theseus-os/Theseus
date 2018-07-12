@@ -920,14 +920,15 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     
     let mut window = window_ref.lock();
     window.display_string("This is a new window")?;
-    window_manager::delete_window(&window_ref);
+    //window_manager::delete_window(&window_ref);
 
     loop {
         
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         terminal.text_display.cursor_blink();//(new_x as u16, new_y as u16, true);
-        
+        window.cursor_blink();
+
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
                 &ConsoleEvent::OutputEvent(ref s) => {
