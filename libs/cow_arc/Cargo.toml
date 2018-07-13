@@ -1,0 +1,15 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "cow_arc"
+version = "0.1.0"
+keywords = ["copy-on-write", "clone-on-write", "cow", "arc", "mrsw", "shared", "exclusive"]
+categories = ["no-std", "memory-management"]
+license = "MIT"
+
+[dependencies]
+spin = "0.4.5"
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
