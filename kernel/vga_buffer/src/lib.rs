@@ -17,6 +17,10 @@ extern crate text_display;
 
 #[macro_use] extern crate log;
 
+// Andrew: refernece note below
+extern crate input_event_types;
+use input_event_types::Event;
+
 use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
@@ -154,7 +158,11 @@ impl TextDisplay for VgaBuffer {
     }
 
     fn draw_border(&self) {
+    }
         
+    fn get_key_event(&self) -> Option<Event> {
+        // Andrew: find another way rather than adding this as a trait method
+        None
     }
 }
 

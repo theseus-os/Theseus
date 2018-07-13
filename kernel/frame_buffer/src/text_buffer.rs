@@ -1,6 +1,11 @@
 extern crate tsc;
 extern crate text_display;
 
+// andrew: fix
+extern crate input_event_types;
+// use input_event_types::Event;
+use text_buffer::input_event_types::Event;
+
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
 
@@ -159,8 +164,13 @@ impl TextDisplay for FrameTextBuffer {
         self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
 
-    fn draw_border(&self) {
-        
+    fn draw_border(&self) {   
+    }
+
+
+    fn get_key_event(&self) -> Option<Event> {
+        // Andrew: fix instead of using as trait
+        None
     }
 }
 
@@ -206,7 +216,7 @@ impl Cursor {
     ///disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
-        fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
+        fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT,  
                     CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
     }
 

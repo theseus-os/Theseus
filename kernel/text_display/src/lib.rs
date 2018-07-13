@@ -1,4 +1,8 @@
 #![no_std]
+
+extern crate input_event_types;
+use input_event_types::Event;
+
 /// Defines the methods that a TextDisplay must have
 /// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
 pub trait TextDisplay {
@@ -14,5 +18,7 @@ pub trait TextDisplay {
     fn cursor_blink(&mut self);
     // Draw a border for the text
     fn draw_border(&self);
+
+    fn get_key_event(&self) -> Option<Event>;
 }
 
