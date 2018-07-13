@@ -59,13 +59,13 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     use core::ops::Deref;
     let window_object = window_manager::get_window_obj(20, 20, 200, 150).unwrap();
     let kernel_producer = terminal::Terminal::init(window_object, 0)?;
-    let mut terminal_input_producers = BTreeMap::new();
+    // let mut terminal_input_producers = BTreeMap::new();
     // populates a struct with the args needed for input_event_loop
-    terminal_input_producers.insert(0, kernel_producer);
+    // terminal_input_producers.insert(0, kernel_producer);
     // Adds this default kernel terminal to the static list of running terminals
     // Note that the list owns all the terminals that are spawned
-    let input_event_loop_args = (keyboard_event_handling_consumer, terminal_input_producers);
-    spawn::spawn_kthread(input_event_loop, input_event_loop_args , "main input event handling loop".to_string(), None)?;
+    // let input_event_loop_args = (keyboard_event_handling_consumer, terminal_input_producers);
+    // spawn::spawn_kthread(input_event_loop, input_event_loop_args , "main input event handling loop".to_string(), None)?;
     Ok(returned_keyboard_producer)
 }
 
@@ -101,7 +101,7 @@ fn input_event_loop((mut consumer, mut terminal_input_producers): (DFQueueConsum
 
                     let window_object = window_manager::get_window_obj(20, 175, 200, 150).unwrap();
                     let terminal_producer = terminal::Terminal::init(window_object, terminal_id_counter)?;
-                    terminal_input_producers.insert(terminal_id_counter , terminal_producer);
+                    // terminal_input_producers.insert(terminal_id_counter , terminal_producer);
                     meta_keypress = true;
                     terminal_id_counter += 1;
                     event.mark_completed();
