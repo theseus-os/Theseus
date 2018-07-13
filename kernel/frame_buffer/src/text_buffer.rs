@@ -73,6 +73,9 @@ impl FrameTextBuffer {
                 if curr_column == buffer_width {
                     curr_column = 0;
                     curr_line += 1;
+                    if curr_line == buffer_height {
+                        break;
+                    }
                 }
                 self.print_byte(buffer, byte, FONT_COLOR, x, y, curr_line, curr_column);
                 curr_column += 1;
@@ -160,7 +163,7 @@ impl TextDisplay for FrameTextBuffer {
     }
 
     fn draw_border(&self) {
-        
+
     }
 }
 

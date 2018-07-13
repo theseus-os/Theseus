@@ -372,9 +372,11 @@ impl TextDisplay for WindowObj {
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
+                trace!("Wenqiu:{}", slice);    
+
         self.text_buffer.print_by_bytes(self.x + self.margin, self.y + self.margin, 
                                         self.width - 2 * self.margin, self.height - 2 * self.margin, 
-                                        slice)     
+                                        slice) 
     }
     
     fn draw_border(&self){
