@@ -875,6 +875,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         terminal.cursor_handler()?;        
     }
 
+    terminal.text_display.lock().draw_border();
     // use core::ops::Deref;
     // let mut refresh_display = false;
 
@@ -883,7 +884,6 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     // let mut window = window_ref.lock();
     // window.lock().display_string("This is a new window")?;
     // window_manager::delete_window(&window_ref);
-
     let mut refresh_display = true;
     use core::ops::Deref;
     loop {

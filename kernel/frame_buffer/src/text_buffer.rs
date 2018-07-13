@@ -158,6 +158,10 @@ impl TextDisplay for FrameTextBuffer {
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
+
+    fn draw_border(&self) {
+        
+    }
 }
 
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 

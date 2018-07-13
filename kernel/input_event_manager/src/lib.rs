@@ -16,6 +16,7 @@ extern crate window_manager;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate log;
 
 use frame_buffer::text_buffer::FrameTextBuffer;
 use input_event_types::{Event};
@@ -57,7 +58,6 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     // FIX: don't use unwrap here and 50 lines down
     use core::ops::Deref;
     let window_object = window_manager::get_window_obj(20, 20, 200, 150).unwrap();
-
     let kernel_producer = terminal::Terminal::init(window_object, 0)?;
     let mut terminal_input_producers = BTreeMap::new();
     // populates a struct with the args needed for input_event_loop

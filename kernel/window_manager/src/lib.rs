@@ -142,7 +142,6 @@ impl WindowAllocator{
         window.consumer = Some(consumer);
         window.clean(BACKGROUND_COLOR);
         window.draw_border();
-
         let reference = Arc::new(Mutex::new(window));
         self.allocated.push_back(Arc::downgrade(&reference));
         self.check_reference();
@@ -296,15 +295,6 @@ impl WindowObj{
         //print_all();
     }
 
-    fn draw_border(&self){
-        let mut color = 0x343c37;
-        if self.active { color = 0xffffff; }
-        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
-        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
-    }
-
     fn clean(&self, color:u32) {
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, color);
     }
@@ -385,6 +375,15 @@ impl TextDisplay for WindowObj {
         self.text_buffer.print_by_bytes(self.x + self.margin, self.y + self.margin, 
                                         self.width - 2 * self.margin, self.height - 2 * self.margin, 
                                         slice)     
+    }
+    
+    fn draw_border(&self){
+        let mut color = 0x343c37;
+        if self.active { color = 0xffffff; }
+        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
+        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 }
 
