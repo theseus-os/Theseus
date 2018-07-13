@@ -12,6 +12,9 @@ extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate frame_buffer;
 #[macro_use] extern crate frame_buffer_3d;
+extern crate input_event_types;
+extern crate spawn;
+extern crate terminal;
 
 
 #[macro_use] extern crate log;
@@ -25,6 +28,8 @@ extern crate text_display;
 use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
 use alloc::{VecDeque};
+use alloc::string::ToString;
+use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
@@ -32,6 +37,7 @@ use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use frame_buffer::text_buffer::{BACKGROUND_COLOR, FrameTextBuffer};
 use text_display::TextDisplay;
+use input_event_types::Event;
 
 //use acpi::get_hpet;
 
@@ -45,8 +51,8 @@ pub mod test_window_manager;
 
 static WINDOW_ALLOCATOR: Once<MutexIrqSafe<WindowAllocator>> = Once::new();
 
-static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Keycode>> = Once::new();
-static KEY_CODE_PRODUCER: Once<DFQueueProducer<Keycode>> = Once::new();
+static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Event>> = Once::new();
+static KEY_CODE_PRODUCER: Once<DFQueueProducer<Event>> = Once::new();
 
 
 struct WindowAllocator {
@@ -55,9 +61,8 @@ struct WindowAllocator {
 
 /// switch the active window
 pub fn window_switch() -> Option<&'static str>{
-
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-//    unsafe { allocator.force_unlock(); }
+    unsafe { allocator.force_unlock(); }
     allocator.lock().deref_mut().switch();
 
 
@@ -153,10 +158,10 @@ impl WindowAllocator{
     fn switch(&mut self) -> Option<&'static str>{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
-//            unsafe{ item.force_unlock();}
             let reference = item.upgrade();
             if reference.is_some() {
                 let mut window = reference.unwrap();
+                unsafe{ window.force_unlock();}
                 let mut window = window.lock();
                 if flag {
                     (*window).active(true);
@@ -173,6 +178,7 @@ impl WindowAllocator{
                 let reference = item.upgrade();
                 if reference.is_some() {
                     let mut window = reference.unwrap();
+                    unsafe{ window.force_unlock();}
                     let mut window = window.lock();
                     (*window).active(true);
                     break;
@@ -250,7 +256,7 @@ pub struct WindowObj {
     /// whether the window is active
     active:bool,
     /// a consumer of key input events
-    consumer: Option<&'static DFQueueConsumer<Keycode>>,
+    consumer: Option<&'static DFQueueConsumer<Event>>,
     margin:usize,
     text_buffer:FrameTextBuffer,
 }
@@ -287,11 +293,12 @@ impl WindowObj{
             let consumer = KEY_CODE_CONSUMER.try();
             self.consumer = consumer;
         }
-        if !active && self.consumer.is_some(){
-            
+        if !active && self.consumer.is_some(){       
             self.consumer = None;
         }
-        self.draw_border();
+
+        
+        self.draw_bd();
         //print_all();
     }
 
@@ -299,17 +306,6 @@ impl WindowObj{
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, color);
     }
 
-    fn get_key_code(&self) -> Option<Keycode> {
-        if self.consumer.is_some() {
-
-            let event_opt = try_opt!(self.consumer).peek();
-            let event = try_opt!(event_opt);
-            let event_data = event.deref().clone(); // event.deref() is the equivalent of   &*event
-            event.mark_completed();
-            return Some(event_data);
-        }
-        None
-    }
 
     /// draw a pixel in a window
     pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
@@ -344,6 +340,16 @@ impl WindowObj{
         frame_buffer::draw_rectangle(x + self.x + 1, y + self.y + 1, width, height, 
             color);
     }
+
+    fn draw_bd(&self){
+        let mut color = 0x343c37;
+        if self.active { color = 0xffffff; }
+        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
+        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
+        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
+    }
+
 }
 
 /// Implements TextDisplay trait for vga buffer.
@@ -372,8 +378,6 @@ impl TextDisplay for WindowObj {
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-                trace!("Wenqiu:{}", slice);    
-
         self.text_buffer.print_by_bytes(self.x + self.margin, self.y + self.margin, 
                                         self.width - 2 * self.margin, self.height - 2 * self.margin, 
                                         slice) 
@@ -387,10 +391,21 @@ impl TextDisplay for WindowObj {
         frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
+
+    fn get_key_event(&self) -> Option<Event> {
+    if self.consumer.is_some() {
+        let event_opt = try_opt!(self.consumer).peek();
+        let event = try_opt!(event_opt);
+        let event_data = event.deref().clone(); // event.deref() is the equivalent of   &*event
+        event.mark_completed();
+        return Some(event_data);
+    }
+    None
+    }
 }
 
 /// put key input events in the producer of window manager
-pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
+pub fn put_key_code(event: Event) -> Result<(), &'static str>{
 
     let consumer = try_opt_err!(KEY_CODE_CONSUMER.try(), "No active window");
 
@@ -398,11 +413,94 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
         consumer.obtain_producer()
     });
     
-    producer.enqueue(keycode);
+    producer.enqueue(event);
     Ok(())
 }
 
 
+
+pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
+    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
+    let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
+    let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
+    // let frame_buffer = FrameTextBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
+    // Initializes the default kernel terminal
+
+
+    // FIX: don't use unwrap here and 50 lines down
+    use core::ops::Deref;
+    let window_object = get_window_obj(20, 20, 600, 150).unwrap();
+
+    let input_producer = terminal::Terminal::init(window_object, 0)?;
+
+    let window_object = get_window_obj(20, 200, 600, 150).unwrap();
+    let input_producer = terminal::Terminal::init(window_object, 1)?;
+
+    // populates a struct with the args needed for input_event_loop
+
+    // Adds this default kernel terminal to the static list of running terminals
+    // Note that the list owns all the terminals that are spawned
+    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
+    Ok(returned_keyboard_producer)
+}
+
+
+fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static str> {
+    
+    let mut terminal_id_counter: usize = 1;
+    // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
+    let mut meta_keypress = false;
+    loop {
+        // meta_keypress = false;
+        use core::ops::Deref;
+
+        // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
+        let event = match consumer.peek() {
+            Some(ev) => ev,
+            _ => { continue; }
+        };
+        match event.deref() {
+            &Event::ExitEvent => {
+                return Ok(()); 
+            }
+
+            &Event::InputEvent(ref input_event) => {
+                let key_input = input_event.key_event;
+                // Creates new terminal window
+                // if key_input.modifiers.control && key_input.keycode == Keycode::T {
+                //     // hardcoding for now, will fix once I figure out a good system for auto-resizing of windows
+                //     debug!("Ctrl + T pressed");
+                //     let window_object = get_window_obj(20, 180, 200, 150).unwrap();
+                //     debug!("window initialization successful");
+                //     let input_producer = terminal::Terminal::init(window_object, terminal_id_counter)?;
+                //     terminal_id_counter += 1;
+                //     // meta_keypress = true;
+                // }
+                if key_input.modifiers.alt && key_input.keycode == Keycode::Tab {
+                    debug!("ALT+TAB PRESSED");
+                    window_switch();
+                    debug!("window switch successful");
+                    // meta_keypress = true;
+
+                }
+
+            }
+            _ => { }
+        }
+
+        // If the keyevent was not for control of the terminal windows
+        if true {
+                put_key_code(event.deref().clone())?;
+                event.mark_completed();
+
+        }
+
+
+    }
+    
+
+
+}
 
 
 //Test functions for performance evaluation
@@ -417,10 +515,23 @@ pub fn calculate_time_statistic() {
     });
 
   unsafe{
-    if STARTING_TIME == 0 {
-        debug!("test_window_managers::calculate: No starting time!");
-        return;
-    }
+    i    let allocator = try_opt!(WINDOW_ALLOCATOR.try());[T] at top of panic_wrapper: index out of bounds: the len is 400 but the index is 400 frame_buffer/src/text_buffer.rs:127:13
+[E] PANIC was unhandled in task "terminal loop" on core Some(0) at frame_buffer/src/text_buffer.rs:127:13 -- index out of bounds: the len is 400 but the index is 400
+[E] STACK TRACE: FFFFFE0000032890
+[E]  FFFFFE0000032890: INVALID_ADDRESS
+[E] Killing panicked task "terminal loop"
+
+//    unsafe { allocator.force_unlock(); }
+    allocator.lock().deref_mut().switch();
+         let allocator = try_opt!(WINDOW_ALLOCATOR.try());
+//    unsafe { allocator.force_unlock(); }
+    allocator.lock().deref_mut().switch();
+         let allocator = try_opt!(WINDOW_ALLOCATOR.try());
+//    unsafe { allocator.force_unlock(); }
+    allocator.lock().deref_mut().switch();
+    }    let allocator = try_opt!(WINDOW_ALLOCATOR.try());
+//    unsafe { allocator.force_unlock(); }
+    allocator.lock().deref_mut().switch();
 
     let hpet_lock = get_hpet();
     let end_time = hpet_lock.as_ref().unwrap().get_counter();  

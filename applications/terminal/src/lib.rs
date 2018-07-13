@@ -13,7 +13,7 @@ extern crate task;
 extern crate memory;
 extern crate text_display;
 // temporary, should remove this once we fix crate system
-extern crate window_manager;
+// extern crate window_manager;
 extern crate input_event_types; 
 
 
@@ -31,7 +31,7 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use window_manager::get_window_obj;
+// use window_manager::get_window_obj;
 
 lazy_static! {
     // maps the terminal reference number to the current task id
@@ -454,7 +454,6 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
             self.text_display.lock().display_string(slice)?;
-                debug!("MADE IT HERE");
 
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -890,7 +889,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
-        terminal.text_display.lock().cursor_blink();//(new_x as u16, new_y as u16, true);
+        //terminal.text_display.lock().cursor_blink();//(new_x as u16, new_y as u16, true);
         // window.cursor_blink();
 
         if let Some(print_event) = terminal.print_consumer.peek() {
@@ -937,21 +936,23 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
-        let event = match terminal.input_consumer.peek() {
+        let event = match terminal.text_display.lock().get_key_event() {
                 Some(ev) => {
                     ev
                 },
                 _ => { continue; }
         };
 
-        match event.deref() {
-            &Event::ExitEvent => {
+
+
+        match event {
+            Event::ExitEvent => {
                 let _result = print_to_stdout("\nSmoothly exiting input_event_manager main loop.\n".to_string(), 1)?;
                 return Ok(());
             }
            
 
-            &Event::InputEvent(ref input_event) => {
+            Event::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;
                 let start_idx = terminal.scroll_start_idx;
                 // Only refreshes the display on a keypress
@@ -966,7 +967,8 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
             }
             _ => { }
         }
-        event.mark_completed();
+        // event.mark_completed();
+        
     }  
     Ok(())
 }

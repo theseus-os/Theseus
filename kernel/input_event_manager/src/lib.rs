@@ -99,7 +99,7 @@ fn input_event_loop((mut consumer, mut terminal_input_producers): (DFQueueConsum
                     CURRENT_TERMINAL_NUM.store(terminal_id_counter , Ordering::SeqCst); // -1 for 0-indexing
                     // let vga_buffer = VgaBuffer::new();
 
-                    let window_object = window_manager::get_window_obj(20, 450, 200, 150).unwrap();
+                    let window_object = window_manager::get_window_obj(20, 175, 200, 150).unwrap();
                     let terminal_producer = terminal::Terminal::init(window_object, terminal_id_counter)?;
                     terminal_input_producers.insert(terminal_id_counter , terminal_producer);
                     meta_keypress = true;
