@@ -13,7 +13,7 @@ use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem};
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
-use e1000::{E1000_NIC};
+use e1000::{E1000_NIC,get_mac};
 use e1000_to_smoltcp_interface::{EthernetDevice};
 
 
@@ -59,7 +59,9 @@ pub fn server_init(_: Option<u64>) {
         rx_next: 0,
     };
 
-    let hardware_addr  = EthernetAddress([0x00, 0x0b, 0x82, 0x01, 0xfc, 0x42]); // 00:0b:82:01:fc:42 
+    // getting the mac address from the ethernet device
+    let mac             = get_mac();
+    let hardware_addr   = EthernetAddress(mac);
     
     let protocol_addrs = [IpAddress::v4(192, 168, 69, 1)];
     let mut iface      = EthernetInterface::new(
@@ -135,11 +137,18 @@ pub fn server_init(_: Option<u64>) {
     }
 }
 
-/// Function to send a message using UDP to configured destination
-pub fn send_msg_udp(msg: fmt::Arguments){
+/// Function to send debug messages using UDP to configured destination
+/// Used to mirror debug messages 
+pub fn send_debug_msg_udp(msg: fmt::Arguments){
     if let Some(producer) = UDP_TEST_SERVER.try(){
         let s = format!("{}", msg);
         producer.enqueue(s.to_string());  
     }
 }
 
+/// Function to send a message using UDP to configured destination
+pub fn send_msg_udp(msg: &str){
+    if let Some(producer) = UDP_TEST_SERVER.try(){
+        producer.enqueue(msg.to_string());  
+    }
+}

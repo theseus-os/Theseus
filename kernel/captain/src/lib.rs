@@ -129,7 +129,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     if true {
         {
             // enable mirroring of serial port logging outputs to udp server
-            logger::mirror_to_udp_server(network::server::send_msg_udp);
+            logger::mirror_to_udp_server(network::server::send_debug_msg_udp);
             use network::server::server_init;
             spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
         }

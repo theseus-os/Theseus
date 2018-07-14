@@ -711,7 +711,6 @@ impl Nic{
 
         /// Send a packet, called by a function higher in the network stack
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
-        #[cfg(not(feature = "udp_server"))]
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
                 
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
@@ -731,54 +730,30 @@ impl Nic{
 
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
-                debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
-                debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-                debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
-                debug!("Waiting for packet to send!");
-                
+                #[cfg(not(feature = "udp_server"))]
+                {
+                        debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                        debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                }
+                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);
 
-                while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
-                        //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-                        //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-                }  //bit 0 should be set when done
-                debug!("Packet is sent!");  
+                #[cfg(not(feature = "udp_server"))] 
+                {
+                        debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                        debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
+                        debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+                        debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].addr);
+                        debug!("Waiting for packet to send!");                     
+
+                        while (self.tx_descs[old_cur as usize].status & 0xF) == 0 {
+                                //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
+                                //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
+                        }  //bit 0 should be set when done
+                        debug!("Packet is sent!");  
+                }
                 Ok(())
         }
 
-        /// Send a packet function called by the udp server
-        #[cfg(feature = "udp_server")]
-        pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {    
-                let t_ptr = translate_v2p(p_data);
-                let ptr;
-                match t_ptr{
-                        Some(_x) => ptr = t_ptr.unwrap(),
-                        None => return Err("e1000:send_packet Couldn't translate address for tx buffer"),
-                } 
-                
-                //debug!("Value of tx descriptor address_translated: {:x}",ptr);
-                self.tx_descs[self.tx_cur as usize].addr = ptr as u64;
-                self.tx_descs[self.tx_cur as usize].length = p_len;
-                self.tx_descs[self.tx_cur as usize].cmd = (CMD_EOP | CMD_IFCS | CMD_RPS | CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
-                self.tx_descs[self.tx_cur as usize].status = 0;
-
-                let old_cur: u8 = self.tx_cur as u8;
-                self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-
-                self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);  
-
-                // below to commands are inserted to prevent some timing issues in the ethernet driver - hardware bugs
-                self.read_command(REG_TXDESCTAIL);
-                self.read_command(REG_TXDESCTAIL);
-    
-                Ok(())
-        }
-
-
-        
         /// Enable Interrupts 
         pub fn enable_interrupts(&self) {
                 //self.write_command(REG_IMASK ,0x1F6DC);
@@ -948,4 +923,10 @@ pub fn e1000_handler () {
         e1000_nc.read_command(0xc0); //clear interrupt
         
 
+}
+
+//Get MAC of the ethernet device
+pub fn get_mac() -> [u8;6]{
+        let mut e1000_nc = E1000_NIC.lock();
+        e1000_nc.mac
 }
