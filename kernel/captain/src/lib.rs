@@ -60,13 +60,10 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
 
-
-
 /// the callback use in the logger crate for mirroring log functions to the input_event_manager
 pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
     println!("{} {}", prefix, args);
 }
-
 
 
 /// Initialize the Captain, which is the main module that steers the ship of Theseus. 
@@ -130,12 +127,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // Initialize the udp server
     if true {
-
-        #[cfg(not(feature = "loadable"))]
         {
+            // enable mirroring of serial port logging outputs to udp server
+            logger::mirror_to_udp_server(network::server::send_msg_udp);
             use network::server::server_init;
             spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
-
         }
     }  
    

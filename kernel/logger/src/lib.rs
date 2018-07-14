@@ -4,19 +4,15 @@
 extern crate serial_port;
 extern crate log;
 extern crate spin;
-extern crate network;
-#[macro_use] extern crate alloc;
 
 use log::*; //{ShutdownLoggerError, SetLoggerError, LogRecord, LogLevel, LogLevelFilter, LogMetadata};
 use core::fmt;
 use spin::Once;
-use network::server::UDP_TEST_SERVER;
-use alloc::*;
-use alloc::string::ToString;
 
 static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 static MIRROR_VGA_FUNC: Once<fn(LogColor, &'static str, fmt::Arguments)> = Once::new();
+static MIRROR_UDP_SERVER_FUNC: Once<fn(fmt::Arguments)> = Once::new();
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
@@ -54,6 +50,10 @@ pub fn mirror_to_vga(func: fn(LogColor, &'static str, fmt::Arguments)) {
     MIRROR_VGA_FUNC.call_once(|| func);
 }
 
+pub fn mirror_to_udp_server(func: fn(fmt::Arguments)) {
+    MIRROR_UDP_SERVER_FUNC.call_once(|| func);
+}
+
 struct Logger;
 
 impl ::log::Log for Logger {
@@ -73,12 +73,9 @@ impl ::log::Log for Logger {
 
             use serial_port;
             let _ = serial_port::write_fmt_log(color.as_terminal_string(), prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
-            // Copying the serial port messages to the UDP server to forward them through UDP
-            if let Some(producer) = UDP_TEST_SERVER.try(){
-                let s = format!("{}", record.args().clone());
-                let mut len: usize;
-                len = s.len();
-                producer.enqueue(s[0..len].to_string());    
+
+            if let Some(func) = MIRROR_UDP_SERVER_FUNC.try() {
+                func(record.args().clone());
             }
 
             if let Some(func) = MIRROR_VGA_FUNC.try() {

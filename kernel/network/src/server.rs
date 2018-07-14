@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::borrow::{ToOwned};
+use alloc::string::ToString;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spin::{Once, Mutex};
 use core::fmt;
@@ -131,6 +132,14 @@ pub fn server_init(_: Option<u64>) {
             Ok(()) | Err(Error::Exhausted) => (),
             Err(e) => debug!("poll error: {}", e)
         }      
+    }
+}
+
+/// Function to send a message using UDP to configured destination
+pub fn send_msg_udp(msg: fmt::Arguments){
+    if let Some(producer) = UDP_TEST_SERVER.try(){
+        let s = format!("{}", msg);
+        producer.enqueue(s.to_string());  
     }
 }
 
