@@ -33,8 +33,8 @@ use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 /// that starts in the `Exclusive` state by default.
 /// 
 /// Finally, the `CowArc` type can be "cloned" in two ways:     
-/// * using the [`share`](#method.share) function, which actually affects the shared state
-///   by duplicating the inner reference,
+/// * using the regular `clone` function, which actually affects the shared state
+///   by duplicating the inner reference, meaning that the `CowArc` will be in the shared state after invoking `clone`,
 /// * using the [`clone_shallow`](#method.clone_shallow) function, which does not affect the shared state
 ///   and only duplicates the outer reference. 
 #[derive(Debug)]
@@ -90,23 +90,6 @@ impl<T> CowArc<T> {
         Arc::strong_count(&self.arc.inner_arc) > 1
     }
 
-    /// Creates a shared reference to `this` `CowArc` 
-    /// and returns that shared reference as a new `CowArc`
-    /// whose internal reference points to the same data.
-    /// 
-    /// This increases the shared count of this `CowArc`, 
-    /// and the returned new `CowArc` instance will have 
-    /// the same shared count and reference the same data.
-    pub fn share(this: &CowArc<T>) -> CowArc<T> {
-        CowArc {
-            arc: Arc::new(
-                InnerRef {
-                    inner_arc: Arc::clone(&this.arc.inner_arc),
-                }
-            ),
-        }
-    }
-
 
     /// Creates a shallow clone of this `CowArc` that **does not** affect its `Shared` state.
     /// This means that it will not change it to `Shared` if it was `Exclusive,
@@ -120,11 +103,30 @@ impl<T> CowArc<T> {
     /// that will be used somewhere else temporarily, e.g., in the same context,
     /// without marking it as a totally separate shared instance. 
     /// 
-    /// The fact that this is different from the [`share`](#method.share) function 
+    /// The fact that this is different from the `clone` function 
     /// is what differentiates the behavior of `CowArc` from regular `Arc`.
-    pub fn clone_shallow(this: &CowArc<T>) -> CowArc<T> {
+    pub fn clone_shallow(&self) -> CowArc<T> {
         CowArc {
-            arc: Arc::clone(&this.arc),
+            arc: Arc::clone(&self.arc),
+        }
+    }
+}
+
+impl<T> Clone for CowArc<T> {
+    /// Creates a shared reference to `this` `CowArc` 
+    /// and returns that shared reference as a new `CowArc`
+    /// whose internal reference points to the same data.
+    /// 
+    /// This increases the shared count of this `CowArc`, 
+    /// and the returned new `CowArc` instance will have 
+    /// the same shared count and reference the same data.
+    fn clone(&self) -> CowArc<T> {
+        CowArc {
+            arc: Arc::new(
+                InnerRef {
+                    inner_arc: Arc::clone(&self.arc.inner_arc),
+                }
+            ),
         }
     }
 }

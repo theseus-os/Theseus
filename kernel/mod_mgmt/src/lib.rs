@@ -218,16 +218,49 @@ impl CrateNamespace {
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
     }
 
-        
+
+
+    /// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
+    /// but uses a copy-on-write/clone-on-write semantic that creates 
+    /// a special shared reference to each crate that indicates it is shared across multiple namespaces.
+    /// 
+    /// In other words, crates in the new namespace returned by this fucntions 
+    /// are fully shared with crates in *this* namespace, 
+    /// until either namespace attempts to modify a shared crate in the future.
+    /// 
+    /// When modifying crates in the new namespace, such as with the funtions 
+    /// [`swap_crates`](#method.swap_crates), any crates in the new namespace
+    /// that are still shared with the old namespace will be deeply copied into a new crate,
+    /// and then that new crate will be modified in whichever way specified. 
+    /// For example, if you swapped one crate `A` in the new namespace returned from this function
+    /// and loaded a new crate `A2` in its place,
+    /// and two other crates `B` and `C` depended on that newly swapped-out `A`,
+    /// then `B` and `C` would be transparently deep copied before modifying them to depend on
+    /// the new crate `A2`, and you would be left with `B2` and `C2` as deep copies of `B` and `C`,
+    /// that now depend on `A2` instead of `A`. 
+    /// The existing versions of `B` and `C` would still depend on `A`, 
+    /// but they would no longer be part of the new namespace. 
+    /// 
+    pub fn clone_on_write(&self) -> CrateNamespace {
+        let new_crate_tree = self.crate_tree.lock().clone();
+        let new_symbol_map = self.symbol_map.lock().clone();
+
+        CrateNamespace {
+            crate_tree: Mutex::new(new_crate_tree),
+            symbol_map: Mutex::new(new_symbol_map),
+        }
+    }
+
+
     /// Swaps in new modules to replace existing crates this in `CrateNamespace`.
     /// This function accepts several modules in order to allow swapping multiple crates all at once 
     /// in a single "atomic" unit, which prevents weird linking/relocation errors, 
     /// such as a new crate linking against an old crate that already exists in this namespace
     /// instead of linking against the new one that we want to replace that old crate with. 
     /// 
-    /// In general, the strategy for replacing and old module `C` with a new module `C'` consists of three simple steps:
-    /// 1) Load the new replacement module `C'`.
-    /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C'`.
+    /// In general, the strategy for replacing and old module `C` with a new module `C2` consists of three simple steps:
+    /// 1) Load the new replacement module `C2`.
+    /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C2`.
     /// 3) Remove module `C` and clean it up, e.g., removing its entries from the symbol map.
     /// 
     /// This `CrateNamespace` (self) is used as the backup namespace for resolving unknown symbols.
@@ -420,7 +453,7 @@ impl CrateNamespace {
 
             // add the new crate and its sections' symbols to this namespace
             self.add_symbols(new_crate.sections.values(), verbose_log);
-            self.crate_tree.lock().insert(new_crate_name, CowArc::share(&new_crate_ref));
+            self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone());
             // Although we used a shared CowArc above, it will go back to being exclusive after this function
             // because the `new_namespace` will be dropped.
         }
@@ -1177,7 +1210,7 @@ impl CrateNamespace {
                     self.add_symbols(parent_crate.sections.values(), true);
                     parent_crate.crate_name.clone()
                 };
-                self.crate_tree.lock().insert(parent_crate_name, CowArc::share(&parent_crate_ref));
+                self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
                 return weak_sec;
             }
             else {
