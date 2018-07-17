@@ -60,7 +60,7 @@
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
 //! * `ps2`: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).
-//! * `rtc``: simple driver for handling the Real Time Clock chip.
+//! * `rtc`: simple driver for handling the Real Time Clock chip.
 //! * `scheduler`: The scheduler and runqueue management.
 //! * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
 //! * `spawn`: Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes.
@@ -125,4 +125,7 @@
 //! 
 
 
+#![no_std]
+pub mod phis;
+pub mod principles;
 
