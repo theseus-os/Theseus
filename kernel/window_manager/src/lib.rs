@@ -31,7 +31,7 @@ use alloc::{VecDeque};
 use alloc::string::ToString;
 use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
-use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
+use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer, PeekedData};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
@@ -49,24 +49,21 @@ use input_event_types::Event;
 pub mod test_window_manager;
 
 
-static WINDOW_ALLOCATOR: Once<MutexIrqSafe<WindowAllocator>> = Once::new();
-
-static KEY_CODE_CONSUMER: Once<DFQueueConsumer<Event>> = Once::new();
-static KEY_CODE_PRODUCER: Once<DFQueueProducer<Event>> = Once::new();
+static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 
 
 struct WindowAllocator {
-    allocated: VecDeque<Weak<Mutex<WindowObj>>>, //The last one is active
+    allocated: VecDeque<Weak<Mutex<WindowMeta>>>, //The last one is active
 }
 
 /// switch the active window
 pub fn window_switch() -> Option<&'static str>{
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    unsafe { allocator.force_unlock(); }
+    //unsafe { allocator.force_unlock(); }
     allocator.lock().deref_mut().switch();
 
 
-    let consumer = try_opt!(KEY_CODE_CONSUMER.try());
+/*    let consumer = try_opt!(KEY_CODE_CONSUMER.try());
 
     //Clear all key events before switch
     let mut event = consumer.peek();
@@ -74,38 +71,38 @@ pub fn window_switch() -> Option<&'static str>{
         try_opt!(event).mark_completed();
         event = consumer.peek();
     }
-
+*/
     Some("End")
 }
 
 /// new a window object and return it
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<WindowObj>>, &'static str>{
+pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
 
-    let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
+    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
 
     allocator.lock().deref_mut().allocate(x,y,width,height)
 }
 
-/// new a window object and return it
-pub fn delete_window<'a>(window:&Arc<Mutex<WindowObj>>) {
-    let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
+/// delete a window object
+pub fn delete_window<'a>(window:WindowObj) {
+    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
-    allocator.lock().deref_mut().delete(window)
+    allocator.lock().deref_mut().delete(&(window.meta))
 }
 
 pub fn check_reference() {
-    let allocator: &MutexIrqSafe<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(WindowAllocator{allocated:VecDeque::new()})
+    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
     allocator.lock().check_reference();
 }
 
 
 impl WindowAllocator{
-    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<WindowObj>>, &'static str>{
+    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         if width < 2 || height < 2 {
             return Err("Window size must be greater than 2");
         }
@@ -114,45 +111,52 @@ impl WindowAllocator{
             return Err("Requested area extends the screen size");
         }
 
+        let consumer = DFQueue::new().into_consumer();
+        let producer = consumer.obtain_producer();
+
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
-        let mut window:WindowObj = WindowObj{
+        let mut meta = WindowMeta{
             x:x,
             y:y,
             width:width,
             height:height,
-            active:true, 
-            consumer:None,
+            active:true,
             margin:2,
-            text_buffer:FrameTextBuffer::new(),
+            key_producer:producer,
         };
 
-        //window.resize(x,y,width,height);
-        let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
-        let overlapped = self.check_overlap(&window);
-        
+        let overlapped = self.check_overlap(&meta);       
         if overlapped  {
-            trace!("Request area is already allocated");
             return Err("Request area is already allocated");
         }
+
+
         for item in self.allocated.iter_mut(){
-            let reference = item.upgrade();
-            if reference.is_some(){
-                let mut allocated_window = reference.unwrap();
-                let mut allocated_window = allocated_window.lock();
-                (*allocated_window).active(false);
+            let ref_opt = item.upgrade();
+            if ref_opt.is_some() {
+                let reference = ref_opt.unwrap();
+                reference.lock().active = false;
+                //reference.lock().active(false);
+                //let inner = reference.lock();
+                //(*inner).active = false; 
+                //(*inner).active(false);
+                //trace!("Wenqiu: end active");
             }
         }
-        //window.fill(0xffffff);
 
-        window.consumer = Some(consumer);
-        window.clean(BACKGROUND_COLOR);
-        window.draw_border();
-        let reference = Arc::new(Mutex::new(window));
-        self.allocated.push_back(Arc::downgrade(&reference));
-        self.check_reference();
-        //let reference = self.allocated.back(), "WindowAllocator fails to get new window reference")); 
-        Ok(reference)
-    
+        let meta_ref = Arc::new(Mutex::new(meta));
+        self.allocated.push_back(Arc::downgrade(&meta_ref));
+
+        let mut window:WindowObj = WindowObj{
+            meta:meta_ref,
+            text_buffer:FrameTextBuffer::new(),
+            consumer:consumer,
+        };
+
+        //window.clean(BACKGROUND_COLOR);
+        //window.draw_border();       
+        
+        Ok(window)    
     }
 
     fn switch(&mut self) -> Option<&'static str>{
@@ -161,7 +165,7 @@ impl WindowAllocator{
             let reference = item.upgrade();
             if reference.is_some() {
                 let mut window = reference.unwrap();
-                unsafe{ window.force_unlock();}
+                //unsafe{ window.force_unlock();}
                 let mut window = window.lock();
                 if flag {
                     (*window).active(true);
@@ -178,7 +182,7 @@ impl WindowAllocator{
                 let reference = item.upgrade();
                 if reference.is_some() {
                     let mut window = reference.unwrap();
-                    unsafe{ window.force_unlock();}
+                    //unsafe{ window.force_unlock();}
                     let mut window = window.lock();
                     (*window).active(true);
                     break;
@@ -186,18 +190,20 @@ impl WindowAllocator{
             }
         }
 
+
+
         Some("End")
     }
 
-    fn delete(&mut self, window:&Arc<Mutex<WindowObj>>){
+    fn delete(&mut self, meta:&Arc<Mutex<WindowMeta>>){
         //TODO clean contents in window
-        
+       
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
             let reference = item.upgrade();
             if reference.is_some() {
-                if Arc::ptr_eq(&(reference.unwrap()), window) {
+                if Arc::ptr_eq(&(reference.unwrap()), meta) {
                     break;
                 }
             }
@@ -209,7 +215,8 @@ impl WindowAllocator{
 
     }
 
-    fn check_overlap(&mut self, window:&WindowObj) -> bool {
+    fn check_overlap(&mut self, meta:&WindowMeta) -> bool {
+
         let mut len = self.allocated.len();
         let mut i = 0;
         while i < len {
@@ -217,9 +224,9 @@ impl WindowAllocator{
             {   
                 let reference = self.allocated.get(i).unwrap().upgrade();
                 if reference.is_some() {
-                    let allocated_window = reference.unwrap();
-                    let allocated_window = allocated_window.lock();
-                    if window.is_overlapped(&(*allocated_window)) {
+                    let allocated_meta = reference.unwrap();
+                    let allocated_meta = allocated_meta.lock();
+                    if meta.is_overlapped(&(*allocated_meta)) {
                         return true;
                     }
                     i += 1;
@@ -241,113 +248,81 @@ impl WindowAllocator{
   */      return false;
     }
 
+    fn put_key_code(&mut self, event:Event) -> Result<(), &'static str> {
+        for item in self.allocated.iter_mut(){
+            let reference = item.upgrade();
+            if reference.is_some() {
+                let mut window = reference.unwrap();
+                //unsafe{ window.force_unlock(); }
+                let mut window = window.lock();
+
+                if (*window).active {
+                    window.key_producer.enqueue(event);
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
 }
 
 /// a window object
 pub struct WindowObj {
-    /// the upper left x-coordinate of the window
-    x: usize,
-    /// the upper left y-coordinate of the window
-    y:usize,
-    /// the width of the window
-    width:usize,
-    /// the height of the window
-    height:usize,
-    /// whether the window is active
-    active:bool,
-    /// a consumer of key input events
-    consumer: Option<&'static DFQueueConsumer<Event>>,
-    margin:usize,
+    meta:Arc<Mutex<WindowMeta>>,
+    //consumer: DFQueueConsumer<Event>,
     text_buffer:FrameTextBuffer,
+
+    consumer:DFQueueConsumer<Event>,
 }
 
 
 impl WindowObj{
-    fn is_overlapped(&self, window:&WindowObj) -> bool {
-        if self.check_in_area(window.x, window.y)
-            {return true;}
-        if self.check_in_area(window.x, window.y+window.height)
-            {return true;}
-        if self.check_in_area(window.x+window.width, window.y)
-            {return true;}
-        if self.check_in_area(window.x+window.width, window.y+window.height)
-            {return true;}
-        false        
-    } 
-
-    fn check_in_area(&self, x:usize, y:usize) -> bool {
-        return x>= self.x && x <= self.x+self.width && y>=self.y && y<=self.y+self.height;
-    }
 
     /// adjust the size of a window
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize){
-        self.x = x;
-        self.y = y;
-        self.width = width;
-        self.height = height;
-    }
-
-    fn active(&mut self, active:bool){
-        self.active = active;
-        if active && self.consumer.is_none() {
-            let consumer = KEY_CODE_CONSUMER.try();
-            self.consumer = consumer;
-        }
-        if !active && self.consumer.is_some(){       
-            self.consumer = None;
-        }
-
-        
-        self.draw_bd();
-        //print_all();
+        let mut meta = self.meta.lock();  
+        meta.deref_mut().resize(x, y, width, height);
     }
 
     fn clean(&self, color:u32) {
-        frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, color);
+        let meta = self.meta.lock();
+        frame_buffer::fill_rectangle(meta.x + 1, meta.y + 1, meta.width - 2, meta.height - 2, color);
     }
 
 
     /// draw a pixel in a window
     pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
-        if x >= self.width - 2 || y >= self.height - 2 {
+        let meta = self.meta.lock();
+        if x >= meta.width - 2 || y >= meta.height - 2 {
             return;
         }
-        //frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, 0, color, true);
-        frame_buffer::draw_pixel(x + self.x + 1, y + self.y + 1, color);
-        }
+        frame_buffer::draw_pixel(x + meta.x + 1, y + meta.y + 1, color);
+    }
 
     /// draw a line in a window
     pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32){
-        if start_x > self.width - 2
-            || start_y > self.height - 2
-            || end_x > self.width - 2
-            || end_y > self.height - 2 {
+        let meta = self.meta.lock();
+        if start_x > meta.width - 2
+            || start_y > meta.height - 2
+            || end_x > meta.width - 2
+            || end_y > meta.height - 2 {
             return;
         }
-//        frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, 
- //           end_x + self.x + 1, end_y + self.y + 1, 0, color, true);
-          frame_buffer::draw_line(start_x + self.x + 1, start_y + self.y + 1, 
-            end_x + self.x + 1, end_y + self.y + 1, color);
+        frame_buffer::draw_line(start_x + meta.x + 1, start_y + meta.y + 1, 
+            end_x + meta.x + 1, end_y + meta.y + 1, color);
     }
 
     /// draw a square in a window
     pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
-        if x + width > self.width - 2
-            || y + height > self.height - 2 {
+        let meta = self.meta.lock();
+        if x + width > meta.width - 2
+            || y + height > meta.height - 2 {
             return;
         }
-        //frame_buffer::draw_square(x + self.x + 1, y + self.y + 1, width, height, 0, color, true);
-        frame_buffer::draw_rectangle(x + self.x + 1, y + self.y + 1, width, height, 
+        frame_buffer::draw_rectangle(x + meta.x + 1, y + meta.y + 1, width, height, 
             color);
-    }
-
-    fn draw_bd(&self){
-        let mut color = 0x343c37;
-        if self.active { color = 0xffffff; }
-        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
-        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
     }
 
 }
@@ -366,57 +341,117 @@ impl TextDisplay for WindowObj {
     }
 
     fn cursor_blink(&mut self) {
-        self.text_buffer.cursor.blink(self.x, self.y, self.margin);     
+        let meta = self.meta.lock();
+        self.text_buffer.cursor.blink(meta.x, meta.y, meta.margin);    
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
     fn get_dimensions(&self) -> (usize, usize) {
-        ((self.width-2*self.margin)/CHARACTER_WIDTH, (self.height-2*self.margin)/CHARACTER_HEIGHT)
+        let meta = self.meta.lock();
+        ((meta.width-2*meta.margin)/CHARACTER_WIDTH, (meta.height-2*meta.margin)/CHARACTER_HEIGHT)
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-        self.text_buffer.print_by_bytes(self.x + self.margin, self.y + self.margin, 
-                                        self.width - 2 * self.margin, self.height - 2 * self.margin, 
-                                        slice) 
+        let inner = self.meta.lock();
+        self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
+            inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
+            slice)
     }
     
-    fn draw_border(&self){
+    fn draw_border(&self) -> (usize, usize, usize){
+        self.meta.lock().draw_border()
+    }
+
+
+    fn get_key_event(&self) -> Option<Event> {
+        let event_opt = self.consumer.peek();
+        if event_opt.is_some() {
+            let event = event_opt.unwrap();
+            event.mark_completed();
+            let event_data = event.deref().clone();
+            Some(event_data)
+        } else {
+            None
+        }
+    }
+}
+
+struct WindowMeta {
+    /// the upper left x-coordinate of the window
+    x: usize,
+    /// the upper left y-coordinate of the window
+    y:usize,
+    /// the width of the window
+    width:usize,
+    /// the height of the window
+    height:usize,
+    /// whether the window is active
+    active:bool,
+    /// a consumer of key input events
+    margin:usize,
+
+    key_producer:DFQueueProducer<Event>,
+}
+
+impl WindowMeta {
+    fn is_overlapped(&self, meta:&WindowMeta) -> bool {
+        if self.check_in_area(meta.x, meta.y)
+            {return true;}
+        if self.check_in_area(meta.x, meta.y+meta.height)
+            {return true;}
+        if self.check_in_area(meta.x+meta.width, meta.y)
+            {return true;}
+        if self.check_in_area(meta.x+meta.width, meta.y+meta.height)
+            {return true;}
+        false        
+    } 
+
+    fn check_in_area(&self, x:usize, y:usize) -> bool {        
+        return x>= self.x && x <= self.x+self.width 
+                && y>=self.y && y<=self.y+self.height;
+    }
+
+    fn active(&mut self, active:bool){
+        self.active = active;
+        self.draw_border();
+        /*if active && self.consumer.is_none() {
+            let consumer = KEY_CODE_CONSUMER.try();
+            self.consumer = consumer;
+        }
+        if !active && self.consumer.is_some(){       
+            self.consumer = None;
+        }*/
+    }
+
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height;
+    }
+
+    fn draw_border(&self) -> (usize, usize, usize){
         let mut color = 0x343c37;
         if self.active { color = 0xffffff; }
         frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
         frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
         frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
-    }
-
-    fn get_key_event(&self) -> Option<Event> {
-    if self.consumer.is_some() {
-        let event_opt = try_opt!(self.consumer).peek();
-        let event = try_opt!(event_opt);
-        let event_data = event.deref().clone(); // event.deref() is the equivalent of   &*event
-        event.mark_completed();
-        return Some(event_data);
-    }
-    None
+        (self.x, self.y, self.margin)
     }
 }
 
 /// put key input events in the producer of window manager
-pub fn put_key_code(event: Event) -> Result<(), &'static str>{
-
-    let consumer = try_opt_err!(KEY_CODE_CONSUMER.try(), "No active window");
-
-    let producer = KEY_CODE_PRODUCER.call_once(|| {
-        consumer.obtain_producer()
+pub fn put_key_code(event: Event) -> Result<(), &'static str>{    
+    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
-    
-    producer.enqueue(event);
-    Ok(())
-}
 
+    allocator.lock().deref_mut().put_key_code(event)
+}
 
 
 pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
@@ -446,7 +481,6 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
 
 
 fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static str> {
-    
     let mut terminal_id_counter: usize = 1;
     // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
     let mut meta_keypress = false;
@@ -497,6 +531,8 @@ fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static 
 
 
     }
+
+    Ok(())
     
 
 

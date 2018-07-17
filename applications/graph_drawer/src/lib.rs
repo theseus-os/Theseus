@@ -438,7 +438,7 @@ pub fn main(_args: Vec<String>) -> isize {
     trace!("Wenqiu : drawer 1");
     let mut times = -1;
 
-    if _args.len() > 0 {
+/*    if _args.len() > 0 {
         times = _args[0].parse().unwrap();
     }
 
@@ -462,7 +462,7 @@ pub fn main(_args: Vec<String>) -> isize {
     //let consumer = KEY_CODE_CONSUMER.call_once(||DFQueue::new().into_consumer());
     
     window_manager::check_reference();
-
+*/
     let mut a = 0;
     loop {
         if times > 0 {

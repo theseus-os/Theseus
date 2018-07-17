@@ -12,6 +12,7 @@ extern crate spawn;
 extern crate task;
 extern crate memory;
 extern crate text_display;
+
 // temporary, should remove this once we fix crate system
 // extern crate window_manager;
 extern crate input_event_types; 
@@ -75,7 +76,7 @@ pub fn print_to_stdout<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &
 pub struct Terminal<D: TextDisplay + Send + 'static> {
     /// The terminal's own text display that it outputs text to
     /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
-    text_display: Arc<Mutex<D>>,
+    text_display: D,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -146,7 +147,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(text_display: Arc<Mutex<D>>, ref_num: usize) -> Result<DFQueueProducer<Event>, &'static str> {
+    pub fn init(text_display: D, ref_num: usize) -> Result<DFQueueProducer<Event>, &'static str> {
         // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
         let terminal_input_queue: DFQueue<Event>  = DFQueue::new();
         let terminal_input_consumer = terminal_input_queue.into_consumer();
@@ -242,7 +243,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.text_display.lock().get_dimensions();
+        let (buffer_width, buffer_height) = self.text_display.get_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -297,7 +298,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.text_display.lock().get_dimensions();
+        let (buffer_width,buffer_height) = self.text_display.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -347,7 +348,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 
     /// Scrolls up by the text display equivalent of one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.text_display.lock().get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -382,7 +383,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 
     /// Scrolls down the text display equivalent of one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.text_display.lock().get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -453,7 +454,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            self.text_display.lock().display_string(slice)?;
+            self.text_display.display_string(slice)?;
 
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -469,7 +470,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         self.scroll_start_idx = start_idx;
         let result = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
-            self.text_display.lock().display_string(slice)?;
+            self.text_display.display_string(slice)?;
             self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -544,7 +545,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> { 
-        let buffer_width = self.text_display.lock().get_dimensions().0;
+        let buffer_width = self.text_display.get_dimensions().0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -555,7 +556,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
             new_y -=1;
         }
 
-        self.text_display.lock().set_cursor(new_y as u16, new_x as u16, true);
+        self.text_display.set_cursor(new_y as u16, new_x as u16, true);
         return Ok(());
     }
 
@@ -600,7 +601,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                self.text_display.lock().disable_cursor();
+                self.text_display.disable_cursor();
                 let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
                 self.input_string.remove(remove_idx);
             }
@@ -652,7 +653,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
-                self.text_display.lock().disable_cursor();
+                self.text_display.disable_cursor();
             }
             return Ok(());
         }
@@ -667,7 +668,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line();
-                self.text_display.lock().disable_cursor();                
+                self.text_display.disable_cursor();                
             }
             return Ok(());
         }
@@ -684,7 +685,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
             }
             self.page_up();
             self.is_scroll_end = false;
-            self.text_display.lock().disable_cursor();
+            self.text_display.disable_cursor();
             return Ok(());
         }
 
@@ -868,13 +869,15 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay + Send + 'static { 
+
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
         terminal.cursor_handler()?;        
     }
 
-    terminal.text_display.lock().draw_border();
+    { terminal.text_display.draw_border();}
+    
     // use core::ops::Deref;
     // let mut refresh_display = false;
 
@@ -936,12 +939,12 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
-        let event = match terminal.text_display.lock().get_key_event() {
+        let event = {match terminal.text_display.get_key_event() {
                 Some(ev) => {
                     ev
                 },
                 _ => { continue; }
-        };
+        }};
 
 
 
@@ -969,7 +972,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         }
         // event.mark_completed();
         
-    }  
+    }
     Ok(())
 }
 

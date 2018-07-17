@@ -157,7 +157,8 @@ impl TextDisplay for VgaBuffer {
         // VGA buffer cursor blink is hardware based
     }
 
-    fn draw_border(&self) {
+    fn draw_border(&self) -> (usize, usize, usize) {
+        (0, 0, 0)
     }
         
     fn get_key_event(&self) -> Option<Event> {

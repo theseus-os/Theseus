@@ -7,7 +7,7 @@ extern crate input_event_types;
 use text_buffer::input_event_types::Event;
 
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
+use super::{Mutex, Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
 
 use self::tsc::{tsc_ticks, TscTicks};
 use self::text_display::TextDisplay;
@@ -167,7 +167,8 @@ impl TextDisplay for FrameTextBuffer {
         self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
 
-    fn draw_border(&self) {
+    fn draw_border(&self) -> (usize, usize, usize) {
+        (0, 0, 0)
     }
 
 
@@ -232,6 +233,7 @@ impl Cursor {
             self.show = !self.show;
         }
 
+        /*
         if self.enabled  {
             if self.show {
                 fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
@@ -242,6 +244,6 @@ impl Cursor {
                     y + margin + self.line * CHARACTER_HEIGHT, 
                     CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
             }
-        }
+        }*/
     }
 }
