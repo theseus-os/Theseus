@@ -147,17 +147,15 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(text_display: D, ref_num: usize) -> Result<DFQueueProducer<Event>, &'static str> {
+    pub fn init(text_display: D, ref_num: usize) -> Result<(), &'static str> {
         // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
         let terminal_input_queue: DFQueue<Event>  = DFQueue::new();
         let terminal_input_consumer = terminal_input_queue.into_consumer();
-        let returned_input_producer = terminal_input_consumer.obtain_producer();
 
         // initialize another dfqueue for the terminal object to handle printing from applications
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        // let terminal_input_producer = terminal_input_consumer.obtain_producer();
 
         let prompt_string: String;
         if ref_num == 0 {
@@ -200,7 +198,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         }
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
-        Ok(returned_input_producer)
+        Ok(())
     }
 
     /// Printing function for use within the terminal crate
@@ -983,7 +981,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 //   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
 //   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
 
-const WELCOME_STRING: &'static str= "Theseus";
+const WELCOME_STRING: &'static str= "Theseus\n";
 
 
 

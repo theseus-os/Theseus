@@ -5,6 +5,10 @@
 #![feature(unique)]
 #![feature(asm)]
 
+// Temp: Notes to andrew
+// Screen pixel dimensions are 640 x 400
+
+
 extern crate spin;
 extern crate irq_safety;
 extern crate alloc;
@@ -458,18 +462,19 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-    // let frame_buffer = FrameTextBuffer::new(); // temporary: we intialize a vga buffer to pass the terminal as the text display
     // Initializes the default kernel terminal
-
-
-    // FIX: don't use unwrap here and 50 lines down
-    use core::ops::Deref;
-    let window_object = get_window_obj(20, 20, 600, 150).unwrap();
-
-    let input_producer = terminal::Terminal::init(window_object, 0)?;
-
-    let window_object = get_window_obj(20, 200, 600, 150).unwrap();
-    let input_producer = terminal::Terminal::init(window_object, 1)?;
+    let window_object = match get_window_obj(20, 20, 600, 150) {
+        Ok(obj) => obj,
+        Err(_) => return Err("Window object couldn't be initalized")
+    };
+    terminal::Terminal::init(window_object, 0)?;
+    
+    // Initalizes a second terminal; will fix in next version
+    let window_object = match get_window_obj(20, 200, 600, 150) {
+    Ok(obj) => obj,
+    Err(_) => return Err("Window object couldn't be initalized")
+};
+    terminal::Terminal::init(window_object, 1)?;
 
     // populates a struct with the args needed for input_event_loop
 
@@ -485,7 +490,7 @@ fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static 
     // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
     let mut meta_keypress = false;
     loop {
-        // meta_keypress = false;
+        meta_keypress = false;
         use core::ops::Deref;
 
         // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
@@ -503,39 +508,37 @@ fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static 
                 // Creates new terminal window
                 // if key_input.modifiers.control && key_input.keycode == Keycode::T {
                 //     // hardcoding for now, will fix once I figure out a good system for auto-resizing of windows
-                //     debug!("Ctrl + T pressed");
-                //     let window_object = get_window_obj(20, 180, 200, 150).unwrap();
-                //     debug!("window initialization successful");
-                //     let input_producer = terminal::Terminal::init(window_object, terminal_id_counter)?;
-                //     terminal_id_counter += 1;
-                //     // meta_keypress = true;
+                //     if terminal_id_counter < 2 {                   
+                //         let window_object = match get_window_obj(20, 200, 600, 150) {
+                //             Ok(obj) => obj,
+                //             Err(_) => {
+                //                 debug!("error initializing window");
+                //                 return Err("Window object couldn't be initalized")}
+                //         };
+                //         debug!("in here");
+                //         terminal::Terminal::init(window_object, 1)?;
+                //         terminal_id_counter += 1;
+                //         meta_keypress = true;
+                //         event.mark_completed();
+                //     }
                 // }
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab {
-                    debug!("ALT+TAB PRESSED");
                     window_switch();
-                    debug!("window switch successful");
-                    // meta_keypress = true;
+                    meta_keypress = true;
+                    event.mark_completed();
 
                 }
-
             }
             _ => { }
         }
 
         // If the keyevent was not for control of the terminal windows
-        if true {
+        if !meta_keypress {
                 put_key_code(event.deref().clone())?;
                 event.mark_completed();
 
         }
-
-
-    }
-
-    Ok(())
-    
-
-
+    }    
 }
 
 
