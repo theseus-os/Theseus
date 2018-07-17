@@ -22,18 +22,18 @@
 //! is never dropped while any other section `A` relies on it.
 //! 
 //! When swapping crates, the `WeakDependent`s are actually more useful. 
-//! For example, if we want to swap the crate that contains section `B` with a new one `B'`, 
-//! then we can immediately find all of the section `A`s that depend on `B` 
-//! by iterating over `B.sections_dependent_on_me`. 
-//! To complete the swap and fully replace `B` with `B'`, 
+//! For example, if we want to swap the crate that contains section `B1` with a new one `B2`, 
+//! then we can immediately find all of the section `A`s that depend on `B1` 
+//! by iterating over `B1.sections_dependent_on_me`. 
+//! To complete the swap and fully replace `B1` with `B2`, 
 //! we would do the following (pseudocode):
 //! ```
-//! for secA in B.sections_dependent_on_me {
-//!     change secA's relocation to point to B'
-//!     add WeakDependent(secA) to B'.sections_dependent_on_me
-//!     remove StrongDependency(B) from secA.sections_i_depend_on
-//!     add StrongDependency(B') to secA.sections_i_depend_on
-//!     remove WeakDependent(secA) from B.sections_dependent_on_me (current iterator)
+//! for secA in B1.sections_dependent_on_me {     
+//!     change secA's relocation to point to B1     
+//!     add WeakDependent(secA) to B2.sections_dependent_on_me     
+//!     remove StrongDependency(B1) from secA.sections_i_depend_on     
+//!     add StrongDependency(B2) to secA.sections_i_depend_on      
+//!     remove WeakDependent(secA) from B1.sections_dependent_on_me (current iterator)     
 //! }
 //! ```
 //! 
