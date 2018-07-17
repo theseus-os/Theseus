@@ -7,6 +7,7 @@ use alloc::{BTreeMap, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
 use spin::Mutex;
+use cow_arc::CowArc;
 
 use xmas_elf;
 use xmas_elf::ElfFile;
@@ -14,7 +15,7 @@ use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-use metadata::{LoadedSection, StrongSectionRef, LoadedCrate, SectionType};
+use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 
 
 /// Decides which parsing technique to use, either the symbol file or the actual binary file.
@@ -105,7 +106,7 @@ pub fn parse_nano_core(
 
         let default_namespace = super::get_default_namespace();
         trace!("parse_nano_core(): adding symbols to namespace...");
-        let new_syms = default_namespace.add_symbols(new_crate_ref.lock().sections.values(), verbose_log);
+        let new_syms = default_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
         trace!("parse_nano_core(): finished adding symbols.");
         default_namespace.crate_tree.lock().insert(crate_name, new_crate_ref);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
@@ -131,7 +132,7 @@ fn parse_nano_core_symbol_file(
     rodata_pages: Arc<Mutex<MappedPages>>,
     data_pages:   Arc<Mutex<MappedPages>>,
     size: usize
-) -> Result<Arc<Mutex<LoadedCrate>>, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -146,14 +147,14 @@ fn parse_nano_core_symbol_file(
         *null_byte = 0u8;
     }
 
-    let new_crate = Arc::new(Mutex::new(LoadedCrate {
+    let new_crate = CowArc::new(LoadedCrate {
         crate_name:   crate_name, 
         sections:     BTreeMap::new(),
         text_pages:   Some(text_pages.clone()),
         rodata_pages: Some(rodata_pages.clone()),
         data_pages:   Some(data_pages.clone()),
-    }));
-    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+    });
+    let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
     // scoped to drop the borrow on mapped_pages through `bytes`
     {
@@ -406,7 +407,15 @@ fn parse_nano_core_symbol_file(
 
     } // drops the borrow of `bytes` (and mapped_pages)
     
-    new_crate.lock().sections = sections;
+    // set the new_crate's sections list, since we didn't do it earlier
+    {
+        let mut new_crate_mut = try_mp!(
+            new_crate.lock_as_mut()
+                .ok_or_else(|| "BUG: parse_nano_core_symbol_file(): couldn't get exclusive mutable access to new_crate"),
+            text_pages, rodata_pages, data_pages
+        );
+        new_crate_mut.sections = sections;
+    }
     
     Ok(new_crate)
 }
@@ -424,7 +433,7 @@ fn parse_nano_core_binary(
     rodata_pages: Arc<Mutex<MappedPages>>, 
     data_pages:   Arc<Mutex<MappedPages>>, 
     size_in_bytes: usize
-) -> Result<Arc<Mutex<LoadedCrate>>, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
     let crate_name = String::from("nano_core");
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -517,16 +526,14 @@ fn parse_nano_core_binary(
     let data_shndx   = try_mp!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"), text_pages, rodata_pages, data_pages);
     let bss_shndx    = try_mp!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"), text_pages, rodata_pages, data_pages);
 
-    let new_crate = Arc::new(Mutex::new(
-        LoadedCrate {
-            crate_name:   crate_name, 
-            sections:     BTreeMap::new(),
-            text_pages:   Some(text_pages.clone()),
-            rodata_pages: Some(rodata_pages.clone()),
-            data_pages:   Some(data_pages.clone()),
-        }
-    ));
-    let new_crate_weak_ref = Arc::downgrade(&new_crate);
+    let new_crate = CowArc::new(LoadedCrate {
+        crate_name:   crate_name, 
+        sections:     BTreeMap::new(),
+        text_pages:   Some(text_pages.clone()),
+        rodata_pages: Some(rodata_pages.clone()),
+        data_pages:   Some(data_pages.clone()),
+    });
+    let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
     let mut loop_result: Result<(), &'static str> = Ok(());
     
@@ -640,7 +647,15 @@ fn parse_nano_core_binary(
     // check if there was an error in the loop above
     try_mp!(loop_result, text_pages, rodata_pages, data_pages);
 
-    new_crate.lock().sections = sections;
+    // set the new_crate's sections list, since we didn't do it earlier
+    {
+        let mut new_crate_mut = try_mp!(
+            new_crate.lock_as_mut()
+                .ok_or_else(|| "BUG: parse_nano_core_binary(): couldn't get exclusive mutable access to new_crate"),
+            text_pages, rodata_pages, data_pages
+        );
+        new_crate_mut.sections = sections;
+    }
 
     Ok(new_crate)
 }
