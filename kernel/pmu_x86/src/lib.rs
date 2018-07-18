@@ -27,7 +27,7 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 
 //the number of samples to be taken, each sample the Atomic SAMPLE_COUNT decrements by 1 and once it's 0, the performance counter causing the interrupts is stopped 
-const NUM_SAMPLES: u32 = 500; 
+const NUM_SAMPLES: u32 = 5000; 
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicU32 = AtomicU32::new(0);
@@ -91,22 +91,32 @@ pub struct Counter {
     core: i32,
 }
 
+pub enum EventType{
+    InstructionsRetired,
+    UnhaltedThreadCycles,
+    UnhaltedReferenceCycles,
+    LongestLatCacheRef,
+    LongestLatCacheMiss,
+    BranchInstructionsRetired,
+    BranchMispredictRetired,
+}
+
 
 impl Counter {
     /// Creates a Counter object and assigns a physical counter for it. 
     /// If it's a PMC, writes the UMASK and Event Code to the relevant MSR, but leaves enable bit clear.  
-    pub fn new(event: &'static str) -> Result<Counter, &'static str> {
+    pub fn new(event: EventType) -> Result<Counter, &'static str> {
         // ensures PMU available and initialized
         check_pmu_availability()?;
         
         match event {
-            "INST_RETIRED.ANY" => return safe_rdpmc(RDPMC_FFC0),
-            "CPU_CLK_UNHALTED.THREAD" => return safe_rdpmc(RDPMC_FFC1),
-            "CPU_CLK_UNHALTED.REF" => return safe_rdpmc(RDPMC_FFC2),
-            "LONGEST_LAT_CACHE.REFERENCE" => return programmable_start(LLC_REF_MASK),
-            "LONGEST_LAT_CACHE.MISS" => return programmable_start(LLC_MISS_MASK),
-            "BR_INST_RETIRED.ALL_BRANCHES" => return programmable_start(BR_INST_RETIRED_MASK),
-            "BR_MISP_RETIRED.ALL_BRANCHES" => return programmable_start(BR_MISS_RETIRED_MASK),	
+            InstructionsRetired => return safe_rdpmc(RDPMC_FFC0),
+            UnhaltedThreadCycles => return safe_rdpmc(RDPMC_FFC1),
+            UnhaltedReferenceCycles => return safe_rdpmc(RDPMC_FFC2),
+            LongestLatCacheRef => return programmable_start(LLC_REF_MASK),
+            LongestLatCacheMiss => return programmable_start(LLC_MISS_MASK),
+            BranchInstructionsRetired => return programmable_start(BR_INST_RETIRED_MASK),
+            BranchMispredictRetired => return programmable_start(BR_MISS_RETIRED_MASK),	
             _ => return Err("Event either not supported or invalid, refer to https://download.01.org/perfmon/index/wsmex.html for event names."),
         }
     }
@@ -239,21 +249,21 @@ fn check_pmu_availability() -> Result<(), &'static str>  {
 }
 
 /// Start interrupt process in order to take samples using PMU. IPs sampled are stored in IP_LIST
-pub fn start_samples(event_type: &'static str, event_per_sample: u32) -> Result<(),&'static str> {    
-    if event_per_sample >= 0xffffffff || event_per_sample <= 0 {
+pub fn start_samples(event_type: EventType, event_per_sample: u32) -> Result<(),&'static str> {    
+    if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
-    let start_value = 0xffffffff - event_per_sample;
+    let start_value = core::u32::MAX - event_per_sample;
     check_pmu_availability()?;
 
     let event_mask = match event_type {
-        "INST_RETIRED.ANY" => UNHALTED_CYCLE_MASK,
-        "CPU_CLK_UNHALTED.THREAD" => INST_RETIRED_MASK,
-        "CPU_CLK_UNHALTED.REF" => UNHALTED_REF_CYCLE_MASK,
-        "LONGEST_LAT_CACHE.REFERENCE" => LLC_REF_MASK,
-        "LONGEST_LAT_CACHE.MISS" => LLC_MISS_MASK,
-        "BR_INST_RETIRED.ALL_BRANCHES" => BR_INST_RETIRED_MASK,
-        "BR_MISP_RETIRED.ALL_BRANCHES" => BR_MISS_RETIRED_MASK,	
+        InstructionsRetired => UNHALTED_CYCLE_MASK,
+        UnhaltedThreadCycles => INST_RETIRED_MASK,
+        UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
+        LongestLatCacheRef => LLC_REF_MASK,
+        LongestLatCacheMiss => LLC_MISS_MASK,
+        BranchInstructionsRetired => BR_INST_RETIRED_MASK,
+        BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
         _ => return Err("Invalid event type"),
     } | PMC_ENABLE | INTERRUPT_ENABLE;
     SAMPLE_START_VALUE.store(start_value, Ordering::SeqCst);
@@ -269,12 +279,16 @@ pub fn start_samples(event_type: &'static str, event_per_sample: u32) -> Result<
 
 /// Function to manually stop the sampling interrupts. 
 pub fn stop_samples() {
+    //immediately stops counting and clears the counter
     unsafe{
         wrmsr(IA32_PERFEVTSEL0, 0);
         wrmsr(IA32_PMC0, 0);
-        SAMPLE_EVENT_TYPE_MASK.store(0, Ordering::SeqCst);
-        SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
-
+    }
+    //clears values in atomics so that 
+    SAMPLE_EVENT_TYPE_MASK.store(0, Ordering::SeqCst);
+    SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
+    while let Some(next_num) = IP_LIST.lock().pop() {
+        debug!("{:x}", next_num);
     }
 }
 
