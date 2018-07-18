@@ -67,10 +67,10 @@ struct WindowAllocator {
 }
 
 /// switch the active window
-pub fn window_switch() -> Option<&'static str>{
-    let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    allocator.lock().switch();
-    Some("End")
+pub fn window_switch() -> Result<(), &'static str> {
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    allocator.switch();
+    Ok(())
 }
 
 /// new a window object and return it
@@ -84,17 +84,16 @@ pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result
 }
 
 /// delete a window object
-pub fn delete_window<'a>(window:WindowObj) -> Option<&'static str> {
-    let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    allocator.lock().delete(&(window.inner));
-    
-    Some("End")
+pub fn delete_window<'a>(window:WindowObj) -> Result<(), &'static str> {
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    allocator.delete(&(window.inner));
+    Ok(())
 }
 
 impl WindowAllocator{
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        if width < 2 || height < 2 {
-            return Err("Window size must be greater than 2");
+        if width < 4 || height < 4 {
+            return Err("Window size must be greater than 4");
         }
         if x + width >= frame_buffer::FRAME_BUFFER_WIDTH
        || y + height >= frame_buffer::FRAME_BUFFER_HEIGHT {
@@ -105,6 +104,7 @@ impl WindowAllocator{
         let producer = consumer.obtain_producer();
 
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
+
         let mut inner = WindowInner{
             x:x,
             y:y,
@@ -115,7 +115,9 @@ impl WindowAllocator{
             key_producer:producer,
         };
 
-        let overlapped = self.check_overlap(&inner);       
+        let inner_ref = Arc::new(Mutex::new(inner));
+
+        let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
         if overlapped  {
             return Err("Request area is already allocated");
         }
@@ -128,7 +130,6 @@ impl WindowAllocator{
             }
         }
 
-        let inner_ref = Arc::new(Mutex::new(inner));
         self.allocated.push_back(Arc::downgrade(&inner_ref));
 
         let mut window:WindowObj = WindowObj{
@@ -201,8 +202,7 @@ impl WindowAllocator{
 
     }
 
-    fn check_overlap(&mut self, inner:&WindowInner) -> bool {
-
+    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
         let mut i = 0;
         while i < len {
@@ -210,10 +210,11 @@ impl WindowAllocator{
             {   
                 let reference = self.allocated.get(i).unwrap().upgrade();
                 if reference.is_some() {
-                    let inner_ref = reference.unwrap();
-                    let inner_lock = inner_ref.lock();
-                    if inner.is_overlapped(&(*inner_lock)) {
-                        return true;
+                    let allocated_ref = reference.unwrap();
+                    if !Arc::ptr_eq(&allocated_ref, inner) {
+                        if allocated_ref.lock().is_overlapped(x, y, width, height) {
+                            return true;
+                        }
                     }
                     i += 1;
                 } else {
@@ -258,9 +259,23 @@ pub struct WindowObj {
 impl WindowObj{
 
     /// adjust the size of a window
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize){
-        let mut inner = self.inner.lock();  
-        inner.resize(x, y, width, height);
+    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
+
+        let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        if allocator.check_overlap(&(self.inner), x, y, width, height) {
+            Err("Required window area is overlapped")
+        } else {
+            let mut inner = self.inner.lock();
+            inner.draw_border(BACKGROUND_COLOR);
+            inner.clean();
+            inner.x = x;
+            inner.y = y;
+            inner.width = width;
+            inner.height = height;
+            inner.draw_border(get_border_color(inner.active));
+            Ok(())
+        }
+
     }
 
     fn clean(&self) {
@@ -387,14 +402,14 @@ struct WindowInner {
 }
 
 impl WindowInner {
-    fn is_overlapped(&self, inner:&WindowInner) -> bool {
-        if self.check_in_area(inner.x, inner.y)
+    fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
+        if self.check_in_area(x, y)
             {return true;}
-        if self.check_in_area(inner.x, inner.y+inner.height)
+        if self.check_in_area(x, y+height)
             {return true;}
-        if self.check_in_area(inner.x+inner.width, inner.y)
+        if self.check_in_area(x+width, y)
             {return true;}
-        if self.check_in_area(inner.x+inner.width, inner.y+inner.height)
+        if self.check_in_area(x+width, y+height)
             {return true;}
         false        
     } 
@@ -416,7 +431,7 @@ impl WindowInner {
         }*/
     }
 
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+    /*fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
         self.draw_border(BACKGROUND_COLOR);
         self.clean();
         self.x = x;
@@ -424,7 +439,7 @@ impl WindowInner {
         self.width = width;
         self.height = height;
         self.draw_border(get_border_color(self.active));
-    }
+    }*/
 
     fn clean(&self) {
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, BACKGROUND_COLOR);
@@ -469,7 +484,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
 
     terminal::Terminal::init(window_object, 0)?;
     // Initalizes a second terminal; will fix in next version
-    let window_object = match get_window_obj(20, 200, 600, 150) {
+    let mut window_object = match get_window_obj(20, 200, 600, 150) {
         Ok(obj) => obj,
         Err(_) => return Err("Window object couldn't be initalized")
     };
@@ -522,7 +537,7 @@ fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static 
                 //     }
                 // }
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab {
-                    window_switch();
+                    window_switch()?;
                     meta_keypress = true;
                     event.mark_completed();
 
