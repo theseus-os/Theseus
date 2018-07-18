@@ -874,16 +874,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         terminal.cursor_handler()?;        
     }
 
-    { terminal.text_display.draw_border();}
+    terminal.text_display.draw_border();
     
     // use core::ops::Deref;
     // let mut refresh_display = false;
-
-    // let window_ref= get_window_obj(100, 10, 300, 380)?;
-    
-    // let mut window = window_ref.lock();
-    // window.lock().display_string("This is a new window")?;
-    // window_manager::delete_window(&window_ref);
     let mut refresh_display = true;
     use core::ops::Deref;
     loop {
@@ -891,7 +885,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         //terminal.text_display.lock().cursor_blink();//(new_x as u16, new_y as u16, true);
-        // window.cursor_blink();
+        terminal.text_display.cursor_blink();
 
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {

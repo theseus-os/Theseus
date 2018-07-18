@@ -144,15 +144,25 @@ impl TextDisplay for FrameTextBuffer {
 
     fn disable_cursor(&mut self) {
         self.cursor.disable();
+        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT,  
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+
     }
 
     fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
         self.cursor.enabled = true;
         self.cursor.update(line as usize, column as usize, reset);
+        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR); 
     }
 
     fn cursor_blink(&mut self) {
-        self.cursor.blink(0, 0, 0);     
+        if self.cursor.blink() {
+            let color = if self.cursor.show { FONT_COLOR } else { BACKGROUND_COLOR };
+            fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, color); 
+        }
+
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
@@ -215,35 +225,29 @@ impl Cursor {
     ///enable a cursor
     pub fn enable(&mut self) {
         self.enabled = true;
+        self.time = tsc_ticks();
+        self.show = true;
     }
 
     ///disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
-        fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT,  
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
-    }
+     }
 
     ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
-    pub fn blink(&mut self, x:usize, y:usize, margin:usize) {
-        let time = tsc_ticks();
-        
-        if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
-            self.time = time;
-            self.show = !self.show;
-        }
-
-        /*
-        if self.enabled  {
-            if self.show {
-                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
-                    y + margin + self.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);    
-            } else {
-                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
-                    y + margin + self.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+    pub fn blink(&mut self) -> bool{
+        if self.enabled {
+            let time = tsc_ticks();
+            if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
+                self.time = time;
+                self.show = !self.show;
+                return true
             }
-        }*/
+        }
+        false
+    }
+
+    pub fn get_info(&self) -> (usize, usize, bool) {
+        (self.line, self.column, self.show)
     }
 }

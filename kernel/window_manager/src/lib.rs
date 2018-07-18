@@ -8,8 +8,7 @@
 // Temp: Notes to andrew
 // Screen pixel dimensions are 640 x 400
 
-//resize
-//delete
+//deref_mut
 //cursor
 //framebuffer::
 
@@ -43,7 +42,7 @@ use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer, PeekedData};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
-use frame_buffer::text_buffer::{BACKGROUND_COLOR, FrameTextBuffer};
+use frame_buffer::text_buffer::{FONT_COLOR, BACKGROUND_COLOR, FrameTextBuffer};
 use text_display::TextDisplay;
 use input_event_types::Event;
 
@@ -59,6 +58,9 @@ pub mod test_window_manager;
 
 static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 
+const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
+const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
+
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, //The last one is active
@@ -67,7 +69,7 @@ struct WindowAllocator {
 /// switch the active window
 pub fn window_switch() -> Option<&'static str>{
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    allocator.lock().deref_mut().switch();
+    allocator.lock().switch();
     Some("End")
 }
 
@@ -78,13 +80,13 @@ pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result
         Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
 
-    allocator.lock().deref_mut().allocate(x,y,width,height)
+    allocator.lock().allocate(x,y,width,height)
 }
 
 /// delete a window object
 pub fn delete_window<'a>(window:WindowObj) -> Option<&'static str> {
     let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-    allocator.lock().deref_mut().delete(&(window.inner));
+    allocator.lock().delete(&(window.inner));
     
     Some("End")
 }
@@ -311,13 +313,25 @@ impl TextDisplay for WindowObj {
     }
 
     fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        self.text_buffer.cursor.enable();
-        self.text_buffer.cursor.update(line as usize, column as usize, reset);
+        let cursor = &mut (self.text_buffer.cursor);
+        cursor.enable();
+        cursor.update(line as usize, column as usize, reset);
+        let inner = self.inner.lock();
+        frame_buffer::fill_rectangle(inner.x + inner.margin + (column as usize) * CHARACTER_WIDTH, 
+                        inner.y + inner.margin + (line as usize) * CHARACTER_HEIGHT, 
+                        CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);
     }
 
     fn cursor_blink(&mut self) {
-        let inner = self.inner.lock();
-        self.text_buffer.cursor.blink(inner.x, inner.y, inner.margin);    
+        let cursor = &mut (self.text_buffer.cursor);
+        if cursor.blink() {
+            let (line, column, show) = cursor.get_info();
+            let inner = self.inner.lock();
+            let color = if show { FONT_COLOR } else { BACKGROUND_COLOR };
+            frame_buffer::fill_rectangle(inner.x + inner.margin + column * CHARACTER_WIDTH, 
+                        inner.y + inner.margin + line * CHARACTER_HEIGHT, 
+                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+        }
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
@@ -338,7 +352,7 @@ impl TextDisplay for WindowObj {
     
     fn draw_border(&self) -> (usize, usize, usize){
         let inner = self.inner.lock();
-        inner.draw_border(get_active_color(inner.active))
+        inner.draw_border(get_border_color(inner.active))
     }
 
 
@@ -392,7 +406,7 @@ impl WindowInner {
 
     fn active(&mut self, active:bool){
         self.active = active;
-        self.draw_border(get_active_color(active));
+        self.draw_border(get_border_color(active));
         /*if active && self.consumer.is_none() {
             let consumer = KEY_CODE_CONSUMER.try();
             self.consumer = consumer;
@@ -409,7 +423,7 @@ impl WindowInner {
         self.y = y;
         self.width = width;
         self.height = height;
-        self.draw_border(get_active_color(self.active));
+        self.draw_border(get_border_color(self.active));
     }
 
     fn clean(&self) {
@@ -432,14 +446,14 @@ pub fn put_key_code(event: Event) -> Result<(), &'static str>{
         Mutex::new(WindowAllocator{allocated:VecDeque::new()})
     });
 
-    allocator.lock().deref_mut().put_key_code(event)
+    allocator.lock().put_key_code(event)
 }
 
-fn get_active_color(active:bool) -> u32 {
+fn get_border_color(active:bool) -> u32 {
     if active {
-        0xffffff
+        WINDOW_ACTIVE_COLOR
     } else {
-        0x343c37
+        WINDOW_INACTIVE_COLOR
     }
 }
 
@@ -453,8 +467,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         Err(_) => return Err("Window object couldn't be initalized")
     };
 
-    //terminal::Terminal::init(window_object, 0)?;
-    delete_window(window_object);
+    terminal::Terminal::init(window_object, 0)?;
     // Initalizes a second terminal; will fix in next version
     let window_object = match get_window_obj(20, 200, 600, 150) {
         Ok(obj) => obj,
