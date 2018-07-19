@@ -8,10 +8,6 @@
 // Temp: Notes to andrew
 // Screen pixel dimensions are 640 x 400
 
-//deref_mut
-//cursor
-//framebuffer::
-
 extern crate spin;
 extern crate irq_safety;
 extern crate alloc;
@@ -21,7 +17,7 @@ extern crate frame_buffer;
 #[macro_use] extern crate frame_buffer_3d;
 extern crate input_event_types;
 extern crate spawn;
-extern crate terminal;
+extern crate pit_clock;
 
 
 #[macro_use] extern crate log;
@@ -36,10 +32,9 @@ use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
 use alloc::{VecDeque};
 use alloc::string::ToString;
-use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer, PeekedData};
-use keycodes_ascii::Keycode;
+use keycodes_ascii::{Keycode, KeyAction};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use frame_buffer::text_buffer::{FONT_COLOR, BACKGROUND_COLOR, FrameTextBuffer};
@@ -55,11 +50,17 @@ use input_event_types::Event;
 /// A test mod of window manager
 pub mod test_window_manager;
 
+pub enum WindowDimensions {
+    Pixels((usize, usize)), 
+    Chars((usize, usize))
+}
 
 static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
+pub static GAP_SIZE: usize = 10; // 10 pixel gap between windows 
+
 
 
 struct WindowAllocator {
@@ -138,6 +139,7 @@ impl WindowAllocator{
             consumer:consumer,
         };
 
+
         window.clean();
         window.draw_border();       
         
@@ -183,6 +185,7 @@ impl WindowAllocator{
        
         let mut i = 0;
         let len = self.allocated.len();
+        debug!("in delete function");
         for item in self.allocated.iter(){
             let reference = item.upgrade();
             if reference.is_some() {
@@ -257,26 +260,6 @@ pub struct WindowObj {
 
 
 impl WindowObj{
-
-    /// adjust the size of a window
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
-
-        let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-        if allocator.check_overlap(&(self.inner), x, y, width, height) {
-            Err("Required window area is overlapped")
-        } else {
-            let mut inner = self.inner.lock();
-            inner.draw_border(BACKGROUND_COLOR);
-            inner.clean();
-            inner.x = x;
-            inner.y = y;
-            inner.width = width;
-            inner.height = height;
-            inner.draw_border(get_border_color(inner.active));
-            Ok(())
-        }
-
-    }
 
     fn clean(&self) {
         let inner = self.inner.lock();
@@ -382,6 +365,26 @@ impl TextDisplay for WindowObj {
             None
         }
     }
+
+        /// adjust the size of a window
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
+
+        let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        if allocator.check_overlap(&(self.inner), x, y, width, height) {
+            Err("Required window area is overlapped")
+        } else {
+            let mut inner = self.inner.lock();
+            inner.draw_border(BACKGROUND_COLOR);
+            inner.clean();
+            inner.x = x;
+            inner.y = y;
+            inner.width = width;
+            inner.height = height;
+            inner.draw_border(get_border_color(inner.active));
+            Ok(())
+        }
+
+    }
 }
 
 struct WindowInner {
@@ -472,88 +475,54 @@ fn get_border_color(active:bool) -> u32 {
     }
 }
 
-pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
-    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
-    let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-    // Initializes the default kernel terminal
-    let mut window_object = match get_window_obj(20, 20, 600, 150) {
-        Ok(obj) => obj,
-        Err(_) => return Err("Window object couldn't be initalized")
-    };
-
-    terminal::Terminal::init(window_object, 0)?;
-    // Initalizes a second terminal; will fix in next version
-    let mut window_object = match get_window_obj(20, 200, 600, 150) {
-        Ok(obj) => obj,
-        Err(_) => return Err("Window object couldn't be initalized")
-    };
-    terminal::Terminal::init(window_object, 1)?;
-
-    // populates a struct with the args needed for input_event_loop
-
-    // Adds this default kernel terminal to the static list of running terminals
-    // Note that the list owns all the terminals that are spawned
-    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
-    Ok(returned_keyboard_producer)
-}
 
 
-fn input_event_loop(mut consumer:DFQueueConsumer<Event>) -> Result<(), &'static str> {
-    let mut terminal_id_counter: usize = 1;
-    // Bool prevents keypresses like ctrl+t from actually being pushed to the terminal scrollback buffer
-    let mut meta_keypress = false;
-    loop {
-        meta_keypress = false;
-        use core::ops::Deref;
+pub fn delete_active_window() -> Option<()> {
+    // deletes the window from the window manager
+    let mut locked_window_objs = try_opt!(WINDOW_ALLOCATOR.try()).lock();
+    for window_ptr in locked_window_objs.deref_mut().allocated.iter() {
+        let window_inner_ref = window_ptr.upgrade().unwrap();
 
-        // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
-        let event = match consumer.peek() {
-            Some(ev) => ev,
-            _ => { continue; }
-        };
-        match event.deref() {
-            &Event::ExitEvent => {
-                return Ok(()); 
+        {
+            if window_inner_ref.lock().active {
+                debug!("starting deletion...");
+                let _result = put_key_code(Event::ExitEvent);
             }
-
-            &Event::InputEvent(ref input_event) => {
-                let key_input = input_event.key_event;
-                // Creates new terminal window
-                // if key_input.modifiers.control && key_input.keycode == Keycode::T {
-                //     // hardcoding for now, will fix once I figure out a good system for auto-resizing of windows
-                //     if terminal_id_counter < 2 {                   
-                //         let window_object = match get_window_obj(20, 200, 600, 150) {
-                //             Ok(obj) => obj,
-                //             Err(_) => {
-                //                 debug!("error initializing window");
-                //                 return Err("Window object couldn't be initalized")}
-                //         };
-                //         debug!("in here");
-                //         terminal::Terminal::init(window_object, 1)?;
-                //         terminal_id_counter += 1;
-                //         meta_keypress = true;
-                //         event.mark_completed();
-                //     }
-                // }
-                if key_input.modifiers.alt && key_input.keycode == Keycode::Tab {
-                    window_switch()?;
-                    meta_keypress = true;
-                    event.mark_completed();
-
-                }
-            }
-            _ => { }
         }
 
-        // If the keyevent was not for control of the terminal windows
-        if !meta_keypress {
-                put_key_code(event.deref().clone())?;
-                event.mark_completed();
-
-        }
     }    
+
+    let _result = put_key_code(Event::ExitEvent); // signals the terminal crate to end that terminal's loop and do other cleanup
+    return Some(())
 }
+
+
+pub fn adjust_windows() -> Option<(usize, usize, usize)> {
+    // let test: usize = try_opt!(WINDOW_ALLOCATOR.try());
+    let mut locked_allocator = try_opt!(WINDOW_ALLOCATOR.try()).lock();
+    let num_windows = locked_allocator.deref_mut().allocated.len();
+    // one gap between each window and one gap between the edge windows and the frame buffer boundary
+    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE;
+    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
+
+    // We will draw the windows from top to bottom
+    for window_inner_ptr in locked_allocator.deref_mut().allocated.iter() {    
+        debug!("height_idx, window_width, window_height are {}, {}, {}", height_index, window_width, window_height);
+        let window_obj = window_inner_ptr.upgrade().unwrap();
+        window_obj.lock().key_producer.enqueue(Event::ResizeEvent((GAP_SIZE, height_index, window_width, window_height))); // fix: don't use unwrap
+        height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+        debug!("height_idx, window_width, window_height of NEW WINDOW will be {}, {}, {}\n ", height_index, window_width, window_height);
+
+    }   
+    debug!("resize function works");
+    return Some((height_index, window_width, window_height)); // this is the index at which the new window should be drawn
+
+}
+
+
+
+
 
 
 
@@ -569,23 +538,6 @@ pub fn calculate_time_statistic() {
     });
 
   unsafe{
-    i    let allocator = try_opt!(WINDOW_ALLOCATOR.try());[T] at top of panic_wrapper: index out of bounds: the len is 400 but the index is 400 frame_buffer/src/text_buffer.rs:127:13
-[E] PANIC was unhandled in task "terminal loop" on core Some(0) at frame_buffer/src/text_buffer.rs:127:13 -- index out of bounds: the len is 400 but the index is 400
-[E] STACK TRACE: FFFFFE0000032890
-[E]  FFFFFE0000032890: INVALID_ADDRESS
-[E] Killing panicked task "terminal loop"
-
-//    unsafe { allocator.force_unlock(); }
-    allocator.lock().deref_mut().switch();
-         let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-//    unsafe { allocator.force_unlock(); }
-    allocator.lock().deref_mut().switch();
-         let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-//    unsafe { allocator.force_unlock(); }
-    allocator.lock().deref_mut().switch();
-    }    let allocator = try_opt!(WINDOW_ALLOCATOR.try());
-//    unsafe { allocator.force_unlock(); }
-    allocator.lock().deref_mut().switch();
 
     let hpet_lock = get_hpet();
     let end_time = hpet_lock.as_ref().unwrap().get_counter();  
@@ -606,3 +558,5 @@ pub fn calculate_time_statistic() {
     }
   }
 }*/
+
+

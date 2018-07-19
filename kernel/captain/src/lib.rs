@@ -134,7 +134,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // initialize the kernel input_event_manager
     // let input_event_queue_producer = input_event_manager::init()?;
-    let input_event_queue_producer = window_manager::init()?;
+    let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
