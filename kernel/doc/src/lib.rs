@@ -40,7 +40,7 @@
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-//! * `input_event_manager`: A input_event_manager implementation that allows simple printing to the screen.
+//! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `input_event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `driver_init`: Code for handling the sequence required to initialize each driver.
@@ -60,16 +60,17 @@
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
 //! * `ps2`: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).
-//! * `rtc``: simple driver for handling the Real Time Clock chip.
+//! * `rtc`: simple driver for handling the Real Time Clock chip.
 //! * `scheduler`: The scheduler and runqueue management.
 //! * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
 //! * `spawn`: Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes.
 //! * `syscall`: Initializes the system call support, and provides basic handling and dispatching of syscalls in Theseus.
 //! * `task`: Task types and structure definitions, a Task is a thread of execution.
+//! * `text_display` : Defines a trait for anything that can display text to the screen
 //! * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
-//!
+//! * `window_manager` : Support for running and managing multiple windows
 //! 
 
 

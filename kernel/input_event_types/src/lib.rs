@@ -12,6 +12,7 @@ use alloc::string::String;
 pub enum Event {
     InputEvent(KeyboardInputEvent),
     OutputEvent(PrintOutputEvent),
+    ResizeEvent((usize, usize, usize, usize)), // tuple containing x, y, width, and height arguments for resizing the window
     ExitEvent,
 }
 
@@ -20,8 +21,8 @@ impl Event {
         Event::InputEvent(KeyboardInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S, display: bool) -> Event where S: Into<String> {
-        Event::OutputEvent(PrintOutputEvent::new(s.into(), display))
+    pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
+        Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 }
 
@@ -45,15 +46,12 @@ impl KeyboardInputEvent {
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
     pub text: String,
-    // indicates whether or not the terminal/application should refresh its TextDisplay when it handles this output event
-    pub display: bool,
 }
 
 impl PrintOutputEvent {
-    pub fn new(s: String, display: bool) -> PrintOutputEvent {
+    pub fn new(s: String) -> PrintOutputEvent {
         PrintOutputEvent {
             text: s,
-            display: display
         }
     }
 }

@@ -162,8 +162,11 @@ impl TextDisplay for VgaBuffer {
     }
         
     fn get_key_event(&self) -> Option<Event> {
-        // Andrew: find another way rather than adding this as a trait method
         None
+    }
+
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
+        Ok(())
     }
 }
 

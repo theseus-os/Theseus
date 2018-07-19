@@ -1,6 +1,9 @@
 #![no_std]
 #![feature(alloc)]
-extern crate input_event_manager;
+extern crate terminal;
+
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate log;
 
 
 // / Calls `print!()` with an extra newilne ('\n') appended to the end. 
@@ -16,13 +19,16 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        $crate::call_input_event_manager(format_args!($($arg)*));
+        $crate::print_to_stdout_args(format_args!($($arg)*));
     });
 }
 
+
 use core::fmt;
-/// Calls print_to_stdout_args inside the input event manager crate so that the print event can be flagged
-/// to refresh the TextDisplay or not
-pub fn call_input_event_manager(fmt_args: fmt::Arguments) {
-    input_event_manager::print_to_stdout_args(fmt_args)
+/// Converts the given `core::fmt::Arguments` to a `String` and queues it up to be printed out to the input_event_manager. FIX THIS
+/// This function is currently in the input_event_manager crate because this crate is the only one that is aware of the focused terminal window
+pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
+    use core::fmt::{Write, Display, Debug, Formatter};
+    // Passes the current terminal number (the one being focused on) to whoever is printing so it knows whether or not to refresh its display
+    let _result = terminal::print_to_stdout(format!("{}", fmt_args));
 }

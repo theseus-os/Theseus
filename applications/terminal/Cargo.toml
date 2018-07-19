@@ -1,6 +1,7 @@
 [package]
 name = "terminal"
 version = "0.1.0"
+description = "Terminal emulator that can run commands in application directory (inspired by gnome-terminal)"
 authors = ["Andrew Pham <apham727@gmail.com>"]
 
 
@@ -49,6 +50,9 @@ path = "../../kernel/text_display"
 
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
+
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

@@ -12,27 +12,23 @@ extern crate spawn;
 extern crate task;
 extern crate memory;
 extern crate text_display;
-
-// temporary, should remove this once we fix crate system
-// extern crate window_manager;
 extern crate input_event_types; 
+extern crate window_manager;
 
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use text_display::TextDisplay;
 use input_event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::btree_map::BTreeMap;
 use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-// use window_manager::get_window_obj;
+use text_display::TextDisplay;
 
 lazy_static! {
     // maps the terminal reference number to the current task id
@@ -40,11 +36,11 @@ lazy_static! {
     // maps the terminal's reference number to its print producer
     static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }
-/// Currently, println! and print! macros will call this function to print to the display provider from the input_event_manager crate. 
+/// Currently, println! and print! macros will call this function to print to the display provider from the input_ever t_manager crate. 
 /// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
 /// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
 /// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
-pub fn print_to_stdout<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &'static str> {
+pub fn print_to_stdout<S: Into<String>>(s: S) -> Result<(), &'static str> {
     // Gets the task id of the task that called this print function
     let result = task::get_my_current_task_id();
     let mut selected_term = 0; // default to kernel terminal
@@ -63,17 +59,12 @@ pub fn print_to_stdout<S: Into<String>>(s: S, focus_term: usize) -> Result<(), &
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
     let result = print_map.get(&selected_term);
     if let Some(selected_term_producer) = result {
-        // If the terminal is the one being focused on, then it enqueues an output event with display field = true to indicate that it should refresh the display provider
-        if selected_term == focus_term {
-            selected_term_producer.enqueue(Event::new_output_event(s, true));
-        } else {
-            selected_term_producer.enqueue(Event::new_output_event(s, false));
-        }
+        selected_term_producer.enqueue(Event::new_output_event(s));
     }
     Ok(())
 }
 
-pub struct Terminal<D: TextDisplay + Send + 'static> {
+pub struct Terminal<D> where D: TextDisplay + Send + 'static {
     /// The terminal's own text display that it outputs text to
     /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
     text_display: D,
@@ -133,6 +124,7 @@ impl<D> fmt::Debug for Terminal<D> where D: TextDisplay + Send + 'static {
     }
 }
 
+
 /// Terminal Structure that allows multiple terminals to be individually run.
 /// There are now two queues that belong to each termianl instance.
 /// 1) The terminal print queue that handles printing from external applications
@@ -143,7 +135,7 @@ impl<D> fmt::Debug for Terminal<D> where D: TextDisplay + Send + 'static {
 ///     - Consumer is the main terminal loop
 ///     - Producers are functions in the event handling crate that send 
 ///         Keyevents if the terminal is the one currently being focused on
-impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
+impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
@@ -161,7 +153,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         if ref_num == 0 {
             prompt_string = "kernel:~$ ".to_string();
         } else {
-            prompt_string = format!("terminal_{}:~$ ", ref_num + 1); // ref numbers are 0-indexed
+            prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
         }
         // creates a new terminal object
         let mut terminal = Terminal {
@@ -194,7 +186,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         if ref_num == 0 {
             terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
         } else {
-            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nTerminal {}\n{}", ref_num + 1, prompt_string))?;
+            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         }
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
@@ -265,7 +257,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 
             // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the text display
             while total_lines < buffer_height {
-                // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/text_display_width + 1
+                // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/window_width + 1
                 if counter == new_line_indices.len() -1 {
                     return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
                 }
@@ -867,7 +859,6 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay + Send + 'static { 
-
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
@@ -875,35 +866,51 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     }
 
     terminal.text_display.draw_border();
-    
     // use core::ops::Deref;
     // let mut refresh_display = false;
-    let mut refresh_display = true;
+
+    // let window_ref= get_window_obj(100, 10, 300, 380)?;
+    
+    // let mut text_display = window_ref.lock();
+    // text_display.lock().display_string("This is a new text_display")?;
+    // window_manager::delete_window(&window_ref);
     use core::ops::Deref;
     loop {
-        
+
+        if let Some(event) = terminal.text_display.get_key_event() {
+            match event {
+                Event::ExitEvent => {
+                    // let x = arg_tuple.0;
+                    // let y = arg_tuple.1;
+                    // let width = arg_tuple.2;
+                    // let height = arg_tuple.3;
+                    // let _result = terminal.text_display.resize(x,y,width,height)?;
+
+                },
+                _ => { },
+            }
+        }
+
+
+
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
-        //terminal.text_display.lock().cursor_blink();//(new_x as u16, new_y as u16, true);
-        terminal.text_display.cursor_blink();
-
         if let Some(print_event) = terminal.print_consumer.peek() {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
                     terminal.push_to_stdout(s.text.clone());
-                    if s.display {
-                        // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
-                        // task_handler() function has cleaned up, which does its own printing to the console
-                        refresh_display = true;
-                        let start_idx = terminal.scroll_start_idx;
-                        if terminal.is_scroll_end {
-                            let buffer_len = terminal.scrollback_buffer.len();
-                            terminal.update_display_backwards(buffer_len)?;
-                            terminal.cursor_handler()?;
-                        } else {
-                            terminal.update_display_forwards(start_idx)?;
-                        }
+
+                    // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
+                    // task_handler() function has cleaned up, which does its own printing to the console
+                    let start_idx = terminal.scroll_start_idx;
+                    if terminal.is_scroll_end {
+                        let buffer_len = terminal.scrollback_buffer.len();
+                        terminal.update_display_backwards(buffer_len)?;
+                        terminal.cursor_handler()?;
+                    } else {
+                        terminal.update_display_forwards(start_idx)?;
                     }
+                    
                     terminal.correct_prompt_position = false;
                 },
                 _ => { },
@@ -916,34 +923,44 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
-        // Refreshes the text display if it is the one being displayed
-        if refresh_display == true {
-            let start_idx = terminal.scroll_start_idx;
-            if terminal.is_scroll_end {
-                let buffer_len = terminal.scrollback_buffer.len();
-                terminal.update_display_backwards(buffer_len)?;
-                terminal.cursor_handler()?;
-            } else {
-                terminal.update_display_forwards(start_idx)?;
-            }
-            refresh_display = false;
+        // Refreshes the text display after the handler has finished
+        let start_idx = terminal.scroll_start_idx;
+        if terminal.is_scroll_end {
+            let buffer_len = terminal.scrollback_buffer.len();
+            terminal.update_display_backwards(buffer_len)?;
+            terminal.cursor_handler()?;
+        } else {
+            terminal.update_display_forwards(start_idx)?;
         }
+        
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
-        let event = {match terminal.text_display.get_key_event() {
+        let event = match terminal.text_display.get_key_event() {
                 Some(ev) => {
                     ev
                 },
                 _ => { continue; }
-        }};
-
-
+        };
 
         match event {
             Event::ExitEvent => {
-                let _result = print_to_stdout("\nSmoothly exiting input_event_manager main loop.\n".to_string(), 1)?;
+                let _result = print_to_stdout("\nSmoothly exiting terminal loop.\n".to_string())?; //fix: will this even get printed?
+                // Removes terminal from the task id and the print producers maps
+                TERMINAL_TASK_IDS.lock().remove(&terminal.term_ref);
+                TERMINAL_PRINT_PRODUCERS.lock().remove(&terminal.term_ref);
+                debug!("exiting the terminal");
+                window_manager::delete_active_window();
                 return Ok(());
+            }
+
+            Event::ResizeEvent(ref arg_tuple) => {
+                let x = arg_tuple.0;
+                let y = arg_tuple.1;
+                let width = arg_tuple.2;
+                let height = arg_tuple.3;
+                terminal.text_display.resize(x,y,width,height)?;
+                debug!("resize event done");
             }
            
 
@@ -964,7 +981,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         }
         // event.mark_completed();
         
-    }
+    }  
     Ok(())
 }
 
