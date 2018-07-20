@@ -63,8 +63,11 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
             &Event::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
+
+                // Moving this to the terminal crate because it's too complicated to put it here
                 // Creates new terminal window
                 if key_input.modifiers.control && key_input.keycode == Keycode::T {
+                    debug!("about to adjust windows");
                     if let Some((height_index, window_width, window_height)) = window_manager::adjust_windows() {
                         debug!("starting initialization...,height_idx, window_width, window_height are {}, {}, {}\n ", height_index, window_width, window_height);
                         let window_object = match window_manager::get_window_obj(GAP_SIZE, height_index, window_width, window_height) {
@@ -82,6 +85,8 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                         return Err ("could not create new window");
                     }                    
                 }
+
+
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab {
                     window_manager::window_switch()?;
                     meta_keypress = true;

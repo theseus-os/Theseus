@@ -27,7 +27,7 @@ extern crate acpi;
 extern crate text_display;
 
 
-
+use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::{Once, Mutex};
 use irq_safety::MutexIrqSafe;
 use alloc::{VecDeque};
@@ -368,9 +368,13 @@ impl TextDisplay for WindowObj {
 
         /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
-
-        let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        debug!("inside resizing");
+        let obtained_allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized"));
+        unsafe { obtained_allocator.force_unlock(); }
+        let mut allocator = obtained_allocator.lock();
+        debug!("acquired allocator");
         if allocator.check_overlap(&(self.inner), x, y, width, height) {
+            debug!("error in resize");
             Err("Required window area is overlapped")
         } else {
             let mut inner = self.inner.lock();
@@ -379,8 +383,9 @@ impl TextDisplay for WindowObj {
             inner.x = x;
             inner.y = y;
             inner.width = width;
-            inner.height = height;
+            inner.height = height; 
             inner.draw_border(get_border_color(inner.active));
+            debug!("physical resize finished");
             Ok(())
         }
 
@@ -508,18 +513,34 @@ pub fn adjust_windows() -> Option<(usize, usize, usize)> {
 
     // We will draw the windows from top to bottom
     for window_inner_ptr in locked_allocator.deref_mut().allocated.iter() {    
-        debug!("height_idx, window_width, window_height are {}, {}, {}", height_index, window_width, window_height);
         let window_obj = window_inner_ptr.upgrade().unwrap();
         window_obj.lock().key_producer.enqueue(Event::ResizeEvent((GAP_SIZE, height_index, window_width, window_height))); // fix: don't use unwrap
+        debug!("enqueued resize event");
         height_index += window_height + GAP_SIZE; // advance to the height index of the next window
-        debug!("height_idx, window_width, window_height of NEW WINDOW will be {}, {}, {}\n ", height_index, window_width, window_height);
+        // debug!("height_idx, window_width, window_height of NEW WINDOW will be {}, {}, {}\n ", height_index, window_width, window_height);
 
     }   
-    debug!("resize function works");
+    // Waits until all terminals give the signal that they have finished resizing their windows (terminal's signal by calling 
+    // the finished_resize() function, which increments the NUM_RESIZED usize by one)
+    let num_curr_windows = locked_allocator.deref_mut().allocated.len();
+    let mut num: usize = 0;
+    while num != num_curr_windows {
+        num = NUM_RESIZED.load(Ordering::SeqCst);
+        // debug!("num is {}", num);
+    }
+    debug!("finished resizing previous window");
+    NUM_RESIZED.store(0, Ordering::SeqCst); // resets the AtomicUsize back to zero for the next resize event
+
     return Some((height_index, window_width, window_height)); // this is the index at which the new window should be drawn
 
 }
 
+static NUM_RESIZED: AtomicUsize = AtomicUsize::new(0);
+
+pub fn finished_resize() {
+    NUM_RESIZED.fetch_add(1, Ordering::SeqCst);
+    debug!("finished resize called once");
+}
 
 
 

@@ -879,12 +879,15 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
         if let Some(event) = terminal.text_display.get_key_event() {
             match event {
-                Event::ExitEvent => {
-                    // let x = arg_tuple.0;
-                    // let y = arg_tuple.1;
-                    // let width = arg_tuple.2;
-                    // let height = arg_tuple.3;
-                    // let _result = terminal.text_display.resize(x,y,width,height)?;
+                Event::ResizeEvent(arg_tuple) => {
+                    let x = arg_tuple.0;
+                    let y = arg_tuple.1;
+                    let width = arg_tuple.2;
+                    let height = arg_tuple.3;
+                    debug!("hello from resize event");
+                    let _result = terminal.text_display.resize(x,y,width,height)?;
+                    debug!("finished resize event");
+                    window_manager::finished_resize();
 
                 },
                 _ => { },
