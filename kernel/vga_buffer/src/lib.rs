@@ -165,9 +165,6 @@ impl TextDisplay for VgaBuffer {
         None
     }
 
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
-        Ok(())
-    }
 }
 
 

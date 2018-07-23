@@ -553,7 +553,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
         // Ctrl+D or Ctrl+Alt+Del kills the OS
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::D
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::D 
         || 
                 keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
         panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
@@ -867,7 +867,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
     terminal.text_display.draw_border();
     // use core::ops::Deref;
-    // let mut refresh_display = false;
+    // let mut refresh_display = false;`
 
     // let window_ref= get_window_obj(100, 10, 300, 380)?;
     
@@ -876,26 +876,6 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
     // window_manager::delete_window(&window_ref);
     use core::ops::Deref;
     loop {
-
-        if let Some(event) = terminal.text_display.get_key_event() {
-            match event {
-                Event::ResizeEvent(arg_tuple) => {
-                    let x = arg_tuple.0;
-                    let y = arg_tuple.1;
-                    let width = arg_tuple.2;
-                    let height = arg_tuple.3;
-                    debug!("hello from resize event");
-                    let _result = terminal.text_display.resize(x,y,width,height)?;
-                    debug!("finished resize event");
-                    window_manager::finished_resize();
-
-                },
-                _ => { },
-            }
-        }
-
-
-
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         if let Some(print_event) = terminal.print_consumer.peek() {
@@ -953,19 +933,11 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
                 TERMINAL_TASK_IDS.lock().remove(&terminal.term_ref);
                 TERMINAL_PRINT_PRODUCERS.lock().remove(&terminal.term_ref);
                 debug!("exiting the terminal");
-                window_manager::delete_active_window();
+                // window_manager::delete_active_window();
+                let window_obj = terminal.text_display;
+                // window_manager::delete_window(window_obj);
                 return Ok(());
             }
-
-            Event::ResizeEvent(ref arg_tuple) => {
-                let x = arg_tuple.0;
-                let y = arg_tuple.1;
-                let width = arg_tuple.2;
-                let height = arg_tuple.3;
-                terminal.text_display.resize(x,y,width,height)?;
-                debug!("resize event done");
-            }
-           
 
             Event::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;

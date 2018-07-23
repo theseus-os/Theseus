@@ -187,9 +187,6 @@ impl TextDisplay for FrameTextBuffer {
         None
     }
 
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
-        Ok(())
-    }
 }
 
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 
