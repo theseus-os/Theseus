@@ -31,17 +31,24 @@ pub static HOST_IP: Once<[u8;4]> = Once::new();
 // Guest (machine) IP address
 pub static GUEST_IP: Once<[u8;4]> = Once::new();
 
+// Max buffer size for UDP socket buffers, can be tuned to get better performance
+pub static UDP_SOCKET_BUFFER_SIZE: Once<usize> = Once::new();
+
 
 /// Initializing the test_server
 /// This is invoked by the captain when the udp_server feature is set
 /// default is used for IP address and port 
 pub fn server_init(_: Option<u64>) {
 
+    // Setting up udp buffer size, default size fis set to 8KB
+    let mut skb_size:usize = 8*1024;
+    if let Some(x_size) = UDP_SOCKET_BUFFER_SIZE.try(){
+        skb_size = *x_size;
+    } 
+
     // For UDP
-    debug!("starting udp");
-    // max sizes for the buffer 
-    let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 1024])]);
-    let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; 1024])]);
+    let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
+    let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
     let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
     
     // For TCP - not implemented on the server
@@ -196,6 +203,13 @@ pub fn set_host_ip_address (ip0:u8,ip1:u8,ip2:u8,ip3:u8){
 pub fn set_guest_ip_address (ip0:u8,ip1:u8,ip2:u8,ip3:u8){
     GUEST_IP.call_once(|| {
            [ip0,ip1,ip2,ip3]
+    });
+}
+
+// Initializing udp socket buffer size
+pub fn set_udp_skb_size(skb_size:usize){
+    UDP_SOCKET_BUFFER_SIZE.call_once(|| {
+            skb_size
     });
 }
 

@@ -21,7 +21,7 @@
 	url = https://github.com/kevinaboos/stable_deref_trait.git
 [submodule "libs/rust-managed"]
 	path = libs/rust-managed
-	url = https://github.com/nisalmenuka2/rust-managed
+	url = https://github.com/kevinaboos/rust-managed
 [submodule "libs/smoltcp"]
 	path = libs/smoltcp
-	url = https://github.com/nisalmenuka2/smoltcp
+	url = https://github.com/kevinaboos/smoltcp
