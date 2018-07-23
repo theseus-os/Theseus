@@ -3,20 +3,18 @@ use alloc::slice;
 use alloc::vec::Vec;
 use smoltcp::Error;
 use smoltcp::phy::Device;
-use e1000::E1000_NIC;
+use e1000::{nic_send_packet,nic_has_packet_arrived,nic_receive_packet};
 //use e1000::E1000E_NIC;
 
 
 /// platform-specific code to check if an incoming packet has arrived 
 fn rx_full() -> bool {
-    let mut e1000_nc = E1000_NIC.lock();
-    e1000_nc.has_packet_arrived()
+    nic_has_packet_arrived()
 }
 
 ///  platform-specific code to receive a packet into a buffer 
 fn rx_setup() -> (*mut u8, usize) {
-    let mut e1000_nc = E1000_NIC.lock();
-    e1000_nc.receive_packet()
+    nic_receive_packet()
 }
 
 /// platform-specific code to check if the outgoing packet was sent 
@@ -28,8 +26,7 @@ fn tx_empty() -> bool {
 /// platform-specific code to send a buffer with a packet 
 fn tx_setup(buf: *const u8, length: usize) {
     let addr: usize = buf as usize;
-    let mut e1000_nc = E1000_NIC.lock();
-    let _result = e1000_nc.send_packet(addr, length as u16);
+    nic_send_packet(addr, length);
 }
 
 pub struct EthernetDevice{

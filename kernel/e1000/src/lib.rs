@@ -925,8 +925,26 @@ pub fn e1000_handler () {
 
 }
 
-//Get MAC of the ethernet device
+// Get MAC of the ethernet device
 pub fn get_mac() -> [u8;6]{
         let mut e1000_nc = E1000_NIC.lock();
         e1000_nc.mac
+}
+
+// A public fn which can send packets via nic
+pub fn nic_send_packet(addr:usize, length:usize){
+        let mut e1000_nc = E1000_NIC.lock();
+        let _result = e1000_nc.send_packet(addr, length as u16);
+}
+
+// A public fn which can check if a packet has arrived in nic
+pub fn nic_has_packet_arrived()-> bool{
+        let mut e1000_nc = E1000_NIC.lock();
+        e1000_nc.has_packet_arrived()
+}
+
+// //A public fn which can receive packets via nic
+pub fn nic_receive_packet() -> (*mut u8, usize) {
+    let mut e1000_nc = E1000_NIC.lock();
+    e1000_nc.receive_packet()
 }
