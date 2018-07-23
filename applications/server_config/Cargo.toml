@@ -1,0 +1,19 @@
+[package]
+name = "server_config"
+version = "0.1.0"
+authors = ["Nisal Menuka <nisalmenuka@gmail.com>"]
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.network]
+path = "../../kernel/network"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"

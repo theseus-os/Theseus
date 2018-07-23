@@ -102,15 +102,6 @@ pub fn server_init(_: Option<u64>) {
         port: forwarding_port,
     };
 
-
-    // target address and port - forwarded udp packets will be sent to this
-    //commented from old
-    /*let host_addrs = IpAddress::v4(192, 168, 69, 100);
-    let destination = IpEndpoint{
-        addr:host_addrs,
-        port: 5901,
-    };*/
-
     let mut client_endpoint:Option<IpEndpoint> = None;
     let client_endpoint = Some(destination);
 
@@ -122,7 +113,7 @@ pub fn server_init(_: Option<u64>) {
     UDP_TEST_SERVER.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
-    debug!("before loop");
+    
     // Main loop for the server
     loop {
 
@@ -132,6 +123,7 @@ pub fn server_init(_: Option<u64>) {
             if socket.endpoint().is_unspecified() {
                 socket.bind(6969)
             }
+            //debug!("looping");
 
             // Receiving packets
             let tuple = match socket.recv() {

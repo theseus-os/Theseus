@@ -4,6 +4,10 @@ name = "network"
 description = "Network stack in theseus"
 version = "0.1.0"
 
+# Enable this feature to use the udp server, will comment out debug messages in the send packet function
+#[features]
+
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

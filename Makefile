@@ -133,6 +133,11 @@ run: $(iso)
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
+run_with_server: export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "udp_server"
+run_with_server: $(iso) 
+	@qemu-img resize random_data2.img 100K
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 debug: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S

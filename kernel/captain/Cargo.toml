@@ -103,6 +103,7 @@ path = "../simd_test"
 
 [features]
 mirror_serial = []
+udp_server = []
 
 
 [lib]
