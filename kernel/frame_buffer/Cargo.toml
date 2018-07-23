@@ -1,7 +1,7 @@
 [package]
 name = "frame_buffer"
 version = "0.1.0"
-authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
+authors = ["Wenqiu Yu <qiuj@mail.bnu.edu.cn>"]
 
 [dependencies]
 spin = "0.4.5"
