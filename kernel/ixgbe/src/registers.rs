@@ -1,6 +1,6 @@
 
-pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
-pub const INTEL_82599:          u16 = 0x10FB;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
+pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
+pub const INTEL_82599:              u16 = 0x10FB;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
 pub const PCI_BAR0:                 u16 = 0x10;
 pub const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
@@ -56,6 +56,7 @@ pub const REG_SRRCTL:               u32 = 0x1014; //specify descriptor type
 pub const REG_RXCTRL:               u32 = 0x3000;
 pub const REG_FCTRL:                u32 = 0x5080;
 
+pub const REG_MRQC:                 u32 = 0xEC80;
 pub const REG_ETQF:                 u32 = 0x5128;
 pub const REG_ETQS:                 u32 = 0xEC00;
 
@@ -70,6 +71,9 @@ pub const BSIZEPACKET_8K:           u32 = 8;
 pub const DESCTYPE_LEG:             u32 = 0;
 pub const DESCTYPE_ADV_1BUFFER:     u32 = 1;
 pub const RX_Q_ENABLE:              bool = true;
+
+pub const RSS_ONLY:                 u32 = 1;
+pub const RSS_UDPIPV4:              u32 = 0x40; // bit 22
  
 /// Buffer Sizes
 pub const RCTL_BSIZE_256:           u32 = (3 << 16);

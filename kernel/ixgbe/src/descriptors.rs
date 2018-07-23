@@ -1,5 +1,6 @@
 use bit_field::BitField;
 
+/// Legacy Descriptors
 /// struct to represent receive descriptors
 #[repr(C,packed)]
 pub struct e1000_rx_desc {
@@ -36,14 +37,17 @@ impl fmt::Debug for e1000_tx_desc {
         }
 }
 
+/// Advanced Descriptors
+/// Advanced Receive Descriptor
+
 #[repr(packed)]
-#[derive(Debug)]
-pub struct AdvancedReceiveDescriptorRead {
-    pub upper:  u64,
-    pub lower:  u64,
+#[derive(Default, Debug, Copy, Clone)]
+pub struct AdvancedReceiveDescriptorR {
+    upper:  u64,
+    lower:  u64,
 }
 
-impl AdvancedReceiveDescriptorRead {
+impl AdvancedReceiveDescriptorR {
     pub fn set_packet_buffer_address(&mut self, val: u64){
         self.upper = val;
     }
@@ -60,17 +64,29 @@ impl AdvancedReceiveDescriptorRead {
         self.lower 
     }
 }
-   
+
+
+impl From<AdvancedReceiveDescriptorWB> for AdvancedReceiveDescriptorR {
+
+    fn from (original: AdvancedReceiveDescriptorWB) -> AdvancedReceiveDescriptorR {
+        AdvancedReceiveDescriptorR {
+            upper: original.upper,
+            lower: original.lower,
+        }
+    }
+
+}
 
 #[repr(packed)]
-#[derive(Debug)]
-pub struct AdvancedReceiveDescriptorWriteBack {
+#[derive(Default, Debug)]
+pub struct AdvancedReceiveDescriptorWB {
     upper:  u64,
     lower:  u64,
 }
 
-impl AdvancedReceiveDescriptorWriteBack {
-     pub fn get_rss_hash(&self) -> u64{
+impl AdvancedReceiveDescriptorWB {
+
+    pub fn get_rss_hash(&self) -> u64{
         self.upper.get_bits(32..63) 
     }
 
@@ -106,10 +122,19 @@ impl AdvancedReceiveDescriptorWriteBack {
         self.lower.get_bits(20..31) 
     }
 
-    pub fn set_ext_status(&mut self, value: u64){
-        self.lower.set_bits(0..19, value); 
-    }
     pub fn get_ext_status(&self) -> u64{
         self.lower.get_bits(0..19) 
     }
 }
+
+impl From<AdvancedReceiveDescriptorR> for AdvancedReceiveDescriptorWB {
+
+    fn from (original: AdvancedReceiveDescriptorR) -> AdvancedReceiveDescriptorWB {
+        AdvancedReceiveDescriptorWB {
+            upper: original.upper,
+            lower: original.lower,
+        }
+    }
+
+}
+

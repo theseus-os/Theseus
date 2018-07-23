@@ -18,7 +18,7 @@ extern crate bit_field;
 
 pub mod test_tx;
 pub mod descriptors;
-mod registers;
+pub mod registers;
 
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
@@ -34,7 +34,7 @@ use registers::*;
 use bit_field::BitField;
 
 //parameter that determine size of tx and rx descriptor queues
-const NUM_RX_DESC:        usize = 64;
+const NUM_RX_DESC:        usize = 8;
 const NUM_TX_DESC:        usize = 8;
 
 const SIZE_RX_DESC:       usize = 16;
@@ -44,7 +44,7 @@ const SIZE_RX_BUFFER:     usize = 8192;
 const SIZE_RX_HEADER:     usize = 256;
 const SIZE_TX_BUFFER:     usize = 256;
 
-const NO_RX_QUEUES:       usize = 1;
+const NO_RX_QUEUES:       usize = 16;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -121,7 +121,7 @@ pub struct Nic {
         /// A buffer for storing the mac address  
         mac: [u8;6],       
         /// Receive Descriptors
-        rx_descs: [Vec<AdvancedReceiveDescriptorRead>; NO_RX_QUEUES], 
+        rx_descs: [Vec<AdvancedReceiveDescriptorR>; NO_RX_QUEUES], 
         /// Transmit Descriptors 
         tx_descs: Vec<e1000_tx_desc>, 
         /// Current Receive Descriptor Buffer
@@ -355,7 +355,7 @@ impl Nic{
                         let ptr1 = ptr + (128-(ptr%128));
                         debug!("pointers: {:x}, {:x}",ptr, ptr1);
 
-                        let raw_ptr = ptr1 as *mut AdvancedReceiveDescriptorRead;
+                        let raw_ptr = ptr1 as *mut AdvancedReceiveDescriptorR;
                         debug!("size of e1000_rx_desc: {}, e1000_tx_desc: {}", 
                                 ::core::mem::size_of::<e1000_rx_desc>(), ::core::mem::size_of::<e1000_tx_desc>());
 
@@ -380,10 +380,9 @@ impl Nic{
 
                                 let buf_addr = try!(translate_v2p(self.rx_buf_addr[queue][i]));
                                 let header_addr = try!(translate_v2p(header));
-                                let mut var = AdvancedReceiveDescriptorRead {
-                                        upper: buf_addr as u64,
-                                        lower: header_addr as u64,
-                                };
+                                let mut var : AdvancedReceiveDescriptorR = Default::default(); 
+                                var.set_header_buffer_address(0);
+                                var.set_packet_buffer_address(buf_addr as u64);
                                                 
                                 self.rx_descs[queue].push(var);
                         }
@@ -444,14 +443,10 @@ impl Nic{
         }
         
         pub fn set_rss(&mut self) {
-                let val = self.read_command(REG_ETQF);
-                self.write_command(REG_ETQF, val | 0x800 | 0x1000_0000);
-
-                let val = self.read_command(REG_ETQF + 4);
-                self.write_command(REG_ETQF + 4, val | 0x800 | 0x1000_0000);
-
-                self.write_command(REG_ETQS, 0x8000_0000);
-                self.write_command(REG_ETQS + 4, 0x8001_0000);
+                let mut val = self.read_command(REG_MRQC);
+                val.set_bits(0..3,RSS_ONLY);
+                val.set_bits(16..31, RSS_UDPIPV4);
+                self.write_command(REG_MRQC, val);
         }
 
         /// Initialize transmit descriptors 
@@ -588,14 +583,16 @@ impl Nic{
                 }
         } */
 
-        pub fn handle_receive_mq(&mut self, queue: usize) {
+        pub fn handle_receive_mq(&mut self, queue: usize, mut wb: AdvancedReceiveDescriptorWB) {
                 //print status of all packets until EoP
-                while(self.rx_descs[queue][self.rx_cur[queue] as usize].get_ext_status()) !=0{
-                        //debug!("rx desc status {}",self.rx_descs[queue][self.rx_cur[queue] as usize].status);
-                        self.rx_descs[queue][self.rx_cur[queue] as usize].set_ext_status(0);
+                while(wb.get_ext_status()& 0x3) !=0{
+                        debug!("rx desc status {}",wb.get_ext_status());
+                        self.rx_descs[queue][self.rx_cur[queue] as usize].set_packet_buffer_address(0);
+                        self.rx_descs[queue][self.rx_cur[queue] as usize].set_header_buffer_address(0);
                         let old_cur = self.rx_cur[queue] as u32;
                         self.rx_cur[queue] = (self.rx_cur[queue] + 1) % NUM_RX_DESC as u16;
                         self.write_command(REG_RDT + (0x40*queue) as u32, old_cur);
+                        wb = AdvancedReceiveDescriptorWB:: from(self.rx_descs[queue][self.rx_cur[queue] as usize])
                 }
         }
 
@@ -612,11 +609,11 @@ lazy_static! {
                         //mem_space : 0;
                         eeprom_exists: false,
                         mac: [0,0,0,0,0,0],
-                        rx_descs: [Vec::with_capacity(NUM_RX_DESC)],
+                        rx_descs: [Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC)],
                         tx_descs: Vec::with_capacity(NUM_TX_DESC),
-                        rx_cur: [0],
+                        rx_cur: [0; NO_RX_QUEUES],
                         tx_cur: 0,
-                        rx_buf_addr: [[0;NUM_RX_DESC]],
+                        rx_buf_addr: [[0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC]],
                         nic_dma_allocator: DmaAllocator{
                                                 start: 0,
                                                 end: 0,
@@ -711,6 +708,7 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         try!(nic.rx_init_mq());
 
         //nic.set_filters();
+        nic.set_rss();
 
        Ok(())
 }
@@ -742,10 +740,10 @@ pub fn rx_poll_mq(_: Option<u64>){
 
        
                 for queue in 0..NO_RX_QUEUES{
-                        let a = nic.rx_descs[queue][nic.rx_cur[queue] as usize] as *mut AdvancedReceiveDescriptorWriteBack;
-                        if (nic.rx_descs[queue][nic.rx_cur[queue] as usize].status&0xF) != 0 {    
+                        let mut a = AdvancedReceiveDescriptorWB:: from(nic.rx_descs[queue][nic.rx_cur[queue] as usize]);
+                        if (a.get_ext_status()&0xF) != 0 {    
                                 debug!("Packet received in QUEUE{}!", queue);
-                                nic.handle_receive_mq(queue);                    
+                                //nic.handle_receive_mq(queue, a);                    
                         }       
                 }               
         }
