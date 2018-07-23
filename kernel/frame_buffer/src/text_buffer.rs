@@ -88,6 +88,12 @@ impl FrameTextBuffer {
             }
         }
         self.fill_blank (buffer, 
+            x + curr_column * CHARACTER_WIDTH,
+            y + curr_line * CHARACTER_HEIGHT,
+            x + width, 
+            y + (curr_line + 1 )* CHARACTER_HEIGHT, 
+            BACKGROUND_COLOR);
+        self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
             BACKGROUND_COLOR);
 
