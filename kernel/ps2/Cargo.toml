@@ -1,7 +1,7 @@
 [package]
 name = "ps2"
 version = "0.1.0"
-authors = ["bowenliu"]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
 
 [dependencies]
 spin = "0.4.5"
