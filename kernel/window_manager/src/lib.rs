@@ -65,6 +65,7 @@ pub static GAP_SIZE: usize = 10; // 10 pixel gap between windows
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, //The last one is active
+    active: Weak<Mutex<WindowInner>>,
 }
 
 /// switch the active window
@@ -78,7 +79,10 @@ pub fn window_switch() -> Result<(), &'static str> {
 pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
 
     let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
+        Mutex::new(WindowAllocator{
+            allocated:VecDeque::new(),
+            active:Weak::new(),
+        })
     });
 
     allocator.lock().allocate(x,y,width,height)
@@ -131,7 +135,9 @@ impl WindowAllocator{
             }
         }
 
-        self.allocated.push_back(Arc::downgrade(&inner_ref));
+        let weak_ref = Arc::downgrade(&inner_ref);
+        self.active = weak_ref.clone();
+        self.allocated.push_back(weak_ref);
 
         let mut window:WindowObj = WindowObj{
             inner:inner_ref,
@@ -157,6 +163,7 @@ impl WindowAllocator{
                 if flag {
                     (*window).active(true);
                     flag = false;
+                    self.active = item.clone();
                 } else if window.active {
                     (*window).active(false);
                     flag = true;
@@ -170,6 +177,7 @@ impl WindowAllocator{
                     let mut window = reference.unwrap();
                     let mut window = window.lock();
                     (*window).active(true);
+                    self.active = item.clone();
                     break;
                 }
             }
@@ -230,20 +238,12 @@ impl WindowAllocator{
     }
 
     fn put_key_code(&mut self, event:Event) -> Result<(), &'static str> {
-        for item in self.allocated.iter_mut(){
-            let reference = item.upgrade();
-            if reference.is_some() {
-                let mut window = reference.unwrap();
-                //unsafe{ window.force_unlock(); }
-                let mut window = window.lock();
-
-                if (*window).active {
-                    window.key_producer.enqueue(event);
-                    break;
-                }
-            }
+        let reference = self.active.upgrade();
+        if reference.is_some() {
+            let mut window = reference.unwrap();
+            let mut window = window.lock();
+            window.key_producer.enqueue(event);
         }
-
         Ok(())
     }
 
@@ -252,9 +252,7 @@ impl WindowAllocator{
 /// a window object
 pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
-    //consumer: DFQueueConsumer<Event>,
     text_buffer:FrameTextBuffer,
-
     consumer:DFQueueConsumer<Event>,
 }
 
@@ -460,11 +458,8 @@ impl WindowInner {
 
 /// put key input events in the producer of window manager
 pub fn put_key_code(event: Event) -> Result<(), &'static str>{    
-    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        Mutex::new(WindowAllocator{allocated:VecDeque::new()})
-    });
-
-    allocator.lock().put_key_code(event)
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    allocator.put_key_code(event)
 }
 
 fn get_border_color(active:bool) -> u32 {
