@@ -21,6 +21,5 @@ pub trait TextDisplay {
     // Grabs a keyevent from the text display, which should have it's own queue for input events 
     fn get_key_event(&self) -> Option<Event>;
     // Resize the window, where x, y are coordinates of the top left corner of the window, and the width and height are the pixel dimensions of the window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>;
 }
 

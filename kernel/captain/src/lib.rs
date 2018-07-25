@@ -132,8 +132,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
 
-    // initialize the kernel input_event_manager
-    // let input_event_queue_producer = input_event_manager::init()?;
+    // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers

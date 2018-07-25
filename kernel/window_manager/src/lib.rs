@@ -5,16 +5,13 @@
 #![feature(unique)]
 #![feature(asm)]
 
-// Temp: Notes to andrew
-// Screen pixel dimensions are 640 x 400
-
 extern crate spin;
 extern crate irq_safety;
 extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate frame_buffer;
-#[macro_use] extern crate frame_buffer_3d;
+extern crate frame_buffer_3d;
 extern crate input_event_types;
 extern crate spawn;
 extern crate pit_clock;
@@ -27,45 +24,32 @@ extern crate acpi;
 extern crate text_display;
 
 
-
 use spin::{Once, Mutex};
-use irq_safety::MutexIrqSafe;
 use alloc::{VecDeque};
-use alloc::string::ToString;
 use core::ops::{DerefMut, Deref};
-use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer, PeekedData};
-use keycodes_ascii::{Keycode, KeyAction};
+use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use frame_buffer::text_buffer::{FONT_COLOR, BACKGROUND_COLOR, FrameTextBuffer};
 use text_display::TextDisplay;
 use input_event_types::Event;
 
-//use acpi::get_hpet;
 
-
-//static mut STARTING_TIME:u64 = 0;
 //static mut COUNTER:usize = 0; //For performance evaluation
 
 /// A test mod of window manager
 pub mod test_window_manager;
 
-pub enum WindowDimensions {
-    Pixels((usize, usize)), 
-    Chars((usize, usize))
-}
 
 static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
-
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 pub static GAP_SIZE: usize = 10; // 10 pixel gap between windows 
 
 
-
 struct WindowAllocator {
-    allocated: VecDeque<Weak<Mutex<WindowInner>>>, //The last one is active
-    active: Weak<Mutex<WindowInner>>,
+    allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
+    active: Weak<Mutex<WindowInner>>, // a weak pointers directly to the active WindowInner so we don't have to search for the active window when we need it quickly
 }
 
 /// switch the active window
@@ -110,7 +94,7 @@ impl WindowAllocator{
 
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
 
-        let mut inner = WindowInner{
+        let inner = WindowInner{
             x:x,
             y:y,
             width:width,
@@ -129,8 +113,7 @@ impl WindowAllocator{
 
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
-            if ref_opt.is_some() {
-                let reference = ref_opt.unwrap();
+            if let Some(reference) = ref_opt {
                 reference.lock().active(false);
             }
         }
@@ -139,7 +122,7 @@ impl WindowAllocator{
         self.active = weak_ref.clone();
         self.allocated.push_back(weak_ref);
 
-        let mut window:WindowObj = WindowObj{
+        let window: WindowObj = WindowObj{
             inner:inner_ref,
             text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
@@ -156,12 +139,11 @@ impl WindowAllocator{
         let mut flag = false;
         for item in self.allocated.iter_mut(){
             let reference = item.upgrade();
-            if reference.is_some() {
-                let mut window = reference.unwrap();
-                //unsafe{ window.force_unlock();}
+            if let Some(window) = reference {
                 let mut window = window.lock();
                 if flag {
                     (*window).active(true);
+                    self.active = item.clone();
                     flag = false;
                     self.active = item.clone();
                 } else if window.active {
@@ -173,11 +155,10 @@ impl WindowAllocator{
         if flag {
             for item in self.allocated.iter_mut(){
                 let reference = item.upgrade();
-                if reference.is_some() {
-                    let mut window = reference.unwrap();
+                if let Some(window) = reference {
                     let mut window = window.lock();
                     (*window).active(true);
-                    self.active = item.clone();
+                    self.active = item.clone(); // clones the weak pointer to put into the active field
                     break;
                 }
             }
@@ -190,38 +171,40 @@ impl WindowAllocator{
 
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
         //TODO clean contents in window
-       
         let mut i = 0;
         let len = self.allocated.len();
-        debug!("in delete function");
         for item in self.allocated.iter(){
             let reference = item.upgrade();
-            if reference.is_some() {
-                if Arc::ptr_eq(&(reference.unwrap()), inner) {
+            if let Some(inner_ptr) = reference {
+                if Arc::ptr_eq(&(inner_ptr), inner) {
                     break;
                 }
             }
             i += 1;
         }
         if i < len {
+            {
+                let window_ref = &self.allocated[i];
+                let window = window_ref.upgrade();
+                if let Some(window) = window {
+                    window.lock().key_producer.enqueue(Event::ExitEvent);
+                }
+            }
             self.allocated.remove(i);
         }
 
         let inner_lock = inner.lock();
         inner_lock.clean();
         inner_lock.draw_border(BACKGROUND_COLOR);
-
     }
 
     fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
         let mut i = 0;
         while i < len {
-            let mut remove = false;
             {   
                 let reference = self.allocated.get(i).unwrap().upgrade();
-                if reference.is_some() {
-                    let allocated_ref = reference.unwrap();
+                if let Some(allocated_ref) = reference {
                     if !Arc::ptr_eq(&allocated_ref, inner) {
                         if allocated_ref.lock().is_overlapped(x, y, width, height) {
                             return true;
@@ -236,11 +219,11 @@ impl WindowAllocator{
         }
         false
     }
-
+    
+    /// enqueues the key event into the active window
     fn put_key_code(&mut self, event:Event) -> Result<(), &'static str> {
-        let reference = self.active.upgrade();
-        if reference.is_some() {
-            let mut window = reference.unwrap();
+        let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
+        if let Some(window) = reference {
             let mut window = window.lock();
             window.key_producer.enqueue(event);
         }
@@ -354,8 +337,7 @@ impl TextDisplay for WindowObj {
 
     fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
-        if event_opt.is_some() {
-            let event = event_opt.unwrap();
+        if let Some(event) = event_opt {
             event.mark_completed();
             let event_data = event.deref().clone();
             Some(event_data)
@@ -364,25 +346,7 @@ impl TextDisplay for WindowObj {
         }
     }
 
-        /// adjust the size of a window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
 
-        let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-        if allocator.check_overlap(&(self.inner), x, y, width, height) {
-            Err("Required window area is overlapped")
-        } else {
-            let mut inner = self.inner.lock();
-            inner.draw_border(BACKGROUND_COLOR);
-            inner.clean();
-            inner.x = x;
-            inner.y = y;
-            inner.width = width;
-            inner.height = height;
-            inner.draw_border(get_border_color(inner.active));
-            Ok(())
-        }
-
-    }
 }
 
 struct WindowInner {
@@ -423,24 +387,7 @@ impl WindowInner {
     fn active(&mut self, active:bool){
         self.active = active;
         self.draw_border(get_border_color(active));
-        /*if active && self.consumer.is_none() {
-            let consumer = KEY_CODE_CONSUMER.try();
-            self.consumer = consumer;
-        }
-        if !active && self.consumer.is_some(){       
-            self.consumer = None;
-        }*/
     }
-
-    /*fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
-        self.draw_border(BACKGROUND_COLOR);
-        self.clean();
-        self.x = x;
-        self.y = y;
-        self.width = width;
-        self.height = height;
-        self.draw_border(get_border_color(self.active));
-    }*/
 
     fn clean(&self) {
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, BACKGROUND_COLOR);
@@ -454,6 +401,22 @@ impl WindowInner {
         frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
         (self.x, self.y, self.margin)
     }
+
+    /// adjust the size of a window
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
+        self.draw_border(BACKGROUND_COLOR);
+        self.clean();
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height; 
+        self.draw_border(get_border_color(self.active));
+        Ok(())
+
+
+    }
+
+
 }
 
 /// put key input events in the producer of window manager
@@ -470,49 +433,98 @@ fn get_border_color(active:bool) -> u32 {
     }
 }
 
-
-
+/// Finds and deletes the active window from the window manager, and sets the new active window
 pub fn delete_active_window() -> Option<()> {
-    // deletes the window from the window manager
-    let mut locked_window_objs = try_opt!(WINDOW_ALLOCATOR.try()).lock();
-    for window_ptr in locked_window_objs.deref_mut().allocated.iter() {
-        let window_inner_ref = window_ptr.upgrade().unwrap();
-
-        {
-            if window_inner_ref.lock().active {
-                debug!("starting deletion...");
-                let _result = put_key_code(Event::ExitEvent);
+    // finds and deletes the window from the window manager
+    let mut active_ref: Arc<Mutex<WindowInner>>;
+    {   
+        let mut i = 0; // tracks the index of the to-be-deleted window
+        let mut locked_window_ptrs = try_opt!(WINDOW_ALLOCATOR.try()).lock();
+        active_ref = locked_window_ptrs.deref_mut().allocated.get(0).unwrap().upgrade().unwrap(); // for variable initialization
+        if locked_window_ptrs.deref_mut().allocated.len() == 1 {
+            return Some(()); // does not proceed with delete if there is only one window currently running
+        }
+        // finding the active window and it's position in the WindowAllocator vector so that we can switch the active window to an adjacent one
+        let num_windows = locked_window_ptrs.deref_mut().allocated.len();
+        for window_ptr in locked_window_ptrs.deref_mut().allocated.iter() {
+            let strong_window_ptr = window_ptr.upgrade();
+            if let Some(window_inner_ref) = strong_window_ptr {
+                {   
+                    if window_inner_ref.lock().active {
+                        active_ref = window_inner_ref; // finds the active WindowInner
+                        break;                
+                    }
+                }
+            }
+            i += 1;
+        }    
+        locked_window_ptrs.delete(&active_ref); //deletes the active window
+        if i == num_windows -1 {
+            i -= 1; // it the user deletes the last window, the new active window will be the one right above it
+        } else { // otherwise, the new active window is the one below it
+        }
+        
+        let new_active_ref;
+        {  // sets the selected window to be the new active window
+            let active_ref = &locked_window_ptrs.deref_mut().allocated[i];
+            new_active_ref = active_ref.clone();
+            let strong_ref = new_active_ref.upgrade();
+            if let Some(strong_ref) = strong_ref {
+                strong_ref.lock().active(true);
             }
         }
+        locked_window_ptrs.deref_mut().active = new_active_ref.clone(); // updates the weak pointer to the new active window
+    }
 
-    }    
-
-    let _result = put_key_code(Event::ExitEvent); // signals the terminal crate to end that terminal's loop and do other cleanup
+    // Readjusts the remaining windows to fill the space
+    let _result = adjust_window_after_deletion();
     return Some(())
 }
 
-
-pub fn adjust_windows() -> Option<(usize, usize, usize)> {
-    // let test: usize = try_opt!(WINDOW_ALLOCATOR.try());
-    let mut locked_allocator = try_opt!(WINDOW_ALLOCATOR.try()).lock();
-    let num_windows = locked_allocator.deref_mut().allocated.len();
+/// Readjusts remaining windows after a window is deleted to maximize screen usage
+pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE;
+    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 1))/(num_windows); 
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // fill the width of the screen with a slight gap at the boundaries
     let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
 
-    // We will draw the windows from top to bottom
-    for window_inner_ptr in locked_allocator.deref_mut().allocated.iter() {    
-        debug!("height_idx, window_width, window_height are {}, {}, {}", height_index, window_width, window_height);
-        let window_obj = window_inner_ptr.upgrade().unwrap();
-        window_obj.lock().key_producer.enqueue(Event::ResizeEvent((GAP_SIZE, height_index, window_width, window_height))); // fix: don't use unwrap
-        height_index += window_height + GAP_SIZE; // advance to the height index of the next window
-        debug!("height_idx, window_width, window_height of NEW WINDOW will be {}, {}, {}\n ", height_index, window_width, window_height);
+    // Resizes the windows vertically
+    for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
+        let strong_window_ptr = window_inner_ref.upgrade();
+        if let Some(window_inner_ptr) = strong_window_ptr {
+            let mut locked_window_ptr = window_inner_ptr.lock();
+            let _result = locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height);
+            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
+            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+        }
+    }
+    Ok(())
+}
 
-    }   
-    debug!("resize function works");
-    return Some((height_index, window_width, window_height)); // this is the index at which the new window should be drawn
+/// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
+pub fn adjust_windows_before_addition() -> Option<(usize, usize, usize)> {
+    let mut allocator = try_opt!(WINDOW_ALLOCATOR.try()).lock();
+     let num_windows = allocator.deref_mut().allocated.len();
+    // one gap between each window and one gap between the edge windows and the frame buffer boundary
+    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
+    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
 
+    // Resizes the windows vertically
+    for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
+        let strong_ptr = window_inner_ref.upgrade();
+        if let Some(window_inner_ptr) = strong_ptr {
+            let mut locked_window_ptr = window_inner_ptr.lock();
+            let _result = locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height);
+            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after resize 
+            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+        }
+    }
+
+
+    return Some((height_index, window_width, window_height)); // returns the index at which the new window should be drawn
 }
 
 

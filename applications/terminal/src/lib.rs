@@ -490,8 +490,8 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
                                     // so we need to downcast it from Any to isize.
                                     let val: Option<&isize> = exit_status.downcast_ref::<isize>();
                                     warn!("task returned exit value: {:?}", val);
-                                    if let Some(unwrapped_val) = val {
-                                        self.print_to_terminal(format!("task returned with exit value {:?}\n", unwrapped_val))?;
+                                    if let Some(val) = val {
+                                        self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
                                     }
                                 }
                                 // If the user manually aborts the task
@@ -553,7 +553,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
         // Ctrl+D or Ctrl+Alt+Del kills the OS
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::D
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::D 
         || 
                 keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
         panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
@@ -843,6 +843,17 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
         return Ok(new_task_id);
         
     }
+    
+    fn refresh_display(&mut self) {
+        let start_idx = self.scroll_start_idx;
+        if self.is_scroll_end {
+            let buffer_len = self.scrollback_buffer.len();
+            let _result = self.update_display_backwards(buffer_len);
+            let _result = self.cursor_handler();
+        } else {
+            let _result = self.update_display_forwards(start_idx);
+        }
+    }
 }
 
 /// This function is called for each terminal instance and handles all input and output events
@@ -865,34 +876,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         terminal.cursor_handler()?;        
     }
 
-    terminal.text_display.draw_border();
-    // use core::ops::Deref;
-    // let mut refresh_display = false;
-
-    // let window_ref= get_window_obj(100, 10, 300, 380)?;
-    
-    // let mut text_display = window_ref.lock();
-    // text_display.lock().display_string("This is a new text_display")?;
-    // window_manager::delete_window(&window_ref);
+    terminal.text_display.draw_border();  
     use core::ops::Deref;
+    let mut refresh_display = true;
     loop {
-
-        if let Some(event) = terminal.text_display.get_key_event() {
-            match event {
-                Event::ExitEvent => {
-                    // let x = arg_tuple.0;
-                    // let y = arg_tuple.1;
-                    // let width = arg_tuple.2;
-                    // let height = arg_tuple.3;
-                    // let _result = terminal.text_display.resize(x,y,width,height)?;
-
-                },
-                _ => { },
-            }
-        }
-
-
-
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         if let Some(print_event) = terminal.print_consumer.peek() {
@@ -902,15 +889,8 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    let start_idx = terminal.scroll_start_idx;
-                    if terminal.is_scroll_end {
-                        let buffer_len = terminal.scrollback_buffer.len();
-                        terminal.update_display_backwards(buffer_len)?;
-                        terminal.cursor_handler()?;
-                    } else {
-                        terminal.update_display_forwards(start_idx)?;
-                    }
-                    
+                    refresh_display = true;
+                    terminal.refresh_display();
                     terminal.correct_prompt_position = false;
                 },
                 _ => { },
@@ -923,16 +903,10 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
-        // Refreshes the text display after the handler has finished
-        let start_idx = terminal.scroll_start_idx;
-        if terminal.is_scroll_end {
-            let buffer_len = terminal.scrollback_buffer.len();
-            terminal.update_display_backwards(buffer_len)?;
-            terminal.cursor_handler()?;
-        } else {
-            terminal.update_display_forwards(start_idx)?;
+        if refresh_display == true {
+            terminal.refresh_display();
+            refresh_display = false;
         }
-        
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
@@ -944,42 +918,28 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         };
 
         match event {
+            // Used by the windowing manager to indicate to the termianl to refresh its display upon terminal resizing
+            Event::DisplayEvent => {
+                terminal.refresh_display();
+                debug!("refreshed display");
+            }
+            // Cleanup to removes terminal from the task id and the print producers maps
             Event::ExitEvent => {
-                let _result = print_to_stdout("\nSmoothly exiting terminal loop.\n".to_string())?; //fix: will this even get printed?
-                // Removes terminal from the task id and the print producers maps
                 TERMINAL_TASK_IDS.lock().remove(&terminal.term_ref);
                 TERMINAL_PRINT_PRODUCERS.lock().remove(&terminal.term_ref);
-                debug!("exiting the terminal");
-                window_manager::delete_active_window();
                 return Ok(());
             }
 
-            Event::ResizeEvent(ref arg_tuple) => {
-                let x = arg_tuple.0;
-                let y = arg_tuple.1;
-                let width = arg_tuple.2;
-                let height = arg_tuple.3;
-                terminal.text_display.resize(x,y,width,height)?;
-                debug!("resize event done");
-            }
-           
-
+            // Handles ordinary keypresses
             Event::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;
-                let start_idx = terminal.scroll_start_idx;
-                // Only refreshes the display on a keypress
-                if terminal.is_scroll_end { 
-                    let buffer_len = terminal.scrollback_buffer.len();
-                    terminal.update_display_backwards(buffer_len)?; // So we don't have to recalculate the starting index every time
-                    terminal.cursor_handler()?;
-                } else {
-                    terminal.update_display_forwards(start_idx)?;
+                if input_event.key_event.action == KeyAction::Pressed {
+                    // only refreshes the display on keypresses to improve display performance 
+                    terminal.refresh_display();
                 }
-                
             }
             _ => { }
         }
-        // event.mark_completed();
         
     }  
     Ok(())
@@ -992,7 +952,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 //   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
 //   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
 
-const WELCOME_STRING: &'static str= "Theseus\n";
+const WELCOME_STRING: &'static str= "THESEUS\n";
 
 
 

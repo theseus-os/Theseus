@@ -13,6 +13,7 @@ pub enum Event {
     InputEvent(KeyboardInputEvent),
     OutputEvent(PrintOutputEvent),
     ResizeEvent((usize, usize, usize, usize)), // tuple containing x, y, width, and height arguments for resizing the window
+    DisplayEvent,
     ExitEvent,
 }
 
@@ -55,3 +56,5 @@ impl PrintOutputEvent {
         }
     }
 }
+
+
