@@ -309,7 +309,7 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
     };
 
     // get the LoadedSection for the "main" function in the app_crate
-    let main_func_sec_ref = app_crate_ref.lock().get_function_section("main")
+    let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
         .ok_or("spawn_application(): couldn't find \"main\" function!")?;
 
     let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
@@ -319,7 +319,7 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
         mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
     };
 
-    let task_name = task_name.unwrap_or_else(|| app_crate_ref.lock().crate_name.clone());
+    let task_name = task_name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone());
     let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
     app_task.write().app_crate = Some(app_crate_ref);
 
