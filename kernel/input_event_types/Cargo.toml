@@ -7,6 +7,5 @@ version = "0.1.0"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

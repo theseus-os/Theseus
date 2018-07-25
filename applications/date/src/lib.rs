@@ -14,7 +14,7 @@ use alloc::{Vec, String};
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     let now = rtc::read_rtc();
-    //println!("{}", now);
+    println!("{}", now);
 
     0
 }
