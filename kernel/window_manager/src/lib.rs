@@ -281,17 +281,11 @@ impl WindowObj{
             color);
     }
 
-}
-
-/// Implements TextDisplay trait for vga buffer.
-/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-impl TextDisplay for WindowObj {
-
-    fn disable_cursor(&mut self) {
+    pub fn disable_cursor(&mut self) {
         self.text_buffer.cursor.disable();
     }
 
-    fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
+    pub fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
         let cursor = &mut (self.text_buffer.cursor);
         cursor.enable();
         cursor.update(line as usize, column as usize, reset);
@@ -301,7 +295,7 @@ impl TextDisplay for WindowObj {
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);
     }
 
-    fn cursor_blink(&mut self) {
+    pub fn cursor_blink(&mut self) {
         let cursor = &mut (self.text_buffer.cursor);
         if cursor.blink() {
             let (line, column, show) = cursor.get_info();
@@ -314,7 +308,7 @@ impl TextDisplay for WindowObj {
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
-    fn get_dimensions(&self) -> (usize, usize) {
+    pub fn get_dimensions(&self) -> (usize, usize) {
         let inner = self.inner.lock();
         ((inner.width-2*inner.margin)/CHARACTER_WIDTH, (inner.height-2*inner.margin)/CHARACTER_HEIGHT)
     }
@@ -322,20 +316,20 @@ impl TextDisplay for WindowObj {
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
-    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
+    pub fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
             inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
             slice)
     }
     
-    fn draw_border(&self) -> (usize, usize, usize){
+    pub fn draw_border(&self) -> (usize, usize, usize){
         let inner = self.inner.lock();
         inner.draw_border(get_border_color(inner.active))
     }
 
 
-    fn get_key_event(&self) -> Option<Event> {
+    pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
             event.mark_completed();

@@ -144,8 +144,7 @@ impl FrameTextBuffer {
 }
 
 
-/// Implements TextDisplay trait for vga buffer.
-/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
+// Implements TextDisplay trait for vga buffer.
 impl TextDisplay for FrameTextBuffer {
 
     fn disable_cursor(&mut self) {

@@ -245,7 +245,7 @@ prot_mode:
     mov dword [0xb8000], 0x4f504f41 ; "AP"
     mov dword [0xb8004], 0x4f504f5F ; "_P"
     mov dword [0xb8008], 0x4f4f4f52 ; "RO"
-    ;mov dword [0xb800c], 0x4f454f54 ; "TE"
+    mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
     

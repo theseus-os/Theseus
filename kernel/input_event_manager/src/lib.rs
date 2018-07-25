@@ -12,16 +12,15 @@ extern crate memory;
 extern crate input_event_types; 
 extern crate frame_buffer;
 extern crate window_manager;
-extern crate terminal;
-extern crate alloc;
 
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
 use input_event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::GAP_SIZE;
-use alloc::string::ToString;
+use alloc::string::{String,ToString};
 
 
 
@@ -32,11 +31,14 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
     // Initializes the default window object (will also start the windowing manager)
-    let window_object = match window_manager::get_window_obj(GAP_SIZE, GAP_SIZE, frame_buffer::FRAME_BUFFER_WIDTH - GAP_SIZE * 2, frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * 2 ) {
-        Ok(obj) => obj,
-        Err(_) => {return Err("could not initialize first window object");}
-    };
-    terminal::Terminal::init(window_object, 0)?; // spawns the default terminal
+    let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
+    let terminal_id_counter = 0;
+    let term_num = terminal_id_counter.to_string();
+    // passes the terminal reference number in the form of the Vec<String>. The terminal::init() function will parse it into a usize
+    // this is a temporary hack to get around for the argument type requirements for applications
+    let args = vec![term_num]; 
+    debug!("ABOUT TO CALL TERMINAL");
+    spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal
     spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
     Ok(returned_keyboard_producer)
 }
@@ -64,20 +66,17 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 // The following are keypresses for control over the windowing system
                 // Creates new terminal window
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
-                    if let Some((height_index, window_width, window_height)) = window_manager::adjust_windows_before_addition() {
-                        let window_object = match window_manager::get_window_obj(GAP_SIZE, height_index, window_width, window_height) {
-                            Ok(obj) => obj,
-                            Err(some_err) => {
-                                return Err(some_err);
-                            },
-                        };
-                        terminal::Terminal::init(window_object, terminal_id_counter)?;
-                        terminal_id_counter += 1;
-                        meta_keypress = true;
-                        event.mark_completed();
-                    } else {
-                        return Err ("could not create new window");
-                    }                    
+                    let task_name: String = format!("terminal {}", terminal_id_counter);
+                    let term_num = terminal_id_counter.to_string();
+                    // passes the terminal reference number in the form of the Vec<String>. The terminal::init() function will parse it into a usize
+                    // this is a temporary hack to get around for the argument type requirements for applications
+                    let args = vec![term_num]; 
+                    let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
+                    spawn::spawn_application(term_module, args, Some(task_name), None)?;
+                    terminal_id_counter += 1;
+                    meta_keypress = true;
+                    event.mark_completed();
+                  
                 }
 
                 // Switches between terminal windows

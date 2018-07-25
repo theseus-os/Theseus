@@ -44,9 +44,6 @@ path  = "../../kernel/memory"
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
 
-[dependencies.text_display]
-path = "../../kernel/text_display"
-
 
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"

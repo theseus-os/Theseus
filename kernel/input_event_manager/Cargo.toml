@@ -46,9 +46,6 @@ path  = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.terminal]
-path = "../../applications/terminal"
-
 [dependencies.text_display]
 path = "../text_display"
 

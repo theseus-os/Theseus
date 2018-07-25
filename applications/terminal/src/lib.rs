@@ -11,7 +11,6 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
-extern crate text_display;
 extern crate input_event_types; 
 extern crate window_manager;
 
@@ -28,7 +27,29 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use text_display::TextDisplay;
+
+
+#[no_mangle]
+pub fn main(args: Vec<String>) -> isize {
+    let num = match args.get(0) {
+        Some(num_as_str) => { num_as_str.parse::<usize>() }
+        None => return -1
+    };
+    let num = match num {
+        Ok(num) => num,
+        Err(_) => return -1
+    };
+
+    match Terminal::init(num) {
+        Ok(_) => { }
+        Err(err) => {
+            error!("{}", err);
+            error!("could not create terminal instance");
+            return -1;
+        }
+    }
+    return 0;
+}
 
 lazy_static! {
     // maps the terminal reference number to the current task id
@@ -36,7 +57,7 @@ lazy_static! {
     // maps the terminal's reference number to its print producer
     static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }
-/// Currently, println! and print! macros will call this function to print to the display provider from the input_ever t_manager crate. 
+/// Currently, println! and print! macros will call this function to print to the display provider. 
 /// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
 /// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
 /// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
@@ -64,10 +85,9 @@ pub fn print_to_stdout<S: Into<String>>(s: S) -> Result<(), &'static str> {
     Ok(())
 }
 
-pub struct Terminal<D> where D: TextDisplay + Send + 'static {
-    /// The terminal's own text display that it outputs text to
-    /// Implemented as a pointer to a trait object that implements TextDisplay (ex. vga buffer)
-    text_display: D,
+pub struct Terminal {
+    /// The terminal's own window
+    window: window_manager::WindowObj,
     /// The reference number that can be used to switch between/correctly identify the terminal object
     term_ref: usize,
     /// The string that stores the users keypresses after the prompt
@@ -106,19 +126,11 @@ pub struct Terminal<D> where D: TextDisplay + Send + 'static {
     left_shift: usize,
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
-    /// The consumer for the Terminal's input dfqueue. It will dequeue input events from the terminal's dfqueue and handle them using
-    /// the handle keypress function. 
-    input_consumer: DFQueueConsumer<Event>,
-
-
-
-
-
 }
 
 /// Manual implementation of debug just prints out the terminal reference number
 use core::fmt;
-impl<D> fmt::Debug for Terminal<D> where D: TextDisplay + Send + 'static {
+impl fmt::Debug for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Point {{ terminal reference number: {} }}", self.term_ref)
     }
@@ -133,22 +145,30 @@ impl<D> fmt::Debug for Terminal<D> where D: TextDisplay + Send + 'static {
 /// 
 /// 2) The terminal input queue that handles input events from the input event handling crate
 ///     - Consumer is the main terminal loop
-///     - Producers are functions in the event handling crate that send 
+///     - Producers are functions in the event handling cra te that send 
 ///         Keyevents if the terminal is the one currently being focused on
-impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
+impl Terminal {
     /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(text_display: D, ref_num: usize) -> Result<(), &'static str> {
-        // initialize a dfqueue for the terminal object for console input events to be fed into from the input event handling crate loop
-        let terminal_input_queue: DFQueue<Event>  = DFQueue::new();
-        let terminal_input_consumer = terminal_input_queue.into_consumer();
-
+    pub fn init(ref_num: usize) -> Result<(), &'static str> {
         // initialize another dfqueue for the terminal object to handle printing from applications
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-
+        let window_object;
+        if ref_num != 0 { // fix for now because window allocator is not yet initialized at this point if it is the first terminal being created
+            let (y,width,height) = match window_manager::adjust_windows_before_addition() {
+                Some((y, width, height)) => (y, width, height),
+                None => { return Err("couldn't adjust windows before creating a new terminal")} 
+            };
+            window_object = window_manager::get_window_obj(window_manager::GAP_SIZE, y, width, height)?;
+        } else {
+            let gap_size = window_manager::GAP_SIZE;
+            let width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * gap_size;
+            let height = frame_buffer::FRAME_BUFFER_HEIGHT - 2 * gap_size;
+            window_object = window_manager::get_window_obj(gap_size,gap_size,width,height)?;
+        }
         let prompt_string: String;
         if ref_num == 0 {
             prompt_string = "kernel:~$ ".to_string();
@@ -159,7 +179,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             term_ref: ref_num,
-            text_display: text_display,
+            window: window_object,
             input_string: String::new(),
             correct_prompt_position: true,
             command_history: Vec::new(),
@@ -176,12 +196,10 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
             absolute_cursor_pos: 0, 
             left_shift: 0,
             print_consumer: terminal_print_consumer,
-            input_consumer: terminal_input_consumer,
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
         {TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);}
-        terminal.print_to_terminal(WELCOME_STRING.to_string())?; 
         let prompt_string = terminal.prompt_string.clone();
         if ref_num == 0 {
             terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
@@ -233,7 +251,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.text_display.get_dimensions();
+        let (buffer_width, buffer_height) = self.window.get_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -288,7 +306,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.text_display.get_dimensions();
+        let (buffer_width,buffer_height) = self.window.get_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -338,7 +356,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
 
     /// Scrolls up by the text display equivalent of one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.text_display.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions().0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -373,7 +391,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
 
     /// Scrolls down the text display equivalent of one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.text_display.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -444,7 +462,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            self.text_display.display_string(slice)?;
+            self.window.display_string(slice)?;
 
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -460,7 +478,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
         self.scroll_start_idx = start_idx;
         let result = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
-            self.text_display.display_string(slice)?;
+            self.window.display_string(slice)?;
             self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -535,7 +553,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> { 
-        let buffer_width = self.text_display.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions().0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -546,7 +564,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
             new_y -=1;
         }
 
-        self.text_display.set_cursor(new_y as u16, new_x as u16, true);
+        self.window.set_cursor(new_y as u16, new_x as u16, true);
         return Ok(());
     }
 
@@ -591,7 +609,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                self.text_display.disable_cursor();
+                self.window.disable_cursor();
                 let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
                 self.input_string.remove(remove_idx);
             }
@@ -643,7 +661,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
-                self.text_display.disable_cursor();
+                self.window.disable_cursor();
             }
             return Ok(());
         }
@@ -658,7 +676,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line();
-                self.text_display.disable_cursor();                
+                self.window.disable_cursor();                
             }
             return Ok(());
         }
@@ -675,7 +693,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
             }
             self.page_up();
             self.is_scroll_end = false;
-            self.text_display.disable_cursor();
+            self.window.disable_cursor();
             return Ok(());
         }
 
@@ -869,14 +887,14 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static  {
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
-fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where D: TextDisplay + Send + 'static { 
+fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> { 
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
         terminal.cursor_handler()?;        
     }
 
-    terminal.text_display.draw_border();  
+    terminal.window.draw_border();  // fix: will delete once this is taken out of text display trait
     use core::ops::Deref;
     let mut refresh_display = true;
     loop {
@@ -910,7 +928,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
         // Looks at the input queue. 
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
-        let event = match terminal.text_display.get_key_event() {
+        let event = match terminal.window.get_key_event() {
                 Some(ev) => {
                     ev
                 },
@@ -952,7 +970,7 @@ fn terminal_loop<D>(mut terminal: Terminal<D>) -> Result<(), &'static str> where
 //   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
 //   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
 
-const WELCOME_STRING: &'static str= "THESEUS\n";
+
 
 
 
