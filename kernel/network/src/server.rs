@@ -6,10 +6,11 @@ use alloc::string::ToString;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spin::{Once, Mutex};
 use core::fmt;
+use acpi::get_hpet;
 use smoltcp::Error;
 use smoltcp::wire::{EthernetAddress, IpAddress};
 use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
-use smoltcp::socket::{AsSocket, SocketSet,SocketHandle, SocketItem}; 
+use smoltcp::socket::{AsSocket, SocketSet,SocketHandle}; 
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
@@ -39,7 +40,7 @@ pub static UDP_SOCKET_BUFFER_SIZE: Once<usize> = Once::new();
 /// This is invoked by the captain when the udp_server feature is set
 /// default is used for IP address and port 
 pub fn server_init(_: Option<u64>) {
-
+    let startup_time = get_hpet().as_ref().unwrap().get_counter();;
     // Setting up udp buffer size, default size fis set to 8KB
     let mut skb_size:usize = 8*1024;
     if let Some(x_size) = UDP_SOCKET_BUFFER_SIZE.try(){
@@ -52,21 +53,21 @@ pub fn server_init(_: Option<u64>) {
     let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
     
     // For TCP - not implemented on the server
-    let tcp1_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
-    let tcp1_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
-    let tcp1_socket = TcpSocket::new(tcp1_rx_buffer, tcp1_tx_buffer);
+    // let tcp1_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
+    // let tcp1_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
+    // let tcp1_socket = TcpSocket::new(tcp1_rx_buffer, tcp1_tx_buffer);
 
-    let tcp2_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
-    let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
-    let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
+    // let tcp2_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
+    // let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
+    // let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
 
     let arp_cache = SliceArpCache::new(vec![Default::default(); 8]);
 
     let mut sockets:SocketSet = SocketSet::new(vec![]);
 
     let udp_handle  = sockets.add(udp_socket);
-    let tcp1_handle = sockets.add(tcp1_socket);
-    let tcp2_handle = sockets.add(tcp2_socket);
+    // let tcp1_handle = sockets.add(tcp1_socket);
+    // let tcp2_handle = sockets.add(tcp2_socket);
 
     let mut tcp_6970_active = false;
 
@@ -74,6 +75,7 @@ pub fn server_init(_: Option<u64>) {
         tx_next: 0,
         rx_next: 0,
     };
+
 
     // getting the mac address from the ethernet device
     let mac             = get_mac();
@@ -127,10 +129,9 @@ pub fn server_init(_: Option<u64>) {
         {         
             /// UDP       
             let socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
-            if socket.endpoint().is_unspecified() {
-                socket.bind(6969)
+            if !socket.is_open() {
+                socket.bind(6969).unwrap()
             }
-            //debug!("looping");
 
             // Receiving packets
             let tuple = match socket.recv() {
@@ -152,9 +153,11 @@ pub fn server_init(_: Option<u64>) {
                 let element = udpserver_consumer.peek();
                 if !element.is_none() {
                     let element = element.unwrap();
-                    //debug!("haako");
                     let data = element.deref(); // event.deref() is the equivalent of   &*event     
-                    socket.send_slice(data.as_bytes(), endpoint).expect("sending failed");
+                    let ret = match socket.send_slice(data.as_bytes(), endpoint){
+                        Ok(_) => (),
+                        Err(err) => debug!("UDP sending error {}",err.to_string()),
+                    };
                     element.mark_completed();
                     //client_endpoint = None;                     
                 }
@@ -162,12 +165,20 @@ pub fn server_init(_: Option<u64>) {
         }
 
         // polling the ethernet interface
-        let timestamp_ms = timestamp_ms + 1;
-        match iface.poll(&mut sockets, timestamp_ms) {
-            Ok(()) | Err(Error::Exhausted) => (),
-            Err(e) => debug!("poll error: {}", e)
-        }      
+        let timestamp = millis_since(startup_time);
+        let poll_at = match iface.poll(&mut sockets, timestamp){
+            Ok(_) => (),
+            Err(err) => debug!("poll error {}",err.to_string()),
+        };     
     }
+}
+
+/// Function to calculate time since a give time in ms
+pub fn millis_since(start_time:u64)-> u64 {
+    let end_time : u64 = get_hpet().as_ref().unwrap().get_counter();
+    let hpet_freq : u64 = get_hpet().as_ref().unwrap().counter_period_femtoseconds() as u64;
+    // Converting to ms
+    (end_time-start_time)*hpet_freq/1000000000
 }
 
 /// Function to send debug messages using UDP to configured destination

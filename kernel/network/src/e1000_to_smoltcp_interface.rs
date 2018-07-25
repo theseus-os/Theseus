@@ -2,7 +2,7 @@
 use alloc::slice;
 use alloc::vec::Vec;
 use smoltcp::Error;
-use smoltcp::phy::Device;
+use smoltcp::phy::{Device, DeviceLimits};
 use e1000::{nic_send_packet,nic_has_packet_arrived,nic_receive_packet};
 //use e1000::E1000E_NIC;
 
@@ -41,9 +41,14 @@ impl Device for EthernetDevice {
     type RxBuffer = &'static [u8];
     type TxBuffer = TxBuffer;
 
-    fn mtu(&self) -> usize { 1536 }
+    fn limits(&self) -> DeviceLimits {
+        let mut limits = DeviceLimits::default();
+        limits.max_transmission_unit = 1536;
+        limits.max_burst_size = Some(2);
+        limits
+    }
 
-    fn receive(&mut self) -> Result<Self::RxBuffer, Error> {
+    fn receive(&mut self, _timestamp: u64) -> Result<Self::RxBuffer, Error> {
         if rx_full() {
             let (buf, length) = rx_setup();
             Ok(unsafe {
@@ -54,7 +59,7 @@ impl Device for EthernetDevice {
         }
     }
 
-    fn transmit(&mut self, length: usize) -> Result<Self::TxBuffer, Error> {
+    fn transmit(&mut self, _timestamp: u64, length: usize) -> Result<Self::TxBuffer, Error> {
         if tx_empty() {
             let index = self.tx_next;
             Ok(TxBuffer {

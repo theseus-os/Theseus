@@ -10,6 +10,7 @@ extern crate smoltcp;
 extern crate e1000;
 extern crate spin;
 extern crate dfqueue;
+extern crate acpi;
 
 
 pub mod server;

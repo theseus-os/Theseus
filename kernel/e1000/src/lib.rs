@@ -130,8 +130,12 @@ const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
 
 const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
-const E1000_SIZE_RX_DESC:       usize = 256;
-const E1000_SIZE_TX_DESC:       usize = 256;
+
+const E1000_SIZE_RX_DESC:       usize = 16;
+const E1000_SIZE_TX_DESC:       usize = 16;
+
+const E1000_SIZE_RX_BUFFER:     usize = 2048;
+const E1000_SIZE_TX_BUFFER:     usize = 2048;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -352,12 +356,12 @@ impl Nic{
 
         }
 
-        /// allocates memory for DMA, will be used by the rx and tx descriptors
+                /// allocates memory for DMA, will be used by the rx and tx descriptors
         pub fn mem_map_dma(&mut self) -> Result<(), &'static str> {
                 
                 // get a reference to the kernel's memory mapping information
-                let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-                //let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!"));
+                //let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+                let kernel_mmi_ref = try!(get_kernel_mmi_ref().ok_or("e1000:mem_map_dma KERNEL_MMI was not yet initialized!"));
                 let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
                 // destructure the kernel's MMI so we can access its page table
@@ -366,22 +370,39 @@ impl Nic{
                 ..  // don't need to access other stuff in kernel_mmi
                 } = *kernel_mmi_locked;
 
-                //will need to change this when size of RX buffers changes
-                let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
-                //let page = Page::containing_address(virt_addr);
+                //let virt_addr = allocate_pages(1).expect("e1000::mem_map_dma(): couldn't allocated virtual page!");
+                
+                let num_pages;
+                let num_frames;
+                let bytes_required = (E1000_NUM_RX_DESC*E1000_SIZE_RX_BUFFER) + (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + E1000_SIZE_RX_DESC; //add an additional desc so we can make sure its 16-byte aligned
+                if bytes_required % PAGE_SIZE == 0 {
+                        num_pages =  bytes_required / PAGE_SIZE;
+                        num_frames =  bytes_required / PAGE_SIZE;
+                }
+                else {
+                       num_pages =  bytes_required / PAGE_SIZE + 1; 
+                       num_frames =  bytes_required / PAGE_SIZE + 1;  
+                }
+                
                 //let virt_addr = try!(allocate_pages(1).ok_or("e1000::mem_map_dma(): couldn't allocated virtual page!"));
-                                        
+                let virt_addr = try!(allocate_pages(num_pages).ok_or("e1000::mem_map_dma(): couldn't allocated virtual page!"));
+
+                self.nic_dma_allocator.start = virt_addr.pages.start.start_address();
+                self.nic_dma_allocator.current = virt_addr.pages.start.start_address();
+                self.nic_dma_allocator.end = virt_addr.pages.end.start_address()+PAGE_SIZE; //end of dma memory
+                trace!("head_pmem: {:#X}, tail_pmem: {:#X}", self.nic_dma_allocator.start, self.nic_dma_allocator.end);
+
                 let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
                 //debug!("page: {:?}, frame {:?}",page,frame);
                 
                 match kernel_page_table {
                 &mut PageTable::Active(ref mut active_table) => {
                         let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("e1000::mem_map_dma(): couldnt get FRAME_ALLOCATOR")).lock();
-                        let frame = try!(frame_allocator.allocate_frame().ok_or("e1000:mem_map_dma couldnt allocate a new frame"));
+                        let frames = try!(frame_allocator.allocate_frames(num_frames).ok_or("e1000:mem_map_dma couldnt allocate a new frame"));
                         // let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
                         // let frame = frame_allocator.allocate_frame().unwrap() ;
                         
-                        let result = try!(active_table.map_to(virt_addr.pages.start, frame, mapping_flags, frame_allocator.deref_mut()));
+                        let result = try!(active_table.map_allocated_pages_to(virt_addr, frames, mapping_flags, frame_allocator.deref_mut()));
                         NIC_DMA_PAGES.call_once(|| result);
                 }
                 _ =>    { 
@@ -389,13 +410,7 @@ impl Nic{
                         }
 
                 }
-                /**************************************/
-                
-                self.nic_dma_allocator.start = virt_addr.pages.start.start_address();
-                self.nic_dma_allocator.current = virt_addr.pages.start.start_address();
-                self.nic_dma_allocator.end = virt_addr.pages.start.start_address()+PAGE_SIZE; //One page is allocated
-                trace!("head_pmem: {:#X}, tail_pmem: {:#X}", self.nic_dma_allocator.start, self.nic_dma_allocator.end);
-                
+                /**************************************/                
               
                Ok(())
         }
@@ -712,7 +727,6 @@ impl Nic{
         /// Send a packet, called by a function higher in the network stack
         /// p_data is address of tranmit buffer, must be pointing to contiguous memory
         pub fn send_packet(&mut self, p_data: usize, p_len: u16) -> Result<(), &'static str> {
-                
                 //debug!("Value of tx descriptor address_translated: {:x}",ptr);
                 let t_ptr = translate_v2p(p_data);
                 let ptr;
