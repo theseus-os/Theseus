@@ -19,8 +19,6 @@ exclude = [
 	## exclude the build directories
 	"target",
 	"build",
-	## exclude the doc directory, which is built separately because it's not executable code
-	"doc",
 
 	## dunno what this is, but it doesn't compile! @Wenqiu?
 	"graph_drawer",

@@ -16,6 +16,7 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.smoltcp]
+#version = "0.4.0"
 path = "../../libs/smoltcp"
 default-features = false
 features = ["log","alloc"]
@@ -32,6 +33,9 @@ version = "0.2.1"
 
 [dependencies.irq_safety]
 path = "../../libs/irq_safety"
+
+[dependencies.acpi]
+path = "../acpi"
 
 [dependencies]
 spin = "0.4.5"

@@ -102,7 +102,7 @@ path = "../simd_test"
 
 
 [features]
-mirror_serial = []
+mirror_log_to_vga = []
 udp_server = []
 
 

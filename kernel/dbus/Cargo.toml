@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 name = "dbus"
 description = "Simple dbus-like IPC support for Theseus"
 version = "0.1.0"
