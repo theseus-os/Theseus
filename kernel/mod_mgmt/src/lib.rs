@@ -15,6 +15,7 @@ extern crate goblin;
 extern crate util;
 extern crate rustc_demangle;
 extern crate owning_ref;
+extern crate cow_arc;
 
 
 use core::ops::DerefMut;
@@ -33,6 +34,7 @@ use util::round_up_power_of_two;
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 
 use metadata::{StrongCrateRef, WeakSectionRef};
+use cow_arc::CowArc;
 
 
 pub mod demangle;
@@ -125,10 +127,15 @@ impl CrateNamespace {
     }
 
 
-    /// Returns a strong reference to the `LoadedCrate` in this namespace 
-    /// that matches the given `crate_name`, if it has been loaded into this namespace.
+    /// Acquires the lock on this `CrateNamespace`'s crate list and looks for the crate 
+    /// that matches the given `crate_name`, if it exists in this namespace.
+    /// 
+    /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
+    /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
+    /// that jointly exists in another namespace, they should invoke the 
+    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.crate_tree.lock().get(crate_name).cloned()
+        self.crate_tree.lock().get(crate_name).map(|r| CowArc::clone_shallow(r))
     }
 
 
@@ -158,7 +165,7 @@ impl CrateNamespace {
         self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
 
         {
-            let new_crate = new_crate_ref.lock();
+            let new_crate = new_crate_ref.lock_as_ref();
             info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
         }
         Ok(new_crate_ref)
@@ -199,7 +206,7 @@ impl CrateNamespace {
         let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
         let (new_crate_name, new_syms) = {
-            let new_crate = new_crate_ref.lock();
+            let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
             (new_crate.crate_name.clone(), new_syms)
         };
@@ -212,40 +219,48 @@ impl CrateNamespace {
     }
 
 
+
     /// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
-    /// but simply marks each crate as copy-on-write rather than performing
-    /// a deep copy of every single crate proactively. 
+    /// but uses a copy-on-write/clone-on-write semantic that creates 
+    /// a special shared reference to each crate that indicates it is shared across multiple namespaces.
     /// 
     /// In other words, crates in the new namespace returned by this fucntions 
-    /// are fully shared with crates in this namespace.
+    /// are fully shared with crates in *this* namespace, 
+    /// until either namespace attempts to modify a shared crate in the future.
     /// 
     /// When modifying crates in the new namespace, such as with the funtions 
     /// [`swap_crates`](#method.swap_crates), any crates in the new namespace
     /// that are still shared with the old namespace will be deeply copied into a new crate,
     /// and then that new crate will be modified in whichever way specified. 
     /// For example, if you swapped one crate `A` in the new namespace returned from this function
-    /// and a loaded a new crate `A'` in its place,
-    /// and two other crates `B` and `C` depended on that new swapped `A`,
+    /// and loaded a new crate `A2` in its place,
+    /// and two other crates `B` and `C` depended on that newly swapped-out `A`,
     /// then `B` and `C` would be transparently deep copied before modifying them to depend on
-    /// the new crate `A'`, and you would be left with `B' and `C'` as deep copies of `B` and `C`,
-    /// that now depend on `A'` instead of `A`. 
+    /// the new crate `A2`, and you would be left with `B2` and `C2` as deep copies of `B` and `C`,
+    /// that now depend on `A2` instead of `A`. 
     /// The existing versions of `B` and `C` would still depend on `A`, 
     /// but they would no longer be part of the new namespace. 
     /// 
-    pub fn copy_on_write(&self) -> CrateNamespace {
-        unimplemented!()
+    pub fn clone_on_write(&self) -> CrateNamespace {
+        let new_crate_tree = self.crate_tree.lock().clone();
+        let new_symbol_map = self.symbol_map.lock().clone();
+
+        CrateNamespace {
+            crate_tree: Mutex::new(new_crate_tree),
+            symbol_map: Mutex::new(new_symbol_map),
+        }
     }
 
-        
+
     /// Swaps in new modules to replace existing crates this in `CrateNamespace`.
     /// This function accepts several modules in order to allow swapping multiple crates all at once 
     /// in a single "atomic" unit, which prevents weird linking/relocation errors, 
     /// such as a new crate linking against an old crate that already exists in this namespace
     /// instead of linking against the new one that we want to replace that old crate with. 
     /// 
-    /// In general, the strategy for replacing and old module `C` with a new module `C'` consists of three simple steps:
-    /// 1) Load the new replacement module `C'`.
-    /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C'`.
+    /// In general, the strategy for replacing and old module `C` with a new module `C2` consists of three simple steps:
+    /// 1) Load the new replacement module `C2`.
+    /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C2`.
     /// 3) Remove module `C` and clean it up, e.g., removing its entries from the symbol map.
     /// 
     /// This `CrateNamespace` (self) is used as the backup namespace for resolving unknown symbols.
@@ -264,9 +279,11 @@ impl CrateNamespace {
         verbose_log: bool,
     ) -> Result<(), &'static str> {
         // create a new CrateNamespace and load all of the new crate modules into it
-        let swap_pairs = swap_pairs.into_iter();
-        let module_iter = swap_pairs.clone().map(|tup| tup.1);
-        let new_namespace = load_crates_in_new_namespace(module_iter, self, kernel_mmi, verbose_log)?;
+        let new_namespace = {
+            let length_hint = swap_pairs.len();
+            let module_iter = swap_pairs.iter().map(|tup| tup.1);
+            load_crates_in_new_namespace(module_iter, length_hint, self, kernel_mmi, verbose_log)?
+        };
 
         // for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
         //     debug!("====================== Loaded new crate \"{}\"  ===========================", crate_name);
@@ -282,10 +299,17 @@ impl CrateNamespace {
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
         for (old_crate_ref, new_module, override_new_crate_name) in swap_pairs {
-            let old_crate = old_crate_ref.lock();
+            let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
+                error!("TODO FIXME: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exlusive mutable instance", old_crate_ref);
+                "TODO FIXME: swap_crates() doesn't yet support deep copying shared crates to get a new exlusive mutable instance"
+            })?;
             let (_new_crate_type, new_crate_name) = CrateType::from_module_name(new_module.name())?;
-            let new_crate_ref = new_namespace.get_crate(new_crate_name).ok_or_else(|| "Couldn't get new crate from new namespace")?;
-            let mut new_crate = new_crate_ref.lock();
+            debug!("trying to get_crate({})", new_crate_name);
+            debug!("new_namespace crates: {:?}", &*new_namespace.crate_tree.lock());
+            let new_crate_ref = new_namespace.get_crate(new_crate_name)
+                .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?;
+            let mut new_crate = new_crate_ref.lock_as_mut()
+                .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
 
             // if requested, override the new crate's name and section prefixes and symbol prefixes
             let new_crate_name = if let Some(override_name) = override_new_crate_name {
@@ -430,7 +454,8 @@ impl CrateNamespace {
             // add the new crate and its sections' symbols to this namespace
             self.add_symbols(new_crate.sections.values(), verbose_log);
             self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone());
-
+            // Although we used a shared CowArc above, it will go back to being exclusive after this function
+            // because the `new_namespace` will be dropped.
         }
 
         Ok(())
@@ -521,14 +546,14 @@ impl CrateNamespace {
         const RELRO_PREFIX:  &'static str = "rel.ro.";
 
 
-        let new_crate = Arc::new(Mutex::new(LoadedCrate {
+        let new_crate = CowArc::new(LoadedCrate {
             crate_name:   String::from(crate_name),
             sections:     BTreeMap::new(),
             text_pages:   text_pages  .as_ref().map(|r| Arc::clone(r)),
             rodata_pages: rodata_pages.as_ref().map(|r| Arc::clone(r)),
             data_pages:   data_pages  .as_ref().map(|r| Arc::clone(r)),
-        }));
-        let new_crate_weak_ref = Arc::downgrade(&new_crate);
+        });
+        let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
         for (shndx, sec) in elf_file.section_iter().enumerate() {
             // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
@@ -823,7 +848,12 @@ impl CrateNamespace {
             }
         }
 
-        new_crate.lock().sections = loaded_sections;
+        // set the new_crate's sections list, since we didn't do it earlier
+        {
+            let mut new_crate_mut = new_crate.lock_as_mut()
+                .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
+            new_crate_mut.sections = loaded_sections;
+        }
 
         Ok((new_crate, elf_file))
     }
@@ -843,7 +873,7 @@ impl CrateNamespace {
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool
     ) -> Result<(), &'static str> {
-        let new_crate = new_crate_ref.lock();
+        let new_crate = new_crate_ref.lock_as_ref();
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
         let symtab = find_symbol_table(&elf_file)?;
 
@@ -1176,11 +1206,11 @@ impl CrateNamespace {
             // so it can't be dropped while this namespace is still relying on it.  
             if let Some(parent_crate_ref) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
                 let parent_crate_name = {
-                    let parent_crate = parent_crate_ref.lock();
+                    let parent_crate = parent_crate_ref.lock_as_ref();
                     self.add_symbols(parent_crate.sections.values(), true);
                     parent_crate.crate_name.clone()
                 };
-                self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
+                self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
                 return weak_sec;
             }
             else {
@@ -1493,7 +1523,7 @@ fn write_relocation(
 fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 	for weak_crate_ref in krate.crates_dependent_on_me() {
 		let strong_crate_ref = weak_crate_ref.upgrade().unwrap();
-        let strong_crate = strong_crate_ref.lock();
+        let strong_crate = strong_crate_ref.lock_as_ref();
 		debug!("{}{}", prefix, strong_crate.crate_name);
 		dump_dependent_crates(&*strong_crate, format!("{}  ", prefix));
 	}
@@ -1534,27 +1564,29 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 /// in which the `String` is the name of the crate, allowing us the override the `ModuleArea`'s name.
 fn load_crates_in_new_namespace<'m, I>(
 	new_modules: I,
+    length_hint: usize,
 	backup_namespace: &CrateNamespace,
 	kernel_mmi: &mut MemoryManagementInfo,
 	verbose_log: bool,
 ) -> Result<CrateNamespace, &'static str> 
-	where I: Iterator<Item = &'m ModuleArea> + Clone 
+	where I: Iterator<Item = &'m ModuleArea> + Clone
 {
-	// first we map all of the crates' ModuleAreas
-	let mappings = {
-		let mut mappings: Vec<MappedPages> = Vec::new(); //Vec::with_capacity(len);
-		for crate_module in new_modules.clone() {
-			mappings.push(map_crate_module(crate_module, kernel_mmi)?);
-		}
-		mappings
-	};
+    // first we map all of the crates' ModuleAreas
+    let mappings = {
+        let mut mappings: Vec<MappedPages> = Vec::new(); //Vec::with_capacity(len);
+        for crate_module in new_modules.clone() {
+            debug!("mapping crate_module {:?}", crate_module);
+            mappings.push(map_crate_module(crate_module, kernel_mmi)?);
+        }
+        mappings
+    };
 
 	// create a new empty namespace so we can add symbols to it before performing the relocations
 	let new_namespace = CrateNamespace::new();
-	let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(mappings.len()); 
+	let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(length_hint); 
 
 	// first we do all of the section parsing and loading
-	for (i, crate_module) in new_modules.clone().enumerate() {
+	for (i, crate_module) in new_modules.enumerate() {
 		let temp_module_mapping = mappings.get(i).ok_or("BUG: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
 		let (new_crate, elf_file) = new_namespace.load_crate_sections(
             temp_module_mapping, 
@@ -1563,14 +1595,14 @@ fn load_crates_in_new_namespace<'m, I>(
             kernel_mmi, 
             verbose_log
         )?;
-		let _new_syms = new_namespace.add_symbols(new_crate.lock().sections.values(), verbose_log);
+		let _new_syms = new_namespace.add_symbols(new_crate.lock_as_ref().sections.values(), verbose_log);
 		partially_loaded_crates.push((new_crate, elf_file));
 	}
 	
 	// then we do all of the relocations 
 	for (new_crate_ref, elf_file) in partially_loaded_crates {
 		new_namespace.perform_relocations(&elf_file, &new_crate_ref, Some(backup_namespace), kernel_mmi, verbose_log)?;
-		let name = new_crate_ref.lock().crate_name.clone();
+		let name = new_crate_ref.lock_as_ref().crate_name.clone();
 		new_namespace.crate_tree.lock().insert(name, new_crate_ref);
 	}
 

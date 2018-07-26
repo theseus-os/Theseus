@@ -78,13 +78,9 @@ $(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm
 
 
 ## Builds Theseus's documentation.
-## The "doc" directory is excluded from the workspace so it is not accidentally built as code, even though it contains the top-level docs.
-## Instead, each file in the "doc" directory, including main lib.rs file, is temporarily moved to the top-level kernel workspace directory
-## so that when compiled with rustdoc, all of the workspace's subcrates show up nicely in the sidebar.
+## The entire project is built as normal using the "cargo doc" command,
+## except for the special top-level documentation file, which we build separately.
 doc:
 	@cargo doc --no-deps
-	@cp -f doc/src/lib.rs __doc.rs
-	@rustdoc --output target/doc --crate-name Theseus __doc.rs
-## TODO: FIXME: build all other .rs files in the "doc" crate... do we give them the same "Theseus" crate name?
-	@rm -f __doc.rs
+	@rustdoc --output target/doc --crate-name "-- Theseus Crates --" documentation/src/_top.rs
 

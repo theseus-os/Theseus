@@ -6,8 +6,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 [dependencies]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.print]
+path = "../../kernel/print"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"

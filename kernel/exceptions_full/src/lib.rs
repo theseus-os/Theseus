@@ -10,7 +10,7 @@ extern crate apic;
 extern crate pmu_x86;
 extern crate memory;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate console; // for regular println!()
+#[macro_use] extern crate print; // for regular println!()
 #[macro_use] extern crate log;
 
 

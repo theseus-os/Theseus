@@ -10,6 +10,7 @@ use alloc::arc::{Arc, Weak};
 use memory::{MappedPages, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
+use cow_arc::{CowArc, CowWeak};
 
 use super::SymbolMap;
 
@@ -19,9 +20,9 @@ pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
 pub type WeakSectionRef = Weak<Mutex<LoadedSection>>;
 
 /// A Strong reference (`Arc`) to a `LoadedCrate`.
-pub type StrongCrateRef  = Arc<Mutex<LoadedCrate>>;
+pub type StrongCrateRef  = CowArc<LoadedCrate>; // Arc<Mutex<LoadedCrate>>;
 /// A Weak reference (`Weak`) to a `LoadedCrate`.
-pub type WeakCrateRef = Weak<Mutex<LoadedCrate>>;
+pub type WeakCrateRef = CowWeak<LoadedCrate>; // Weak<Mutex<LoadedCrate>>;
 
 
 #[derive(PartialEq)]
@@ -212,14 +213,14 @@ impl LoadedCrate {
         let mut new_rodata_pages_locked = new_rodata_pages_ref.as_ref().map(|rp| rp.lock());
         let mut new_data_pages_locked   = new_data_pages_ref  .as_ref().map(|dp| dp.lock());
 
-        let new_crate = Arc::new(Mutex::new(LoadedCrate {
+        let new_crate = CowArc::new(LoadedCrate {
             crate_name:   self.crate_name.clone(),
             sections:     BTreeMap::new(),
             text_pages:   new_text_pages_ref.clone(),
             rodata_pages: new_rodata_pages_ref.clone(),
             data_pages:   new_data_pages_ref.clone(),
-        }));
-        let new_crate_weak_ref = Arc::downgrade(&new_crate);
+        });
+        let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
         // Second, deep copy the entire list of sections and fix things that don't make sense to directly clone:
         // 1) The parent_crate reference itself, since we're replacing that with a new one,

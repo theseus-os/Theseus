@@ -26,6 +26,9 @@ features = ["elf64", "goblin"]
 [dependencies.util]
 path = "../../libs/util"
 
+[dependencies.cow_arc]
+path = "../../libs/cow_arc"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 

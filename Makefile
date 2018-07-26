@@ -124,7 +124,7 @@ loadable: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso) 
-	@qemu-img resize random_data2.img 100K
+	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
@@ -145,7 +145,7 @@ gdb:
 # bochs : export RUST_FEATURES = --package apic --features apic_timer_fixed
 bochs : export RUST_FEATURES = --manifest-path "apic/Cargo.toml" --features "apic_timer_fixed"
 bochs: $(iso) 
-	#@qemu-img resize random_data2.img 100K
+	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
 
 
@@ -168,8 +168,8 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-# boot : export RUST_FEATURES = --package captain --features mirror_serial
-boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_serial"
+# boot : export RUST_FEATURES = --package captain --features mirror_log_to_vga
+boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -177,7 +177,7 @@ boot: check_usb $(iso)
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_serial"
+pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)
@@ -258,7 +258,7 @@ kernel: check_rustc check_xargo
 	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 
 
-DOC_ROOT := build/doc/Theseus/index.html
+DOC_ROOT := "build/doc/-- Theseus Crates --/index.html"
 
 doc:
 	@rm -rf build/doc
@@ -266,7 +266,7 @@ doc:
 	@$(MAKE) -C kernel doc
 	@cp -rf kernel/target/doc ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You run 'make view-doc' to view it, or just open $(DOC_ROOT)"
+	@echo -e "You can run 'make view-doc' to view it."
 
 docs: doc
 

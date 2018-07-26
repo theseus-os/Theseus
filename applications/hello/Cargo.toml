@@ -11,8 +11,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.print]
+path = "../../kernel/print"
 
 
 # [dependencies.application_main_fn]

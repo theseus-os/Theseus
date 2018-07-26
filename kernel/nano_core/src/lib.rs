@@ -1,9 +1,19 @@
-// Copyright 2017 Kevin Boos. 
-// Licensed under the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>,
-// This file may not be copied, modified, or distributed
-// except according to those terms.
-
+//! The aptly-named tiny crate containing the first OS code to run.
+//! 
+//! The `nano_core` is very simple, and only does the following things:
+//! 
+//! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
+//! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
+//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
+//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
+//!
+//! In general, you shouldn't ever need to change `nano_core`. 
+//! That's because `nano_core` doesn't contain any specific program logic, 
+//! it just sets up an initial environment so that other subsystems can run.
+//! 
+//! If you want to change how the OS starts up and which systems it initializes, 
+//! you should change the code in the [`captain`](../captain/index.html) crate instead.
+//! 
 
 #![no_std]
 #![feature(alloc)]

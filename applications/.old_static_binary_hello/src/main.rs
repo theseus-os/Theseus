@@ -7,12 +7,12 @@
 // extern crate alloc;
 extern crate rlibc;
 #[macro_use] extern crate log;
-extern crate console;
+extern crate print;
 
 
 fn main() {
     info!("Hello, world! (from hello application)");
-    console::print_to_console("HELLO WORLD FROM HELLO APP!");
+    print::println("HELLO WORLD FROM HELLO APP!");
 }
 
 #[no_mangle]
