@@ -894,7 +894,6 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         terminal.cursor_handler()?;        
     }
 
-    terminal.window.draw_border();  // fix: will delete once this is taken out of text display trait
     use core::ops::Deref;
     let mut refresh_display = true;
     loop {

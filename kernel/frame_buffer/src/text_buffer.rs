@@ -182,11 +182,6 @@ impl TextDisplay for FrameTextBuffer {
         self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
 
-    fn draw_border(&self) -> (usize, usize, usize) {
-        (0, 0, 0)
-    }
-
-
     fn get_key_event(&self) -> Option<Event> {
         // Andrew: fix instead of using as trait
         None

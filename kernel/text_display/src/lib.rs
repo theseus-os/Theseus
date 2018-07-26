@@ -16,9 +16,7 @@ pub trait TextDisplay {
     fn disable_cursor(&mut self);
     /// Display the cursor and let it blinks
     fn cursor_blink(&mut self);
-    /// Draw a border for the text
-    fn draw_border(&self) -> (usize, usize, usize);
-    /// Grabs a keyevent from the text display, which should have it's own queue for input events 
+   /// Grabs a keyevent from the text display, which should have it's own queue for input events 
     fn get_key_event(&self) -> Option<Event>;
 }
 

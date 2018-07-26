@@ -111,6 +111,12 @@ impl WindowAllocator{
             return Err("Request area is already allocated");
         }
 
+        {
+            let inner_lock = inner_ref.lock();
+            inner_lock.clean();
+            inner_lock.draw_border(get_border_color(true));
+        }
+  
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
             if let Some(reference) = ref_opt {
@@ -126,11 +132,7 @@ impl WindowAllocator{
             inner:inner_ref,
             text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
-        };
-
-
-        window.clean();
-        window.draw_border();       
+        };    
         
         Ok(window)    
     }
@@ -323,10 +325,12 @@ impl WindowObj{
             slice)
     }
     
+    /*
     pub fn draw_border(&self) -> (usize, usize, usize){
         let inner = self.inner.lock();
         inner.draw_border(get_border_color(inner.active))
     }
+    */
 
 
     pub fn get_key_event(&self) -> Option<Event> {
@@ -406,8 +410,6 @@ impl WindowInner {
         self.height = height; 
         self.draw_border(get_border_color(self.active));
         Ok(())
-
-
     }
 
 
