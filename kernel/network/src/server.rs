@@ -6,6 +6,7 @@ use alloc::string::ToString;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spin::{Once, Mutex};
 use core::fmt;
+use core::ops::Deref;
 use acpi::get_hpet;
 use smoltcp::Error;
 use smoltcp::wire::{EthernetAddress, IpAddress};
@@ -14,9 +15,17 @@ use smoltcp::socket::{AsSocket, SocketSet,SocketHandle};
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
+use smoltcp::phy::Device;
 use e1000::{E1000_NIC,get_mac};
 use e1000_to_smoltcp_interface::{EthernetDevice};
 
+//constants
+const  SET_DESTINATION_IP:      u8 = 0;
+const  SET_DESTINATION_PORT:    u8 = 1;
+
+//type aliases
+type Port_Number     = u16;
+type Command_type    = u8;
 
 
 /// Static instance of the DFQueueProducer for the UDP_TEST_SERVER
@@ -24,6 +33,8 @@ use e1000_to_smoltcp_interface::{EthernetDevice};
 /// default mode: IP address 192.168.69.100, Port 5901
 /// otherwise custom address
 pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
+
+pub static CONFIG_MIRROR_LOG_TO_NETWORK: Once<DFQueueProducer<String>> = Once::new();
 
 // Forwarding (host) IP address
 pub static HOST_PORT: Once<u16> = Once::new();
@@ -34,6 +45,12 @@ pub static GUEST_IP: Once<[u8;4]> = Once::new();
 
 // Max buffer size for UDP socket buffers, can be tuned to get better performance
 pub static UDP_SOCKET_BUFFER_SIZE: Once<usize> = Once::new();
+
+
+
+pub struct network_ethernet_interface <'a, 'b, 'c, DeviceT: Device + 'a> {
+    iface: EthernetInterface<'a, 'b, 'c, DeviceT>,
+}
 
 
 /// Initializing the test_server
@@ -122,11 +139,43 @@ pub fn server_init(_: Option<u64>) {
     UDP_TEST_SERVER.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
+
+	let config_mirror_log_to_nw_dfq: DFQueue<String> = DFQueue::new();
+    let config_mirror_log_to_nw_consumer = config_mirror_log_to_nw_dfq.into_consumer();
+    let config_mirror_log_to_nw_producer = config_mirror_log_to_nw_consumer.obtain_producer();
+
+    CONFIG_MIRROR_LOG_TO_NETWORK.call_once(|| {
+       config_mirror_log_to_nw_consumer.obtain_producer()
+    });
     
     // Main loop for the server
     loop {
 
-        {         
+        {   
+			/// Configuring the mirror log server
+			let element = config_mirror_log_to_nw_consumer.peek();
+			if !element.is_none() {
+				let element = element.unwrap();
+				let data = element.deref(); // event.deref() is the equivalent of   &*event     
+                let cmd = match parse_mirror_log_to_nw_command(data){
+                    Ok(cmd_type) => 
+                    {
+                        if cmd_type == SET_DESTINATION_IP {
+
+                        }
+                        else if cmd_type == SET_DESTINATION_PORT {
+
+                        }
+                        else {
+                            debug!("Command type not supported");
+                        }
+                    },
+                    Err(err) => debug!("{}",err.to_string()),
+                }
+				element.mark_completed();
+				//client_endpoint = None;                     
+			}			
+
             /// UDP       
             let socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
             if !socket.is_open() {
@@ -149,7 +198,6 @@ pub fn server_init(_: Option<u64>) {
 
             // Sending packets
             if let Some(endpoint) = client_endpoint{
-                use core::ops::Deref;
                 let element = udpserver_consumer.peek();
                 if !element.is_none() {
                     let element = element.unwrap();
@@ -222,5 +270,53 @@ pub fn set_udp_skb_size(skb_size:usize){
     UDP_SOCKET_BUFFER_SIZE.call_once(|| {
             skb_size
     });
+}
+
+
+
+
+// Other supporting functions
+pub fn parse_mirror_log_to_nw_command (command:String) -> Result<Command_type, &'static str>{
+    match command.as_ref(){
+        "set_destination_ip"        => Ok(SET_DESTINATION_IP),
+        "set_destination_port"      => Ok(SET_DESTINATION_PORT),
+        _                           => Err("Invalid command"),
+    }
+}
+
+
+pub fn parse_ip_address (addr:String) -> Result<IpAddress, &'static str>{
+	let mut ip: [u8; 4] = [0;4];
+	let split = addr.split(".");
+	if split.clone().count()!= 4 {
+		return Err("Invalid IP address")
+	}
+	let mut x_count = 0;
+	for x in split{
+		match x.parse::<u8>(){
+			Ok(y) => {
+				ip[x_count] = y;
+				x_count = x_count + 1;
+			}
+			_ => {
+				return Err("Invalid IP address")
+			}
+		}
+	}
+	Ok (IpAddress::v4(ip[0],ip[1],ip[2],ip[3]))
+
+}
+
+
+pub fn parse_port_no (port_no:String) -> Result<Port_Number, &'static str>{
+    match port_no.parse::<Port_Number>(){
+        Ok(y) => {
+            Ok(y)
+        }
+        _ => {
+            return Err("Invalid Port Number")
+        }
+    }
+
 }
 

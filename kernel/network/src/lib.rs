@@ -6,6 +6,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate lazy_static;
 extern crate smoltcp;
 extern crate e1000;
 extern crate spin;
