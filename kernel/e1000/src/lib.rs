@@ -744,14 +744,14 @@ impl Nic{
 
                 let old_cur: u8 = self.tx_cur as u8;
                 self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-                #[cfg(not(feature = "udp_server"))]
+                #[cfg(not(feature = "mirror_log_to_network"))]
                 {
                         debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));
                 }
                 self. write_command(REG_TXDESCTAIL, self.tx_cur as u32);
 
-                #[cfg(not(feature = "udp_server"))] 
+                #[cfg(not(feature = "mirror_log_to_network"))] 
                 {
                         debug!("THD {}",self.read_command(REG_TXDESCHEAD));
                         debug!("TDT!{}",self.read_command(REG_TXDESCTAIL));

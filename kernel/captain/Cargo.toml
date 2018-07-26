@@ -78,7 +78,7 @@ path = "../driver_init"
 
 [dependencies.e1000]
 path = "../e1000"
-features = ["udp_server"]
+features = ["mirror_log_to_network"]
 
 [dependencies.task]
 path = "../task"

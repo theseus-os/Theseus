@@ -33,9 +33,9 @@ path = "../apic"
 [dependencies.pci]
 path = "../pci"
 
-# Enable this feature to use the udp server, will comment out debug messages in the send packet function
+# Enable this feature to use the mirror_log_to_network, will comment out debug messages in the send packet function
 [features]
-udp_server = []
+mirror_log_to_network = []
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
