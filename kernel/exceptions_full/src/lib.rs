@@ -8,6 +8,7 @@ extern crate x86_64;
 extern crate task;
 extern crate apic;
 extern crate pmu_x86;
+extern crate memory;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate console; // for regular println!()
 #[macro_use] extern crate log;
@@ -15,7 +16,7 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT};
+use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT, SAMPLE_TASK_ID, TASK_ID_LIST};
 use core::sync::atomic::Ordering;
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -24,7 +25,7 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
+        idt.debug.set_handler_fn(debug_handler);
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.overflow.set_handler_fn(overflow_handler);
@@ -85,10 +86,17 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
     kill_and_halt(0x0)
 }
 
+/// exception 0x01
+pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFrame) {
+    println_both!("\nEXCEPTION: DEBUG at {:#x}\n{:#?}\n",
+             stack_frame.instruction_pointer,
+             stack_frame);
+}
 
 /// exception 0x02, also used for TLB Shootdown IPIs
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
+
         
         let event_mask = rdmsr(IA32_PERFEVTSEL0);
         let current_count = SAMPLE_COUNT.load(Ordering::SeqCst);
@@ -96,9 +104,19 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
             pmu_x86::stop_samples();
             return;
         }
-
         SAMPLE_COUNT.store(current_count - 1, Ordering::SeqCst);
-        IP_LIST.lock().push(stack_frame.instruction_pointer);
+        
+        if let Some(taskref) = task::get_my_current_task() {
+            let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
+
+            if (requested_task_id == 0) | (requested_task_id == taskref.read().id) {
+                IP_LIST.lock().push(stack_frame.instruction_pointer);
+                TASK_ID_LIST.lock().push(taskref.read().id);
+            }
+        } else {
+            println_both!("No running tasks?");
+        }
+        
         unsafe {
             wrmsr(IA32_PERFEVTSEL0, 0);
             wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);

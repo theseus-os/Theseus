@@ -28,5 +28,8 @@ path = "../pmu_x86"
 default-features = false
 version = "0.3.7"
 
+[dependencies.memory]
+path = "../memory"
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

@@ -22,17 +22,16 @@ use raw_cpuid::*;
 use spin::Once;
 use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-
-//the number of samples to be taken, each sample the Atomic SAMPLE_COUNT decrements by 1 and once it's 0, the performance counter causing the interrupts is stopped 
-const NUM_SAMPLES: u32 = 5000; 
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicU32 = AtomicU32::new(0);
 pub static SAMPLE_EVENT_TYPE_MASK: AtomicU32 = AtomicU32::new(0);
-pub static SAMPLE_COUNT:AtomicU32 = AtomicU32::new(NUM_SAMPLES);
+pub static SAMPLE_TASK_ID: AtomicUsize = AtomicUsize::new(0);
+pub static SAMPLE_COUNT:AtomicU32 = AtomicU32::new(0);
+pub static NUM_SAMPLES: AtomicU32 = AtomicU32::new(0);
 
 static RDPMC_FFC0: u32 = 1 << 30;
 static RDPMC_FFC1: u32 = (1 << 30) + 1;
@@ -49,7 +48,8 @@ static BR_INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC4;
 static BR_MISS_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC5;
 
 lazy_static!{
-    pub static ref IP_LIST: MutexIrqSafe<Vec<VirtualAddress>> = MutexIrqSafe::new(Vec::with_capacity(NUM_SAMPLES as usize));
+    pub static ref IP_LIST: MutexIrqSafe<Vec<VirtualAddress>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
+    pub static ref TASK_ID_LIST: MutexIrqSafe<Vec<usize>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
     static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
 }
 static NUM_PMC: u32 = 4;
@@ -110,13 +110,13 @@ impl Counter {
         check_pmu_availability()?;
         
         match event {
-            InstructionsRetired => return safe_rdpmc(RDPMC_FFC0),
-            UnhaltedThreadCycles => return safe_rdpmc(RDPMC_FFC1),
-            UnhaltedReferenceCycles => return safe_rdpmc(RDPMC_FFC2),
-            LongestLatCacheRef => return programmable_start(LLC_REF_MASK),
-            LongestLatCacheMiss => return programmable_start(LLC_MISS_MASK),
-            BranchInstructionsRetired => return programmable_start(BR_INST_RETIRED_MASK),
-            BranchMispredictRetired => return programmable_start(BR_MISS_RETIRED_MASK),	
+            EventType::InstructionsRetired => return safe_rdpmc(RDPMC_FFC0),
+            EventType::UnhaltedThreadCycles => return safe_rdpmc(RDPMC_FFC1),
+            EventType::UnhaltedReferenceCycles => return safe_rdpmc(RDPMC_FFC2),
+            EventType::LongestLatCacheRef => return programmable_start(LLC_REF_MASK),
+            EventType::LongestLatCacheMiss => return programmable_start(LLC_MISS_MASK),
+            EventType::BranchInstructionsRetired => return programmable_start(BR_INST_RETIRED_MASK),
+            EventType::BranchMispredictRetired => return programmable_start(BR_MISS_RETIRED_MASK),	
             _ => return Err("Event either not supported or invalid, refer to https://download.01.org/perfmon/index/wsmex.html for event names."),
         }
     }
@@ -249,7 +249,12 @@ fn check_pmu_availability() -> Result<(), &'static str>  {
 }
 
 /// Start interrupt process in order to take samples using PMU. IPs sampled are stored in IP_LIST
-pub fn start_samples(event_type: EventType, event_per_sample: u32) -> Result<(),&'static str> {    
+pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Option<usize>, sample_count: u32) -> Result<(),&'static str> {        
+    if let Some(task_id_num) = task_id {
+        SAMPLE_TASK_ID.store(task_id_num, Ordering::SeqCst);
+    }
+    NUM_SAMPLES.store(sample_count, Ordering::SeqCst);
+    SAMPLE_COUNT.store(sample_count, Ordering::SeqCst);
     if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
@@ -257,13 +262,13 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32) -> Result<(),
     check_pmu_availability()?;
 
     let event_mask = match event_type {
-        InstructionsRetired => UNHALTED_CYCLE_MASK,
-        UnhaltedThreadCycles => INST_RETIRED_MASK,
-        UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
-        LongestLatCacheRef => LLC_REF_MASK,
-        LongestLatCacheMiss => LLC_MISS_MASK,
-        BranchInstructionsRetired => BR_INST_RETIRED_MASK,
-        BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
+        EventType::InstructionsRetired => UNHALTED_CYCLE_MASK,
+        EventType::UnhaltedThreadCycles => INST_RETIRED_MASK,
+        EventType::UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
+        EventType::LongestLatCacheRef => LLC_REF_MASK,
+        EventType::LongestLatCacheMiss => LLC_MISS_MASK,
+        EventType::BranchInstructionsRetired => BR_INST_RETIRED_MASK,
+        EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
         _ => return Err("Invalid event type"),
     } | PMC_ENABLE | INTERRUPT_ENABLE;
     SAMPLE_START_VALUE.store(start_value, Ordering::SeqCst);
@@ -287,8 +292,10 @@ pub fn stop_samples() {
     //clears values in atomics so that 
     SAMPLE_EVENT_TYPE_MASK.store(0, Ordering::SeqCst);
     SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
+    SAMPLE_TASK_ID.store(0, Ordering::SeqCst);
     while let Some(next_num) = IP_LIST.lock().pop() {
-        debug!("{:x}", next_num);
+        let next_id = TASK_ID_LIST.lock().pop();
+        debug!("{:x} {}", next_num, next_id.unwrap());
     }
 }
 
