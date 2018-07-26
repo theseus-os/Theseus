@@ -136,8 +136,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     driver_init::init(input_event_queue_producer)?;
 
-    // Initialize the udp server
-    #[cfg(feature = "udp_server")] 
+    // Initialize mirroring the debug log to the network
+    #[cfg(feature = "mirror_log_to_network")] 
     {
         {
             // enable mirroring of serial port logging outputs to udp server

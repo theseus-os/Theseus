@@ -103,8 +103,7 @@ path = "../simd_test"
 
 [features]
 mirror_log_to_vga = []
-udp_server = []
-
+mirror_log_to_network = []
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

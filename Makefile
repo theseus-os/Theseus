@@ -128,7 +128,7 @@ run: $(iso)
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 ### builds and runs Theseus in QEMU with the udp server - adds the udp feature flag to the crate Captain
-run_with_server: export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "udp_server"
+run_with_server: export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_network"
 ## basic networking setup with a standard e1000 ethernet card which allows udp and tcp packet 
 ## transfer via tap interface
 	QEMU_FLAGS += -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
