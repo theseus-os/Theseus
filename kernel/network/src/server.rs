@@ -39,13 +39,6 @@ pub static GUEST_IP: Once<[u8;4]> = Once::new();
 // Max buffer size for UDP socket buffers, can be tuned to get better performance
 pub static UDP_SOCKET_BUFFER_SIZE: Once<usize> = Once::new();
 
-
-
-pub struct network_ethernet_interface <'a, 'b, 'c, DeviceT: Device + 'a> {
-    iface: EthernetInterface<'a, 'b, 'c, DeviceT>,
-}
-
-
 /// Initializing the test_server
 /// This is invoked by the captain when the udp_server feature is set
 /// default is used for IP address and port 
@@ -122,7 +115,7 @@ pub fn server_init(_: Option<u64>) {
     };
 
     let mut client_endpoint:Option<IpEndpoint> = None;
-    let client_endpoint = Some(destination);
+    client_endpoint = Some(destination);
 
     //code to initialize the DFQ
     let udpserver_dfq: DFQueue<String> = DFQueue::new();
@@ -149,22 +142,42 @@ pub fn server_init(_: Option<u64>) {
 			let element = config_iface_consumer.peek();
 			if !element.is_none() {
 				let element = element.unwrap();
-				let data = element.deref(); // event.deref() is the equivalent of   &*event     
-                // let cmd = match parse_mirror_log_to_nw_command(data.to_string()){
-                //     Ok(cmd_type) => 
-                //     {
-                //         if cmd_type == SET_DESTINATION_IP {
+				let config = element.deref(); // event.deref() is the equivalent of   &*event  
+                if config.get_iface() == IFACE_MIRROR_LOG_TO_NW {
+                    match config.get_cmd() {
+                        SET_DESTINATION_IP => {
+                            if let Some(endpoint) = client_endpoint{
+                                let new_destination = IpEndpoint{
+                                    addr: config.get_ip(),
+                                    port: endpoint.port,
+                                };
+                                client_endpoint = Some(new_destination);
+                            }                         
+                        }
+                        SET_DESTINATION_PORT => {
+                            if let Some(endpoint) = client_endpoint{
+                                let new_destination = IpEndpoint{
+                                    addr: endpoint.addr,
+                                    port: config.get_port(),
+                                };
+                                client_endpoint = Some(new_destination);
+                            }  
+                        }
+                        SET_HOST_IP => {
+  
+                        }
+                        SET_HOST_PORT => {
 
-                //         }
-                //         else if cmd_type == SET_DESTINATION_PORT {
+                        }
+                        _ => {
+                            debug!("Incorrect filed for mirror_log_to_nw configuration");
+                        }
+                    }
+                }
+                else {
+                    debug!{"Only Mirror_log_to_nw interface can be configured here"};
+                }
 
-                //         }
-                //         else {
-                //             debug!("Command type not supported");
-                //         }
-                //     },
-                //     Err(err) => debug!("{}",err.to_string()),
-                // };
 				element.mark_completed();
 				//client_endpoint = None;                     
 			}			
@@ -235,6 +248,14 @@ pub fn send_debug_msg_udp(msg: fmt::Arguments){
 pub fn send_msg_udp<T:ToString>(msg: T){
     if let Some(producer) = UDP_TEST_SERVER.try(){
         producer.enqueue(msg.to_string());  
+    }
+}
+
+
+/// Add to network processing queue
+pub fn add_nw_config_queue(config: nw_iface_config){
+    if let Some(producer) = CONFIG_IFACE.try(){
+        producer.enqueue(config);  
     }
 }
 
