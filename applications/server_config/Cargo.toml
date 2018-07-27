@@ -15,5 +15,11 @@ path = "../../kernel/network"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
+[dependencies.smoltcp]
+path = "../../libs/smoltcp"
+default-features = false
+features = ["log","alloc"]
+
+
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

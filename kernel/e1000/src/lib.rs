@@ -356,7 +356,7 @@ impl Nic{
 
         }
 
-                /// allocates memory for DMA, will be used by the rx and tx descriptors
+        /// allocates memory for DMA, will be used by the rx and tx descriptors
         pub fn mem_map_dma(&mut self) -> Result<(), &'static str> {
                 
                 // get a reference to the kernel's memory mapping information

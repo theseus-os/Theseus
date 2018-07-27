@@ -18,14 +18,7 @@ use smoltcp::wire::{IpProtocol, IpEndpoint};
 use smoltcp::phy::Device;
 use e1000::{E1000_NIC,get_mac};
 use e1000_to_smoltcp_interface::{EthernetDevice};
-
-//constants
-const  SET_DESTINATION_IP:      u8 = 0;
-const  SET_DESTINATION_PORT:    u8 = 1;
-
-//type aliases
-type Port_Number     = u16;
-type Command_type    = u8;
+use config::*;
 
 
 /// Static instance of the DFQueueProducer for the UDP_TEST_SERVER
@@ -34,7 +27,7 @@ type Command_type    = u8;
 /// otherwise custom address
 pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
 
-pub static CONFIG_MIRROR_LOG_TO_NETWORK: Once<DFQueueProducer<String>> = Once::new();
+pub static CONFIG_IFACE: Once<DFQueueProducer<nw_iface_config>> = Once::new();
 
 // Forwarding (host) IP address
 pub static HOST_PORT: Once<u16> = Once::new();
@@ -135,17 +128,17 @@ pub fn server_init(_: Option<u64>) {
     let udpserver_dfq: DFQueue<String> = DFQueue::new();
     let udpserver_consumer = udpserver_dfq.into_consumer();
     let udpserver_producer = udpserver_consumer.obtain_producer();
-
     UDP_TEST_SERVER.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
 
-	let config_mirror_log_to_nw_dfq: DFQueue<String> = DFQueue::new();
-    let config_mirror_log_to_nw_consumer = config_mirror_log_to_nw_dfq.into_consumer();
-    let config_mirror_log_to_nw_producer = config_mirror_log_to_nw_consumer.obtain_producer();
+    // Configuring the queue for the iface config
+	let config_iface_dfq: DFQueue<nw_iface_config> = DFQueue::new();
+    let config_iface_consumer = config_iface_dfq.into_consumer();
+    let config_iface_producer = config_iface_consumer.obtain_producer();
 
-    CONFIG_MIRROR_LOG_TO_NETWORK.call_once(|| {
-       config_mirror_log_to_nw_consumer.obtain_producer()
+    CONFIG_IFACE.call_once(|| {
+       config_iface_consumer.obtain_producer()
     });
     
     // Main loop for the server
@@ -153,25 +146,25 @@ pub fn server_init(_: Option<u64>) {
 
         {   
 			/// Configuring the mirror log server
-			let element = config_mirror_log_to_nw_consumer.peek();
+			let element = config_iface_consumer.peek();
 			if !element.is_none() {
 				let element = element.unwrap();
 				let data = element.deref(); // event.deref() is the equivalent of   &*event     
-                let cmd = match parse_mirror_log_to_nw_command(data){
-                    Ok(cmd_type) => 
-                    {
-                        if cmd_type == SET_DESTINATION_IP {
+                // let cmd = match parse_mirror_log_to_nw_command(data.to_string()){
+                //     Ok(cmd_type) => 
+                //     {
+                //         if cmd_type == SET_DESTINATION_IP {
 
-                        }
-                        else if cmd_type == SET_DESTINATION_PORT {
+                //         }
+                //         else if cmd_type == SET_DESTINATION_PORT {
 
-                        }
-                        else {
-                            debug!("Command type not supported");
-                        }
-                    },
-                    Err(err) => debug!("{}",err.to_string()),
-                }
+                //         }
+                //         else {
+                //             debug!("Command type not supported");
+                //         }
+                //     },
+                //     Err(err) => debug!("{}",err.to_string()),
+                // };
 				element.mark_completed();
 				//client_endpoint = None;                     
 			}			
@@ -275,48 +268,5 @@ pub fn set_udp_skb_size(skb_size:usize){
 
 
 
-// Other supporting functions
-pub fn parse_mirror_log_to_nw_command (command:String) -> Result<Command_type, &'static str>{
-    match command.as_ref(){
-        "set_destination_ip"        => Ok(SET_DESTINATION_IP),
-        "set_destination_port"      => Ok(SET_DESTINATION_PORT),
-        _                           => Err("Invalid command"),
-    }
-}
 
-
-pub fn parse_ip_address (addr:String) -> Result<IpAddress, &'static str>{
-	let mut ip: [u8; 4] = [0;4];
-	let split = addr.split(".");
-	if split.clone().count()!= 4 {
-		return Err("Invalid IP address")
-	}
-	let mut x_count = 0;
-	for x in split{
-		match x.parse::<u8>(){
-			Ok(y) => {
-				ip[x_count] = y;
-				x_count = x_count + 1;
-			}
-			_ => {
-				return Err("Invalid IP address")
-			}
-		}
-	}
-	Ok (IpAddress::v4(ip[0],ip[1],ip[2],ip[3]))
-
-}
-
-
-pub fn parse_port_no (port_no:String) -> Result<Port_Number, &'static str>{
-    match port_no.parse::<Port_Number>(){
-        Ok(y) => {
-            Ok(y)
-        }
-        _ => {
-            return Err("Invalid Port Number")
-        }
-    }
-
-}
 

@@ -16,7 +16,6 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.smoltcp]
-#version = "0.4.0"
 path = "../../libs/smoltcp"
 default-features = false
 features = ["log","alloc"]
