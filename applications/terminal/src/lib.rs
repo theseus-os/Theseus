@@ -13,6 +13,8 @@ extern crate task;
 extern crate memory;
 extern crate input_event_types; 
 extern crate window_manager;
+extern crate text_display;
+
 
 
 #[macro_use] extern crate lazy_static;
@@ -27,6 +29,7 @@ use alloc::arc::Arc;
 use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use window_manager::displayable::text_display::TextDisplay;
 
 
 #[no_mangle]
@@ -169,6 +172,7 @@ impl Terminal {
             let height = frame_buffer::FRAME_BUFFER_HEIGHT - 2 * gap_size;
             window_object = window_manager::get_window_obj(gap_size,gap_size,width,height)?;
         }
+
         let prompt_string: String;
         if ref_num == 0 {
             prompt_string = "kernel:~$ ".to_string();
@@ -251,7 +255,7 @@ impl Terminal {
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
     fn calc_start_idx(&mut self, end_idx: usize) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.window.get_dimensions();
+        let (buffer_width, buffer_height) = self.window.get_dimensions("content");
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -306,7 +310,7 @@ impl Terminal {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.window.get_dimensions();
+        let (buffer_width,buffer_height) = self.window.get_dimensions("content");
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -356,7 +360,7 @@ impl Terminal {
 
     /// Scrolls up by the text display equivalent of one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.window.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions("content").0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -391,7 +395,7 @@ impl Terminal {
 
     /// Scrolls down the text display equivalent of one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.window.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions("content").0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -457,12 +461,19 @@ impl Terminal {
     }
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
-    fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
+    fn update_display_forwards(&mut self, display_name:&String, start_idx: usize) -> Result<(), &'static str> {
         let end_idx = self.calc_end_idx(start_idx); 
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            self.window.display_string(slice)?;
+            let display_opt = self.window.get_displayable(display_name);
+            if display_opt.is_none() {
+                return Err("fail to the the text display component");
+            } else {
+                let (x, y) = self.window.get_content_position();
+                let text_display = display_opt.unwrap();
+                text_display.display_string(x, y, slice)?;
+            }
 
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -472,14 +483,21 @@ impl Terminal {
 
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
-    fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
+    fn update_display_backwards(&mut self, display_name:&String, end_idx: usize) -> Result<(), &'static str> {
     
         let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
         self.scroll_start_idx = start_idx;
         let result = self.scrollback_buffer.get(start_idx..end_idx);
         if let Some(slice) = result {
-            self.window.display_string(slice)?;
-            self.absolute_cursor_pos = cursor_pos;
+            let display_opt = self.window.get_displayable(display_name);
+            if display_opt.is_none() {
+                return Err("fail to the the text display component");
+            } else {
+                let (x, y) = self.window.get_content_position();
+                let text_display = display_opt.unwrap();
+                text_display.display_string(x, y, slice)?;
+                self.absolute_cursor_pos = cursor_pos;
+            }
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -553,7 +571,7 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self) -> Result<(), &'static str> { 
-        let buffer_width = self.window.get_dimensions().0;
+        let buffer_width = self.window.get_dimensions("content").0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -862,14 +880,14 @@ impl Terminal {
         
     }
     
-    fn refresh_display(&mut self) {
+    fn refresh_display(&mut self, display_name:&String) {
         let start_idx = self.scroll_start_idx;
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
-            let _result = self.update_display_backwards(buffer_len);
+            let _result = self.update_display_backwards(display_name, buffer_len);
             let _result = self.cursor_handler();
         } else {
-            let _result = self.update_display_forwards(start_idx);
+            let _result = self.update_display_forwards(display_name, start_idx);
         }
     }
 }
@@ -887,15 +905,23 @@ impl Terminal {
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
-fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> { 
+fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
+    let display_name = "content";
+    { 
+        terminal.window.add_displayable(String::from(display_name), 
+            TextDisplay::new(0, 0, 400, 300));
+    }
+
+    let display_name = String::from(display_name);
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
-        terminal.update_display_forwards(0)?; // displays forward from the starting index of the scrollback buffer
+        terminal.update_display_forwards(&display_name, 0)?; // displays forward from the starting index of the scrollback buffer
         terminal.cursor_handler()?;        
     }
 
     use core::ops::Deref;
     let mut refresh_display = true;
+
     loop {
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
@@ -907,7 +933,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
                     refresh_display = true;
-                    terminal.refresh_display();
+                    terminal.refresh_display(&display_name);
                     terminal.correct_prompt_position = false;
                 },
                 _ => { },
@@ -921,7 +947,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
         if refresh_display == true {
-            terminal.refresh_display();
+            terminal.refresh_display(&display_name);
             refresh_display = false;
         }
         // Looks at the input queue. 
@@ -937,7 +963,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         match event {
             // Used by the windowing manager to indicate to the termianl to refresh its display upon terminal resizing
             Event::DisplayEvent => {
-                terminal.refresh_display();
+                terminal.refresh_display(&display_name);
                 debug!("refreshed display");
             }
             // Cleanup to removes terminal from the task id and the print producers maps
@@ -952,7 +978,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                 terminal.handle_key_event(input_event.key_event)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
-                    terminal.refresh_display();
+                    terminal.refresh_display(&display_name);
                 }
             }
             _ => { }

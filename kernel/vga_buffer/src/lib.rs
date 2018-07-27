@@ -72,7 +72,7 @@ impl VgaBuffer {
 
 /// Implements TextDisplay trait for vga buffer.
 /// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-impl TextDisplay for VgaBuffer {
+/*impl TextDisplay for VgaBuffer {
     /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
     /// which correspond to the column and row (line) respectively 
     fn set_cursor(&mut self, line: u16, column: u16, reset:bool) {
@@ -161,7 +161,7 @@ impl TextDisplay for VgaBuffer {
         None
     }
 
-}
+}*/
 
 
 #[allow(dead_code)]

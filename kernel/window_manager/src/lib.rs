@@ -21,24 +21,27 @@ extern crate pit_clock;
 #[macro_use] extern crate util;
 
 extern crate acpi;
-extern crate text_display;
 
 
 use spin::{Once, Mutex};
-use alloc::{VecDeque};
+use alloc::{VecDeque, String};
+use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use frame_buffer::text_buffer::{FONT_COLOR, BACKGROUND_COLOR, FrameTextBuffer};
-use text_display::TextDisplay;
 use input_event_types::Event;
+
 
 
 //static mut COUNTER:usize = 0; //For performance evaluation
 
 /// A test mod of window manager
 pub mod test_window_manager;
+pub mod displayable;
+
+use displayable::text_display::TextDisplay;
 
 
 static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
@@ -132,6 +135,7 @@ impl WindowAllocator{
             inner:inner_ref,
             text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
+            components:BTreeMap::new(),
         };    
         
         Ok(window)    
@@ -239,6 +243,7 @@ pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
+    components:BTreeMap<String, TextDisplay>,
 }
 
 
@@ -249,6 +254,23 @@ impl WindowObj{
         inner.clean();
     }
 
+    pub fn add_displayable(&mut self, key:String, displayable:TextDisplay) {
+        //TODO check fit
+        self.components.insert(key.clone(), displayable);
+    }
+
+    pub fn remove_displayable(&mut self, key:&String){
+        self.components.remove(key);
+    }
+
+    pub fn get_displayable(&self, key:&String) -> Option<&TextDisplay> {
+        return self.components.get(key);
+    }
+
+    pub fn get_content_position(&self) -> (usize, usize) {
+        let inner = self.inner.lock();
+        (inner.x + inner.margin, inner.y + inner.margin)
+    }
 
     /// draw a pixel in a window
     pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
@@ -288,13 +310,13 @@ impl WindowObj{
     }
 
     pub fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        let cursor = &mut (self.text_buffer.cursor);
+        /*let cursor = &mut (self.text_buffer.cursor);
         cursor.enable();
         cursor.update(line as usize, column as usize, reset);
         let inner = self.inner.lock();
         frame_buffer::fill_rectangle(inner.x + inner.margin + (column as usize) * CHARACTER_WIDTH, 
                         inner.y + inner.margin + (line as usize) * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);
+                        CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);*/
     }
 
     pub fn cursor_blink(&mut self) {
@@ -310,20 +332,24 @@ impl WindowObj{
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
-    pub fn get_dimensions(&self) -> (usize, usize) {
+    pub fn get_dimensions(&self, name:&str) -> (usize, usize) {
+        /*
         let inner = self.inner.lock();
         ((inner.width-2*inner.margin)/CHARACTER_WIDTH, (inner.height-2*inner.margin)/CHARACTER_HEIGHT)
+        */
+        let display = self.get_displayable(&String::from(name)).unwrap();
+        return (display.width, display.height);
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
-    pub fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
+    /*pub fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
             inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
             slice)
-    }
+    }*/
     
     /*
     pub fn draw_border(&self) -> (usize, usize, usize){

@@ -145,7 +145,7 @@ impl FrameTextBuffer {
 
 
 // Implements TextDisplay trait for vga buffer.
-impl TextDisplay for FrameTextBuffer {
+/*impl TextDisplay for FrameTextBuffer {
 
     fn disable_cursor(&mut self) {
         self.cursor.disable();
@@ -187,7 +187,7 @@ impl TextDisplay for FrameTextBuffer {
         None
     }
 
-}
+}*/
 
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 
 ///the frequency it blinks, the last time it blinks, and the current blink state show/hidden

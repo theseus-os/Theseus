@@ -51,6 +51,9 @@ path = "../../kernel/frame_buffer"
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
+[dependencies.text_display]
+path = "../../kernel/text_display"
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 
