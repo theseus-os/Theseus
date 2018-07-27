@@ -14,5 +14,5 @@ version = "0.3.7"
 path = "../../libs/port_io"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]
 
