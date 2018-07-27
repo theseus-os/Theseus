@@ -58,4 +58,4 @@ path = "../scheduler"
 path = "../mod_mgmt"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

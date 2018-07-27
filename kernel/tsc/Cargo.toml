@@ -18,4 +18,4 @@ path = "../pit_clock"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

@@ -57,4 +57,4 @@ path = "../text_display"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

@@ -622,7 +622,7 @@ impl MappedPages {
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &T = unsafe {
+        let t: &T = unsafe { 
             mem::transmute(self.pages.start_address() + offset)
         };
 

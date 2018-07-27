@@ -26,4 +26,4 @@ path = "../ps2"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

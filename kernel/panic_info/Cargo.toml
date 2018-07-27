@@ -8,4 +8,4 @@ version = "0.1.0"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]
