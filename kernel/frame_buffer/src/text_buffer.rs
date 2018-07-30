@@ -16,9 +16,6 @@ use self::text_display::TextDisplay;
 const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH / CHARACTER_WIDTH;
 const BUFFER_HEIGHT:usize = FRAME_BUFFER_HEIGHT / CHARACTER_HEIGHT;
 
-pub const FONT_COLOR:u32 = 0x93ee90;
-pub const BACKGROUND_COLOR:u32 = 0x000000;
-
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
 pub enum DisplayPosition {
@@ -53,7 +50,8 @@ impl FrameTextBuffer {
     }
 
     ///print a string by bytes
-    pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, slice: &str) -> Result<(), &'static str> {
+    pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
+        slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
         let mut cursor_pos = 0;
@@ -70,7 +68,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    BACKGROUND_COLOR);
+                    bg_color);
                 cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -82,7 +80,7 @@ impl FrameTextBuffer {
                         break;
                     }
                 }
-                self.print_byte(buffer, byte, FONT_COLOR, x, y, curr_line, curr_column);
+                self.print_byte(buffer, byte, font_color, bg_color, x, y, curr_line, curr_column);
                 curr_column += 1;
                 cursor_pos += 1;
             }
@@ -92,15 +90,16 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            BACKGROUND_COLOR);
+            bg_color);
         self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            BACKGROUND_COLOR);
+            bg_color);
 
         Ok(())
     }
 
-    fn print_byte (&self, buffer:&mut Buffer, byte:u8, color:u32, left:usize, top:usize, line:usize, column:usize) {
+    fn print_byte (&self, buffer:&mut Buffer, byte:u8, font_color:u32, bg_color:u32,
+            left:usize, top:usize, line:usize, column:usize) {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
         let mut i = 0;
@@ -110,7 +109,7 @@ impl FrameTextBuffer {
    
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
-            buffer.chars[i + y][j + x] = color & mask | BACKGROUND_COLOR & (!mask);
+            buffer.chars[i + y][j + x] = font_color & mask | bg_color & (!mask);
             j += 1;
             if j == CHARACTER_WIDTH {
                 i += 1;
@@ -198,6 +197,7 @@ pub struct Cursor {
     freq:u64,
     time:TscTicks,
     show:bool,
+    color:u32,
 }
 
 impl Cursor {
@@ -210,6 +210,7 @@ impl Cursor {
             freq:500000000,
             time:tsc_ticks(),
             show:true,
+            color:0xFFFFFF,
         }
     }
 

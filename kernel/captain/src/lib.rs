@@ -15,6 +15,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate vga_buffer;
 
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
@@ -126,9 +127,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // //init frame_buffer
     let rs = frame_buffer::init();
     if rs.is_ok() {
-         trace!("frame_buffer initialized.");
+        trace!("frame_buffer initialized.");
     } else {
-         debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
+        println_raw!("nano_core_start():fail to initialize frame_buffer");
+        return Err(rs.unwrap_err());
     }
 
 

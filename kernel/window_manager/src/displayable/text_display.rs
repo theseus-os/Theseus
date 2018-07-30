@@ -28,13 +28,13 @@ impl TextDisplay
     }
 
     /// takes in a str slice and display as much as it can to the screen
-    pub fn display_string(&self, x:usize, y:usize, slice: &str) -> Result<(), &'static str>{       
+    pub fn display_string(&self, x:usize, y:usize, slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
         let text_buffer = TEXT_BUFFER.call_once(|| {
             FrameTextBuffer::new()
         });
         text_buffer.print_by_bytes(x + self.x, y + self.y, 
             self.width, self.height, 
-            slice)
+            slice, font_color, bg_color)
     }
 
     /// Gets the dimensions of the text area to display

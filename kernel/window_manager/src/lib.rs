@@ -30,7 +30,7 @@ use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
-use frame_buffer::text_buffer::{FONT_COLOR, BACKGROUND_COLOR, FrameTextBuffer};
+use frame_buffer::text_buffer::{FrameTextBuffer};
 use input_event_types::Event;
 
 
@@ -47,7 +47,8 @@ use displayable::text_display::TextDisplay;
 static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
-pub static GAP_SIZE: usize = 10; // 10 pixel gap between windows 
+const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+pub const GAP_SIZE: usize = 10; // 10 pixel gap between windows 
 
 
 struct WindowAllocator {
@@ -56,14 +57,14 @@ struct WindowAllocator {
 }
 
 /// switch the active window
-pub fn window_switch() -> Result<(), &'static str> {
+pub fn switch() -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     allocator.switch();
     Ok(())
 }
 
 /// new a window object and return it
-pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
 
     let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         Mutex::new(WindowAllocator{
@@ -76,7 +77,7 @@ pub fn get_window_obj<'a>(x:usize, y:usize, width:usize, height:usize) -> Result
 }
 
 /// delete a window object
-pub fn delete_window<'a>(window:WindowObj) -> Result<(), &'static str> {
+pub fn delete<'a>(window:WindowObj) -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     allocator.delete(&(window.inner));
     Ok(())
@@ -201,7 +202,7 @@ impl WindowAllocator{
 
         let inner_lock = inner.lock();
         inner_lock.clean();
-        inner_lock.draw_border(BACKGROUND_COLOR);
+        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR);
     }
 
     fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
@@ -324,7 +325,7 @@ impl WindowObj{
         if cursor.blink() {
             let (line, column, show) = cursor.get_info();
             let inner = self.inner.lock();
-            let color = if show { FONT_COLOR } else { BACKGROUND_COLOR };
+            let color = if show { 0xFFFFFF } else { 0 };
             frame_buffer::fill_rectangle(inner.x + inner.margin + column * CHARACTER_WIDTH, 
                         inner.y + inner.margin + line * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
@@ -414,7 +415,7 @@ impl WindowInner {
     }
 
     fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, BACKGROUND_COLOR);
+        frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, SCREEN_BACKGROUND_COLOR);
     }
 
     fn draw_border(&self, color:u32) -> (usize, usize, usize){
@@ -428,7 +429,7 @@ impl WindowInner {
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
-        self.draw_border(BACKGROUND_COLOR);
+        self.draw_border(SCREEN_BACKGROUND_COLOR);
         self.clean();
         self.x = x;
         self.y = y;

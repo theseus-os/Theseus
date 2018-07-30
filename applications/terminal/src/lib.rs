@@ -31,6 +31,8 @@ use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 
+pub const FONT_COLOR:u32 = 0x93ee90;
+pub const BACKGROUND_COLOR:u32 = 0x000000;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -165,12 +167,12 @@ impl Terminal {
                 Some((y, width, height)) => (y, width, height),
                 None => { return Err("couldn't adjust windows before creating a new terminal")} 
             };
-            window_object = window_manager::get_window_obj(window_manager::GAP_SIZE, y, width, height)?;
+            window_object = window_manager::new_window(window_manager::GAP_SIZE, y, width, height)?;
         } else {
             let gap_size = window_manager::GAP_SIZE;
             let width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * gap_size;
             let height = frame_buffer::FRAME_BUFFER_HEIGHT - 2 * gap_size;
-            window_object = window_manager::get_window_obj(gap_size,gap_size,width,height)?;
+            window_object = window_manager::new_window(gap_size,gap_size,width,height)?;
         }
 
         let prompt_string: String;
@@ -472,7 +474,7 @@ impl Terminal {
             } else {
                 let (x, y) = self.window.get_content_position();
                 let text_display = display_opt.unwrap();
-                text_display.display_string(x, y, slice)?;
+                text_display.display_string(x, y, slice, FONT_COLOR, BACKGROUND_COLOR)?;
             }
 
         } else {
@@ -495,7 +497,7 @@ impl Terminal {
             } else {
                 let (x, y) = self.window.get_content_position();
                 let text_display = display_opt.unwrap();
-                text_display.display_string(x, y, slice)?;
+                text_display.display_string(x, y, slice, FONT_COLOR, BACKGROUND_COLOR)?;
                 self.absolute_cursor_pos = cursor_pos;
             }
         } else {

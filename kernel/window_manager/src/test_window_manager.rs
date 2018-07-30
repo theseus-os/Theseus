@@ -1,5 +1,5 @@
 
-use super::{get_window_obj};
+use super::{new_window};
 use frame_buffer;
 use frame_buffer_3d;
 use acpi::get_hpet;  
@@ -10,7 +10,7 @@ pub fn test_cursor(_: Option<u64>) -> Option<&'static str> {
     let width=200;
     let height=150;
     let color = 0xe4cf8e;
-    let rs = get_window_obj(x,y,width + 2,height + 2);
+    let rs = new_window(x,y,width + 2,height + 2);
     if rs.is_err() {
         return rs.err();
     }
@@ -97,7 +97,7 @@ pub fn test_draw(_: Option<u64>) -> Option<&'static str>{
     let mut x=width/2;
     let mut y=height/2;
     let color = 0xa71368;
-    let rs = get_window_obj(300,200,width + 2,height + 2);
+    let rs = new_window(300,200,width + 2,height + 2);
     if rs.is_err() {
         return rs.err();
     }

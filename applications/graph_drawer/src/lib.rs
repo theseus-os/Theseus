@@ -20,7 +20,7 @@ use irq_safety::MutexIrqSafe;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
-use window_manager::{get_window_obj, delete_window};
+use window_manager::{new_window, delete};
 //use alloc::arc::{Arc, Weak};
 
 //pub mod test_drawer;
@@ -444,7 +444,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
    
     {
-        let rs= get_window_obj(100, 10, 300, 380);
+        let rs= new_window(100, 10, 300, 380);
         trace!("Wenqiu : drawer 2");
         if rs.is_err() {
             return -1;
