@@ -331,17 +331,7 @@ impl WindowObj{
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
         }
     }
-
-    /// Returns a tuple containing (buffer height, buffer width)
-    pub fn get_dimensions(&self, name:&str) -> (usize, usize) {
-        /*
-        let inner = self.inner.lock();
-        ((inner.width-2*inner.margin)/CHARACTER_WIDTH, (inner.height-2*inner.margin)/CHARACTER_HEIGHT)
-        */
-        let display = self.get_displayable(&String::from(name)).unwrap();
-        return (display.width, display.height);
-    }
-
+    
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color

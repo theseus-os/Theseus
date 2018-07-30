@@ -250,14 +250,23 @@ impl Terminal {
         self.scrollback_buffer.remove(buffer_len - self.left_shift -1);
     }
 
+    fn get_displayable_dimensions(&self, name:&String) -> (usize, usize){
+        let display_opt = self.window.get_displayable(name);
+        if display_opt.is_none() {
+            (0, 0)
+        } else {        
+            display_opt.unwrap().get_dimensions()  
+        }
+    }
+
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     /// If the text display's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
-    fn calc_start_idx(&mut self, end_idx: usize) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.window.get_dimensions("content");
+    fn calc_start_idx(&mut self, end_idx: usize, display_name:&String) -> (usize, usize) {
+        let (buffer_width, buffer_height) = self.get_displayable_dimensions(display_name);
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -265,7 +274,8 @@ impl Terminal {
             result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
         } else {
             result = self.scrollback_buffer.get(0..end_idx);
-        }        
+        }
+
         if let Some(slice) = result {
             let mut total_lines = 0;
             // Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur
@@ -311,8 +321,8 @@ impl Terminal {
    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize) -> usize {
-        let (buffer_width,buffer_height) = self.window.get_dimensions("content");
+    fn calc_end_idx(&mut self, start_idx: usize, display_name:&String) -> usize {
+        let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -361,8 +371,8 @@ impl Terminal {
     }
 
     /// Scrolls up by the text display equivalent of one line
-    fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.window.get_dimensions("content").0;
+    fn scroll_up_one_line(&mut self, display_name:&String) {
+        let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -396,8 +406,8 @@ impl Terminal {
     }
 
     /// Scrolls down the text display equivalent of one line
-    fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.window.get_dimensions("content").0;
+    fn scroll_down_one_line(&mut self, display_name:&String) {
+        let buffer_width = self.get_displayable_dimensions(display_name).0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -405,11 +415,11 @@ impl Terminal {
         } else {
             prev_start_idx = self.scroll_start_idx;
         }
-        let mut end_idx = self.calc_end_idx(prev_start_idx);
+        let mut end_idx = self.calc_end_idx(prev_start_idx, display_name);
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
-            let new_start = self.calc_start_idx(end_idx).0;
+            let new_start = self.calc_start_idx(end_idx, display_name).0;
             self.scroll_start_idx = new_start;
             return;
         }
@@ -438,22 +448,22 @@ impl Terminal {
             }
         }
         // Recalculates new starting index
-        let start_idx = self.calc_start_idx(new_end_idx).0;
+        let start_idx = self.calc_start_idx(new_end_idx, display_name).0;
         self.scroll_start_idx = start_idx;
     }
     
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
-    fn page_up(&mut self) {
+    fn page_up(&mut self, display_name:&String) {
         let new_end_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_start_idx(new_end_idx);
+        let new_start_idx = self.calc_start_idx(new_end_idx, display_name);
         self.scroll_start_idx = new_start_idx.0;
     }
 
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
-    fn page_down(&mut self) {
+    fn page_down(&mut self, display_name:&String) {
         let start_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_end_idx(start_idx);
-        let new_end_idx = self.calc_end_idx(new_start_idx);
+        let new_start_idx = self.calc_end_idx(start_idx, display_name);
+        let new_end_idx = self.calc_end_idx(new_start_idx, display_name);
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
@@ -464,7 +474,7 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, display_name:&String, start_idx: usize) -> Result<(), &'static str> {
-        let end_idx = self.calc_end_idx(start_idx); 
+        let end_idx = self.calc_end_idx(start_idx, display_name); 
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
@@ -486,10 +496,11 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, display_name:&String, end_idx: usize) -> Result<(), &'static str> {
-    
-        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
+        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx, display_name);
         self.scroll_start_idx = start_idx;
+
         let result = self.scrollback_buffer.get(start_idx..end_idx);
+
         if let Some(slice) = result {
             let display_opt = self.window.get_displayable(display_name);
             if display_opt.is_none() {
@@ -572,8 +583,8 @@ impl Terminal {
     
 
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self) -> Result<(), &'static str> { 
-        let buffer_width = self.window.get_dimensions("content").0;
+    fn cursor_handler(&mut self, display_name:&String) -> Result<(), &'static str> { 
+        let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -589,7 +600,7 @@ impl Terminal {
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
-    pub fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
+    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&String) -> Result<(), &'static str> {
         // Ctrl+D or Ctrl+Alt+Del kills the OS
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D 
         || 
@@ -689,20 +700,20 @@ impl Terminal {
             if !self.is_scroll_end {
                 self.is_scroll_end = true;
                 let buffer_len = self.scrollback_buffer.len();
-                self.scroll_start_idx = self.calc_start_idx(buffer_len).0;
+                self.scroll_start_idx = self.calc_start_idx(buffer_len, display_name).0;
             }
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
-                self.scroll_up_one_line();
+                self.scroll_up_one_line(display_name);
                 self.window.disable_cursor();                
             }
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
             if !self.is_scroll_end {
-                self.scroll_down_one_line();
+                self.scroll_down_one_line(display_name);
             }
             return Ok(());
         }
@@ -711,7 +722,7 @@ impl Terminal {
             if self.scroll_start_idx <= 1 {
                 return Ok(())
             }
-            self.page_up();
+            self.page_up(display_name);
             self.is_scroll_end = false;
             self.window.disable_cursor();
             return Ok(());
@@ -721,7 +732,7 @@ impl Terminal {
             if self.is_scroll_end {
                 return Ok(());
             }
-            self.page_down();
+            self.page_down(display_name);
             return Ok(());
         }
 
@@ -887,7 +898,7 @@ impl Terminal {
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
             let _result = self.update_display_backwards(display_name, buffer_len);
-            let _result = self.cursor_handler();
+            let _result = self.cursor_handler(display_name);
         } else {
             let _result = self.update_display_forwards(display_name, start_idx);
         }
@@ -908,17 +919,16 @@ impl Terminal {
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
-    let display_name = "content";
+    let display_name = String::from("content");
     { 
-        terminal.window.add_displayable(String::from(display_name), 
-            TextDisplay::new(0, 0, 400, 300));
+        terminal.window.add_displayable(String::clone(&display_name), 
+            TextDisplay::new(100, 50, 400, 300));
     }
 
-    let display_name = String::from(display_name);
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
     if terminal.term_ref == 0 {
         terminal.update_display_forwards(&display_name, 0)?; // displays forward from the starting index of the scrollback buffer
-        terminal.cursor_handler()?;        
+        terminal.cursor_handler(&display_name)?;        
     }
 
     use core::ops::Deref;
@@ -977,7 +987,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
             // Handles ordinary keypresses
             Event::InputEvent(ref input_event) => {
-                terminal.handle_key_event(input_event.key_event)?;
+                terminal.handle_key_event(input_event.key_event, &display_name)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
                     terminal.refresh_display(&display_name);

@@ -3,7 +3,7 @@
 extern crate input_event_types;
 
 use input_event_types::Event;
-use super::super::{FrameTextBuffer,Once};
+use super::super::{FrameTextBuffer,Once, CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 static TEXT_BUFFER:Once<FrameTextBuffer> = Once::new();
 
@@ -39,11 +39,10 @@ impl TextDisplay
 
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize){
-        return (0, 0)
-
+        (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
     }
+
     /// Function to set a cursor on the display at an (x,y) position. 
-    /// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
     pub fn set_cursor(&mut self, line: u16, column: u16, reset:bool){
 
     } 
