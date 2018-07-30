@@ -921,8 +921,11 @@ impl Terminal {
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     let display_name = String::from("content");
     { 
-        terminal.window.add_displayable(String::clone(&display_name), 
+        let rs = terminal.window.add_displayable(String::clone(&display_name), 
             TextDisplay::new(100, 50, 400, 300));
+        if rs.is_err(){
+            //handle error
+        }
     }
 
     // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application

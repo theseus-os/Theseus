@@ -255,9 +255,20 @@ impl WindowObj{
         inner.clean();
     }
 
-    pub fn add_displayable(&mut self, key:String, displayable:TextDisplay) {
+    ///We check if the displayable is in the window. But we do not check if it is overlapped with others
+    pub fn add_displayable(&mut self, key:String, displayable:TextDisplay) -> Result<(), &'static str>{
         //TODO check fit
+        let (x, y, width, height) = displayable.get_size();
+        let inner = self.inner.lock();
+        if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
+            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
+            !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
+            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
+            return Err("The displayable does not fit the window size.");
+        } 
+
         self.components.insert(key.clone(), displayable);
+        Ok(())
     }
 
     pub fn remove_displayable(&mut self, key:&String){
@@ -331,7 +342,7 @@ impl WindowObj{
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
         }
     }
-    
+
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
@@ -397,6 +408,11 @@ impl WindowInner {
     fn check_in_area(&self, x:usize, y:usize) -> bool {        
         return x>= self.x && x <= self.x+self.width 
                 && y>=self.y && y<=self.y+self.height;
+    }
+
+    fn check_in_content(&self, x:usize, y:usize) -> bool {        
+        return x>= self.x+self.margin && x <= self.x+self.width-self.margin 
+                && y>=self.y+self.margin && y<=self.y+self.height-self.margin;
     }
 
     fn active(&mut self, active:bool){

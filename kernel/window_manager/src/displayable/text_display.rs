@@ -12,8 +12,8 @@ static TEXT_BUFFER:Once<FrameTextBuffer> = Once::new();
 pub struct TextDisplay {
     x:usize,
     y:usize,
-    pub width:usize,
-    pub height:usize,
+    width:usize,
+    height:usize,
 }
 
 impl TextDisplay
@@ -40,6 +40,10 @@ impl TextDisplay
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize){
         (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
+    }
+
+    pub fn get_size(&self) -> (usize, usize, usize, usize) {
+        (self.x, self.y, self.width, self.height)
     }
 
     /// Function to set a cursor on the display at an (x,y) position. 
