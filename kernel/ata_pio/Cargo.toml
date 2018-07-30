@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 name = "ata_pio"
 description = "Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA."
 version = "0.1.0"

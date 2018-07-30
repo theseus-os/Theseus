@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "console_types"
-description = "A temporary way to move the console typedefs out of the console crate"
+name = "input_event_types"
+description = "A temporary way to move the input_event_manager typedefs out of the input_event_manager crate"
 version = "0.1.0"
 
 [dependencies.keycodes_ascii]

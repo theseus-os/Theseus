@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "e1000"
 description = "Support for the e1000 NIC and driver"
 version = "0.1.0"

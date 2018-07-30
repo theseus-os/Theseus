@@ -39,8 +39,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.print]
+path = "../../kernel/print"
+
 
 [dependencies.window_manager]
 path = "../../kernel/window_manager"

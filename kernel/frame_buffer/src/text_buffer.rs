@@ -1,8 +1,13 @@
 extern crate tsc;
 extern crate text_display;
 
+// andrew: fix
+extern crate input_event_types;
+// use input_event_types::Event;
+use text_buffer::input_event_types::Event;
+
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
+use super::{Mutex, Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
 
 use self::tsc::{tsc_ticks, TscTicks};
 use self::text_display::TextDisplay;
@@ -73,6 +78,9 @@ impl FrameTextBuffer {
                 if curr_column == buffer_width {
                     curr_column = 0;
                     curr_line += 1;
+                    if curr_line == buffer_height {
+                        break;
+                    }
                 }
                 self.print_byte(buffer, byte, FONT_COLOR, x, y, curr_line, curr_column);
                 curr_column += 1;
@@ -80,7 +88,13 @@ impl FrameTextBuffer {
             }
         }
         self.fill_blank (buffer, 
-            x, (y + curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
+            x + curr_column * CHARACTER_WIDTH,
+            y + curr_line * CHARACTER_HEIGHT,
+            x + width, 
+            y + (curr_line + 1 )* CHARACTER_HEIGHT, 
+            BACKGROUND_COLOR);
+        self.fill_blank (buffer, 
+            x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
             BACKGROUND_COLOR);
 
         Ok(())
@@ -111,6 +125,9 @@ impl FrameTextBuffer {
     fn fill_blank(&self, buffer:&mut Buffer, left:usize, top:usize, right:usize, bottom:usize, color:u32){
         let mut x = left;
         let mut y = top;
+        if left > right || top > bottom {
+            return
+        }
         loop {
             if x == right {
                 y += 1;
@@ -127,21 +144,30 @@ impl FrameTextBuffer {
 }
 
 
-/// Implements TextDisplay trait for vga buffer.
-/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-impl TextDisplay for FrameTextBuffer {
+// Implements TextDisplay trait for vga buffer.
+/*impl TextDisplay for FrameTextBuffer {
 
     fn disable_cursor(&mut self) {
         self.cursor.disable();
+        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT,  
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+
     }
 
     fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
         self.cursor.enabled = true;
         self.cursor.update(line as usize, column as usize, reset);
+        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR); 
     }
 
     fn cursor_blink(&mut self) {
-        self.cursor.blink(0, 0, 0);     
+        if self.cursor.blink() {
+            let color = if self.cursor.show { FONT_COLOR } else { BACKGROUND_COLOR };
+            fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
+                    CHARACTER_WIDTH, CHARACTER_HEIGHT, color); 
+        }
+
     }
 
     /// Returns a tuple containing (buffer height, buffer width)
@@ -155,7 +181,13 @@ impl TextDisplay for FrameTextBuffer {
     fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
         self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
     }
-}
+
+    fn get_key_event(&self) -> Option<Event> {
+        // Andrew: fix instead of using as trait
+        None
+    }
+
+}*/
 
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 
 ///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
@@ -194,34 +226,32 @@ impl Cursor {
     ///enable a cursor
     pub fn enable(&mut self) {
         self.enabled = true;
+        self.time = tsc_ticks();
+        self.show = true;
     }
 
     ///disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
-        fill_rectangle(self.column * CHARACTER_WIDTH, self.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
-    }
+     }
 
     ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
-    pub fn blink(&mut self, x:usize, y:usize, margin:usize) {
-        let time = tsc_ticks();
-        
-        if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
-            self.time = time;
-            self.show = !self.show;
-        }
-
-        if self.enabled  {
-            if self.show {
-                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
-                    y + margin + self.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);    
-            } else {
-                fill_rectangle(x + margin + self.column * CHARACTER_WIDTH, 
-                    y + margin + self.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
+    pub fn blink(&mut self) -> bool{
+        if self.enabled {
+            let time = tsc_ticks();
+            if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
+                self.time = time;
+                self.show = !self.show;
+                return true
             }
         }
+        false
+    }
+
+    pub fn get_info(&self) -> (usize, usize, bool) {
+        (self.line, self.column, self.show)
     }
 }
+
+
+

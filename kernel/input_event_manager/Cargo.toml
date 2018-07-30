@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "console"
-description = "A console (terminal emulator) implementation"
+name = "input_event_manager"
+description = "Handles keyboard input and redirects to the appropriate terminal"
 version = "0.1.0"
 
 
@@ -31,8 +31,8 @@ version = "0.1.0"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_types]
+path = "../input_event_types"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -46,14 +46,12 @@ path  = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.terminal]
-path = "../terminal"
-
 [dependencies.text_display]
 path = "../text_display"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

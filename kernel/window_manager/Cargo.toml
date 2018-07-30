@@ -1,7 +1,7 @@
 [package]
 name = "window_manager"
 version = "0.1.0"
-authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 
 [dependencies]
 spin = "0.4.5"
@@ -50,6 +50,17 @@ path = "../../libs/util"
 
 [dependencies.text_display]
 path = "../text_display"
+
+[dependencies.input_event_types]
+path = "../input_event_types"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
