@@ -46,6 +46,13 @@ impl TextDisplay
         (self.x, self.y, self.width, self.height)
     }
 
+    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height;
+    }
+
     /// Function to set a cursor on the display at an (x,y) position. 
     pub fn set_cursor(&mut self, line: u16, column: u16, reset:bool){
 

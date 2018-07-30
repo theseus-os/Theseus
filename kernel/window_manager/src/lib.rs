@@ -360,6 +360,20 @@ impl WindowObj{
     }
     */
 
+    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
+        let mut inner = self.inner.lock();
+        let rs = inner.resize(x,y,width,height);
+        if rs.is_err(){
+            Err(rs.unwrap_err())
+        } else {
+            let percent = rs.unwrap();
+            for (key, item) in self.components.iter_mut() {
+                let (x, y, width, height) = item.get_size();
+                item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
+            }
+            Ok(())
+        }
+    }
 
     pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
@@ -434,15 +448,19 @@ impl WindowInner {
     }
 
     /// adjust the size of a window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str> {
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
+        //Check overlap
         self.draw_border(SCREEN_BACKGROUND_COLOR);
         self.clean();
+
+        let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
         self.x = x;
         self.y = y;
         self.width = width;
         self.height = height; 
+        
         self.draw_border(get_border_color(self.active));
-        Ok(())
+        Ok(percent)
     }
 
 
@@ -547,7 +565,7 @@ pub fn adjust_windows_before_addition() -> Option<(usize, usize, usize)> {
         if let Some(window_inner_ptr) = strong_ptr {
             let mut locked_window_ptr = window_inner_ptr.lock();
             let _result = locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height);
-            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after resize 
+            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
             height_index += window_height + GAP_SIZE; // advance to the height index of the next window
         }
     }
