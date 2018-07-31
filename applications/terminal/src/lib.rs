@@ -6,7 +6,6 @@ extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate atomic_linked_list; 
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
@@ -15,26 +14,25 @@ extern crate input_event_types;
 extern crate window_manager;
 extern crate text_display;
 
+extern crate terminal_print;
+extern crate print;
 
-
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
 use input_event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
-use alloc::btree_map::BTreeMap;
-use alloc::arc::Arc;
-use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
+use task::TaskRef;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
 
 #[no_mangle]
+/// A main fucntion that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
 pub fn main(args: Vec<String>) -> isize {
     let num = match args.get(0) {
         Some(num_as_str) => { num_as_str.parse::<usize>() }
@@ -45,50 +43,22 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_) => return -1
     };
 
-    match Terminal::init(num) {
-        Ok(_) => { }
+   let term_task_ref =  match Terminal::new(num) {
+        Ok(task_ref) => {task_ref}
         Err(err) => {
             error!("{}", err);
             error!("could not create terminal instance");
             return -1;
         }
+    };
+    // waits for the terminal loop to exit before exiting the main function
+    match spawn::join(&term_task_ref) {
+        Ok(_) => { }
+        Err(err) => {error!("{}", err)}
     }
     return 0;
 }
 
-lazy_static! {
-    // maps the terminal reference number to the current task id
-    static ref TERMINAL_TASK_IDS: Arc<Mutex<BTreeMap<usize, usize>>> = Arc::new(Mutex::new(BTreeMap::new()));
-    // maps the terminal's reference number to its print producer
-    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
-}
-/// Currently, println! and print! macros will call this function to print to the display provider. 
-/// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
-/// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
-/// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
-pub fn print_to_stdout<S: Into<String>>(s: S) -> Result<(), &'static str> {
-    // Gets the task id of the task that called this print function
-    let result = task::get_my_current_task_id();
-    let mut selected_term = 0; // default to kernel terminal
-    if let Some(current_task_id) = result {
-            let terminal_task_ids_lock = TERMINAL_TASK_IDS.lock();
-            for term in terminal_task_ids_lock.iter() {
-                // finds the corresponding terminal instance running the current task id
-                if *term.1 == current_task_id {
-                    let number = term.0.clone();
-                    selected_term = number;
-                }
-            }
-    }
-    // Obtains the correct temrinal print producer and enqueues the print event, which will later be popped off
-    // and handled by the infinite temrinal instance loop 
-    let print_map = TERMINAL_PRINT_PRODUCERS.lock();
-    let result = print_map.get(&selected_term);
-    if let Some(selected_term_producer) = result {
-        selected_term_producer.enqueue(Event::new_output_event(s));
-    }
-    Ok(())
-}
 
 pub struct Terminal {
     /// The terminal's own window
@@ -131,6 +101,8 @@ pub struct Terminal {
     left_shift: usize,
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
+    /// The producer to the terminal's print dfqueue
+    print_producer: DFQueueProducer<Event>,
 }
 
 /// Manual implementation of debug just prints out the terminal reference number
@@ -153,34 +125,23 @@ impl fmt::Debug for Terminal {
 ///     - Producers are functions in the event handling cra te that send 
 ///         Keyevents if the terminal is the one currently being focused on
 impl Terminal {
-    /// Creates a new terminal object
     /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(ref_num: usize) -> Result<(), &'static str> {
+    pub fn new(ref_num: usize) -> Result<TaskRef, &'static str> {
         // initialize another dfqueue for the terminal object to handle printing from applications
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        let window_object;
-        if ref_num != 0 { // fix for now because window allocator is not yet initialized at this point if it is the first terminal being created
-            let (y,width,height) = match window_manager::adjust_windows_before_addition() {
-                Some((y, width, height)) => (y, width, height),
-                None => { return Err("couldn't adjust windows before creating a new terminal")} 
-            };
-            window_object = window_manager::new_window(window_manager::GAP_SIZE, y, width, height)?;
-        } else {
-            let gap_size = window_manager::GAP_SIZE;
-            let width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * gap_size;
-            let height = frame_buffer::FRAME_BUFFER_HEIGHT - 2 * gap_size;
-            window_object = window_manager::new_window(gap_size,gap_size,width,height)?;
-        }
-
+        let terminal_print_producer_copy = terminal_print_producer.obtain_producer();
+        // Sets up the kernel to terminal-application printing
+        print::DEFAULT_TERMINAL_QUEUE.call_once(|| terminal_print_producer_copy); 
+        // Requests a new window object from the window manager
+        let window_object = match window_manager::request_new_window() {
+            Ok(window_object) => window_object,
+            Err(err) => {debug!("new window returned err"); return Err(err)}
+        };
         let prompt_string: String;
-        if ref_num == 0 {
-            prompt_string = "kernel:~$ ".to_string();
-        } else {
-            prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
-        }
+        prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
         // creates a new terminal object
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
@@ -202,10 +163,10 @@ impl Terminal {
             absolute_cursor_pos: 0, 
             left_shift: 0,
             print_consumer: terminal_print_consumer,
+            print_producer: terminal_print_producer,
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
-        {TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);}
         let prompt_string = terminal.prompt_string.clone();
         if ref_num == 0 {
             terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
@@ -213,8 +174,8 @@ impl Terminal {
             terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         }
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
-        spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
-        Ok(())
+        let task_ref = spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
+        Ok(task_ref)
     }
 
     /// Printing function for use within the terminal crate
@@ -555,7 +516,7 @@ impl Terminal {
                                 }
                             }
                             // Removes the task_id from the task_map
-                            TERMINAL_TASK_IDS.lock().remove(&self.term_ref);
+                            terminal_print::remove_child(self.current_task_id)?;
                             // Resets the current task id to be ready for the next command
                             self.current_task_id = 0;
                             let prompt_string = self.prompt_string.clone();
@@ -665,7 +626,7 @@ impl Terminal {
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_id) => { 
                         self.current_task_id = new_task_id;
-                        TERMINAL_TASK_IDS.lock().insert(self.term_ref, self.current_task_id);
+                        terminal_print::add_child(self.current_task_id, self.print_producer.obtain_producer())?;
                     } Err("Error: no module with this name found!") => {
                         self.print_to_terminal(format!("\n{}: command not found\n\n{}",input_string, prompt_string))?;
                         self.input_string.clear();
@@ -979,12 +940,10 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             // Used by the windowing manager to indicate to the termianl to refresh its display upon terminal resizing
             Event::DisplayEvent => {
                 terminal.refresh_display(&display_name);
-                debug!("refreshed display");
             }
-            // Cleanup to removes terminal from the task id and the print producers maps
+            // Returns from the loop so that the terminal object is dropped
             Event::ExitEvent => {
-                TERMINAL_TASK_IDS.lock().remove(&terminal.term_ref);
-                TERMINAL_PRINT_PRODUCERS.lock().remove(&terminal.term_ref);
+                trace!("exited terminal");
                 return Ok(());
             }
 

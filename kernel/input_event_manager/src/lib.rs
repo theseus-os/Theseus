@@ -37,7 +37,6 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     // passes the terminal reference number in the form of the Vec<String>. The terminal::init() function will parse it into a usize
     // this is a temporary hack to get around for the argument type requirements for applications
     let args = vec![term_num]; 
-    debug!("ABOUT TO CALL TERMINAL");
     spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal
     spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
     Ok(returned_keyboard_producer)

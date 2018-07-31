@@ -63,7 +63,44 @@ pub fn switch() -> Result<(), &'static str> {
     Ok(())
 }
 
-/// new a window object and return it
+/// Applications call this function to request a new window object. This function preemptively resizes the original windows and 
+/// computes the dimensions needed to create the new window
+pub fn request_new_window() -> Result<WindowObj, &'static str> {
+    // Initializes allocator if it has not already
+    let mut height_index; 
+    let window_width;
+    let window_height;
+    {
+        let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
+            Mutex::new(WindowAllocator{
+                allocated:VecDeque::new(),
+                active:Weak::new(),
+            })
+        });     
+        let mut allocator = allocator.lock();
+        let num_windows = allocator.deref_mut().allocated.len();
+        // one gap between each window and one gap between the edge windows and the frame buffer boundary
+        window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
+        window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
+        height_index = GAP_SIZE; // start resizing the windows after the first gap 
+        // Resizes the windows vertically
+        for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
+            let strong_ptr = window_inner_ref.upgrade();
+            if let Some(window_inner_ptr) = strong_ptr {
+                let mut locked_window_ptr = window_inner_ptr.lock();
+                let _result = locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height);
+                locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
+                height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+            }
+        }
+    }
+    match new_window(GAP_SIZE, height_index, window_width, window_height) {
+        Ok(new_window) => {return Ok(new_window)}
+        Err(err) => {return Err(err)}
+    }
+}
+
+/// This is now a private function that creates a new window
 pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
 
     let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
@@ -549,31 +586,6 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
     }
     Ok(())
 }
-
-/// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
-pub fn adjust_windows_before_addition() -> Option<(usize, usize, usize)> {
-    let mut allocator = try_opt!(WINDOW_ALLOCATOR.try()).lock();
-     let num_windows = allocator.deref_mut().allocated.len();
-    // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
-
-    // Resizes the windows vertically
-    for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
-        let strong_ptr = window_inner_ref.upgrade();
-        if let Some(window_inner_ptr) = strong_ptr {
-            let mut locked_window_ptr = window_inner_ptr.lock();
-            let _result = locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height);
-            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
-            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
-        }
-    }
-
-
-    return Some((height_index, window_width, window_height)); // returns the index at which the new window should be drawn
-}
-
 
 
 

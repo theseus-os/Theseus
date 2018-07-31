@@ -7,7 +7,7 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 extern crate itertools;
 
 extern crate getopts;
