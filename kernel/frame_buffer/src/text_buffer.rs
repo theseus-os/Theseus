@@ -39,13 +39,13 @@ pub enum DisplayPosition {
 /// An instance of a frame text buffer which can be displayed to the screen.
 /// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
-    pub cursor:Cursor,
+    pub cursor:Mutex<Cursor>,
 }
 
 impl FrameTextBuffer {
     pub fn new() -> FrameTextBuffer {
         FrameTextBuffer {
-            cursor:Cursor::new(0, 0, true),
+            cursor:Mutex::new(Cursor::new(0, 0, true)),
         }
     }
 

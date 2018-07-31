@@ -318,7 +318,7 @@ impl WindowObj{
     }
 
     pub fn disable_cursor(&mut self) {
-        self.text_buffer.cursor.disable();
+       // self.text_buffer.cursor.disable();
     }
 
     pub fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
@@ -332,7 +332,7 @@ impl WindowObj{
     }
 
     pub fn cursor_blink(&mut self) {
-        let cursor = &mut (self.text_buffer.cursor);
+        /*let cursor = &mut (self.text_buffer.cursor);
         if cursor.blink() {
             let (line, column, show) = cursor.get_info();
             let inner = self.inner.lock();
@@ -340,7 +340,7 @@ impl WindowObj{
             frame_buffer::fill_rectangle(inner.x + inner.margin + column * CHARACTER_WIDTH, 
                         inner.y + inner.margin + line * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
-        }
+        }*/
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
