@@ -441,11 +441,10 @@ impl Terminal {
         if let Some(slice) = result {
             let display_opt = self.window.get_displayable(display_name);
             if display_opt.is_none() {
-                return Err("fail to the the text display component");
+                return Err("fail to get the text display component");
             } else {
-                let (x, y) = self.window.get_content_position();
                 let text_display = display_opt.unwrap();
-                text_display.display_string(x, y, slice, FONT_COLOR, BACKGROUND_COLOR)?;
+                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
             }
 
         } else {
@@ -465,11 +464,10 @@ impl Terminal {
         if let Some(slice) = result {
             let display_opt = self.window.get_displayable(display_name);
             if display_opt.is_none() {
-                return Err("fail to the the text display component");
+                return Err("fail to get the text display component");
             } else {
-                let (x, y) = self.window.get_content_position();
                 let text_display = display_opt.unwrap();
-                text_display.display_string(x, y, slice, FONT_COLOR, BACKGROUND_COLOR)?;
+                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
                 self.absolute_cursor_pos = cursor_pos;
             }
         } else {
@@ -556,7 +554,13 @@ impl Terminal {
             new_y -=1;
         }
 
-        self.window.set_cursor(new_y as u16, new_x as u16, true);
+        let display_opt = self.window.get_displayable(display_name);
+        if display_opt.is_none() {
+            return Err("fail to get the text display component");
+        } else {
+            let text_display = display_opt.unwrap();
+            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
+        }
         return Ok(());
     }
 
@@ -899,6 +903,18 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     let mut refresh_display = true;
 
     loop {
+
+        //Handle cursor blink
+        {
+            let display_opt = terminal.window.get_displayable(&display_name);
+            if display_opt.is_none() {
+                return Err("fail to get the text display component");
+            } else {
+                let text_display = display_opt.unwrap();
+                text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
+            }
+        }
+
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional
         if let Some(print_event) = terminal.print_consumer.peek() {
