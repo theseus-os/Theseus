@@ -1,0 +1,10 @@
+[package]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
+name = "usb_device"
+version = "0.1.0"
+keywords = ["usb_device"]
+categories = ["no-std", "hardware-support"]
+
+[dependencies]
+[dependencies.usb_desc]
+path = "../usb_desc"

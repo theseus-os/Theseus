@@ -3,18 +3,9 @@
 
 #![allow(dead_code)]
 
-extern crate alloc;
+extern crate usb_desc;
 
 
-pub struct UsbEndpDesc
-{
-    len: u8,
-    endp_type: u8,
-    addr: u8,
-    attributes: u8,
-    maxpacketsize: u16,
-    interval: u8,
-}
 
 pub struct UsbDevice{
 
