@@ -1,14 +1,19 @@
+//! Allows crates in the kernel to log messages to the default terminal using the 
+//! println! and print! macros
+//! 
+//! The current system simply enqueus the Print event into the print queue of the default terminal
+
 #![no_std]
 #![feature(alloc)]
 extern crate input_event_manager;
 extern crate spin;
 extern crate dfqueue;
-extern crate input_event_types;
+extern crate event_types;
 #[macro_use] extern crate alloc;
 
 use dfqueue::DFQueueProducer;
 use spin::Once;
-use input_event_types::Event;
+use event_types::Event;
 
 pub static DEFAULT_TERMINAL_QUEUE: Once<DFQueueProducer<Event>> = Once::new();
 // / Calls `print!()` with an extra newilne ('\n') appended to the end. 

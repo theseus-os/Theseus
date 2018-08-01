@@ -1,7 +1,7 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate input_event_types;
+extern crate event_types;
 extern crate ata_pio;
 extern crate e1000;
 extern crate memory;
@@ -14,7 +14,7 @@ extern crate mouse;
 
 
 use dfqueue::DFQueueProducer;
-use input_event_types::Event;
+use event_types::Event;
 use memory::{MemoryManagementInfo, PageTable};
 use pci::get_pci_device_vd;
 

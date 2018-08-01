@@ -2,6 +2,7 @@
 name = "print"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>"]
+description = "offers kernel crates the ability to print to the default terminal"
 
 [dependencies]
 spin = "0.4.5"
@@ -13,8 +14,8 @@ path = "../input_event_manager"
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 
 [dependencies.log]

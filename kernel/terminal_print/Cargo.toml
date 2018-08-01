@@ -24,5 +24,5 @@ version = "0.3.7"
 features = ["spin_no_std"]
 version = "1.0"
 
-[dependencies.input_event_types]
-path = "../../kernel/input_event_types"
+[dependencies.event_types]
+path = "../../kernel/event_types"

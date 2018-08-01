@@ -1,3 +1,12 @@
+//! Applications that want to print to their parent terminal must import this crate
+//! To print, applications can call the println! or print! macros
+//! 
+//! Printing simulates the parent-child relationship for standard out when parent applications spawn child applications
+//! For example, when a terminal runs a command, it will map that child command's task ID to that terminal's print producer
+//! so that any output from the child command is identified and outputted to the parent terminal
+//! 
+//! *Note: this printing crate only supports single-task child applications
+
 #![no_std]
 #![feature(alloc)]
 
@@ -6,10 +15,10 @@
 #[macro_use] extern crate lazy_static;
 extern crate task;
 extern crate dfqueue;
-extern crate input_event_types;
+extern crate event_types;
 extern crate spin;
 
-use input_event_types::Event;
+use event_types::Event;
 use dfqueue::DFQueueProducer;
 use alloc::arc::Arc;
 use alloc::btree_map::BTreeMap;

@@ -22,7 +22,7 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-extern crate input_event_types; // a temporary way to use input_event_manager types 
+extern crate event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 

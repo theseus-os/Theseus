@@ -40,8 +40,8 @@ path = "../tsc"
 [dependencies.text_display]
 path = "../text_display"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
