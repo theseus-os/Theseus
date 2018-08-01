@@ -1,8 +1,8 @@
 [package]
 authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
-name = "usb_reqs"
+name = "usb_req"
 version = "0.1.0"
-keywords = ["usb_reqs"]
+keywords = ["usb_req"]
 categories = ["no-std", "hardware-support"]
 
 [dependencies]

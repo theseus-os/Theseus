@@ -816,14 +816,6 @@ impl UhciTDRegisters {
 }
 
 
-pub struct UhciTD
-{
-    pub registers: BoxRefMut<MappedPages, UhciTDRegisters>,
-    pub td_next: u32,
-    pub active: u8,
-    _padding1:[u8;11],
-}
-
 // ------------------------------------------------------------------------------------------------
 // Queue Head
 
@@ -833,24 +825,3 @@ pub struct UhciQH
     pub vertical_pointer: Volatile<u32>,
 }
 
-// ------------------------------------------------------------------------------------------------
-// Device
-//
-//pub struct UhciController
-//{
-//    pub io_addr: u16,
-//    pub frame_list_add: u32,
-//    pub qh_pool: UhciQH,
-//    pub td_pool: UhciTD,
-//    pub async_qh: UhciQH,
-//}
-//
-//impl UhciController{
-//
-//    pub fn uhci_alloc_td(hc: UhciController){
-//
-//        let end_address = &hc.qh_pool;
-//
-//    }
-//
-//}

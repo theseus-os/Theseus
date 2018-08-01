@@ -4,7 +4,6 @@
 
 #![feature(const_fn)]
 
-extern crate alloc;
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types
 
@@ -30,35 +29,35 @@ static USB_DESC_HUB:u8 =                    0x29;
 
 pub struct UsbDeviceDesc
 {
-    len: u8,
-    deivce_type: u8,
-    usb_version: u16,
-    class: u8,
-    sub_class: u8,
-    protocol: u8,
-    max_packet_size: u8,
-    vendor_id: u16,
-    product_id: u16,
-    device_version: u16,
-    vendor_str: u8,
-    product_str: u8,
-    serial_str: u8,
-    conf_count: u8,
+    pub len: u8,
+    pub deivce_type: u8,
+    pub usb_version: u16,
+    pub class: u8,
+    pub sub_class: u8,
+    pub protocol: u8,
+    pub max_packet_size: u8,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub device_version: u16,
+    pub vendor_str: u8,
+    pub product_str: u8,
+    pub serial_str: u8,
+    pub conf_count: u8,
 }
 
 // ------------------------------------------------------------------------------------------------
 // USB Configuration Descriptor
 
-struct UsbConfDesc
+pub struct UsbConfDesc
 {
-    len: u8,
-    config_type: u8,
-    total_len: u8,
-    intf_count: u8,
-    conf_value: u8,
-    conf_str: u8,
-    attributes: u8,
-    max_power: u8,
+    pub len: u8,
+    pub config_type: u8,
+    pub total_len: u8,
+    pub intf_count: u8,
+    pub conf_value: u8,
+    pub conf_str: u8,
+    pub attributes: u8,
+    pub max_power: u8,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -66,10 +65,10 @@ struct UsbConfDesc
 
 pub struct UsbStringDesc
 {
-    len: u8,
-    string_type: u8,
-    size: u8,
-    str: [u16; 30],
+    pub len: u8,
+    pub string_type: u8,
+    pub size: u8,
+    pub str: [u16; 30],
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -78,16 +77,16 @@ pub struct UsbStringDesc
 pub struct UsbIntfDesc
 {
 
-    len: u8,
-    config_type: u8,
-    intf_type: u8,
-    intf_index: u8,
-    alt_setting: u8,
-    endp_count: u8,
-    class: u8,
-    sub_class: u8,
-    protocol: u8,
-    inf_str: u8,
+    pub len: u8,
+    pub config_type: u8,
+    pub intf_type: u8,
+    pub intf_index: u8,
+    pub alt_setting: u8,
+    pub endp_count: u8,
+    pub class: u8,
+    pub sub_class: u8,
+    pub protocol: u8,
+    pub inf_str: u8,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -95,12 +94,12 @@ pub struct UsbIntfDesc
 
 pub struct UsbEndpDesc
 {
-    len: u8,
-    endp_type: u8,
-    addr: u8,
-    attributes: u8,
-    maxpacketsize: u16,
-    interval: u8,
+    pub len: u8,
+    pub endp_type: u8,
+    pub addr: u8,
+    pub attributes: u8,
+    pub maxpacketsize: u16,
+    pub interval: u8,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -108,14 +107,14 @@ pub struct UsbEndpDesc
 
 pub struct UsbHidDesc
 {
-    len: u8,
-    hid_type: u8,
-    version: u16,
-    country_code: u8,
-    desc_count: u8,
-    desc_type: u8,
-    desc_len: u16,
-    length: u8,
+    pub len: u8,
+    pub hid_type: u8,
+    pub version: u16,
+    pub country_code: u8,
+    pub desc_count: u8,
+    pub desc_type: u8,
+    pub desc_len: u16,
+    pub length: u8,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -134,12 +133,12 @@ static HUB_PORT_INDICATORS:u8 =             0x80;        // Port Indicators
 pub struct UsbHubDesc
 {
 
-    len: u8,
-    hub_type: u8,
-    port_count: u8,
-    chars: u16,
-    power_time: u8,
-    current: u8,
+    pub len: u8,
+    pub hub_type: u8,
+    pub port_count: u8,
+    pub chars: u16,
+    pub power_time: u8,
+    pub current: u8,
 
 }
 

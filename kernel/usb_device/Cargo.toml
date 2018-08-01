@@ -1,6 +1,18 @@
 [package]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
 name = "usb_device"
 version = "0.1.0"
-authors = ["BowenLiu15 <bl28@rice.edu>"]
+
 
 [dependencies]
+[dependencies.usb_desc]
+path = "../../libs/usb_desc"
+
+[dependencies.usb_req]
+path = "../../libs/usb_req"
+
+[dependencies.usb_uhci]
+path = "../usb_uhci"
+
+[lib]
+crate-type = ["rlib"] # "lib" does the same thing I think

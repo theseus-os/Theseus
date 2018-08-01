@@ -88,9 +88,26 @@ static F_PORT_INDICATOR:u8 =                 22;  // Port
 
 pub struct UsbDevReq
 {
-    dev_req_type: u8,
-    req:          u8,
-    value:        u16,
-    index:        u16,
-    len:          u16,
+    pub dev_req_type: u8,
+    pub req:          u8,
+    pub value:        u16,
+    pub index:        u16,
+    pub len:          u16,
+}
+
+impl UsbDevReq{
+
+    pub fn new( dev_req_type: u8,req: u8, value: u16,
+                index: u16, len: u16) -> UsbDevReq{
+
+        UsbDevReq
+            {
+                dev_req_type,
+                req,
+                value,
+                index,
+                len,
+            }
+
+    }
 }
