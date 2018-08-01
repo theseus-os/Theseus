@@ -12,7 +12,7 @@ use alloc::string::String;
 pub enum Event {
     InputEvent(KeyboardInputEvent),
     OutputEvent(PrintOutputEvent),
-    ResizeEvent((usize, usize, usize, usize)), // tuple containing x, y, width, and height arguments for resizing the window
+    ResizeEvent(WindowResizeEvent), // tuple containing x, y, width, and height arguments for resizing the window
     DisplayEvent,
     ExitEvent,
 }
@@ -24,6 +24,10 @@ impl Event {
 
     pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
+    }
+
+    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
+        Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
     }
 }
 
@@ -41,8 +45,6 @@ impl KeyboardInputEvent {
     }
 }
 
-
-
 /// use this to queue up a formatted string that should be printed to the input_event_manager. 
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
@@ -57,4 +59,21 @@ impl PrintOutputEvent {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct WindowResizeEvent {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize, 
+    pub height: usize, 
+}
 
+impl WindowResizeEvent {
+    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
+        WindowResizeEvent {
+            x: x,
+            y: y,
+            width: width, 
+            height: height,
+        }
+    }
+}

@@ -1,100 +1,66 @@
+//! Terminal emulator with event-driven architecture
+//! Commands that can be run are the names of the crates in the applications directory
+//! 
+//! The terminal is roughly designed as follows: the main function calls the init() function of the terminal. In here, 
+//! the terminal instance is created (defined by the Terminal struct) and an event handling loop is spawned which can handle
+//! keypresses, resize, print events, etc. 
+
 #![no_std]
 #![feature(alloc)]
-// used by the text display
-
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate atomic_linked_list; 
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
-extern crate input_event_types; 
+extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
 
+extern crate terminal_print;
+extern crate print;
 
-
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use input_event_types::{Event};
+use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
-use alloc::btree_map::BTreeMap;
-use alloc::arc::Arc;
-use spin::Mutex;
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
+use task::TaskRef;
+use alloc::arc::Arc;
+use spin::Mutex;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
 
 #[no_mangle]
-pub fn main(args: Vec<String>) -> isize {
-    let num = match args.get(0) {
-        Some(num_as_str) => { num_as_str.parse::<usize>() }
-        None => return -1
-    };
-    let num = match num {
-        Ok(num) => num,
-        Err(_) => return -1
-    };
-
-    match Terminal::init(num) {
-        Ok(_) => { }
+/// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
+pub fn main(_args: Vec<String>) -> isize {
+   let term_task_ref =  match Terminal::new() {
+        Ok(task_ref) => {task_ref}
         Err(err) => {
             error!("{}", err);
             error!("could not create terminal instance");
             return -1;
         }
+    };
+    // waits for the terminal loop to exit before exiting the main function
+    match spawn::join(&term_task_ref) {
+        Ok(_) => { }
+        Err(err) => {error!("{}", err)}
     }
     return 0;
 }
 
-lazy_static! {
-    // maps the terminal reference number to the current task id
-    static ref TERMINAL_TASK_IDS: Arc<Mutex<BTreeMap<usize, usize>>> = Arc::new(Mutex::new(BTreeMap::new()));
-    // maps the terminal's reference number to its print producer
-    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
-}
-/// Currently, println! and print! macros will call this function to print to the display provider. 
-/// Whenever the println! macro (and thereby this funtion) is called, the task id of the application that called
-/// the print function is recorded. The TERMINAL_TASK_ID map then finds which terminal instance is running that task id,
-/// and then the TERMINAL_PRINT_PRODUCERS map will give the correct print producer to enqueue the print event
-pub fn print_to_stdout<S: Into<String>>(s: S) -> Result<(), &'static str> {
-    // Gets the task id of the task that called this print function
-    let result = task::get_my_current_task_id();
-    let mut selected_term = 0; // default to kernel terminal
-    if let Some(current_task_id) = result {
-            let terminal_task_ids_lock = TERMINAL_TASK_IDS.lock();
-            for term in terminal_task_ids_lock.iter() {
-                // finds the corresponding terminal instance running the current task id
-                if *term.1 == current_task_id {
-                    let number = term.0.clone();
-                    selected_term = number;
-                }
-            }
-    }
-    // Obtains the correct temrinal print producer and enqueues the print event, which will later be popped off
-    // and handled by the infinite temrinal instance loop 
-    let print_map = TERMINAL_PRINT_PRODUCERS.lock();
-    let result = print_map.get(&selected_term);
-    if let Some(selected_term_producer) = result {
-        selected_term_producer.enqueue(Event::new_output_event(s));
-    }
-    Ok(())
-}
 
 pub struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
-    /// The reference number that can be used to switch between/correctly identify the terminal object
-    term_ref: usize,
     /// The string that stores the users keypresses after the prompt
     input_string: String,
     /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
@@ -131,60 +97,48 @@ pub struct Terminal {
     left_shift: usize,
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
+    /// The producer to the terminal's print dfqueue
+    print_producer: DFQueueProducer<Event>,
 }
 
 /// Manual implementation of debug just prints out the terminal reference number
 use core::fmt;
 impl fmt::Debug for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Point {{ terminal reference number: {} }}", self.term_ref)
+        write!(f, "Point {{ terminal application }}")
     }
 }
 
 
 /// Terminal Structure that allows multiple terminals to be individually run.
-/// There are now two queues that belong to each termianl instance.
+/// There are now two queues that constitute the event-driven terminal architecture
 /// 1) The terminal print queue that handles printing from external applications
 ///     - Consumer is the main terminal loop
 ///     - Producers are any external application trying to print to the terminal's stdout
 /// 
-/// 2) The terminal input queue that handles input events from the input event handling crate
+/// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
-///     - Producers are functions in the event handling cra te that send 
-///         Keyevents if the terminal is the one currently being focused on
+///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 impl Terminal {
-    /// Creates a new terminal object
-    /// text display: T => any concrete type that implements the TextDisplay trait (i.e. Vga buffer, etc.)
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn init(ref_num: usize) -> Result<(), &'static str> {
+    pub fn new() -> Result<TaskRef, &'static str> {
         // initialize another dfqueue for the terminal object to handle printing from applications
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        let window_object;
-        if ref_num != 0 { // fix for now because window allocator is not yet initialized at this point if it is the first terminal being created
-            let (y,width,height) = match window_manager::adjust_windows_before_addition() {
-                Some((y, width, height)) => (y, width, height),
-                None => { return Err("couldn't adjust windows before creating a new terminal")} 
-            };
-            window_object = window_manager::new_window(window_manager::GAP_SIZE, y, width, height)?;
-        } else {
-            let gap_size = window_manager::GAP_SIZE;
-            let width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * gap_size;
-            let height = frame_buffer::FRAME_BUFFER_HEIGHT - 2 * gap_size;
-            window_object = window_manager::new_window(gap_size,gap_size,width,height)?;
-        }
-
+        let terminal_print_producer_copy = terminal_print_producer.obtain_producer();
+        // Sets up the kernel to terminal-application printing
+        print::DEFAULT_TERMINAL_QUEUE.call_once(|| terminal_print_producer_copy); 
+        // Requests a new window object from the window manager
+        let window_object = match window_manager::new_default_window() {
+            Ok(window_object) => window_object,
+            Err(err) => {debug!("new window returned err"); return Err(err)}
+        };
         let prompt_string: String;
-        if ref_num == 0 {
-            prompt_string = "kernel:~$ ".to_string();
-        } else {
-            prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
-        }
+        prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
         // creates a new terminal object
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
-            term_ref: ref_num,
             window: window_object,
             input_string: String::new(),
             correct_prompt_position: true,
@@ -202,19 +156,15 @@ impl Terminal {
             absolute_cursor_pos: 0, 
             left_shift: 0,
             print_consumer: terminal_print_consumer,
+            print_producer: terminal_print_producer,
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
-        {TERMINAL_PRINT_PRODUCERS.lock().insert(ref_num, terminal_print_producer);}
         let prompt_string = terminal.prompt_string.clone();
-        if ref_num == 0 {
-            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\nKernel Terminal\n{}", prompt_string))?;
-        } else {
-            terminal.print_to_terminal(format!("input_event_manager says once!\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
-        }
+        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
-        spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
-        Ok(())
+        let task_ref = spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
+        Ok(task_ref)
     }
 
     /// Printing function for use within the terminal crate
@@ -547,7 +497,7 @@ impl Terminal {
                                 }
                             }
                             // Removes the task_id from the task_map
-                            TERMINAL_TASK_IDS.lock().remove(&self.term_ref);
+                            terminal_print::remove_child(self.current_task_id)?;
                             // Resets the current task id to be ready for the next command
                             self.current_task_id = 0;
                             let prompt_string = self.prompt_string.clone();
@@ -596,18 +546,26 @@ impl Terminal {
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
-    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&String) -> Result<(), &'static str> {
-        // Ctrl+D or Ctrl+Alt+Del kills the OS
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::D 
-        || 
-                keyevent.modifiers.control && keyevent.modifiers.alt && keyevent.keycode == Keycode::Delete {
-        panic!("Ctrl+D or Ctrl+Alt+Del was pressed, abruptly (not cleanly) stopping the OS!"); //FIXME do this better, by signaling the main thread
-        }
-        
+    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&String) -> Result<(), &'static str> {       
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
             return Ok(()); 
         }
+
+        // window manager resize function test
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::B {
+            let win_pointer = Arc::new(Mutex::new(&self.window));
+            let gap_size = window_manager::GAP_SIZE;
+            let width = 500;
+            let height = 200;
+            match window_manager::put_event_into_app(win_pointer, Event::new_resize_event(
+                gap_size, gap_size, width, height)) {
+                    Ok(_) => { }
+                    Err(err) => {error!("couldn't resize window because {}", err);}
+                }
+            return Ok(());
+        }
+
 
         // Ctrl+C signals the main loop to exit the task
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
@@ -615,7 +573,10 @@ impl Terminal {
             if self.current_task_id != 0 {
                 let task_ref = task::get_task(self.current_task_id);
                 if let Some(curr_task) = task_ref {
-                    let _result = curr_task.write().kill(task::KillReason::Requested);
+                    match curr_task.write().kill(task::KillReason::Requested) {
+                        true => { }
+                        false => {error!("could not kill task");}
+                    }
                 }
             } else {
                 self.input_string.clear();
@@ -663,9 +624,9 @@ impl Terminal {
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_id) => { 
                         self.current_task_id = new_task_id;
-                        TERMINAL_TASK_IDS.lock().insert(self.term_ref, self.current_task_id);
+                        terminal_print::add_child(self.current_task_id, self.print_producer.obtain_producer())?;
                     } Err("Error: no module with this name found!") => {
-                        self.print_to_terminal(format!("\n{}: command not found\n\n{}",input_string, prompt_string))?;
+                        self.print_to_terminal(format!("\n{}: command not found\n{}",input_string, prompt_string))?;
                         self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
@@ -851,7 +812,10 @@ impl Terminal {
                 if !self.correct_prompt_position{
                     let prompt_string = self.prompt_string.clone();
                     let mut input_string = self.input_string.clone();
-                    let _result = input_string.pop();
+                    match input_string.pop() {
+                        Some(_) => { }
+                        None => {return Err("couldn't pop newline from input event string")}
+                    }
                     self.print_to_terminal(prompt_string)?;
                     self.print_to_terminal(input_string)?;
                     self.correct_prompt_position = true;
@@ -899,30 +863,42 @@ impl Terminal {
     
     fn refresh_display(&mut self, display_name:&String) {
         let start_idx = self.scroll_start_idx;
+        // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
-            let _result = self.update_display_backwards(display_name, buffer_len);
-            let _result = self.cursor_handler(display_name);
+            match self.update_display_backwards(display_name, buffer_len) {
+                Ok(_) => { }
+                Err(err) => {error!("could not update display forwards: {}", err); return}
+            }
+            match self.cursor_handler(display_name) {
+                Ok(_) => { }
+                Err(err) => {error!("could not update cursor: {}", err); return}
+            }
         } else {
-            let _result = self.update_display_forwards(display_name, start_idx);
+            match self.update_display_forwards(display_name, start_idx) {
+                Ok(_) => { }
+                Err(err) => {error!("could not update display forwards: {}", err); return}
+            }
         }
     }
 }
 
-/// This function is called for each terminal instance and handles all input and output events
-/// of that terminal instance. There are two queues being handled in this loop.
+/// This main loop is the core component of the terminal's event-driven architecture. The terminal receives events
+/// from two queues
 /// 
 /// 1) The print queue handles print events from applications. The producer to this queue
-/// is any EXTERNAL application that prints to the terminal (any printing from within this crate
+/// is any EXTERNAL application that prints to the terminal (any printing from within the terminal
 /// is simply pushed to the scrollback buffer using the associated print_to_terminal method)
 /// 
-/// 2) The input queue handles any input events from the input event handling crate (currently still named
-/// the input_event_manager crate but will change soon)
+/// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
+/// and resize event to the application
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
+    use core::ops::Deref;
+    let mut refresh_display = true;
     let display_name = String::from("content");
     { 
         let rs = terminal.window.add_displayable(String::clone(&display_name), 
@@ -931,18 +907,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             //handle error
         }
     }
-
-    // Refreshes the text display with the default terminal upon boot, will fix once we refactor the terminal as an application
-    if terminal.term_ref == 0 {
-        terminal.update_display_forwards(&display_name, 0)?; // displays forward from the starting index of the scrollback buffer
-        terminal.cursor_handler(&display_name)?;        
-    }
-
-    use core::ops::Deref;
-    let mut refresh_display = true;
-
     loop {
-
         //Handle cursor blink
         {
             if let Some(text_display) = terminal.window.get_displayable(&display_name){
@@ -968,7 +933,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             print_event.mark_completed();
             // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
             continue;
-        }
+        } 
 
 
         // Handles the cleanup of any application task that has finished running
@@ -977,7 +942,8 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             terminal.refresh_display(&display_name);
             refresh_display = false;
         }
-        // Looks at the input queue. 
+        
+        // Looks at the input queue from the window manager
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
         let event = match terminal.window.get_key_event() {
@@ -991,13 +957,21 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             // Used by the windowing manager to indicate to the termianl to refresh its display upon terminal resizing
             Event::DisplayEvent => {
                 terminal.refresh_display(&display_name);
-                debug!("refreshed display");
             }
-            // Cleanup to removes terminal from the task id and the print producers maps
+            // Returns from the main loop so that the terminal object is dropped
             Event::ExitEvent => {
-                TERMINAL_TASK_IDS.lock().remove(&terminal.term_ref);
-                TERMINAL_PRINT_PRODUCERS.lock().remove(&terminal.term_ref);
+                trace!("exited terminal");
                 return Ok(());
+            }
+
+            // All resize events to the terminal application should be dealt with here so that
+            // all associated tasks with a window resize can be correctly completed
+            Event::ResizeEvent(ref rev) => {
+                match terminal.window.resize(rev.x, rev.y, rev.width, rev.height) {
+                    Ok(_) => { }
+                    Err(err) => {error!("{}", err);} // terminal should not exit even if the resize cannot be completed
+                }
+                terminal.refresh_display(&display_name)
             }
 
             // Handles ordinary keypresses

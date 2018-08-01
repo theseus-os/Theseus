@@ -31,8 +31,8 @@ version = "0.1.0"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.spawn]
 path = "../spawn"

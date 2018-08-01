@@ -1,8 +1,8 @@
 #![no_std]
 
-extern crate input_event_types;
+extern crate event_types;
 
-use input_event_types::Event;
+use event_types::Event;
 use super::super::{FrameTextBuffer,Once, WindowObj, frame_buffer};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 

@@ -18,8 +18,8 @@ extern crate text_display;
 #[macro_use] extern crate log;
 
 // Andrew: refernece note below
-extern crate input_event_types;
-use input_event_types::Event;
+extern crate event_types;
+use event_types::Event;
 
 use text_display::TextDisplay;
 use core::fmt;

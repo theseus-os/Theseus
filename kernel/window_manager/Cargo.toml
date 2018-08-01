@@ -51,8 +51,8 @@ path = "../../libs/util"
 [dependencies.text_display]
 path = "../text_display"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.spawn]
 path = "../spawn"

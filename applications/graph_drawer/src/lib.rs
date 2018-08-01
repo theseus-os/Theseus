@@ -11,7 +11,7 @@ extern crate keycodes_ascii;
 #[macro_use] extern crate frame_buffer;
 #[macro_use] extern crate window_manager;
 #[macro_use] extern crate log;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 
 
 use alloc::{Vec, String, LinkedList};

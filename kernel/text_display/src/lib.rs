@@ -1,9 +1,9 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate input_event_types;
+extern crate event_types;
 
-use input_event_types::Event;
+use event_types::Event;
 
 /// Defines the methods that a TextDisplay must have
 pub struct TextDisplay {

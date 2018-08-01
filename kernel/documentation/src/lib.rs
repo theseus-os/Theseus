@@ -41,7 +41,7 @@
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
-//! * `input_event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
+//! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `driver_init`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.

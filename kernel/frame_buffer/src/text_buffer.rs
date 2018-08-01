@@ -2,9 +2,9 @@ extern crate tsc;
 extern crate text_display;
 
 // andrew: fix
-extern crate input_event_types;
-// use input_event_types::Event;
-use text_buffer::input_event_types::Event;
+extern crate event_types;
+// use event_types::Event;
+use text_buffer::event_types::Event;
 
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use super::{Mutex, Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
@@ -207,7 +207,7 @@ impl Cursor {
             line:li,
             column:col,
             enabled:ena,
-            freq:500000000,
+            freq:2500000000,
             time:tsc_ticks(),
             show:true,
             color:0xFFFFFF,
