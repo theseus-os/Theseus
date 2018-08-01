@@ -1,0 +1,6 @@
+[package]
+name = "usb_device"
+version = "0.1.0"
+authors = ["BowenLiu15 <bl28@rice.edu>"]
+
+[dependencies]
