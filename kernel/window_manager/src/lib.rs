@@ -29,16 +29,9 @@ use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
-use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use frame_buffer::text_buffer::{FrameTextBuffer};
 use input_event_types::Event;
 
-
-
-//static mut COUNTER:usize = 0; //For performance evaluation
-
-/// A test mod of window manager
-pub mod test_window_manager;
 pub mod displayable;
 
 use displayable::text_display::TextDisplay;
@@ -48,22 +41,23 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-pub const GAP_SIZE: usize = 10; // 10 pixel gap between windows 
 
+/// 10 pixel gap between windows 
+pub const GAP_SIZE: usize = 10; 
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
     active: Weak<Mutex<WindowInner>>, // a weak pointers directly to the active WindowInner so we don't have to search for the active window when we need it quickly
 }
 
-/// switch the active window
+/// switch the active window. Active the next window in the list based on the order they are created
 pub fn switch() -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     allocator.switch();
     Ok(())
 }
 
-/// new a window object and return it
+/// new a window object and return a strong reference to it
 pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
 
     let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
@@ -171,13 +165,10 @@ impl WindowAllocator{
             }
         }
 
-
-
         Some("End")
     }
 
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
-        //TODO clean contents in window
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
@@ -249,12 +240,12 @@ pub struct WindowObj {
 
 
 impl WindowObj{
-
     fn clean(&self) {
         let inner = self.inner.lock();
         inner.clean();
     }
 
+    ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
     pub fn add_displayable(&mut self, key:String, displayable:TextDisplay) -> Result<(), &'static str>{
         //TODO check fit
@@ -271,14 +262,17 @@ impl WindowObj{
         Ok(())
     }
 
+    ///Remove a displayable
     pub fn remove_displayable(&mut self, key:&String){
         self.components.remove(key);
     }
 
+    ///Get a displayable by key
     pub fn get_displayable(&self, key:&String) -> Option<&TextDisplay> {
         return self.components.get(key);
     }
 
+    ///Get the content position of the displayable excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
         let inner = self.inner.lock();
         (inner.x + inner.margin, inner.y + inner.margin)
@@ -317,49 +311,7 @@ impl WindowObj{
             color);
     }
 
-    pub fn disable_cursor(&mut self) {
-       // self.text_buffer.cursor.disable();
-    }
-
-    pub fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        /*let cursor = &mut (self.text_buffer.cursor);
-        cursor.enable();
-        cursor.update(line as usize, column as usize, reset);
-        let inner = self.inner.lock();
-        frame_buffer::fill_rectangle(inner.x + inner.margin + (column as usize) * CHARACTER_WIDTH, 
-                        inner.y + inner.margin + (line as usize) * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);*/
-    }
-
-    pub fn cursor_blink(&mut self) {
-        /*let cursor = &mut (self.text_buffer.cursor);
-        if cursor.blink() {
-            let (line, column, show) = cursor.get_info();
-            let inner = self.inner.lock();
-            let color = if show { 0xFFFFFF } else { 0 };
-            frame_buffer::fill_rectangle(inner.x + inner.margin + column * CHARACTER_WIDTH, 
-                        inner.y + inner.margin + line * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
-        }*/
-    }
-
-    /// Requires that a str slice that will exactly fit the frame buffer
-    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
-    /// Print every byte and fill the blank with background color
-    /*pub fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
-            inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
-            slice)
-    }*/
-    
-    /*
-    pub fn draw_border(&self) -> (usize, usize, usize){
-        let inner = self.inner.lock();
-        inner.draw_border(get_border_color(inner.active))
-    }
-    */
-
+    ///resize a window and resize its displayable components proportionally
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
         let mut inner = self.inner.lock();
         let rs = inner.resize(x,y,width,height);
@@ -375,6 +327,7 @@ impl WindowObj{
         }
     }
 
+    ///Get a key event of the window
     pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
@@ -385,7 +338,6 @@ impl WindowObj{
             None
         }
     }
-
 
 }
 
@@ -402,7 +354,7 @@ struct WindowInner {
     active:bool,
     /// a consumer of key input events
     margin:usize,
-
+    /// the producer accepting a key event
     key_producer:DFQueueProducer<Event>,
 }
 
@@ -438,8 +390,7 @@ impl WindowInner {
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, SCREEN_BACKGROUND_COLOR);
     }
 
-    fn draw_border(&self, color:u32) -> (usize, usize, usize){
-        
+    fn draw_border(&self, color:u32) -> (usize, usize, usize){        
         frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
         frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
         frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
@@ -463,21 +414,12 @@ impl WindowInner {
         Ok(percent)
     }
 
-
 }
 
 /// put key input events in the producer of window manager
 pub fn put_key_code(event: Event) -> Result<(), &'static str>{    
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     allocator.put_key_code(event)
-}
-
-fn get_border_color(active:bool) -> u32 {
-    if active {
-        WINDOW_ACTIVE_COLOR
-    } else {
-        WINDOW_INACTIVE_COLOR
-    }
 }
 
 /// Finds and deletes the active window from the window manager, and sets the new active window
@@ -553,7 +495,7 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
 /// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
 pub fn adjust_windows_before_addition() -> Option<(usize, usize, usize)> {
     let mut allocator = try_opt!(WINDOW_ALLOCATOR.try()).lock();
-     let num_windows = allocator.deref_mut().allocated.len();
+    let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
     let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
     let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
@@ -570,47 +512,13 @@ pub fn adjust_windows_before_addition() -> Option<(usize, usize, usize)> {
         }
     }
 
-
     return Some((height_index, window_width, window_height)); // returns the index at which the new window should be drawn
 }
 
-
-
-
-
-
-
-//Test functions for performance evaluation
-/*pub fn set_time_start() {
-    let hpet_lock = get_hpet();
-    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
-}
-
-pub fn calculate_time_statistic() {
-    let statistic = STATISTIC.call_once(|| {
-        Mutex::new(Vec::new())
-    });
-
-  unsafe{
-
-    let hpet_lock = get_hpet();
-    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
-
-   
-    let mut queue = statistic.lock();
-    queue.push(end_time - STARTING_TIME);
-
-    STARTING_TIME = 0;
-
-    COUNTER  = COUNTER+1;
-
-    if COUNTER == 1000 {
-        for i in 0..queue.len(){
-            trace!("Time\t{}", queue.pop().unwrap());
-        }
-        COUNTER = 0;
+fn get_border_color(active:bool) -> u32 {
+    if active {
+        WINDOW_ACTIVE_COLOR
+    } else {
+        WINDOW_INACTIVE_COLOR
     }
-  }
-}*/
-
-
+}

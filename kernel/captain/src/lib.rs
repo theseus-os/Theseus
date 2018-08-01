@@ -169,13 +169,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
     }  
 
-    //test window manager
-    if false {
-        use window_manager::test_window_manager;
-        spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
-        spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
-    }
-
     // create and jump to the first userspace thread
     if false {
         debug!("trying to jump to userspace");

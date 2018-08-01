@@ -251,11 +251,10 @@ impl Terminal {
     }
 
     fn get_displayable_dimensions(&self, name:&String) -> (usize, usize){
-        let display_opt = self.window.get_displayable(name);
-        if display_opt.is_none() {
+        if let Some(text_display) = self.window.get_displayable(name){
+            text_display.get_dimensions()
+        } else {
             (0, 0)
-        } else {        
-            display_opt.unwrap().get_dimensions()  
         }
     }
 
@@ -478,14 +477,11 @@ impl Terminal {
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            let display_opt = self.window.get_displayable(display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = self.window.get_displayable(display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
+            } else {
+                return Err("faild to get the text displayable component")
             }
-
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -501,13 +497,11 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            let display_opt = self.window.get_displayable(display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = self.window.get_displayable(display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-                self.absolute_cursor_pos = cursor_pos;
+                self.absolute_cursor_pos = cursor_pos;          
+            } else {
+                return Err("faild to get the text displayable component")
             }
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -593,12 +587,10 @@ impl Terminal {
             new_y -=1;
         }
 
-        let display_opt = self.window.get_displayable(display_name);
-        if display_opt.is_none() {
-            return Err("fail to get the text display component");
-        } else {
-            let text_display = display_opt.unwrap();
+        if let Some(text_display) = self.window.get_displayable(display_name){
             text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
+        } else {
+            return Err("faild to get the text displayable component")
         }
         return Ok(());
     }
@@ -644,7 +636,9 @@ impl Terminal {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                self.window.disable_cursor();
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }
                 let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
                 self.input_string.remove(remove_idx);
             }
@@ -696,7 +690,9 @@ impl Terminal {
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
-                self.window.disable_cursor();
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }            
             }
             return Ok(());
         }
@@ -711,7 +707,9 @@ impl Terminal {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line(display_name);
-                self.window.disable_cursor();                
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }
             }
             return Ok(());
         }
@@ -728,7 +726,9 @@ impl Terminal {
             }
             self.page_up(display_name);
             self.is_scroll_end = false;
-            self.window.disable_cursor();
+            if let Some(text_display) = self.window.get_displayable(display_name){
+                text_display.disable_cursor();
+            }
             return Ok(());
         }
 
@@ -945,11 +945,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
         //Handle cursor blink
         {
-            let display_opt = terminal.window.get_displayable(&display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = terminal.window.get_displayable(&display_name){
                 text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
             }
         }
