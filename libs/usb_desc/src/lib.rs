@@ -69,7 +69,7 @@ pub struct UsbStringDesc
     len: u8,
     string_type: u8,
     size: u8,
-    str: [u16; ],
+    str: [u16; 30],
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -121,6 +121,16 @@ pub struct UsbHidDesc
 // ------------------------------------------------------------------------------------------------
 // USB Hub Descriptor
 
+// Hub Characteristics
+static HUB_POWER_MASK:u8 =                  0x03;        // Logical Power Switching Mode
+static HUB_POWER_GLOBAL:u8 =                0x00;
+static HUB_POWER_INDIVIDUAL:u8 =            0x01;
+static HUB_COMPOUND:u8 =                    0x04;        // Part of a Compound Device
+static HUB_CURRENT_MASK:u8 =                0x18;        // Over-current Protection Mode
+static HUB_TT_TTI_MASK:u8 =                 0x60;        // TT Think Time
+static HUB_PORT_INDICATORS:u8 =             0x80;        // Port Indicators
+
+
 pub struct UsbHubDesc
 {
 
@@ -130,17 +140,9 @@ pub struct UsbHubDesc
     chars: u16,
     power_time: u8,
     current: u8,
-    // removable/power control bits vary in size
+
 }
 
-// Hub Characteristics
-#define HUB_POWER_MASK                  0x03        // Logical Power Switching Mode
-#define HUB_POWER_GLOBAL                0x00
-#define HUB_POWER_INDIVIDUAL            0x01
-#define HUB_COMPOUND                    0x04        // Part of a Compound Device
-#define HUB_CURRENT_MASK                0x18        // Over-current Protection Mode
-#define HUB_TT_TTI_MASK                 0x60        // TT Think Time
-#define HUB_PORT_INDICATORS             0x80        // Port Indicators
 
 
 
