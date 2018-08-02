@@ -92,6 +92,9 @@ pub type SymbolMap = BTreeMap<String, WeakSectionRef>;
 /// completely separate and in isolation from any other crate namespace 
 /// (although a given crate may be present in multiple namespaces). 
 pub struct CrateNamespace {
+    /// An identifier for this namespace, just for convenience.
+    name: String,
+
     /// The list of all the crates in this namespace,
     /// stored as a map in which the crate's String name
     /// is the key that maps to the value, a strong reference to a crate.
@@ -114,9 +117,19 @@ impl CrateNamespace {
     /// Creates a new `CrateNamespace` that is completely empty. 
     pub fn new() -> CrateNamespace {
         CrateNamespace {
+            name: String::from(""),
             crate_tree: Mutex::new(BTreeMap::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
+        }
+    } 
+    
 
+    /// Creates a new `CrateNamespace` that is completely empty, and is given the specified `name`.
+    pub fn with_name(name: &str) -> CrateNamespace {
+        CrateNamespace {
+            name: String::from(name),
+            crate_tree: Mutex::new(BTreeMap::new()),
+            symbol_map: Mutex::new(SymbolMap::new()),
         }
     } 
 
@@ -246,6 +259,7 @@ impl CrateNamespace {
         let new_symbol_map = self.symbol_map.lock().clone();
 
         CrateNamespace {
+            name: self.name.clone(),
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
         }

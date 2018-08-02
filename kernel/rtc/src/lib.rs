@@ -274,7 +274,7 @@ pub fn rtc_ack_irq() {
 
 pub extern "x86-interrupt" fn rtc_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
 
-    // we must acknowledge the interrupt first before handling it, in case the custom func does something like context switch
+    // we must acknowledge the interrupt first before handling it, in case the custom func does something like task switch
     rtc_ack_irq();
     unsafe { outb(0x20, 0x20); outb(0xA0, 0x20); } // equivalent to:  unsafe { PIC.notify_end_of_interrupt(0x28); } 
 
