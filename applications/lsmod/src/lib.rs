@@ -10,9 +10,7 @@ extern crate memory;
 extern crate mod_mgmt;
 
 use alloc::{Vec, String};
-use getopts::{Options, Matches};
-use memory::{get_module, ModuleArea};
-
+use getopts::Options;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

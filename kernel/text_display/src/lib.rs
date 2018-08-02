@@ -1,6 +1,5 @@
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate event_types;
 
 use event_types::Event;
