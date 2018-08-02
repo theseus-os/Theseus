@@ -86,6 +86,7 @@ static F_PORT_INDICATOR:u8 =                 22;  // Port
 // ------------------------------------------------------------------------------------------------
 // USB Device Request
 
+#[repr(C,packed)]
 pub struct UsbDevReq
 {
     pub dev_req_type: u8,

@@ -78,16 +78,16 @@ pub fn init() -> Result<(), &'static str> {
 
     ioc_int(1);
 
-    if let Some(connect) = if_connect(1){
-        if connect{
-            port_enable(1,1);
-        }
+    if if_connect_port1(){
+
+        port1_enable(1);
+
     }
 
-    if let Some(connect) = if_connect(2){
-        if connect{
-            port_enable(2,1);
-        }
+    if if_connect_port2(){
+
+        port2_enable(1);
+
     }
 
     run(1);
@@ -114,9 +114,9 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI))
+            return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI));
         }
-        Err("Port 1 is not enabled")
+        return Err("Port 1 is not enabled");
     }
     Err("No device is connected to the port 1")
 
@@ -133,9 +133,9 @@ pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI))
+            return Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI));
         }
-        Err("Port 2 is not enabled")
+        return Err("Port 2 is not enabled");
     }
     Err("No device is connected to the port 2")
 
@@ -455,9 +455,9 @@ pub fn if_port1_reset() -> bool{
 
 /// Reset the port 1
 pub fn port1_reset() {
-    if port_num == 1 {
-        unsafe { REG_PORT1.lock().write(REG_PORT1.lock().read() & (!PORT_RESET)); }
-    }
+
+    unsafe { REG_PORT1.lock().write(REG_PORT1.lock().read() & (!PORT_RESET)); }
+
 }
 
 /// See whether low speed device attached to port 1
@@ -550,7 +550,7 @@ pub fn if_connect_port1() -> bool{
 pub fn if_port2_suspend() -> bool{
 
 
-    let flag = (REG_port2.lock().read() & PORT_SUSP) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_SUSP) != 0;
     flag
 
 }
@@ -559,15 +559,15 @@ pub fn if_port2_suspend() -> bool{
 /// value: 1 -> suspend, 0 -> activate
 pub fn port2_suspend(value: u8){
 
-    let bits = REG_port2.lock().read();
+    let bits = REG_PORT2.lock().read();
     if value == 1{
         unsafe{
-            REG_port2.lock().write(bits | PORT_SUSP);
+            REG_PORT2.lock().write(bits | PORT_SUSP);
         }
     } else if value == 0{
 
         unsafe{
-            REG_port2.lock().write(bits & (!PORT_SUSP));
+            REG_PORT2.lock().write(bits & (!PORT_SUSP));
         }
     }
 
@@ -579,7 +579,7 @@ pub fn port2_suspend(value: u8){
 pub fn if_port2_reset() -> bool{
 
 
-    let flag = (REG_port2.lock().read() & PORT_RESET) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
     flag
 
 
@@ -587,16 +587,16 @@ pub fn if_port2_reset() -> bool{
 
 /// Reset the port 2
 pub fn port2_reset() {
-    if port_num == 1 {
-        unsafe { REG_port2.lock().write(REG_port2.lock().read() & (!PORT_RESET)); }
-    }
+
+    unsafe { REG_PORT2.lock().write(REG_port2.lock().read() & (!PORT_RESET)); }
+
 }
 
 /// See whether low speed device attached to port 2
 /// Return a bool
 pub fn low_speed_attach_port2() -> bool{
 
-    let flag = (REG_port2.lock().read() & PORT_LSDA) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_LSDA) != 0;
     flag
 
 
@@ -608,7 +608,7 @@ pub fn low_speed_attach_port2() -> bool{
 pub fn enable_change_port2() -> bool{
 
 
-    let flag = (REG_port2.lock().read() & PORT_ENABLE_CHANGE) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_ENABLE_CHANGE) != 0;
     flag
 
 
@@ -617,7 +617,7 @@ pub fn enable_change_port2() -> bool{
 /// Clear Enable Change bit of port 2
 pub fn enable_change_clear_port2() {
 
-    unsafe { REG_port2.lock().write(PORT_ENABLE_CHANGE); }
+    unsafe { REG_PORT2.lock().write(PORT_ENABLE_CHANGE); }
 }
 
 
@@ -626,7 +626,7 @@ pub fn enable_change_clear_port2() {
 pub fn if_enable_port2() -> bool{
 
 
-    let flag = (REG_port2.lock().read() & PORT_RESET) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
     flag
 
 
@@ -636,14 +636,14 @@ pub fn if_enable_port2() -> bool{
 /// value: 1 -> enable; 0 -> disable
 pub fn port2_enable(value: u8) {
 
-    let bits = REG_port2.lock().read();
+    let bits = REG_PORT2.lock().read();
     if value == 1{
         unsafe{
-            REG_port2.lock().write(bits | PORT_ENABLE);
+            REG_PORT2.lock().write(bits | PORT_ENABLE);
         }
     } else if value == 0{
         unsafe{
-            REG_port2.lock().write(bits & (!PORT_ENABLE));
+            REG_PORT2.lock().write(bits & (!PORT_ENABLE));
         }
     }
 
@@ -654,7 +654,7 @@ pub fn port2_enable(value: u8) {
 pub fn connect_change_port2() -> bool{
 
 
-    let flag = (REG_port2.lock().read() & PORT_CONNECTION_CHANGE) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_CONNECTION_CHANGE) != 0;
     flag
 
 
@@ -664,14 +664,14 @@ pub fn connect_change_port2() -> bool{
 pub fn connect_change_clear_port2() {
 
 
-    unsafe { REG_port2.lock().write(PORT_CONNECTION_CHANGE); }
+    unsafe { REG_PORT2.lock().write(PORT_CONNECTION_CHANGE); }
 
 }
 
 /// See whether a device is connected to this port
 pub fn if_connect_port2() -> bool{
 
-    let flag = (REG_port2.lock().read() & PORT_CONNECTION) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_CONNECTION) != 0;
     flag
 
 
@@ -714,9 +714,9 @@ pub fn assign_frame_list_base(base: u32){
 // Transfer Descriptor
 
 // TD Link Pointer
-const TD_PTR_TERMINATE:u32=                 (1 << 0);
-const TD_PTR_QH :u32=                       (1 << 1);
-const TD_PTR_DEPTH  :u32=                   (1 << 2);
+const TD_PTR_TERMINATE:usize=                 (1 << 0);
+const TD_PTR_QH :usize=                       (1 << 1);
+const TD_PTR_DEPTH  :usize=                   (1 << 2);
 
 
 // TD Control and Status
@@ -747,16 +747,13 @@ const TD_TOK_D_SHIFT :u8=                   19;
 const TD_TOK_MAXLEN_MASK  :u32=             0xffe00000;    // Maximum Length
 const TD_TOK_MAXLEN_SHIFT :u8=              21;
 
-const TD_PACKET_IN :u32=                    0x69;
-const TD_PACKET_OUT :u32=                   0xe1;
-const TD_PACKET_SETUP :u32=                 0x2d;
 
 pub struct UhciTDRegisters
 {
-    pub link_pointer: Volatile<u32>,
+    pub link_pointer: Volatile<PhysicalAddress>,
     pub control_status: Volatile<u32>,
     pub token: Volatile<u32>,
-    pub buffer_point: Volatile<u32>,
+    pub buffer_point: Volatile<PhysicalAddress>,
 }
 
 impl UhciTDRegisters {
@@ -772,8 +769,8 @@ impl UhciTDRegisters {
     /// len: The Maximum Length field specifies the maximum number of data bytes allowed for the transfer.
     /// The Maximum Length value does not include protocol bytes, such as PID and CRC.
     /// data_add: the pointer to data to be transferred
-    pub fn init(speed: u32, add: u32, endp: u32, toggle: u32, pid: u32,
-                len: u32, data_add: u32) -> UhciTDRegisters {
+    pub fn init(link: PhysicalAddress, speed: u32, add: u32, endp: u32, toggle: u32, pid: u32,
+                len: u32, data_add: PhysicalAddress) -> UhciTDRegisters {
         let token = ((len << TD_TOK_MAXLEN_SHIFT) |
             (toggle << TD_TOK_D_SHIFT) |
             (endp << TD_TOK_ENDP_SHIFT) |
@@ -782,7 +779,7 @@ impl UhciTDRegisters {
 
         let cs = ((3 << TD_CS_ERROR_SHIFT) | TD_CS_ACTIVE) as u32;
         UhciTDRegisters {
-            link_pointer: Volatile::new(TD_PTR_TERMINATE),
+            link_pointer: Volatile::new(link | TD_PTR_TERMINATE),
             control_status: Volatile::new(cs),
             token: Volatile::new(token),
             buffer_point: Volatile::new(data_add),
@@ -797,13 +794,13 @@ impl UhciTDRegisters {
     }
 
     /// get the horizotal pointer to next data struct
-    pub fn next_pointer(&self) -> u32 {
+    pub fn next_pointer(&self) -> PhysicalAddress {
         let pointer = self.link_pointer.read() & 0xFFFFFFF0;
         pointer
     }
 
     /// get the pointer to the data buffer
-    pub fn read_buffer_pointer(&self) -> u32 {
+    pub fn read_buffer_pointer(&self) -> PhysicalAddress {
 
         let pointer = self.buffer_point.read();
         pointer

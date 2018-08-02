@@ -27,6 +27,7 @@ static USB_DESC_HUB:u8 =                    0x29;
 // ------------------------------------------------------------------------------------------------
 // USB Device Descriptor
 
+#[repr(C,packed)]
 pub struct UsbDeviceDesc
 {
     pub len: u8,
@@ -48,6 +49,7 @@ pub struct UsbDeviceDesc
 // ------------------------------------------------------------------------------------------------
 // USB Configuration Descriptor
 
+#[repr(C,packed)]
 pub struct UsbConfDesc
 {
     pub len: u8,
@@ -63,6 +65,7 @@ pub struct UsbConfDesc
 // ------------------------------------------------------------------------------------------------
 // USB String Descriptor
 
+#[repr(C,packed)]
 pub struct UsbStringDesc
 {
     pub len: u8,
@@ -74,6 +77,7 @@ pub struct UsbStringDesc
 // ------------------------------------------------------------------------------------------------
 // USB Interface Descriptor
 
+#[repr(C,packed)]
 pub struct UsbIntfDesc
 {
 
@@ -92,6 +96,7 @@ pub struct UsbIntfDesc
 // ------------------------------------------------------------------------------------------------
 // USB Endpoint Descriptor
 
+#[repr(C,packed)]
 pub struct UsbEndpDesc
 {
     pub len: u8,
@@ -105,6 +110,7 @@ pub struct UsbEndpDesc
 // ------------------------------------------------------------------------------------------------
 // USB HID Desciptor
 
+#[repr(C,packed)]
 pub struct UsbHidDesc
 {
     pub len: u8,
@@ -130,6 +136,7 @@ static HUB_TT_TTI_MASK:u8 =                 0x60;        // TT Think Time
 static HUB_PORT_INDICATORS:u8 =             0x80;        // Port Indicators
 
 
+#[repr(C,packed)]
 pub struct UsbHubDesc
 {
 
