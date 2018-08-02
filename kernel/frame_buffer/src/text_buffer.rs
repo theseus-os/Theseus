@@ -189,10 +189,14 @@ impl Cursor {
     pub fn blink(&mut self) -> bool{
         if self.enabled {
             let time = tsc_ticks();
-            if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
-                self.time = time;
-                self.show = !self.show;
-                return true
+            if let Some(duration) = time.sub(&(self.time)) {
+                if let Some(ns) = duration.to_ns() {
+                    if ns >= self.freq {
+                        self.time = time;
+                        self.show = !self.show;
+                        return true;
+                    }
+                }
             }
         }
         false
