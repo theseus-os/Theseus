@@ -286,8 +286,9 @@ pub fn spawn_kthread<A, R, F>(func: F, arg: A, thread_name: String, pin_on_core:
 type MainFuncSignature = fn(Vec<String>) -> isize;
 
 
-/// Spawns a new application task within the kernel, based on the provided `ModuleArea` which must have an entry point called `main`.
-/// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
+/// Spawns a new application task that runs in kernel mode (currently the only way to run applications), 
+/// based on the provided `ModuleArea` which is an object file that must have an entry point called `main`.
+/// The new application `Task` is set up to enter the `main` function with the arguments `args`.
 /// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
 /// 
 /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
@@ -298,14 +299,48 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 /// * `args`: the arguments that will be passed to the `main` function of the application. 
 /// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-/// 
 pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
+    -> Result<TaskRef, &'static str> 
+{
+    spawn_application_internal(module, args, task_name, pin_on_core, false)
+}
+
+
+/// Similar to [`spawn_application`](#method.spawn_application), but adds the newly-spanwed application's public symbols 
+/// to the default namespace's symbol map, which allows other applications to depend upon it. 
+/// This also prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
+/// 
+/// In general, for regular applications, you should likely use [`spawn_application`](#method.spawn_application).
+pub fn spawn_application_singleton(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
+    -> Result<TaskRef, &'static str> 
+{
+    spawn_application_internal(module, args, task_name, pin_on_core, true)
+}
+
+
+
+/// The internal routine for spawning a new application task that runs in kernel mode (currently the only way to run applications), 
+/// based on the provided `ModuleArea` which is an object file that must have an entry point called `main`.
+/// The new application `Task` is set up to enter the `main` function with the arguments `args`.
+/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// 
+/// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
+/// 
+/// # Arguments
+/// 
+/// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
+/// * `args`: the arguments that will be passed to the `main` function of the application. 
+/// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
+/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
+/// * `is_singleton`: if true, adds this application's public symbols to the default namespace's symbol map, which allows other applications to depend upon it,
+///    and prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
+fn spawn_application_internal(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>, is_singleton: bool)
     -> Result<TaskRef, &'static str> 
 {
     let app_crate_ref = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), false)?
+        mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), is_singleton, false)?
     };
 
     // get the LoadedSection for the "main" function in the app_crate
@@ -325,7 +360,6 @@ pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Opti
 
     Ok(app_task)
 }
-
 
 
 
