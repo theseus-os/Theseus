@@ -599,8 +599,10 @@ impl Terminal {
 
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-            // Does nothing if the user presses enter without any command
             if self.input_string.len() == 0 {
+                // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
+                let prompt_string = self.prompt_string.clone();
+                self.print_to_terminal(format!("\n{}", prompt_string))?;
                 return Ok(());
             } else if self.current_task_id != 0 { // prevents the user from trying to execute a new command while one is currently running
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;

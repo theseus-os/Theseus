@@ -10,7 +10,7 @@
 //! should implement a functionality to resize their own window upon receiving a ResizeEvent (this can be done through 
 //! window.resize(), and the ResizeEvent is defined inside the event_types crate)
 //! 
-//! Windows can be deleted through window.delete()
+//! Window can be deleted through delete_active_window() or directly through WindowObj.delete(), though the 2nd option requires updating the active pointer manually
 //! 
 //! The window object is designed as follows:
 //! The application's window provides a screen area for the application to display its content into. The application can select
@@ -44,7 +44,7 @@ extern crate acpi;
 use spin::{Once, Mutex};
 use alloc::{VecDeque, String};
 use alloc::btree_map::BTreeMap;
-use core::ops::{DerefMut, Deref};
+use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::text_buffer::{FrameTextBuffer};
@@ -198,21 +198,25 @@ impl WindowAllocator{
         Ok(window)    
     }
 
-    fn switch(&mut self) -> Option<&'static str>{
+    fn switch(&mut self) -> usize {
         let mut flag = false;
+        let mut i = 0;
+        let mut prev_active = 0;
         for item in self.allocated.iter_mut(){
             let reference = item.upgrade();
             if let Some(window) = reference {
                 let mut window = window.lock();
                 if flag {
                     (*window).active(true);
-                    self.active = item.clone();
+                    self.active = item.clone(); // clones the weak pointer to put in the active field
                     flag = false;
                     self.active = item.clone();
                 } else if window.active {
                     (*window).active(false);
+                    prev_active = i;
                     flag = true;
                 }
+                i += 1;
             }
         }
         if flag {
@@ -227,7 +231,7 @@ impl WindowAllocator{
             }
         }
 
-        Some("End")
+        return prev_active;
     }
 
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
@@ -490,53 +494,25 @@ impl WindowInner {
 
 /// Finds and deletes the active window from the window manager, and sets the new active window
 pub fn delete_active_window() -> Result<(), &'static str> {
-    // finds and deletes the window from the window manager
-    let mut active_ref: Arc<Mutex<WindowInner>>;
-    {   
-        let mut i = 0; // tracks the index of the to-be-deleted window
-        let mut locked_window_ptrs = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-        active_ref = locked_window_ptrs.deref_mut().allocated.get(0).unwrap().upgrade().unwrap(); // for variable initialization
-        if locked_window_ptrs.deref_mut().allocated.len() == 1 {
-            return Ok(()); // does not proceed with delete if there is only one window currently running
-        }
-        // finding the active window and it's position in the WindowAllocator vector so that we can switch the active window to an adjacent one
-        let num_windows = locked_window_ptrs.deref_mut().allocated.len();
-        for window_ptr in locked_window_ptrs.deref_mut().allocated.iter() {
-            let strong_window_ptr = window_ptr.upgrade();
-            if let Some(window_inner_ref) = strong_window_ptr {
-                {   
-                    if window_inner_ref.lock().active {
-                        active_ref = window_inner_ref; // finds the active WindowInner
-                        break;                
-                    }
-                }
-            }
-            i += 1;
-        }  
-        if i == 0 {
-            // This hack prevents the user from deleting the default terminal because the print crate inside the
-            // kernel logs messages to the default terminal window (i.e. the first window spawned in this crate)
-            return Err("cannot delete the default terminal because this is where kernel print statements are currently logged");
-        }  
-        locked_window_ptrs.delete(&active_ref); //deletes the active window
-        if i == num_windows -1 {
-            i -= 1; // it the user deletes the last window, the new active window will be the one right above it
-        } else { // otherwise, the new active window is the one below it
-        }
-        
-        let new_active_ref;
-        {  // sets the selected window to be the new active window
-            let active_ref = &locked_window_ptrs.deref_mut().allocated[i];
-            new_active_ref = active_ref.clone();
-            let strong_ref = new_active_ref.upgrade();
-            if let Some(strong_ref) = strong_ref {
-                strong_ref.lock().active(true);
-            }
-        }
-        locked_window_ptrs.deref_mut().active = new_active_ref.clone(); // updates the weak pointer to the new active window
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    // Note that this function call takes care of setting 
+    // the active pointer field of the window allocator to the new active window
+    let prev_active_window_idx = allocator.switch();
+    let strong_ptr;
+    {
+        let prev_active_window_ptr = match allocator.allocated.get(prev_active_window_idx) {
+            Some(ptr) => ptr,
+            None => {return Err("couldn't get active window ptr")}
+        };
+        let upgraded_ptr = match prev_active_window_ptr.upgrade() {
+            Some(ptr) => ptr,
+            None => {return Err("could not upgrade weak pointer to previously active window");}
+        };
+        strong_ptr  = upgraded_ptr.clone(); 
     }
+    allocator.delete(&strong_ptr);
 
-    return Ok(());
+    Ok(())
 }
 
 
@@ -561,14 +537,23 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
         }
     }
     Ok(())
-}
+}    fn switch(&mut self) -> Option<&'static str>{
 
+    fn switch(&mut self) -> Option<&'static str>{
+
+    fn switch(&mut self) -> Option<&'static str>{
 /// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
+    fn switch(&mut self) -> Option<&'static str>{
 pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'static str> {
+    fn switch(&mut self) -> Option<&'static str>{
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    fn switch(&mut self) -> Option<&'static str>{
     let num_windows = allocator.deref_mut().allocated.len();
+    fn switch(&mut self) -> Option<&'static str>{
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
+    fn switch(&mut self) -> Option<&'static str>{
     let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
+    fn switch(&mut self) -> Option<&'static str>{
     let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
     let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
 
