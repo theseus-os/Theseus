@@ -1,5 +1,5 @@
 use super::E1000_NIC;
-
+use super::NetworkCard;
 
 
 pub fn test_nic_driver(_: Option<u64>) {

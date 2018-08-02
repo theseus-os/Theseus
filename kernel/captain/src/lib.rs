@@ -165,18 +165,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // testing nic
     // TODO: remove this (@Ramla)
-    /* if false {
-        use e1000::test_nic_driver::test_nic_driver;
+    if true {
+        use e1000::test_e1000_driver::test_nic_driver;
         spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
-    } */  
+    }  
 
-    /* if true {
+    if true {
         #[cfg(not(feature = "loadable"))]
         {
             use e1000::rx_poll;
             spawn::spawn_kthread(rx_poll, None, String::from("e1000 polling thread"), None)?;
         }
-    } */
+    }
 
     //test window manager
     if false {

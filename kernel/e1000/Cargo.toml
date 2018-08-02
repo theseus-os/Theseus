@@ -34,5 +34,8 @@ path = "../apic"
 [dependencies.pci]
 path = "../pci"
 
+[dependencies.owning_ref]
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
