@@ -263,15 +263,20 @@ impl WindowAllocator{
         let mut i = 0;
         while i < len {
             {   
-                let reference = self.allocated.get(i).unwrap().upgrade();
-                if let Some(allocated_ref) = reference {
-                    if !Arc::ptr_eq(&allocated_ref, inner) {
-                        if allocated_ref.lock().is_overlapped(x, y, width, height) {
-                            return true;
+                let mut void = false;
+                if let Some(reference) = self.allocated.get(i) {
+                    if let Some(allocated_ref) = reference.upgrade() {
+                        if !Arc::ptr_eq(&allocated_ref, inner) {
+                            if allocated_ref.lock().is_overlapped(x, y, width, height) {
+                                return true;
+                            }
                         }
+                        i += 1;
+                    } else {
+                        void = true;
                     }
-                    i += 1;
-                } else {
+                }
+                if void {
                     self.allocated.remove(i);
                     len -= 1;
                 }

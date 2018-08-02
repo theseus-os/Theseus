@@ -38,7 +38,6 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
@@ -132,7 +131,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         println_raw!("nano_core_start():fail to initialize frame_buffer");
         return Err(rs.unwrap_err());
     }
-
 
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
