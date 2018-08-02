@@ -1,12 +1,6 @@
-#![no_std]
 
-extern crate event_types;
-
-use event_types::Event;
-use super::super::{FrameTextBuffer,Once, WindowObj, frame_buffer};
+use super::super::{FrameTextBuffer, WindowObj, frame_buffer};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
-
-use core::ops::DerefMut;
 
 /// A displayable component for text display
 pub struct TextDisplay {

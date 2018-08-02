@@ -31,14 +31,12 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate frame_buffer;
-extern crate frame_buffer_3d;
 extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
 
-
-#[macro_use] extern crate log;
-#[macro_use] extern crate util;
+//#[macro_use] extern crate log;
+//#[macro_use] extern crate util;
 
 extern crate acpi;
 
@@ -192,7 +190,7 @@ impl WindowAllocator{
 
         let window: WindowObj = WindowObj{
             inner:inner_ref,
-            text_buffer:FrameTextBuffer::new(),
+            //text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
             components:BTreeMap::new(),
         };    
@@ -297,7 +295,7 @@ impl WindowAllocator{
 /// a window object
 pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
-    text_buffer:FrameTextBuffer,
+    //text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
     components:BTreeMap<String, TextDisplay>,
 }
@@ -393,7 +391,7 @@ impl WindowObj{
             Err(rs.unwrap_err())
         } else {
             let percent = rs.unwrap();
-            for (key, item) in self.components.iter_mut() {
+            for (_key, item) in self.components.iter_mut() {
                 let (x, y, width, height) = item.get_size();
                 item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
             }

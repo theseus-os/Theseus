@@ -15,20 +15,22 @@ extern crate spin;
 extern crate volatile;
 extern crate text_display;
 
-#[macro_use] extern crate log;
+//#[macro_use] extern crate log;
+
 
 // Andrew: refernece note below
-extern crate event_types;
-use event_types::Event;
 
-use text_display::TextDisplay;
+//use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
-use core::mem;
-use kernel_config::memory::KERNEL_OFFSET;
-use port_io::Port;
+//use core::mem;
+//use port_io::Port;
 use spin::Mutex;
 use volatile::Volatile;
+
+use kernel_config::memory::KERNEL_OFFSET;
+
+pub mod raw;
 
 /// defined by x86's physical memory maps
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
@@ -38,11 +40,9 @@ const BUFFER_HEIGHT: usize = 25;
 /// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
 
-pub mod raw;
+//type Line = [ScreenChar; BUFFER_WIDTH];
 
-type Line = [ScreenChar; BUFFER_WIDTH];
-
-const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
+/*const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
 static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new(Port::new(0x3D4));
 static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new(Port::new(0x3D5));
 static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new(Port::new(0x3E0));
@@ -60,7 +60,7 @@ const RIGHT_BIT_SHIFT: u8 = 8;
 const DISABLE_SEQ_1: u8 = 0x0A;
 const DISABLE_SEQ_2: u8 = 0x20;
 
-
+*/
 /// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct VgaBuffer { }
 impl VgaBuffer {
