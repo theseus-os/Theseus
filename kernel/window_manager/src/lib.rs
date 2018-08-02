@@ -198,6 +198,8 @@ impl WindowAllocator{
         Ok(window)    
     }
 
+    /// Switches to the next active window in the window allocator list
+    /// This function returns the index of the previously active window in the window_allocator.allocated vector
     fn switch(&mut self) -> usize {
         let mut flag = false;
         let mut i = 0;
@@ -384,7 +386,7 @@ impl WindowObj{
 
     ///resize a window and resize its displayable components proportionally
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
-        {
+        { // checks for overlap
             let inner = self.inner.clone();
             let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
             match allocator.check_overlap(&inner, x,y,width,height) {
@@ -481,7 +483,6 @@ impl WindowInner {
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
-        //Check overlap
         self.draw_border(SCREEN_BACKGROUND_COLOR);
         self.clean();
 
@@ -542,23 +543,12 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
         }
     }
     Ok(())
-}    fn switch(&mut self) -> Option<&'static str>{
-
-    fn switch(&mut self) -> Option<&'static str>{
-
-    fn switch(&mut self) -> Option<&'static str>{
 /// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
-    fn switch(&mut self) -> Option<&'static str>{
 pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'static str> {
-    fn switch(&mut self) -> Option<&'static str>{
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    fn switch(&mut self) -> Option<&'static str>{
     let num_windows = allocator.deref_mut().allocated.len();
-    fn switch(&mut self) -> Option<&'static str>{
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    fn switch(&mut self) -> Option<&'static str>{
     let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    fn switch(&mut self) -> Option<&'static str>{
     let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
     let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
 
