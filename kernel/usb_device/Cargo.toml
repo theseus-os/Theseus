@@ -11,8 +11,7 @@ path = "../../libs/usb_desc"
 [dependencies.usb_req]
 path = "../../libs/usb_req"
 
-[dependencies.usb_uhci]
-path = "../usb_uhci"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

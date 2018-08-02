@@ -1,5 +1,5 @@
 [package]
-name = "uhci"
+name = "usb_uhci"
 version = "0.1.0"
 authors = ["BowenLiu15 <bl28@rice.edu>"]
 
@@ -50,6 +50,9 @@ path = "../spawn"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
+
+[dependencies.usb_device]
+path = "../usb_device"
 
 
 [lib]

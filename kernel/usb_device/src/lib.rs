@@ -5,18 +5,12 @@
 
 extern crate usb_desc;
 extern crate usb_req;
-extern crate usb_uhci;
+
 
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
 use usb_req::{UsbDevReq};
 
 
-pub enum Controller{
-
-    UCHI,
-    EHCI,
-
-}
 pub struct UsbEndpoint{
 
     pub description: UsbEndpDesc,
@@ -37,24 +31,22 @@ impl UsbEndpoint{
 
 pub struct UsbDevice{
 
-    pub port: u32,
-    pub speed: u32,
+    pub port: u8,
+    pub speed: u8,
     pub addr: u32,
     pub maxpacketsize: u32,
-    pub endpoint: UsbEndpoint,
     pub controller: Controller,
 }
 
 impl UsbDevice{
 
-    pub fn new(port: u32, speed: u32, addr: u32, maxpacketsize: u32, endpoint: UsbEndpoint, controller: Controller) -> UsbDevice{
+    pub fn new(port: u8, speed: u8, addr: u32, maxpacketsize: u32, controller: Controller) -> UsbDevice{
 
         UsbDevice{
             port,
             speed,
             addr,
             maxpacketsize,
-            endpoint,
             controller,
         }
 
@@ -123,4 +115,6 @@ pub fn uhci_dev_control(dev: &UsbDevice, trans: &UsbTransfer){
     let size = dev.maxpacketsize;
     let req_type = trans.request.dev_req_type;
     let len = trans.request.len;
+
+
 }

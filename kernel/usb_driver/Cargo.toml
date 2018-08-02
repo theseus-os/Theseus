@@ -1,0 +1,11 @@
+[package]
+name = "usb"
+version = "0.1.0"
+authors = ["BowenLiu15 <bl28@rice.edu>"]
+
+[dependencies]
+[dependencies.usb_device]
+path = "../usb_device"
+
+[dependencies.usb_uhci]
+path = "../usb_uhci"

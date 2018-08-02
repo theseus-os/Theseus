@@ -14,6 +14,7 @@ extern crate spin;
 extern crate kernel_config;
 extern crate port_io;
 extern crate spawn;
+extern crate usb_device;
 
 
 
@@ -30,11 +31,7 @@ use owning_ref::{BoxRef, BoxRefMut};
 use spin::{RwLock, Once, Mutex};
 use irq_safety::MutexIrqSafe;
 use memory::{MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
-
-
-//static CAPA_REGS: Once<BoxRef<MappedPages, CapabilityRegisters>> = Once::new();
-//static OPRA_REGS: Once<BoxRefMut<MappedPages, IORegisters>> = Once::new();
-//static OPRA_REGS: Once<Mutex<BoxRefMut<MappedPages, IORegisters>>> = Once::new();
+use usb_device::{UsbDevice,Controller};
 
 static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
 static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
@@ -44,56 +41,20 @@ static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
 static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
-//static REG_LEGSUP :  Mutex<Port<u16>> = Mutex::new(Port::new(0x6C2));
 
-
-
-//pub fn keep_read(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>)-> Result<(), &'static str>{
-//
-//
-//    spawn::spawn_kthread(loop_frame_list, kernel_mmi_ref, "see usb data struct loop".to_string(), None)?;
-//    Ok(())
-//
-//}
-//
-//fn loop_frame_list(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>)-> Result<(), &'static str>{
-//
-//    for _x in 0..10 {
-//        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-//            let index = current_index() as PhysicalAddress;
-//            let base = frame_list_base() as PhysicalAddress;
-//            if let Ok(pointer_box) = box_framelist_pointer(active_table,base,index){
-//                let pointer = pointer_box.read();
-//                info!("the current pointer:{:?}", pointer);
-//                let qh = box_queue_head(active_table,pointer as PhysicalAddress)?;
-//                info!("QH's horizontal pointer:{:?}", qh.horizontal_pointer.read());
-//                info!("QH's vertical pointer:{:?}", qh.vertical_pointer.read());
-//            }else{
-//                return Err("Couldn't get kernel's ActivePageTable!");
-//            }
-//        } else {
-//            return Err("Couldn't get kernel's ActivePageTable!");
-//        }
-//    }
-//
-//    Ok(())
-//
-//}
-//
-///// Box the Queue Head Data Struct
-//pub fn box_queue_head(active_table: &mut ActivePageTable, pointer_address: PhysicalAddress)
-//                      -> Result<BoxRefMut<MappedPages, UhciQH>, &'static str>{
-//
-//    let data_struct: BoxRefMut<MappedPages, UhciQH>  = BoxRefMut::new(Box::new(map_data_struct(active_table, pointer_address)?))
-//        .try_map_mut(|mp| mp.as_type_mut::<UhciQH>(0))?;
-//
-//    Ok(data_struct)
-//
-//
-//}
 
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+// USB Limits
 
+static USB_STRING_SIZE:u8=                 127;
+
+// ------------------------------------------------------------------------------------------------
+// USB Speeds
+
+static USB_FULL_SPEED:u8=                  0x00;
+static USB_LOW_SPEED:u8=                   0x01;
+static USB_HIGH_SPEED:u8=                  0x02;
 
 /// Initialize the USB 1.1 host controller
 pub fn init() -> Result<(), &'static str> {
@@ -140,6 +101,45 @@ pub fn init() -> Result<(), &'static str> {
     info!("\nUHCI PORTSC2: {:b}\n", REG_PORT2.lock().read());
     Ok(())
  }
+
+
+/// Read the information of the device on the port 1 and config the device
+pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
+    if if_connect_port1(){
+        if if_enable_port1(){
+            let mut speed:u8;
+            if low_speed_attach_port1(){
+                speed = USB_LOW_SPEED;
+            }else{
+                speed = USB_FULL_SPEED;
+            }
+
+            Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI))
+        }
+        Err("Port 1 is not enabled")
+    }
+    Err("No device is connected to the port 1")
+
+}
+
+/// Read the information of the device on the port 1 and config the device
+pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
+    if if_connect_port2(){
+        if if_enable_port2(){
+            let mut speed:u8;
+            if low_speed_attach_port2(){
+                speed = USB_LOW_SPEED;
+            }else{
+                speed = USB_FULL_SPEED;
+            }
+
+            Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI))
+        }
+        Err("Port 2 is not enabled")
+    }
+    Err("No device is connected to the port 2")
+
+}
 
 /// Read the SOF timing value
 /// please read the intel doc for value decode
@@ -413,249 +413,270 @@ const PORT_RWC: u16 =                        (PORT_CONNECTION_CHANGE | PORT_ENAB
 
 
 
-/// See whether the port is in suspend state
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
+/// See whether the port 1 is in suspend state
 /// Return a bool
-pub fn if_suspend(port_num: u8) -> Option<bool>{
+pub fn if_port1_suspend() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_SUSP) != 0;
-        return Some(flag);
-    }else if port_num == 2{
 
-        let flag = (REG_PORT2.lock().read() & PORT_SUSP) != 0;
-        return Some(flag);
-    }else{
-        None
-    }
+    let flag = (REG_PORT1.lock().read() & PORT_SUSP) != 0;
+    flag
 
 }
 
 /// Suspend or Activate the port
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
 /// value: 1 -> suspend, 0 -> activate
-pub fn port_suspend(port_num: u8, value: u8){
+pub fn port1_suspend(value: u8){
 
-    if port_num == 1{
-        let bits = REG_PORT1.lock().read();
-        if value == 1{
-            unsafe{
-                REG_PORT1.lock().write(bits | PORT_SUSP);
-            }
-        } else if value == 0{
-
-            unsafe{
-                REG_PORT1.lock().write(bits & (!PORT_SUSP));
-            }
+    let bits = REG_PORT1.lock().read();
+    if value == 1{
+        unsafe{
+            REG_PORT1.lock().write(bits | PORT_SUSP);
         }
+    } else if value == 0{
 
-    }else if port_num == 2{
-
-        let bits = REG_PORT2.lock().read();
-        if value == 1{
-            unsafe{
-                REG_PORT2.lock().write(bits | PORT_SUSP);
-            }
-        } else if value == 0{
-
-            unsafe{
-                REG_PORT2.lock().write(bits & (!PORT_SUSP));
-            }
+        unsafe{
+            REG_PORT1.lock().write(bits & (!PORT_SUSP));
         }
     }
 
 }
 
-/// See whether the port is in reset state
+/// See whether the port 1 is in reset state
 /// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
 /// Return a bool
-pub fn if_reset(port_num: u8) -> Option<bool>{
+pub fn if_port1_reset() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
-        Some(flag)
-    }else if port_num == 2{
 
-        let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
-        Some(flag)
-    }else{
+    let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
+    flag
 
-        None
-    }
 
 }
 
-/// Reset the port
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
-pub fn port_reset(port_num: u8) {
+/// Reset the port 1
+pub fn port1_reset() {
     if port_num == 1 {
-
         unsafe { REG_PORT1.lock().write(REG_PORT1.lock().read() & (!PORT_RESET)); }
-
-    } else if port_num == 2 {
-
-        unsafe { REG_PORT2.lock().write(REG_PORT2.lock().read() & (!PORT_RESET)); }
     }
 }
 
-/// See whether low speed device attached
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
+/// See whether low speed device attached to port 1
 /// Return a bool
-pub fn low_speed_attach(port_num: u8) -> Option<bool>{
+pub fn low_speed_attach_port1() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_LSDA) != 0;
-        Some(flag)
-    }else if port_num == 2{
+    let flag = (REG_PORT1.lock().read() & PORT_LSDA) != 0;
+    flag
 
-        let flag = (REG_PORT2.lock().read() & PORT_LSDA) != 0;
-        Some(flag)
-    }else{
-        None
-    }
 
 }
 
 /// See whether Port enbale/disable state changes
 /// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
 /// Return a bool
-pub fn enable_change(port_num: u8) -> Option<bool>{
+pub fn enable_change_port1() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_ENABLE_CHANGE) != 0;
-        Some(flag)
-    }else if port_num == 2{
 
-        let flag = (REG_PORT2.lock().read() & PORT_ENABLE_CHANGE) != 0;
-        Some(flag)
-    }else{
-        None
-    }
+    let flag = (REG_PORT1.lock().read() & PORT_ENABLE_CHANGE) != 0;
+    flag
+
 
 }
 
-/// Clear Enable Change bit
-pub fn enable_change_clear(port_num: u8) {
-    if port_num == 1 {
+/// Clear Enable Change bit of port 1
+pub fn enable_change_clear_port1() {
 
         unsafe { REG_PORT1.lock().write(PORT_ENABLE_CHANGE); }
-
-    } else if port_num == 2 {
-
-        unsafe { REG_PORT1.lock().write(PORT_ENABLE_CHANGE); }
-    }
 }
 
 
-/// See whether the port is in enable state
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
+/// See whether the port 1 is in enable state
 /// Return a bool
-pub fn if_enable(port_num: u8) -> Option<bool>{
+pub fn if_enable_port1() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
-        Some(flag)
-    }else if port_num == 2{
 
-        let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
-        Some(flag)
-    }else{
+    let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
+    flag
 
-        None
-    }
 
 }
 
-/// Enable or Disable the port
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
+/// Enable or Disable the port 1
 /// value: 1 -> enable; 0 -> disable
-pub fn port_enable(port_num: u8, value: u8) {
-    if port_num == 1{
-        let bits = REG_PORT1.lock().read();
-        if value == 1{
-            unsafe{
-                REG_PORT1.lock().write(bits | PORT_ENABLE);
-            }
-        } else if value == 0{
+pub fn port1_enable(value: u8) {
 
-            unsafe{
-                REG_PORT1.lock().write(bits & (!PORT_ENABLE));
-            }
+    let bits = REG_PORT1.lock().read();
+    if value == 1{
+        unsafe{
+            REG_PORT1.lock().write(bits | PORT_ENABLE);
         }
-
-    }else if port_num == 2{
-
-        let bits = REG_PORT2.lock().read();
-        if value == 1{
-            unsafe{
-                REG_PORT2.lock().write(bits | PORT_ENABLE);
-            }
-        } else if value == 0{
-
-            unsafe{
-                REG_PORT2.lock().write(bits & (!PORT_ENABLE));
-            }
+    } else if value == 0{
+        unsafe{
+            REG_PORT1.lock().write(bits & (!PORT_ENABLE));
         }
     }
+
 }
 
-/// See whether Port connect state changes
-/// Param:
-/// port_num: 1 -> port 1; 2 -> port 2
+/// See whether Port 1 connect state changes
 /// Return a bool
-pub fn connect_change(port_num: u8) -> Option<bool>{
+pub fn connect_change_port1() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_CONNECTION_CHANGE) != 0;
-        Some(flag)
-    }else if port_num == 2{
 
-        let flag = (REG_PORT2.lock().read() & PORT_CONNECTION_CHANGE) != 0;
-        Some(flag)
-    }else{
+    let flag = (REG_PORT1.lock().read() & PORT_CONNECTION_CHANGE) != 0;
+    flag
 
-        None
-    }
 
 }
 
-/// Clear Connect Change bit
-/// port_num: 1 -> port 1; 2 -> port 2
-pub fn connect_change_clear(port_num: u8) {
-    if port_num == 1 {
+/// Clear Connect Change bit in port 1
+pub fn connect_change_clear_port1() {
 
-        unsafe { REG_PORT1.lock().write(PORT_CONNECTION_CHANGE); }
 
-    } else if port_num == 2 {
+    unsafe { REG_PORT1.lock().write(PORT_CONNECTION_CHANGE); }
 
-        unsafe { REG_PORT1.lock().write(PORT_CONNECTION_CHANGE); }
-    }
 }
 
 /// See whether a device is connected to this port
-/// port_num: 1 -> port 1; 2 -> port 2
-pub fn if_connect(port_num: u8) -> Option<bool>{
+pub fn if_connect_port1() -> bool{
 
-    if port_num == 1{
-        let flag = (REG_PORT1.lock().read() & PORT_CONNECTION) != 0;
-        Some(flag)
-    }else if port_num == 2{
+    let flag = (REG_PORT1.lock().read() & PORT_CONNECTION) != 0;
+    flag
 
-        let flag = (REG_PORT2.lock().read() & PORT_CONNECTION) != 0;
-        Some(flag)
-    }else{
-        None
+
+}
+
+/// See whether the port 2 is in suspend state
+/// Return a bool
+pub fn if_port2_suspend() -> bool{
+
+
+    let flag = (REG_port2.lock().read() & PORT_SUSP) != 0;
+    flag
+
+}
+
+/// Suspend or Activate the port
+/// value: 1 -> suspend, 0 -> activate
+pub fn port2_suspend(value: u8){
+
+    let bits = REG_port2.lock().read();
+    if value == 1{
+        unsafe{
+            REG_port2.lock().write(bits | PORT_SUSP);
+        }
+    } else if value == 0{
+
+        unsafe{
+            REG_port2.lock().write(bits & (!PORT_SUSP));
+        }
     }
 
 }
+
+/// See whether the port 2 is in reset state
+/// Param:
+/// Return a bool
+pub fn if_port2_reset() -> bool{
+
+
+    let flag = (REG_port2.lock().read() & PORT_RESET) != 0;
+    flag
+
+
+}
+
+/// Reset the port 2
+pub fn port2_reset() {
+    if port_num == 1 {
+        unsafe { REG_port2.lock().write(REG_port2.lock().read() & (!PORT_RESET)); }
+    }
+}
+
+/// See whether low speed device attached to port 2
+/// Return a bool
+pub fn low_speed_attach_port2() -> bool{
+
+    let flag = (REG_port2.lock().read() & PORT_LSDA) != 0;
+    flag
+
+
+}
+
+/// See whether Port enbale/disable state changes
+/// Param:
+/// Return a bool
+pub fn enable_change_port2() -> bool{
+
+
+    let flag = (REG_port2.lock().read() & PORT_ENABLE_CHANGE) != 0;
+    flag
+
+
+}
+
+/// Clear Enable Change bit of port 2
+pub fn enable_change_clear_port2() {
+
+    unsafe { REG_port2.lock().write(PORT_ENABLE_CHANGE); }
+}
+
+
+/// See whether the port 2 is in enable state
+/// Return a bool
+pub fn if_enable_port2() -> bool{
+
+
+    let flag = (REG_port2.lock().read() & PORT_RESET) != 0;
+    flag
+
+
+}
+
+/// Enable or Disable the port 2
+/// value: 1 -> enable; 0 -> disable
+pub fn port2_enable(value: u8) {
+
+    let bits = REG_port2.lock().read();
+    if value == 1{
+        unsafe{
+            REG_port2.lock().write(bits | PORT_ENABLE);
+        }
+    } else if value == 0{
+        unsafe{
+            REG_port2.lock().write(bits & (!PORT_ENABLE));
+        }
+    }
+
+}
+
+/// See whether port 2 connect state changes
+/// Return a bool
+pub fn connect_change_port2() -> bool{
+
+
+    let flag = (REG_port2.lock().read() & PORT_CONNECTION_CHANGE) != 0;
+    flag
+
+
+}
+
+/// Clear Connect Change bit in port 2
+pub fn connect_change_clear_port2() {
+
+
+    unsafe { REG_port2.lock().write(PORT_CONNECTION_CHANGE); }
+
+}
+
+/// See whether a device is connected to this port
+pub fn if_connect_port2() -> bool{
+
+    let flag = (REG_port2.lock().read() & PORT_CONNECTION) != 0;
+    flag
+
+
+}
+
 // ------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------------------------------------------------------
@@ -824,4 +845,6 @@ pub struct UhciQH
     pub horizontal_pointer: Volatile<u32>,
     pub vertical_pointer: Volatile<u32>,
 }
+
+
 
