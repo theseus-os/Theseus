@@ -88,12 +88,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
                 // Deletes the active window (whichever window Ctrl + W is logged in)
                 if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
-                    match window_manager::delete_active_window() {
-                        Ok(_) => { },
-                        Err(err) => {error!("{}", err);}
-                    }
-                    meta_keypress = true;
-                    event.mark_completed();
+                    window_manager::send_event_to_active(Event::ExitEvent)?; // tells application to exit
                 }
             }
             _ => { }
@@ -101,7 +96,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
         // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
         if !meta_keypress {
-            window_manager::put_event_into_active_app(event.deref().clone())?;
+            window_manager::send_event_to_active(event.deref().clone())?;
             event.mark_completed();
 
         }

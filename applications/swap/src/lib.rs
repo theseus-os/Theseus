@@ -15,14 +15,12 @@ extern crate memory;
 extern crate mod_mgmt;
 
 use core::ops::DerefMut;
-use alloc::{Vec, String, BTreeMap};
+use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
 use memory::{get_module, ModuleArea};
 use mod_mgmt::metadata::StrongCrateRef;
-use itertools::Itertools;
-
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

@@ -12,8 +12,8 @@ use alloc::string::String;
 pub enum Event {
     InputEvent(KeyboardInputEvent),
     OutputEvent(PrintOutputEvent),
-    ResizeEvent(WindowResizeEvent), // tuple containing x, y, width, and height arguments for resizing the window
-    DisplayEvent,
+    // Tells an application that the window manager has resized the application's window so that it knows to 
+    // perform any necessary refresh tasks
     ExitEvent,
 }
 
@@ -26,9 +26,6 @@ impl Event {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 
-    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
-        Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
-    }
 }
 
 /// use this to deliver input events (such as keyboard input) to the input_event_manager.
@@ -55,25 +52,6 @@ impl PrintOutputEvent {
     pub fn new(s: String) -> PrintOutputEvent {
         PrintOutputEvent {
             text: s,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WindowResizeEvent {
-    pub x: usize,
-    pub y: usize,
-    pub width: usize, 
-    pub height: usize, 
-}
-
-impl WindowResizeEvent {
-    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
-        WindowResizeEvent {
-            x: x,
-            y: y,
-            width: width, 
-            height: height,
         }
     }
 }

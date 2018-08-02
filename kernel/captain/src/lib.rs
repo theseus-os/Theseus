@@ -38,7 +38,6 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
@@ -60,7 +59,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-use frame_buffer::text_buffer;
+//use frame_buffer::text_buffer;
 
 
 
@@ -133,7 +132,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         return Err(rs.unwrap_err());
     }
 
-
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
 
@@ -168,13 +166,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         use e1000::test_nic_driver::test_nic_driver;
         spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
     }  
-
-    //test window manager
-    if false {
-        use window_manager::test_window_manager;
-        spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
-        spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
-    }
 
     // create and jump to the first userspace thread
     if false {

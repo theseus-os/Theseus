@@ -39,17 +39,8 @@ path = "../../libs/keycodes_ascii"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.frame_buffer_3d]
-path = "../frame_buffer_3d"
-
 [dependencies.acpi]
 path = "../acpi"
-
-[dependencies.util]
-path = "../../libs/util"
-
-[dependencies.text_display]
-path = "../text_display"
 
 [dependencies.event_types]
 path = "../event_types"

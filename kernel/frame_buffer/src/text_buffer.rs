@@ -1,6 +1,4 @@
 extern crate tsc;
-extern crate text_display;
-
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use super::{Mutex, Buffer, FRAME_DRAWER};
 
@@ -44,7 +42,7 @@ impl FrameTextBuffer {
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let mut curr_line = 0;
         let mut curr_column = 0;
-        let mut cursor_pos = 0;
+        //let mut cursor_pos = 0;
 
         let buffer_width = width/CHARACTER_WIDTH;
         let buffer_height = height/CHARACTER_HEIGHT;
@@ -59,7 +57,7 @@ impl FrameTextBuffer {
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
                     bg_color);
-                cursor_pos += buffer_width - curr_column;
+                //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
             } else {
@@ -72,7 +70,7 @@ impl FrameTextBuffer {
                 }
                 self.print_byte(buffer, byte, font_color, bg_color, x, y, curr_line, curr_column);
                 curr_column += 1;
-                cursor_pos += 1;
+                //cursor_pos += 1;
             }
         }
         self.fill_blank (buffer, 
@@ -132,52 +130,6 @@ impl FrameTextBuffer {
     
 }
 
-
-// Implements TextDisplay trait for vga buffer.
-/*impl TextDisplay for FrameTextBuffer {
-
-    fn disable_cursor(&mut self) {
-        self.cursor.disable();
-        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT,  
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, BACKGROUND_COLOR);
-
-    }
-
-    fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        self.cursor.enabled = true;
-        self.cursor.update(line as usize, column as usize, reset);
-        fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR); 
-    }
-
-    fn cursor_blink(&mut self) {
-        if self.cursor.blink() {
-            let color = if self.cursor.show { FONT_COLOR } else { BACKGROUND_COLOR };
-            fill_rectangle(self.cursor.column * CHARACTER_WIDTH, self.cursor.line * CHARACTER_HEIGHT, 
-                    CHARACTER_WIDTH, CHARACTER_HEIGHT, color); 
-        }
-
-    }
-
-    /// Returns a tuple containing (buffer height, buffer width)
-    fn get_dimensions(&self) -> (usize, usize) {
-        (BUFFER_WIDTH, BUFFER_HEIGHT)
-    }
-
-    /// Requires that a str slice that will exactly fit the frame buffer
-    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
-    /// Print every byte and fill the blank with background color
-    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-        self.print_by_bytes (0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, slice)     
-    }
-
-    fn get_key_event(&self) -> Option<Event> {
-        // Andrew: fix instead of using as trait
-        None
-    }
-
-}*/
-
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 
 ///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
 pub struct Cursor {
@@ -187,7 +139,6 @@ pub struct Cursor {
     freq:u64,
     time:TscTicks,
     show:bool,
-    color:u32,
 }
 
 impl Cursor {
@@ -197,10 +148,9 @@ impl Cursor {
             line:li,
             column:col,
             enabled:ena,
-            freq:500000000,
+            freq:400000000,
             time:tsc_ticks(),
             show:true,
-            color:0xFFFFFF,
         }
     }
 
@@ -230,10 +180,14 @@ impl Cursor {
     pub fn blink(&mut self) -> bool{
         if self.enabled {
             let time = tsc_ticks();
-            if time.sub(&(self.time)).unwrap().to_ns().unwrap() >= self.freq {
-                self.time = time;
-                self.show = !self.show;
-                return true
+            if let Some(duration) = time.sub(&(self.time)) {
+                if let Some(ns) = duration.to_ns() {
+                    if ns >= self.freq {
+                        self.time = time;
+                        self.show = !self.show;
+                        return true;
+                    }
+                }
             }
         }
         false

@@ -32,8 +32,6 @@ use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use task::TaskRef;
-use alloc::arc::Arc;
-use spin::Mutex;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -83,8 +81,6 @@ struct Terminal {
     stdout_buffer: String,
     /// The input_event_manager's standard input buffer to store what the user inputs into the terminal application
     stdin_buffer: String,
-    /// The input_event_manager's standard error buffer to store any errors logged by the program
-    stderr_buffer: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -144,7 +140,6 @@ impl Terminal {
             prompt_string: prompt_string,
             stdout_buffer: String::new(),
             stdin_buffer: String::new(),
-            stderr_buffer: String::new(),
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
@@ -174,11 +169,6 @@ impl Terminal {
         self.scrollback_buffer.push_str(&s);
     }
 
-    /// Pushes a string to the standard error buffer and the scrollback buffer with a new line
-    fn push_to_stderr(&mut self, s: String) {
-        self.stderr_buffer.push_str(&s);
-        self.scrollback_buffer.push_str(&s);
-    }
     /// Pushes a string to the standard in buffer and the scrollback buffer with a new line
     fn push_to_stdin(&mut self, s: String) {
         let buffer_len = self.stdin_buffer.len();
@@ -196,11 +186,10 @@ impl Terminal {
     }
 
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
-        let display_opt = self.window.get_displayable(name);
-        if display_opt.is_none() {
+        if let Some(text_display) = self.window.get_displayable(name){
+            text_display.get_dimensions()
+        } else {
             (0, 0)
-        } else {        
-            display_opt.unwrap().get_dimensions()  
         }
     }
 
@@ -423,14 +412,11 @@ impl Terminal {
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
         if let Some(slice) = result {
-            let display_opt = self.window.get_displayable(display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = self.window.get_displayable(display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
+            } else {
+                return Err("faild to get the text displayable component")
             }
-
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -446,13 +432,11 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            let display_opt = self.window.get_displayable(display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = self.window.get_displayable(display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-                self.absolute_cursor_pos = cursor_pos;
+                self.absolute_cursor_pos = cursor_pos;          
+            } else {
+                return Err("faild to get the text displayable component")
             }
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -539,12 +523,10 @@ impl Terminal {
             new_y -=1;
         }
 
-        let display_opt = self.window.get_displayable(display_name);
-        if display_opt.is_none() {
-            return Err("fail to get the text display component");
-        } else {
-            let text_display = display_opt.unwrap();
+        if let Some(text_display) = self.window.get_displayable(display_name){
             text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
+        } else {
+            return Err("faild to get the text displayable component")
         }
         return Ok(());
     }
@@ -555,21 +537,6 @@ impl Terminal {
         if keyevent.action != KeyAction::Pressed {
             return Ok(()); 
         }
-
-        // window manager resize function test
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::B {
-            let win_pointer = Arc::new(Mutex::new(&self.window));
-            let gap_size = window_manager::GAP_SIZE;
-            let width = 500;
-            let height = 200;
-            match window_manager::put_event_into_app(win_pointer, Event::new_resize_event(
-                gap_size, gap_size, width, height)) {
-                    Ok(_) => { }
-                    Err(err) => {error!("couldn't resize window because {}", err);}
-                }
-            return Ok(());
-        }
-
 
         // Ctrl+C signals the main loop to exit the task
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
@@ -601,7 +568,9 @@ impl Terminal {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                self.window.disable_cursor();
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }
                 let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
                 self.input_string.remove(remove_idx);
             }
@@ -609,8 +578,10 @@ impl Terminal {
 
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-            // Does nothing if the user presses enter without any command
             if self.input_string.len() == 0 {
+                // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
+                let prompt_string = self.prompt_string.clone();
+                self.print_to_terminal(format!("\n{}", prompt_string))?;
                 return Ok(());
             } else if self.current_task_id != 0 { // prevents the user from trying to execute a new command while one is currently running
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
@@ -653,7 +624,9 @@ impl Terminal {
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0;
-                self.window.disable_cursor();
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }            
             }
             return Ok(());
         }
@@ -668,7 +641,9 @@ impl Terminal {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line(display_name);
-                self.window.disable_cursor();                
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }
             }
             return Ok(());
         }
@@ -685,7 +660,9 @@ impl Terminal {
             }
             self.page_up(display_name);
             self.is_scroll_end = false;
-            self.window.disable_cursor();
+            if let Some(text_display) = self.window.get_displayable(display_name){
+                text_display.disable_cursor();
+            }
             return Ok(());
         }
 
@@ -906,11 +883,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     loop {
         //Handle cursor blink
         {
-            let display_opt = terminal.window.get_displayable(&display_name);
-            if display_opt.is_none() {
-                return Err("fail to get the text display component");
-            } else {
-                let text_display = display_opt.unwrap();
+            if let Some(text_display) = terminal.window.get_displayable(&display_name){
                 text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
             }
         }
@@ -935,7 +908,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         } 
 
 
-        // Handles the cleanup of any application task that has finished running
+        // Handles the cleanup of any application task that has finished running, including refreshing the display
         terminal.task_handler()?;
         
         // Looks at the input queue from the window manager
@@ -949,24 +922,11 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         };
 
         match event {
-            // Used by the windowing manager to indicate to the termianl to refresh its display upon terminal resizing
-            Event::DisplayEvent => {
-                terminal.refresh_display(&display_name);
-            }
             // Returns from the main loop so that the terminal object is dropped
             Event::ExitEvent => {
                 trace!("exited terminal");
+                window_manager::delete(terminal.window)?;
                 return Ok(());
-            }
-
-            // All resize events to the terminal application should be dealt with here so that
-            // all associated tasks with a window resize can be correctly completed
-            Event::ResizeEvent(ref rev) => {
-                match terminal.window.resize(rev.x, rev.y, rev.width, rev.height) {
-                    Ok(_) => { }
-                    Err(err) => {error!("{}", err);} // terminal should not exit even if the resize cannot be completed
-                }
-                terminal.refresh_display(&display_name)
             }
 
             // Handles ordinary keypresses

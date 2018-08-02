@@ -18,7 +18,7 @@ extern crate memory;
 extern crate util;
 
 use core::ptr::Unique;
-use spin::Mutex;
+use spin::{Mutex};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
@@ -38,6 +38,8 @@ pub const FRAME_BUFFER_WIDTH:usize = 640;
 
 ///The height of the screen
 pub const FRAME_BUFFER_HEIGHT:usize = 400;
+
+const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
@@ -59,12 +61,12 @@ pub fn init() -> Result<(), &'static str > {
     if rs.is_ok() {
          trace!("frame_buffer text initialized.");
     } else {
-         debug!("frame_buffer::init(): {}", rs.unwrap_err());
+         return Err("frame_buffer::init() fails in font initiailizing");
     }
 
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*4;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*PIXEL_BYTES;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");

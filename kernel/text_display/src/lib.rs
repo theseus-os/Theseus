@@ -1,6 +1,5 @@
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate event_types;
 
 use event_types::Event;
@@ -15,12 +14,12 @@ pub struct TextDisplay {
 
 impl TextDisplay
 {
-    /*pub fn new(x:usize, y:usize, width:usize, height:usize) -> TextDisplay {
+    pub fn new(x:usize, y:usize, width:usize, height:usize) -> TextDisplay {
         TextDisplay{
             x:x,
             y:y,
             width:width,
-            height:height,
+            height:height
         }
     }
 
@@ -41,6 +40,10 @@ impl TextDisplay
     /// Display the cursor and let it blinks
     pub fn cursor_blink(&mut self){
 
-    }*/
+    }
+
+    pub fn get_size(&self) -> (usize, usize, usize, usize){
+        (self.x, self.y, self.width, self.height)
+    }
 }
 
