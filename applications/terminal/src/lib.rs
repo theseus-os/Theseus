@@ -58,7 +58,7 @@ pub fn main(_args: Vec<String>) -> isize {
 }
 
 
-pub struct Terminal {
+struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
     /// The string that stores the users keypresses after the prompt
@@ -66,6 +66,8 @@ pub struct Terminal {
     /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
     /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
     correct_prompt_position: bool,
+    // Name of the displayable object of the terminal
+    display_name: &'static str,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -101,14 +103,6 @@ pub struct Terminal {
     print_producer: DFQueueProducer<Event>,
 }
 
-/// Manual implementation of debug just prints out the terminal reference number
-use core::fmt;
-impl fmt::Debug for Terminal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Point {{ terminal application }}")
-    }
-}
-
 
 /// Terminal Structure that allows multiple terminals to be individually run.
 /// There are now two queues that constitute the event-driven terminal architecture
@@ -141,6 +135,7 @@ impl Terminal {
             // internal number used to track the terminal object 
             window: window_object,
             input_string: String::new(),
+            display_name: "content",
             correct_prompt_position: true,
             command_history: Vec::new(),
             history_index: 0,
@@ -200,7 +195,7 @@ impl Terminal {
         self.scrollback_buffer.remove(buffer_len - self.left_shift -1);
     }
 
-    fn get_displayable_dimensions(&self, name:&String) -> (usize, usize){
+    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
         let display_opt = self.window.get_displayable(name);
         if display_opt.is_none() {
             (0, 0)
@@ -215,7 +210,7 @@ impl Terminal {
     /// If the text display's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
-    fn calc_start_idx(&mut self, end_idx: usize, display_name:&String) -> (usize, usize) {
+    fn calc_start_idx(&mut self, end_idx: usize, display_name:&str) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_displayable_dimensions(display_name);
         let mut start_idx = end_idx;
         let result;
@@ -271,7 +266,7 @@ impl Terminal {
    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize, display_name:&String) -> usize {
+    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> usize {
         let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
@@ -321,7 +316,7 @@ impl Terminal {
     }
 
     /// Scrolls up by the text display equivalent of one line
-    fn scroll_up_one_line(&mut self, display_name:&String) {
+    fn scroll_up_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
@@ -356,7 +351,7 @@ impl Terminal {
     }
 
     /// Scrolls down the text display equivalent of one line
-    fn scroll_down_one_line(&mut self, display_name:&String) {
+    fn scroll_down_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
@@ -403,14 +398,14 @@ impl Terminal {
     }
     
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
-    fn page_up(&mut self, display_name:&String) {
+    fn page_up(&mut self, display_name:&str) {
         let new_end_idx = self.scroll_start_idx;
         let new_start_idx = self.calc_start_idx(new_end_idx, display_name);
         self.scroll_start_idx = new_start_idx.0;
     }
 
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
-    fn page_down(&mut self, display_name:&String) {
+    fn page_down(&mut self, display_name:&str) {
         let start_idx = self.scroll_start_idx;
         let new_start_idx = self.calc_end_idx(start_idx, display_name);
         let new_end_idx = self.calc_end_idx(new_start_idx, display_name);
@@ -423,7 +418,7 @@ impl Terminal {
     }
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
-    fn update_display_forwards(&mut self, display_name:&String, start_idx: usize) -> Result<(), &'static str> {
+    fn update_display_forwards(&mut self, display_name:&str, start_idx: usize) -> Result<(), &'static str> {
         let end_idx = self.calc_end_idx(start_idx, display_name); 
         self.scroll_start_idx = start_idx;
         let result  = self.scrollback_buffer.get(start_idx..=end_idx);
@@ -444,7 +439,7 @@ impl Terminal {
 
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
-    fn update_display_backwards(&mut self, display_name:&String, end_idx: usize) -> Result<(), &'static str> {
+    fn update_display_backwards(&mut self, display_name:&str, end_idx: usize) -> Result<(), &'static str> {
         let (start_idx, cursor_pos) = self.calc_start_idx(end_idx, display_name);
         self.scroll_start_idx = start_idx;
 
@@ -519,6 +514,7 @@ impl Terminal {
                             }
                             // Resets the bool to true once the print prompt has been redisplayed
                             self.correct_prompt_position = true;
+                            self.refresh_display(self.display_name);
                         },
                         // None value indicates task has not yet finished so does nothing
                     None => {
@@ -531,7 +527,7 @@ impl Terminal {
     
 
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self, display_name:&String) -> Result<(), &'static str> { 
+    fn cursor_handler(&mut self, display_name:&str) -> Result<(), &'static str> { 
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
@@ -554,7 +550,7 @@ impl Terminal {
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
-    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&String) -> Result<(), &'static str> {       
+    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&str) -> Result<(), &'static str> {       
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
             return Ok(()); 
@@ -838,7 +834,7 @@ impl Terminal {
     }
     
     /// Parses the string that the user inputted when Enter is pressed into the form of command (String) + arguments (Vec<String>)
-    fn parse_input(&self, input_string: &String) -> (String, Vec<String>) {
+    fn parse_input(&self, input_string: &str) -> (String, Vec<String>) {
         let mut words: Vec<String> = input_string.split_whitespace().map(|s| s.to_string()).collect();
         // This will never panic because pressing the enter key does not register if she has not entered anything
         let mut command_string = words.remove(0);
@@ -861,7 +857,7 @@ impl Terminal {
         
     }
     
-    fn refresh_display(&mut self, display_name:&String) {
+    fn refresh_display(&mut self, display_name:&str) {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
@@ -898,15 +894,15 @@ impl Terminal {
 /// This allows for clean appending to the scrollback buffer and prevents interleaving of text
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
-    let mut refresh_display = true;
-    let display_name = String::from("content");
+    let display_name = terminal.display_name.clone();
     { 
-        let rs = terminal.window.add_displayable(String::clone(&display_name), 
+        let rs = terminal.window.add_displayable(display_name, 
             TextDisplay::new(100, 50, 400, 300));
         if rs.is_err(){
             //handle error
         }
     }
+    terminal.refresh_display(terminal.display_name);
     loop {
         //Handle cursor blink
         {
@@ -928,7 +924,6 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    refresh_display = true;
                     terminal.refresh_display(&display_name);
                     terminal.correct_prompt_position = false;
                 },
@@ -942,10 +937,6 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
         // Handles the cleanup of any application task that has finished running
         terminal.task_handler()?;
-        if refresh_display == true {
-            terminal.refresh_display(&display_name);
-            refresh_display = false;
-        }
         
         // Looks at the input queue from the window manager
         // If it has unhandled items, it handles them with the match
@@ -980,7 +971,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
             // Handles ordinary keypresses
             Event::InputEvent(ref input_event) => {
-                terminal.handle_key_event(input_event.key_event, &display_name)?;
+                terminal.handle_key_event(input_event.key_event, display_name)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
                     terminal.refresh_display(&display_name);
@@ -990,18 +981,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         }
         
     }  
-    Ok(())
 }
-
-// const WELCOME_STRING: &'static str = "\n\n
-//  _____ _                              
-// |_   _| |__   ___  ___  ___ _   _ ___ 
-//   | | | '_ \\ / _ \\/ __|/ _ \\ | | / __|
-//   | | | | | |  __/\\__ \\  __/ |_| \\__ \\
-//   |_| |_| |_|\\___||___/\\___|\\__,_|___/ \n\n";
-
-
-
 
 
 

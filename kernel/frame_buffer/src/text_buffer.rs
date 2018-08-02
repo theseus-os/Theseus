@@ -1,20 +1,10 @@
 extern crate tsc;
 extern crate text_display;
 
-// andrew: fix
-extern crate event_types;
-// use event_types::Event;
-use text_buffer::event_types::Event;
-
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Mutex, Buffer, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, FRAME_DRAWER, fill_rectangle};
+use super::{Mutex, Buffer, FRAME_DRAWER};
 
 use self::tsc::{tsc_ticks, TscTicks};
-use self::text_display::TextDisplay;
-
-
-const BUFFER_WIDTH:usize = FRAME_BUFFER_WIDTH / CHARACTER_WIDTH;
-const BUFFER_HEIGHT:usize = FRAME_BUFFER_HEIGHT / CHARACTER_HEIGHT;
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]

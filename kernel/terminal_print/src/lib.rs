@@ -44,7 +44,7 @@ macro_rules! print {
 /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
 /// applications so that applications can print to the correct terminal
 lazy_static! {
-    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
+    static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 }
 
 /// Adds the (child application's task ID, parent terminal print_producer) key-val pair to the map 

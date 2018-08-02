@@ -44,7 +44,7 @@ extern crate acpi;
 
 
 use spin::{Once, Mutex};
-use alloc::{VecDeque, String};
+use alloc::VecDeque;
 use alloc::btree_map::BTreeMap;
 use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
@@ -308,7 +308,7 @@ pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<String, TextDisplay>,
+    components:BTreeMap<&'static str, TextDisplay>,
 }
 
 
@@ -320,7 +320,7 @@ impl WindowObj{
     }
 
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key:String, displayable:TextDisplay) -> Result<(), &'static str>{
+    pub fn add_displayable(&mut self, key:&'static str, displayable:TextDisplay) -> Result<(), &'static str>{
         //TODO check fit
         let (x, y, width, height) = displayable.get_size();
         let inner = self.inner.lock();
@@ -331,15 +331,15 @@ impl WindowObj{
             return Err("The displayable does not fit the window size.");
         } 
 
-        self.components.insert(key.clone(), displayable);
+        self.components.insert(key, displayable);
         Ok(())
     }
 
-    pub fn remove_displayable(&mut self, key:&String){
+    pub fn remove_displayable(&mut self, key:&str){
         self.components.remove(key);
     }
 
-    pub fn get_displayable(&self, key:&String) -> Option<&TextDisplay> {
+    pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
         return self.components.get(key);
     }
 
@@ -410,7 +410,7 @@ impl WindowObj{
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
-    /*pub fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
+    /*pub fn display_&str(&mut self, slice: &str) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
             inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
