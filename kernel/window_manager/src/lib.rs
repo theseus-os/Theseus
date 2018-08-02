@@ -46,6 +46,7 @@ use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
 use frame_buffer::text_buffer::{FrameTextBuffer};
 use event_types::Event;
+use alloc::string::{String, ToString};
 
 pub mod displayable;
 
@@ -301,7 +302,7 @@ pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<&'static str, TextDisplay>,
+    components:BTreeMap<String, TextDisplay>,
 }
 
 
@@ -313,8 +314,9 @@ impl WindowObj{
 
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key:&'static str, displayable:TextDisplay) -> Result<(), &'static str>{
+    pub fn add_displayable(&mut self, key: &str, displayable:TextDisplay) -> Result<(), &'static str>{
         //TODO check fit
+        let key = key.to_string();
         let (x, y, width, height) = displayable.get_size();
         let inner = self.inner.lock();
         if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||

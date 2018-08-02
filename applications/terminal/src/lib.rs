@@ -65,7 +65,7 @@ struct Terminal {
     /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
     correct_prompt_position: bool,
     // Name of the displayable object of the terminal
-    display_name: &'static str,
+    display_name: String,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -131,7 +131,7 @@ impl Terminal {
             // internal number used to track the terminal object 
             window: window_object,
             input_string: String::new(),
-            display_name: "content",
+            display_name: String::from("content"),
             correct_prompt_position: true,
             command_history: Vec::new(),
             history_index: 0,
@@ -498,7 +498,8 @@ impl Terminal {
                             }
                             // Resets the bool to true once the print prompt has been redisplayed
                             self.correct_prompt_position = true;
-                            self.refresh_display(self.display_name);
+                            let display_name = &self.display_name.clone();
+                            self.refresh_display(display_name);
                         },
                         // None value indicates task has not yet finished so does nothing
                     None => {
@@ -873,13 +874,13 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
     { 
-        let rs = terminal.window.add_displayable(display_name, 
+        let rs = terminal.window.add_displayable(&display_name, 
             TextDisplay::new(100, 50, 400, 300));
         if rs.is_err(){
             //handle error
         }
     }
-    terminal.refresh_display(terminal.display_name);
+    terminal.refresh_display(&display_name);
     loop {
         //Handle cursor blink
         {
@@ -930,15 +931,15 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             }
 
             Event::ResizeEvent(ref _rev) => {
-                terminal.refresh_display(display_name); // application refreshes display after resize event is received
+                terminal.refresh_display(&display_name); // application refreshes display after resize event is received
             }
 
             // Handles ordinary keypresses
             Event::InputEvent(ref input_event) => {
-                terminal.handle_key_event(input_event.key_event, display_name)?;
+                terminal.handle_key_event(input_event.key_event, &display_name)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
-                    terminal.refresh_display(display_name);
+                    terminal.refresh_display(&display_name);
                 }
             }
             _ => { }
