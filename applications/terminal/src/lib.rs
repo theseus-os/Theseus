@@ -81,8 +81,6 @@ pub struct Terminal {
     stdout_buffer: String,
     /// The input_event_manager's standard input buffer to store what the user inputs into the terminal application
     stdin_buffer: String,
-    /// The input_event_manager's standard error buffer to store any errors logged by the program
-    stderr_buffer: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -149,7 +147,6 @@ impl Terminal {
             prompt_string: prompt_string,
             stdout_buffer: String::new(),
             stdin_buffer: String::new(),
-            stderr_buffer: String::new(),
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
@@ -179,11 +176,6 @@ impl Terminal {
         self.scrollback_buffer.push_str(&s);
     }
 
-    /// Pushes a string to the standard error buffer and the scrollback buffer with a new line
-    fn push_to_stderr(&mut self, s: String) {
-        self.stderr_buffer.push_str(&s);
-        self.scrollback_buffer.push_str(&s);
-    }
     /// Pushes a string to the standard in buffer and the scrollback buffer with a new line
     fn push_to_stdin(&mut self, s: String) {
         let buffer_len = self.stdin_buffer.len();
@@ -986,7 +978,6 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         }
         
     }  
-    Ok(())
 }
 
 // const WELCOME_STRING: &'static str = "\n\n
