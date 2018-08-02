@@ -929,12 +929,16 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                 return Ok(());
             }
 
+            Event::ResizeEvent(ref _rev) => {
+                terminal.refresh_display(display_name); // application refreshes display after resize event is received
+            }
+
             // Handles ordinary keypresses
             Event::InputEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event, display_name)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
-                    terminal.refresh_display(&display_name);
+                    terminal.refresh_display(display_name);
                 }
             }
             _ => { }

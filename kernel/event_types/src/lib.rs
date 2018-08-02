@@ -14,6 +14,7 @@ pub enum Event {
     OutputEvent(PrintOutputEvent),
     // Tells an application that the window manager has resized the application's window so that it knows to 
     // perform any necessary refresh tasks
+    ResizeEvent(WindowResizeEvent),
     ExitEvent,
 }
 
@@ -24,6 +25,10 @@ impl Event {
 
     pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
+    }
+
+    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
+        Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
     }
 
 }
@@ -55,3 +60,21 @@ impl PrintOutputEvent {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct WindowResizeEvent {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize, 
+    pub height: usize, 
+}
+ impl WindowResizeEvent {
+    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
+        WindowResizeEvent {
+            x: x,
+            y: y,
+            width: width, 
+            height: height,
+        }
+    }
+} 

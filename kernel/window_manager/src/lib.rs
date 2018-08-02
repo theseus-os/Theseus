@@ -439,6 +439,7 @@ impl WindowObj{
                 let (x, y, width, height) = item.get_size();
                 item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
             }
+            inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
             Ok(())
         }
     }
