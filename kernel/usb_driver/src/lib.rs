@@ -59,7 +59,7 @@ pub fn set_device_address(dev: &UsbDevice, add: u16) -> UhciTDRegisters{
 
     let dev_request = &UsbDevReq::new(0x00, usb_req::REQ_SET_ADDR, add, 0,0);
 
-    let frame = allocate_frame();
+
     // read necessary information to build TDs
     let speed = dev.speed as u32;
     let addr = dev.addr;
@@ -92,8 +92,7 @@ pub fn uhci_dev_request(dev: &UsbDevice, dev_req_type: u8,dev_request: u8, value
 /// Return: Vec<UhciTDRegisters> (a Vec contains Control transfer's transactions)
 pub fn uhci_control_transfer(dev: &UsbDevice, dev_request: &UsbDevReq)-> UhciTDRegisters{
 
-
-    let frame = allocate_frame();
+    ;
     // read necessary information to build TDs
     let speed = dev.speed as u32;
     let addr = dev.addr;
