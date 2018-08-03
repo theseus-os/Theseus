@@ -588,7 +588,7 @@ pub fn if_port2_reset() -> bool{
 /// Reset the port 2
 pub fn port2_reset() {
 
-    unsafe { REG_PORT2.lock().write(REG_port2.lock().read() & (!PORT_RESET)); }
+    unsafe { REG_PORT2.lock().write(REG_PORT2.lock().read() & (!PORT_RESET)); }
 
 }
 
@@ -758,7 +758,6 @@ pub struct UhciTDRegisters
 
 impl UhciTDRegisters {
 
-
     ///Initialize the Transfer description  according to the usb device(function)'s information
     /// Param:
     /// speed: device's speed; add: device assigned address by host controller
@@ -770,8 +769,9 @@ impl UhciTDRegisters {
     /// The Maximum Length value does not include protocol bytes, such as PID and CRC.
     /// data_add: the pointer to data to be transferred
     pub fn init(link: PhysicalAddress, speed: u32, add: u32, endp: u32, toggle: u32, pid: u32,
-                len: u32, data_add: PhysicalAddress) -> UhciTDRegisters {
-        let token = ((len << TD_TOK_MAXLEN_SHIFT) |
+                data_size: u32, data_add: PhysicalAddress) -> UhciTDRegisters {
+        let size = data_size - 1;
+        let token = ((size << TD_TOK_MAXLEN_SHIFT) |
             (toggle << TD_TOK_D_SHIFT) |
             (endp << TD_TOK_ENDP_SHIFT) |
             (add << TD_TOK_DEVADDR_SHIFT) |

@@ -1,4 +1,3 @@
-#![no_std]
 #![feature(alloc)]
 
 #![allow(dead_code)]
@@ -13,19 +12,20 @@ use usb_req::{UsbDevReq};
 use usb_device::{UsbTransfer,UsbDevice,Controller};
 use usb_uhci::{UhciTDRegisters};
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
+use std::mem::size_of_val;
 
 
-
-const TD_PACKET_IN :u32=                    0x69;
-const TD_PACKET_OUT :u32=                   0xe1;
-const TD_PACKET_SETUP :u32=                 0x2d;
-
+const TD_PACKET_IN :u8=                    0x69;
+const TD_PACKET_OUT :u8=                   0xe1;
+const TD_PACKET_SETUP :u8=                 0x2d;
 
 
+/// Set up the device request and control transfer that contains the request data
+/// Use proper Controller to send or response to the control transfer
 pub fn usb_dev_request(dev: UsbDevice, dev_req_type: u8,request: u8, value: u16,
                        index: u16, len: u16) {
     let dev_request = UsbDevReq::new(dev_req_type, request, value, index, len);
-    let usb_transfer = UsbTransfer::new(0, dev_request, len, false, false);
+    let control_transfer = UsbTransfer::new(0, dev_request, len, false, false);
     match dev.controller {
         Controller::EHCI => {},
 
@@ -35,7 +35,8 @@ pub fn usb_dev_request(dev: UsbDevice, dev_req_type: u8,request: u8, value: u16,
     }
 }
 
-
+/// According to the request and device information to build control transfer
+/// within proper data structures
 pub fn uhci_dev_control(dev: &UsbDevice, trans: &UsbTransfer){
 
     let speed = dev.speed as u32;
@@ -43,10 +44,47 @@ pub fn uhci_dev_control(dev: &UsbDevice, trans: &UsbTransfer){
     let size = dev.maxpacketsize;
     let req_type = trans.request.dev_req_type;
     let len = trans.request.len as u32;
-    let data_virtual_add: *UsbDevReq = &trans.request;
+    let request_size = size_of_val(trans.request) as u32;
+
+
+    let data_virtual_add: *const UsbDevReq = &trans.request;
     if let Some(data_buffer_point) = translate_add(data_virtual_add as usize){
-        let control_transfer = UhciTDRegisters::init(0,speed ,add,0,0,TD_PACKET_SETUP,len ,data_buffer_point);
+
+        let mut control_transfer = UhciTDRegisters::
+        init(0,speed ,addr,0,0,
+             TD_PACKET_SETUP as u32, request_size,data_buffer_point);
+
+        // if the length field is not zero need TDs to read or send the required data
+        if len != 0{
+
+            //check the direction of following data
+            let mut direction: u8;
+            if req_type & usb_req::RT_DEV_TO_HOST = usb_req::RT_DEV_TO_HOST{
+
+                direction = TD_PACKET_IN;
+
+            }else if req_type & usb_req::RT_HOST_TO_DEV =usb_req::RT_HOST_TO_DEV{
+
+                direction = TD_PACKET_OUT;
+
+            }
+
+        }
+
+
+
+
+
+
     }
+
+
+
+
+
+
+
+
 
 
 

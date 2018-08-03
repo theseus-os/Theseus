@@ -27,6 +27,7 @@ static USB_DESC_HUB:u8 =                    0x29;
 // ------------------------------------------------------------------------------------------------
 // USB Device Descriptor
 
+
 #[repr(C,packed)]
 pub struct UsbDeviceDesc
 {
@@ -45,6 +46,7 @@ pub struct UsbDeviceDesc
     pub serial_str: u8,
     pub conf_count: u8,
 }
+
 
 // ------------------------------------------------------------------------------------------------
 // USB Configuration Descriptor
