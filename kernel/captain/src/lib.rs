@@ -229,8 +229,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
-
     
+
     loop { 
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
