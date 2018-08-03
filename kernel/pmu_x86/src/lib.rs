@@ -252,12 +252,22 @@ fn check_pmu_availability() -> Result<(), &'static str>  {
 /// Start interrupt process in order to take samples using PMU. IPs sampled are stored in IP_LIST. Task IDs that IPs came from are stored in ID_LIST.
 /// event_type determines type of event that sampling interval is based on, event_per_sample is how many of those events should occur between each sample, 
 /// task_id allows the user to choose to only sample from a specific task by inputting a number or sample from all tasks by inputting None, 
-/// and sample_count specifies how many samples should be recorded.
+/// and sample_count specifies how many samples should be recorded. Clears previous values in IP_LIST and TASK_ID_LIST so values must be retrieved before 
+/// starting a new sampling process.
 pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Option<usize>, sample_count: u32) -> Result<(),&'static str> {        
+    check_pmu_availability()?;
     if let Some(my_task) = get_my_current_task() {
+        // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
         if CORES_SAMPLING[my_task.write().running_on_cpu as usize].swap(true, Ordering::SeqCst) {
             return Err("Sampling is already being performed on this CPU.")
         }
+        if RESULTS_READY[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
+            return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
+            set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
+        }
+        IP_LIST.lock().clear();
+        TASK_ID_LIST.lock().clear();
+        // if a task_id was requested, sets the value for the interrupt handler to later read
         if let Some(task_id_num) = task_id {
             SAMPLE_TASK_ID.store(task_id_num, Ordering::SeqCst);
         }
@@ -266,10 +276,9 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
             return Err("Number of events per sample invalid: must be within unsigned 32 bit");
         }
         let start_value = core::u32::MAX - event_per_sample;
-        IP_LIST.lock().clear();
-        TASK_ID_LIST.lock().clear();
-        check_pmu_availability()?;
+        SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
 
+        // selects the appropriate mask for the event type and starts the counter
         let event_mask = match event_type {
             EventType::InstructionsRetired => UNHALTED_CYCLE_MASK,
             EventType::UnhaltedThreadCycles => INST_RETIRED_MASK,
@@ -279,8 +288,6 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
             EventType::BranchInstructionsRetired => BR_INST_RETIRED_MASK,
             EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
         } | PMC_ENABLE | INTERRUPT_ENABLE;
-        SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
-
         unsafe{
             wrmsr(IA32_PMC0, start_value as u64);
             wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
@@ -296,17 +303,17 @@ pub struct SampleResults {
     pub task_ids:  Vec<usize>,
 }
 
-/// Function to manually stop the sampling interrupts. Returns a Result with an array which contains slices that hold instruction pointers and
-/// task IDs. The first slice holds the 
+/// Function to manually stop the sampling interrupts. Marks the stored instruction pointers and task IDs as ready to retrieve. 
 pub fn stop_samples() -> Result<(), &'static str> {
-    //immediately stops counting and clears the counter
+    // immediately stops counting and clears the counter
     unsafe{
         wrmsr(IA32_PERFEVTSEL0, 0);
         wrmsr(IA32_PMC0, 0);
     }
-    //clears values in atomics so that even if exception is somehow triggered, it stops at the next iteration
+    // clears values in atomics so that even if exception is somehow triggered, it stops at the next iteration
     SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
     SAMPLE_TASK_ID.store(0, Ordering::SeqCst);
+    // marks core as no longer sampling and results as ready
     if let Some(my_task) = get_my_current_task() {
         if CORES_SAMPLING[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
             RESULTS_READY[my_task.write().running_on_cpu as usize].store(true, Ordering::SeqCst);
@@ -328,8 +335,7 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
         }  
         CORES_SAMPLING[my_task.write().running_on_cpu as usize].store(false, Ordering::SeqCst);
         RESULTS_READY[my_task.write().running_on_cpu as usize].store(false, Ordering::SeqCst);
-        return Ok(SampleResults{instruction_pointers: IP_LIST.lock().clone(), task_ids: TASK_ID_LIST.lock().clone()});
-        
+        return Ok(SampleResults{instruction_pointers: IP_LIST.lock().clone(), task_ids: TASK_ID_LIST.lock().clone()});   
     } 
     Err("Task implentation not yet initialized.")
 }
