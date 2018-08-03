@@ -86,6 +86,11 @@ QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vl
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
+##set up usb
+QEMU_FLAGS += -usb
+QEMU_FLAGS += -device usb-ehci,id=ehci            
+QEMU_FLAGS += -device usb-kbd,bus=usb-bus.0,port=1	
+
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif

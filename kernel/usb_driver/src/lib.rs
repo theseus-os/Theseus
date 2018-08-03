@@ -1,18 +1,23 @@
+#![no_std]
 #![feature(alloc)]
 
 #![allow(dead_code)]
-extern crate usb_uhci;
 extern crate usb_device;
 extern crate usb_desc;
 extern crate usb_req;
+extern crate usb_uhci;
+extern crate usb_ehci;
 extern crate memory;
+extern crate alloc;
+#[macro_use] extern crate log;
 
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
 use usb_req::{UsbDevReq};
-use usb_device::{UsbTransfer,UsbDevice,Controller};
-use usb_uhci::{UhciTDRegisters};
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter};
-use std::mem::size_of_val;
+use usb_device::{UsbControlTransfer,UsbDevice,Controller};
+use usb_uhci::{UhciTDRegisters, UhciQH};
+use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
+use core::mem::size_of_val;
+use alloc::Vec;
 
 
 const TD_PACKET_IN :u8=                    0x69;
@@ -20,75 +25,94 @@ const TD_PACKET_OUT :u8=                   0xe1;
 const TD_PACKET_SETUP :u8=                 0x2d;
 
 
-/// Set up the device request and control transfer that contains the request data
-/// Use proper Controller to send or response to the control transfer
-pub fn usb_dev_request(dev: UsbDevice, dev_req_type: u8,request: u8, value: u16,
-                       index: u16, len: u16) {
-    let dev_request = UsbDevReq::new(dev_req_type, request, value, index, len);
-    let control_transfer = UsbTransfer::new(0, dev_request, len, false, false);
-    match dev.controller {
-        Controller::EHCI => {},
+/// Initialize the USB 1.1 host controller
+pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
-        Controller::UCHI => {},
 
-        _ => {}
+    if let Err(e) = usb_ehci::init(active_table){
+        return Err(e);
     }
+    if let Err(e) = usb_uhci::init(){
+        return Err(e);
+    }
+
+
+
+
+    if usb_uhci::if_enable_port1(){
+        let device = usb_uhci::port1_device_init()?;
+        let add_trans = set_device_address(&device,1);
+        let pointer = &add_trans as *const UhciTDRegisters;
+        let index = usb_uhci::frame_number() as PhysicalAddress;
+        let base = usb_uhci::frame_list_base() as PhysicalAddress;
+        let mut frame_pointer = usb_uhci::frame_pointer(active_table,index,base)?;
+        frame_pointer.write(pointer as u32);
+    }
+
+
+    Ok(())
 }
 
-/// According to the request and device information to build control transfer
-/// within proper data structures
-pub fn uhci_dev_control(dev: &UsbDevice, trans: &UsbTransfer){
+/// build a setup transaction in TD to assign a device address to the device
+pub fn set_device_address(dev: &UsbDevice, add: u16) -> UhciTDRegisters{
 
+
+    let dev_request = &UsbDevReq::new(0x00, usb_req::REQ_SET_ADDR, add, 0,0);
+
+    let frame = allocate_frame();
+    // read necessary information to build TDs
     let speed = dev.speed as u32;
     let addr = dev.addr;
-    let size = dev.maxpacketsize;
-    let req_type = trans.request.dev_req_type;
-    let len = trans.request.len as u32;
-    let request_size = size_of_val(trans.request) as u32;
+    let max_size = dev.maxpacketsize;
+    let req_type = dev_request.dev_req_type;
+    let mut len = dev_request.len as u32;
+    let request_size = size_of_val(dev_request) as u32;
+    let mut toggle: u32 = 0;
+
+    // get the data buffer physical pointer
+    let data_virtual_add= dev_request as *const UsbDevReq;
+    let data_buffer_point = translate_add(data_virtual_add as usize).unwrap();
+
+    // build the set up transaction to set address within a TD
+    let set_add_transaction = UhciTDRegisters::
+    init(0,speed ,addr, 0,0, TD_PACKET_SETUP as u32, request_size,data_buffer_point);
+
+    set_add_transaction
+}
+
+/// According to the device information and request to build a setup transaction in TD
+pub fn uhci_dev_request(dev: &UsbDevice, dev_req_type: u8,dev_request: u8, value: u16,
+                       index: u16, len: u16) -> UhciTDRegisters{
+    let dev_request = &UsbDevReq::new(dev_req_type, dev_request, value, index, len);
+    uhci_control_transfer(dev,dev_request)
+
+}
+
+/// According to the request and device information to build a Control Transfer
+/// Return: Vec<UhciTDRegisters> (a Vec contains Control transfer's transactions)
+pub fn uhci_control_transfer(dev: &UsbDevice, dev_request: &UsbDevReq)-> UhciTDRegisters{
 
 
-    let data_virtual_add: *const UsbDevReq = &trans.request;
-    if let Some(data_buffer_point) = translate_add(data_virtual_add as usize){
+    let frame = allocate_frame();
+    // read necessary information to build TDs
+    let speed = dev.speed as u32;
+    let addr = dev.addr;
+    let max_size = dev.maxpacketsize;
+    let req_type = dev_request.dev_req_type;
+    let mut len = dev_request.len as u32;
+    let request_size = size_of_val(dev_request) as u32;
+    let mut toggle: u32 = 0;
+//    let mut td_list:Vec<&mut UhciTDRegisters> = Vec::new();
 
-        let mut control_transfer = UhciTDRegisters::
-        init(0,speed ,addr,0,0,
-             TD_PACKET_SETUP as u32, request_size,data_buffer_point);
+    // get the data buffer physical pointer
+    let data_virtual_add= dev_request as *const UsbDevReq;
+    let data_buffer_point = translate_add(data_virtual_add as usize).unwrap();
 
-        // if the length field is not zero need TDs to read or send the required data
-        if len != 0{
+    // build the set up transaction within a TD
+    let setup_transaction = UhciTDRegisters::
+    init(0,speed ,addr, 0,0, TD_PACKET_SETUP as u32, request_size,data_buffer_point);
 
-            //check the direction of following data
-            let mut direction: u8;
-            if req_type & usb_req::RT_DEV_TO_HOST = usb_req::RT_DEV_TO_HOST{
-
-                direction = TD_PACKET_IN;
-
-            }else if req_type & usb_req::RT_HOST_TO_DEV =usb_req::RT_HOST_TO_DEV{
-
-                direction = TD_PACKET_OUT;
-
-            }
-
-        }
-
-
-
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
+    setup_transaction
 }
 
 /// translate virtual address to physical address
@@ -118,3 +142,4 @@ pub fn translate_add(v_addr : usize) -> Option<usize> {
     }
 
 }
+

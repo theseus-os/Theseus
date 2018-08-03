@@ -15,6 +15,8 @@ extern crate kernel_config;
 extern crate port_io;
 extern crate spawn;
 extern crate usb_device;
+extern crate usb_desc;
+
 
 
 
@@ -30,16 +32,17 @@ use port_io::Port;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::{RwLock, Once, Mutex};
 use irq_safety::MutexIrqSafe;
-use memory::{MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
+use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 use usb_device::{UsbDevice,Controller};
+use usb_desc::UsbDeviceDesc;
 
-static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
+pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
 static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
 static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
 static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
 static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
-static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
+pub static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
 
 
@@ -56,38 +59,20 @@ static USB_FULL_SPEED:u8=                  0x00;
 static USB_LOW_SPEED:u8=                   0x01;
 static USB_HIGH_SPEED:u8=                  0x02;
 
+
 /// Initialize the USB 1.1 host controller
 pub fn init() -> Result<(), &'static str> {
-
-    reset();
-    if let Err(e) = mode(0) {
-        error!("{:?}", e);
-    }else{
-        info!("The USB 1.1 host conreoller is in the normal mode");
-    }
-
-    if let Err(e) = packet_size(1) {
-        error!("{:?}", e);
-    }else{
-        info!("The packet maximum size is 64 bytes")
-    }
-
-    assign_frame_list_base( 0x1FFDE000);
 
     short_packet_int(1);
 
     ioc_int(1);
 
     if if_connect_port1(){
-
         port1_enable(1);
-
     }
 
     if if_connect_port2(){
-
         port2_enable(1);
-
     }
 
     run(1);
@@ -100,8 +85,7 @@ pub fn init() -> Result<(), &'static str> {
     info!("\nUHCI PORTSC1: {:b}\n", REG_PORT1.lock().read());
     info!("\nUHCI PORTSC2: {:b}\n", REG_PORT2.lock().read());
     Ok(())
- }
-
+}
 
 /// Read the information of the device on the port 1 and config the device
 pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
@@ -114,11 +98,13 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI));
+            let desc = UsbDeviceDesc::default();
+            return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI,desc));
         }
         return Err("Port 1 is not enabled");
     }
     Err("No device is connected to the port 1")
+
 
 }
 
@@ -133,7 +119,8 @@ pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            return Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI));
+            let desc = UsbDeviceDesc::default();
+            return Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI,desc));
         }
         return Err("Port 2 is not enabled");
     }
@@ -149,6 +136,9 @@ pub fn get_sof_timing() -> u16{
     UHCI_SOFMD_PORT.lock().read() & 0xEF
 
 }
+
+
+
 
 
 
@@ -842,6 +832,32 @@ pub struct UhciQH
     pub horizontal_pointer: Volatile<u32>,
     pub vertical_pointer: Volatile<u32>,
 }
+//-------------------------------------------------------------------------------------------------
+/// Box the the frame pointer
+pub fn frame_pointer(active_table: &mut ActivePageTable, frame_index: PhysicalAddress, frame_base: PhysicalAddress)
+                         -> Result<BoxRefMut<MappedPages, Volatile<u32>>, &'static str>{
+
+
+    let frame_pointer: BoxRefMut<MappedPages, Volatile<u32>>  = BoxRefMut::new(Box::new(map(active_table,frame_base)?))
+        .try_map_mut(|mp| mp.as_type_mut::<Volatile<u32>>(frame_index))?;
+
+    Ok(frame_pointer)
+}
+/// return a mapped page of given physical addrsss
+pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {
+
+    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
+    let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();
+    let mapped_page = try!(active_table.map_allocated_pages_to(
+        new_page,
+        frames,
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+        fa.deref_mut())
+    );
+    Ok(mapped_page)
+}
+
 
 
 

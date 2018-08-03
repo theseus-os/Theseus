@@ -42,11 +42,13 @@ pub struct UsbDevice{
     pub addr: u32,
     pub maxpacketsize: u32,
     pub controller: Controller,
+    pub description: UsbDeviceDesc,
 }
 
 impl UsbDevice{
 
-    pub fn new(port: u8, speed: u8, addr: u32, maxpacketsize: u32, controller: Controller) -> UsbDevice{
+    pub fn new(port: u8, speed: u8, addr: u32, maxpacketsize: u32, controller: Controller,
+               description: UsbDeviceDesc) -> UsbDevice{
 
         UsbDevice{
             port,
@@ -54,6 +56,7 @@ impl UsbDevice{
             addr,
             maxpacketsize,
             controller,
+            description,
         }
 
 
@@ -61,7 +64,7 @@ impl UsbDevice{
 
 }
 
-pub struct UsbTransfer{
+pub struct UsbControlTransfer{
 
     pub endpoint: u16,
     pub request: UsbDevReq,
@@ -72,12 +75,12 @@ pub struct UsbTransfer{
 
 }
 
-impl UsbTransfer{
+impl UsbControlTransfer{
 
     pub fn new(endpoint: u16, request: UsbDevReq,
-               length: u16, complete: bool, success: bool) -> UsbTransfer{
+               length: u16, complete: bool, success: bool) -> UsbControlTransfer{
 
-        UsbTransfer{
+        UsbControlTransfer{
 
             endpoint,
             request,

@@ -1,5 +1,5 @@
 [package]
-name = "ehci"
+name = "usb_ehci"
 version = "0.1.0"
 authors = ["BowenLiu15 <bl28@rice.edu>"]
 

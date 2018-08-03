@@ -1,5 +1,5 @@
 [package]
-name = "usb"
+name = "usb_driver"
 version = "0.1.0"
 authors = ["BowenLiu15 <bl28@rice.edu>"]
 
@@ -7,8 +7,15 @@ authors = ["BowenLiu15 <bl28@rice.edu>"]
 [dependencies.usb_device]
 path = "../usb_device"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.usb_uhci]
 path = "../usb_uhci"
+
+[dependencies.usb_ehci]
+path = "../usb_ehci"
 
 [dependencies.usb_desc]
 path = "../../libs/usb_desc"

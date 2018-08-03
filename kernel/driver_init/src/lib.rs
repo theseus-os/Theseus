@@ -11,6 +11,10 @@ extern crate acpi;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
+extern crate usb_uhci;
+extern crate usb_ehci;
+extern crate usb_driver;
+
 
 
 use dfqueue::DFQueueProducer;
@@ -31,6 +35,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
         &mut PageTable::Active(ref mut active_table) => {
             // first, init the local apic info
             try!(apic::init(active_table));
+            try!(usb_driver::init(active_table));
             
             // then init/parse the ACPI tables to fill in the APIC details, among other things
             // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores

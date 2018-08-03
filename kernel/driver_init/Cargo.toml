@@ -41,8 +41,14 @@ path = "../keyboard"
 [dependencies.mouse]
 path = "../mouse"
 
+[dependencies.usb_uhci]
+path = "../usb_uhci"
 
+[dependencies.usb_ehci]
+path = "../usb_ehci"
 
+[dependencies.usb_driver]
+path = "../usb_driver"
 
 [lib]
 crate-type = ["rlib"]

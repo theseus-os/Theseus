@@ -32,7 +32,7 @@ static USB_DESC_HUB:u8 =                    0x29;
 pub struct UsbDeviceDesc
 {
     pub len: u8,
-    pub deivce_type: u8,
+    pub device_type: u8,
     pub usb_version: u16,
     pub class: u8,
     pub sub_class: u8,
@@ -47,6 +47,29 @@ pub struct UsbDeviceDesc
     pub conf_count: u8,
 }
 
+impl UsbDeviceDesc{
+
+    pub fn default()-> UsbDeviceDesc{
+
+        UsbDeviceDesc{
+            len: 0,
+            device_type: 0,
+            usb_version: 0,
+            class: 0,
+            sub_class: 0,
+            protocol: 0,
+            max_packet_size: 0,
+            vendor_id: 0,
+            product_id: 0,
+            device_version: 0,
+            vendor_str: 0,
+            product_str: 0,
+            serial_str: 0,
+            conf_count: 0,
+
+        }
+    }
+}
 
 // ------------------------------------------------------------------------------------------------
 // USB Configuration Descriptor
