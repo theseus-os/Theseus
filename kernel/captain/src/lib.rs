@@ -225,14 +225,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-
-
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
-    pmu_x86::init();
-    let check = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFF, None, 2000);
-    if let Err(inner_check) = check {
-        debug!("{}", inner_check);
-    }
     enable_interrupts();
     debug!("{}", interrupts_enabled());
 

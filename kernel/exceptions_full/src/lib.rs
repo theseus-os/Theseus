@@ -93,30 +93,32 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
              stack_frame);
 }
 
-/// exception 0x02, also used for TLB Shootdown IPIs
+/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupt handling
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
+    // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-
         
         let event_mask = rdmsr(IA32_PERFEVTSEL0);
         let current_count = SAMPLE_COUNT.load(Ordering::SeqCst);
+        // if all samples have already been taken, calls the function to turn off the counter
         if current_count == 0 {
-            pmu_x86::stop_samples();
+            if pmu_x86::stop_samples().is_err() {
+                println_both!("Error stopping samples. Counter not marked as free.");
+            } 
             return;
         }
         SAMPLE_COUNT.store(current_count - 1, Ordering::SeqCst);
-        
+        // if the running task is the requested one or if one isn't requested, records the IP
         if let Some(taskref) = task::get_my_current_task() {
             let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
-
             if (requested_task_id == 0) | (requested_task_id == taskref.read().id) {
                 IP_LIST.lock().push(stack_frame.instruction_pointer);
                 TASK_ID_LIST.lock().push(taskref.read().id);
             }
         } else {
-            println_both!("No running tasks?");
+            println_both!("No running tasks on CPU being sampled.");
         }
-        
+        // stops the counter, resets it, and restarts it
         unsafe {
             wrmsr(IA32_PERFEVTSEL0, 0);
             wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
