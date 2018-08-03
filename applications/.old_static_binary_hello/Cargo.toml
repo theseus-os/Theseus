@@ -15,9 +15,6 @@ version = "0.3.7"
 [dependencies.print]
 path = "../../kernel/print"
 
-# [lib]
-# crate-type = ["rlib"] # "lib" does the same thing I think
-
 
 [profile.dev]
 panic = "abort"

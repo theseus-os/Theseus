@@ -10,4 +10,4 @@ path = "../../libs/port_io"
 git = "https://github.com/kevinaboos/irq_safety"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]
