@@ -8,15 +8,12 @@ extern crate x86_64;
 extern crate task;
 extern crate apic;
 extern crate pmu_x86;
-extern crate memory;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
-#[macro_use] extern crate log;
-
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use pmu_x86::{SAMPLE_EVENT_TYPE_MASK, SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT, SAMPLE_TASK_ID, TASK_ID_LIST};
+use pmu_x86::{SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT, SAMPLE_TASK_ID, TASK_ID_LIST};
 use core::sync::atomic::Ordering;
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -29,12 +26,12 @@ pub fn init(idt_ref: &'static LockedIdt) {
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.overflow.set_handler_fn(overflow_handler);
-        // missing: 0x05 bound range exceeded exception
+        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
         idt.double_fault.set_handler_fn(double_fault_handler);
         // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
+        idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
         // missing: 0x0c stack segment exception
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
@@ -93,7 +90,7 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
              stack_frame);
 }
 
-/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupt handling
+/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
@@ -213,13 +210,6 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
     kill_and_halt(0xB)
 }
 
-/// exception 0x0c
-pub extern "x86-interrupt" fn stack_seg_fault_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_both!("\nEXCEPTION: INVALID TSS at {:#x}\n{:#?}\n",
-             stack_frame.instruction_pointer,
-             stack_frame);
-}
-
 /// exception 0x0d
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
@@ -241,5 +231,3 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
     
     kill_and_halt(0xE)
 }
-
-// exception 0x10

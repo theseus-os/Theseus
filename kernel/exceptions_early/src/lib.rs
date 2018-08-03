@@ -19,7 +19,7 @@ pub fn init(idt_ref: &'static LockedIdt) {
         // missing: 0x01 debug exception
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        idt.overflow.set_handler_fn(overflow_handler);
+        // missing: 0x04 overflow exception
         // missing: 0x05 bound range exceeded exception
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
@@ -69,15 +69,6 @@ pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame)
 /// exception 0x03
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-
-    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
-}
-
-/// exception 0x04
-pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION: overflow at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
 

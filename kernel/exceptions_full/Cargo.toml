@@ -24,12 +24,5 @@ path = "../task"
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.memory]
-path = "../memory"
-
 [lib]
 crate-type = ["rlib"]

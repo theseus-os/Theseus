@@ -88,9 +88,6 @@ path = "../scheduler"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.pmu_x86]
-path = "../pmu_x86"
-
 [dependencies.print]
 path = "../print"
 

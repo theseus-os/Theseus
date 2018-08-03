@@ -28,7 +28,6 @@ use alloc::vec::Vec;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicUsize = AtomicUsize::new(0);
-pub static SAMPLE_EVENT_TYPE_MASK: AtomicUsize = AtomicUsize::new(0);
 pub static SAMPLE_TASK_ID: AtomicUsize = AtomicUsize::new(0);
 pub static SAMPLE_COUNT:AtomicU32 = AtomicU32::new(0);
 
@@ -281,7 +280,6 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
             EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
         } | PMC_ENABLE | INTERRUPT_ENABLE;
         SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
-        SAMPLE_EVENT_TYPE_MASK.store(event_mask as usize, Ordering::SeqCst);
 
         unsafe{
             wrmsr(IA32_PMC0, start_value as u64);
