@@ -305,7 +305,6 @@ pub fn stop_samples() -> Result<(), &'static str> {
         wrmsr(IA32_PMC0, 0);
     }
     //clears values in atomics so that even if exception is somehow triggered, it stops at the next iteration
-    SAMPLE_EVENT_TYPE_MASK.store(0, Ordering::SeqCst);
     SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
     SAMPLE_TASK_ID.store(0, Ordering::SeqCst);
     if let Some(my_task) = get_my_current_task() {
