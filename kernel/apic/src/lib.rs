@@ -79,6 +79,11 @@ pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
 	&LOCAL_APICS
 }
 
+/// Returns the number of processor core (local APICs) that exist on this system.
+pub fn core_count() -> usize {
+    get_lapics().iter().count()
+}
+
 
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
@@ -750,8 +755,8 @@ pub fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
 /// currently stored in `TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES`.
 /// DO not invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
-    // let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs {:?}", apic_id, virtual_addresses);
+    let apic_id = get_my_apic_id().unwrap_or(0xFF);
+    trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs {:?}", apic_id, virtual_addresses);
 
     for vaddr in virtual_addresses {
         x86_64::instructions::tlb::flush(x86_64::VirtualAddress(*vaddr));

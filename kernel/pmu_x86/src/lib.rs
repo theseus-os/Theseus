@@ -14,17 +14,20 @@ extern crate task;
 extern crate memory;
 extern crate irq_safety;
 extern crate alloc;
+extern crate apic;
 #[macro_use] extern crate log;
 
 use x86_64::registers::msr::*;
 use x86_64::VirtualAddress;
+use x86_64::structures::idt::ExceptionStackFrame;
 use raw_cpuid::*;
-use spin::Once;
+use spin::{Once, Mutex};
 use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
 use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize, AtomicBool};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
+use alloc::BTreeSet;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicUsize = AtomicUsize::new(0);
@@ -48,9 +51,12 @@ static BR_MISS_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC5;
 lazy_static!{
     pub static ref IP_LIST: MutexIrqSafe<Vec<VirtualAddress>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
     pub static ref TASK_ID_LIST: MutexIrqSafe<Vec<usize>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
+    // Here 4 is the number of programmable counters
     static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
-    static ref CORES_SAMPLING: [AtomicBool; 4] = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
-    static ref RESULTS_READY: [AtomicBool; 4] = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
+    //static ref CORES_SAMPLING: Mutex<BTreeSet<u8>> = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
+    static ref CORES_SAMPLING: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
+    //static ref RESULTS_READY: [AtomicBool; 4] = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
+    static ref RESULTS_READY: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
 }
 static NUM_PMC: u32 = 4;
 
@@ -253,49 +259,63 @@ fn check_pmu_availability() -> Result<(), &'static str>  {
 /// event_type determines type of event that sampling interval is based on, event_per_sample is how many of those events should occur between each sample, 
 /// task_id allows the user to choose to only sample from a specific task by inputting a number or sample from all tasks by inputting None, 
 /// and sample_count specifies how many samples should be recorded. Clears previous values in IP_LIST and TASK_ID_LIST so values must be retrieved before 
-/// starting a new sampling process.
+/// starting a new sampling process. 
+/// # Note
+/// Currently can only sample "this" core - core that the function was called on. 
 pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Option<usize>, sample_count: u32) -> Result<(),&'static str> {        
     check_pmu_availability()?;
-    if let Some(my_task) = get_my_current_task() {
-        // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-        if CORES_SAMPLING[my_task.write().running_on_cpu as usize].swap(true, Ordering::SeqCst) {
-            return Err("Sampling is already being performed on this CPU.")
-        }
-        if RESULTS_READY[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
-            return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
-            set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
-        }
-        IP_LIST.lock().clear();
-        TASK_ID_LIST.lock().clear();
-        // if a task_id was requested, sets the value for the interrupt handler to later read
-        if let Some(task_id_num) = task_id {
-            SAMPLE_TASK_ID.store(task_id_num, Ordering::SeqCst);
-        }
-        SAMPLE_COUNT.store(sample_count, Ordering::SeqCst);
-        if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
-            return Err("Number of events per sample invalid: must be within unsigned 32 bit");
-        }
-        let start_value = core::u32::MAX - event_per_sample;
-        SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
 
-        // selects the appropriate mask for the event type and starts the counter
-        let event_mask = match event_type {
-            EventType::InstructionsRetired => UNHALTED_CYCLE_MASK,
-            EventType::UnhaltedThreadCycles => INST_RETIRED_MASK,
-            EventType::UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
-            EventType::LongestLatCacheRef => LLC_REF_MASK,
-            EventType::LongestLatCacheMiss => LLC_MISS_MASK,
-            EventType::BranchInstructionsRetired => BR_INST_RETIRED_MASK,
-            EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
-        } | PMC_ENABLE | INTERRUPT_ENABLE;
-        unsafe{
-            wrmsr(IA32_PMC0, start_value as u64);
-            wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+    // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
+    if let Some(my_core_id) = apic::get_my_apic_id() {
+        let mut cores_sampling_locked = CORES_SAMPLING.lock();
+        if cores_sampling_locked.contains(&my_core_id) {
+            return Err("Sampling is already being performed on this CPU.");
         }
-
-        return Ok(());
+        else {
+            if RESULTS_READY.lock().contains(&my_core_id) {
+                return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
+                set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
+            }
+            cores_sampling_locked.insert(my_core_id);
+        }
+    //if CORES_SAMPLING[my_task.write().running_on_cpu as usize].swap(true, Ordering::SeqCst) {
     }
-    Err("Task implentation not yet initialized.")
+    /*
+    if RESULTS_READY[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
+        return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
+        set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
+    }
+    */
+    IP_LIST.lock().clear();
+    TASK_ID_LIST.lock().clear();
+    // if a task_id was requested, sets the value for the interrupt handler to later read
+    if let Some(task_id_num) = task_id {
+        SAMPLE_TASK_ID.store(task_id_num, Ordering::SeqCst);
+    }
+    SAMPLE_COUNT.store(sample_count, Ordering::SeqCst);
+    if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
+        return Err("Number of events per sample invalid: must be within unsigned 32 bit");
+    }
+    let start_value = core::u32::MAX - event_per_sample;
+    SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
+
+    // selects the appropriate mask for the event type and starts the counter
+    let event_mask = match event_type {
+        EventType::InstructionsRetired => UNHALTED_CYCLE_MASK,
+        EventType::UnhaltedThreadCycles => INST_RETIRED_MASK,
+        EventType::UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
+        EventType::LongestLatCacheRef => LLC_REF_MASK,
+        EventType::LongestLatCacheMiss => LLC_MISS_MASK,
+        EventType::BranchInstructionsRetired => BR_INST_RETIRED_MASK,
+        EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
+    } | PMC_ENABLE | INTERRUPT_ENABLE;
+    unsafe{
+        wrmsr(IA32_PMC0, start_value as u64);
+        wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+    }
+
+    return Ok(());
+
 }
 
 pub struct SampleResults {
@@ -314,13 +334,12 @@ pub fn stop_samples() -> Result<(), &'static str> {
     SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
     SAMPLE_TASK_ID.store(0, Ordering::SeqCst);
     // marks core as no longer sampling and results as ready
-    if let Some(my_task) = get_my_current_task() {
-        if CORES_SAMPLING[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
-            RESULTS_READY[my_task.write().running_on_cpu as usize].store(true, Ordering::SeqCst);
-            return Ok(());
-        } else {
-            return Err("Core wasn't marked as locked, sample results likely invalid.");
-        }
+    if let Some(my_core_id) = apic::get_my_apic_id() {
+        let mut locked_cores_sampling = CORES_SAMPLING.lock();
+        RESULTS_READY.lock().insert(my_core_id);
+        locked_cores_sampling.remove(&my_core_id);
+        return Ok(());
+        
     } else {
         return Err("Task structure not yet enabled.");
     }
@@ -329,12 +348,10 @@ pub fn stop_samples() -> Result<(), &'static str> {
 /// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
-    if let Some(my_task) = get_my_current_task() {
-        if !RESULTS_READY[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
-            stop_samples()?;
-        }  
-        CORES_SAMPLING[my_task.write().running_on_cpu as usize].store(false, Ordering::SeqCst);
-        RESULTS_READY[my_task.write().running_on_cpu as usize].store(false, Ordering::SeqCst);
+    if let Some(my_core_id) = apic::get_my_apic_id() {
+        stop_samples()?;
+        
+        RESULTS_READY.lock().remove(&my_core_id);
         return Ok(SampleResults{instruction_pointers: IP_LIST.lock().clone(), task_ids: TASK_ID_LIST.lock().clone()});   
     } 
     Err("Task implentation not yet initialized.")
@@ -347,6 +364,62 @@ pub fn print_samples(sample_results: &mut SampleResults) {
             debug!("{:x} {}", next_ip, next_id);
         }
     }
+}
+
+pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
+    
+    debug!("handle_sample(): [0] on core {:?}!", apic::get_my_apic_id());
+
+    let event_mask = rdmsr(IA32_PERFEVTSEL0);
+    let current_count = SAMPLE_COUNT.load(Ordering::SeqCst);
+    // if all samples have already been taken, calls the function to turn off the counter
+
+    debug!("handle_sample(): [1] on core {:?}!", apic::get_my_apic_id());
+
+    if current_count == 0 {
+        if stop_samples().is_err() {
+            debug!("Error stopping samples. Counter not marked as free.");
+        } 
+        return;
+    }
+    SAMPLE_COUNT.store(current_count - 1, Ordering::SeqCst);
+
+    debug!("handle_sample(): [2] on core {:?}!", apic::get_my_apic_id());
+
+    // if the running task is the requested one or if one isn't requested, records the IP
+    if let Some(taskref) = task::get_my_current_task() {
+
+        debug!("handle_sample(): [3] on core {:?}!", apic::get_my_apic_id());
+
+        let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
+
+        debug!("handle_sample(): [4] on core {:?}!", apic::get_my_apic_id());
+
+        if (requested_task_id == 0) | (requested_task_id == taskref.read().id) {
+            IP_LIST.lock().push(stack_frame.instruction_pointer);
+            TASK_ID_LIST.lock().push(taskref.read().id);
+        }
+    } else {
+
+        debug!("handle_sample(): [5] on core {:?}!", apic::get_my_apic_id());
+
+        IP_LIST.lock().push(stack_frame.instruction_pointer);
+
+        debug!("handle_sample(): [6] on core {:?}!", apic::get_my_apic_id());
+
+        TASK_ID_LIST.lock().push(0);
+    }
+    // stops the counter, resets it, and restarts it
+    unsafe {
+        wrmsr(IA32_PERFEVTSEL0, 0);
+        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
+        wrmsr(IA32_PMC0, SAMPLE_START_VALUE.load(Ordering::SeqCst) as u64);
+        wrmsr(IA32_PERFEVTSEL0, event_mask);
+    }
+
+    debug!("handle_sample(): [end] on core {:?}!", apic::get_my_apic_id());
+
+    return;
 }
 
 /// Read 64 bit PMC (performance monitor counter).

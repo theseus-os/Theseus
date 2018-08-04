@@ -9,11 +9,14 @@ spin = "0.4.5"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+[dependencies.apic]
+path = "../apic"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
