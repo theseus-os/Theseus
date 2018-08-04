@@ -7,7 +7,7 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 
 [dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+path = "../terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

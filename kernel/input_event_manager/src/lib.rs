@@ -37,7 +37,13 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-    // Initializes the default window object (will also start the windowing manager)
+
+    // Spawns the terminal print crate so that we can print to the terminal
+    let args: Vec<String> =  vec![]; // terminal print doesn't have any arguments
+    let term_print_module = memory::get_module("__a_terminal_print").ok_or("Error: terminal print module not found")?;
+    spawn::spawn_application_singleton(term_print_module, args, None, None)?;
+
+    // Initializes the default terminal (will also start the windowing manager)
     let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
     let args: Vec<String> =  vec![]; // terminal::main() doesn't have any arguments
     spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal

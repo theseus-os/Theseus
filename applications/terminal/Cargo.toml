@@ -45,7 +45,7 @@ path = "../../kernel/window_manager"
 [dependencies.text_display]
 path = "../../kernel/text_display"
 [dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+path = "../terminal_print"
 
 [dependencies.print]
 path = "../../kernel/print"

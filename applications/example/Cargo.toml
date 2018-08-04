@@ -8,4 +8,4 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 
 [dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+path = "../terminal_print"

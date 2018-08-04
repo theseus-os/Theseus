@@ -22,6 +22,8 @@ use event_types::Event;
 use dfqueue::DFQueueProducer;
 use alloc::arc::Arc;
 use alloc::btree_map::BTreeMap;
+use alloc::vec::Vec;
+use alloc::string::String;
 use spin::Mutex;
 
 // / Calls `print!()` with an extra newilne ('\n') appended to the end. 
@@ -44,7 +46,7 @@ macro_rules! print {
 /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
 /// applications so that applications can print to the correct terminal
 lazy_static! {
-    static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
+    static ref TERMINAL_PRINT_PRODUCERS: Arc<Mutex<BTreeMap<usize, DFQueueProducer<Event>>>> = Arc::new(Mutex::new(BTreeMap::new()));
 }
 
 /// Adds the (child application's task ID, parent terminal print_producer) key-val pair to the map 
@@ -78,4 +80,9 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     if let Some(selected_term_producer) = result {
         selected_term_producer.enqueue(Event::new_output_event(format!("{}", fmt_args)));
     }
+}
+
+#[no_mangle]
+pub fn main(_args: Vec<String>) -> isize {
+    0
 }
