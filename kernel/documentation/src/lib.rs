@@ -24,8 +24,8 @@
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-//! * `input_event_manager`: A input_event_manager implementation that allows simple printing to the screen.
-//! * `input_event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
+//! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
+//! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `driver_init`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.
@@ -51,6 +51,7 @@
 //! * `spawn`: Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes.
 //! * `syscall`: Initializes the system call support, and provides basic handling and dispatching of syscalls in Theseus.
 //! * `task`: Task types and structure definitions, a Task is a thread of execution.
+//! * `text_display` : Defines a trait for anything that can display text to the screen
 //! * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.

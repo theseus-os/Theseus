@@ -19,8 +19,8 @@ path = "../../libs/keycodes_ascii"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.ps2]
 path = "../ps2"

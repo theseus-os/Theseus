@@ -10,8 +10,8 @@ getopts = { git = "https://github.com/kevinaboos/getopts" }
 version = "0.7.8"
 default-features = false
 
-[dependencies.print]
-path = "../../kernel/print"
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"

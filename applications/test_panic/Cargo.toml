@@ -11,8 +11,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.print]
-path = "../../kernel/print"
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
 
 [dependencies.panic_info]
 path = "../../kernel/panic_info"

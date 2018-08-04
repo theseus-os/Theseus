@@ -31,6 +31,12 @@ path = "../memory"
 [dependencies.util]
 path = "../../libs/util"
 
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.tsc]
+path = "../tsc"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

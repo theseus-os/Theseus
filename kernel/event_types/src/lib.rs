@@ -12,6 +12,9 @@ use alloc::string::String;
 pub enum Event {
     InputEvent(KeyboardInputEvent),
     OutputEvent(PrintOutputEvent),
+    // Tells an application that the window manager has resized the application's window so that it knows to 
+    // perform any necessary refresh tasks
+    ResizeEvent(WindowResizeEvent),
     ExitEvent,
 }
 
@@ -20,9 +23,14 @@ impl Event {
         Event::InputEvent(KeyboardInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S, display: bool) -> Event where S: Into<String> {
-        Event::OutputEvent(PrintOutputEvent::new(s.into(), display))
+    pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
+        Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
+
+    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
+        Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
+    }
+
 }
 
 /// use this to deliver input events (such as keyboard input) to the input_event_manager.
@@ -39,21 +47,34 @@ impl KeyboardInputEvent {
     }
 }
 
-
-
 /// use this to queue up a formatted string that should be printed to the input_event_manager. 
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
     pub text: String,
-    // indicates whether or not the terminal/application should refresh its TextDisplay when it handles this output event
-    pub display: bool,
 }
 
 impl PrintOutputEvent {
-    pub fn new(s: String, display: bool) -> PrintOutputEvent {
+    pub fn new(s: String) -> PrintOutputEvent {
         PrintOutputEvent {
             text: s,
-            display: display
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct WindowResizeEvent {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize, 
+    pub height: usize, 
+}
+ impl WindowResizeEvent {
+    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
+        WindowResizeEvent {
+            x: x,
+            y: y,
+            width: width, 
+            height: height,
+        }
+    }
+} 

@@ -7,7 +7,7 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 extern crate itertools;
 
 extern crate getopts;
@@ -15,14 +15,12 @@ extern crate memory;
 extern crate mod_mgmt;
 
 use core::ops::DerefMut;
-use alloc::{Vec, String, BTreeMap};
+use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
 use memory::{get_module, ModuleArea};
 use mod_mgmt::metadata::StrongCrateRef;
-use itertools::Itertools;
-
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

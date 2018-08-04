@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 
 extern crate apic;
 extern crate getopts;

@@ -8,9 +8,9 @@
 #![feature(asm)]
 
 extern crate spin;
+extern crate acpi;
 
 extern crate volatile;
-extern crate alloc;
 extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
@@ -18,24 +18,28 @@ extern crate memory;
 extern crate util;
 
 use core::ptr::Unique;
-use spin::Mutex;
-use alloc::vec::Vec;
+use spin::{Mutex};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
+use kernel_config::memory::KERNEL_OFFSET;
 
+pub mod text_buffer;
+pub mod font;
 
-
-const VGA_BUFFER_ADDR: usize = 0xa0000;
+//const VGA_BUFFER_ADDR: usize = 0xa0000;
+const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 
 //Size of VESA mode 0x4112
 
 ///The width of the screen
-pub const FRAME_BUFFER_WIDTH:usize = 640*3;
+pub const FRAME_BUFFER_WIDTH:usize = 640;
 
 ///The height of the screen
-pub const FRAME_BUFFER_HEIGHT:usize = 480;
+pub const FRAME_BUFFER_HEIGHT:usize = 400;
+
+const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
@@ -52,10 +56,17 @@ macro_rules! try_opt_err {
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
+    
+    let rs = font::init();
+    if rs.is_ok() {
+         trace!("frame_buffer text initialized.");
+    } else {
+         return Err("frame_buffer::init() fails in font initiailizing");
+    }
 
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*PIXEL_BYTES;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -109,96 +120,136 @@ static FRAME_DRAWER: Mutex<Drawer> = {
 
 
 /// draw a pixel with coordinates and color
-pub fn draw_pixel(x:usize, y:usize, color:usize) {
+pub fn draw_pixel(x:usize, y:usize, color:u32) {
     FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
 
 /// draw a line with start and end coordinates and color
-pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:usize) {
+pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
 }
 
-/// draw a line with upper left coordinates, width, height and color
-pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize, color:usize) {
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, color)
+/// draw a rectangle with upper left coordinates, width, height and color
+pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
+    FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, color)
 }
 
-struct Point {
+/// fill a rectangle with upper left coordinates, width, height and color
+pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
+    FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, color)
+}
+
+pub struct Point {
     pub x: usize,
     pub y: usize,
     pub color: usize,
 }
 
-struct Drawer {
+pub struct Drawer {
     start_address: usize,
     buffer: Unique<Buffer> ,
 }
 
 impl Drawer {
-    fn draw_pixel(&mut self, x:usize, y:usize, color:usize) -> Option<&'static str>{
-        if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
-            return Some("pixel is ont of bound");
-        }
-        self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
-        self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
-        self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
-    
-        Some("End")
-    }
+    /*unsafe fn set_background(&mut self, offset:usize, len:usize, color:u32) {
+        asm!("cld
+            rep stosd"
+            :
+            : "{rdi}"(self.start_address + offset), "{eax}"(color), "{rcx}"(len)
+            : "cc", "memory", "rdi", "rcx"
+            : "intel", "volatile");
+    }*/
 
-    fn draw_points(&mut self, points:Vec<Point>){
-        for p in points{
-            draw_pixel(p.x, p.y, p.color);
-        }
-      
+    fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
+        self.buffer().chars[y][x] = color;
     }
 
     fn check_in_range(&mut self, x:usize, y:usize) -> bool {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
     }
 
-    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:usize){
+    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
-        let mut points = Vec::new();
         if width.abs() > height.abs() {
             let mut y;
-            for x in start_x..end_x {
-                y = (x-start_x)*height/width+start_y;
-                if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, color:color});
+            let mut x = start_x;
+            let step = if width > 0 {1} else {-1};
+            loop {
+                if x == end_x {
+                    break;
                 }
+                y = (x - start_x) * height / width + start_y;
+                if self.check_in_range(x as usize,y as usize) {
+                    self.buffer().chars[y as usize][x as usize] = color;
+                }
+                x += step;
             }
         }
         else {
             let mut x;
-            for y in start_y..end_y {
-                x = (y-start_y)*width/height+start_x;
+            let mut y = start_y;
+            let step = if height > 0 {1} else {-1};
+            loop {
+                if y == end_y {
+                    break;
+                }
+                x = (y - start_y) * width / height + start_x;
                 if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, color:color});
-                }            
+                    self.buffer().chars[y as usize][x as usize] = color;
+                }
+                y += step;   
             }
         }
-        self.draw_points(points);
     }
 
-    fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:usize){
-        let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH };
-        let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT };  
-        let mut points = Vec::new();
+    fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
+            else { FRAME_BUFFER_WIDTH }};
+        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
+            else { FRAME_BUFFER_HEIGHT }};  
 
-        for x in start_x..end_x{
-            for y in start_y..end_y{
-                points.push(Point{x:x as usize, y:y as usize, color:color});
-              // draw_pixel(x, y, color);
+        let mut x = start_x;
+        loop {
+            if x == end_x {
+                break;
             }
+            self.buffer().chars[start_y][x] = color;
+            self.buffer().chars[end_y-1][x] = color;
+            x += 1;
         }
-        self.draw_points(points);
 
+        let mut y = start_y;
+        loop {
+            if y == end_x {
+                break;
+            }
+            self.buffer().chars[y][start_x] = color;
+            self.buffer().chars[y][end_x-1] = color;
+            y += 1;
+        }
     }
 
+    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
+            else { FRAME_BUFFER_WIDTH }};
+        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
+            else { FRAME_BUFFER_HEIGHT }};  
+
+        let mut x = start_x;
+        let mut y = start_y;
+        loop {
+            if x == end_x {
+                y += 1;
+                if y == end_y {
+                    break;
+                }
+                x = start_x;
+            }
+            self.buffer().chars[y][x] = color;
+            x += 1;
+        }
+    }
 
     fn buffer(&mut self) -> &mut Buffer {
          unsafe { self.buffer.as_mut() }
@@ -215,9 +266,7 @@ impl Drawer {
     }  
 }
 
-struct Buffer {
+pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    pub chars: [[u32; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
 }
-
-
