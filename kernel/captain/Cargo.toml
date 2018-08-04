@@ -98,8 +98,8 @@ path = "../simd_test"
 
 
 [features]
-mirror_serial = []
+mirror_log_to_vga = []
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

@@ -51,7 +51,7 @@ path = "../../kernel/terminal_print"
 path = "../../kernel/print"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]
 
 
 

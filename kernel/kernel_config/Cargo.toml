@@ -4,4 +4,4 @@ name = "kernel_config"
 version = "0.1.0"
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["rlib"]

@@ -82,5 +82,5 @@ $(KERNEL_BUILD_DIR)/boot/$(ARCH)/%.o: $(nano_core-src)/boot/arch_$(ARCH)/%.asm
 ## except for the special top-level documentation file, which we build separately.
 doc:
 	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name Theseus documentation/src/_top.rs
+	@rustdoc --output target/doc --crate-name "-- Theseus Crates --" documentation/src/_top.rs
 
