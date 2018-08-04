@@ -24,7 +24,7 @@ use raw_cpuid::*;
 use spin::{Once, Mutex};
 use atomic_linked_list::atomic_map::*;
 use task::get_my_current_task;
-use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize, AtomicBool};
+use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::BTreeSet;
@@ -329,6 +329,8 @@ pub fn stop_samples() -> Result<(), &'static str> {
     unsafe{
         wrmsr(IA32_PERFEVTSEL0, 0);
         wrmsr(IA32_PMC0, 0);
+        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
+
     }
     // clears values in atomics so that even if exception is somehow triggered, it stops at the next iteration
     SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
@@ -375,7 +377,6 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
     // if all samples have already been taken, calls the function to turn off the counter
 
     debug!("handle_sample(): [1] on core {:?}!", apic::get_my_apic_id());
-
     if current_count == 0 {
         if stop_samples().is_err() {
             debug!("Error stopping samples. Counter not marked as free.");
@@ -412,7 +413,7 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
     // stops the counter, resets it, and restarts it
     unsafe {
         wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
+        wrmsr(IA32_PERF_GLOBAL_STAUS, 0);
         wrmsr(IA32_PMC0, SAMPLE_START_VALUE.load(Ordering::SeqCst) as u64);
         wrmsr(IA32_PERFEVTSEL0, event_mask);
     }

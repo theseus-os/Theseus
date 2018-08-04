@@ -756,7 +756,7 @@ pub fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
 /// DO not invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
     let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs {:?}", apic_id, virtual_addresses);
+    //trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs {:?}", apic_id, virtual_addresses);
 
     for vaddr in virtual_addresses {
         x86_64::instructions::tlb::flush(x86_64::VirtualAddress(*vaddr));
