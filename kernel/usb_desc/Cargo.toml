@@ -1,0 +1,16 @@
+[package]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
+name = "usb_desc"
+version = "0.1.0"
+keywords = ["usb_desc"]
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies]
+volatile = "0.2.4"

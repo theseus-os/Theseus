@@ -18,25 +18,17 @@ extern crate usb_device;
 extern crate usb_desc;
 
 
-
-
-
-
-use alloc::string::ToString;
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
-use alloc::arc::Arc;
-use alloc::Vec;
 use port_io::Port;
 use owning_ref::{BoxRef, BoxRefMut};
-use spin::{RwLock, Once, Mutex};
-use irq_safety::MutexIrqSafe;
+use spin::{Once, Mutex};
 use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 use usb_device::{UsbDevice,Controller};
 use usb_desc::UsbDeviceDesc;
 
-pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
+static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
 static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
 static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
 static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
@@ -44,6 +36,10 @@ static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
 pub static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
+static QH_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciQH;MAX_QH]>>> = Once::new();
+static TD_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciTDRegisters;MAX_TD]>>> = Once::new();
+static UHCI_FRAME_LIST: Once<Mutex<BoxRefMut<MappedPages, [Volatile<u32>;1024]>>> = Once::new();
+static DATA_BUFFER: Once<Mutex<MappedPages>> = Once::new();
 
 
 // ------------------------------------------------------------------------------------------------
@@ -61,7 +57,7 @@ static USB_HIGH_SPEED:u8=                  0x02;
 
 
 /// Initialize the USB 1.1 host controller
-pub fn init() -> Result<(), &'static str> {
+pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
     short_packet_int(1);
 
@@ -75,6 +71,32 @@ pub fn init() -> Result<(), &'static str> {
         port2_enable(1);
     }
 
+    let frame_list = box_frame_list(active_table,frame_list_base() as PhysicalAddress)?;
+    UHCI_FRAME_LIST.call_once(|| {
+        Mutex::new(frame_list)
+    });
+
+    let qh_pool = box_qh_pool(active_table)?;
+    QH_POOL.call_once(||{
+        Mutex::new(qh_pool)
+    });
+
+    let td_pool = box_td_pool(active_table)?;
+    TD_POOL.call_once(||{
+        Mutex::new(td_pool)
+    });
+
+    let buffer = map_pool(active_table)?;
+    DATA_BUFFER.call_once(||{
+        Mutex::new(buffer)
+    });
+
+    clean_framelist();
+
+
+//    let queue_head_add = qh_alloc().unwrap()?;
+//    info!("the queuehead add in uhci init:{:?}",queue_head_add);
+//    info!("the queuehead physical add in uhci init:{:?}",active_table.translate(queue_head_add).unwrap());
     run(1);
     info!("\nUHCI USBCMD: {:b}\n", UHCI_CMD_PORT.lock().read());
     info!("\nUHCI USBSTS: {:b}\n", UHCI_STS_PORT.lock().read());
@@ -87,11 +109,231 @@ pub fn init() -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Allocate a available virtual buffer pointer for building TD
+pub fn buffer_pointer_alloc(offset:usize)-> Option<Result<(usize),&'static str>>{
+
+    DATA_BUFFER.try().map(|buffer| {
+
+        let virtual_buffer_pointer = buffer.lock().address_at_offset(offset).unwrap();
+
+        Ok(virtual_buffer_pointer)
+
+    })
+}
+/// Allocate a available Uhci Queue Head
+/// Return the available Queue Head's physical address and index in the pool
+pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
+
+    QH_POOL.try().map(|qh_pool| {
+
+
+        let mut index:usize = 0;
+        for x in qh_pool.lock().iter_mut(){
+
+            if x.active.read() == 0{
+                info!("found a avaliable qh /n");
+
+                x.active.write(1);
+
+                let add: *mut UhciQH = x;
+
+
+                return Ok((add as usize, index));
+
+
+            }else{
+                index += 1;
+            }
+        }
+
+        info!("No available Queue head for transfer");
+        Err("No available Queue head for transfer")
+
+    })
+}
+
+/// According to the given index, init the available queue head
+pub fn init_qh(index:usize,horizontal_pointer:u32,element_pointer:u32){
+
+    QH_POOL.try().map(|qh_pool| {
+
+        let qh = &mut qh_pool.lock()[index];
+        qh.horizontal_pointer.write(horizontal_pointer);
+        qh.vertical_pointer.write(element_pointer);
+
+    });
+}
+
+
+
+/// Allocate a available Uhci TD
+pub fn td_alloc()-> Option<Result<(usize,usize),&'static str>>{
+
+    TD_POOL.try().map(|td_pool| {
+
+        let mut index:usize = 0;
+        for x in td_pool.lock().iter_mut(){
+
+            if x.active.read() == 0{
+
+                x.active.write(1);
+
+                let add: *mut UhciTDRegisters = x;
+
+                return Ok((add as usize,index));
+
+            }else{
+
+                index += 1;
+            }
+        }
+
+        Err("No available Queue head for transfer")
+
+    })
+}
+
+/// According to the given index, init the available TD
+pub fn init_td(index:usize,type_select: u8, pointer: u32, speed: u8, add: u32, endp: u32, toggle: u32, pid: u32,
+               data_size: u32, data_add: u32){
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        td.init(type_select, pointer, speed, add, endp, toggle, pid,
+                data_size, data_add)
+
+    });
+}
+
+/// Write next data structure's physical address into given TD according to the index
+pub fn td_link(index:usize, type_select: u8, pointer: u32){
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        if type_select == 1{
+            td.link_pointer.write(pointer|TD_PTR_QH);
+        }else{
+            td.link_pointer.write(pointer);
+        }
+
+    });
+}
+
+pub fn clean_framelist(){
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+        let mut index:usize = 0;
+        for x in frame_list.lock().iter_mut() {
+
+            x.write(1);
+
+        }
+    });
+}
+
+/// Link the TD and Queue Head to the frame list, and return the index of the frame
+pub fn link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+        let mut index:usize = 0;
+        for x in frame_list.lock().iter_mut() {
+
+            if (x.read() == 0) || (x.read() & 0x1 == 0x1) {
+
+                x.write(pointer);
+
+                return Ok(index);
+
+            }else{
+                index += 1;
+            }
+
+        }
+
+        Err("No empty frame, need to clean one")
+        })
+}
+
+/// Allocate
+
+//-------------------------------------------------------------------------------------------------
+const MAX_QH:usize=                          16;
+const MAX_TD:usize=                          64;
+
+pub fn box_qh_pool(active_table: &mut ActivePageTable)
+                   -> Result<BoxRefMut<MappedPages, [UhciQH; MAX_QH]>, &'static str>{
+
+    let qh_pool: BoxRefMut<MappedPages, [UhciQH; MAX_QH]>  = BoxRefMut::new(Box::new(map_pool(active_table)?))
+        .try_map_mut(|mp| mp.as_type_mut::<[UhciQH; MAX_QH]>(0))?;
+
+
+
+    Ok(qh_pool)
+}
+pub fn box_td_pool(active_table: &mut ActivePageTable)
+                   -> Result<BoxRefMut<MappedPages, [UhciTDRegisters; MAX_TD]>, &'static str>{
+
+
+    let td_pool: BoxRefMut<MappedPages, [UhciTDRegisters; MAX_TD]>  = BoxRefMut::new(Box::new(map_pool(active_table)?))
+        .try_map_mut(|mp| mp.as_type_mut::<[UhciTDRegisters; MAX_TD]>(0))?;
+
+    Ok(td_pool)
+}
+
+
+///Get a physical memory page for data
+pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
+
+    let frame = allocate_frame().unwrap();
+    info!{"uhci map pool start address:{:?}", frame.start_address()};
+    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
+    let frames = Frame::range_inclusive(frame.clone(), frame.clone());
+    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();
+    let mapped_page = try!(active_table.map_allocated_pages_to(
+        new_page,
+        frames,
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+        fa.deref_mut())
+    );
+
+    Ok(mapped_page)
+}
+
+
+/// Box the the frame pointer
+pub fn box_frame_list(active_table: &mut ActivePageTable, frame_base: PhysicalAddress)
+                      -> Result<BoxRefMut<MappedPages, [Volatile<u32>;1024]>, &'static str>{
+
+
+    let frame_pointer: BoxRefMut<MappedPages, [Volatile<u32>;1024]>  = BoxRefMut::new(Box::new(map(active_table,frame_base)?))
+        .try_map_mut(|mp| mp.as_type_mut::<[Volatile<u32>;1024]>(0))?;
+
+    Ok(frame_pointer)
+}
+/// return a mapped page of given physical addrsss
+pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {
+
+    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
+    let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();
+    let mapped_page = try!(active_table.map_allocated_pages_to(
+        new_page,
+        frames,
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+        fa.deref_mut())
+    );
+    Ok(mapped_page)
+}
+
 /// Read the information of the device on the port 1 and config the device
 pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
     if if_connect_port1(){
         if if_enable_port1(){
-            let mut speed:u8;
+            let speed:u8;
             if low_speed_attach_port1(){
                 speed = USB_LOW_SPEED;
             }else{
@@ -101,8 +343,10 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
             let desc = UsbDeviceDesc::default();
             return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI,desc));
         }
+        info!("Port 1 is not enabled");
         return Err("Port 1 is not enabled");
     }
+    info!("No device is connected to the port 1");
     Err("No device is connected to the port 1")
 
 
@@ -112,7 +356,7 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
 pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
     if if_connect_port2(){
         if if_enable_port2(){
-            let mut speed:u8;
+            let speed:u8;
             if low_speed_attach_port2(){
                 speed = USB_LOW_SPEED;
             }else{
@@ -484,7 +728,7 @@ pub fn enable_change_clear_port1() {
 pub fn if_enable_port1() -> bool{
 
 
-    let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
+    let flag = (REG_PORT1.lock().read() & PORT_ENABLE) != 0;
     flag
 
 
@@ -616,7 +860,7 @@ pub fn enable_change_clear_port2() {
 pub fn if_enable_port2() -> bool{
 
 
-    let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
+    let flag = (REG_PORT2.lock().read() & PORT_ENABLE) != 0;
     flag
 
 
@@ -704,9 +948,9 @@ pub fn assign_frame_list_base(base: u32){
 // Transfer Descriptor
 
 // TD Link Pointer
-const TD_PTR_TERMINATE:usize=                 (1 << 0);
-const TD_PTR_QH :usize=                       (1 << 1);
-const TD_PTR_DEPTH  :usize=                   (1 << 2);
+pub const TD_PTR_TERMINATE:u32=                 (1 << 0);
+const TD_PTR_QH :u32=                       (1 << 1);
+const TD_PTR_DEPTH  :u32=                   (1 << 2);
 
 
 // TD Control and Status
@@ -737,19 +981,22 @@ const TD_TOK_D_SHIFT :u8=                   19;
 const TD_TOK_MAXLEN_MASK  :u32=             0xffe00000;    // Maximum Length
 const TD_TOK_MAXLEN_SHIFT :u8=              21;
 
-
+#[repr(C,packed)]
 pub struct UhciTDRegisters
 {
-    pub link_pointer: Volatile<PhysicalAddress>,
+    pub link_pointer: Volatile<u32>,
     pub control_status: Volatile<u32>,
     pub token: Volatile<u32>,
-    pub buffer_point: Volatile<PhysicalAddress>,
+    pub buffer_point: Volatile<u32>,
+    pub active:Volatile<u8>,
 }
 
 impl UhciTDRegisters {
 
     ///Initialize the Transfer description  according to the usb device(function)'s information
     /// Param:
+    /// type_select: 1 -> link pointer links to Queue Head, 0 -> links to TD
+    /// pointer: link pointer
     /// speed: device's speed; add: device assigned address by host controller
     /// endp: endpoinet number of this transfer pipe of this device
     /// toggle: Data Toggle. This bit is used to synchronize data transfers between a USB endpoint and the host
@@ -758,25 +1005,45 @@ impl UhciTDRegisters {
     /// len: The Maximum Length field specifies the maximum number of data bytes allowed for the transfer.
     /// The Maximum Length value does not include protocol bytes, such as PID and CRC.
     /// data_add: the pointer to data to be transferred
-    pub fn init(link: PhysicalAddress, speed: u32, add: u32, endp: u32, toggle: u32, pid: u32,
-                data_size: u32, data_add: PhysicalAddress) -> UhciTDRegisters {
-        let size = data_size - 1;
+    pub fn init(&mut self, type_select: u8, pointer: u32, speed: u8, add: u32, endp: u32, toggle: u32, pid: u32,
+                data_size: u32, data_add: u32){
+        let size:u32;
+        if data_size == 0{
+            size = data_size;
+        }else {
+            size = data_size - 1;
+        }
+
         let token = ((size << TD_TOK_MAXLEN_SHIFT) |
             (toggle << TD_TOK_D_SHIFT) |
             (endp << TD_TOK_ENDP_SHIFT) |
             (add << TD_TOK_DEVADDR_SHIFT) |
             pid) as u32;
+        let mut cs = ((3 << TD_CS_ERROR_SHIFT) | TD_CS_ACTIVE) as u32;
 
-        let cs = ((3 << TD_CS_ERROR_SHIFT) | TD_CS_ACTIVE) as u32;
-        UhciTDRegisters {
-            link_pointer: Volatile::new(link | TD_PTR_TERMINATE),
-            control_status: Volatile::new(cs),
-            token: Volatile::new(token),
-            buffer_point: Volatile::new(data_add),
-
+        if speed == USB_LOW_SPEED {
+                cs |= TD_CS_LOW_SPEED;
+            }
+        if pointer == 0{
+            self.link_pointer.write(TD_PTR_TERMINATE);
+        }else{
+            if type_select == 1{
+                self.link_pointer.write(pointer|TD_PTR_QH);
+            }else{
+                self.link_pointer.write(pointer);
+            }
         }
+
+
+        self.control_status.write(cs);
+
+        self.token.write(token);
+
+        self.buffer_point.write(data_add);
+
     }
 
+    ///
     /// get the pointer to this TD struct itself
     pub fn get_self_pointer(&mut self) -> *mut UhciTDRegisters {
         let add: *mut UhciTDRegisters = self;
@@ -786,13 +1053,13 @@ impl UhciTDRegisters {
     /// get the horizotal pointer to next data struct
     pub fn next_pointer(&self) -> PhysicalAddress {
         let pointer = self.link_pointer.read() & 0xFFFFFFF0;
-        pointer
+        pointer as PhysicalAddress
     }
 
     /// get the pointer to the data buffer
     pub fn read_buffer_pointer(&self) -> PhysicalAddress {
 
-        let pointer = self.buffer_point.read();
+        let pointer = self.buffer_point.read() as PhysicalAddress;
         pointer
     }
 
@@ -826,37 +1093,15 @@ impl UhciTDRegisters {
 
 // ------------------------------------------------------------------------------------------------
 // Queue Head
-
+#[repr(C,packed)]
 pub struct UhciQH
 {
     pub horizontal_pointer: Volatile<u32>,
     pub vertical_pointer: Volatile<u32>,
+    pub active: Volatile<u8>,
+
 }
-//-------------------------------------------------------------------------------------------------
-/// Box the the frame pointer
-pub fn frame_pointer(active_table: &mut ActivePageTable, frame_index: PhysicalAddress, frame_base: PhysicalAddress)
-                         -> Result<BoxRefMut<MappedPages, Volatile<u32>>, &'static str>{
 
-
-    let frame_pointer: BoxRefMut<MappedPages, Volatile<u32>>  = BoxRefMut::new(Box::new(map(active_table,frame_base)?))
-        .try_map_mut(|mp| mp.as_type_mut::<Volatile<u32>>(frame_index))?;
-
-    Ok(frame_pointer)
-}
-/// return a mapped page of given physical addrsss
-pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {
-
-    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
-    let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();
-    let mapped_page = try!(active_table.map_allocated_pages_to(
-        new_page,
-        frames,
-        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
-        fa.deref_mut())
-    );
-    Ok(mapped_page)
-}
 
 
 

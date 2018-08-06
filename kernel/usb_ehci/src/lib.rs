@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate volatile;
 extern crate owning_ref;
@@ -20,14 +19,12 @@ extern crate kernel_config;
 
 
 use core::ops::DerefMut;
-use volatile::{Volatile, ReadOnly, WriteOnly};
+use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use alloc::arc::Arc;
 use alloc::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
-use spin::{RwLock, Once, Mutex};
-use irq_safety::MutexIrqSafe;
-use memory::{MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
+use spin::{Once, Mutex};
+use memory::{FRAME_ALLOCATOR,Frame,ActivePageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 
 
 //static CAPA_REGS: Once<BoxRef<MappedPages, CapabilityRegisters>> = Once::new();
@@ -108,7 +105,7 @@ pub fn read_interrupt_type() -> Option<Vec<IntType>>{
         let mut int_vec:Vec<IntType> =  Vec::new();
         let mut mask:u8 = 0x1;
         // read each bit to see the interrupt types
-        for x in 0..6{
+        for _x in 0..6{
 
             mask = mask << 1;
             let id:u8 = int_type_ids & mask;
@@ -402,7 +399,7 @@ impl CapabilityRegisters{
     /// see whether the ECHI has the Asynchronous Schedule Park Capablity
     pub fn asyn_schedule_park(&self) -> bool{
         let value = self.hcc_params.read();
-        let num = ((value & 0x4) >> 2);
+        let num = (value & 0x4) >> 2;
         num == 1
     }
 
@@ -410,7 +407,7 @@ impl CapabilityRegisters{
     /// If false, the EHCI's frame list size is set to 1024 elements
     pub fn promgrammbale_frame_list_flag(&self) -> bool{
         let value = self.hcc_params.read();
-        let num = ((value & 0x2) >> 1);
+        let num = (value & 0x2) >> 1;
         num == 1
     }
 
@@ -569,7 +566,7 @@ impl OperationRegisters{
 
         if value == 1{
 
-            let value_s = (value << 13);
+            let value_s = value << 13;
             self.usb_status.update(|old_status| *old_status |= value_s );
 
         }

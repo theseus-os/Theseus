@@ -56,7 +56,7 @@ path = "../usb_device"
 
 
 [dependencies.usb_desc]
-path = "../../libs/usb_desc"
+path = "../usb_desc"
 
 
 [lib]

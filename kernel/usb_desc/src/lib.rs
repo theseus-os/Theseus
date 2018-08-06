@@ -4,14 +4,17 @@
 
 #![feature(const_fn)]
 
+extern crate volatile;
+
+use volatile::{Volatile, ReadOnly, WriteOnly};
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types
 
-static USB_DESC_DEVICE:u8 =                 0x01;
-static USB_DESC_CONF:u8 =                   0x02;
-static USB_DESC_STRING:u8 =                 0x03;
-static USB_DESC_INTF:u8 =                   0x04;
-static USB_DESC_ENDP:u8 =                   0x05;
+pub static USB_DESC_DEVICE:u16 =                 0x01 << 8;
+pub static USB_DESC_CONF:u16 =                   0x02 << 8;
+pub static USB_DESC_STRING:u16 =                 0x03 << 8;
+pub static USB_DESC_INTF:u16 =                   0x04 << 8;
+pub static USB_DESC_ENDP:u16 =                   0x05 << 8;
 
 // ------------------------------------------------------------------------------------------------
 // USB HID Descriptor Types
@@ -31,45 +34,23 @@ static USB_DESC_HUB:u8 =                    0x29;
 #[repr(C,packed)]
 pub struct UsbDeviceDesc
 {
-    pub len: u8,
-    pub device_type: u8,
-    pub usb_version: u16,
-    pub class: u8,
-    pub sub_class: u8,
-    pub protocol: u8,
-    pub max_packet_size: u8,
-    pub vendor_id: u16,
-    pub product_id: u16,
-    pub device_version: u16,
-    pub vendor_str: u8,
-    pub product_str: u8,
-    pub serial_str: u8,
-    pub conf_count: u8,
+    pub len: Volatile<u8>,
+    pub device_type: Volatile<u8>,
+    pub usb_version: Volatile<Volatile<u16>>,
+    pub class: Volatile<u8>,
+    pub sub_class: Volatile<u8>,
+    pub protocol: Volatile<u8>,
+    pub max_packet_size: Volatile<u8>,
+    pub vendor_id: Volatile<Volatile<u16>>,
+    pub product_id: Volatile<Volatile<u16>>,
+    pub device_version: Volatile<Volatile<u16>>,
+    pub vendor_str: Volatile<u8>,
+    pub product_str: Volatile<u8>,
+    pub serial_str: Volatile<u8>,
+    pub conf_count: Volatile<u8>,
 }
 
-impl UsbDeviceDesc{
 
-    pub fn default()-> UsbDeviceDesc{
-
-        UsbDeviceDesc{
-            len: 0,
-            device_type: 0,
-            usb_version: 0,
-            class: 0,
-            sub_class: 0,
-            protocol: 0,
-            max_packet_size: 0,
-            vendor_id: 0,
-            product_id: 0,
-            device_version: 0,
-            vendor_str: 0,
-            product_str: 0,
-            serial_str: 0,
-            conf_count: 0,
-
-        }
-    }
-}
 
 // ------------------------------------------------------------------------------------------------
 // USB Configuration Descriptor
@@ -77,14 +58,14 @@ impl UsbDeviceDesc{
 #[repr(C,packed)]
 pub struct UsbConfDesc
 {
-    pub len: u8,
-    pub config_type: u8,
-    pub total_len: u8,
-    pub intf_count: u8,
-    pub conf_value: u8,
-    pub conf_str: u8,
-    pub attributes: u8,
-    pub max_power: u8,
+    pub len: Volatile<u8>,
+    pub config_type: Volatile<u8>,
+    pub total_len: Volatile<u8>,
+    pub intf_count: Volatile<u8>,
+    pub conf_value: Volatile<u8>,
+    pub conf_str: Volatile<u8>,
+    pub attributes: Volatile<u8>,
+    pub max_power: Volatile<u8>,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -93,10 +74,10 @@ pub struct UsbConfDesc
 #[repr(C,packed)]
 pub struct UsbStringDesc
 {
-    pub len: u8,
-    pub string_type: u8,
-    pub size: u8,
-    pub str: [u16; 30],
+    pub len: Volatile<u8>,
+    pub string_type: Volatile<u8>,
+    pub size: Volatile<u8>,
+    pub str: [Volatile<Volatile<u16>>; 30],
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -106,16 +87,16 @@ pub struct UsbStringDesc
 pub struct UsbIntfDesc
 {
 
-    pub len: u8,
-    pub config_type: u8,
-    pub intf_type: u8,
-    pub intf_index: u8,
-    pub alt_setting: u8,
-    pub endp_count: u8,
-    pub class: u8,
-    pub sub_class: u8,
-    pub protocol: u8,
-    pub inf_str: u8,
+    pub len: Volatile<u8>,
+    pub config_type: Volatile<u8>,
+    pub intf_type: Volatile<u8>,
+    pub intf_index: Volatile<u8>,
+    pub alt_setting: Volatile<u8>,
+    pub endp_count: Volatile<u8>,
+    pub class: Volatile<u8>,
+    pub sub_class: Volatile<u8>,
+    pub protocol: Volatile<u8>,
+    pub inf_str: Volatile<u8>,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -124,12 +105,12 @@ pub struct UsbIntfDesc
 #[repr(C,packed)]
 pub struct UsbEndpDesc
 {
-    pub len: u8,
-    pub endp_type: u8,
-    pub addr: u8,
-    pub attributes: u8,
-    pub maxpacketsize: u16,
-    pub interval: u8,
+    pub len: Volatile<u8>,
+    pub endp_type: Volatile<u8>,
+    pub addr: Volatile<u8>,
+    pub attributes: Volatile<u8>,
+    pub maxpacketsize: Volatile<Volatile<u16>>,
+    pub interval: Volatile<u8>,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -138,14 +119,14 @@ pub struct UsbEndpDesc
 #[repr(C,packed)]
 pub struct UsbHidDesc
 {
-    pub len: u8,
-    pub hid_type: u8,
-    pub version: u16,
-    pub country_code: u8,
-    pub desc_count: u8,
-    pub desc_type: u8,
-    pub desc_len: u16,
-    pub length: u8,
+    pub len: Volatile<u8>,
+    pub hid_type: Volatile<u8>,
+    pub version: Volatile<Volatile<u16>>,
+    pub country_code: Volatile<u8>,
+    pub desc_count: Volatile<u8>,
+    pub desc_type: Volatile<u8>,
+    pub desc_len: Volatile<Volatile<u16>>,
+    pub length: Volatile<u8>,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -165,12 +146,12 @@ static HUB_PORT_INDICATORS:u8 =             0x80;        // Port Indicators
 pub struct UsbHubDesc
 {
 
-    pub len: u8,
-    pub hub_type: u8,
-    pub port_count: u8,
-    pub chars: u16,
-    pub power_time: u8,
-    pub current: u8,
+    pub len: Volatile<u8>,
+    pub hub_type: Volatile<u8>,
+    pub port_count: Volatile<u8>,
+    pub chars: Volatile<Volatile<u16>>,
+    pub power_time: Volatile<u8>,
+    pub current: Volatile<u8>,
 
 }
 
