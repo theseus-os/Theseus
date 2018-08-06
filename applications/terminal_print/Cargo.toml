@@ -15,9 +15,8 @@ path = "../../libs/dfqueue"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
+[dependencies.serial_port]
+path = "../../kernel/serial_port"
 
 
 [dependencies.lazy_static]

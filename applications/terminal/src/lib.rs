@@ -36,8 +36,8 @@ use task::TaskRef;
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
 
-#[no_mangle]
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
+#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
    let term_task_ref =  match Terminal::new() {
         Ok(task_ref) => {task_ref}

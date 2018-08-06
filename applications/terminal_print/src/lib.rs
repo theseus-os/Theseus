@@ -11,13 +11,14 @@
 #![feature(alloc)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+extern crate serial_port;
 extern crate task;
 extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
 
+use core::sync::atomic::spin_loop_hint;
 use event_types::Event;
 use dfqueue::DFQueueProducer;
 use alloc::btree_map::BTreeMap;
@@ -25,7 +26,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Mutex;
 
-// / Calls `print!()` with an extra newilne ('\n') appended to the end. 
+/// Calls `print!()` with an extra newline ('\n') appended to the end. 
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => (print!(concat!($fmt, "\n")));
@@ -69,11 +70,16 @@ use core::fmt;
 pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     let task_id = match task::get_my_current_task_id() {
         Some(task_id) => {task_id},
-        None => {error!("could not get current task id" ); return}
+        None => {
+            // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
+            // Instead, we write direclty to the serial port. 
+            let _ = serial_port::write_fmt_log("\x1b[31m", "[E] ", format_args!("error in print!/println! macro."), "\x1b[0m\n");
+            return;
+        }
     };
     
     // Obtains the correct temrinal print producer and enqueues the print event, which will later be popped off
-    // and handled by the infinite temrinal instance loop 
+    // and handled by the infinite terminal instance loop 
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
     let result = print_map.get(&task_id);
     if let Some(selected_term_producer) = result {
@@ -83,5 +89,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
-    0
+    loop {
+        spin_loop_hint();
+    }
 }

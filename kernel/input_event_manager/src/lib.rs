@@ -47,7 +47,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
     let args: Vec<String> =  vec![]; // terminal::main() doesn't have any arguments
     spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal
-    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "main input event handling loop".to_string(), None)?;
+    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "input_event_loop".to_string(), None)?;
     Ok(returned_keyboard_producer)
 }
 
