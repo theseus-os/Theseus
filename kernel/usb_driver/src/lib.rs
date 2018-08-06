@@ -41,31 +41,15 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
     let set_add_request = &UsbDevReq::new(0x00, usb_req::REQ_SET_ADDR, 1, 0,0);
     let set_add_frame_index = set_device_address(device,set_add_request,1,active_table)?;
-    info!("see the pointer in this frame:{:b}, {:?}", usb_uhci::frame_link_pointer(set_add_frame_index).unwrap()?, set_add_frame_index);
+
 
 
     let mut offset:usize = 0;
     let get_config_len = &UsbDevReq::new(0x00, usb_req::REQ_GET_DESC, usb_desc::USB_DESC_CONF, 0,6);
     let (config_value_frame_index,config_value) = get_config_value(device,get_config_len,active_table,offset)?;
     offset = 7;
-    info!("see the pointer in this frame:{:b}, {:?}", usb_uhci::frame_link_pointer(config_value_frame_index).unwrap()?, config_value_frame_index);
+    info!("see the value:{:?}", config_value);
 
-
-
-
-//    let add = active_table.translate(18446743523955233792).unwrap();
-//    info!("physical address of queue head pool:{:?}",add);
-
-
-//    if usb_uhci::if_enable_port1(){
-
-//        let add_trans = set_device_address(&mut device,1);
-//        let pointer = &add_trans as *const UhciTDRegisters;
-//        let index = usb_uhci::frame_number() as PhysicalAddress;
-//        let base = usb_uhci::frame_list_base() as PhysicalAddress;
-//        let mut frame_pointer = usb_uhci::box_frame_list(active_table,base)?;
-//        frame_pointer.write(pointer as u32);
-//    }
 
 
     Ok(())
@@ -76,13 +60,13 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 pub fn set_device_address(dev: &mut UsbDevice, dev_request:&UsbDevReq,add: u16, active_table: &mut ActivePageTable) -> Result<usize,&'static str>{
 
 
-    let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
+
 
     // read necessary information to build TDs
     let speed = dev.speed;
     let addr = dev.addr;
-//    let max_size = dev.maxpacketsize;
-//    let req_type = dev_request.dev_req_type;
+    let max_size = dev.maxpacketsize;
+    let req_type = dev_request.dev_req_type;
     let len = dev_request.len as u32;
     let request_size = size_of_val(dev_request) as u32;
 
@@ -90,14 +74,16 @@ pub fn set_device_address(dev: &mut UsbDevice, dev_request:&UsbDevReq,add: u16, 
     let data_virtual_add= dev_request as *const UsbDevReq;
     let data_buffer_point = active_table.translate(data_virtual_add as usize).unwrap() as u32;
 
+
     // build the set up transaction to set address within a TD
+    let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
     usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
         request_size,data_buffer_point);
 
     let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
-
     usb_uhci::init_td(end_index,0,0,speed ,addr, 0,1, TD_PACKET_IN as u32,
-                      len,0);
+                      0x7FF,0);
+
 
     usb_uhci::td_link(setup_index,0,end_add as u32);
 
@@ -127,8 +113,13 @@ pub fn get_config_value(dev: &UsbDevice,dev_request:&UsbDevReq,
     let speed = dev.speed;
     let addr = dev.addr;
     let max_size = dev.maxpacketsize;
-    let req_type = dev_request.dev_req_type;
-    let len = dev_request.len as u32;
+    let req_type = dev_request.dev_req_type as u64;
+    let req_len = dev_request.len as u64;
+    let req_request = dev_request.req as u64;
+    let req_value = dev_request.value as u64;
+    let req_index = dev_request.index as u64;
+
+    let request_data = req_len << 48 | req_index <<32 | req_value << 16 | req_request << 8 | req_type;
     let request_size = size_of_val(dev_request) as u32;
     let mut toggle: u32 = 0;
 
@@ -141,17 +132,14 @@ pub fn get_config_value(dev: &UsbDevice,dev_request:&UsbDevReq,
     let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
     usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
                       request_size,data_buffer_point);
-    info!("the pointer in setup's link pointer:{:b}", setup_add as u32);
-
 
     let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(offset).unwrap()?;
     let data_buffer_point = active_table.translate(v_buffer_pointer as usize).unwrap() as u32;
+
     // build the set up transaction to set address within a TD
     let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
     usb_uhci::init_td(packet_index,0,0,speed ,addr, 0,1, TD_PACKET_IN as u32,
-                      len,data_buffer_point);
-
-    info!("the pointer in packet's link pointer:{:b}", packet_add as u32);
+                      6,data_buffer_point);
     usb_uhci::td_link(setup_index,0,packet_add as u32);
 
 
@@ -159,37 +147,19 @@ pub fn get_config_value(dev: &UsbDevice,dev_request:&UsbDevReq,
     let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
     usb_uhci::init_td(end_index,0,1,speed ,addr, 0,1, TD_PACKET_OUT as u32,
                       0,0);
-
-    info!("the pointer in end's link pointer:{:b}", end_add as u32);
     usb_uhci::td_link(packet_index,0,end_add as u32);
 
     let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
 
-
-    info!("the pointer in seconde frame:{:b}", qh_physical_add as u32);
     let frame_index = usb_uhci:: link_to_framelist(qh_physical_add as u32).unwrap()?;
 
     for x in 0..5{
 
     };
 
-    let mapped_page =usb_uhci::map(active_table,data_buffer_point as usize)?;
-    let config_desc = box_config_desc(active_table,mapped_page)?;
 
-    for x in 0..1000{
-        if config_desc.total_len.read() != 0{
-            info!("not zero the data buffer")
-        }
-
-    }
-
-
-    let config_value = config_desc.conf_value.read();
-
-
-
-    Ok((frame_index,config_value))
+    Ok((frame_index,0))
 
 
 }

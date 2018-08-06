@@ -71,7 +71,8 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         port2_enable(1);
     }
 
-    let frame_list = box_frame_list(active_table,frame_list_base() as PhysicalAddress)?;
+    let frame_list = box_frame_list(active_table,
+                                    UHCI_FRBASEADD_PORT.lock().read() as PhysicalAddress)?;
     UHCI_FRAME_LIST.call_once(|| {
         Mutex::new(frame_list)
     });
@@ -271,6 +272,7 @@ pub fn frame_link_pointer(index: usize) -> Option<Result<u32,&'static str>>{
 //-------------------------------------------------------------------------------------------------
 const MAX_QH:usize=                          16;
 const MAX_TD:usize=                          64;
+
 
 pub fn box_qh_pool(active_table: &mut ActivePageTable)
                    -> Result<BoxRefMut<MappedPages, [UhciQH; MAX_QH]>, &'static str>{
@@ -996,7 +998,8 @@ pub struct UhciTDRegisters
     pub control_status: Volatile<u32>,
     pub token: Volatile<u32>,
     pub buffer_point: Volatile<u32>,
-    pub active:Volatile<u8>,
+    pub active:Volatile<u32>,
+    _padding_1: [u32;3],
 }
 
 impl UhciTDRegisters {
@@ -1106,7 +1109,8 @@ pub struct UhciQH
 {
     pub horizontal_pointer: Volatile<u32>,
     pub vertical_pointer: Volatile<u32>,
-    pub active: Volatile<u8>,
+    pub active: Volatile<u32>,
+    _padding_1: u32
 
 }
 

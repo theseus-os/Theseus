@@ -21,7 +21,7 @@ path = "../usb_ehci"
 path = "../usb_desc"
 
 [dependencies.usb_req]
-path = "../../libs/usb_req"
+path = "../usb_req"
 
 [dependencies.memory]
 path = "../memory"
