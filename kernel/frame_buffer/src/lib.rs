@@ -43,25 +43,14 @@ const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
-/// try to unwrap an option. return error result if fails. 
-#[macro_export]
-macro_rules! try_opt_err {
-    ($e:expr, $s:expr) =>(
-        match $e {
-            Some(v) => v,
-            None => return Err($s),
-        }
-    )
-}
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
     let rs = font::init();
-    if rs.is_ok() {
-         trace!("frame_buffer text initialized.");
-    } else {
-         return Err("frame_buffer::init() fails in font initiailizing");
+    match font::init() {
+        Ok(_) => { trace!("frame_buffer text initialized."); },
+        Err(err) => { return Err(err); }
     }
 
     //Allocate VESA frame buffer
@@ -80,18 +69,24 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages = try_opt_err!(allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE), "framebuffer::init() couldn't allocate pages.");
+            let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
+                Some(pages) => { pages },
+                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
+            };
+            
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
-            if allocator_mutex.is_none(){
-                return Err("framebuffer::init() Couldn't get frame allocator");
-            } 
-
-            let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-            if err.is_err() {
-                debug!("Fail to init frame buffer");
-                return err;
+            match allocator_mutex {
+                Some(_) => { },
+                None => { return Err("framebuffer::init() Couldn't get frame allocator"); }
             }
+
+            let rs = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
+            match rs {
+                Ok(_) => { },
+                Err(err) => { return Err(err); }
+            }
+
             let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
             let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
@@ -258,11 +253,16 @@ impl Drawer {
     fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
             self.start_address = virtual_address;
-            self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Fail to init frame buffer"); 
-            trace!("Set frame buffer address {:#x}", virtual_address);
+            match Unique::new((virtual_address) as *mut _) {
+                Some(buffer) => { 
+                    self.buffer = buffer; 
+                    trace!("Set frame buffer address {:#x}", virtual_address);
+                },
+                None => { return Err("Fail to new virtual frame buffer"); }
+            }
         }
-
         Ok(())
+
     }  
 }
 

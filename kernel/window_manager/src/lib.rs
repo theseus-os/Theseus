@@ -59,7 +59,8 @@ const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
 
 /// 10 pixel gap between windows 
-pub const GAP_SIZE: usize = 10; 
+pub const GAP_SIZE:usize = 10;
+pub const WINDOW_MARGIN:usize = 2;
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
@@ -154,7 +155,7 @@ impl WindowAllocator{
             width:width,
             height:height,
             active:true,
-            margin:2,
+            margin:WINDOW_MARGIN,
             key_producer:producer,
         };
 
@@ -450,18 +451,17 @@ impl WindowObj{
         }
         
         let mut inner = self.inner.lock();
-        let rs = inner.resize(x,y,width,height);
-        if rs.is_err(){
-            Err(rs.unwrap_err())
-        } else {
-            let percent = rs.unwrap();
-            for (_key, item) in self.components.iter_mut() {
-                let (x, y) = item.get_position();
-                let (width, height) = item.get_displayable().get_size();
-                item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
-            }
-            inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
-            Ok(())
+        match inner.resize(x, y, width, height) {
+            Ok(percent) => {
+                for (_key, item) in self.components.iter_mut() {
+                    let (x, y) = item.get_position();
+                    let (width, height) = item.get_displayable().get_size();
+                    item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
+                }
+                inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
+                Ok(())
+            },
+            Err(err) => { Err(err) }
         }
     }
 
