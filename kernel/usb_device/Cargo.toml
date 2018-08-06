@@ -6,7 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 [dependencies.usb_desc]
-path = "../../libs/usb_desc"
+path = "../usb_desc"
 
 [dependencies.usb_req]
 path = "../../libs/usb_req"

@@ -1,8 +1,0 @@
-[package]
-name = "usb_desc"
-version = "0.1.0"
-authors = ["BowenLiu15 <bl28@rice.edu>"]
-
-[
-[dependencies]
-volatile = "0.2.4"

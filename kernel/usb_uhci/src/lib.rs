@@ -131,7 +131,6 @@ pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
         for x in qh_pool.lock().iter_mut(){
 
             if x.active.read() == 0{
-                info!("found a avaliable qh /n");
 
                 x.active.write(1);
 
@@ -258,7 +257,16 @@ pub fn link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
         })
 }
 
-/// Allocate
+///read frame list link pointer
+pub fn frame_link_pointer(index: usize) -> Option<Result<u32,&'static str>>{
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+        let pointer = frame_list.lock()[index].read();
+        Ok(pointer)
+    })
+}
+
 
 //-------------------------------------------------------------------------------------------------
 const MAX_QH:usize=                          16;

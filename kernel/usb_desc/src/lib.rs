@@ -1,12 +1,18 @@
-#![allow(dead_code)]
 #![no_std]
+#![feature(alloc)]
 
+#![allow(dead_code)]
 
-#![feature(const_fn)]
-
+extern crate alloc;
 extern crate volatile;
+extern crate owning_ref;
+extern crate memory;
 
+use alloc::boxed::Box;
+use owning_ref::{BoxRef, BoxRefMut};
 use volatile::{Volatile, ReadOnly, WriteOnly};
+use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags,
+             MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types
 
@@ -36,18 +42,39 @@ pub struct UsbDeviceDesc
 {
     pub len: Volatile<u8>,
     pub device_type: Volatile<u8>,
-    pub usb_version: Volatile<Volatile<u16>>,
+    pub usb_version: Volatile<u16>,
     pub class: Volatile<u8>,
     pub sub_class: Volatile<u8>,
     pub protocol: Volatile<u8>,
     pub max_packet_size: Volatile<u8>,
-    pub vendor_id: Volatile<Volatile<u16>>,
-    pub product_id: Volatile<Volatile<u16>>,
-    pub device_version: Volatile<Volatile<u16>>,
+    pub vendor_id: Volatile<u16>,
+    pub product_id: Volatile<u16>,
+    pub device_version: Volatile<u16>,
     pub vendor_str: Volatile<u8>,
     pub product_str: Volatile<u8>,
     pub serial_str: Volatile<u8>,
     pub conf_count: Volatile<u8>,
+}
+
+impl UsbDeviceDesc {
+    pub fn default() -> UsbDeviceDesc {
+        UsbDeviceDesc {
+            len: Volatile::new(0),
+            device_type: Volatile::new(0),
+            usb_version: Volatile::new(0),
+            class: Volatile::new(0),
+            sub_class: Volatile::new(0),
+            protocol: Volatile::new(0),
+            max_packet_size: Volatile::new(0),
+            vendor_id: Volatile::new(0),
+            product_id: Volatile::new(0),
+            device_version: Volatile::new(0),
+            vendor_str: Volatile::new(0),
+            product_str: Volatile::new(0),
+            serial_str: Volatile::new(0),
+            conf_count: Volatile::new(0),
+        }
+    }
 }
 
 
@@ -60,13 +87,25 @@ pub struct UsbConfDesc
 {
     pub len: Volatile<u8>,
     pub config_type: Volatile<u8>,
-    pub total_len: Volatile<u8>,
+    pub total_len: Volatile<u16>,
     pub intf_count: Volatile<u8>,
     pub conf_value: Volatile<u8>,
     pub conf_str: Volatile<u8>,
     pub attributes: Volatile<u8>,
     pub max_power: Volatile<u8>,
 }
+
+/// Box the the frame pointer
+pub fn box_config_desc(active_table: &mut ActivePageTable,page: MappedPages)
+                      -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
+
+
+    let frame_pointer: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbConfDesc>(0))?;
+
+    Ok(frame_pointer)
+}
+
 
 // ------------------------------------------------------------------------------------------------
 // USB String Descriptor
@@ -77,7 +116,7 @@ pub struct UsbStringDesc
     pub len: Volatile<u8>,
     pub string_type: Volatile<u8>,
     pub size: Volatile<u8>,
-    pub str: [Volatile<Volatile<u16>>; 30],
+    pub str: [Volatile<u16>; 30],
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -109,7 +148,7 @@ pub struct UsbEndpDesc
     pub endp_type: Volatile<u8>,
     pub addr: Volatile<u8>,
     pub attributes: Volatile<u8>,
-    pub maxpacketsize: Volatile<Volatile<u16>>,
+    pub maxpacketsize: Volatile<u16>,
     pub interval: Volatile<u8>,
 }
 
@@ -121,11 +160,11 @@ pub struct UsbHidDesc
 {
     pub len: Volatile<u8>,
     pub hid_type: Volatile<u8>,
-    pub version: Volatile<Volatile<u16>>,
+    pub version: Volatile<u16>,
     pub country_code: Volatile<u8>,
     pub desc_count: Volatile<u8>,
     pub desc_type: Volatile<u8>,
-    pub desc_len: Volatile<Volatile<u16>>,
+    pub desc_len: Volatile<u16>,
     pub length: Volatile<u8>,
 }
 
@@ -149,7 +188,7 @@ pub struct UsbHubDesc
     pub len: Volatile<u8>,
     pub hub_type: Volatile<u8>,
     pub port_count: Volatile<u8>,
-    pub chars: Volatile<Volatile<u16>>,
+    pub chars: Volatile<u16>,
     pub power_time: Volatile<u8>,
     pub current: Volatile<u8>,
 
