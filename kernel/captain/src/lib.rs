@@ -136,11 +136,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // //init frame_buffer
     let rs = frame_buffer::init();
-    if rs.is_ok() {
-        trace!("frame_buffer initialized.");
-    } else {
-        println_raw!("nano_core_start():fail to initialize frame_buffer");
-        return Err(rs.unwrap_err());
+    match rs {
+        Ok(_) => { trace!("frame_buffer initialized."); }
+        Err(err) => { 
+            println_raw!("nano_core_start():fail to initialize frame_buffer");
+            return Err(err);
+        }
     }
 
     // initialize the input event manager, which will start the default terminal 
