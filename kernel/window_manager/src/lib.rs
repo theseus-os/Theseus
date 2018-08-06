@@ -32,7 +32,7 @@ extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
 
-//#[macro_use] extern crate log;
+#[macro_use] extern crate log;
 //#[macro_use] extern crate util;
 
 extern crate acpi;
@@ -302,7 +302,7 @@ pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<String, TextDisplay>,
+    components:BTreeMap<String, Component>,
 }
 
 
@@ -314,10 +314,10 @@ impl WindowObj{
 
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key: &str, displayable:TextDisplay) -> Result<(), &'static str>{
+    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
         //TODO check fit
         let key = key.to_string();
-        let (x, y, width, height) = displayable.get_size();
+        let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
         if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
@@ -325,8 +325,14 @@ impl WindowObj{
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
             return Err("The displayable does not fit the window size.");
         } 
+        
+        let component = Component {
+            x:x,
+            y:y,
+            displayable:displayable,
+        };
 
-        self.components.insert(key, displayable);
+        self.components.insert(key, component);
         Ok(())
     }
 
@@ -335,7 +341,19 @@ impl WindowObj{
     }
 
     pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
-        return self.components.get(key);
+        let opt = self.components.get(key);
+        match opt {
+            None => {return None},
+            Some(component) => {return Some(component.get_displayable());},
+        };
+    }
+
+    pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
+        let opt = self.components.get(key);
+        match opt {
+            None => {return Err("No such displayable");},
+            Some(component) => {return Ok(component.get_position());},
+        };
     }
 
     ///Get the content position of the displayable excluding border and padding
@@ -438,7 +456,8 @@ impl WindowObj{
         } else {
             let percent = rs.unwrap();
             for (_key, item) in self.components.iter_mut() {
-                let (x, y, width, height) = item.get_size();
+                let (x, y) = item.get_position();
+                let (width, height) = item.get_displayable().get_size();
                 item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
             }
             inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
@@ -532,7 +551,27 @@ impl WindowInner {
 
 }
 
+struct Component {
+    x:usize,
+    y:usize,
+    displayable:TextDisplay,
+}
 
+impl Component {
+    pub fn get_displayable(&self) -> &TextDisplay {
+        return &(self.displayable)
+    }
+
+    pub fn get_position(&self) -> (usize, usize) {
+        (self.x, self.y)
+    }
+
+    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+        self.x = x;
+        self.y = y;
+        self.displayable.resize(width, height);
+    }
+}
 
 /*  Following two functions can be used to systematically resize windows forcibly
 /// Readjusts remaining windows after a window is deleted to maximize screen usage

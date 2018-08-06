@@ -1,11 +1,11 @@
 
 use super::super::{FrameTextBuffer, WindowObj, frame_buffer};
+use super::super::{String};
 use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 /// A displayable component for text display
 pub struct TextDisplay {
-    x:usize,
-    y:usize,
+    name:String,
     width:usize,
     height:usize,
     textbuffer:FrameTextBuffer,
@@ -13,10 +13,9 @@ pub struct TextDisplay {
 
 impl TextDisplay
 {
-    pub fn new(x:usize, y:usize, width:usize, height:usize) -> TextDisplay {
+    pub fn new(name:&str, width:usize, height:usize) -> TextDisplay {
         TextDisplay{
-            x:x,
-            y:y,
+            name:String::from(name),
             width:width,
             height:height,
             textbuffer:FrameTextBuffer::new(),
@@ -24,11 +23,14 @@ impl TextDisplay
     }
 
     /// takes in a str slice and display as much as it can to the text area
-    pub fn display_string(&self, window:&WindowObj, slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
-        let (x, y) = window.get_content_position();
-        self.textbuffer.print_by_bytes(x + self.x, y + self.y, 
-            self.width, self.height, 
-            slice, font_color, bg_color)
+    pub fn display_string(&self, window:&WindowObj, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
+        match self.get_display_pos(window) {
+            Ok((x, y)) => {
+                return self.textbuffer.print_by_bytes(x, y, self.width, self.height,
+                    slice, font_color, bg_color);
+            },
+            Err(err) => {return Err(err);}
+        }
     }
 
     /// Gets the dimensions of the text area to display
@@ -37,14 +39,12 @@ impl TextDisplay
     }
 
     ///Gets the position and size of the text area
-    pub fn get_size(&self) -> (usize, usize, usize, usize) {
-        (self.x, self.y, self.width, self.height)
+    pub fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
     }
 
     ///resize the text displayable area
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
-        self.x = x;
-        self.y = y;
+    pub fn resize(&mut self, width:usize, height:usize) {
         self.width = width;
         self.height = height;
     }
@@ -54,10 +54,14 @@ impl TextDisplay
         let mut cursor = self.textbuffer.cursor.lock();
         cursor.enable();
         cursor.update(line as usize, column as usize, reset);
-        let (x, y) = window.get_content_position();
-        frame_buffer::fill_rectangle(x + self.x + (column as usize) * CHARACTER_WIDTH, 
-                        y + self.y + (line as usize) * CHARACTER_HEIGHT, 
+        match self.get_display_pos(window) {
+            Ok((x, y)) => {
+                frame_buffer::fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                        y + (line as usize) * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+            },
+            Err(err) => {error!("could not update display forwards: {}", err);}
+        }        
     } 
 
     /// Take the cursor off the display
@@ -71,12 +75,24 @@ impl TextDisplay
         let mut cursor = self.textbuffer.cursor.lock();
         if cursor.blink() {
             let (line, column, show) = cursor.get_info();
-            let (x, y) = window.get_content_position();
-            let color = if show { font_color } else { bg_color };
-            frame_buffer::fill_rectangle(x + self.x + (column as usize) * CHARACTER_WIDTH, 
-                        y + self.y + (line as usize) * CHARACTER_HEIGHT, 
+            match self.get_display_pos(window) {
+                Ok((x, y)) => {
+                    let color = if show { font_color } else { bg_color };
+                    frame_buffer::fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                        y + (line as usize) * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+                },
+                Err(err) => { }
+            }                
         }
+    }
+
+    fn get_display_pos(&self, window:&WindowObj) -> Result<(usize, usize), &'static str> {
+        let content_pos = window.get_content_position();
+        match window.get_displayable_position(&(self.name)) {
+            Ok(display_pos) => {return Ok((content_pos.0 + display_pos.0, content_pos.1 + display_pos.1));}
+            Err(err) => {return Err(err);}
+        }       
     }
 }
 

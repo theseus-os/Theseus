@@ -874,8 +874,8 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
     { 
-        match terminal.window.add_displayable(&display_name, 
-            TextDisplay::new(100, 50, 400, 300)) {
+        match terminal.window.add_displayable(&display_name, 100, 50,
+            TextDisplay::new(&display_name, 400, 300)) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}
         };
