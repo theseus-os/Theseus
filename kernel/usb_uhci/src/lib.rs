@@ -16,6 +16,7 @@ extern crate port_io;
 extern crate spawn;
 extern crate usb_device;
 extern crate usb_desc;
+extern crate usb_req;
 
 
 use core::ops::DerefMut;
@@ -26,15 +27,16 @@ use owning_ref::{BoxRef, BoxRefMut};
 use spin::{Once, Mutex};
 use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 use usb_device::{UsbDevice,Controller};
-use usb_desc::UsbDeviceDesc;
+use usb_desc::{UsbDeviceDesc,UsbConfDesc};
+use usb_req::UsbDevReq;
 
-static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
-static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
+pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
+pub static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
 static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
 static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
 static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
-pub static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
+static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
 static QH_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciQH;MAX_QH]>>> = Once::new();
 static TD_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciTDRegisters;MAX_TD]>>> = Once::new();
@@ -59,13 +61,20 @@ static USB_HIGH_SPEED:u8=                  0x02;
 /// Initialize the USB 1.1 host controller
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
+
+
+    run(0);
     short_packet_int(1);
 
     ioc_int(1);
 
+    port1_reset();
+
     if if_connect_port1(){
         port1_enable(1);
     }
+
+    port2_reset();
 
     if if_connect_port2(){
         port2_enable(1);
@@ -95,14 +104,11 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     clean_framelist();
 
 
-//    let queue_head_add = qh_alloc().unwrap()?;
-//    info!("the queuehead add in uhci init:{:?}",queue_head_add);
-//    info!("the queuehead physical add in uhci init:{:?}",active_table.translate(queue_head_add).unwrap());
     run(1);
     info!("\nUHCI USBCMD: {:b}\n", UHCI_CMD_PORT.lock().read());
     info!("\nUHCI USBSTS: {:b}\n", UHCI_STS_PORT.lock().read());
     info!("\nUHCI USBINTR: {:b}\n", UHCI_INT_PORT.lock().read());
-    info!("\nUHCI FRNUM: {:b}\n", UHCI_FRNUM_PORT.lock().read());
+    info!("\nUHCI FRNUM: {:b}\n", frame_number());
     info!("\nUHCI FAME BASE: {:b}\n", UHCI_FRBASEADD_PORT.lock().read());
     info!("\nUHCI SOFMOD: {:b}\n", UHCI_SOFMD_PORT.lock().read());
     info!("\nUHCI PORTSC1: {:b}\n", REG_PORT1.lock().read());
@@ -111,7 +117,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 }
 
 /// Allocate a available virtual buffer pointer for building TD
-pub fn buffer_pointer_alloc(offset:usize)-> Option<Result<(usize),&'static str>>{
+pub fn buffer_pointer_alloc(offset:usize)-> Option<Result<usize,&'static str>>{
 
     DATA_BUFFER.try().map(|buffer| {
 
@@ -121,6 +127,19 @@ pub fn buffer_pointer_alloc(offset:usize)-> Option<Result<(usize),&'static str>>
 
     })
 }
+
+
+/// Read allocated td's link pointer
+pub fn qh_pointers(index:usize)->Option<Result<(u32,u32),&'static str>>{
+
+    QH_POOL.try().map(|qh_pool| {
+
+        let qh = &mut qh_pool.lock()[index];
+        Ok((qh.vertical_pointer.read(),qh.horizontal_pointer.read()))
+
+    })
+}
+
 /// Allocate a available Uhci Queue Head
 /// Return the available Queue Head's physical address and index in the pool
 pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
@@ -146,7 +165,7 @@ pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
             }
         }
 
-        info!("No available Queue head for transfer");
+        warn!("No available Queue head for transfer");
         Err("No available Queue head for transfer")
 
     })
@@ -163,7 +182,6 @@ pub fn init_qh(index:usize,horizontal_pointer:u32,element_pointer:u32){
 
     });
 }
-
 
 
 /// Allocate a available Uhci TD
@@ -221,6 +239,51 @@ pub fn td_link(index:usize, type_select: u8, pointer: u32){
     });
 }
 
+/// Write next data structure's physical address into given TD according to the index
+/// Let the TD indicate vertical first.
+pub fn td_link_vf(index:usize, type_select: u8, pointer: u32){
+
+    let vf_pointer = pointer | TD_PTR_DEPTH;
+    td_link(index, type_select, vf_pointer)
+}
+
+/// Read allocated td's link pointer
+pub fn td_link_pointer(index:usize)->Option<Result<u32,&'static str>>{
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        Ok(td.link_pointer.read())
+
+
+
+    })
+}
+
+/// Read allocated td's link pointer
+pub fn td_token(index:usize)->Option<Result<u32,&'static str>>{
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        Ok(td.token.read())
+
+    })
+}
+
+/// Read allocated td's link pointer
+pub fn td_status(index:usize)->Option<Result<u32,&'static str>>{
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        let status = td.control_status.read();
+        Ok(status)
+
+    })
+}
+
+
 pub fn clean_framelist(){
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
@@ -235,7 +298,7 @@ pub fn clean_framelist(){
 }
 
 /// Link the TD and Queue Head to the frame list, and return the index of the frame
-pub fn link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
+pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
 
@@ -244,7 +307,7 @@ pub fn link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
             if (x.read() == 0) || (x.read() & 0x1 == 0x1) {
 
-                x.write(pointer);
+                x.write(pointer | TD_PTR_QH);
 
                 return Ok(index);
 
@@ -277,6 +340,7 @@ const MAX_TD:usize=                          64;
 pub fn box_qh_pool(active_table: &mut ActivePageTable)
                    -> Result<BoxRefMut<MappedPages, [UhciQH; MAX_QH]>, &'static str>{
 
+
     let qh_pool: BoxRefMut<MappedPages, [UhciQH; MAX_QH]>  = BoxRefMut::new(Box::new(map_pool(active_table)?))
         .try_map_mut(|mp| mp.as_type_mut::<[UhciQH; MAX_QH]>(0))?;
 
@@ -294,12 +358,23 @@ pub fn box_td_pool(active_table: &mut ActivePageTable)
     Ok(td_pool)
 }
 
+/// Box the the frame list
+pub fn box_frame_list(active_table: &mut ActivePageTable, frame_base: PhysicalAddress)
+                      -> Result<BoxRefMut<MappedPages, [Volatile<u32>;1024]>, &'static str>{
+
+
+    let frame_pointer: BoxRefMut<MappedPages, [Volatile<u32>;1024]>  = BoxRefMut::new(Box::new(map(active_table,frame_base)?))
+        .try_map_mut(|mp| mp.as_type_mut::<[Volatile<u32>;1024]>(0))?;
+
+
+    Ok(frame_pointer)
+}
+
 
 ///Get a physical memory page for data
 pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
 
     let frame = allocate_frame().unwrap();
-    info!{"uhci map pool start address:{:?}", frame.start_address()};
     let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
     let frames = Frame::range_inclusive(frame.clone(), frame.clone());
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();
@@ -314,16 +389,7 @@ pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'sta
 }
 
 
-/// Box the the frame pointer
-pub fn box_frame_list(active_table: &mut ActivePageTable, frame_base: PhysicalAddress)
-                      -> Result<BoxRefMut<MappedPages, [Volatile<u32>;1024]>, &'static str>{
 
-
-    let frame_pointer: BoxRefMut<MappedPages, [Volatile<u32>;1024]>  = BoxRefMut::new(Box::new(map(active_table,frame_base)?))
-        .try_map_mut(|mp| mp.as_type_mut::<[Volatile<u32>;1024]>(0))?;
-
-    Ok(frame_pointer)
-}
 /// return a mapped page of given physical addrsss
 pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {
 
@@ -700,9 +766,42 @@ pub fn if_port1_reset() -> bool{
 /// Reset the port 1
 pub fn port1_reset() {
 
-    unsafe { REG_PORT1.lock().write(REG_PORT1.lock().read() & (!PORT_RESET)); }
+    let reset_command = REG_PORT1.lock().read() | PORT_RESET;
+    unsafe { REG_PORT1.lock().write(reset_command); }
 
+    //use better way to delay, need 60 ms
+    for _x in 0..300{}
+
+    let reset_command = REG_PORT1.lock().read() & (!PORT_RESET);
+    unsafe { REG_PORT1.lock().write(reset_command); }
+
+    for _x in 0..20{
+
+        let port_status = REG_PORT1.lock().read();
+
+        if if_connect_port1(){
+            port1_enable(1);
+            info!("UHCI port 1 reset complete, the port is ready to use for device");
+            return;
+        }
+
+        if connect_change_port1(){
+            connect_change_clear_port1();
+            info!("UHCI port 1 connect status changed after port reset");
+            continue;
+        }
+
+        if enable_change_port1(){
+            enable_change_clear_port1();
+            info!("UHCI port 1 enable status changed after port reset");
+            continue;
+        }
+    }
+
+    info!("UHCI port 1 reset complete, no device is attached");
 }
+
+
 
 /// See whether low speed device attached to port 1
 /// Return a bool
@@ -831,9 +930,39 @@ pub fn if_port2_reset() -> bool{
 
 /// Reset the port 2
 pub fn port2_reset() {
+    let reset_command = REG_PORT2.lock().read() | PORT_RESET;
+    unsafe { REG_PORT2.lock().write(reset_command); }
 
-    unsafe { REG_PORT2.lock().write(REG_PORT2.lock().read() & (!PORT_RESET)); }
+    //use better way to delay, need 60 ms
+    for _x in 0..300 {}
 
+    let reset_command = REG_PORT2.lock().read() & (!PORT_RESET);
+    unsafe { REG_PORT2.lock().write(reset_command); }
+
+    for _x in 0..20 {
+        let port_status = REG_PORT2.lock().read();
+
+        if if_connect_port2() {
+            port2_enable(1);
+            info!("UHCI port 2 reset complete, the port is ready to use for device");
+            break;
+        }
+
+        if connect_change_port2() {
+            connect_change_clear_port2();
+            info!("UHCI port 2 connect status changed after port reset");
+            continue;
+        }
+
+        if enable_change_port2() {
+            enable_change_clear_port2();
+            info!("UHCI port 2 enable status changed after port reset");
+            continue;
+        }
+
+    }
+
+    info!("UHCI port 2 reset complete, no device is attached");
 }
 
 /// See whether low speed device attached to port 2
@@ -935,7 +1064,7 @@ pub fn frame_list_base() -> u32{
 /// Read the current frame number
 pub fn frame_number() -> u16{
 
-    UHCI_FRNUM_PORT.lock().read() & 0xEFF
+    UHCI_FRNUM_PORT.lock().read() & 0x3FF
 }
 
 /// Read the Frame List current index
@@ -972,7 +1101,7 @@ const TD_CS_NAK :u32=                       (1 << 19);     // NAK Received
 const TD_CS_BABBLE  :u32=                   (1 << 20);     // Babble Detected
 const TD_CS_DATABUFFER :u32=                (1 << 21);     // Data Buffer Error
 const TD_CS_STALLED :u32=                   (1 << 22);     // Stalled
-const TD_CS_ACTIVE  :u32=                   (1 << 23);     // Active
+pub const TD_CS_ACTIVE  :u32=                   (1 << 23);     // Active
 const TD_CS_IOC :u32=                       (1 << 24);     // Interrupt on Complete
 const TD_CS_IOS :u32=                       (1 << 25);     // Isochronous Select
 const TD_CS_LOW_SPEED :u32=                 (1 << 26);     // Low Speed Device

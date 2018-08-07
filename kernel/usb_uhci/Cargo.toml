@@ -58,6 +58,9 @@ path = "../usb_device"
 [dependencies.usb_desc]
 path = "../usb_desc"
 
+[dependencies.usb_req]
+path = "../usb_req"
+
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

@@ -3,7 +3,16 @@
 
 #![allow(dead_code)]
 
+extern crate alloc;
+extern crate volatile;
+extern crate owning_ref;
+extern crate memory;
 
+use alloc::boxed::Box;
+use owning_ref::{BoxRef, BoxRefMut};
+use volatile::{Volatile, ReadOnly, WriteOnly};
+use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags,
+             MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 // ------------------------------------------------------------------------------------------------
 // USB Request Type
 
@@ -88,26 +97,33 @@ pub static F_PORT_INDICATOR:u8 =                 22;  // Port
 #[repr(C,packed)]
 pub struct UsbDevReq
 {
-    pub dev_req_type: u8,
-    pub req:          u8,
-    pub value:        u16,
-    pub index:        u16,
-    pub len:          u16,
+    pub dev_req_type: Volatile<u8>,
+    pub request:          Volatile<u8>,
+    pub value:        Volatile<u16>,
+    pub index:        Volatile<u16>,
+    pub len:          Volatile<u16>,
 }
 
 impl UsbDevReq{
 
-    pub fn new( dev_req_type: u8,req: u8, value: u16,
-                index: u16, len: u16) -> UsbDevReq{
+    pub fn init( &mut self, dev_req_type: u8,request: u8, value: u16,
+                index: u16, len: u16) {
 
-        UsbDevReq
-            {
-                dev_req_type,
-                req,
-                value,
-                index,
-                len,
-            }
+        self.dev_req_type.write(dev_req_type);
+        self.request.write(request);
+        self.value.write(value);
+        self.index.write(index);
+        self.len.write(len);
+
 
     }
+}
+
+/// Box the the frame pointer
+pub fn box_dev_req(active_table: &mut ActivePageTable,page: MappedPages)
+                       -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
+    let dev_req: BoxRefMut<MappedPages, UsbDevReq> = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbDevReq>(0))?;
+
+    Ok(dev_req)
 }

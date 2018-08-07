@@ -100,10 +100,10 @@ pub fn box_config_desc(active_table: &mut ActivePageTable,page: MappedPages)
                       -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
 
 
-    let frame_pointer: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
+    let config_desc: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
         .try_map_mut(|mp| mp.as_type_mut::<UsbConfDesc>(0))?;
 
-    Ok(frame_pointer)
+    Ok(config_desc)
 }
 
 

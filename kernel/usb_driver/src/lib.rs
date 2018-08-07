@@ -12,7 +12,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc,box_config_desc};
-use usb_req::{UsbDevReq};
+use usb_req::{UsbDevReq,box_dev_req};
 use usb_device::{UsbControlTransfer,UsbDevice,Controller};
 //use usb_uhci::{UhciTDRegisters, UhciQH};
 use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
@@ -36,28 +36,57 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     }
 
 
-    let device = &mut usb_uhci::port1_device_init()?;
+    if let Err(e) = device_init(active_table){
+        return Err(e);
+    }
 
-
-    let set_add_request = &UsbDevReq::new(0x00, usb_req::REQ_SET_ADDR, 1, 0,0);
-    let set_add_frame_index = set_device_address(device,set_add_request,1,active_table)?;
-
-
-
-    let mut offset:usize = 0;
-    let get_config_len = &UsbDevReq::new(0x00, usb_req::REQ_GET_DESC, usb_desc::USB_DESC_CONF, 0,6);
-    let (config_value_frame_index,config_value) = get_config_value(device,get_config_len,active_table,offset)?;
-    offset = 7;
-    info!("see the value:{:?}", config_value);
 
 
 
     Ok(())
 }
 
+/// Initialize the device
+/// Have not implemented error check yet, need to use the return of the set up request functions to return error
+pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str>{
+
+    usb_uhci::port1_reset();
+    let device = &mut usb_uhci::port1_device_init()?;
+    let mut offset:usize = 0;
+
+    let dev_request_pointer_v = usb_uhci::buffer_pointer_alloc(offset).unwrap()?;
+    let dev_request_pointer = active_table.translate(dev_request_pointer_v as usize).unwrap();
+    let map = usb_uhci::map(active_table,dev_request_pointer)?;
+    let mut address_request = box_dev_req(active_table,map)?;
+    offset += 8;
+
+    address_request.init(0x00, usb_req::REQ_SET_ADDR, 1, 0,0);
+    let set_add_frame_index = set_device_address(device, dev_request_pointer as u32,1,active_table)?;
+
+
+    let dev_request_pointer_v = usb_uhci::buffer_pointer_alloc(offset).unwrap()?;
+    let dev_request_pointer = active_table.translate(dev_request_pointer_v as usize).unwrap();
+    let map = usb_uhci::map(active_table,dev_request_pointer)?;
+    let mut config_value_request = box_dev_req(active_table,map)?;
+    offset += 8;
+
+    config_value_request.init(0x00, usb_req::REQ_GET_DESC, usb_desc::USB_DESC_CONF, 0,8);
+    let (config_val_frame_index,value,new_off) =
+        get_config_value(device,dev_request_pointer as u32,active_table,offset)?;
+
+    Ok(())
+
+
+}
+
 /// build a setup transaction in TD to assign a device address to the device
 /// Return the physical pointer to this transaction
-pub fn set_device_address(dev: &mut UsbDevice, dev_request:&UsbDevReq,add: u16, active_table: &mut ActivePageTable) -> Result<usize,&'static str>{
+/// Have not implemented error check yet, need to read status to decide the error of the transaction and return that
+/// HID request is little different from standard request, check the Intel USB HID doc to debug this
+/// function.
+/// Currently this function should work, according to the write back status.
+/// But the get_config_value which depends on this function is not working, so check this function also.
+pub fn set_device_address(dev: &mut UsbDevice, data_buffer_pointer: u32,add: u16, active_table: &mut ActivePageTable) -> Result<usize,&'static str>{
 
 
 
@@ -66,34 +95,45 @@ pub fn set_device_address(dev: &mut UsbDevice, dev_request:&UsbDevReq,add: u16, 
     let speed = dev.speed;
     let addr = dev.addr;
     let max_size = dev.maxpacketsize;
-    let req_type = dev_request.dev_req_type;
-    let len = dev_request.len as u32;
-    let request_size = size_of_val(dev_request) as u32;
-
-    // get the data buffer physical pointer
-    let data_virtual_add= dev_request as *const UsbDevReq;
-    let data_buffer_point = active_table.translate(data_virtual_add as usize).unwrap() as u32;
 
 
     // build the set up transaction to set address within a TD
     let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
-    usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
-        request_size,data_buffer_point);
+    let setup_add = active_table.translate(setup_add).unwrap();
+    usb_uhci::init_td(setup_index,0,1,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
+        8,data_buffer_pointer);
+
 
     let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
+    let end_add = active_table.translate(end_add).unwrap();
     usb_uhci::init_td(end_index,0,0,speed ,addr, 0,1, TD_PACKET_IN as u32,
-                      0x7FF,0);
+                      0,0);
 
 
-    usb_uhci::td_link(setup_index,0,end_add as u32);
-
-    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let (qh_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let qh_add = active_table.translate(qh_add).unwrap();
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
 
 
     dev.addr = add as u32;
 
-    let frame_index = usb_uhci:: link_to_framelist(qh_physical_add as u32).unwrap()?;
+
+    let frame_index = usb_uhci:: qh_link_to_framelist(qh_add as u32).unwrap()?;
+
+
+
+
+    // wait for the transfer to be completed
+    // Currently the get config transfer is not working
+    loop{
+        let status = usb_uhci::td_status(setup_index).unwrap()?;
+        if status & usb_uhci::TD_CS_ACTIVE == 0{
+            debug!("The write back status of this set_add transfer,{:x}", status);
+            break
+        }
+    }
+
+    info!("Set device address set up transfer complete");
 
 
 
@@ -103,126 +143,79 @@ pub fn set_device_address(dev: &mut UsbDevice, dev_request:&UsbDevReq,add: u16, 
 
 }
 
-pub fn get_config_value(dev: &UsbDevice,dev_request:&UsbDevReq,
-                        active_table: &mut ActivePageTable,offset:usize)-> Result<(usize,u8),&'static str>{
+/// Get the configuration value which is used to set configuration in the device
+/// Currently choose the first configuration and first interface inside
+/// Have not implemented error check yet, need to read status to decide the error of the transaction and return that
+/// This function doesn't work as expect, two possible problems:
+/// 1: address is not set. check the request data and TD init
+/// 2: this get config request has wrong value, check the request init.
+/// HID request is little different from standard request, check the Intel USB HID doc to debug this
+/// function.
 
 
-    //read first 4 bytes of the configuration
+pub fn get_config_value(dev: &UsbDevice,data_buffer_pointer: u32,
+                        active_table: &mut ActivePageTable,offset: usize)-> Result<(usize,u8,usize),&'static str>{
 
+
+    //read first 6 bytes of the configuration to read the config value
     // read necessary information to build TDs
     let speed = dev.speed;
     let addr = dev.addr;
     let max_size = dev.maxpacketsize;
-    let req_type = dev_request.dev_req_type as u64;
-    let req_len = dev_request.len as u64;
-    let req_request = dev_request.req as u64;
-    let req_value = dev_request.value as u64;
-    let req_index = dev_request.index as u64;
 
-    let request_data = req_len << 48 | req_index <<32 | req_value << 16 | req_request << 8 | req_type;
-    let request_size = size_of_val(dev_request) as u32;
-    let mut toggle: u32 = 0;
-
-
-    // get the data buffer physical pointer
-    let data_virtual_add= dev_request as *const UsbDevReq;
-    let data_buffer_point = active_table.translate(data_virtual_add as usize).unwrap() as u32;
-
-    // build the set up transaction to set address within a TD
+    // build the set up transaction within a TD
     let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
+    let setup_add = active_table.translate(setup_add).unwrap();
     usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
-                      request_size,data_buffer_point);
+                      8,data_buffer_pointer);
 
+    // get a pointer to save the following data
     let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(offset).unwrap()?;
-    let data_buffer_point = active_table.translate(v_buffer_pointer as usize).unwrap() as u32;
+    let data_buffer_pointer = active_table.translate(v_buffer_pointer as usize).unwrap() as u32;
 
-    // build the set up transaction to set address within a TD
+    // build the following data transaction within a TD
     let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
+    let packet_add = active_table.translate(packet_add).unwrap();
     usb_uhci::init_td(packet_index,0,0,speed ,addr, 0,1, TD_PACKET_IN as u32,
-                      6,data_buffer_point);
-    usb_uhci::td_link(setup_index,0,packet_add as u32);
+                      6,data_buffer_pointer);
+    usb_uhci::td_link_vf(setup_index,0,packet_add as u32);
 
 
-
+    // build the end  transaction within a TD
     let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
+    let end_add = active_table.translate(end_add).unwrap();
     usb_uhci::init_td(end_index,0,1,speed ,addr, 0,1, TD_PACKET_OUT as u32,
                       0,0);
-    usb_uhci::td_link(packet_index,0,end_add as u32);
+    usb_uhci::td_link_vf(packet_index,0,end_add as u32);
 
     let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let qh_physical_add = active_table.translate(qh_physical_add).unwrap();
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
 
-    let frame_index = usb_uhci:: link_to_framelist(qh_physical_add as u32).unwrap()?;
+    let frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).unwrap()?;
 
-    for x in 0..5{
-
-    };
-
-
-    Ok((frame_index,0))
-
-
-}
-///// According to the device information and request to build a setup transaction in TD
-//pub fn uhci_dev_request(dev: &UsbDevice, dev_req_type: u8,dev_request: u8, value: u16,
-//                       index: u16, len: u16) -> UhciTDRegisters{
-//    let dev_request = &UsbDevReq::new(dev_req_type, dev_request, value, index, len);
-//    uhci_control_transfer(dev,dev_request)
-//
-//}
-
-///// According to the request and device information to build a Control Transfer
-///// Return: Vec<UhciTDRegisters> (a Vec contains Control transfer's transactions)
-//pub fn uhci_control_transfer(dev: &UsbDevice, dev_request: &UsbDevReq)-> UhciTDRegisters{
-//
-//    ;
-//    // read necessary information to build TDs
-//    let speed = dev.speed as u32;
-//    let addr = dev.addr;
-//    let max_size = dev.maxpacketsize;
-//    let req_type = dev_request.dev_req_type;
-//    let mut len = dev_request.len as u32;
-//    let request_size = size_of_val(dev_request) as u32;
-//    let mut toggle: u32 = 0;
-////    let mut td_list:Vec<&mut UhciTDRegisters> = Vec::new();
-//
-//    // get the data buffer physical pointer
-//    let data_virtual_add= dev_request as *const UsbDevReq;
-//    let data_buffer_point = translate_add(data_virtual_add as usize).unwrap();
-//
-//     build the set up transaction within a TD
-//    let setup_transaction = UhciTDRegisters::
-//    init(0,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
-//         request_size,data_buffer_point as u32);
-//
-//    setup_transaction
-//}
-
-/// translate virtual address to physical address
-pub fn translate_add(v_addr : usize) -> Option<usize> {
-
-    // get a reference to the kernel's memory mapping information
-    let kernel_mmi_ref = get_kernel_mmi_ref().expect("e1000: translate_v2p couldnt get ref to kernel mmi");
-    let mut kernel_mmi_locked = kernel_mmi_ref.lock();
-    // destructure the kernel's MMI so we can access its page table
-    let MemoryManagementInfo {
-        page_table: ref mut kernel_page_table,
-        ..  // don't need to access other stuff in kernel_mmi
-    } = *kernel_mmi_locked;
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-
-            //let phys = try!(active_table.translate(v_addr).ok_or("e1000:translatev2p couldnt translate v addr"));
-            //return Ok(phys);
-            return active_table.translate(v_addr);
-
+    // wait for the transfer to be completed
+    // Currently the get config transfer is stalled
+    // wait for the transfer to be completed
+    loop{
+        let status = usb_uhci::td_status(setup_index).unwrap()?;
+        if status & usb_uhci::TD_CS_ACTIVE == 0{
+            debug!("The write back status of this get config transfer,{:x}", status);
+            break
         }
-        _ => {
-            //return Err("kernel page table wasn't an ActivePageTable!");
-            return None;
-        }
-
     }
 
+    let map = usb_uhci::map(active_table,data_buffer_pointer as usize)?;
+    let mut config_desc = box_config_desc(active_table,map)?;
+    let value = config_desc.len.read();
+
+    debug!("config value {}", value);
+
+
+
+    Ok((frame_index,value,offset+6))
+
+
 }
+
 
