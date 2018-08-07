@@ -50,7 +50,6 @@ extern crate scheduler;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
-extern crate pmu_x86;
 
 
 #[cfg(target_feature = "sse2")]
@@ -225,7 +224,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-    
+
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
