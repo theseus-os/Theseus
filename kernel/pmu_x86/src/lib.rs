@@ -76,9 +76,7 @@ lazy_static!{
     pub static ref TASK_ID_LIST: MutexIrqSafe<Vec<usize>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
     // Here 4 is the number of programmable counters
     static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
-    //static ref CORES_SAMPLING: Mutex<BTreeSet<u8>> = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
     static ref CORES_SAMPLING: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
-    //static ref RESULTS_READY: [AtomicBool; 4] = [AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false), AtomicBool::new(false)];
     static ref RESULTS_READY: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
 }
 static NUM_PMC: u32 = 4;
@@ -301,14 +299,8 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
             }
             cores_sampling_locked.insert(my_core_id);
         }
-    //if CORES_SAMPLING[my_task.write().running_on_cpu as usize].swap(true, Ordering::SeqCst) {
     }
-    /*
-    if RESULTS_READY[my_task.write().running_on_cpu as usize].load(Ordering::SeqCst) {
-        return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
-        set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
-    }
-    */
+    
     IP_LIST.lock().clear();
     TASK_ID_LIST.lock().clear();
     // if a task_id was requested, sets the value for the interrupt handler to later read
