@@ -1,4 +1,27 @@
 //! Support for Performance Monitoring Unit readouts.
+//! 
+//! # Example
+//! ```
+//! pmu_x86::init();
+//! 
+//! let counter_freq = 0xFFFFF;
+//! let num_samples = 500;
+//! let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, counter_freq, None, num_samples);
+//! 
+//! if let Ok(my_sampler) = sampler {
+//! 
+//! 	// wait some time here
+//! 	
+//! 	if let Ok(mut samples) = pmu_x86::retrieve_samples() {
+//! 		pmu_x86::print_samples(&mut samples);
+//! 	}
+//! }
+//! ```
+//!
+//! # Note
+//! Currently, the PMU-based sampler will only capture samples on the same core as it was initialized and started from. 
+//! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
+//!
 
 #![no_std]
 #![feature(integer_atomics)]
