@@ -79,6 +79,11 @@ pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
 	&LOCAL_APICS
 }
 
+/// Returns the number of processor core (local APICs) that exist on this system.
+pub fn core_count() -> usize {
+    get_lapics().iter().count()
+}
+
 
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
