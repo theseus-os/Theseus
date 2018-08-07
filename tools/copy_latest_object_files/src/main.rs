@@ -25,13 +25,18 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let mut opts = Options::new();
-    opts.optflag("v", "verbose", "print input file path to output file path for every file that is copied");
-    opts.optflag("h", "help", "print this help menu");
+    opts.optflag("v", "verbose", "print all file copying actions");
+    opts.optopt ("p", "prefix",  "set the string that goes before all files, e.g., \"__k_\"", "PREFIX");
+    opts.optflag("h", "help",    "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
     };
+
+    let verbose = matches.opt_present("v");
+    let prefix = matches.opt_str("prefix").unwrap_or_default();
+    println!("*********** VERBOSE: {:?}, PREFIX: {:?} ==========", verbose, prefix);
 
     let (input_dir, output_dir) = match matches.free.len() {
         0=>{ eprintln!("No input or output directory");
@@ -49,7 +54,7 @@ fn main() {
     let mut file_list: Vec<FileRecord> = Vec::new();
     let mut unique_source_files: Vec<String> = Vec::new();
 
-    if let Ok(input_dir) = fs::read_dir(input_dir) {
+    if let Ok(input_dir) = fs::read_dir(input_dir.clone()) {
         for file in input_dir {
             if let Ok(file) = file {
                 let mut file_path = file.path();
@@ -76,13 +81,13 @@ fn main() {
                 }
             }
             else {
-                eprintln!("Invalid file");
+                eprintln!("Invalid file in input directory: {:?}", file);
                 process::exit(-1);
             }       
         }
     }
     else{
-        eprintln!("Invalid directory");
+        eprintln!("Invalid input directory: {:?}", input_dir);
         process::exit(-1);
     }
 
@@ -94,10 +99,10 @@ fn main() {
     // copy files to output directory
     for file in file_list.iter() {
         let mut output_path = PathBuf::from(output_dir.clone());
-        output_path.push(format!("{}{}", "__k_", file.short_name.clone()));
+        output_path.push(format!("{}{}", prefix, file.short_name.clone()));
         output_path.set_extension("o");
         
-        if matches.opt_present("v") {
+        if verbose {
             println!("{:?} --> {:?}", file.file_path, output_path)
         }
         if fs::copy(file.file_path.clone(), output_path.as_path()).is_err() {

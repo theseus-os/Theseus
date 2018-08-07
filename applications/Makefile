@@ -73,15 +73,15 @@ cargo: compiler_plugins
 	
 
 ### This first calls the cargo target, but then copies all object files into the build dir. 
-### It gives all object files the "__k_" prefix, except for "executable" application object files that get the "__a_" prefix.
+### It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: cargo
 	@mkdir -p ./build
 
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
-		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/__k_\1\.o/p'` 2> /dev/null ; \
+		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/$(KERNEL_PREFIX)\1\.o/p'` 2> /dev/null ; \
 	done
 	
 	@for app in $(APPS) ; do  \
-		mv  ./build/__k_$${app}.o  ./build/__a_$${app}.o ; \
-		strip --strip-debug  ./build/__a_$${app}.o ; \
+		mv  ./build/$(KERNEL_PREFIX)$${app}.o  ./build/$(APP_PREFIX)$${app}.o ; \
+		strip --strip-debug  ./build/$(APP_PREFIX)$${app}.o ; \
 	done
