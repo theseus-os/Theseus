@@ -225,40 +225,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
         
     }
-    /*
-    spawn::spawn_kthread(|_: Option<u8>| {
-            pmu_x86::init();
-            let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 500);
-            if let Ok(my_sampler) = sampler {
-                /*
-                debug!("Sampling running ok.");
-                let mut counter = 0;
-                while counter < 5000 {
-                    counter += 1;
-                } 
-                
-                if let Ok(mut samples) = pmu_x86::retrieve_samples() {
-                    debug!("The results from retrieve_samples was okay");
-                    pmu_x86::print_samples(&mut samples);
-                } else {
-                    debug!("Something went wrong!");
-                }
-                */
-            } else {
-                debug!("Sample didn't begin");
-            }
-        }, 
-        None, String::from("pmu_test"), None)?;
-    */
-    /*
-    pmu_x86::init();
-    let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    */
-    /*
-    pmu_x86::init();
-    let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    */
-    debug!("apic value: {}", apic::get_my_apic_id().unwrap());
+    
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
