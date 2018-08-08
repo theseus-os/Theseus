@@ -64,3 +64,4 @@ pub mod contributing;
 pub mod build_process;
 pub mod booting;
 pub mod phis;
+pub mod git;
