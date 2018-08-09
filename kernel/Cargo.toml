@@ -7,7 +7,7 @@
 # 	"nano_core",
 # ]
 
-## Here, we specify wthat all subdirectories should be built, except for those starting with a "."
+## Here, we specify that all subdirectories should be built, except for those starting with a "."
 ## So, we build everything except hidden directories.
 members = [
 	"[!.]*/"
