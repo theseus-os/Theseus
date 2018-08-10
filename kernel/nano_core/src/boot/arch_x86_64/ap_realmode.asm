@@ -115,7 +115,7 @@ findmode:
     add si, 2
     mov cx, [fs:si]
     cmp cx, 0xFFFF
-    je set_graphic_mode
+    je store_mode_info
 
 .getmodeinfo:
     push esi
@@ -125,7 +125,7 @@ findmode:
     int 0x10
     pop esi
     cmp ax, 0x4F
-    jne set_graphic_mode
+    jne store_mode_info
 
 .foundmode:
     ;check minimum values, really not minimums from an OS perspective but ugly for users
@@ -134,13 +134,33 @@ findmode:
     cmp byte [VBEModeInfo.xresolution], 600
     jb .searchmodes
 
-set_graphic_mode:
-    ; bx 4___ is linear frame buffer 
-    mov ax, 0x4f02
-    mov bx, [current.mode] ; 0x4f41:640*400*32bit
-    ;mov bx, 0xf41
-    int 0x10;
+store_mode_info:    
+    push di
+    mov ax, 0
+    mov es, ax
+    mov di, 0xF100
+    mov word ax, [VBEModeInfo.xresolution]
+    mov word [es:di], ax
+    mov word [es:di+2], 0
+    mov word [es:di+4], 0
+    mov word [es:di+6], 0
+    mov word ax, [VBEModeInfo.yresolution]
+    mov word [es:di+8], ax
+    mov word [es:di+10], 0
+    mov word [es:di+12], 0
+    mov word [es:di+14], 0
+    mov word ax, [VBEModeInfo.physbaseptr]
+    mov word [es:di+16], ax
+    mov word ax, [VBEModeInfo.physbaseptr+2]
+    mov word [es:di+18], ax
+    mov word [es:di+20], 0000
+    mov word [es:di+22], 0000
+    pop di
 
+set_graphic_mode:
+    mov ax, 0x4f02;bx 4___ is linear frame buffer 
+    mov bx, [current.mode] ; 0x4f41:640*400*32bit
+    int 0x10;
 
     push ds
     push es

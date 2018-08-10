@@ -43,10 +43,15 @@ const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
+static GRAPHIC_MODE_PAGE:Mutex<Option<MappedPages>> = Mutex::new(None);
+
+
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
+    //let _rs = init_info();
+
     let rs = font::init();
     match font::init() {
         Ok(_) => { trace!("frame_buffer text initialized."); },
@@ -55,6 +60,8 @@ pub fn init() -> Result<(), &'static str > {
 
     //Allocate VESA frame buffer
     const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
+    //const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0x9000_0000;
+    
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*PIXEL_BYTES;
 
     // get a reference to the kernel's memory mapping information
@@ -106,12 +113,99 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
+fn init_info() -> Result<(), &'static str > {
+   //Allocate VESA frame buffer
+    const GRAPHIC_MODE_INFO: PhysicalAddress = 0xF100;
+    //const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0x9000_0000;
+    
+    const GRAPHIC_MODE_SIZE: usize = 0x300;
+
+    // get a reference to the kernel's memory mapping information
+    let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+    let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+
+    // destructure the kernel's MMI so we can access its page table
+    let MemoryManagementInfo { 
+        page_table: ref mut kernel_page_table, 
+        .. // don't need to access other stuff in kernel_mmi
+    } = *kernel_mmi_locked;
+    
+    match kernel_page_table {
+        &mut PageTable::Active(ref mut active_table) => {
+            let pages = match allocate_pages_by_bytes(GRAPHIC_MODE_INFO) {
+                Some(pages) => { pages },
+                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
+            };
+            
+            let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            let allocator_mutex = FRAME_ALLOCATOR.try();
+            match allocator_mutex {
+                Some(_) => { },
+                None => { return Err("framebuffer::init() Couldn't get frame allocator"); }
+            }
+
+            let rs = GRAPHIC_BUFFER.lock().init_mode_buffer(pages.start_address());
+            match rs {
+                Ok(_) => { },
+                Err(err) => { return Err(err); }
+            }
+
+            let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
+            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
+                pages, 
+                Frame::range_inclusive_addr(GRAPHIC_MODE_INFO, GRAPHIC_MODE_SIZE), 
+                vesa_display_flags, 
+                allocator.deref_mut())
+            );
+
+            let mut pages = GRAPHIC_MODE_PAGE.lock();
+            *pages = Some(mapped_frame_buffer);
+
+            Ok(())
+        }
+        _ => { 
+            return Err("");
+        }
+    }
+}
+
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
     })
 };
+
+static GRAPHIC_BUFFER: Mutex<VideoMode> = {
+    Mutex::new(VideoMode {
+            start_address:0,
+            buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) 
+        }
+    })
+};
+
+struct VideoMode {
+    start_address:usize,
+    buffer: Unique<Buffer>,
+}
+
+impl VideoMode {
+
+    fn init_mode_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
+        if self.start_address == 0 {
+            self.start_address = virtual_address;
+            match Unique::new((virtual_address) as *mut _) {
+                Some(buffer) => { 
+                    self.buffer = buffer; 
+                    trace!("Set frame buffer address {:#x}", virtual_address);
+                },
+                None => { return Err("Fail to new virtual frame buffer"); }
+            }
+        }
+        Ok(())
+
+    }
+}  
 
 
 /// draw a pixel with coordinates and color

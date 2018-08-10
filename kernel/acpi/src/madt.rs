@@ -19,7 +19,40 @@ use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
-
+struct Info{
+    attributes:u16,
+	winA:u8,
+	winB:u8,
+	granularity:u16,
+	winsize:u16,
+	segmentA:u16,
+	segmentB:u16,
+	winfuncptr:u32,
+	bytesperscanline:u16,
+	xresolution:u16,
+	yresolution:u16,
+	xcharsize:u8,
+	ycharsize:u8,
+	numberofplanes:u8,
+	bitsperpixel:u8,
+	numberofbanks:u8,
+	memorymodel:u8,
+	banksize:u8,
+	numberofimagepages:u8,
+	unused:u8,
+	redmasksize:u8,
+	redfieldposition:u8,
+	greenmasksize:u8,
+	greenfieldposition:u8,
+	bluemasksize:u8,
+	bluefieldposition:u8,
+	rsvdmasksize:u8,
+	rsvdfieldposition:u8,
+	directcolormodeinfo:u8,
+	physbaseptr:u32,
+	offscreenmemoryoffset:u32,
+	offscreenmemsize:u8,
+}
 
 
 /// The Multiple APIC Descriptor Table
@@ -319,6 +352,9 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         }
     }
 
+    let frameinfo = trampoline_mapped_pages.as_type::<In>(0x100).unwrap();
+    trace!("The trace is {:X} {:X} {:X} vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv", frameinfo.x, frameinfo.y, frameinfo.address);
+
     // wait for all cores to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let mut count = get_lapics().iter().count();
@@ -329,6 +365,12 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     }
     
     Ok(ap_count)  
+}
+
+struct In{
+    x:u64,
+    y:u64,
+    address:u64,
 }
 
 
