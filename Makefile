@@ -258,9 +258,9 @@ kernel: check_rustc check_xargo
 	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
 
 
-DOC_ROOT := "build/doc/-- Theseus Crates --/index.html"
+DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
 
-doc:
+doc: check_rustc
 	@rm -rf build/doc
 	@mkdir -p build
 	@$(MAKE) -C kernel doc
