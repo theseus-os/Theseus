@@ -34,10 +34,10 @@ const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 //Size of VESA mode 0x4112
 
 ///The width of the screen
-pub const FRAME_BUFFER_WIDTH:usize = 640;
+//pub const FRAME_BUFFER_WIDTH:usize = 640;
 
 ///The height of the screen
-pub const FRAME_BUFFER_HEIGHT:usize = 400;
+//pub const FRAME_BUFFER_HEIGHT:usize = 400;
 
 const PIXEL_BYTES:usize = 4;
 
@@ -51,9 +51,14 @@ static GRAPHIC_MODE_PAGE:Mutex<Option<MappedPages>> = Mutex::new(None);
 pub fn init() -> Result<(), &'static str > {
     
     let VESA_DISPLAY_PHYS_START:PhysicalAddress;
+    let VESA_DISPLAY_PHYS_SIZE: usize;
     {
         let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
         VESA_DISPLAY_PHYS_START = graphic_info.address as usize;
+        let mut drawer = FRAME_DRAWER.lock();
+        drawer.set_resolution(graphic_info.x as usize, graphic_info.y as usize);
+        VESA_DISPLAY_PHYS_SIZE= (graphic_info.x*graphic_info.y) as usize * PIXEL_BYTES;
+
     }
     let rs = font::init();
     match font::init() {
@@ -63,7 +68,6 @@ pub fn init() -> Result<(), &'static str > {
 
     //const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0x9000_0000;
     
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*PIXEL_BYTES;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -173,6 +177,8 @@ fn init_info() -> Result<(), &'static str > {
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         start_address:0,
+        width:0,
+        height:0,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
     })
 };
@@ -187,6 +193,7 @@ static GRAPHIC_BUFFER: Mutex<VideoMode> = {
 
 struct VideoMode {
     start_address:usize,
+
     buffer: Unique<Buffer>,
 }
 
@@ -237,6 +244,8 @@ pub struct Point {
 
 pub struct Drawer {
     start_address: usize,
+    width:usize,
+    height:usize,
     buffer: Unique<Buffer> ,
 }
 
@@ -249,13 +258,21 @@ impl Drawer {
             : "cc", "memory", "rdi", "rcx"
             : "intel", "volatile");
     }*/
+    fn set_resolution(&mut self, x:usize, y:usize) {
+        self.width = x;
+        self.height = y;
+    }
+
+    pub fn get_resolution(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
         self.buffer().chars[y][x] = color;
     }
 
     fn check_in_range(&mut self, x:usize, y:usize) -> bool {
-        x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
+        x + 2 < self.width && y < self.height
     }
 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
@@ -294,10 +311,10 @@ impl Drawer {
     }
 
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH }};
-        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT }};  
+        let end_x:usize = {if start_x + width < self.width { start_x + width } 
+            else { self.width }};
+        let end_y:usize = {if start_y + height < self.height { start_y + height } 
+            else { self.height }};  
 
         let mut x = start_x;
         loop {
@@ -321,10 +338,10 @@ impl Drawer {
     }
 
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        let end_x:usize = {if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH }};
-        let end_y:usize = {if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT }};  
+        let end_x:usize = {if start_x + width < self.width { start_x + width } 
+            else { self.width }};
+        let end_y:usize = {if start_y + height < self.height { start_y + height } 
+            else { self.height }};  
 
         let mut x = start_x;
         let mut y = start_y;
@@ -363,5 +380,9 @@ impl Drawer {
 
 pub struct Buffer {
     //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    pub chars: [[u32; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+    pub chars: [[u32; 640];400],
+}
+
+pub fn get_resolution() -> (usize, usize) {
+    FRAME_DRAWER.lock().get_resolution()
 }

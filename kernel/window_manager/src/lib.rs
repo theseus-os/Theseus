@@ -131,16 +131,17 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
 
 /// Returns the width and height (in pixels) of the screen 
 pub fn get_screen_size() -> (usize, usize) {
-    return (frame_buffer::FRAME_BUFFER_WIDTH, frame_buffer::FRAME_BUFFER_HEIGHT);
+    frame_buffer::get_resolution()
 }
 
 impl WindowAllocator{
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+        let (buffer_width, buffer_height) = frame_buffer::get_resolution();
         if width < 4 || height < 4 {
             return Err("Window size must be greater than 4");
         }
-        if x + width >= frame_buffer::FRAME_BUFFER_WIDTH
-       || y + height >= frame_buffer::FRAME_BUFFER_HEIGHT {
+        if x + width >= buffer_width
+       || y + height >= buffer_height {
             return Err("Requested area extends the screen size");
         }
 
