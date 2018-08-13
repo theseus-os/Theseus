@@ -1,6 +1,6 @@
 extern crate tsc;
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Mutex, Buffer, FRAME_DRAWER, DerefMut};
+use super::{Mutex, Buffer, FRAME_DRAWER, DerefMut, get_index};
 
 use self::tsc::{tsc_ticks, TscTicks};
 
@@ -49,16 +49,13 @@ impl FrameTextBuffer {
         let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
-        
-        {
-            let mut b = drawer.buf();
-            match b {
-                Ok(ref mut buf) => {buf[640*30+30] = 0x777777;},
-                Err(err) => {},
-            }
+
+        let buffer;
+        match drawer.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => {return Err(err);},
         }
 
-        let buffer = drawer.buffer();
         for byte in slice.bytes() {
             if byte == b'\n' {
                 self.fill_blank (buffer, 
@@ -66,7 +63,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color);
+                    bg_color, width);
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -78,7 +75,8 @@ impl FrameTextBuffer {
                         break;
                     }
                 }
-                self.print_byte(buffer, byte, font_color, bg_color, x, y, curr_line, curr_column);
+                self.print_byte(buffer, byte, font_color, bg_color, x, y, 
+                    curr_line, curr_column, width);
                 curr_column += 1;
                 //cursor_pos += 1;
             }
@@ -88,16 +86,16 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color);
+            bg_color, width);
         self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color);
+            bg_color, width);
 
         Ok(())
     }
 
-    fn print_byte (&self, buffer:&mut Buffer, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize) {
+    fn print_byte (&self, buffer:&mut[u32], byte:u8, font_color:u32, bg_color:u32,
+            left:usize, top:usize, line:usize, column:usize, width:usize) {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
         let mut i = 0;
@@ -107,7 +105,7 @@ impl FrameTextBuffer {
    
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
-            buffer.chars[i + y][j + x] = font_color & mask | bg_color & (!mask);
+            buffer[get_index(x + j, y + i, width)] = font_color & mask | bg_color & (!mask);
             j += 1;
             if j == CHARACTER_WIDTH {
                 i += 1;
@@ -119,7 +117,8 @@ impl FrameTextBuffer {
         }
     }
 
-    fn fill_blank(&self, buffer:&mut Buffer, left:usize, top:usize, right:usize, bottom:usize, color:u32){
+    fn fill_blank(&self, buffer:&mut[u32], left:usize, top:usize, right:usize,
+             bottom:usize, color:u32, width:usize){
         let mut x = left;
         let mut y = top;
         if left > right || top > bottom {
@@ -133,7 +132,7 @@ impl FrameTextBuffer {
             if y == bottom {
                 break;
             }
-            buffer.chars[y][x] = color;
+            buffer[get_index(x, y, width)] = color;
             x += 1;
         }
     }

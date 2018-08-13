@@ -273,16 +273,26 @@ impl Drawer {
     }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
-        self.buffer().chars[y][x] = color;
-    }
-
-    fn check_in_range(&mut self, x:usize, y:usize) -> bool {
-        x + 2 < self.width && y < self.height
+        let buffer_width = {self.width};
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return; },
+        }
+        buffer[get_index(x, y, buffer_width)] = color;
     }
 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
+        let (buffer_width, buffer_height) = {self.get_resolution()};
+
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return;},
+        }
+
         if width.abs() > height.abs() {
             let mut y;
             let mut x = start_x;
@@ -292,8 +302,8 @@ impl Drawer {
                     break;
                 }
                 y = (x - start_x) * height / width + start_y;
-                if self.check_in_range(x as usize,y as usize) {
-                    self.buffer().chars[y as usize][x as usize] = color;
+                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
+                    buffer[get_index(x as usize, y as usize, buffer_width)] = color;
                 }
                 x += step;
             }
@@ -307,8 +317,8 @@ impl Drawer {
                     break;
                 }
                 x = (y - start_y) * width / height + start_x;
-                if self.check_in_range(x as usize,y as usize) {
-                    self.buffer().chars[y as usize][x as usize] = color;
+                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
+                    buffer[get_index(x as usize, y as usize, buffer_width)] = color;
                 }
                 y += step;   
             }
@@ -320,14 +330,21 @@ impl Drawer {
             else { self.width }};
         let end_y:usize = {if start_y + height < self.height { start_y + height } 
             else { self.height }};  
+        let buffer_width = {self.width};
 
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return;},
+        }
+  
         let mut x = start_x;
         loop {
             if x == end_x {
                 break;
             }
-            self.buffer().chars[start_y][x] = color;
-            self.buffer().chars[end_y-1][x] = color;
+            buffer[get_index(x, start_y, buffer_width)] = color;
+            buffer[get_index(x, end_y-1, buffer_width)] = color;
             x += 1;
         }
 
@@ -336,8 +353,8 @@ impl Drawer {
             if y == end_x {
                 break;
             }
-            self.buffer().chars[y][start_x] = color;
-            self.buffer().chars[y][end_x-1] = color;
+            buffer[get_index(start_x, y, buffer_width)] = color;
+            buffer[get_index(end_x-1, y, buffer_width)] = color;
             y += 1;
         }
     }
@@ -350,6 +367,15 @@ impl Drawer {
 
         let mut x = start_x;
         let mut y = start_y;
+
+        let buffer_width = {self.width};
+
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return;},
+        }
+        
         loop {
             if x == end_x {
                 y += 1;
@@ -358,16 +384,12 @@ impl Drawer {
                 }
                 x = start_x;
             }
-            self.buffer().chars[y][x] = color;
+            buffer[get_index(x, y, buffer_width)] = color;
             x += 1;
         }
     }
 
-    fn buffer(&mut self) -> &mut Buffer {
-         unsafe { self.buffer.as_mut() }
-    } 
-
-    fn buf(&mut self) -> Result<&mut [u32], &'static str> {
+    fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
         match self.pages {
             Some(ref mut pages) => {
                 let buffer = try!(pages.as_slice_mut(0, 640*400));
@@ -400,4 +422,12 @@ pub struct Buffer {
 
 pub fn get_resolution() -> (usize, usize) {
     FRAME_DRAWER.lock().get_resolution()
+}
+
+fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
+        x + 2 < width && y < height
+}
+
+pub fn get_index(x:usize, y:usize, width:usize) -> usize{
+    y * width + x
 }
