@@ -41,6 +41,7 @@ impl FrameTextBuffer {
     pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
 
+    
         let mut curr_line = 0;
         let mut curr_column = 0;
         //let mut cursor_pos = 0;
@@ -49,6 +50,7 @@ impl FrameTextBuffer {
         let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
+        let screen_width = {drawer.width};
 
         let buffer;
         match drawer.buffer() {
@@ -63,7 +65,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, width);
+                    bg_color, screen_width);
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -76,7 +78,7 @@ impl FrameTextBuffer {
                     }
                 }
                 self.print_byte(buffer, byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, width);
+                    curr_line, curr_column, screen_width);
                 curr_column += 1;
                 //cursor_pos += 1;
             }
@@ -86,10 +88,10 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, width);
+            bg_color, screen_width);
         self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, width);
+            bg_color, screen_width);
 
         Ok(())
     }
@@ -105,6 +107,7 @@ impl FrameTextBuffer {
    
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
+            let index = get_index(x + j, y + i, width);
             buffer[get_index(x + j, y + i, width)] = font_color & mask | bg_color & (!mask);
             j += 1;
             if j == CHARACTER_WIDTH {
