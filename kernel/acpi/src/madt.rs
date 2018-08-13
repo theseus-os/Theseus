@@ -353,6 +353,15 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     }
 
     let frameinfo = trampoline_mapped_pages.as_type::<In>(0x100).unwrap();
+    {
+        let mut info = GRAPHIC_INFO.lock();
+        *info = In {
+            x:frameinfo.x,
+            y:frameinfo.y,
+            address:frameinfo.address,
+        };
+    }
+    
     trace!("The trace is {:X} {:X} {:X} vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv", frameinfo.x, frameinfo.y, frameinfo.address);
 
     // wait for all cores to finish booting and init
@@ -367,11 +376,17 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     Ok(ap_count)  
 }
 
-struct In{
-    x:u64,
-    y:u64,
-    address:u64,
+pub struct In{
+    pub x:u64,
+    pub y:u64,
+    pub address:u64,
 }
+
+pub static GRAPHIC_INFO:Mutex<In> = Mutex::new(In {
+    x:0,
+    y:0,
+    address:0,
+});
 
 
 fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {

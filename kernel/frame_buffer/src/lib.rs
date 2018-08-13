@@ -50,16 +50,17 @@ static GRAPHIC_MODE_PAGE:Mutex<Option<MappedPages>> = Mutex::new(None);
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
-    //let _rs = init_info();
-
+    let VESA_DISPLAY_PHYS_START:PhysicalAddress;
+    {
+        let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
+        VESA_DISPLAY_PHYS_START = graphic_info.address as usize;
+    }
     let rs = font::init();
     match font::init() {
         Ok(_) => { trace!("frame_buffer text initialized."); },
         Err(err) => { return Err(err); }
     }
 
-    //Allocate VESA frame buffer
-    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
     //const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0x9000_0000;
     
     const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT*PIXEL_BYTES;

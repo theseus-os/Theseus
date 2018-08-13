@@ -134,16 +134,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
 
-    // //init frame_buffer
-    let rs = frame_buffer::init();
-    match rs {
-        Ok(_) => { trace!("frame_buffer initialized."); }
-        Err(err) => { 
-            println_raw!("nano_core_start():fail to initialize frame_buffer");
-            return Err(err);
-        }
-    }
-
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
 
@@ -154,6 +144,15 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
+    // //init frame_buffer
+    let rs = frame_buffer::init();
+    match rs {
+        Ok(_) => { trace!("frame_buffer initialized."); }
+        Err(err) => { 
+            println_raw!("nano_core_start():fail to initialize frame_buffer");
+            return Err(err);
+        }
+    }
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
