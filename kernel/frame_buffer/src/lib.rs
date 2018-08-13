@@ -107,8 +107,11 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            let mut pages = FRAME_BUFFER_PAGES.lock();
-            *pages = Some(mapped_frame_buffer);
+            //let mut pages = FRAME_BUFFER_PAGES.lock();
+            //*pages = Some(mapped_frame_buffer);
+            let mut drawer = FRAME_DRAWER.lock();
+            drawer.pages = Some(mapped_frame_buffer);
+
 
             Ok(())
         }
@@ -179,6 +182,7 @@ static FRAME_DRAWER: Mutex<Drawer> = {
         start_address:0,
         width:0,
         height:0,
+        pages:None,
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
     })
 };
@@ -246,7 +250,8 @@ pub struct Drawer {
     start_address: usize,
     width:usize,
     height:usize,
-    buffer: Unique<Buffer> ,
+    pages:Option<MappedPages>,
+    buffer: Unique<Buffer>,
 }
 
 impl Drawer {
@@ -361,6 +366,16 @@ impl Drawer {
     fn buffer(&mut self) -> &mut Buffer {
          unsafe { self.buffer.as_mut() }
     } 
+
+    fn buf(&mut self) -> Result<&mut [u32], &'static str> {
+        match self.pages {
+            Some(ref mut pages) => {
+                let buffer = try!(pages.as_slice_mut(0, 640*400));
+                return Ok(buffer);
+            },
+            None => { return Err("no allocated pages in framebuffer") }
+        }
+    }
 
     fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
