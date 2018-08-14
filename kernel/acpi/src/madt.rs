@@ -19,40 +19,11 @@ use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
-struct Info{
-    attributes:u16,
-	winA:u8,
-	winB:u8,
-	granularity:u16,
-	winsize:u16,
-	segmentA:u16,
-	segmentB:u16,
-	winfuncptr:u32,
-	bytesperscanline:u16,
-	xresolution:u16,
-	yresolution:u16,
-	xcharsize:u8,
-	ycharsize:u8,
-	numberofplanes:u8,
-	bitsperpixel:u8,
-	numberofbanks:u8,
-	memorymodel:u8,
-	banksize:u8,
-	numberofimagepages:u8,
-	unused:u8,
-	redmasksize:u8,
-	redfieldposition:u8,
-	greenmasksize:u8,
-	greenfieldposition:u8,
-	bluemasksize:u8,
-	bluefieldposition:u8,
-	rsvdmasksize:u8,
-	rsvdfieldposition:u8,
-	directcolormodeinfo:u8,
-	physbaseptr:u32,
-	offscreenmemoryoffset:u32,
-	offscreenmemsize:u8,
-}
+pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
+    x:0,
+    y:0,
+    physical_address:0,
+});
 
 
 /// The Multiple APIC Descriptor Table
@@ -352,18 +323,16 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         }
     }
 
-    let frameinfo = trampoline_mapped_pages.as_type::<In>(0x100).unwrap();
-    {
+    {    
+        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(0x100).unwrap();
         let mut info = GRAPHIC_INFO.lock();
-        *info = In {
-            x:frameinfo.x,
-            y:frameinfo.y,
-            address:frameinfo.address,
+        *info = GraphicInfo {
+            x:graphic_info.x,
+            y:graphic_info.y,
+            physical_address:graphic_info.physical_address,
         };
     }
     
-    trace!("The trace is {:X} {:X} {:X} vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv", frameinfo.x, frameinfo.y, frameinfo.address);
-
     // wait for all cores to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let mut count = get_lapics().iter().count();
@@ -375,19 +344,6 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     
     Ok(ap_count)  
 }
-
-pub struct In{
-    pub x:u64,
-    pub y:u64,
-    pub address:u64,
-}
-
-pub static GRAPHIC_INFO:Mutex<In> = Mutex::new(In {
-    x:0,
-    y:0,
-    address:0,
-});
-
 
 fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
@@ -648,4 +604,10 @@ impl Iterator for MadtIter {
             None
         }
     }
+}
+
+pub struct GraphicInfo{
+    pub x:u64,
+    pub y:u64,
+    pub physical_address:u64,
 }

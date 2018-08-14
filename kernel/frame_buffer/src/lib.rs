@@ -32,7 +32,7 @@ pub mod text_buffer;
 pub mod font;
 
 //const VGA_BUFFER_ADDR: usize = 0xa0000;
-const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+//const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
 
 //Size of VESA mode 0x4112
 
@@ -46,10 +46,6 @@ const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
-static GRAPHIC_MODE_PAGE:Mutex<Option<MappedPages>> = Mutex::new(None);
-
-
-
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
@@ -57,10 +53,10 @@ pub fn init() -> Result<(), &'static str > {
     let VESA_DISPLAY_PHYS_SIZE: usize;
     let (width, height) = {
         let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
-        if graphic_info.address == 0 {
+        if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
-        VESA_DISPLAY_PHYS_START = graphic_info.address as usize;
+        VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
         let mut drawer = FRAME_DRAWER.lock();
         //drawer.set_resolution(graphic_info.x as usize, graphic_info.y as usize);
         VESA_DISPLAY_PHYS_SIZE= (graphic_info.x*graphic_info.y) as usize * PIXEL_BYTES;
@@ -71,9 +67,7 @@ pub fn init() -> Result<(), &'static str > {
     match font::init() {
         Ok(_) => { trace!("frame_buffer text initialized."); },
         Err(err) => { return Err(err); }
-    }
-
-    
+    }    
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -107,7 +101,7 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            let rs = FRAME_DRAWER.lock().set_mode_info(width, height, mapped_frame_buffer);
+            FRAME_DRAWER.lock().set_mode_info(width, height, mapped_frame_buffer);
 
             Ok(())
         }
@@ -172,7 +166,7 @@ impl Drawer {
         self.pages = Some(pages);
     }
 
-    pub fn get_resolution(&self) -> (usize, usize) {
+    fn get_resolution(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 

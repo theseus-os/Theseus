@@ -139,16 +139,22 @@ store_mode_info:
     mov ax, 0
     mov es, ax
     mov di, 0xF100
+
+    ;x resolution
     mov word ax, [VBEModeInfo.xresolution]
     mov word [es:di], ax
     mov word [es:di+2], 0
     mov word [es:di+4], 0
     mov word [es:di+6], 0
+
+    ;y resolution
     mov word ax, [VBEModeInfo.yresolution]
     mov word [es:di+8], ax
     mov word [es:di+10], 0
     mov word [es:di+12], 0
     mov word [es:di+14], 0
+
+    ;liner frame buffer address
     mov word ax, [VBEModeInfo.physbaseptr]
     mov word [es:di+16], ax
     mov word ax, [VBEModeInfo.physbaseptr+2]
