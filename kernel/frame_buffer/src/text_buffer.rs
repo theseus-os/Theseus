@@ -1,6 +1,6 @@
 extern crate tsc;
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Mutex, Buffer, FRAME_DRAWER, DerefMut, get_index};
+use super::{Mutex, Buffer, FRAME_DRAWER, DerefMut, get_index_fn, Box};
 
 use self::tsc::{tsc_ticks, TscTicks};
 
@@ -50,7 +50,7 @@ impl FrameTextBuffer {
         let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
-        let screen_width = {drawer.width};
+        let index = get_index_fn(drawer.width);
 
         let buffer;
         match drawer.buffer() {
@@ -65,7 +65,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, screen_width);
+                    bg_color, &index);
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -78,7 +78,7 @@ impl FrameTextBuffer {
                     }
                 }
                 self.print_byte(buffer, byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, screen_width);
+                    curr_line, curr_column, &index);
                 curr_column += 1;
                 //cursor_pos += 1;
             }
@@ -88,16 +88,16 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, screen_width);
+            bg_color, &index);
         self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, screen_width);
+            bg_color, &index);
 
         Ok(())
     }
 
     fn print_byte (&self, buffer:&mut[u32], byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, width:usize) {
+            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
         let mut i = 0;
@@ -107,8 +107,7 @@ impl FrameTextBuffer {
    
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
-            let index = get_index(x + j, y + i, width);
-            buffer[get_index(x + j, y + i, width)] = font_color & mask | bg_color & (!mask);
+            buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
             j += 1;
             if j == CHARACTER_WIDTH {
                 i += 1;
@@ -121,7 +120,7 @@ impl FrameTextBuffer {
     }
 
     fn fill_blank(&self, buffer:&mut[u32], left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, width:usize){
+             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>){
         let mut x = left;
         let mut y = top;
         if left > right || top > bottom {
@@ -135,7 +134,7 @@ impl FrameTextBuffer {
             if y == bottom {
                 break;
             }
-            buffer[get_index(x, y, width)] = color;
+            buffer[index(x, y)] = color;
             x += 1;
         }
     }

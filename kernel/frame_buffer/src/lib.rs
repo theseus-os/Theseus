@@ -16,6 +16,8 @@ extern crate kernel_config;
 extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
+extern crate alloc;
+
 
 use core::ptr::Unique;
 use spin::{Mutex};
@@ -24,6 +26,7 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
+use alloc::boxed::Box;
 
 pub mod text_buffer;
 pub mod font;
@@ -273,19 +276,20 @@ impl Drawer {
     }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
-        let buffer_width = {self.width};
+        let index = get_index_fn(self.width);
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
             Err(err) => { debug!("Fail to get frame buffer"); return; },
         }
-        buffer[get_index(x, y, buffer_width)] = color;
+        buffer[index(x, y)] = color;
     }
 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         let (buffer_width, buffer_height) = {self.get_resolution()};
+        let index = get_index_fn(buffer_width);
 
         let buffer;
         match self.buffer() {
@@ -303,7 +307,7 @@ impl Drawer {
                 }
                 y = (x - start_x) * height / width + start_y;
                 if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
-                    buffer[get_index(x as usize, y as usize, buffer_width)] = color;
+                    buffer[index(x as usize, y as usize)] = color;
                 }
                 x += step;
             }
@@ -318,7 +322,7 @@ impl Drawer {
                 }
                 x = (y - start_y) * width / height + start_x;
                 if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
-                    buffer[get_index(x as usize, y as usize, buffer_width)] = color;
+                    buffer[index(x as usize, y as usize)] = color;
                 }
                 y += step;   
             }
@@ -330,7 +334,7 @@ impl Drawer {
             else { self.width }};
         let end_y:usize = {if start_y + height < self.height { start_y + height } 
             else { self.height }};  
-        let buffer_width = {self.width};
+        let index = get_index_fn(self.width);
 
         let buffer;
         match self.buffer() {
@@ -343,8 +347,8 @@ impl Drawer {
             if x == end_x {
                 break;
             }
-            buffer[get_index(x, start_y, buffer_width)] = color;
-            buffer[get_index(x, end_y-1, buffer_width)] = color;
+            buffer[index(x, start_y)] = color;
+            buffer[index(x, end_y-1)] = color;
             x += 1;
         }
 
@@ -353,8 +357,8 @@ impl Drawer {
             if y == end_x {
                 break;
             }
-            buffer[get_index(start_x, y, buffer_width)] = color;
-            buffer[get_index(end_x-1, y, buffer_width)] = color;
+            buffer[index(start_x, y)] = color;
+            buffer[index(end_x-1, y)] = color;
             y += 1;
         }
     }
@@ -368,7 +372,7 @@ impl Drawer {
         let mut x = start_x;
         let mut y = start_y;
 
-        let buffer_width = {self.width};
+        let index = get_index_fn(self.width);
 
         let buffer;
         match self.buffer() {
@@ -384,7 +388,7 @@ impl Drawer {
                 }
                 x = start_x;
             }
-            buffer[get_index(x, y, buffer_width)] = color;
+            buffer[index(x, y)] = color;
             x += 1;
         }
     }
@@ -428,6 +432,6 @@ fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
         x + 2 < width && y < height
 }
 
-pub fn get_index(x:usize, y:usize, width:usize) -> usize{
-    y * width + x
+pub fn get_index_fn(width:usize) -> Box<Fn(usize, usize)->usize>{
+    Box::new(move |x:usize, y:usize| y * width + x )
 }
