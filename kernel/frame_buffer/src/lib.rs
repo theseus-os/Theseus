@@ -94,12 +94,16 @@ pub fn init() -> Result<(), &'static str > {
             }
 
             let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
+            let mut mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
                 Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
                 vesa_display_flags, 
                 allocator.deref_mut())
             );
+            {
+                let t = mapped_frame_buffer.as_type_mut::<u32>(0).unwrap();
+                *t = 0x777777;
+            }
 
             FRAME_DRAWER.lock().set_mode_info(width, height, mapped_frame_buffer);
 

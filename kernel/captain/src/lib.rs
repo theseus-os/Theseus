@@ -134,11 +134,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
 
-    // initialize the input event manager, which will start the default terminal 
-    let input_event_queue_producer = input_event_manager::init()?;
-
-    // initialize the rest of our drivers
-    driver_init::init(input_event_queue_producer)?;
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
@@ -153,6 +148,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             return Err(err);
         }
     }
+
+    // initialize the input event manager, which will start the default terminal 
+    let input_event_queue_producer = input_event_manager::init()?;
+
+    // initialize the rest of our drivers
+    driver_init::init(input_event_queue_producer)?;
+    
+    
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
