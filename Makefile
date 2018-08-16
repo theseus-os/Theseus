@@ -49,7 +49,7 @@ endif ## BYPASS_RUSTC_CHECK
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.10
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.12
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -261,7 +261,8 @@ kernel: check_rustc check_xargo
 ### dual_simd is a special target for the dual SIMD personalities.
 ### Builds the kernel components and nano_core with the regular x86_64-theseus target,
 ### and then builds the kernel components again with the SIMD-enabled x86_64-theseus-sse target. 
-dual_simd: export TARGET := x86_64-theseus
+dual_simd : export TARGET := x86_64-theseus
+dual_simd : export BUILD_MODE = release
 dual_simd: kernel applications simd_build
 # after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -277,15 +278,24 @@ dual_simd: kernel applications simd_build
 ### simd_build is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
 ### It is the latter half of the dual_simd target.
 simd_build : export TARGET := x86_64-theseus-sse
-simd_build : export KERNEL_PREFIX := __k_sse_
-simd_build : export APP_PREFIX := __a_sse_
+simd_build : export KERNEL_PREFIX := k_sse\#
+simd_build : export APP_PREFIX := a_sse\#
 simd_build:
 # now we build the kernel with SIMD support enabled (it has already been built normally in the "kernel" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
 	@$(MAKE) -C kernel cargo
 	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  -v --prefix $(KERNEL_PREFIX) $(ROOT_DIR)/kernel/target/$(TARGET)/$(BUILD_MODE)/deps/  $(ROOT_DIR)/kernel/build
-# copy the core library's object file, compiled with SIMD support
+# copy kernel module build files
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
+	done
+# copy the SIMD-enabled core library's object file
 	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/$(KERNEL_PREFIX)core.o
+# copy the SIMD-enabled compiler_builtins object file.
+# This isn't necessary for regular compilation because it's included in the nano_core static lib.
+# But here, since we have no static lib, we need to include it explicitly as a separate library.
+	# @cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/compiler_builtins-*.o $(grub-isofiles)/modules/$(KERNEL_PREFIX)compiler_builtins.o
 #  now we build the applications with SIMD support enabled
 	@echo -e "\n======== BUILDING SIMD APPLICATIONS, TARGET = $(TARGET) ========"
 	@$(MAKE) -C applications all

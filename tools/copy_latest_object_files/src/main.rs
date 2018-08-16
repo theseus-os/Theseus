@@ -26,7 +26,7 @@ fn main() {
 
     let mut opts = Options::new();
     opts.optflag("v", "verbose", "print all file copying actions");
-    opts.optopt ("p", "prefix",  "set the string that goes before all files, e.g., \"__k_\"", "PREFIX");
+    opts.reqopt ("p", "prefix",  "set the string that goes before all files, e.g., \"k#\"", "PREFIX");
     opts.optflag("h", "help",    "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -35,7 +35,13 @@ fn main() {
     };
 
     let verbose = matches.opt_present("v");
-    let prefix = matches.opt_str("prefix").unwrap_or_default();
+    let prefix = match matches.opt_str("prefix") {
+		Some(p) => p,
+		_ => {
+			eprintln!("No prefix string specified!");
+            process::exit(-1);
+		}
+	};
     println!("*********** VERBOSE: {:?}, PREFIX: {:?} ==========", verbose, prefix);
 
     let (input_dir, output_dir) = match matches.free.len() {

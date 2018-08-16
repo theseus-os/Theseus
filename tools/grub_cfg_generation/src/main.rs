@@ -76,7 +76,7 @@ fn create_grub_cfg_string(input_directory: String) -> String {
     to_file.push_str("menuentry \"Theseus OS\" {\n");
     to_file.push_str("\tmultiboot2 /boot/kernel.bin \n");
 
-    to_file.push_str(&format!("\tmodule2 /modules/{0:25}\t\t{1:20}\n", "__k_nano_core.sym", "__k_nano_core"));
+    to_file.push_str(&format!("\tmodule2 /modules/{0:25}\t\t{1:20}\n", "k#nano_core.sym", "k#nano_core"));
     
     if let Ok(paths) = fs::read_dir(input_directory) {
         for path in paths {
@@ -86,7 +86,7 @@ fn create_grub_cfg_string(input_directory: String) -> String {
                 if let Some(file_stem) = cur_path.file_stem() {
                     if let Some(file_name_str) = file_name.to_str() {
                     if let Some(file_stem_str) = file_stem.to_str() {
-                        if file_name_str.contains("nano_core") || !file_name_str.starts_with("__") {
+                        if file_name_str.contains("nano_core") || !file_name_str.contains("#") {
                             continue;
                         }
                         to_file.push_str(&format!("\tmodule2 /modules/{0:25}\t\t{1:20}\n", file_name_str, file_stem_str));

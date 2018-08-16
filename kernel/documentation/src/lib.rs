@@ -39,8 +39,9 @@
 //! * `mod_mgmt`: Module management, including parsing, loading, linking, unloading, and metadata management.
 //! * `mouse`: simple PS2 mouse driver.
 //! * `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
-//! * `panic_handling`: Wrapper functions for handling and propagating panics.
 //! * `panic_info`: Struct definitions containing panic information and such.
+//! * `panic_unwind`: Default entry point for panics and unwinding, as required by the Rust compiler.
+//! * `panic_wrapper`: Wrapper functions for handling and propagating panics.
 //! * `pci`: Basic PCI support for Theseus, x86 only.
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.

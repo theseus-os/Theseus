@@ -42,8 +42,5 @@ features = [ "use_arch" ]
 [dependencies.task]
 path = "../task"
 
-[dependencies.tsc]
-path = "../tsc"
-
 [lib]
 crate-type = ["rlib"]

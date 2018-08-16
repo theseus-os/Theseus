@@ -829,10 +829,7 @@ impl<D> Terminal<D> where D: TextDisplay + Send + 'static {
         // This will never panic because pressing the enter key does not register if she has not entered anything
         let mut command_string = words.remove(0);
         // Formats the string into the application module syntax
-        command_string.insert(0, '_');
-        command_string.insert(0, 'a');
-        command_string.insert(0, '_');
-        command_string.insert(0, '_');
+		command_string.insert_str(0, mod_mgmt::metadata::CrateType::Application.prefix());
         return (command_string.to_string(), words);
     }
 

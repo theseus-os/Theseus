@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "panic_handling"
+name = "panic_wrapper"
 description = "Wrapper functions for handling and propagating panics"
 version = "0.1.0"
 

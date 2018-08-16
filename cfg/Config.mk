@@ -18,16 +18,17 @@ ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/..
 CFG_DIR := $(ROOT_DIR)/cfg
 
 ## Prefixes for object files
-KERNEL_PREFIX ?= __k_
-APP_PREFIX    ?= __a_
+KERNEL_PREFIX ?= k\#
+APP_PREFIX    ?= a\#
 
 ## Build modes:  debug is default (dev mode), release is release with full optimizations.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 BUILD_MODE ?= debug
 # BUILD_MODE ?= release
+
 ifeq ($(BUILD_MODE), release)
 	XARGO_RELEASE_ARG := --release
-endif  ## otherwise, nothing, which means "debug" by default
+endif
 
 
 ## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.
