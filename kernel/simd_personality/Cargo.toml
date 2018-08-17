@@ -22,6 +22,9 @@ version = "0.3.7"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.spawn]
+path = "../spawn"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 

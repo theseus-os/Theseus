@@ -65,10 +65,11 @@ extern crate compiler_builtins as unused_compiler_builtins;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate spawn;
 
 
 use core::ops::{Deref, DerefMut};
-use memory::{get_kernel_mmi_ref, get_module};
+use memory::{get_kernel_mmi_ref, get_module, MemoryManagementInfo};
 use mod_mgmt::CrateNamespace;
 use alloc::String;
 
@@ -111,24 +112,55 @@ pub fn init_simd_personality(_: ()) -> Result<(), &'static str> {
 
 	let new_modules = vec![compiler_builtins_simd, rlibc_simd, core_lib_simd, panic_unwind_simd];
 	// simd_namespace.load_kernel_crates(new_modules.into_iter(), None, kernel_mmi_ref.lock().deref_mut(), true)?;
-	simd_namespace.load_kernel_crates(new_modules.into_iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), true)?;
+	simd_namespace.load_kernel_crates(new_modules.into_iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 
+	let simd_test = get_module("k_sse#simd_test").ok_or("couldn't get module k_sse#simd_test")?;
+	simd_namespace.load_kernel_crate(simd_test, None, kernel_mmi_ref.lock().deref_mut(), false)?;
 
-	// We cannot use any other namespace (like the default namespace) as a backup namespace, 
-	// because SIMD code must only link against other SIMD code.
-	let section_ref = simd_namespace.get_symbol_or_load("simd_test::test1", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), true)
+	
+	type SimdTestFunc = fn(());
+	let section_ref1 = simd_namespace.get_symbol_or_load("simd_test::test1", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), false)
 		.upgrade()
 		.ok_or("no symbol: simd_test::test1")?;
-
-	type SimdTestFunc = fn(());
-	let mut space = 0;
-	let (mapped_pages, mapped_pages_offset) = { 
-		let section = section_ref.lock();
+	let mut space1 = 0;	
+	let (mapped_pages1, mapped_pages_offset1) = { 
+		let section = section_ref1.lock();
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
-	let func: &SimdTestFunc = mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?;
+	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
+	spawn::spawn_kthread(func1, (), String::from("simd_test_1-sse"), None)?;
+	debug!("finished spawning first simd task");
 
-	func(());
 
-	Err("unfinished")
+	let section_ref2 = simd_namespace.get_symbol_or_load("simd_test::test2", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), false)
+		.upgrade()
+		.ok_or("no symbol: simd_test::test2")?;
+	let mut space2 = 0;	
+	let (mapped_pages2, mapped_pages_offset2) = { 
+		let section = section_ref2.lock();
+		(section.mapped_pages.clone(), section.mapped_pages_offset)
+	};
+	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
+	spawn::spawn_kthread(func, (), String::from("simd_test_2-sse"), None)?;
+	debug!("finished spawning second simd task");
+
+
+	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test3", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), false)
+		.upgrade()
+		.ok_or("no symbol: simd_test::test3")?;
+	let mut space3 = 0;	
+	let (mapped_pages3, mapped_pages_offset3) = { 
+		let section = section_ref3.lock();
+		(section.mapped_pages.clone(), section.mapped_pages_offset)
+	};
+	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
+	spawn::spawn_kthread(func, (), String::from("simd_test_3-sse"), None)?;
+	debug!("finished spawning third simd task");
+
+
+	loop {
+
+	}
+
+	// Err("unfinished")
 }

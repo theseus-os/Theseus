@@ -11,6 +11,7 @@ extern crate pit_clock;
 use core::simd::f32x4;
 
 pub fn test1(_: ()) {
+    trace!("at the top of simd_test::test1.");
     let mut x = f32x4::new(1.111, 2.111, 3.111, 4.111);
     let y = f32x4::new(1.0, 1.0, 1.0, 1.0);
 
@@ -24,6 +25,7 @@ pub fn test1(_: ()) {
 }
 
 pub fn test2(_: ()) {
+    trace!("at the top of simd_test::test2.");
     let mut x = f32x4::new(1.222, 2.222, 3.222, 4.222);
     let y = f32x4::new(1.0, 1.0, 1.0, 1.0);
 
@@ -37,6 +39,7 @@ pub fn test2(_: ()) {
 }
 
 pub fn test3(_: ()) {
+    trace!("at the top of simd_test::test3.");
     let mut x = f32x4::new(1.333, 2.333, 3.333, 4.333);
     let y = f32x4::new(1.0, 1.0, 1.0, 1.0);
 
