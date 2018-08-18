@@ -128,7 +128,7 @@ pub fn init_simd_personality(_: ()) -> Result<(), &'static str> {
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	spawn::spawn_kthread(func1, (), String::from("simd_test_1-sse"), None)?;
+	spawn::spawn_kthread(func1, (), String::from("simd_test_1-sse"), Some(2))?;
 	debug!("finished spawning first simd task");
 
 
@@ -141,21 +141,21 @@ pub fn init_simd_personality(_: ()) -> Result<(), &'static str> {
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	spawn::spawn_kthread(func, (), String::from("simd_test_2-sse"), None)?;
+	spawn::spawn_kthread(func, (), String::from("simd_test_2-sse"), Some(2))?;
 	debug!("finished spawning second simd task");
 
 
-	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test3", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), false)
-		.upgrade()
-		.ok_or("no symbol: simd_test::test3")?;
-	let mut space3 = 0;	
-	let (mapped_pages3, mapped_pages_offset3) = { 
-		let section = section_ref3.lock();
-		(section.mapped_pages.clone(), section.mapped_pages_offset)
-	};
-	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
-	spawn::spawn_kthread(func, (), String::from("simd_test_3-sse"), None)?;
-	debug!("finished spawning third simd task");
+	// let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test3", SSE_KERNEL_PREFIX, None, kernel_mmi_ref.lock().deref_mut(), false)
+	// 	.upgrade()
+	// 	.ok_or("no symbol: simd_test::test3")?;
+	// let mut space3 = 0;	
+	// let (mapped_pages3, mapped_pages_offset3) = { 
+	// 	let section = section_ref3.lock();
+	// 	(section.mapped_pages.clone(), section.mapped_pages_offset)
+	// };
+	// let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
+	// spawn::spawn_kthread(func, (), String::from("simd_test_3-sse"), Some(2))?;
+	// debug!("finished spawning third simd task");
 
 
 	loop {

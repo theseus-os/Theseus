@@ -223,7 +223,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         if false {
             spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None)?;
             spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None)?;
-            spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None)?;
+            // spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None)?;
         }
 
     }
