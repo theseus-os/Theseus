@@ -39,6 +39,7 @@ pub const BACKGROUND_COLOR:u32 = 0x000000;
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+
    let term_task_ref =  match Terminal::new() {
         Ok(task_ref) => {task_ref}
         Err(err) => {

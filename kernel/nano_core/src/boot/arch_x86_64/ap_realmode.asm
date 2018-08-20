@@ -164,8 +164,8 @@ store_mode_info:
     pop di
 
 set_graphic_mode:
-    mov ax, 0x4f02;bx 4___ is linear frame buffer 
-    mov bx, [current.mode] ; 0x4f41:640*400*32bit
+    mov ax, 0x4f02; bx 4___ is linear frame buffer 
+    mov bx, [current.mode]; 0x4f41:640*400*32bit in QEMU
     int 0x10;
 
     push ds

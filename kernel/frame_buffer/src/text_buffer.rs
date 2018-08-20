@@ -1,6 +1,6 @@
 extern crate tsc;
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Mutex, Buffer, FRAME_DRAWER, DerefMut, get_index_fn, Box};
+use super::{Mutex, FRAME_DRAWER, DerefMut, Box};
 
 use self::tsc::{tsc_ticks, TscTicks};
 
@@ -40,7 +40,6 @@ impl FrameTextBuffer {
     ///print a string by bytes
     pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
-
     
         let mut curr_line = 0;
         let mut curr_column = 0;
@@ -50,7 +49,7 @@ impl FrameTextBuffer {
         let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
-        let index = get_index_fn(drawer.width);
+        let index = drawer.get_index_fn();
 
         let buffer;
         match drawer.buffer() {
@@ -69,6 +68,9 @@ impl FrameTextBuffer {
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
+                if curr_line == buffer_height {
+                    break;
+                }
             } else {
                 if curr_column == buffer_width {
                     curr_column = 0;

@@ -17,6 +17,7 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
+#[macro_use] extern crate vga_buffer;
 
 
 use core::ptr::Unique;
@@ -31,17 +32,6 @@ use alloc::boxed::Box;
 pub mod text_buffer;
 pub mod font;
 
-//const VGA_BUFFER_ADDR: usize = 0xa0000;
-//const VGA_BUFFER_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
-
-//Size of VESA mode 0x4112
-
-///The width of the screen
-//pub const FRAME_BUFFER_WIDTH:usize = 640;
-
-///The height of the screen
-//pub const FRAME_BUFFER_HEIGHT:usize = 400;
-
 const PIXEL_BYTES:usize = 4;
 
 static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
@@ -51,16 +41,17 @@ pub fn init() -> Result<(), &'static str > {
     
     let VESA_DISPLAY_PHYS_START:PhysicalAddress;
     let VESA_DISPLAY_PHYS_SIZE: usize;
-    let (width, height) = {
+    let BUFFER_WIDTH:usize;
+    let BUFFER_HEIGHT:usize;
+    {
         let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
         VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
-        let mut drawer = FRAME_DRAWER.lock();
-        //drawer.set_resolution(graphic_info.x as usize, graphic_info.y as usize);
         VESA_DISPLAY_PHYS_SIZE= (graphic_info.x*graphic_info.y) as usize * PIXEL_BYTES;
-        (graphic_info.x as usize, graphic_info.y as usize)
+        BUFFER_WIDTH = graphic_info.x as usize;
+        BUFFER_HEIGHT = graphic_info.y as usize
     };
 
     let rs = font::init();
@@ -83,14 +74,14 @@ pub fn init() -> Result<(), &'static str > {
         &mut PageTable::Active(ref mut active_table) => {
             let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
                 Some(pages) => { pages },
-                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
+                None => { return Err("frame_buffer::init() couldn't allocate pages."); }
             };
             
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
             match allocator_mutex {
                 Some(_) => { },
-                None => { return Err("framebuffer::init() Couldn't get frame allocator"); }
+                None => { return Err("framebuffer::init() couldn't get frame allocator"); }
             }
 
             let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
@@ -100,12 +91,8 @@ pub fn init() -> Result<(), &'static str > {
                 vesa_display_flags, 
                 allocator.deref_mut())
             );
-            {
-                let t = mapped_frame_buffer.as_type_mut::<u32>(0).unwrap();
-                *t = 0x777777;
-            }
 
-            FRAME_DRAWER.lock().set_mode_info(width, height, mapped_frame_buffer);
+            FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
 
             Ok(())
         }
@@ -130,7 +117,7 @@ pub fn draw_pixel(x:usize, y:usize, color:u32) {
 
 /// draw a line with start and end coordinates and color
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) {
-    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color)
+    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color);
 }
 
 /// draw a rectangle with upper left coordinates, width, height and color
@@ -143,14 +130,14 @@ pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, c
     FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, color)
 }
 
-pub struct Point {
+/*pub struct Point {
     pub x: usize,
     pub y: usize,
     pub color: usize,
-}
+}*/
 
 pub struct Drawer {
-    width:usize,
+    pub width:usize,
     height:usize,
     pages:Option<MappedPages>,
 }
@@ -164,6 +151,7 @@ impl Drawer {
             : "cc", "memory", "rdi", "rcx"
             : "intel", "volatile");
     }*/
+
     fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
         self.width = width;
         self.height = height;
@@ -175,7 +163,7 @@ impl Drawer {
     }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
-        let index = get_index_fn(self.width);
+        let index = self.get_index_fn();
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
@@ -188,30 +176,31 @@ impl Drawer {
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         let (buffer_width, buffer_height) = {self.get_resolution()};
-        let index = get_index_fn(buffer_width);
+        let index = self.get_index_fn();
 
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
-            Err(err) => { debug!("Fail to get frame buffer"); return;},
+            Err(err) => {
+                debug!("Fail to get frame buffer"); return;},
         }
 
         if width.abs() > height.abs() {
             let mut y;
             let mut x = start_x;
             let step = if width > 0 {1} else {-1};
+
             loop {
                 if x == end_x {
                     break;
-                }
+                }          
                 y = (x - start_x) * height / width + start_y;
                 if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
                     buffer[index(x as usize, y as usize)] = color;
                 }
                 x += step;
             }
-        }
-        else {
+        } else {
             let mut x;
             let mut y = start_y;
             let step = if height > 0 {1} else {-1};
@@ -226,6 +215,7 @@ impl Drawer {
                 y += step;   
             }
         }
+
     }
 
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
@@ -233,7 +223,7 @@ impl Drawer {
             else { self.width }};
         let end_y:usize = {if start_y + height < self.height { start_y + height } 
             else { self.height }};  
-        let index = get_index_fn(self.width);
+        let index = self.get_index_fn();
 
         let buffer;
         match self.buffer() {
@@ -253,7 +243,7 @@ impl Drawer {
 
         let mut y = start_y;
         loop {
-            if y == end_x {
+            if y == end_y {
                 break;
             }
             buffer[index(start_x, y)] = color;
@@ -271,7 +261,7 @@ impl Drawer {
         let mut x = start_x;
         let mut y = start_y;
 
-        let index = get_index_fn(self.width);
+        let index = self.get_index_fn();
 
         let buffer;
         match self.buffer() {
@@ -287,25 +277,27 @@ impl Drawer {
                 }
                 x = start_x;
             }
+
             buffer[index(x, y)] = color;
             x += 1;
         }
     }
 
-    fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
+    pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
         match self.pages {
             Some(ref mut pages) => {
-                let buffer = try!(pages.as_slice_mut(0, 640*400));
+                let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
                 return Ok(buffer);
             },
             None => { return Err("no allocated pages in framebuffer") }
         }
     }
-}
 
-pub struct Buffer {
-    //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    pub chars: [[u32; 640];400],
+    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+        let width = self.width;
+        Box::new(move |x:usize, y:usize| y * width + x )
+    }
+
 }
 
 pub fn get_resolution() -> (usize, usize) {
@@ -313,9 +305,5 @@ pub fn get_resolution() -> (usize, usize) {
 }
 
 fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
-        x + 2 < width && y < height
-}
-
-pub fn get_index_fn(width:usize) -> Box<Fn(usize, usize)->usize>{
-    Box::new(move |x:usize, y:usize| y * width + x )
+    x + 2 < width && y < height
 }

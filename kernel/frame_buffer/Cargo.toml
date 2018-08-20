@@ -37,6 +37,9 @@ path = "../acpi"
 [dependencies.tsc]
 path = "../tsc"
 
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

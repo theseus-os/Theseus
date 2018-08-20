@@ -38,7 +38,7 @@ impl TextDisplay
         (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
     }
 
-    ///Gets the position and size of the text area
+    ///Gets the size of the text area
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }

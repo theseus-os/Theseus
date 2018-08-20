@@ -123,6 +123,7 @@ loadable: run
 
 
 ### builds and runs Theseus in QEMU
+run: export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
 run: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -169,7 +170,7 @@ endif
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 # boot : export RUST_FEATURES = --package captain --features mirror_log_to_vga
-boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
+# boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)

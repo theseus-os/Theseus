@@ -135,11 +135,25 @@ pub fn get_screen_size() -> (usize, usize) {
 }
 
 impl WindowAllocator{
+    
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+        /*{
+            let mut drawer = frame_buffer::FRAME_DRAWER.lock();
+                let index = frame_buffer::get_index_fn(drawer.width);
+
+                let buffer;
+                match drawer.buffer() {
+                    Ok(rs) => {buffer = rs;},
+                    Err(err) => {return Err(err);},
+                }
+                buffer[index(0,0)] = 0x777777;
+        }*/
+
         let (buffer_width, buffer_height) = frame_buffer::get_resolution();
-        if width < 4 || height < 4 {
-            return Err("Window size must be greater than 4");
+        if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
+            return Err("Window size must be greater than the margin");
         }
+
         if x + width >= buffer_width
        || y + height >= buffer_height {
             return Err("Requested area extends the screen size");
@@ -167,11 +181,13 @@ impl WindowAllocator{
             return Err("Request area is already allocated");
         }
 
+
         {
             let inner_lock = inner_ref.lock();
             inner_lock.clean();
             inner_lock.draw_border(get_border_color(true));
         }
+        
   
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
@@ -189,8 +205,8 @@ impl WindowAllocator{
             //text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
             components:BTreeMap::new(),
-        };    
-        
+        }; 
+
         Ok(window)    
     }
 
@@ -317,7 +333,6 @@ impl WindowObj{
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
     pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
-        //TODO check fit
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
@@ -448,7 +463,6 @@ impl WindowObj{
                 true => {return Err("cannot resize because requested resize will cause overlap")}
                 false => { }
             }
-
         }
         
         let mut inner = self.inner.lock();
@@ -529,12 +543,12 @@ impl WindowInner {
         frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, SCREEN_BACKGROUND_COLOR);
     }
 
-    fn draw_border(&self, color:u32) -> (usize, usize, usize){        
-        frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color);
-        frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);
-        frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);        
-        (self.x, self.y, self.margin)
+    fn draw_border(&self, color:u32) {
+        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);       
+        /*{ frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color); }
+        { frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color); }
+        { frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);}
+        { frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);}*/
     }
 
     /// adjust the size of a window
