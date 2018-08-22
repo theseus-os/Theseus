@@ -117,13 +117,14 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 }
 
 /// Allocate a available virtual buffer pointer for building TD
-pub fn buffer_pointer_alloc(offset:usize)-> Option<Result<usize,&'static str>>{
+pub fn buffer_pointer_alloc(offset:usize)-> Option<usize> {
 
-    DATA_BUFFER.try().map(|buffer| {
-
-        let virtual_buffer_pointer = buffer.lock().address_at_offset(offset).unwrap();
-
-        Ok(virtual_buffer_pointer)
+    DATA_BUFFER.try().and_then(|buffer| {
+        if offset >= 4096 {
+            buffer.lock().address_at_offset(offset - 4096)
+        } else{
+            buffer.lock().address_at_offset(offset)
+        }
 
     })
 }
@@ -225,6 +226,8 @@ pub fn init_td(index:usize,type_select: u8, pointer: u32, speed: u8, add: u32, e
 }
 
 /// Write next data structure's physical address into given TD according to the index
+/// Param: index: index of the allocated TD; type_select: 1 -> Queue Head, 0 -> TD;
+/// pointer : the physical address to be linked
 pub fn td_link(index:usize, type_select: u8, pointer: u32){
 
     TD_POOL.try().map(|td_pool| {
@@ -388,7 +391,26 @@ pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'sta
     Ok(mapped_page)
 }
 
+/// Box the the frame pointer
+pub fn box_dev_req(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                   -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
+    let page = map(active_table,phys_addr)?;
+    let dev_req: BoxRefMut<MappedPages, UsbDevReq> = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbDevReq>(offset))?;
 
+    Ok(dev_req)
+}
+
+/// Box the the frame pointer
+pub fn box_config_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                       -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
+
+    let page = map(active_table,phys_addr)?;
+    let config_desc: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbConfDesc>(offset))?;
+
+    Ok(config_desc)
+}
 
 /// return a mapped page of given physical addrsss
 pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {
@@ -1161,6 +1183,7 @@ impl UhciTDRegisters {
             pid) as u32;
         let mut cs = ((3 << TD_CS_ERROR_SHIFT) | TD_CS_ACTIVE) as u32;
 
+
         if speed == USB_LOW_SPEED {
                 cs |= TD_CS_LOW_SPEED;
             }
@@ -1176,6 +1199,7 @@ impl UhciTDRegisters {
 
 
         self.control_status.write(cs);
+;
 
         self.token.write(token);
 

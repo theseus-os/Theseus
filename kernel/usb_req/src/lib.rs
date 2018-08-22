@@ -120,10 +120,10 @@ impl UsbDevReq{
 }
 
 /// Box the the frame pointer
-pub fn box_dev_req(active_table: &mut ActivePageTable,page: MappedPages)
+pub fn box_dev_req(active_table: &mut ActivePageTable,page: MappedPages,offset: PhysicalAddress)
                        -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
     let dev_req: BoxRefMut<MappedPages, UsbDevReq> = BoxRefMut::new(Box::new(page))
-        .try_map_mut(|mp| mp.as_type_mut::<UsbDevReq>(0))?;
+        .try_map_mut(|mp| mp.as_type_mut::<UsbDevReq>(offset))?;
 
     Ok(dev_req)
 }
