@@ -391,7 +391,7 @@ pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'sta
     Ok(mapped_page)
 }
 
-/// Box the the frame pointer
+/// Box the the device standard request
 pub fn box_dev_req(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
                    -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
     let page = map(active_table,phys_addr)?;
@@ -401,7 +401,7 @@ pub fn box_dev_req(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress
     Ok(dev_req)
 }
 
-/// Box the the frame pointer
+/// Box the the device config description
 pub fn box_config_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
                        -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
 
@@ -411,6 +411,19 @@ pub fn box_config_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAdd
 
     Ok(config_desc)
 }
+
+/// Box the the device description
+pub fn box_device_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                       -> Result<BoxRefMut<MappedPages, UsbDeviceDesc>, &'static str>{
+
+    let page = map(active_table,phys_addr)?;
+    let config_desc: BoxRefMut<MappedPages, UsbDeviceDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbDeviceDesc>(offset))?;
+
+    Ok(config_desc)
+}
+
+
 
 /// return a mapped page of given physical addrsss
 pub fn map(active_table: &mut ActivePageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str> {

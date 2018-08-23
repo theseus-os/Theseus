@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["BowenLiu15 <bl28@rice.edu>"]
 
 [dependencies]
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.usb_device]
 path = "../usb_device"
 
