@@ -136,6 +136,7 @@ pub fn get_screen_size() -> (usize, usize) {
 
 impl WindowAllocator{
     
+    // Allocate a new window and return it
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
@@ -181,25 +182,25 @@ impl WindowAllocator{
             return Err("Request area is already allocated");
         }
 
-
+        // draw the window
         {
             let inner_lock = inner_ref.lock();
             inner_lock.clean();
             inner_lock.draw_border(get_border_color(true));
         }
         
-  
+        // inactive all other windows and active the new one
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
             if let Some(reference) = ref_opt {
                 reference.lock().active(false);
             }
         }
-
         let weak_ref = Arc::downgrade(&inner_ref);
         self.active = weak_ref.clone();
         self.allocated.push_back(weak_ref);
 
+        // new the window
         let window: WindowObj = WindowObj{
             inner:inner_ref,
             //text_buffer:FrameTextBuffer::new(),
@@ -325,6 +326,8 @@ pub struct WindowObj {
 
 
 impl WindowObj{
+
+    // clean the content of the window
     fn clean(&self) {
         let inner = self.inner.lock();
         inner.clean();
@@ -412,32 +415,6 @@ impl WindowObj{
             color);
     }
 
-    pub fn disable_cursor(&mut self) {
-       // self.text_buffer.cursor.disable();
-    }
-
-    pub fn set_cursor(&mut self, line:u16, column:u16, reset:bool) {
-        /*let cursor = &mut (self.text_buffer.cursor);
-        cursor.enable();
-        cursor.update(line as usize, column as usize, reset);
-        let inner = self.inner.lock();
-        frame_buffer::fill_rectangle(inner.x + inner.margin + (column as usize) * CHARACTER_WIDTH, 
-                        inner.y + inner.margin + (line as usize) * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, FONT_COLOR);*/
-    }
-
-    pub fn cursor_blink(&mut self) {
-        /*let cursor = &mut (self.text_buffer.cursor);
-        if cursor.blink() {
-            let (line, column, show) = cursor.get_info();
-            let inner = self.inner.lock();
-            let color = if show { 0xFFFFFF } else { 0 };
-            frame_buffer::fill_rectangle(inner.x + inner.margin + column * CHARACTER_WIDTH, 
-                        inner.y + inner.margin + line * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
-        }*/
-    }
-
     /// Requires that a str slice that will exactly fit the frame buffer
     /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
     /// Print every byte and fill the blank with background color
@@ -455,6 +432,7 @@ impl WindowObj{
     }
     */
 
+    // @Andrew
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
         { // checks for overlap
             let inner = self.inner.clone();
@@ -512,6 +490,8 @@ struct WindowInner {
 }
 
 impl WindowInner {
+
+    //check if the window is overlapped with any existing window
     fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
         if self.check_in_area(x, y)
             {return true;}
@@ -524,32 +504,33 @@ impl WindowInner {
         false        
     } 
 
+    // check if the pixel is within the window
     fn check_in_area(&self, x:usize, y:usize) -> bool {        
         return x>= self.x && x <= self.x+self.width 
                 && y>=self.y && y<=self.y+self.height;
     }
 
+    // check if the pixel is within the window exluding the border and margin
     fn check_in_content(&self, x:usize, y:usize) -> bool {        
         return x>= self.x+self.margin && x <= self.x+self.width-self.margin 
                 && y>=self.y+self.margin && y<=self.y+self.height-self.margin;
     }
 
+    // active or inactive a window
     fn active(&mut self, active:bool){
         self.active = active;
         self.draw_border(get_border_color(active));
     }
 
+    // clean the content of a window
     fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + 1, self.y + 1, self.width - 2, self.height - 2, SCREEN_BACKGROUND_COLOR);
+        frame_buffer::fill_rectangle(self.x + self.margin, self.y + self.margin,
+            self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
     }
 
+    // draw the border of the window
     fn draw_border(&self, color:u32) {
-        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);       
-        /*{ frame_buffer::draw_line(self.x, self.y, self.x+self.width, self.y, color); }
-        { frame_buffer::draw_line(self.x, self.y + self.height-1, self.x+self.width, self.y+self.height-1, color); }
-        { frame_buffer::draw_line(self.x, self.y+1, self.x, self.y+self.height-1, color);}
-        { frame_buffer::draw_line(self.x+self.width-1, self.y+1, self.x+self.width-1, self.y+self.height-1, color);}*/
-    }
+        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {

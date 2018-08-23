@@ -29,7 +29,9 @@ use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
 use alloc::boxed::Box;
 
+//The buffer for text printing
 pub mod text_buffer;
+//The font for text printing
 pub mod font;
 
 const PIXEL_BYTES:usize = 4;
@@ -39,6 +41,7 @@ static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
+    //Get the graphic mode information
     let VESA_DISPLAY_PHYS_START:PhysicalAddress;
     let VESA_DISPLAY_PHYS_SIZE: usize;
     let BUFFER_WIDTH:usize;
@@ -54,6 +57,7 @@ pub fn init() -> Result<(), &'static str > {
         VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
     };
 
+    // init the font for text printing
     let rs = font::init();
     match font::init() {
         Ok(_) => { trace!("frame_buffer text initialized."); },
@@ -102,6 +106,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
+// Window manager uses this drawer to draw/print to the screen
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         width:0,
@@ -136,6 +141,7 @@ pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, c
     pub color: usize,
 }*/
 
+// The drawer is responsible for drawing/printing to the screen
 pub struct Drawer {
     pub width:usize,
     height:usize,
@@ -152,12 +158,14 @@ impl Drawer {
             : "intel", "volatile");
     }*/
 
+    // set the graphic mode information of the buffer
     fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
         self.width = width;
         self.height = height;
         self.pages = Some(pages);
     }
 
+    //get the resolution of the screen
     fn get_resolution(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -283,6 +291,7 @@ impl Drawer {
         }
     }
 
+    // return the framebuffer
     pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
         match self.pages {
             Some(ref mut pages) => {
@@ -293,6 +302,8 @@ impl Drawer {
         }
     }
 
+    // get the index computation function according to the width of the buffer
+    // call it to get the index function before locking the buffer
     pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
         let width = self.width;
         Box::new(move |x:usize, y:usize| y * width + x )
@@ -300,10 +311,12 @@ impl Drawer {
 
 }
 
+// Get the resolution of the screen
 pub fn get_resolution() -> (usize, usize) {
     FRAME_DRAWER.lock().get_resolution()
 }
 
+// Check if a point is in the screen
 fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
-    x + 2 < width && y < height
+    x < width && y < height
 }

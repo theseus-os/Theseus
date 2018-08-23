@@ -61,6 +61,7 @@ impl PrintOutputEvent {
     }
 }
 
+//Use this to inform the window manager to adjust the sizes of existing windows
 #[derive(Debug, Clone)]
 pub struct WindowResizeEvent {
     pub x: usize,

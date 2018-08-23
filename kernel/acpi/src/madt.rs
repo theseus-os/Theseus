@@ -21,6 +21,7 @@ use ap_start::{kstart_ap, AP_READY_FLAG};
 
 const GRAPHIC_INFO_TRAMPOLINE_OFFSET:usize = 0x100;
 
+// graphic mode information
 pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
     width:0,
     height:0,
@@ -325,6 +326,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         }
     }
 
+    // Get the graphic mode information
     {    
         let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
         match rs {

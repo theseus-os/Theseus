@@ -87,6 +87,7 @@ impl TextDisplay
         }
     }
 
+    // Get the position of this displayable
     fn get_display_pos(&self, window:&WindowObj) -> Result<(usize, usize), &'static str> {
         let content_pos = window.get_content_position();
         match window.get_displayable_position(&(self.name)) {

@@ -25,7 +25,6 @@ pub enum DisplayPosition {
 //const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
 
 /// An instance of a frame text buffer which can be displayed to the screen.
-/// An instance of a VGA text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
     pub cursor:Mutex<Cursor>,
 }
@@ -49,6 +48,8 @@ impl FrameTextBuffer {
         let buffer_height = height/CHARACTER_HEIGHT;
         
         let mut drawer = FRAME_DRAWER.lock();
+
+        //get the index computation function
         let index = drawer.get_index_fn();
 
         let buffer;
@@ -85,12 +86,16 @@ impl FrameTextBuffer {
                 //cursor_pos += 1;
             }
         }
+
+        // Fill the blank of the last line
         self.fill_blank (buffer, 
             x + curr_column * CHARACTER_WIDTH,
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
             bg_color, &index);
+
+        // Fill the blank of remaining lines
         self.fill_blank (buffer, 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
             bg_color, &index);
