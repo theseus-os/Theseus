@@ -19,9 +19,11 @@ use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
+const GRAPHIC_INFO_TRAMPOLINE_OFFSET:usize = 0x100;
+
 pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
-    x:0,
-    y:0,
+    width:0,
+    height:0,
     physical_address:0,
 });
 
@@ -324,12 +326,17 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     }
 
     {    
-        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(0x100).unwrap();
-        let mut info = GRAPHIC_INFO.lock();
-        *info = GraphicInfo {
-            x:graphic_info.x,
-            y:graphic_info.y,
-            physical_address:graphic_info.physical_address,
+        let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
+        match rs {
+            Ok(graphic_info) => {
+                let mut info = GRAPHIC_INFO.lock();
+                *info = GraphicInfo {
+                    width:graphic_info.width,
+                    height:graphic_info.height,
+                    physical_address:graphic_info.physical_address,
+                };
+            },
+            Err(_) => { debug!("Fail to get the graphic information"); }
         };
     }
     
@@ -607,7 +614,7 @@ impl Iterator for MadtIter {
 }
 
 pub struct GraphicInfo{
-    pub x:u64,
-    pub y:u64,
+    pub width:u64,
+    pub height:u64,
     pub physical_address:u64,
 }

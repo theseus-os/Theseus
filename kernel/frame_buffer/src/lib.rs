@@ -49,9 +49,9 @@ pub fn init() -> Result<(), &'static str > {
             return Err("Fail to get graphic mode infomation!");
         }
         VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
-        VESA_DISPLAY_PHYS_SIZE= (graphic_info.x*graphic_info.y) as usize * PIXEL_BYTES;
-        BUFFER_WIDTH = graphic_info.x as usize;
-        BUFFER_HEIGHT = graphic_info.y as usize
+        BUFFER_WIDTH = graphic_info.width as usize;
+        BUFFER_HEIGHT = graphic_info.height as usize;
+        VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
     };
 
     let rs = font::init();
