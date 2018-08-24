@@ -11,6 +11,7 @@
 //! 
 //! # Table of Contents
 //! * [Advice and Principles for Contributing to Theseus](contributing/index.html)
+//! * [Git-based Development](git/index.html)
 //! * [The PHIS Principle: Performance in Hardware, Isolation in Software](phis/index.html)
 //! * [How the Build Process Works](build_process/index.html)
 //! * [Loadable Mode: Runtime Loading and Linking of Crates](build_process/index.html#loadable-mode-runtime-loading-and-linking-of-crates)
@@ -64,3 +65,4 @@ pub mod contributing;
 pub mod build_process;
 pub mod booting;
 pub mod phis;
+pub mod git;

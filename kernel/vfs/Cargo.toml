@@ -1,0 +1,17 @@
+[package]
+name = "vfs"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
+
+
+[dependencies]
+spin = "0.4.5"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[lib]
+crate-type = ["rlib"]
+
