@@ -52,6 +52,7 @@ extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
+extern crate vfs;
 
 
 #[cfg(target_feature = "sse2")]
@@ -151,6 +152,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
+
+    use vfs::Directory;
+    let root_dir = Directory::create_root();
+    spawn::spawn_kthread(vfs::hack_loop, root_dir, String::from("persistent virtual filesystem"), None)?;
 
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
