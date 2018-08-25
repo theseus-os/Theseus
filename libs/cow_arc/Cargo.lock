@@ -1,0 +1,34 @@
+[[package]]
+name = "cow_arc"
+version = "0.1.0"
+dependencies = [
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "owning_ref"
+version = "0.3.3"
+source = "git+https://github.com/kevinaboos/owning-ref-rs.git#3d839b1c57bff0fc2de1d1ebd26f3c7d296416b2"
+dependencies = [
+ "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
+name = "spin"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.0.0"
+source = "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#fb924d62dda9740d05fc1e5554226b18bbe1eaf0"
+dependencies = [
+ "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)" = "<none>"
+"checksum spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14db77c5b914df6d6173dda9a3b3f5937bd802934fa5edaf934df06a3491e56f"
+"checksum stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)" = "<none>"

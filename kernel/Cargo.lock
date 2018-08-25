@@ -1,0 +1,925 @@
+[[package]]
+name = "acpi"
+version = "0.1.0"
+dependencies = [
+ "ap_start 0.1.0",
+ "apic 0.1.0",
+ "ioapic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "pic 0.1.0",
+ "pit_clock 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ap_start"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "interrupts 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "scheduler 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syscall 0.1.0",
+]
+
+[[package]]
+name = "apic"
+version = "0.1.0"
+dependencies = [
+ "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "pit_clock 0.1.0",
+ "raw-cpuid 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "ata_pio"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pit_clock 0.1.0",
+ "port_io 0.2.1",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "atomic"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "atomic_linked_list"
+version = "0.1.0"
+
+[[package]]
+name = "bit_field"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "bitflags"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "captain"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "apic 0.1.0",
+ "dfqueue 0.1.0",
+ "driver_init 0.1.0",
+ "e1000 0.1.0",
+ "exceptions_full 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_3d 0.1.0",
+ "input_event_manager 0.1.0",
+ "input_event_types 0.1.0",
+ "interrupts 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "print 0.1.0",
+ "scheduler 0.1.0",
+ "simd_test 0.1.0",
+ "spawn 0.1.0",
+ "syscall 0.1.0",
+ "task 0.1.0",
+ "tsc 0.1.0",
+ "vga_buffer 0.1.0",
+ "window_manager 0.1.0",
+]
+
+[[package]]
+name = "cc"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "cow_arc"
+version = "0.1.0"
+dependencies = [
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "dbus"
+version = "0.1.0"
+dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "util 0.1.0",
+]
+
+[[package]]
+name = "debugit"
+version = "0.1.0"
+
+[[package]]
+name = "dfqueue"
+version = "0.1.0"
+dependencies = [
+ "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "documentation"
+version = "0.1.0"
+
+[[package]]
+name = "driver_init"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "apic 0.1.0",
+ "ata_pio 0.1.0",
+ "dfqueue 0.1.0",
+ "e1000 0.1.0",
+ "input_event_types 0.1.0",
+ "keyboard 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mouse 0.1.0",
+ "pci 0.1.0",
+]
+
+[[package]]
+name = "e1000"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pci 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "exceptions_early"
+version = "0.1.0"
+dependencies = [
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "exceptions_full"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pmu_x86 0.1.0",
+ "print 0.1.0",
+ "task 0.1.0",
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "frame_buffer"
+version = "0.1.0"
+dependencies = [
+ "kernel_config 0.1.0",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "util 0.1.0",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "frame_buffer_3d"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "irq_safety 0.1.1",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "frame_buffer_text"
+version = "0.1.0"
+dependencies = [
+ "frame_buffer 0.1.0",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "gdt"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tss 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "goblin"
+version = "0.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "plain 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "scroll 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "heap_irq_safe"
+version = "0.1.0"
+dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "linked_list_allocator 0.5.0 (git+https://github.com/weclaw1/linked-list-allocator)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "input_event_manager"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "dfqueue 0.1.0",
+ "input_event_types 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal 0.1.0",
+ "text_display 0.1.0",
+ "vga_buffer 0.1.0",
+ "window_manager 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "input_event_types"
+version = "0.1.0"
+dependencies = [
+ "keycodes_ascii 0.1.0",
+]
+
+[[package]]
+name = "interrupts"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exceptions_early 0.1.0",
+ "gdt 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "keyboard 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mouse 0.1.0",
+ "pic 0.1.0",
+ "pit_clock 0.1.0",
+ "port_io 0.2.1",
+ "ps2 0.1.0",
+ "scheduler 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "tss 0.1.0",
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "ioapic"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "irq_safety"
+version = "0.1.1"
+source = "git+https://github.com/kevinaboos/irq_safety#90affdc92306c67f11ad99516227e6dc04050709"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "irq_safety"
+version = "0.1.1"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "kernel_config"
+version = "0.1.0"
+
+[[package]]
+name = "keyboard"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "input_event_types 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ps2 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "keyboard_new"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "input_event_types 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ps2 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "keycodes_ascii"
+version = "0.1.0"
+
+[[package]]
+name = "lazy_static"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lazy_static"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "linked_list_allocator"
+version = "0.5.0"
+source = "git+https://github.com/weclaw1/linked-list-allocator#aec3742e248b637ccf6dcf0634fa6df2b8d52e86"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "log"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "logger"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "memory"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heap_irq_safe 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "multiboot2 0.3.2",
+ "once 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
+]
+
+[[package]]
+name = "mod_mgmt"
+version = "0.1.0"
+dependencies = [
+ "cow_arc 0.1.0",
+ "goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "rustc-demangle 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "util 0.1.0",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
+]
+
+[[package]]
+name = "mouse"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mouse_data 0.1.0",
+ "ps2 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "mouse_data"
+version = "0.1.0"
+
+[[package]]
+name = "multiboot2"
+version = "0.3.2"
+dependencies = [
+ "bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nano_core"
+version = "0.1.0"
+dependencies = [
+ "captain 0.1.0",
+ "exceptions_early 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "multiboot2 0.3.2",
+ "panic_handling 0.1.0",
+ "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "once"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "owning_ref"
+version = "0.3.3"
+source = "git+https://github.com/kevinaboos/owning-ref-rs.git#3d839b1c57bff0fc2de1d1ebd26f3c7d296416b2"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
+name = "panic_handling"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "panic_info 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "panic_info"
+version = "0.1.0"
+
+[[package]]
+name = "pci"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "port_io 0.2.1",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pic"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "port_io 0.2.1",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "pit_clock"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "port_io 0.2.1",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "plain"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "pmu_x86"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pit_clock 0.1.0",
+ "port_io 0.2.1",
+ "raw-cpuid 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "tsc 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "port_io"
+version = "0.2.1"
+
+[[package]]
+name = "print"
+version = "0.1.0"
+dependencies = [
+ "input_event_manager 0.1.0",
+]
+
+[[package]]
+name = "ps2"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "port_io 0.2.1",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc_version 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rlibc"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "rtc"
+version = "0.1.0"
+dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "port_io 0.2.1",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "rustc-demangle"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "rustc_version"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "semver 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "scheduler"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scroll"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "semver"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "semver-parser"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "serial_port"
+version = "0.1.0"
+dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "port_io 0.2.1",
+]
+
+[[package]]
+name = "simd_test"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pit_clock 0.1.0",
+]
+
+[[package]]
+name = "spawn"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atomic_linked_list 0.1.0",
+ "debugit 0.1.0",
+ "gdt 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "scheduler 0.1.0",
+ "task 0.1.0",
+ "tss 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "spin"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.0.0"
+source = "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#fb924d62dda9740d05fc1e5554226b18bbe1eaf0"
+dependencies = [
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "state_store"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "syscall"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "dbus 0.1.0",
+ "gdt 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "util 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "task"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "panic_info 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tss 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "terminal"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "dfqueue 0.1.0",
+ "input_event_types 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "text_display 0.1.0",
+ "window_manager 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "text_display"
+version = "0.1.0"
+
+[[package]]
+name = "tsc"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pit_clock 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "tss"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic_linked_list 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "util"
+version = "0.1.0"
+
+[[package]]
+name = "vga_buffer"
+version = "0.1.0"
+dependencies = [
+ "kernel_config 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "port_io 0.2.1",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "text_display 0.1.0",
+ "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "volatile"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "volatile"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "window_manager"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "dfqueue 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_3d 0.1.0",
+ "frame_buffer_text 0.1.0",
+ "irq_safety 0.1.1",
+ "kernel_config 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "util 0.1.0",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "x86_64"
+version = "0.1.2"
+dependencies = [
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+]
+
+[[package]]
+name = "xmas-elf"
+version = "0.6.2"
+source = "git+https://github.com/kevinaboos/xmas-elf.git#faf514033cb815a58f5119c3e867c42fac5cb6d6"
+dependencies = [
+ "zero 0.1.3 (git+https://github.com/kevinaboos/zero.git)",
+]
+
+[[package]]
+name = "zero"
+version = "0.1.3"
+source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
+
+[metadata]
+"checksum atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6945bb928733f277215e12824ca9e31ce2016b6231dfc4816ed877df189cc17e"
+"checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
+"checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
+"checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
+"checksum goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)" = "b9c41a5d6172009a2dddc6e1d8f48472e6d01aab6f8b4db9cb6703596047885c"
+"checksum irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)" = "<none>"
+"checksum lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "49247ec2a285bb3dcb23cbd9c35193c025e7251bfce77c1d5da97e6362dffe7f"
+"checksum lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c8f31047daa365f19be14b47c29df4f7c3b581832407daabe6ae77397619237d"
+"checksum linked_list_allocator 0.5.0 (git+https://github.com/weclaw1/linked-list-allocator)" = "<none>"
+"checksum log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "5141eca02775a762cc6cd564d8d2c50f67c0ea3a372cbf1c51592b3e029e10ad"
+"checksum once 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1ae5868dd493edd93941c182240a2c019dfe84c7d2de51d4659da32e58688ce9"
+"checksum owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)" = "<none>"
+"checksum plain 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+"checksum raw-cpuid 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fe3c460bd35fdb75644e94ab498372bdf29a4849367ce7ba74cf358edce590c4"
+"checksum rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
+"checksum rustc-demangle 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "11fb43a206a04116ffd7cfcf9bcb941f8eb6cc7ff667272246b0a1c74259a3cb"
+"checksum rustc_version 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1e114e275f7c9b5d50bb52b28f9aac1921209f02aa6077c8b255e21eefaf8ffa"
+"checksum scroll 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b13864e1e0b3ed661d7206d512b8d1c4970f7fd9de23ae4e9b4331f0c25559e8"
+"checksum semver 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7a3186ec9e65071a2095434b1f5bb24838d4e8e130f584c790f6033c79943537"
+"checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+"checksum spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7e4deb3c2455c73779e6d3eebceae9599fc70957e54c69fe88f93aa48e62f432"
+"checksum stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)" = "<none>"
+"checksum volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "37c5d76c0f40ba4f8ac10ec4717d4e98ce3e58c5607eea36e9464226fc5e0a95"
+"checksum volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "54d4343a2df2d65144a874f95950754ee7b7e8594f6027aae8c7d0f4858a3fe8"
+"checksum xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)" = "<none>"
+"checksum zero 0.1.3 (git+https://github.com/kevinaboos/zero.git)" = "<none>"
