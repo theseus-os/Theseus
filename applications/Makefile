@@ -2,7 +2,7 @@
 ### It is run by the Makefile in applications/ directory, 
 ### but actually runs within the context of eact subdirectory.
 
-BUILD_MODE := release
+#BUILD_MODE := release
 
 ## Since applications are run in the kernel, we use the same Config.mk file 
 ## as the one that defines all config options for building regular kernel crates.
@@ -52,7 +52,7 @@ clean:
 
 ### Builds our custom lints in the compiler plugins directory so we can use them here
 compiler_plugins:
-	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(XARGO_RELEASE_ARG)
+	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
 
 
 cargo: compiler_plugins
@@ -62,14 +62,14 @@ cargo: compiler_plugins
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
-# 		$(XARGO_RELEASE_ARG) \
+# 		$(CARGO_OPTIONS) \
 # 		--target $(TARGET) \
 # 		-- \
 # 		$(COMPILER_LINTS) ; \
 # 	cd .. ; \
 # done
 ### Old command
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(XARGO_RELEASE_ARG) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(CARGO_OPTIONS) --all --target $(TARGET)
 	
 
 ### This first calls the cargo target, but then copies all object files into the build dir. 

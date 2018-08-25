@@ -43,7 +43,7 @@ clean:
 
 cargo: 
 ### Old command: 
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(PACKAGE_FEATURES) $(XARGO_RELEASE_ARG)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(PACKAGE_FEATURES) $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 # ### We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 # ### But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -52,7 +52,7 @@ cargo:
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 			xargo rustc \
-# 			$(XARGO_RELEASE_ARG) \
+# 			$(CARGO_OPTIONS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
 # 		cd .. ; \

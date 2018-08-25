@@ -27,7 +27,7 @@ BUILD_MODE ?= debug
 # BUILD_MODE ?= release
 
 ifeq ($(BUILD_MODE), release)
-	XARGO_RELEASE_ARG := --release
+	CARGO_OPTIONS += --release
 endif
 
 

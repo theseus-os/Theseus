@@ -229,7 +229,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
     
     // testing SIMD dual personalities
-    spawn::spawn_kthread(simd_personality::init_simd_personality, (), String::from("init_simd_personality"), None)?;
+    if false {
+        spawn::spawn_kthread(simd_personality::init_simd_personality, (), String::from("init_simd_personality"), None)?;
+    }
 
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");

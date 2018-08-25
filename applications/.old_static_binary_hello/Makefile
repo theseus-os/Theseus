@@ -6,7 +6,7 @@ RUSTFLAGS := "-C prefer-dynamic -Z pre-link-args=-nostartfiles"
 
 BUILD_MODE := release
 ifeq ($(BUILD_MODE), release)
-	XARGO_RELEASE_ARG := --release
+	CARGO_OPTIONS := --release
 endif  ## otherwise, nothing, which means "debug" by default
 
 
@@ -26,4 +26,4 @@ clean:
 
 
 build: 
-	RUST_TARGET_PATH="$(PWD)/../../cfg" RUSTFLAGS=$(RUSTFLAGS) xargo build $(XARGO_RELEASE_ARG) --target $(TARGET)
+	RUST_TARGET_PATH="$(PWD)/../../cfg" RUSTFLAGS=$(RUSTFLAGS) xargo build $(CARGO_OPTIONS) --target $(TARGET)

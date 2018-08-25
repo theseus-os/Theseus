@@ -157,10 +157,12 @@ pub fn init_simd_personality(_: ()) -> Result<(), &'static str> {
 	// spawn::spawn_kthread(func, (), String::from("simd_test_3-sse"), Some(2))?;
 	// debug!("finished spawning third simd task");
 
-
 	loop {
+		// we can't return here because the mapped pages that contain
+		// the simd_test functions being run must not be dropped 
+		// until the threads are completed.
+		// TODO FIXME: check for this somehow in the thread spawn code
 
 	}
 
-	// Err("unfinished")
 }

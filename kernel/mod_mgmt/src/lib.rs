@@ -1261,23 +1261,27 @@ impl CrateNamespace {
 
         // If not, our second try is to check the backup_namespace
         // to see if that namespace already has the section we want
-        if let Some(weak_sec) = backup_namespace.and_then(|backup| backup.get_symbol_internal(demangled_full_symbol)) {
-            // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
-            // We need to add a shared reference to that section's parent crate to this namespace as well, 
-            // so it can't be dropped while this namespace is still relying on it.  
-            if let Some(parent_crate_ref) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
-                let parent_crate_name = {
-                    let parent_crate = parent_crate_ref.lock_as_ref();
-                    self.add_symbols(parent_crate.sections.values(), true);
-                    parent_crate.crate_name.clone()
-                };
-                self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
-                return weak_sec;
-            }
-            else {
-                error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
-                    demangled_full_symbol);
-                return Weak::default();
+        if let Some(backup) = backup_namespace {
+            if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
+                // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
+                // We need to add a shared reference to that section's parent crate to this namespace as well, 
+                // so it can't be dropped while this namespace is still relying on it.  
+                if let Some(parent_crate_ref) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
+                    let parent_crate_name = {
+                        let parent_crate = parent_crate_ref.lock_as_ref();
+                        self.add_symbols(parent_crate.sections.values(), true);
+                        parent_crate.crate_name.clone()
+                    };
+                    // info!("Using symbol {:?} (crate {:?}) from backup namespace {:?} --> new namespace {:?}",
+                    //     demangled_full_symbol, parent_crate_name, backup.name, self.name);
+                    self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
+                    return weak_sec;
+                }
+                else {
+                    error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
+                        demangled_full_symbol);
+                    return Weak::default();
+                }
             }
         }
 

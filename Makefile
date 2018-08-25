@@ -258,9 +258,9 @@ kernel: check_rustc check_xargo
 
 
 
-### dual_simd is a special target for the dual SIMD personalities.
+### "dual_simd" is a special target for the dual SIMD personalities.
 ### Builds the kernel components and nano_core with the regular x86_64-theseus target,
-### and then builds the kernel components again with the SIMD-enabled x86_64-theseus-sse target. 
+### and then builds everything again with the SIMD-enabled x86_64-theseus-sse target. 
 dual_simd : export TARGET := x86_64-theseus
 dual_simd : export BUILD_MODE = release
 dual_simd: kernel applications simd_build
@@ -278,6 +278,8 @@ dual_simd: kernel applications simd_build
 ### simd_build is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
 ### It is the latter half of the dual_simd target.
 simd_build : export TARGET := x86_64-theseus-sse
+simd_build : export RUSTFLAGS += -C no-vectorize-loops
+simd_build : export RUSTFLAGS += -C no-vectorize-slp
 simd_build : export KERNEL_PREFIX := k_sse\#
 simd_build : export APP_PREFIX := a_sse\#
 simd_build:
