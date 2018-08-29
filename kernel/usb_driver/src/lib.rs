@@ -16,7 +16,7 @@ use owning_ref::BoxRefMut;
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
 use usb_req::UsbDevReq;
 use usb_device::{UsbControlTransfer,UsbDevice,Controller};
-use usb_uhci::{box_dev_req,box_config_desc,box_device_desc};
+use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_endpoint_desc};
 use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
 use core::mem::size_of_val;
 
@@ -91,7 +91,8 @@ pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str
     info!("config value of this configuration:{:b}", config_value);
     info!("total len of the incoming data of get description request:{:b}", total_len);
     info!("Number of interfaces supported by this configuration:{:b}", inter_num);
-
+    let (config_desc,new_offset) = get_all_desc(device,total_len,active_table,offset)?;
+    offset = new_offset;
 
 
     let (request_pointer,new_offset) = build_request(active_table,0x00, usb_req::REQ_SET_CONF,
@@ -137,6 +138,59 @@ pub fn get_config_desc(dev: &UsbDevice, active_table: &mut ActivePageTable, offs
 
 
 }
+
+/// Get the all descriptions
+pub fn get_all_desc(dev: &UsbDevice, total_len: u16, active_table: &mut ActivePageTable, offset: usize)-> Result<(BoxRefMut<MappedPages, UsbConfDesc>,usize),&'static str>{
+
+    let (request_pointer,mut new_offset) = build_request(active_table,0x80, usb_req::REQ_GET_DESC,
+                                                     usb_desc::USB_DESC_CONF, 0,total_len,offset)?;
+    let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(new_offset)
+        .ok_or("Couldn't get virtual memory address for the buffer pointer in get_config_desc request for device in UHCI!!")?;
+    let data_buffer_pointer = active_table.translate(v_buffer_pointer as usize)
+        .ok_or("Couldn't translate the virtual memory address of the buffer pointer to phys_addr!!")?;
+
+    let new_off = get_request(dev, request_pointer as u32,
+                              data_buffer_pointer as u32,total_len as u32,new_offset,active_table)?;
+
+
+    let mut config_desc = box_config_desc(active_table,data_buffer_pointer,new_offset)?;
+    new_offset +=  (config_desc.len.read() as usize);
+    let inter_num = config_desc.intf_count.read();
+    info!("interface number : {:x}", inter_num);
+    info!("config len : {:x}", config_desc.len.read());
+    for _x in 0..inter_num{
+        info!("woshinibaba");
+        let mut inter_desc = box_inter_desc(active_table,data_buffer_pointer,new_offset)?;
+        let endpoint_num = inter_desc.endp_count.read();
+        new_offset += (inter_desc.len.read() as usize);
+        let class_code = inter_desc.class.read();
+        let protocal = inter_desc.protocol.read();
+        let interface_number = inter_desc.intf_num.read();
+        info!("endpoint number : {:x}", endpoint_num);
+        info!("interface len : {:x}", inter_desc.len.read());
+        info!("base class : {:x}", class_code);
+        info!("protocol: {:x}",protocal);
+        info!("interface num: {:x}",interface_number);
+        for _y in 0..endpoint_num{
+
+            let end_desc = box_endpoint_desc(active_table, data_buffer_pointer,new_offset)?;
+            let endpoint_add = end_desc.addr.read();
+            let endpoint_len = end_desc.len.read();
+            new_offset += (endpoint_len as usize);
+            let endpoint_type = end_desc.endp_type.read();
+            let attribute = end_desc.attributes.read();
+            debug!("the endpoint address: {:x}, and type: {:x} and attribute: {:x}",endpoint_add,endpoint_type,attribute);
+        }
+
+    }
+
+
+    Ok((config_desc,new_off))
+
+
+}
+
+
 
 /// Get the device description
 pub fn get_device_desc(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: usize)-> Result<(BoxRefMut<MappedPages, UsbDeviceDesc>,usize),&'static str>{
@@ -184,6 +238,7 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
     let mut data_size = data_size;
     let mut link_index = setup_index;
     let mut report_index: usize;
+    let mut last_index: usize;
     loop{
         toggle ^= 1;
         if data_size > max_size{
@@ -218,6 +273,7 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
                               NO_DATA,0);
             usb_uhci::td_link_vf(packet_index,0,end_add as u32);
             report_index = end_index;
+            last_index = packet_index;
 
 
             break;
@@ -235,6 +291,14 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
     // wait for the transfer to be completed
     // Currently the get config transfer is stalled
     // wait for the transfer to be completed
+    loop{
+        let status = usb_uhci::td_status(last_index).unwrap()?;
+
+        if status & usb_uhci::TD_CS_ACTIVE == 0{
+            debug!("The write back status of the last data,{:x}", status);
+            break
+        }
+    }
     loop{
         let status = usb_uhci::td_status(report_index).unwrap()?;
 

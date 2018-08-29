@@ -27,7 +27,7 @@ use owning_ref::{BoxRef, BoxRefMut};
 use spin::{Once, Mutex};
 use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 use usb_device::{UsbDevice,Controller};
-use usb_desc::{UsbDeviceDesc,UsbConfDesc};
+use usb_desc::{UsbDeviceDesc,UsbConfDesc, UsbIntfDesc, UsbEndpDesc};
 use usb_req::UsbDevReq;
 
 pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
@@ -391,7 +391,7 @@ pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'sta
     Ok(mapped_page)
 }
 
-/// Box the the device standard request
+/// Box the device standard request
 pub fn box_dev_req(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
                    -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
     let page = map(active_table,phys_addr)?;
@@ -401,7 +401,28 @@ pub fn box_dev_req(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress
     Ok(dev_req)
 }
 
-/// Box the the device config description
+/// Box the endpoint description
+pub fn box_endpoint_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                      -> Result<BoxRefMut<MappedPages, UsbEndpDesc>, &'static str>{
+
+    let page = map(active_table,phys_addr)?;
+    let endpoint_desc: BoxRefMut<MappedPages, UsbEndpDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbEndpDesc>(offset))?;
+
+    Ok(endpoint_desc)
+}
+
+/// Box the interface description
+pub fn box_inter_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                      -> Result<BoxRefMut<MappedPages, UsbIntfDesc>, &'static str>{
+
+    let page = map(active_table,phys_addr)?;
+    let inter_desc: BoxRefMut<MappedPages, UsbIntfDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbIntfDesc>(offset))?;
+
+    Ok(inter_desc)
+}
+/// Box the device config description
 pub fn box_config_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
                        -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
 
@@ -412,7 +433,7 @@ pub fn box_config_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAdd
     Ok(config_desc)
 }
 
-/// Box the the device description
+/// Box the device description
 pub fn box_device_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
                        -> Result<BoxRefMut<MappedPages, UsbDeviceDesc>, &'static str>{
 

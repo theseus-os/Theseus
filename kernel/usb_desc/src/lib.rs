@@ -127,9 +127,8 @@ pub struct UsbIntfDesc
 {
 
     pub len: Volatile<u8>,
-    pub config_type: Volatile<u8>,
-    pub intf_type: Volatile<u8>,
-    pub intf_index: Volatile<u8>,
+    pub desc_type: Volatile<u8>,
+    pub intf_num: Volatile<u8>,
     pub alt_setting: Volatile<u8>,
     pub endp_count: Volatile<u8>,
     pub class: Volatile<u8>,
@@ -150,6 +149,7 @@ pub struct UsbEndpDesc
     pub attributes: Volatile<u8>,
     pub maxpacketsize: Volatile<u16>,
     pub interval: Volatile<u8>,
+    _padding: u16,
 }
 
 // ------------------------------------------------------------------------------------------------
