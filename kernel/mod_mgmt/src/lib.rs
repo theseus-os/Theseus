@@ -1228,10 +1228,16 @@ impl CrateNamespace {
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string,
     /// similar to the simpler function `get_symbol()`.
     /// 
-    /// If the symbol cannot be found, it tries to load the kernel crate containing that symbol. 
-    /// This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
-    /// if a symbol was given the `no_mangle` attribute, then we will not be able to find it
-    /// and that symbol's containing crate should be manually loaded before invoking this. 
+    /// If the symbol cannot be found in this namespace, it does the following:    
+    /// (1) First, try to find the missing symbol in the `backup_namespace`. 
+    ///     If we find it there, then add that shared crate into this namespace,
+    ///     and add all of that shared crate's symbols into this crate as well. 
+    /// 
+    /// (2) Second, if the missing symbol isn't in the backup namespace either, 
+    ///     try to load its containing crate from the module file. 
+    ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
+    ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it
+    ///     and that symbol's containing crate should be manually loaded before invoking this. 
     /// 
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo".
@@ -1240,10 +1246,9 @@ impl CrateNamespace {
     ///   You can specify the default by passing in `CrateType::Kernel.prefix()`, or specify another prefix
     ///   to help the symbol resolver know in which crate modules to look.
     /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
-    ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
+    ///   if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
-    ///   If `backup_namespace` is `None`, then no other namespace will be searched, 
-    ///   and any missing symbols will return an `Err`. 
+    ///   If `backup_namespace` is `None`, then no other namespace will be searched.
     /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
     pub fn get_symbol_or_load(
         &self, 
@@ -1262,25 +1267,33 @@ impl CrateNamespace {
         // If not, our second try is to check the backup_namespace
         // to see if that namespace already has the section we want
         if let Some(backup) = backup_namespace {
+            info!("Symbol \"{}\" not initially found, attemping to load it from backup namespace {:?}", 
+                demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
-                // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
-                // We need to add a shared reference to that section's parent crate to this namespace as well, 
-                // so it can't be dropped while this namespace is still relying on it.  
-                if let Some(parent_crate_ref) = weak_sec.upgrade().and_then(|sec| sec.lock().parent_crate.upgrade()) {
-                    let parent_crate_name = {
-                        let parent_crate = parent_crate_ref.lock_as_ref();
-                        self.add_symbols(parent_crate.sections.values(), true);
-                        parent_crate.crate_name.clone()
-                    };
-                    // info!("Using symbol {:?} (crate {:?}) from backup namespace {:?} --> new namespace {:?}",
-                    //     demangled_full_symbol, parent_crate_name, backup.name, self.name);
-                    self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
-                    return weak_sec;
-                }
-                else {
-                    error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
-                        demangled_full_symbol);
-                    return Weak::default();
+                if let Some(sec) = weak_sec.upgrade() {
+                    // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
+                    // We need to add a shared reference to that section's parent crate to this namespace as well, 
+                    // so it can't be dropped while this namespace is still relying on it.  
+                    let pcref_opt = { sec.lock().parent_crate.upgrade() };
+                    if let Some(parent_crate_ref) = pcref_opt {
+                        let parent_crate_name = {
+                            let parent_crate = parent_crate_ref.lock_as_ref();
+                            // (1) We could either add just this one missing symbol ...
+                            // self.add_symbols(Some(sec.clone()).iter(), true);
+                            // (2) Or add all symbols from the already-loaded crate in the backup namespace
+                            self.add_symbols(parent_crate.sections.values(), true);
+                            parent_crate.crate_name.clone()
+                        };
+                        // info!("Using symbol {:?} (crate {:?}) from backup namespace {:?} in new namespace {:?}",
+                        //     demangled_full_symbol, parent_crate_name, backup.name, self.name);
+                        self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref.clone());
+                        return weak_sec;
+                    }
+                    else {
+                        error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
+                            demangled_full_symbol);
+                        return Weak::default();
+                    }
                 }
             }
         }
@@ -1296,7 +1309,7 @@ impl CrateNamespace {
             
             // module names have a prefix like "k#", so we need to prepend that to the crate name
             let crate_dependency_name = format!("{}{}", kernel_crate_prefix, crate_dependency_name);
-
+ 
             if let Some(dependency_module) = get_module(&crate_dependency_name) {
                 // try to load the missing symbol's containing crate
                 if let Ok(_num_new_syms) = self.load_kernel_crate(dependency_module, backup_namespace, kernel_mmi, verbose_log) {

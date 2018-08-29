@@ -52,9 +52,6 @@ extern crate input_event_manager;
 extern crate exceptions_full;
 
 
-#[cfg(target_feature = "sse2")]
-extern crate simd_test;
-
 extern crate simd_personality;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -217,20 +214,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_userspace(module, None)?;
     }
 
-
-    #[cfg(target_feature = "sse2")]
-    {
-        if false {
-            spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None)?;
-            spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None)?;
-            // spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None)?;
-        }
-
-    }
     
-    // testing SIMD dual personalities
-    if false {
-        spawn::spawn_kthread(simd_personality::init_simd_personality, (), String::from("init_simd_personality"), None)?;
+    // create a SIMD personality
+    if true {
+        spawn::spawn_kthread(simd_personality::setup_simd_personality, (), String::from("setup_simd_personality"), None)?;
     }
 
 

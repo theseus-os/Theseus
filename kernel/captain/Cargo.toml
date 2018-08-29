@@ -91,11 +91,6 @@ path = "../../libs/keycodes_ascii"
 [dependencies.print]
 path = "../print"
 
-
-## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
-[target.'cfg(target_feature = "sse2")'.dependencies.simd_test]
-path = "../simd_test"
-
 [dependencies.simd_personality]
 path = "../simd_personality"
 
