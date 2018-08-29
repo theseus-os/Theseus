@@ -25,6 +25,8 @@ pub type StrongCrateRef  = CowArc<LoadedCrate>; // Arc<Mutex<LoadedCrate>>;
 pub type WeakCrateRef = CowWeak<LoadedCrate>; // Weak<Mutex<LoadedCrate>>;
 
 
+const CRATE_PREFIX_DELIMITER: &'static str = "#";
+
 #[derive(PartialEq)]
 pub enum CrateType {
     Kernel,
@@ -34,9 +36,17 @@ pub enum CrateType {
 impl CrateType {
     pub fn prefix(&self) -> &'static str {
         match self {
-            CrateType::Kernel       => "__k_",
-            CrateType::Application  => "__a_",
-            CrateType::Userspace    => "__u_",
+            CrateType::Kernel       => "k#",
+            CrateType::Application  => "a#",
+            CrateType::Userspace    => "u#",
+        }
+    }
+
+    fn first_prefix(&self) -> &'static str {
+        match self {
+            CrateType::Kernel       => "k",
+            CrateType::Application  => "a",
+            CrateType::Userspace    => "u",
         }
     }
 
@@ -44,27 +54,25 @@ impl CrateType {
     /// in which the `&str` is the rest of the module name after the prefix. 
     /// # Examples 
     /// ```
-    /// let result = CrateType::from_module_name("__k_my_crate");
+    /// let result = CrateType::from_module_name("k#my_crate");
     /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
     /// ```
     pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
-        if module_name.starts_with(CrateType::Application.prefix()) {
-            Ok((
-                CrateType::Application,
-                module_name.get(CrateType::Application.prefix().len() .. ).ok_or("Couldn't get name of application module")?
-            ))
+        let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
+        let prefix = iter.next().ok_or("couldn't get crate type prefix before delimiter")?;
+        let crate_name = iter.next().ok_or("couldn't get crate name after prefix delimiter")?;
+        if iter.next().is_some() {
+            return Err("too many # delimiters in crate's module name");
         }
-        else if module_name.starts_with(CrateType::Kernel.prefix()) {
-            Ok((
-                CrateType::Kernel,
-                module_name.get(CrateType::Kernel.prefix().len() .. ).ok_or("Couldn't get name of kernel module")?
-            ))
+        
+        if prefix.starts_with(CrateType::Kernel.first_prefix()) {
+            Ok((CrateType::Kernel, crate_name))
         }
-        else if module_name.starts_with(CrateType::Userspace.prefix()) {
-            Ok((
-                CrateType::Userspace,
-                module_name.get(CrateType::Userspace.prefix().len() .. ).ok_or("Couldn't get name of userspace module")?
-            ))
+        else if prefix.starts_with(CrateType::Application.first_prefix()) {
+            Ok((CrateType::Application, crate_name))
+        }
+        else if prefix.starts_with(CrateType::Userspace.first_prefix()) {
+            Ok((CrateType::Userspace, crate_name))
         }
         else {
             Err("module_name didn't start with a known CrateType prefix")
@@ -73,15 +81,15 @@ impl CrateType {
 
 
     pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.prefix())
+        module_name.starts_with(CrateType::Application.first_prefix())
     }
 
     pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.prefix())
+        module_name.starts_with(CrateType::Kernel.first_prefix())
     }
 
     pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.prefix())
+        module_name.starts_with(CrateType::Userspace.first_prefix())
     }
 }
 

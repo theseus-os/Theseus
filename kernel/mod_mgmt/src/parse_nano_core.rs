@@ -68,7 +68,7 @@ pub fn parse_nano_core(
 
     let crate_name = String::from("nano_core");
     debug!("parse_nano_core: trying to load and parse the nano_core file");
-    let module = try_mp!(get_module("__k_nano_core").ok_or("Couldn't find module called __k_nano_core"), text_pages, rodata_pages, data_pages);
+    let module = try_mp!(get_module("k#nano_core").ok_or("Couldn't find module called k#nano_core"), text_pages, rodata_pages, data_pages);
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
         error!("module {} is not page aligned!", module.name());

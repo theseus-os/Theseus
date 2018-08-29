@@ -52,9 +52,7 @@ extern crate input_event_manager;
 extern crate exceptions_full;
 
 
-#[cfg(target_feature = "sse2")]
-extern crate simd_test;
-
+extern crate simd_personality;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
@@ -216,14 +214,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_userspace(module, None)?;
     }
 
-
-    #[cfg(target_feature = "sse2")]
-    {
-        spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
-        spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
-        spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
-        
+    
+    // create a SIMD personality
+    if false {
+        spawn::spawn_kthread(simd_personality::setup_simd_personality, (), String::from("setup_simd_personality"), None)?;
     }
+
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
