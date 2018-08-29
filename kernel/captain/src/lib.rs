@@ -216,7 +216,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     
     // create a SIMD personality
-    if true {
+    if false {
         spawn::spawn_kthread(simd_personality::setup_simd_personality, (), String::from("setup_simd_personality"), None)?;
     }
 
