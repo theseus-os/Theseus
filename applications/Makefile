@@ -2,7 +2,7 @@
 ### It is run by the Makefile in applications/ directory, 
 ### but actually runs within the context of eact subdirectory.
 
-#BUILD_MODE := release
+BUILD_MODE := release
 
 ## Since applications are run in the kernel, we use the same Config.mk file 
 ## as the one that defines all config options for building regular kernel crates.

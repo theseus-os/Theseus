@@ -106,7 +106,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
- "simd_test 0.1.0",
+ "simd_personality 0.1.0",
  "spawn 0.1.0",
  "syscall 0.1.0",
  "task 0.1.0",
@@ -119,6 +119,19 @@ dependencies = [
 name = "cc"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "compiler_builtins"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang-nursery/compiler-builtins#88f5efa79c94c9b76cd9e45718704383c0983210"
+
+[[package]]
+name = "context_switch"
+version = "0.1.0"
+
+[[package]]
+name = "context_switch_sse"
+version = "0.1.0"
 
 [[package]]
 name = "cow_arc"
@@ -506,7 +519,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "multiboot2 0.3.2",
- "panic_handling 0.1.0",
+ "panic_unwind 0.1.0",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
@@ -529,7 +542,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic_handling"
+name = "panic_info"
+version = "0.1.0"
+
+[[package]]
+name = "panic_unwind"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "panic_wrapper 0.1.0",
+ "vga_buffer 0.1.0",
+]
+
+[[package]]
+name = "panic_unwind_simple"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
@@ -538,10 +573,6 @@ dependencies = [
  "panic_info 0.1.0",
  "task 0.1.0",
 ]
-
-[[package]]
-name = "panic_info"
-version = "0.1.0"
 
 [[package]]
 name = "pci"
@@ -592,7 +623,6 @@ dependencies = [
  "raw-cpuid 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "tsc 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -698,6 +728,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "simd_personality"
+version = "0.1.0"
+dependencies = [
+ "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "pit_clock 0.1.0",
+ "spawn 0.1.0",
+]
+
+[[package]]
 name = "simd_test"
 version = "0.1.0"
 dependencies = [
@@ -712,6 +754,8 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
+ "context_switch 0.1.0",
+ "context_switch_sse 0.1.0",
  "debugit 0.1.0",
  "gdt 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -770,6 +814,8 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
+ "context_switch 0.1.0",
+ "context_switch_sse 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -901,6 +947,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
 "checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
+"checksum compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)" = "b9c41a5d6172009a2dddc6e1d8f48472e6d01aab6f8b4db9cb6703596047885c"
 "checksum irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)" = "<none>"
 "checksum lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "49247ec2a285bb3dcb23cbd9c35193c025e7251bfce77c1d5da97e6362dffe7f"
