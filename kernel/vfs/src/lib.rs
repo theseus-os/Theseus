@@ -3,10 +3,16 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
+extern crate spin;
+
 
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::arc::Arc;
+use alloc::boxed::Box;
+use alloc::rc::{Rc, Weak};
+use spin::Mutex;
 
 
 pub struct File {
@@ -30,20 +36,23 @@ impl File {
 }
 
 
-pub struct Directory {
+pub struct Directory<'a>{
     name: String,
-    child_dirs: Vec<Directory>,
+    child_dirs: Vec<Directory<'a>>,
     files: Vec<File>,
+    parent: Option<Weak<Directory<'a>>>,
 }
 
 
-impl Directory {
+impl<'a> Directory<'a> {
     /// Creates the root directory
-    pub fn create_root() -> Directory {
+    pub fn create_root<'a>() -> Directory<'a> {
         let root = Directory {
             name: "root".to_string(),
             child_dirs: Vec::new(),
             files: Vec::new(),
+            parent: None,
+            
         };
         
         return root;
@@ -51,7 +60,7 @@ impl Directory {
 
 
     /// Assumes you actually want to open the file upon creation
-    pub fn new_file(mut self, name: String, filepath: String, filetype: FileType) {
+    pub fn new_file(&mut self, name: String, filepath: String, filetype: FileType) {
         let file = File {
             name: name,
             filepath: filepath,
@@ -62,17 +71,25 @@ impl Directory {
         self.files.push(file);
     }   
 
-    pub fn new_dir(mut self, name: String) {
+    pub fn new_dir(&mut self, name: String) {
+        let copy;
+        {
+        let strong_ptr = Rc::new(self);
+        let weak_ptr = Rc::downgrade(&strong_ptr);
+
         let directory = Directory {
             name: name, 
             child_dirs: Vec::new(),
             files:  Vec::new(),
+            parent: Some(weak_ptr),
         };
-        self.child_dirs.push(directory);
+        copy = directory;
+        }
+        self.child_dirs.push(copy);
     }
 
 
-    pub fn list_children(self) -> String {
+    pub fn list_children(&mut self) -> String {
         let mut children_list = String::new();
         for dir in self.child_dirs.iter() {
             children_list.push_str(&format!("{}, ",dir.name.to_string()));
@@ -89,6 +106,6 @@ impl Directory {
 
 }
 
-pub fn hack_loop(dir: Directory) {
+pub fn hack_loop(_dir: Arc<Mutex<Directory>>) {
     loop { }
 }

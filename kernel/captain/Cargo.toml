@@ -5,6 +5,7 @@ description = "The main driver of Theseus. Controls the loading and initializati
 version = "0.1.0"
 
 [dependencies]
+spin = "0.4.5"
 
 [dependencies.log]
 default-features = false

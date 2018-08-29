@@ -53,7 +53,7 @@ extern crate frame_buffer;
 extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate vfs;
-
+extern crate spin;
 
 #[cfg(target_feature = "sse2")]
 extern crate simd_test;
@@ -71,6 +71,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use spin::Mutex;
 //use frame_buffer::text_buffer;
 
 
@@ -150,13 +151,15 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    // initialize the input event manager, which will start the default terminal 
-    let input_event_queue_producer = input_event_manager::init()?;
 
     use vfs::Directory;
     let root_dir = Directory::create_root();
-    spawn::spawn_kthread(vfs::hack_loop, root_dir, String::from("persistent virtual filesystem"), None)?;
+    let root_dir_ptr = Arc::new(Mutex::new(root_dir));
+    spawn::spawn_kthread(vfs::hack_loop, Arc::clone(&root_dir_ptr), String::from("persistent vfs"), None)?;
 
+    // initialize the input event manager, which will start the default terminal 
+    let input_event_queue_producer = input_event_manager::init()?;
+    
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
 
