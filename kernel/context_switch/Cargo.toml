@@ -1,0 +1,8 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "context_switch"
+description = "Context switching routines and structs for regular (non-SSE) register sets"
+version = "0.1.0"
+
+[lib]
+crate-type = ["rlib"]

@@ -463,11 +463,8 @@ pub fn init(boot_info: BootInformation)
         }
         modules
     });   
-    // print_early!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try().unwrap());
+    debug!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try());
     
-    // TODO FIXME: add occupied areas to the AreaFrameAllocator that mark all module's physical memory as occupied!!
-
-
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
         let stack_alloc_start = Page::containing_address(KERNEL_STACK_ALLOCATOR_BOTTOM); 
