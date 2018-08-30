@@ -396,18 +396,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyboard_new"
-version = "0.1.0"
-dependencies = [
- "dfqueue 0.1.0",
- "input_event_types 0.1.0",
- "keycodes_ascii 0.1.0",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "ps2 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "keycodes_ascii"
 version = "0.1.0"
 
