@@ -221,31 +221,64 @@ impl Terminal {
             if new_line_indices[0].0 != slice.len() - 1 {
                 start_idx -= slice.len() -1 - new_line_indices[0].0;
                 total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
-                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width // fix: account for more than one line
+                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
             }
 
             // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the text display
-            while total_lines < buffer_height {
-                // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/window_width + 1
-                if counter == new_line_indices.len() -1 {
-                    return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
+            // while total_lines < buffer_height {
+            //     // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/window_width + 1
+            //     if counter == new_line_indices.len() -1 {
+                    
+            //         return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
+            //     }
+            //     // finds  the number of characters between newlines and thereby the number of lines those will take up
+            //     let num_chars = new_line_indices[counter].0 - new_line_indices[counter+1].0;
+            //     let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {(num_chars-1) / buffer_width + 1 } else {(num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
+            //     if num_chars > start_idx { // prevents subtraction overflow
+            //         return (0, total_lines * buffer_width + last_line_chars);
+            //     }
+            //     start_idx -= num_chars;
+            //     total_lines += num_lines;
+            //     counter += 1;
+            // }
+
+            // covers everything *up to* the characters between the beginning of the slice and the first new line character
+            for i in 0..new_line_indices.len()-1 {
+                if total_lines >= buffer_height {
+                    break;
                 }
-                // finds  the number of characters between newlines and thereby the number of lines those will take up
-                let num_chars = new_line_indices[counter].0 - new_line_indices[counter+1].0;
+                let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
                 let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {(num_chars-1) / buffer_width + 1 } else {(num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
                 if num_chars > start_idx { // prevents subtraction overflow
                     return (0, total_lines * buffer_width + last_line_chars);
-                }
+                }  
                 start_idx -= num_chars;
                 total_lines += num_lines;
                 counter += 1;
             }
 
-            // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
+            // covers the characters between the beginning of the slice and the first new line character
+            let first_chars = new_line_indices[new_line_indices.len() -1].0;
+            let first_chars_lines = first_chars/buffer_width + 1;
             if total_lines > buffer_height {
+                debug!("inside the overcounting statement");
                 start_idx += (total_lines - buffer_height) * buffer_width;
                 total_lines = buffer_height;
+            } else if first_chars_lines + total_lines > buffer_height {
+                debug!("caught 1st block");
+                let diff = buffer_height - total_lines;
+                total_lines += diff;
+                start_idx -= diff * buffer_width;
+            } else if first_chars_lines + total_lines == buffer_height {
+                debug!("caught middle block");
+                total_lines += 1;
+                start_idx -= first_chars;
+            } else {
+                debug!("returning 0 in the last block");
+                return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
             }
+
+            // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
             return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
 
         } else {
