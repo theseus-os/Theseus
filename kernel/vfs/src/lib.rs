@@ -9,9 +9,8 @@ extern crate spin;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::arc::Arc;
+use alloc::arc::{Arc, Weak};
 use alloc::boxed::Box;
-use alloc::rc::{Rc, Weak};
 use spin::Mutex;
 
 
@@ -36,31 +35,30 @@ impl File {
 }
 
 
-pub struct Directory<'a>{
+pub struct Directory{
     name: String,
-    child_dirs: Vec<Directory<'a>>,
+    child_dirs: Vec<Directory>,
     files: Vec<File>,
-    parent: Option<Weak<Directory<'a>>>,
+    parent: Option<Weak<&'static mut Directory>>,
 }
 
 
-impl<'a> Directory<'a> {
+impl Directory{
     /// Creates the root directory
-    pub fn create_root<'a>() -> Directory<'a> {
-        let root = Directory {
+    pub fn create_root() -> Directory {
+        static ROOT: Directory = Directory {
             name: "root".to_string(),
             child_dirs: Vec::new(),
             files: Vec::new(),
             parent: None,
             
-        };
-        
-        return root;
+        };    
+    return ROOT;
     }
 
 
     /// Assumes you actually want to open the file upon creation
-    pub fn new_file(&mut self, name: String, filepath: String, filetype: FileType) {
+    pub fn new_file<'e>(&'e mut self, name: String, filepath: String, filetype: FileType) {
         let file = File {
             name: name,
             filepath: filepath,
@@ -71,14 +69,14 @@ impl<'a> Directory<'a> {
         self.files.push(file);
     }   
 
-    pub fn new_dir(&mut self, name: String) {
+    pub fn new_dir<'e>(&'e mut self, name: String) {
         let copy;
         {
-        let strong_ptr = Rc::new(self);
-        let weak_ptr = Rc::downgrade(&strong_ptr);
+        let strong_ptr = Arc::new(self);
+        let weak_ptr = Arc::downgrade(&strong_ptr);
 
         let directory = Directory {
-            name: name, 
+            name: &name, 
             child_dirs: Vec::new(),
             files:  Vec::new(),
             parent: Some(weak_ptr),
