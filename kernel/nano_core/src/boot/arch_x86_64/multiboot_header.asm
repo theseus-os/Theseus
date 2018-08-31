@@ -22,6 +22,14 @@ header_start:
 	dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
 
 	;optional tags
+	;framebuffer tags
+	;dw 5
+	;dw 0
+	;dd 20
+	;dd 640
+	;dd 400
+	;dd 32
+
 
 	;end tags
 	dw 0	;type

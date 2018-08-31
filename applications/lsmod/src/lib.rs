@@ -3,16 +3,14 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 
 use alloc::{Vec, String};
-use getopts::{Options, Matches};
-use memory::{get_module, ModuleArea};
-
+use getopts::Options;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

@@ -3,7 +3,7 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate input_event_types;
+extern crate event_types;
 extern crate ps2;
 #[macro_use] extern crate log;
 
@@ -11,7 +11,7 @@ extern crate ps2;
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
 use dfqueue::DFQueueProducer;
-use input_event_types::Event;
+use event_types::Event;
 use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardType};
 
 

@@ -7,7 +7,7 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 extern crate itertools;
 
 extern crate getopts;
@@ -15,14 +15,12 @@ extern crate memory;
 extern crate mod_mgmt;
 
 use core::ops::DerefMut;
-use alloc::{Vec, String, BTreeMap};
+use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
 use memory::{get_module, ModuleArea};
 use mod_mgmt::metadata::StrongCrateRef;
-use itertools::Itertools;
-
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -144,5 +142,5 @@ fn print_usage(opts: Options) {
 
 const USAGE: &'static str = "Usage: swap (OLD1,NEW1[,NEW_NAME1]) [(OLD2,NEW2[,NEW_NAME2])]...
 Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.
-The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"__k_my_crate\").
+The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"k#my_crate\").
 A NEW_NAME string is optional, which will override the crate name derived from the NEW module.";

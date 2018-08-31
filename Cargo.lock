@@ -91,11 +91,11 @@ dependencies = [
  "dfqueue 0.1.0",
  "driver_init 0.1.0",
  "e1000 0.1.0",
+ "event_types 0.1.0",
  "exceptions_full 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_3d 0.1.0",
  "input_event_manager 0.1.0",
- "input_event_types 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -123,7 +123,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "compiler_builtins"
 version = "0.1.0"
-source = "git+https://github.com/rust-lang-nursery/compiler-builtins#88f5efa79c94c9b76cd9e45718704383c0983210"
+source = "git+https://github.com/rust-lang-nursery/compiler-builtins#cdbad7225fb61b4bf255501e974b3c2dbed0db58"
 
 [[package]]
 name = "context_switch"
@@ -147,16 +147,16 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
- "print 0.1.0",
  "scheduler 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
 name = "date"
 version = "0.1.0"
 dependencies = [
- "print 0.1.0",
  "rtc 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -194,7 +194,7 @@ dependencies = [
  "ata_pio 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -219,15 +219,22 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.5.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "event_types"
+version = "0.1.0"
+dependencies = [
+ "keycodes_ascii 0.1.0",
+]
 
 [[package]]
 name = "example"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
- "print 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -255,6 +262,7 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
+ "acpi 0.1.0",
  "kernel_config 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -262,7 +270,9 @@ dependencies = [
  "serial_port 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
+ "tsc 0.1.0",
  "util 0.1.0",
+ "vga_buffer 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -278,18 +288,6 @@ dependencies = [
  "serial_port 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "frame_buffer_text"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
- "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "serial_port 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -336,7 +334,7 @@ name = "hello"
 version = "0.1.0"
 dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "print 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -345,7 +343,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "dfqueue 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -354,18 +353,9 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "terminal 0.1.0",
  "text_display 0.1.0",
- "vga_buffer 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
-]
-
-[[package]]
-name = "input_event_types"
-version = "0.1.0"
-dependencies = [
- "keycodes_ascii 0.1.0",
 ]
 
 [[package]]
@@ -428,7 +418,7 @@ name = "itertools"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "either 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -440,7 +430,7 @@ name = "keyboard"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "ps2 0.1.0",
@@ -456,8 +446,8 @@ name = "kill"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
- "print 0.1.0",
  "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -505,7 +495,7 @@ dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
- "print 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -712,7 +702,11 @@ version = "0.2.1"
 name = "print"
 version = "0.1.0"
 dependencies = [
+ "dfqueue 0.1.0",
+ "event_types 0.1.0",
  "input_event_manager 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -720,8 +714,8 @@ name = "ps"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
- "print 0.1.0",
  "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -888,7 +882,7 @@ dependencies = [
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
- "print 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -929,19 +923,33 @@ dependencies = [
 name = "terminal"
 version = "0.1.0"
 dependencies = [
- "atomic_linked_list 0.1.0",
  "dfqueue 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
- "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "print 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
+ "terminal_print 0.1.0",
  "text_display 0.1.0",
  "window_manager 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "terminal_print"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "event_types 0.1.0",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -951,13 +959,17 @@ version = "0.1.0"
 dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "panic_info 0.1.0",
- "print 0.1.0",
  "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
 name = "text_display"
 version = "0.1.0"
+dependencies = [
+ "event_types 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "tsc"
@@ -989,6 +1001,7 @@ version = "0.1.0"
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
+ "event_types 0.1.0",
  "kernel_config 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "port_io 0.2.1",
@@ -1014,18 +1027,18 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "dfqueue 0.1.0",
+ "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
- "frame_buffer_text 0.1.0",
  "irq_safety 0.1.1",
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pit_clock 0.1.0",
  "serial_port 0.1.0",
+ "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "util 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1056,7 +1069,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
 "checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
 "checksum compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
-"checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
+"checksum either 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5845bf77d497f79416df39462df26d4a8b71dd6440246848ee63709476dbb9a6"
 "checksum getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)" = "<none>"
 "checksum goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)" = "b9c41a5d6172009a2dddc6e1d8f48472e6d01aab6f8b4db9cb6703596047885c"
 "checksum irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)" = "<none>"

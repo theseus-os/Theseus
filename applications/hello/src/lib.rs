@@ -5,8 +5,8 @@
 
 
 extern crate alloc;
-// #[macro_use] extern crate log;
-#[macro_use] extern crate print;
+#[macro_use] extern crate log;
+#[macro_use] extern crate terminal_print;
 
 use alloc::{Vec, String};
 
