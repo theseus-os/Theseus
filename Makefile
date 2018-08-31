@@ -408,11 +408,7 @@ odebug:
 # loadable : export RUST_FEATURES = --package nano_core --features loadable
 loadable : export RUST_FEATURES = --manifest-path "kernel/nano_core/Cargo.toml" --features loadable
 loadable : export BUILD_MODE = release
-# loadable: run
-loadable: 
-	@echo -e "\nLoadable mode is currently not working, due to the input_event_manager directly referencing a terminal crate."
-	@echo -e "This will be fixed soon."
-	@exit 1
+loadable: run
 
 
 ### builds and runs Theseus in QEMU
@@ -436,7 +432,7 @@ gdb:
 
 ### builds and runs Theseus in Bochs
 # bochs : export RUST_FEATURES = --package apic --features apic_timer_fixed
-bochs : export RUST_FEATURES = --manifest-path "apic/Cargo.toml" --features "apic_timer_fixed"
+bochs : export RUST_FEATURES = --manifest-path "kernel/apic/Cargo.toml" --features "apic_timer_fixed"
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -462,7 +458,7 @@ endif
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 # boot : export RUST_FEATURES = --package captain --features mirror_log_to_vga
-boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
+boot : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -470,7 +466,7 @@ boot: check_usb $(iso)
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
+pxe : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)
