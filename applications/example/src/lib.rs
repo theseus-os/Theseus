@@ -4,7 +4,7 @@
 #![feature(alloc)]
 
 extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 extern crate getopts;
 
 use alloc::{Vec, String};

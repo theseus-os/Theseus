@@ -26,13 +26,14 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate vga_buffer;
 
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-extern crate input_event_types; // a temporary way to use input_event_manager types 
+extern crate event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
@@ -47,6 +48,7 @@ extern crate driver_init;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
+extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
@@ -66,6 +68,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+//use frame_buffer::text_buffer;
 
 
 
@@ -129,15 +132,26 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
 
-    // initialize the kernel input_event_manager
-    let input_event_queue_producer = input_event_manager::init()?;
-
-    // initialize the rest of our drivers
-    driver_init::init(input_event_queue_producer)?;
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
+
+    // //init frame_buffer
+    let rs = frame_buffer::init();
+    match rs {
+        Ok(_) => { trace!("frame_buffer initialized."); }
+        Err(err) => { 
+            println_raw!("nano_core_start():fail to initialize frame_buffer");
+            return Err(err);
+        }
+    }
+
+    // initialize the input event manager, which will start the default terminal 
+    let input_event_queue_producer = input_event_manager::init()?;
+
+    // initialize the rest of our drivers
+    driver_init::init(input_event_queue_producer)?;
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
@@ -157,22 +171,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-
-    // //init frame_buffer
-    // let rs = frame_buffer::init();
-    // if rs.is_ok() {
-    //     trace!("frame_buffer initialized.");
-    // } else {
-    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    // }
-    // let rs = frame_buffer_3d::init();
-    // if rs.is_ok() {
-    //     trace!("frame_buffer initialized.");
-    // } else {
-    //     debug!("nano_core::nano_core_start: {}", rs.unwrap_err());
-    // }
-
-
     // testing nic
     // TODO: remove this (@Ramla)
     if false {
@@ -180,37 +178,30 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
     }  
 
-    //test window manager
-    if false {
-        use window_manager::test_window_manager;
-        spawn::spawn_kthread(test_window_manager::test_cursor, None, String::from("test_cursor"), None).unwrap();
-        spawn::spawn_kthread(test_window_manager::test_draw, None, String::from("test_draw"), None).unwrap();
-    }
-
     // create and jump to the first userspace thread
     if false {
         debug!("trying to jump to userspace");
-        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
     }
 
     if false {
         debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
     }
 
     // create and jump to a userspace thread that tests syscalls
     if false {
         debug!("trying out a system call module");
-        let module = memory::get_module("__u_syscall_send").ok_or("Error: no module named '__u_syscall_send' found!")?;
+        let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
         spawn::spawn_userspace(module, None)?;
     }
 
     // a second duplicate syscall test user task
     if false {
         debug!("trying out a receive system call module");
-        let module = memory::get_module("__u_syscall_receive").ok_or("Error: no module named '__u_syscall_receive' found!")?;
+        let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
         spawn::spawn_userspace(module, None)?;
     }
 

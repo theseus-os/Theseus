@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "input_event_manager"
-description = "A input_event_manager (terminal emulator) implementation"
+description = "Handles keyboard input and redirects to the appropriate terminal"
 version = "0.1.0"
 
 
@@ -21,9 +21,6 @@ version = "1.0"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
 [dependencies.window_manager]
 path = "../window_manager"
 
@@ -34,8 +31,8 @@ version = "0.1.0"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.input_event_types]
-path = "../input_event_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -49,11 +46,11 @@ path  = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.terminal]
-path = "../../applications/terminal"
-
 [dependencies.text_display]
 path = "../text_display"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
 
 
 [lib]
