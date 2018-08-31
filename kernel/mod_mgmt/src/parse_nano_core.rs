@@ -15,7 +15,7 @@ use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
+use metadata::{CrateType, LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 
 
 /// Decides which parsing technique to use, either the symbol file or the actual binary file.
@@ -68,7 +68,10 @@ pub fn parse_nano_core(
 
     let crate_name = String::from("nano_core");
     debug!("parse_nano_core: trying to load and parse the nano_core file");
-    let module = try_mp!(get_module("__k_nano_core").ok_or("Couldn't find module called __k_nano_core"), text_pages, rodata_pages, data_pages);
+    let module = try_mp!(
+        get_module(&format!("{}nano_core", CrateType::Kernel.prefix())).ok_or("Couldn't find nano_core module"), 
+        text_pages, rodata_pages, data_pages
+    );
     use kernel_config::memory::address_is_page_aligned;
     if !address_is_page_aligned(module.start_address()) {
         error!("module {} is not page aligned!", module.name());

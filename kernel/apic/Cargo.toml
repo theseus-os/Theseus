@@ -42,7 +42,7 @@ path = "../memory"
 path = "../kernel_config"
 
 [dependencies.raw-cpuid]
-version = "4.0.0"
+version = "5.0.0"
 features = [ "use_arch" ]
 
 [features]

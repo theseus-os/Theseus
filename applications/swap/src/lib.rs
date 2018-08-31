@@ -142,5 +142,5 @@ fn print_usage(opts: Options) {
 
 const USAGE: &'static str = "Usage: swap (OLD1,NEW1[,NEW_NAME1]) [(OLD2,NEW2[,NEW_NAME2])]...
 Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.
-The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"__k_my_crate\").
+The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"k#my_crate\").
 A NEW_NAME string is optional, which will override the crate name derived from the NEW module.";

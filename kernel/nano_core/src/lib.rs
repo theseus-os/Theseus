@@ -17,7 +17,6 @@
 
 #![no_std]
 #![feature(alloc)]
-#![feature(lang_items)]
 #![feature(used)]
 
 
@@ -38,7 +37,7 @@ extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
-extern crate panic_handling;
+extern crate panic_unwind; // the panic/unwind lang items
 
 #[macro_use] extern crate vga_buffer;
 
@@ -143,7 +142,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
     match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
         Ok(_new_syms) => {
-            // debug!("========================== Symbol map after __k_nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
+            // debug!("========================== Symbol map after nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
         }
         Err((msg, mapped_pages)) => {
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
@@ -156,11 +155,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
     #[cfg(feature = "loadable")] 
     {
-        let core_module = try_exit!(memory::get_module("__k_core").ok_or("couldn't find __k_core module"));
+        let kernel_prefix = mod_mgmt::metadata::CrateType::Kernel.prefix();
+        let core_module = try_exit!(memory::get_module(&format!("{}core", kernel_prefix)).ok_or("couldn't find core module"));
         let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
-        let captain_module = try_exit!(memory::get_module("__k_captain").ok_or("couldn't find __k_captain module"));
+        let captain_module = try_exit!(memory::get_module(&format!("{}captain", kernel_prefix)).ok_or("couldn't find captain module"));
         let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
@@ -173,9 +173,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use alloc::arc::Arc;
         use irq_safety::MutexIrqSafe;
         use memory::{MappedPages, MemoryManagementInfo};
+        use mod_mgmt::metadata::CrateType;
 
         let section_ref = try_exit!(
-            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", None, kernel_mmi_ref.lock().deref_mut(), false)
+            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", CrateType::Kernel.prefix(), None, kernel_mmi_ref.lock().deref_mut(), false)
             .upgrade()
             .ok_or("no symbol: captain::init")
         );
@@ -211,95 +212,6 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
 }
 
-
-
-
-
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-#[no_mangle]
-#[doc(hidden)]
-pub extern "C" fn eh_personality() {}
-
-
-#[cfg(not(test))]
-#[lang = "panic_fmt"]
-#[no_mangle]
-#[doc(hidden)]
-pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
-    
-    // Since a panic could occur before the memory subsystem is initialized,
-    // we must check before using alloc types or other functions that depend on the memory system (the heap).
-    // We can check that by seeing if the kernel mmi has been initialized.
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
-    let res = if kernel_mmi_ref.is_some() {
-        // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
-        #[cfg(feature = "loadable")]
-        {
-            type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
-            let section_ref = kernel_mmi_ref.and_then(|kernel_mmi| {
-                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_handling::panic_wrapper", None, kernel_mmi.lock().deref_mut(), false).upgrade()
-            }).ok_or("Couldn't get symbol: \"panic_handling::panic_wrapper\"");
-
-            // call the panic_wrapper function, otherwise return an Err into "res"
-            let mut space = 0;
-            section_ref.and_then(|section_ref| {
-                let (mapped_pages, mapped_pages_offset) = { 
-                    let section = section_ref.lock();
-                    (section.mapped_pages.clone(), section.mapped_pages_offset)
-                };
-                let mapped_pages_locked = mapped_pages.lock();
-                mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
-                    .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
-            })
-        }
-        #[cfg(not(feature = "loadable"))]
-        {
-            panic_handling::panic_wrapper(fmt_args, file, line, col)
-        }
-    }
-    else {
-        Err("memory subsystem not yet initialized, cannot call panic_wrapper because it requires alloc types")
-    };
-
-    if let Err(_e) = res {
-        // basic early panic printing with no dependencies
-        error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
-        println_raw!("\nPANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
-    }
-
-    // if we failed to handle the panic, there's not really much we can do about it
-    // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
-    // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
-    // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
-    
-    loop {}
-}
-
-
-
-/// This function isn't used since our Theseus target.json file
-/// chooses panic=abort (as does our build process), 
-/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
-#[allow(non_snake_case)]
-#[lang = "eh_unwind_resume"]
-#[no_mangle]
-#[cfg(all(target_os = "windows", target_env = "gnu"))]
-#[doc(hidden)]
-pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
-    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    loop {}
-}
-
-
-#[allow(non_snake_case)]
-#[no_mangle]
-#[cfg(not(target_os = "windows"))]
-#[doc(hidden)]
-pub extern "C" fn _Unwind_Resume() -> ! {
-    error!("\n\nin _Unwind_Resume, unimplemented!");
-    loop {}
-}
 
 
 // symbols exposed in the initial assembly boot files

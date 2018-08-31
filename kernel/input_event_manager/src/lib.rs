@@ -30,6 +30,7 @@ use keycodes_ascii::{Keycode, KeyAction};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::string::{String,ToString};
 use alloc::vec::Vec;
+use mod_mgmt::metadata::CrateType;
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
@@ -39,12 +40,13 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
 
     // Spawns the terminal print crate so that we can print to the terminal
+    let app_prefix = CrateType::Application.prefix();
     let args: Vec<String> =  vec![]; // terminal print doesn't have any arguments
-    let term_print_module = memory::get_module("__a_terminal_print").ok_or("Error: terminal print module not found")?;
+    let term_print_module = memory::get_module(&format!("{}terminal_print", app_prefix)).ok_or("Error: terminal_print module not found")?;
     spawn::spawn_application_singleton(term_print_module, args, None, None)?;
 
     // Initializes the default terminal (will also start the windowing manager)
-    let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
+    let term_module = memory::get_module(&format!("{}terminal", app_prefix)).ok_or("Error: terminal module not found")?;
     let args: Vec<String> =  vec![]; // terminal::main() doesn't have any arguments
     spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal
     spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "input_event_loop".to_string(), None)?;
@@ -76,7 +78,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
                     let task_name: String = format!("terminal {}", terminal_id_counter);
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    let term_module = memory::get_module("__a_terminal").ok_or("Error: terminal module not found")?;
+                    let term_module = memory::get_module(&format!("{}terminal", CrateType::Application.prefix())).ok_or("Error: terminal module not found")?;
                     spawn::spawn_application(term_module, args, Some(task_name), None)?;
                     terminal_id_counter += 1;
                     meta_keypress = true;

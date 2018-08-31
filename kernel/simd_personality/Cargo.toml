@@ -1,0 +1,32 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "simd_personality"
+description = "Support for multiple kernel personalities: SIMD and non-SIMD"
+version = "0.1.0"
+
+[dependencies]
+# rlibc = "1.0.0"
+
+[target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
+git = "https://github.com/rust-lang-nursery/compiler-builtins"
+features = [ "no-lang-items", "mem"]
+# features = [ "no-lang-items" ]
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[lib]
+crate-type = ["rlib"]

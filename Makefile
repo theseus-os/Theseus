@@ -3,12 +3,11 @@
 ### It also provides convenient targets for running and debugging Theseus and using GDB on your host computer.
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
+include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo clean run debug iso kernel applications userspace cargo gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso kernel applications userspace cargo dual_simd simd_build gdb doc docs view-doc view-docs
 
 
-ARCH ?= x86_64
-TARGET ?= $(ARCH)-theseus
 nano_core := kernel/build/nano_core-$(ARCH).bin
 iso := build/theseus-$(ARCH).iso
 
@@ -50,7 +49,7 @@ endif ## BYPASS_RUSTC_CHECK
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.10
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.12
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -186,7 +185,7 @@ endif
 	@sudo sudo ifconfig $(netdev) 192.168.1.105
 endif
 	
-	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
 
@@ -238,16 +237,16 @@ applications: check_rustc check_xargo
 userspace: 
 	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
-# copy userspace binary files and add the __u_ prefix
+# copy userspace binary files and add the u# prefix
 	@mkdir -p $(grub-isofiles)/modules
 	@for f in `find ./userspace/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/u#\1/p'` 2> /dev/null ; \
 	done
 
 
 ### this builds all kernel components
 kernel: check_rustc check_xargo
-	@echo -e "\n======== BUILDING KERNEL ========"
+	@echo -e "\n======== BUILDING KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
 	@$(MAKE) -C kernel all
 # copy kernel module build files
 	@mkdir -p $(grub-isofiles)/modules
@@ -255,12 +254,63 @@ kernel: check_rustc check_xargo
 		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
 	done
 # copy the core library's object file
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/$(KERNEL_PREFIX)core.o
 
 
-DOC_ROOT := "build/doc/-- Theseus Crates --/index.html"
 
-doc:
+### "dual_simd" is a special target for the dual SIMD personalities.
+### Builds the kernel components and nano_core with the regular x86_64-theseus target,
+### and then builds everything again with the SIMD-enabled x86_64-theseus-sse target. 
+dual_simd : export TARGET := x86_64-theseus
+dual_simd : export BUILD_MODE = release
+dual_simd: kernel applications simd_build
+# after building all the modules, copy the kernel boot image files
+	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
+	@mkdir -p $(grub-isofiles)/boot/grub
+	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
+# autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
+# run it in QEMU
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
+
+### simd_build is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
+### It is the latter half of the dual_simd target.
+simd_build : export TARGET := x86_64-theseus-sse
+simd_build : export RUSTFLAGS += -C no-vectorize-loops
+simd_build : export RUSTFLAGS += -C no-vectorize-slp
+simd_build : export KERNEL_PREFIX := k_sse\#
+simd_build : export APP_PREFIX := a_sse\#
+simd_build:
+# now we build the kernel with SIMD support enabled (it has already been built normally in the "kernel" target)
+	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
+	@$(MAKE) -C kernel cargo
+	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  -v --prefix $(KERNEL_PREFIX) $(ROOT_DIR)/kernel/target/$(TARGET)/$(BUILD_MODE)/deps/  $(ROOT_DIR)/kernel/build
+# copy kernel module build files
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
+	done
+# copy the SIMD-enabled core library's object file
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/$(KERNEL_PREFIX)core.o
+# copy the SIMD-enabled compiler_builtins object file.
+# This isn't necessary for regular compilation because it's included in the nano_core static lib.
+# But here, since we have no static lib, we need to include it explicitly as a separate library.
+	# @cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/compiler_builtins-*.o $(grub-isofiles)/modules/$(KERNEL_PREFIX)compiler_builtins.o
+#  now we build the applications with SIMD support enabled
+	@echo -e "\n======== BUILDING SIMD APPLICATIONS, TARGET = $(TARGET) ========"
+	@$(MAKE) -C applications all
+# copy applications' object files
+	@mkdir -p $(grub-isofiles)/modules
+	@for f in  ./applications/build/*.o ; do \
+		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
+	done
+
+
+DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
+
+doc: check_rustc
 	@rm -rf build/doc
 	@mkdir -p build
 	@$(MAKE) -C kernel doc

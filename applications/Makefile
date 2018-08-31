@@ -52,7 +52,7 @@ clean:
 
 ### Builds our custom lints in the compiler plugins directory so we can use them here
 compiler_plugins:
-	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(XARGO_RELEASE_ARG)
+	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
 
 
 cargo: compiler_plugins
@@ -62,26 +62,26 @@ cargo: compiler_plugins
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
-# 		$(XARGO_RELEASE_ARG) \
+# 		$(CARGO_OPTIONS) \
 # 		--target $(TARGET) \
 # 		-- \
 # 		$(COMPILER_LINTS) ; \
 # 	cd .. ; \
 # done
 ### Old command
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(XARGO_RELEASE_ARG) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build $(CARGO_OPTIONS) --all --target $(TARGET)
 	
 
 ### This first calls the cargo target, but then copies all object files into the build dir. 
-### It gives all object files the "__k_" prefix, except for "executable" application object files that get the "__a_" prefix.
+### It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: cargo
 	@mkdir -p ./build
 
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
-		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/__k_\1\.o/p'` 2> /dev/null ; \
+		cp -vf $${f}  ./build/`basename $${f} | sed -n -e 's/\(.*\)-.*/$(KERNEL_PREFIX)\1\.o/p'` 2> /dev/null ; \
 	done
 	
 	@for app in $(APPS) ; do  \
-		mv  ./build/__k_$${app}.o  ./build/__a_$${app}.o ; \
-		strip --strip-debug  ./build/__a_$${app}.o ; \
+		mv  ./build/$(KERNEL_PREFIX)$${app}.o  ./build/$(APP_PREFIX)$${app}.o ; \
+		strip --strip-debug  ./build/$(APP_PREFIX)$${app}.o ; \
 	done
