@@ -21,10 +21,11 @@ CFG_DIR := $(ROOT_DIR)/cfg
 KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
+### NOTE: CURRENTLY FORCING RELEASE MODE UNTIL HASH-BASED SYMBOL RESOLUTION IS WORKING
 ## Build modes:  debug is default (dev mode), release is release with full optimizations.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
-BUILD_MODE ?= debug
-# BUILD_MODE ?= release
+# BUILD_MODE ?= debug
+BUILD_MODE ?= release
 
 ifeq ($(BUILD_MODE), release)
 	CARGO_OPTIONS += --release

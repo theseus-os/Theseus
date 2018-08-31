@@ -10,10 +10,12 @@ use alloc::string::String;
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    /// An input event from a keyboard
     InputEvent(KeyboardInputEvent),
+    /// An event from another entity that wishes to print a message
     OutputEvent(PrintOutputEvent),
-    // Tells an application that the window manager has resized the application's window so that it knows to 
-    // perform any necessary refresh tasks
+    /// Tells an application that the window manager has resized that application's window
+    /// so that it knows to perform any necessary tasks related to window size, such as text reflow.
     ResizeEvent(WindowResizeEvent),
     ExitEvent,
 }

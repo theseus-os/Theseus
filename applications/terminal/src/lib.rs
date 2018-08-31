@@ -117,17 +117,18 @@ impl Terminal {
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        let terminal_print_producer_copy = terminal_print_producer.obtain_producer();
-        // Sets up the kernel to terminal-application printing
-        print::DEFAULT_TERMINAL_QUEUE.call_once(|| terminal_print_producer_copy); 
+
+        // Sets up the kernel to print to this terminal instance
+        print::set_default_print_output(terminal_print_producer.obtain_producer()); 
+
         // Requests a new window object from the window manager
         let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
-        let prompt_string: String;
-        prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
-        // creates a new terminal object
+
+        let prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
+
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             window: window_object,
@@ -275,7 +276,7 @@ impl Terminal {
         }         
     }
 
-   /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
+    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> usize {
@@ -327,7 +328,7 @@ impl Terminal {
         }
     }
 
-    /// Scrolls up by the text display equivalent of one line
+    /// Scrolls the text display up one line
     fn scroll_up_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut start_idx = self.scroll_start_idx;
@@ -362,7 +363,7 @@ impl Terminal {
         self.is_scroll_end = false;
     }
 
-    /// Scrolls down the text display equivalent of one line
+    /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let prev_start_idx;
@@ -470,8 +471,6 @@ impl Terminal {
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
-        // Called by the main loop to handle the exit of tasks
-
         // task id is 0 if there are no command line tasks running
         if self.current_task_id != 0 {
             // gets the task from the current task id variable
@@ -877,15 +876,16 @@ impl Terminal {
 /// from two queues
 /// 
 /// 1) The print queue handles print events from applications. The producer to this queue
-/// is any EXTERNAL application that prints to the terminal (any printing from within the terminal
-/// is simply pushed to the scrollback buffer using the associated print_to_terminal method)
+///    is any EXTERNAL application that prints to the terminal (any printing from within the terminal
+///    is simply pushed to the scrollback buffer using the associated print_to_terminal method)
 /// 
 /// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
-/// and resize event to the application
+///    and resize event to the application
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
-/// This allows for clean appending to the scrollback buffer and prevents interleaving of text
+/// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
+/// 
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
@@ -898,11 +898,9 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     }
     terminal.refresh_display(&display_name);
     loop {
-        //Handle cursor blink
-        {
-            if let Some(text_display) = terminal.window.get_displayable(&display_name){
-                text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
-            }
+        // Handle cursor blink
+        if let Some(text_display) = terminal.window.get_displayable(&display_name){
+            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
         }
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
@@ -930,17 +928,16 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         if !terminal.correct_prompt_position {
             terminal.redisplay_prompt();
             terminal.correct_prompt_position = true;
-
         }
         
         // Looks at the input queue from the window manager
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
         let event = match terminal.window.get_key_event() {
-                Some(ev) => {
-                    ev
-                },
-                _ => { continue; }
+            Some(ev) => {
+                ev
+            },
+            _ => { continue; }
         };
 
         match event {
