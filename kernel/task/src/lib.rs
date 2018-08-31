@@ -41,6 +41,7 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
+extern crate vfs;
 
 
 use core::fmt;
@@ -57,7 +58,8 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-
+use vfs::StrongDirRef;
+use spin::Mutex;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
@@ -192,6 +194,8 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
+    /// the task's working directory that it is created in
+    pub working_dir: StrongDirRef,
 }
 
 impl fmt::Debug for Task {
@@ -226,12 +230,17 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
+            working_dir: Arc::new(Mutex::new(vfs::ROOT)),
         }
     }
 
     /// set the name of this Task
     pub fn set_name(&mut self, n: String) {
         self.name = n;
+    }
+
+    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
+        self.working_dir = new_dir;
     }
 
     /// returns true if this Task is currently running on any cpu.
@@ -454,7 +463,7 @@ impl Task {
             task_switch();
         }
 
-    }
+    }lazy_static
 }
 
 impl fmt::Display for Task {

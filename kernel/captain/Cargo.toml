@@ -92,8 +92,6 @@ path = "../../libs/keycodes_ascii"
 [dependencies.print]
 path = "../print"
 
-[dependencies.vfs]
-path = "../vfs"
 
 
 ## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies

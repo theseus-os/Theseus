@@ -52,7 +52,6 @@ extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
-extern crate vfs;
 extern crate spin;
 
 #[cfg(target_feature = "sse2")]
@@ -151,11 +150,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-
-    use vfs::Directory;
-    let root_dir = Directory::create_root();
-    let root_dir_ptr = Arc::new(Mutex::new(root_dir));
-    spawn::spawn_kthread(vfs::hack_loop, Arc::clone(&root_dir_ptr), String::from("persistent vfs"), None)?;
 
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;

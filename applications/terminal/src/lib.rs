@@ -945,7 +945,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             }
             _ => { }
         }
-        
+
     }  
 }
 

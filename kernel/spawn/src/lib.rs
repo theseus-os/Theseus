@@ -299,10 +299,16 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 /// * `args`: the arguments that will be passed to the `main` function of the application. 
 /// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
+pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>, dir: StrongDirRef)
     -> Result<TaskRef, &'static str> 
 {
-    spawn_application_internal(module, args, task_name, pin_on_core, false)
+    let mut task = spawn_application_internal(module, args, task_name, pin_on_core, false);
+    match task {
+        Ok(task) => task,
+        Err(err) => return Err(err),
+    };
+    task.set_wd(dir);
+    return Ok(task);
 }
 
 

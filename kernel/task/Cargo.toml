@@ -41,5 +41,8 @@ path = "../panic_info"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
+[dependencies.vfs]
+path = "../vfs"
+
 [lib]
 crate-type = ["rlib"]
