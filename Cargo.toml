@@ -1,27 +1,28 @@
 [workspace]
 
 
-# ## The members element is required, but we really only *need* the nano_core.
-# ## Other crates will be built as needed, if they are actually used.
-# members = [
-# 	"nano_core",
-# ]
-
-## Here, we specify that all subdirectories should be built, except for those starting with a "."
-## So, we build everything except hidden directories.
+## Here, we specify that all subdirectories in the kernel/ and applications/ directories should be built, 
+## except for those starting with a "." So, we build all kernel and application crates except hidden directories.
 members = [
-	"[!.]*/"
+	"kernel/[!.]*/",
+	"applications/[!.]*/"
 ]
 
 
 
 exclude = [
 	## exclude the build directories
-	"target",
 	"build",
+	"cfg",
+	"compiler_plugins",
+	"libs",
+	"scripts",
+	"target",
+	"tools",
+	"userspace",
 
 	## dunno what this is, but it doesn't compile! @Wenqiu?
-	"graph_drawer",
+	"kernel/graph_drawer",
 ]
 
 
