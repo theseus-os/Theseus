@@ -17,11 +17,11 @@ use alloc::boxed::Box;
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 
-    let _ = task::set_my_panic_handler(Box::new(|info| {
+    let _res = task::set_my_panic_handler(Box::new(|info| {
         println!("Caught a panic: {}", info);
     }));
 
-    info!("test_panic::main(): registered panic handler. Calling panic...");
+    info!("test_panic::main(): registering panic handler: {:?}. Calling panic...", _res);
 
 
     panic!("yo i'm testing a panic!!");

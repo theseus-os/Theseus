@@ -226,7 +226,7 @@ impl ActivePageTable {
     /// so that we can set up new mappings on the new `table` before actually switching to it.
     /// Accepts a closure that is given a `Mapper` such that it can set up new mappins on the given `InactivePageTable`.
     /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
-    /// Note: THIS DOES NOT PERFORM ANY CONTEXT SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
+    /// Note: THIS DOES NOT PERFORM ANY TASK SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
     pub fn with<F>(&mut self,
                    table: &mut InactivePageTable,
                    mut temporary_page: temporary_page::TemporaryPage,

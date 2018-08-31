@@ -4,18 +4,10 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-.PHONY: all check_rustc check_xargo clean run debug iso kernel applications userspace cargo gdb doc docs view-doc view-docs
+## most of the variables used below are defined in Config.mk
+include cfg/Config.mk
 
-
-ARCH ?= x86_64
-TARGET ?= $(ARCH)-theseus
-nano_core := kernel/build/nano_core-$(ARCH).bin
-iso := build/theseus-$(ARCH).iso
-
-ifeq ($(bypass),yes)
-	BYPASS_RUSTC_CHECK := yes
-endif
-
+.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo dual_simd simd_build gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -50,7 +42,7 @@ endif ## BYPASS_RUSTC_CHECK
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.10
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.12
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -67,6 +59,303 @@ else
 	@echo -e '\nFound proper xargo version, proceeding with build...\n'
 endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
 endif ## BYPASS_XARGO_CHECK
+
+
+
+###################################################################################################
+### This section contains targets to actually build Theseus components and create an iso file.
+###################################################################################################
+
+BUILD_DIR := build
+NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
+iso := $(BUILD_DIR)/theseus-$(ARCH).iso
+GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
+OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
+
+
+## This is the output path of the xargo command, defined by cargo (not our choice).
+nano_core_static_lib := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
+## The directory where the nano_core source files are
+NANO_CORE_SRC_DIR := kernel/nano_core/src
+## The output directory of where the nano_core binary should go
+nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
+## The linker script for linking the nano_core_binary to the assembly files
+linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
+assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
+assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
+	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
+
+
+# get all the subdirectories in kernel/, i.e., the list of all kernel crates
+KERNEL_CRATES := $(notdir $(wildcard kernel/*))
+# exclude the build directory 
+KERNEL_CRATES := $(filter-out build/. target/., $(KERNEL_CRATES))
+# exclude hidden directories starting with a "."
+KERNEL_CRATES := $(filter-out .*/, $(KERNEL_CRATES))
+# remove the trailing /. on each name
+KERNEL_CRATES := $(patsubst %/., %, $(KERNEL_CRATES))
+
+# get all the subdirectories in applications/, i.e., the list of application crates
+APP_CRATES := $(notdir $(wildcard applications/*))
+# exclude the build directory 
+APP_CRATES := $(filter-out build/. target/., $(APP_CRATES))
+# exclude hidden directories starting with a "."
+APP_CRATES := $(filter-out .*/, $(APP_CRATES))
+# remove the trailing /. on each name
+APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
+
+
+### This target builds an .iso OS image from all of the compiled crates.
+### It skips userspace for now, but you can add it back in easily on the line below.
+$(iso): build
+# after building kernel and application modules, copy the kernel boot image files
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
+# autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+
+
+# ### This target builds an .iso OS image from the userspace and kernel.
+# $(iso): kernel userspace
+# # after building kernel and userspace modules, copy the kernel boot image files
+# 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+# 	@cp $(nano_core) $(GRUB_ISOFILES)/boot/kernel.bin
+# # autogenerate the grub.cfg file
+#	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+# 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	
+iso: $(iso)
+
+
+
+## This first calls the cargo target, but then copies all object files into the build dir. 
+## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
+build: $(nano_core_binary)
+## Copy the object files from the target/ directory into the object files build directory, and give EVERY file the kernel prefix
+	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  \
+		-v --prefix $(KERNEL_PREFIX) ./target/$(TARGET)/$(BUILD_MODE)/deps/  $(OBJECT_FILES_BUILD_DIR)
+## (the old way: just copying all files directly)
+# @for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
+# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)-.*/$(KERNEL_PREFIX)\1\.o/p'`   2> /dev/null ; \
+# done
+
+## Copy the core library's object file
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)core.o
+	
+## Since we gave ALL object files the kernel prefix, we need to rename the application object files with the proper app prefix
+	@for app in $(APP_CRATES) ; do  \
+		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+	done
+
+
+
+## This target invokes the actual Rust build process
+cargo: check_rustc check_xargo
+	@echo -e "\n======== BUILDING ALL CRATES, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(PACKAGE_FEATURES) $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
+
+## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
+## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
+## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
+## whereas all of the arguments to rustc come after the "--".
+# 	for kd in $(KERNEL_CRATES) ; do  \
+# 		cd $${kd} ; \
+# 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
+# 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 			xargo rustc \
+# 			$(CARGO_OPTIONS) \
+# 			$(RUST_FEATURES) \
+# 			--target $(TARGET) ; \
+# 		cd .. ; \
+# 	done
+# for app in $(APP_CRATES) ; do  \
+# 	cd $${app} ; \
+# 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 		xargo rustc \
+# 		$(CARGO_OPTIONS) \
+# 		--target $(TARGET) \
+# 		-- \
+# 		$(COMPILER_LINTS) ; \
+# 	cd .. ; \
+# done
+
+
+## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
+$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(NANO_CORE_BUILD_DIR)
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
+	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d')  >  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+
+
+## This compiles the assembly files in the nano_core
+$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
+	@mkdir -p $(shell dirname $@)
+	@nasm -felf64 $< -o $@
+
+
+
+## (This is currently not used in Theseus, since we don't run anything in userspace)
+## This builds all userspace programs
+userspace: 
+	@echo -e "\n======== BUILDING USERSPACE ========"
+	@$(MAKE) -C userspace all
+## copy userspace binary files and add the __u_ prefix
+	@mkdir -p $(GRUB_ISOFILES)/modules
+	@for f in `find ./userspace/build -type f` ; do \
+		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+	done
+
+
+
+# ## this builds all kernel components
+# kernel: check_rustc check_xargo	
+# 	@$(MAKE) -C kernel all
+# 	## copy kernel module build files
+# 	@mkdir -p $(GRUB_ISOFILES)/modules
+# 	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+# 		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
+# 	done
+
+
+
+## TODO FIXME: fix up the applications build procedure so we can use lints for them, such as disabling unsafe code.
+# ## The directory where we store custom lints (compiler plugins)
+# COMPILER_PLUGINS_DIR = $(ROOT_DIR)/compiler_plugins
+# ## Applications are forbidden from using unsafe code
+# COMPILER_LINTS += -D unsafe-code
+# ## Applications must have a main function
+# COMPILER_LINTS += --extern application_main_fn=$(COMPILER_PLUGINS_DIR)/target/$(BUILD_MODE)/libapplication_main_fn.so  \
+# 				  -Z extra-plugins=application_main_fn \
+# 				  -D application_main_fn
+#
+# ## Builds our custom lints in the compiler plugins directory so we can use them here
+# compiler_plugins:
+# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
+
+
+
+
+### "dual_simd" is a special target for the dual SIMD personalities.
+### Builds the kernel components and nano_core with the regular x86_64-theseus target,
+### and then builds everything again with the SIMD-enabled x86_64-theseus-sse target. 
+dual_simd : export TARGET := x86_64-theseus
+dual_simd : export BUILD_MODE = release
+dual_simd: kernel applications simd_build
+## after building all the modules, copy the kernel boot image files
+	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	@cp $(nano_core) $(GRUB_ISOFILES)/boot/kernel.bin
+## autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+## run it in QEMU
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
+
+### simd_build is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
+### It is the latter half of the dual_simd target.
+simd_build : export TARGET := x86_64-theseus-sse
+simd_build : export RUSTFLAGS += -C no-vectorize-loops
+simd_build : export RUSTFLAGS += -C no-vectorize-slp
+simd_build : export KERNEL_PREFIX := k_sse\#
+simd_build : export APP_PREFIX := a_sse\#
+simd_build:
+## now we build the kernel with SIMD support enabled (it has already been built normally in the "kernel" target)
+	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
+	@$(MAKE) -C kernel cargo
+	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  -v --prefix $(KERNEL_PREFIX) $(ROOT_DIR)/kernel/target/$(TARGET)/$(BUILD_MODE)/deps/  $(ROOT_DIR)/kernel/build
+## copy kernel module build files
+	@mkdir -p $(GRUB_ISOFILES)/modules
+	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
+		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
+	done
+## copy the SIMD-enabled core library's object file
+	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(GRUB_ISOFILES)/modules/$(KERNEL_PREFIX)core.o
+## copy the SIMD-enabled compiler_builtins object file.
+## This isn't necessary for regular compilation because it's included in the nano_core static lib.
+## But here, since we have no static lib, we need to include it explicitly as a separate library.
+	# @cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/compiler_builtins-*.o $(GRUB_ISOFILES)/modules/$(KERNEL_PREFIX)compiler_builtins.o
+##  now we build the applications with SIMD support enabled
+	@echo -e "\n======== BUILDING SIMD APPLICATIONS, TARGET = $(TARGET) ========"
+	@$(MAKE) -C applications all
+## copy applications' object files
+	@mkdir -p $(GRUB_ISOFILES)/modules
+	@for f in  ./applications/build/*.o ; do \
+		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
+	done
+
+
+DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
+
+
+## Builds Theseus's documentation.
+## The entire project is built as normal using the "cargo doc" command.
+doc: check_rustc
+	@cargo doc --no-deps
+	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" kernel/documentation/src/_top.rs
+	@mkdir -p build
+	@rm -rf build/doc
+	@cp -rf target/doc ./build/
+	@echo -e "\n\nDocumentation is now available in the build/doc directory."
+	@echo -e "You can also run 'make view-doc' to view it."
+
+docs: doc
+
+
+## Opens the documentation root in the system's default browser. 
+## the "powershell" command is used on Windows Subsystem for Linux
+view-doc: doc
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+
+view-docs: view-doc
+
+
+## Removes all build files
+clean:
+	cargo clean
+	@rm -rf build
+	@$(MAKE) -C userspace clean
+	
+
+
+help: 
+	@echo -e "\nThe following make targets are available:"
+	@echo -e "  run:"
+	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
+	@echo -e "  debug:"
+	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+	@echo -e "  gdb:"
+	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
+	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+	@echo -e "  bochs:"
+	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
+	@echo -e "  boot:"
+	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
+	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
+	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+	@echo -e "  pxe:"
+	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
+	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
+	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
+	@echo -e "  doc:"
+	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
+	@echo -e "  view-doc:"
+	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
+	@echo -e "\nThe following options are available for QEMU:"
+	@echo -e "  int=yes:"
+	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+	@echo -e "\t Only relevant for QEMU targets like 'run' and 'debug'."
+	@echo ""
+
+
+
 
 
 
@@ -117,7 +406,7 @@ odebug:
 
 ### Currently, loadable module mode requires release build mode
 # loadable : export RUST_FEATURES = --package nano_core --features loadable
-loadable : export RUST_FEATURES = --manifest-path "nano_core/Cargo.toml" --features loadable
+loadable : export RUST_FEATURES = --manifest-path "kernel/nano_core/Cargo.toml" --features loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
@@ -143,7 +432,7 @@ gdb:
 
 ### builds and runs Theseus in Bochs
 # bochs : export RUST_FEATURES = --package apic --features apic_timer_fixed
-bochs : export RUST_FEATURES = --manifest-path "apic/Cargo.toml" --features "apic_timer_fixed"
+bochs : export RUST_FEATURES = --manifest-path "kernel/apic/Cargo.toml" --features "apic_timer_fixed"
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -169,7 +458,7 @@ endif
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 # boot : export RUST_FEATURES = --package captain --features mirror_log_to_vga
-boot : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
+boot : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -177,7 +466,7 @@ boot: check_usb $(iso)
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : export RUST_FEATURES = --manifest-path "captain/Cargo.toml" --features "mirror_log_to_vga"
+pxe : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)
@@ -186,133 +475,6 @@ endif
 	@sudo sudo ifconfig $(netdev) 192.168.1.105
 endif
 	
-	@sudo cp -vf build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
-
-
-###################################################################################################
-### This section contains targets to actually build Theseus components and create an iso file.
-###################################################################################################
-
-iso: $(iso)
-grub-isofiles := build/grub-isofiles
-
-
-### This target builds an .iso OS image from the applications and kernel.
-### It skips userspace for now, but you can add it back in easily on the line below.
-$(iso): kernel applications
-# after building kernel and application modules, copy the kernel boot image files
-	@mkdir -p $(grub-isofiles)/boot/grub
-	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
-# autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isofiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
-
-
-# ### This target builds an .iso OS image from the userspace and kernel.
-# $(iso): kernel userspace
-# # after building kernel and userspace modules, copy the kernel boot image files
-# 	@mkdir -p $(grub-isofiles)/boot/grub
-# 	@cp $(nano_core) $(grub-isofiles)/boot/kernel.bin
-# # autogenerate the grub.cfg file
-#	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(grub-isolfiles)/modules/ -o $(grub-isofiles)/boot/grub/grub.cfg
-# 	@grub-mkrescue -o $(iso) $(grub-isofiles)  2> /dev/null
-	
-
-
-### this builds all applications, which run in the kernel
-applications: check_rustc check_xargo
-	@echo -e "\n======== BUILDING APPLICATIONS ========"
-	@$(MAKE) -C applications all
-# copy applications' object files
-	@mkdir -p $(grub-isofiles)/modules
-	@for f in  ./applications/build/*.o ; do \
-		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
-	done
-### TODO FIXME: not sure if it's correct to forcibly overwrite all module files with the applications' version (the cp line above),
-### since sometimes the kernel is build in debug mode but applications are alwasy built in release mode right now 
-
-
-### this builds all userspace programs
-userspace: 
-	@echo -e "\n======== BUILDING USERSPACE ========"
-	@$(MAKE) -C userspace all
-# copy userspace binary files and add the __u_ prefix
-	@mkdir -p $(grub-isofiles)/modules
-	@for f in `find ./userspace/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
-	done
-
-
-### this builds all kernel components
-kernel: check_rustc check_xargo
-	@echo -e "\n======== BUILDING KERNEL ========"
-	@$(MAKE) -C kernel all
-# copy kernel module build files
-	@mkdir -p $(grub-isofiles)/modules
-	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
-		cp -vf  $${f}  $(grub-isofiles)/modules/  ; \
-	done
-# copy the core library's object file
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(grub-isofiles)/modules/__k_core.o
-
-
-DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
-
-doc: check_rustc
-	@rm -rf build/doc
-	@mkdir -p build
-	@$(MAKE) -C kernel doc
-	@cp -rf kernel/target/doc ./build/
-	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You can run 'make view-doc' to view it."
-
-docs: doc
-
-
-## Opens the documentation root in the system's default browser. 
-## the "powershell" command is used on Windows Subsystem for Linux
-view-doc: doc
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
-
-view-docs: view-doc
-
-
-clean:
-	@rm -rf build
-	@$(MAKE) -C kernel clean
-	@$(MAKE) -C applications clean
-	@$(MAKE) -C userspace clean
-	
-
-
-help: 
-	@echo -e "\nThe following make targets are available:"
-	@echo -e "  run:"
-	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
-	@echo -e "  debug:"
-	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
-	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
-	@echo -e "  gdb:"
-	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
-	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
-	@echo -e "  bochs:"
-	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
-	@echo -e "  boot:"
-	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
-	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
-	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
-	@echo -e "  pxe:"
-	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
-	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
-	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
-	@echo -e "  doc:"
-	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
-	@echo -e "  view-doc:"
-	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
-	@echo -e "\nThe following options are available for QEMU:"
-	@echo -e "  int=yes:"
-	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
-	@echo -e "\t Only relevant for QEMU targets like 'run' and 'debug'."
-	@echo ""

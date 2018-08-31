@@ -5,25 +5,31 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
+## specifies which architecture we're building for
 ARCH ?= x86_64
 
-## this should not point directly to the .json target spec file, but it should have the same name.
+## The name of the target JSON file (without the ".json" suffix)
 TARGET ?= $(ARCH)-theseus
 
 ## The top level directory of the Theseus project
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/..
 
-## specifies where the configuration files are kept, like target json files
+## Where the configuration files are kept, like target json files
 CFG_DIR := $(ROOT_DIR)/cfg
 
+## Prefixes for object files
+KERNEL_PREFIX ?= k\#
+APP_PREFIX    ?= a\#
 
+### NOTE: CURRENTLY FORCING RELEASE MODE UNTIL HASH-BASED SYMBOL RESOLUTION IS WORKING
 ## Build modes:  debug is default (dev mode), release is release with full optimizations.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
-BUILD_MODE ?= debug
-# BUILD_MODE ?= release
+# BUILD_MODE ?= debug
+BUILD_MODE ?= release
+
 ifeq ($(BUILD_MODE), release)
-	XARGO_RELEASE_ARG := --release
-endif  ## otherwise, nothing, which means "debug" by default
+	CARGO_OPTIONS += --release
+endif
 
 
 ## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.

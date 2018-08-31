@@ -19,7 +19,7 @@ use task::{Task, TaskRef, get_my_current_task};
 use apic::get_my_apic_id;
 
 
-/// This function performs a context switch.
+/// This function performs a task switch.
 ///
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
@@ -66,12 +66,12 @@ pub fn schedule() -> bool {
     // we want mutable references to mutable tasks
     let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
 
-    // trace!("BEFORE CONTEXT_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
+    // trace!("BEFORE TASK_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
 
-    curr.context_switch(next, apic_id); 
+    curr.task_switch(next, apic_id); 
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("AFTER CONTEXT_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
+    // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
 
     true
 }

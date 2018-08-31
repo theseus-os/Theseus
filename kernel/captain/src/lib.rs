@@ -54,9 +54,7 @@ extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate spin;
 
-#[cfg(target_feature = "sse2")]
-extern crate simd_test;
-
+extern crate simd_personality;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
 // and make visible/accessible to other modules that depend on nano_core functions.
@@ -70,7 +68,6 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-use spin::Mutex;
 //use frame_buffer::text_buffer;
 
 
@@ -150,10 +147,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
-    
+
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
 
@@ -185,38 +181,36 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // create and jump to the first userspace thread
     if false {
         debug!("trying to jump to userspace");
-        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
     }
 
     if false {
         debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("__u_test_program").ok_or("Error: no userspace modules named '__u_test_program' found!")?;
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
     }
 
     // create and jump to a userspace thread that tests syscalls
     if false {
         debug!("trying out a system call module");
-        let module = memory::get_module("__u_syscall_send").ok_or("Error: no module named '__u_syscall_send' found!")?;
+        let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
         spawn::spawn_userspace(module, None)?;
     }
 
     // a second duplicate syscall test user task
     if false {
         debug!("trying out a receive system call module");
-        let module = memory::get_module("__u_syscall_receive").ok_or("Error: no module named '__u_syscall_receive' found!")?;
+        let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
         spawn::spawn_userspace(module, None)?;
     }
 
-
-    #[cfg(target_feature = "sse2")]
-    {
-        spawn::spawn_kthread(simd_test::test1, (), String::from("simd_test_1"), None).unwrap();
-        spawn::spawn_kthread(simd_test::test2, (), String::from("simd_test_2"), None).unwrap();
-        spawn::spawn_kthread(simd_test::test3, (), String::from("simd_test_3"), None).unwrap();
-        
+    
+    // create a SIMD personality
+    if false {
+        spawn::spawn_kthread(simd_personality::setup_simd_personality, (), String::from("setup_simd_personality"), None)?;
     }
+
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();

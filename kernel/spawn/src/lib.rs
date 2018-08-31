@@ -15,6 +15,12 @@ extern crate gdt;
 extern crate owning_ref;
 #[macro_use] extern crate debugit;
 
+#[cfg(not(target_feature = "sse2"))]
+extern crate context_switch;
+#[cfg(target_feature = "sse2")]
+extern crate context_switch_sse; 
+
+
 use core::mem;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
@@ -22,13 +28,16 @@ use core::sync::atomic::{Ordering, AtomicBool, compiler_fence};
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use alloc::boxed::Box;
-
-
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, CONTEXT_SWITCH_LOCKS, CURRENT_TASKS};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
+
+#[cfg(not(target_feature = "sse2"))]
+use context_switch::Context;
+#[cfg(target_feature = "sse2")]
+use context_switch_sse::Context;
 
 
 /// Initializes tasking for the given AP core, including creating a runqueue for it
@@ -37,7 +46,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<TaskRef, &'static str> 
 {
-    CONTEXT_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
+    TASK_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
 
     scheduler::init_runqueue(apic_id);
     
@@ -93,96 +102,7 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
 
-#[cfg(not(target_feature = "sse2"))]
-#[repr(C, packed)]
-/// Must match the order of registers popped in the [`task`](../task/index.html) crate's `task_switch`
-pub struct Context {
-    r15: usize, 
-    r14: usize,
-    r13: usize,
-    r12: usize,
-    rbp: usize,
-    rbx: usize,
-    rip: usize,
-}
 
-#[cfg(not(target_feature = "sse2"))]
-impl Context {
-    pub fn new(rip: usize) -> Context {
-        Context {
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
-            rbp: 0,
-            rbx: 0,
-            rip: rip,
-        }
-    }
-}
-
-
-#[cfg(target_feature = "sse2")]
-#[repr(C, packed)]
-/// Must match the order of registers popped in the [`task`](../task/index.html) crate's `task_switch`
-pub struct Context {
-    xmm15: u128,
-    xmm14: u128,   
-    xmm13: u128,   
-    xmm12: u128,   
-    xmm11: u128,   
-    xmm10: u128,   
-    xmm9:  u128,   
-    xmm8:  u128,   
-    xmm7:  u128,   
-    xmm6:  u128,   
-    xmm5:  u128,   
-    xmm4:  u128,   
-    xmm3:  u128,   
-    xmm2:  u128,   
-    xmm1:  u128,   
-    xmm0:  u128, 
-
-    r15: usize, 
-    r14: usize,
-    r13: usize,
-    r12: usize,
-    rbp: usize,
-    rbx: usize,
-    rip: usize,
-}
-
-#[cfg(target_feature = "sse2")]
-impl Context {
-    pub fn new(rip: usize) -> Context {
-        Context {
-            xmm15: 0,
-            xmm14: 0,   
-            xmm13: 0,   
-            xmm12: 0,   
-            xmm11: 0,   
-            xmm10: 0,   
-            xmm9:  0,   
-            xmm8:  0,   
-            xmm7:  0,   
-            xmm6:  0,   
-            xmm5:  0,   
-            xmm4:  0,   
-            xmm3:  0,   
-            xmm2:  0,   
-            xmm1:  0,   
-            xmm0:  0,   
-
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
-            rbp: 0,
-            rbx: 0,
-            rip: rip,
-        }
-    }
-}
 
 
 
@@ -208,7 +128,7 @@ impl<A, R, F> KthreadCall<A, R, F> {
 
 /// Spawns a new kernel task with the same address space as the current task. 
 /// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
-/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
 /// 
 /// # Arguments
 /// 
@@ -268,7 +188,7 @@ pub fn spawn_kthread<A, R, F>(func: F, arg: A, thread_name: String, pin_on_core:
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
         error!("spawn_kthread(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
-        return Err("TASKLIST already contained a task with the new task's ID");
+        return Err("TASKLIST a contained a task with the new task's ID");
     }
     
     if let Some(core) = pin_on_core {
@@ -286,10 +206,9 @@ pub fn spawn_kthread<A, R, F>(func: F, arg: A, thread_name: String, pin_on_core:
 type MainFuncSignature = fn(Vec<String>) -> isize;
 
 
-/// Spawns a new application task that runs in kernel mode (currently the only way to run applications), 
-/// based on the provided `ModuleArea` which is an object file that must have an entry point called `main`.
-/// The new application `Task` is set up to enter the `main` function with the arguments `args`.
-/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
+/// Spawns a new application task within the kernel, based on the provided `ModuleArea` which must have an entry point called `main`.
+/// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
+/// This merely makes the new task Runnable, it does not task switch to it immediately. That will happen on the next scheduler invocation.
 /// 
 /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
 /// 
@@ -299,16 +218,10 @@ type MainFuncSignature = fn(Vec<String>) -> isize;
 /// * `args`: the arguments that will be passed to the `main` function of the application. 
 /// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
 /// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>, dir: StrongDirRef)
+pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
     -> Result<TaskRef, &'static str> 
 {
-    let mut task = spawn_application_internal(module, args, task_name, pin_on_core, false);
-    match task {
-        Ok(task) => task,
-        Err(err) => return Err(err),
-    };
-    task.set_wd(dir);
-    return Ok(task);
+    spawn_application_internal(module, args, task_name, pin_on_core, false)
 }
 
 

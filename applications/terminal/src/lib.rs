@@ -117,17 +117,18 @@ impl Terminal {
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let terminal_print_consumer = terminal_print_dfq.into_consumer();
         let terminal_print_producer = terminal_print_consumer.obtain_producer();
-        let terminal_print_producer_copy = terminal_print_producer.obtain_producer();
-        // Sets up the kernel to terminal-application printing
-        print::DEFAULT_TERMINAL_QUEUE.call_once(|| terminal_print_producer_copy); 
+
+        // Sets up the kernel to print to this terminal instance
+        print::set_default_print_output(terminal_print_producer.obtain_producer()); 
+
         // Requests a new window object from the window manager
         let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
-        let prompt_string: String;
-        prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
-        // creates a new terminal object
+
+        let prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
+
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             window: window_object,
@@ -162,6 +163,12 @@ impl Terminal {
     fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
         self.scrollback_buffer.push_str(&s);
         Ok(())
+    }
+
+    /// Redisplays the terminal prompt (does not insert a newline before it)
+    fn redisplay_prompt(&mut self) {
+        let prompt = self.prompt_string.clone();
+        self.scrollback_buffer.push_str(&prompt);
     }
 
     /// Pushes a string to the standard out buffer and the scrollback buffer with a new line
@@ -221,31 +228,47 @@ impl Terminal {
             if new_line_indices[0].0 != slice.len() - 1 {
                 start_idx -= slice.len() -1 - new_line_indices[0].0;
                 total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
-                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width // fix: account for more than one line
+                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
             }
 
-            // Loops until the string slice bounded by the start and end indices is at most one newline away from fitting on the text display
-            while total_lines < buffer_height {
-                // Operation finds the number of lines that a single "sentence" will occupy on the text display through the operation length_of_sentence/window_width + 1
-                if counter == new_line_indices.len() -1 {
-                    return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
+            // covers everything *up to* the characters between the beginning of the slice and the first new line character
+            for i in 0..new_line_indices.len()-1 {
+                if total_lines >= buffer_height {
+                    break;
                 }
-                // finds  the number of characters between newlines and thereby the number of lines those will take up
-                let num_chars = new_line_indices[counter].0 - new_line_indices[counter+1].0;
+                let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
                 let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {(num_chars-1) / buffer_width + 1 } else {(num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
                 if num_chars > start_idx { // prevents subtraction overflow
                     return (0, total_lines * buffer_width + last_line_chars);
-                }
+                }  
                 start_idx -= num_chars;
                 total_lines += num_lines;
                 counter += 1;
             }
 
-            // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
+            // covers the characters between the beginning of the slice and the first new line character
+            let first_chars = new_line_indices[new_line_indices.len() -1].0;
+            let first_chars_lines = first_chars/buffer_width + 1;
+
+            // if the loop overcounts the line
             if total_lines > buffer_height {
                 start_idx += (total_lines - buffer_height) * buffer_width;
                 total_lines = buffer_height;
+            // if the characters between the beginning of the slice and the first newline char occupy more than one line
+            } else if first_chars_lines + total_lines > buffer_height {
+                let diff = buffer_height - total_lines;
+                total_lines += diff;
+                start_idx -= diff * buffer_width;
+            // if the characters between the beginning of the slice and the first newline occupy one line
+            } else if first_chars_lines + total_lines == buffer_height {
+                total_lines += 1;
+                start_idx -= first_chars;
+            // if the slice takes up less than the full capacity of the buffer
+            } else {
+                return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
             }
+
+            // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
             return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
 
         } else {
@@ -253,7 +276,7 @@ impl Terminal {
         }         
     }
 
-   /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
+    /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> usize {
@@ -305,7 +328,7 @@ impl Terminal {
         }
     }
 
-    /// Scrolls up by the text display equivalent of one line
+    /// Scrolls the text display up one line
     fn scroll_up_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let mut start_idx = self.scroll_start_idx;
@@ -340,7 +363,7 @@ impl Terminal {
         self.is_scroll_end = false;
     }
 
-    /// Scrolls down the text display equivalent of one line
+    /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self, display_name:&str) {
         let buffer_width = self.get_displayable_dimensions(display_name).0;
         let prev_start_idx;
@@ -448,8 +471,6 @@ impl Terminal {
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
-        // Called by the main loop to handle the exit of tasks
-
         // task id is 0 if there are no command line tasks running
         if self.current_task_id != 0 {
             // gets the task from the current task id variable
@@ -486,14 +507,11 @@ impl Terminal {
                             terminal_print::remove_child(self.current_task_id)?;
                             // Resets the current task id to be ready for the next command
                             self.current_task_id = 0;
-                            let prompt_string = self.prompt_string.clone();
-                            self.print_to_terminal(prompt_string)?;
-
+                            self.redisplay_prompt();
                             // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
                             if self.buffer_string.len() > 0 {
                                 let temp = self.buffer_string.clone();
                                 self.print_to_terminal(temp.clone())?;
-                                
                                 self.input_string = temp;
                                 self.buffer_string.clear();
                             }
@@ -582,8 +600,8 @@ impl Terminal {
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             if self.input_string.len() == 0 {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
-                let prompt_string = self.prompt_string.clone();
-                self.print_to_terminal(format!("\n{}", prompt_string))?;
+                self.print_to_terminal("\n".to_string())?;
+                self.redisplay_prompt();
                 return Ok(());
             } else if self.current_task_id != 0 { // prevents the user from trying to execute a new command while one is currently running
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
@@ -682,8 +700,7 @@ impl Terminal {
                 return Ok(());
             }
             if !self.correct_prompt_position {
-                let prompt_string = self.prompt_string.clone();
-                self.print_to_terminal(prompt_string)?;
+                self.redisplay_prompt();
                 self.correct_prompt_position  = true;
             }
             self.left_shift = 0;
@@ -785,13 +802,12 @@ impl Terminal {
 
                 // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
                 if !self.correct_prompt_position{
-                    let prompt_string = self.prompt_string.clone();
                     let mut input_string = self.input_string.clone();
                     match input_string.pop() {
                         Some(_) => { }
                         None => {return Err("couldn't pop newline from input event string")}
                     }
-                    self.print_to_terminal(prompt_string)?;
+                    self.redisplay_prompt();
                     self.print_to_terminal(input_string)?;
                     self.correct_prompt_position = true;
                 }
@@ -818,10 +834,7 @@ impl Terminal {
         // This will never panic because pressing the enter key does not register if she has not entered anything
         let mut command_string = words.remove(0);
         // Formats the string into the application module syntax
-        command_string.insert(0, '_');
-        command_string.insert(0, 'a');
-        command_string.insert(0, '_');
-        command_string.insert(0, '_');
+		command_string.insert_str(0, mod_mgmt::metadata::CrateType::Application.prefix());
         return (command_string.to_string(), words);
     }
 
@@ -862,15 +875,16 @@ impl Terminal {
 /// from two queues
 /// 
 /// 1) The print queue handles print events from applications. The producer to this queue
-/// is any EXTERNAL application that prints to the terminal (any printing from within the terminal
-/// is simply pushed to the scrollback buffer using the associated print_to_terminal method)
+///    is any EXTERNAL application that prints to the terminal (any printing from within the terminal
+///    is simply pushed to the scrollback buffer using the associated print_to_terminal method)
 /// 
 /// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
-/// and resize event to the application
+///    and resize event to the application
 /// 
 /// The print queue is handled first inside the loop iteration, which means that all print events in the print
 /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
-/// This allows for clean appending to the scrollback buffer and prevents interleaving of text
+/// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
+/// 
 fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
@@ -883,11 +897,9 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     }
     terminal.refresh_display(&display_name);
     loop {
-        //Handle cursor blink
-        {
-            if let Some(text_display) = terminal.window.get_displayable(&display_name){
-                text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
-            }
+        // Handle cursor blink
+        if let Some(text_display) = terminal.window.get_displayable(&display_name){
+            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
         }
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
@@ -912,15 +924,19 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
         // Handles the cleanup of any application task that has finished running, including refreshing the display
         terminal.task_handler()?;
+        if !terminal.correct_prompt_position {
+            terminal.redisplay_prompt();
+            terminal.correct_prompt_position = true;
+        }
         
         // Looks at the input queue from the window manager
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
         let event = match terminal.window.get_key_event() {
-                Some(ev) => {
-                    ev
-                },
-                _ => { continue; }
+            Some(ev) => {
+                ev
+            },
+            _ => { continue; }
         };
 
         match event {
@@ -945,7 +961,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             }
             _ => { }
         }
-
+        
     }  
 }
 
