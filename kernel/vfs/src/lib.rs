@@ -55,7 +55,7 @@ impl Directory {
 
     pub fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) {
         let directory = Directory {
-            name: name, 
+            name: &name, 
             child_dirs: Vec::new(),
             files:  Vec::new(),
             parent: parent_pointer,
