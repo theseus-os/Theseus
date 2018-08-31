@@ -1,6 +1,7 @@
 [package]
 name = "terminal"
 version = "0.1.0"
+description = "Terminal emulator that can run commands in application directory"
 authors = ["Andrew Pham <apham727@gmail.com>"]
 
 
@@ -13,25 +14,15 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
-
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
-
-[dependencies.window_manager]
-path = "../../kernel/window_manager"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
-[dependencies.input_event_types]
-path = "../../kernel/input_event_types"
+[dependencies.event_types]
+path = "../../kernel/event_types"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"
@@ -45,9 +36,19 @@ path  = "../../kernel/memory"
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
 
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
 [dependencies.text_display]
 path = "../../kernel/text_display"
+[dependencies.terminal_print]
+path = "../terminal_print"
 
+[dependencies.print]
+path = "../../kernel/print"
 
 [lib]
 crate-type = ["rlib"]

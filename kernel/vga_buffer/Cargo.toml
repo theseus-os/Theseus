@@ -26,5 +26,8 @@ path = "../../libs/port_io"
 default-features = false
 version = "0.3.7"
 
+[dependencies.event_types]
+path = "../event_types"
+
 [lib]
 crate-type = ["rlib"]

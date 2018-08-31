@@ -237,10 +237,10 @@ applications: check_rustc check_xargo
 userspace: 
 	@echo -e "\n======== BUILDING USERSPACE ========"
 	@$(MAKE) -C userspace all
-# copy userspace binary files and add the __u_ prefix
+# copy userspace binary files and add the u# prefix
 	@mkdir -p $(grub-isofiles)/modules
 	@for f in `find ./userspace/build -type f` ; do \
-		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+		cp -vf $${f}  $(grub-isofiles)/modules/`basename $${f} | sed -n -e 's/\(.*\)/u#\1/p'` 2> /dev/null ; \
 	done
 
 

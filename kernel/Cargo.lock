@@ -91,11 +91,11 @@ dependencies = [
  "dfqueue 0.1.0",
  "driver_init 0.1.0",
  "e1000 0.1.0",
+ "event_types 0.1.0",
  "exceptions_full 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_3d 0.1.0",
  "input_event_manager 0.1.0",
- "input_event_types 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -176,7 +176,7 @@ dependencies = [
  "ata_pio 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -197,6 +197,13 @@ dependencies = [
  "pci 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
+]
+
+[[package]]
+name = "event_types"
+version = "0.1.0"
+dependencies = [
+ "keycodes_ascii 0.1.0",
 ]
 
 [[package]]
@@ -224,6 +231,7 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
+ "acpi 0.1.0",
  "kernel_config 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -231,7 +239,9 @@ dependencies = [
  "serial_port 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
+ "tsc 0.1.0",
  "util 0.1.0",
+ "vga_buffer 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -247,18 +257,6 @@ dependencies = [
  "serial_port 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "frame_buffer_text"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
- "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "serial_port 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -301,7 +299,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "dfqueue 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -310,18 +309,9 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "terminal 0.1.0",
  "text_display 0.1.0",
- "vga_buffer 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
-]
-
-[[package]]
-name = "input_event_types"
-version = "0.1.0"
-dependencies = [
- "keycodes_ascii 0.1.0",
 ]
 
 [[package]]
@@ -388,7 +378,7 @@ name = "keyboard"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
- "input_event_types 0.1.0",
+ "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "ps2 0.1.0",
@@ -622,7 +612,11 @@ version = "0.2.1"
 name = "print"
 version = "0.1.0"
 dependencies = [
+ "dfqueue 0.1.0",
+ "event_types 0.1.0",
  "input_event_manager 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -816,28 +810,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "terminal"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list 0.1.0",
- "dfqueue 0.1.0",
- "input_event_types 0.1.0",
- "keycodes_ascii 0.1.0",
- "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mod_mgmt 0.1.0",
- "spawn 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "task 0.1.0",
- "text_display 0.1.0",
- "window_manager 0.1.0",
- "x86_64 0.1.2",
-]
-
-[[package]]
 name = "text_display"
 version = "0.1.0"
+dependencies = [
+ "event_types 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "tsc"
@@ -869,6 +847,7 @@ version = "0.1.0"
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
+ "event_types 0.1.0",
  "kernel_config 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "port_io 0.2.1",
@@ -894,18 +873,18 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "dfqueue 0.1.0",
+ "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
- "frame_buffer_text 0.1.0",
  "irq_safety 0.1.1",
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pit_clock 0.1.0",
  "serial_port 0.1.0",
+ "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "util 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

@@ -4,7 +4,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate print;
+#[macro_use] extern crate terminal_print;
 extern crate panic_info; 
 extern crate task;
 

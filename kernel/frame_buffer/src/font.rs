@@ -1,28 +1,9 @@
+use super::{Mutex, DerefMut};
 
-#![no_std]
-#![feature(alloc)]
-#![feature(const_fn)]
-#![feature(unique)]
-#![feature(asm)]
-
-extern crate frame_buffer;
-#[macro_use] extern crate log;
-extern crate alloc;
-extern crate serial_port;
-extern crate spin;
-
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::fmt;
-use core::cmp::min;
-
-const CHARACTER_WIDTH:usize = 9;
-const CHARACTER_HEIGHT:usize = 16;
-const WINDOW_COLUMNS:usize = (frame_buffer::FRAME_BUFFER_WIDTH/3)/CHARACTER_WIDTH;
-const WINDOW_LINES:usize = frame_buffer::FRAME_BUFFER_HEIGHT/CHARACTER_HEIGHT;
-
-const FONT_COLOR:usize = 0xFFFFFF;
-const BACKGROUND_COLOR:usize = 0x000000;
+///The width of a character
+pub const CHARACTER_WIDTH:usize = 9;
+///The height of a character
+pub const CHARACTER_HEIGHT:usize = 16;
 
 const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -283,268 +264,25 @@ const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 ];
 
+///The font mask array.
+///FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which ascii is the ascii code of a character, and (x, y) represents its coordinate
+pub static FONT_PIXEL:Mutex<[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]> = Mutex::new([[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]);
 
-/// Specifies where we want to scroll the display, and by how much
-#[derive(Debug)]
-pub enum DisplayPosition {
-    /// Move the display to the very top of the FrameBuffer
-    Start,
-    /// Refresh the display without scrolling it
-    Same, 
-    /// Move the display down by the specified number of lines
-    Down(usize),
-    /// Move the display up by the specified number of lines
-    Up(usize),
-    /// Move the display to the very end of the FrameBuffer
-    End
-}
+///init the font mask array
+pub fn init()-> Result<(), &'static str> {
+    let mut fonts_locked = FONT_PIXEL.lock();
+    let fonts = fonts_locked.deref_mut();
 
-
-type Line = [ScreenChar; WINDOW_COLUMNS];
-
-const BLANK_LINE: Line = [ScreenChar::new(' ', 0); WINDOW_COLUMNS];
-
-
-/// An instance of a frame text buffer which can be displayed to the screen.
-pub struct FrameTextBuffer {
-    /// the index of the line that is currently being displayed
-    display_line: usize,
-    /// whether the display is locked to scroll with the end and show new lines as printed
-    display_scroll_end: bool,
-    /// the column position in the last line where the next character will go
-    column: usize,
-    /// the actual buffer memory that can be written to the frame memory
-    lines: Vec<Line>,
-}
-
-impl FrameTextBuffer {
-    /// Create a new FrameBuffer.
-    pub fn new() -> FrameTextBuffer {
-        FrameTextBuffer::with_capacity(1000)
-    }
-
-    // Create a new FrameBuffer with the given capacity, specified in number of lines. 
-    fn with_capacity(num_initial_lines: usize) -> FrameTextBuffer {
-        let first_line = BLANK_LINE;
-        let mut lines = Vec::with_capacity(num_initial_lines);
-        lines.push(first_line);
-
-        FrameTextBuffer {
-            display_line: 0,
-            display_scroll_end: true,
-            column: 0,
-            lines: lines,
-        }
-    }
-    
-
-    fn write_str_with_color(&mut self, s: &str, color: usize) {
-        for byte in s.chars() {
-            match byte {
-                // handle new line
-                '\n' => {
-                    self.new_line(color);
-                }
-
-                byte => {
-                    {
-                        let mut curr_line = self.lines.last_mut().unwrap();
-                        curr_line[self.column] = ScreenChar::new(byte, color);
-                    }
-                    self.column += 1;
-
-                    if self.column == WINDOW_COLUMNS { // wrap to a new line
-                        self.new_line(color); 
-                    }
+    for index in 0..FONT_BASIC.len(){
+        for y in 0..CHARACTER_HEIGHT{
+            let char_font = FONT_BASIC[index][y] as u64;
+            for x in 0..CHARACTER_WIDTH{
+                if char_font & (0x80 >> x) !=0 {
+                    fonts[index][y][x+1] = 0xFFFFFFFF; 
                 }
             }
-        }
-
-        // refresh the Frame text display if the changes would be visible on screen
-        // i.e., if the end of the frame buffer is visible
-        let last_line = self.lines.len() - 1;;
-        if  self.display_scroll_end || 
-            (last_line >= self.display_line && last_line <= (self.display_line + WINDOW_LINES))
-        {
-            self.display(DisplayPosition::End);
-        }
-        
-        // // refresh the Frame text display if the changes would be visible on screen
-        // // keep in mind the latest write to the frame buffer is always written into the last element of self.lines
-        // let display_line = self.display_line;
-        // let written_line = self.lines.len();
-        // if written_line >= display_line && written_line <= display_line + BUFFER_HEIGHT {
-        //     // the recent write will be visible
-        //     self.display(DisplayPosition::Same);
-        // }
-
+        }   
     }
 
-    ///Write string to console with color
-    pub fn write_string_with_color(&mut self, s: &String, color: usize) {
-        self.write_str_with_color(s.as_str(), color);
-    }
-
-
-    /// To create a new line, this function does the following:
-    /// 1) Clears the rest of the current line.
-    /// 2) Resets the column index to 0 (beginning of next line).
-    /// 3) Allocates a new Line and pushes it to the `lines` Vec.
-    fn new_line(&mut self, color: usize) {
-        // clear out the rest of the current line
-        let ref mut lines = self.lines;
-        for c in self.column .. WINDOW_COLUMNS {
-            lines.last_mut().unwrap()[c] = ScreenChar::new(' ', color);
-        }
-        
-        self.column = 0; 
-        lines.push([ScreenChar::new(' ', color); WINDOW_COLUMNS]);
-    }
-
-
-
-    /// Displays this FrameBuffer at the given string offset by flushing it to the screen.
-    pub fn display(&mut self, position: DisplayPosition) {
-        // trace!("FrameBuffer::display(): position {:?}", position);
-        let (start, end) = match position {
-            DisplayPosition::Start => {
-                self.display_scroll_end = false;
-                self.display_line = 0;
-                (0, WINDOW_LINES)
-            }
-            DisplayPosition::Up(u) => {
-                if self.display_scroll_end {
-                    // handle the case when it was previously at the end, but then scrolled up
-                    self.display_line = self.display_line.saturating_sub(WINDOW_LINES);
-                }
-                self.display_scroll_end = false;
-                self.display_line = self.display_line.saturating_sub(u);
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
-            }
-            DisplayPosition::Down(d) => {
-                if self.display_scroll_end {
-                    // do nothing if we're already locked to the end
-                }
-                else {
-                    self.display_line = self.display_line.saturating_add(d);
-                    if self.display_line + WINDOW_LINES >= self.lines.len() {
-                        self.display_scroll_end = true;
-                        self.display_line = self.lines.len() - 1;
-                    }
-                }
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
-            }
-            DisplayPosition::Same => {
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
-            }
-            DisplayPosition::End => {
-                self.display_scroll_end = true;
-                self.display_line = self.lines.len() - 1;
-                (self.display_line, self.display_line.saturating_add(WINDOW_LINES))
-            }
-        };
-
-        // trace!("   initial start {}, end {}", start, end);
-        // if we're displaying the end of the FrameBuffer, the range of characters displayed needs to start before that
-        let start = if start == (self.lines.len() - 1) {
-            start.saturating_sub(WINDOW_LINES - 1)
-        } else {
-            start
-        };
-        let end = min(end, self.lines.len());       // ending line must be within the bounds of the buffer (exclusive)
-        //let num_lines = end - start;
-        
-        // trace!("   adjusted start {}, end {}, num_lines {}", start, end, num_lines);
-
-        // use volatile memory to ensure the writes happen every time
-        //use core::ptr::write_volatile;
-        // write the lines that we *can* get from the buffer
-        for (i, line) in (start .. end).enumerate() {
-            printline(i, self.lines[line]);
-        }
-
-        // fill the rest of the space, if any, with blank lines
-        /*    if num_lines < WINDOW_LINES {
-            for i in num_lines .. WINDOW_LINES {
-                //trace!(self.lines[line]);
-
-                //  write_volatile(addr, BLANK_LINE);
-            }
-            }
-        */
-
-        // // here, we do the actual writing of the VGA memory
-        // unsafe {
-        //     // copy lines from the our VgaBuffer to the VGA text memory
-        //     let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR as *mut Line), num_lines);
-        //     dest.copy_from_slice(&self.lines[start .. end]);
-            
-        //     // if the buffer is too small, fill in the rest of the lines
-        //     if num_lines < BUFFER_HEIGHT {
-        //         let start = BUFFER_HEIGHT - num_lines;
-        //         for line in start .. BUFFER_HEIGHT {
-        //             let dest = slice::from_raw_parts_mut((VGA_BUFFER_VIRTUAL_ADDR + (line * mem::size_of::<Line>())) as *mut ScreenChar, BUFFER_WIDTH); // copy 1 line at a time
-        //             dest.copy_from_slice(&BLANK_LINE);
-        //         }
-        //     }
-        // }
-    }
-
+    Ok(())
 }
-
-impl fmt::Write for FrameTextBuffer {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        let ret = serial_port::write_str(s); // mirror to serial port
-        self.write_str_with_color(s, FONT_COLOR);
-        ret
-    }
-}
-
-
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-struct ScreenChar {
-    ascii_character: char,
-    color_code: usize,
-}
-
-impl ScreenChar {
-    const fn new(ascii: char, color: usize) -> ScreenChar {
-        ScreenChar {
-            ascii_character: ascii,
-            color_code: color,
-        }
-    }
-}
-
-fn printline(line_num:usize, line:Line){
-    for i in 0..WINDOW_COLUMNS{
-        printchar(line[i].ascii_character, line_num, i, line[i].color_code);
-    }
-}
-
-fn printchar(character:char, line:usize, col:usize, color:usize){
-    if col >= WINDOW_COLUMNS {
-        debug!("frame_buffer_text::print(): The col is out of bound");
-        return
-    }
-    if line >= WINDOW_LINES {
-        debug!("frame_buffer_text::print(): The line is out of bound");
-        return
-    }
-    for k in 0..CHARACTER_HEIGHT{
-        let ascii = character as usize;
-        let x = (col*CHARACTER_WIDTH)+1;//leave 1 pixel left margin for every character
-        let y = line*CHARACTER_HEIGHT + k;
-        let num = FONT_BASIC[ascii][k];
-        for i in 0..8 {
-            if num & (0x80 >> i) !=0 {
-                frame_buffer::draw_pixel(x + i, y, color);        
-            } else {
-                frame_buffer::draw_pixel(x + i, y, BACKGROUND_COLOR);
-            }
-        }
-    }  
-}
-

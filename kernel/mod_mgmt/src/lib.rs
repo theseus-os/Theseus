@@ -109,7 +109,7 @@ pub struct CrateNamespace {
     /// that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
     /// which is guaranteed to be part of one of the crates in this `CrateNamespace`.  
-    /// Symbols declared as "no_mangle" will appear  root namespace with no crate prefixex, as expected.
+    /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
     symbol_map: Mutex<SymbolMap>,
 }
 
@@ -152,17 +152,22 @@ impl CrateNamespace {
     }
 
 
-    /// Loads the specified application crate into memory, allowing it to be invoked.  
-    /// Unlike [`load_kernel_crate`](#method.load_kernel_crate), this does not add the newly-loaded
-    /// application crate to this namespace, nor does it add the new crate's symbols to the 
-    /// Instead, it returns a Result containing the new crate itself.
+    /// Loads the specified application crate into memory, allowing it to be invoked.
+    /// 
+    /// The argument `load_symbols_as_singleton` determines what is done with the newly-loaded crate:      
+    /// * If true, this application is loaded as a system-wide singleton crate and added to this namespace, 
+    ///   and its public symbols are added to this namespace's symbol map, allowing other applications to depend upon it.
+    /// * If false, this application is loaded normally and not added to this namespace in any way,
+    ///   allowing it to be loaded again in the future as a totally separate instance.
+    /// 
+    /// Returns a Result containing the new crate itself.
     pub fn load_application_crate(
         &self, 
         crate_module: &ModuleArea, 
         kernel_mmi: &mut MemoryManagementInfo, 
-        verbose_log: bool) 
-        -> Result<StrongCrateRef, &'static str> 
-    {
+        load_symbols_as_singleton: bool,
+        verbose_log: bool
+    ) -> Result<StrongCrateRef, &'static str> {
         let (crate_type, crate_name) = CrateType::from_module_name(crate_module.name())?;
         if crate_type != CrateType::Application {
             error!("load_application_crate() cannot be used for crate \"{}\", only for application crate modules starting with \"{}\"",
@@ -172,12 +177,20 @@ impl CrateNamespace {
         
         debug!("load_application_crate: trying to load \"{}\" application module", crate_module.name());
         let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        
         let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
         self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
 
-        {
+        if load_symbols_as_singleton {
+            // if this is a singleton application, we add its public symbols (except "main")
+            let new_crate = new_crate_ref.lock_as_ref();
+            self.add_symbols_filtered(new_crate.sections.values(), 
+                |sec| sec.name != "main", 
+                verbose_log
+            );
+            self.crate_tree.lock().insert(new_crate.crate_name.clone(), CowArc::clone_shallow(&new_crate_ref));
+        } else {
             let new_crate = new_crate_ref.lock_as_ref();
             info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
         }
@@ -556,6 +569,13 @@ impl CrateNamespace {
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'e>), &'static str> {
         
+        // First, check to make sure this crate hasn't already been loaded. 
+        // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.
+        if self.crate_tree.lock().contains_key(crate_name) {
+            return Err("the crate has already been loaded, so it doesn't make sense to load it again into the same namespace");
+        }
+
+        // Parse the given `mapped_pages` as an ELF file
         let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
         let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
 
@@ -916,9 +936,6 @@ impl CrateNamespace {
     /// The second stage of parsing and loading a new kernel crate, 
     /// filling in the missing relocation information in the already-loaded sections. 
     /// It also remaps the `new_crate`'s MappedPages according to each of their section permissions.
-    /// 
-    /// # Note
-    /// The sections in the returned `LoadedCrate` are somewhat incomplete -- their `parent_crate` weak references aren't yet set up. 
     fn perform_relocations(
         &self,
         elf_file: &ElfFile,
@@ -1136,9 +1153,9 @@ impl CrateNamespace {
         }
     }
 
-    /// Adds any global symbols in the given list of `sections` to this namespace's symbol map.
+    /// Adds all global symbols in the given `sections` iterator to this namespace's symbol map. 
     /// 
-    /// Returns the number of *new* unique global symbols added.
+    /// Returns the number of *new* unique symbols added.
     /// 
     /// # Note
     /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
@@ -1149,14 +1166,34 @@ impl CrateNamespace {
     ) -> usize
         where I: IntoIterator<Item = &'a StrongSectionRef>,
     {
+        self.add_symbols_filtered(sections, |_sec| true, _log_replacements)
+    }
+
+
+    /// Adds symbols in the given `sections` iterator to this namespace's symbol map,
+    /// but only the symbols that correspond to *global* sections AND for which the given `filter_func` returns true. 
+    /// 
+    /// Returns the number of *new* unique symbols added.
+    /// 
+    /// # Note
+    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
+    fn add_symbols_filtered<'a, I, F>(
+        &self, 
+        sections: I,
+        filter_func: F,
+        _log_replacements: bool,
+    ) -> usize
+        where I: IntoIterator<Item = &'a StrongSectionRef>,
+              F: Fn(&LoadedSection) -> bool
+    {
         let mut existing_map = self.symbol_map.lock();
 
         // add all the global symbols to the symbol map, in a way that lets us inspect/log each one
         let mut count = 0;
         for sec_ref in sections.into_iter() {
-            let mut sec = sec_ref.lock();
+            let sec = sec_ref.lock();
             
-            if sec.global {
+            if filter_func(&sec) && sec.global {
                 let added = CrateNamespace::add_symbol(&mut existing_map, sec.name.clone(), sec_ref);
                 if added {
                     count += 1;

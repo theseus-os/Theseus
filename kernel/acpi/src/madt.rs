@@ -19,7 +19,14 @@ use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
 use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
+const GRAPHIC_INFO_TRAMPOLINE_OFFSET:usize = 0x100;
 
+// graphic mode information
+pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
+    width:0,
+    height:0,
+    physical_address:0,
+});
 
 
 /// The Multiple APIC Descriptor Table
@@ -319,6 +326,22 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
         }
     }
 
+    // Get the graphic mode information
+    {    
+        let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
+        match rs {
+            Ok(graphic_info) => {
+                let mut info = GRAPHIC_INFO.lock();
+                *info = GraphicInfo {
+                    width:graphic_info.width,
+                    height:graphic_info.height,
+                    physical_address:graphic_info.physical_address,
+                };
+            },
+            Err(_) => { debug!("Fail to get the graphic information"); }
+        };
+    }
+    
     // wait for all cores to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let mut count = get_lapics().iter().count();
@@ -330,7 +353,6 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     
     Ok(ap_count)  
 }
-
 
 fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
@@ -591,4 +613,10 @@ impl Iterator for MadtIter {
             None
         }
     }
+}
+
+pub struct GraphicInfo{
+    pub width:u64,
+    pub height:u64,
+    pub physical_address:u64,
 }

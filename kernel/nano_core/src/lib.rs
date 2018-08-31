@@ -142,7 +142,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
     match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
         Ok(_new_syms) => {
-            // debug!("========================== Symbol map after k#nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
+            // debug!("========================== Symbol map after nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
         }
         Err((msg, mapped_pages)) => {
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
@@ -155,11 +155,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
     #[cfg(feature = "loadable")] 
     {
-        let core_module = try_exit!(memory::get_module("k#core").ok_or("couldn't find k#core module"));
+        let kernel_prefix = mod_mgmt::metadata::CrateType::Kernel.prefix();
+        let core_module = try_exit!(memory::get_module(&format!("{}core", kernel_prefix)).ok_or("couldn't find core module"));
         let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
         
-        let captain_module = try_exit!(memory::get_module("k#captain").ok_or("couldn't find k#captain module"));
+        let captain_module = try_exit!(memory::get_module(&format!("{}captain", kernel_prefix)).ok_or("couldn't find captain module"));
         let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
