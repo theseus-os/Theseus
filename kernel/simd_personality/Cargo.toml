@@ -9,8 +9,8 @@ version = "0.1.0"
 
 [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins"
-features = [ "no-lang-items", "mem"]
-# features = [ "no-lang-items" ]
+features = [ "no-lang-items" ]
+# features = [ "no-lang-items", "mem"]
 
 [dependencies.pit_clock]
 path = "../pit_clock"

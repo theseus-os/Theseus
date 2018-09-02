@@ -12,7 +12,7 @@ ARCH ?= x86_64
 TARGET ?= $(ARCH)-theseus
 
 ## The top level directory of the Theseus project
-ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/..
+ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
 ## Where the configuration files are kept, like target json files
 CFG_DIR := $(ROOT_DIR)/cfg
