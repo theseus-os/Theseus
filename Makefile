@@ -106,7 +106,7 @@ APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-### It skips userspace for now, but you can add it back in easily on the line below.
+### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
 $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -115,15 +115,6 @@ $(iso): build
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
-
-# ### This target builds an .iso OS image from the userspace and kernel.
-# $(iso): kernel userspace
-# # after building kernel and userspace modules, copy the kernel boot image files
-# 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-# 	@cp $(nano_core) $(GRUB_ISOFILES)/boot/kernel.bin
-# # autogenerate the grub.cfg file
-#	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-# 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 	
 iso: $(iso)
 
@@ -213,17 +204,6 @@ userspace:
 
 
 
-# ## this builds all kernel components
-# kernel: check_rustc check_xargo	
-# 	@$(MAKE) -C kernel all
-# 	## copy kernel module build files
-# 	@mkdir -p $(GRUB_ISOFILES)/modules
-# 	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
-# 		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
-# 	done
-
-
-
 ## TODO FIXME: fix up the applications build procedure so we can use lints for them, such as disabling unsafe code.
 # ## The directory where we store custom lints (compiler plugins)
 # COMPILER_PLUGINS_DIR = $(ROOT_DIR)/compiler_plugins
@@ -241,16 +221,17 @@ userspace:
 
 
 
-### "dual_simd" is a special target for the dual SIMD personalities.
-### Builds the kernel components and nano_core with the regular x86_64-theseus target,
-### and then builds everything again with the SIMD-enabled x86_64-theseus-sse target. 
+## "dual_simd" is a special target for the dual SIMD personalities.
+## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
+## and then builds everything again with the regular x86_64-theseus target. 
+## The "regular" target must come last (simd_build, THEN build) to ensure that the final nano_core_binary is non-SIMD.
 dual_simd : export TARGET := x86_64-theseus
 dual_simd : export BUILD_MODE = release
-dual_simd: kernel applications simd_build
+dual_simd: simd_build build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core) $(GRUB_ISOFILES)/boot/kernel.bin
+	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
@@ -266,33 +247,14 @@ simd_build : export RUSTFLAGS += -C no-vectorize-slp
 simd_build : export KERNEL_PREFIX := k_sse\#
 simd_build : export APP_PREFIX := a_sse\#
 simd_build:
-## now we build the kernel with SIMD support enabled (it has already been built normally in the "kernel" target)
+## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
-	@$(MAKE) -C kernel cargo
-	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  -v --prefix $(KERNEL_PREFIX) $(ROOT_DIR)/kernel/target/$(TARGET)/$(BUILD_MODE)/deps/  $(ROOT_DIR)/kernel/build
-## copy kernel module build files
-	@mkdir -p $(GRUB_ISOFILES)/modules
-	@for f in `find ./kernel/build -maxdepth 1 -type f` ; do \
-		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
-	done
-## copy the SIMD-enabled core library's object file
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(GRUB_ISOFILES)/modules/$(KERNEL_PREFIX)core.o
-## copy the SIMD-enabled compiler_builtins object file.
-## This isn't necessary for regular compilation because it's included in the nano_core static lib.
-## But here, since we have no static lib, we need to include it explicitly as a separate library.
-	# @cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/compiler_builtins-*.o $(GRUB_ISOFILES)/modules/$(KERNEL_PREFIX)compiler_builtins.o
-##  now we build the applications with SIMD support enabled
-	@echo -e "\n======== BUILDING SIMD APPLICATIONS, TARGET = $(TARGET) ========"
-	@$(MAKE) -C applications all
-## copy applications' object files
-	@mkdir -p $(GRUB_ISOFILES)/modules
-	@for f in  ./applications/build/*.o ; do \
-		cp -vf  $${f}  $(GRUB_ISOFILES)/modules/  ; \
-	done
+	@$(MAKE) build
 
 
+
+## The top-level (root) documentation file
 DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
-
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -344,6 +306,9 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
+	@echo -e "  dual_simd:"
+	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
+	@echo -e "\t then runs it just like the 'make run' target."
 	@echo -e "  doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "  view-doc:"
@@ -426,7 +391,7 @@ debug: $(iso)
 ### Runs a gdb instance on the host machine. 
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
-	@rust-os-gdb/bin/rust-gdb "$(nano_core)" -ex "target remote :1234"
+	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 
 
 
@@ -450,7 +415,7 @@ else
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
 	@echo -e "The following usb drives are currently attached to this system:"
-	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape $ in makefile with $$
+	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
 	@echo ""
 	@exit 1
 endif
