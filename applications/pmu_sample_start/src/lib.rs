@@ -27,7 +27,8 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
     /*
-    let _my_thread = spawn::spawn_kthread(|_: Option<u8>| {
+    let _my_thread = spawn::KernelTaskBuilder::new( 
+        |_: Option<u8>| {
             pmu_x86::init();
             let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 500);
             if let Ok(my_sampler) = sampler {
@@ -49,7 +50,10 @@ pub fn main(args: Vec<String>) -> isize {
                 println!("Sample didn't begin");
             }
         }, 
-        None, String::from("pmu_test"), Some(0));
+        None)
+        .name(String::from("pmu_test"))
+        .pin_on_core(0)
+        .spawn()?;
     */
     pmu_x86::init();
     let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);

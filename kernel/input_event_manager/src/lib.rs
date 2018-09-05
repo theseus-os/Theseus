@@ -31,6 +31,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::string::{String,ToString};
 use alloc::vec::Vec;
 use mod_mgmt::metadata::CrateType;
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
@@ -41,15 +42,22 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
 
     // Spawns the terminal print crate so that we can print to the terminal
     let app_prefix = CrateType::Application.prefix();
-    let args: Vec<String> =  vec![]; // terminal print doesn't have any arguments
     let term_print_module = memory::get_module(&format!("{}terminal_print", app_prefix)).ok_or("Error: terminal_print module not found")?;
-    spawn::spawn_application_singleton(term_print_module, args, None, None)?;
+    ApplicationTaskBuilder::new(term_print_module)
+        .name("terminal_print_singleton".to_string())
+        .singleton()
+        .spawn()?;
 
     // Initializes the default terminal (will also start the windowing manager)
     let term_module = memory::get_module(&format!("{}terminal", app_prefix)).ok_or("Error: terminal module not found")?;
-    let args: Vec<String> =  vec![]; // terminal::main() doesn't have any arguments
-    spawn::spawn_application(term_module, args, Some("default_terminal".to_string()), None)?; // spawns the default terminal
-    spawn::spawn_kthread(input_event_loop, keyboard_event_handling_consumer, "input_event_loop".to_string(), None)?;
+    // spawn the default terminal
+    ApplicationTaskBuilder::new(term_module)
+        .name("default_terminal".to_string())
+        .spawn()?;
+    // start the input event loop thread
+    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
+        .name("input_event_loop".to_string())
+        .spawn()?;
     Ok(returned_keyboard_producer)
 }
 
@@ -79,7 +87,10 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                     let task_name: String = format!("terminal {}", terminal_id_counter);
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
                     let term_module = memory::get_module(&format!("{}terminal", CrateType::Application.prefix())).ok_or("Error: terminal module not found")?;
-                    spawn::spawn_application(term_module, args, Some(task_name), None)?;
+                    ApplicationTaskBuilder::new(term_module)
+                        .argument(args)
+                        .name(task_name)
+                        .spawn()?;
                     terminal_id_counter += 1;
                     meta_keypress = true;
                     event.mark_completed();

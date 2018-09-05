@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(asm)]
+#![feature(core_intrinsics)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -101,21 +102,231 @@ fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 }
 
 
+/// The argument type accepted by the `main` function entry point into each application.
+type MainFuncArg = Vec<String>;
 
+/// The type returned by the `main` function entry point of each application.
+type MainFuncRet = isize;
+
+/// The function signature of the `main` function that every application must have,
+/// as it is the entry point into each application `Task`.
+type MainFunc = fn(MainFuncArg) -> MainFuncRet;
+
+
+
+/// A struct that uses the Builder pattern to create and customize new kernel `Task`s.
+/// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
+pub struct KernelTaskBuilder<F, A, R> {
+    func: F,
+    argument: A,
+    _rettype: PhantomData<R>,
+    name: Option<String>,
+    pin_on_core: Option<u8>,
+}
+
+impl<F, A, R> KernelTaskBuilder<F, A, R> 
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R,
+{
+    /// Creates a new `Task` from the given kernel function `func`
+    /// that will be passed the argument `arg` when spawned. 
+    pub fn new(func: F, argument: A) -> KernelTaskBuilder<F, A, R> {
+        KernelTaskBuilder {
+            argument: argument,
+            func: func,
+            _rettype: PhantomData,
+            name: None,
+            pin_on_core: None,
+        }
+    }
+
+    /// Set the String name for the new Task.
+    pub fn name(mut self, name: String) -> KernelTaskBuilder<F, A, R> {
+        self.name = Some(name);
+        self
+    }
+
+    /// Pin the new Task to a specific core.
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> KernelTaskBuilder<F, A, R> {
+        self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
+    /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
+    #[inline(never)]
+    pub fn spawn(self) -> Result<TaskRef, &'static str> 
+        where A: Send + 'static, 
+              R: Send + 'static,
+              F: FnOnce(A) -> R, 
+    {
+        let mut new_task = Task::new();
+        let name = self.name.unwrap_or_else(|| String::from( 
+            // if a Task name wasn't provided, then just use the function's name
+            unsafe { ::core::intrinsics::type_name::<F>() }
+        ));
+        new_task.set_name(name);
+
+        // the new kernel thread uses the same kernel address space
+        new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
+
+        // create and set up a new kstack
+        let kstack: Stack = {
+            let mut mmi = try!(new_task.mmi.as_mut().ok_or("new_task.mmi was None!")).lock();
+            try!(mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("couldn't allocate kernel stack!"))
+        };
+
+        // When this new task is scheduled in, a `Context` struct will be popped off the stack,
+        // and at the end of that struct is the next instruction that will be popped off as part of the "ret" instruction. 
+        // So we need to allocate space for the saved context registers to be popped off when this task is switch to.
+        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
+        unsafe {
+            *new_context_ptr = Context::new(kthread_wrapper::<F, A, R> as usize);
+            new_task.saved_sp = new_context_ptr as usize; 
+        }
+
+        // set up the kthread stuff
+        let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
+        debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
+
+        // currently we're using the very bottom of the kstack for kthread arguments
+        let arg_ptr = kstack.bottom();
+        let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
+        unsafe {
+            *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
+            debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
+        }
+
+        new_task.kstack = Some(kstack);
+        new_task.runstate = RunState::Runnable; // ready to be scheduled in
+
+        let new_task_id = new_task.id;
+        let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
+        let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
+        // insert should return None, because that means there was no existing task with the same ID 
+        if old_task.is_some() {
+            error!("BUG: KernelTaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+            return Err("BUG: TASKLIST a contained a task with the new task's ID");
+        }
+        
+        if let Some(core) = self.pin_on_core {
+            try!(scheduler::add_task_to_specific_runqueue(core, task_ref.clone()));
+        }
+        else {
+            try!(scheduler::add_task_to_runqueue(task_ref.clone()));
+        }
+
+        Ok(task_ref)
+    }
+
+}
+
+
+/// A struct that uses the Builder pattern to create and customize new application `Task`s.
+/// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
+pub struct ApplicationTaskBuilder<'m> {
+    module: &'m ModuleArea,
+    argument: MainFuncArg,
+    name: Option<String>,
+    pin_on_core: Option<u8>,
+    singleton: bool,
+}
+
+impl<'m> ApplicationTaskBuilder<'m> {
+    /// Creates a new application `Task` from the given `module`, 
+    /// which must have an entry point called `main`.
+    pub fn new(module: &'m ModuleArea) -> ApplicationTaskBuilder<'m> {
+        ApplicationTaskBuilder {
+            module: module,
+            argument: Vec::new(), // doesn't allocate yet
+            name: None,
+            pin_on_core: None,
+            singleton: false,
+        }
+    }
+
+    /// Set the String name for the new Task.
+    pub fn name(mut self, name: String) -> ApplicationTaskBuilder<'m> {
+        self.name = Some(name);
+        self
+    }
+
+    /// Pin the new Task to a specific core.
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder<'m> {
+        self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Set the argument strings for this Task.
+    pub fn argument(mut self, argument: MainFuncArg) -> ApplicationTaskBuilder<'m> {
+        self.argument = argument;
+        self
+    }
+
+    /// Sets this application Task to be a **singleton** application.
+    /// A singleton application is a special application whose public symbols are added
+    /// to the default namespace's symbol map, which allows other applications to depend upon it. 
+    /// This also prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
+    /// 
+    /// In general, for regular applications, you likely should *not* use this. 
+    pub fn singleton(mut self) -> ApplicationTaskBuilder<'m> {
+        self.singleton = true;
+        self
+    }
+
+    /// Spawns a new application task that runs in kernel mode (currently the only way to run applications).
+    /// This merely makes the new task Runnable, it does not task switch to it immediately. That will happen on the next scheduler invocation.
+    /// 
+    /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
+    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+        let app_crate_ref = {
+            let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
+            let mut kernel_mmi = kernel_mmi_ref.lock();
+            mod_mgmt::get_default_namespace().load_application_crate(self.module, kernel_mmi.deref_mut(), self.singleton, false)?
+        };
+
+        // get the LoadedSection for the "main" function in the app_crate
+        let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
+            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function!")?;
+
+        let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
+        let main_func = {
+            let main_func_sec = main_func_sec_ref.lock();
+            let mapped_pages = main_func_sec.mapped_pages.lock();
+            mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
+        };
+
+        // build and spawn the actual underlying kernel Task
+        let ktb = KernelTaskBuilder::new(*main_func, self.argument)
+            .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
+        let ktb = if let Some(core) = self.pin_on_core {
+            ktb.pin_on_core(core)
+        } else {
+            ktb
+        };
+
+        let app_task = ktb.spawn()?;
+        app_task.write().app_crate = Some(app_crate_ref);
+
+        Ok(app_task)
+    }
+
+}
 
 
 
 
 #[derive(Debug)]
-struct KthreadCall<A, R, F> {
+struct KthreadCall<F, A, R> {
     /// comes from Box::into_raw(Box<A>)
     pub arg: *mut A,
     pub func: F,
     _rettype: PhantomData<R>,
 }
 
-impl<A, R, F> KthreadCall<A, R, F> {
-    fn new(a: A, f: F) -> KthreadCall<A, R, F> where F: FnOnce(A) -> R {
+impl<F, A, R> KthreadCall<F, A, R> {
+    fn new(a: A, f: F) -> KthreadCall<F, A, R> where F: FnOnce(A) -> R {
         KthreadCall {
             arg: Box::into_raw(Box::new(a)),
             func: f,
@@ -124,161 +335,6 @@ impl<A, R, F> KthreadCall<A, R, F> {
     }
 }
 
-
-
-/// Spawns a new kernel task with the same address space as the current task. 
-/// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
-/// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
-/// 
-/// # Arguments
-/// 
-/// * `func`: the function or closure that will be invoked in the new task.
-/// * `arg`: the argument to the function `func`. It must be a type that implements the Send trait, i.e., not a borrowed reference.
-/// * `thread_name`: the String name of the new task.
-/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-/// 
-#[inline(never)]
-pub fn spawn_kthread<A, R, F>(func: F, arg: A, thread_name: String, pin_on_core: Option<u8>)
-    -> Result<TaskRef, &'static str> 
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
-{
-    let mut new_task = Task::new();
-    new_task.set_name(thread_name);
-
-    // the new kernel thread uses the same kernel address space
-    new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("spawn_kthread(): KERNEL_MMI was not initialized!!")) );
-
-    // create and set up a new kstack
-    let kstack: Stack = {
-        let mut mmi = try!(new_task.mmi.as_mut().ok_or("spawn_kthread: new_task.mmi was None!")).lock();
-        try!(mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("spawn_kthread: couldn't allocate kernel stack!"))
-    };
-
-    // When this new task is scheduled in, a `Context` struct be popped off the stack,
-    // and then at the end of that struct is the next instruction that will be popped off as part of the "ret" instruction. 
-    // So we need to allocate space for the saved context registers to be popped off when this task is switch to.
-    let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
-    unsafe {
-        *new_context_ptr = Context::new(kthread_wrapper::<A, R, F> as usize);
-        new_task.saved_sp = new_context_ptr as usize; 
-    }
-
-    // set up the kthread stuff
-    let kthread_call = Box::new( KthreadCall::new(arg, func) );
-    debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
-
-
-    // currently we're using the very bottom of the kstack for kthread arguments
-    let arg_ptr = kstack.bottom();
-    let kthread_ptr: *mut KthreadCall<A, R, F> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
-    unsafe {
-        *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
-        debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
-    }
-
-
-    new_task.kstack = Some(kstack);
-    new_task.runstate = RunState::Runnable; // ready to be scheduled in
-
-    let new_task_id = new_task.id;
-    let task_ref = Arc::new(RwLockIrqSafe::new(new_task));
-    let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
-    // insert should return None, because that means there was no other 
-    if old_task.is_some() {
-        error!("spawn_kthread(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
-        return Err("TASKLIST a contained a task with the new task's ID");
-    }
-    
-    if let Some(core) = pin_on_core {
-        try!(scheduler::add_task_to_specific_runqueue(core, task_ref.clone()));
-    }
-    else {
-        try!(scheduler::add_task_to_runqueue(task_ref.clone()));
-    }
-
-    Ok(task_ref)
-}
-
-
-
-type MainFuncSignature = fn(Vec<String>) -> isize;
-
-
-/// Spawns a new application task within the kernel, based on the provided `ModuleArea` which must have an entry point called `main`.
-/// The new kernel thread is set up to enter the given function `func` and passes it the arguments `arg`.
-/// This merely makes the new task Runnable, it does not task switch to it immediately. That will happen on the next scheduler invocation.
-/// 
-/// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
-/// 
-/// # Arguments
-/// 
-/// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
-/// * `args`: the arguments that will be passed to the `main` function of the application. 
-/// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
-/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-pub fn spawn_application(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
-    -> Result<TaskRef, &'static str> 
-{
-    spawn_application_internal(module, args, task_name, pin_on_core, false)
-}
-
-
-/// Similar to [`spawn_application`](#method.spawn_application), but adds the newly-spanwed application's public symbols 
-/// to the default namespace's symbol map, which allows other applications to depend upon it. 
-/// This also prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
-/// 
-/// In general, for regular applications, you should likely use [`spawn_application`](#method.spawn_application).
-pub fn spawn_application_singleton(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>)
-    -> Result<TaskRef, &'static str> 
-{
-    spawn_application_internal(module, args, task_name, pin_on_core, true)
-}
-
-
-
-/// The internal routine for spawning a new application task that runs in kernel mode (currently the only way to run applications), 
-/// based on the provided `ModuleArea` which is an object file that must have an entry point called `main`.
-/// The new application `Task` is set up to enter the `main` function with the arguments `args`.
-/// This merely makes the new task Runnable, it does not context switch to it immediately. That will happen on the next scheduler invocation.
-/// 
-/// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
-/// 
-/// # Arguments
-/// 
-/// * `module`: the [`ModuleArea`](../memory/ModuleArea.t.html) that will be loaded and its main function invoked in the new `Task`.
-/// * `args`: the arguments that will be passed to the `main` function of the application. 
-/// * `task_name`: the String name of the new task. If None, the `module`'s crate name will be used. 
-/// * `pin_on_core`: the core number that this task will be permanently scheduled onto, or if None, the "least busy" core will be chosen.
-/// * `is_singleton`: if true, adds this application's public symbols to the default namespace's symbol map, which allows other applications to depend upon it,
-///    and prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
-fn spawn_application_internal(module: &ModuleArea, args: Vec<String>, task_name: Option<String>, pin_on_core: Option<u8>, is_singleton: bool)
-    -> Result<TaskRef, &'static str> 
-{
-    let app_crate_ref = {
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        mod_mgmt::get_default_namespace().load_application_crate(module, kernel_mmi.deref_mut(), is_singleton, false)?
-    };
-
-    // get the LoadedSection for the "main" function in the app_crate
-    let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
-        .ok_or("spawn_application(): couldn't find \"main\" function!")?;
-
-    let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
-    let main_func = {
-        let main_func_sec = main_func_sec_ref.lock();
-        let mapped_pages = main_func_sec.mapped_pages.lock();
-        mapped_pages.as_func::<MainFuncSignature>(main_func_sec.mapped_pages_offset, &mut space)?
-    };
-
-    let task_name = task_name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone());
-    let app_task = spawn_kthread(*main_func, args, task_name, pin_on_core)?;
-    app_task.write().app_crate = Some(app_crate_ref);
-
-    Ok(app_task)
-}
 
 
 
@@ -309,7 +365,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
         }
     
         new_task.kstack = Some(kstack);
-        // unlike spawn_kthread, we don't need to place any arguments at the bottom of the stack,
+        // unlike when spawning a kthread, we don't need to place any arguments at the bottom of the stack,
         // because we can just utilize the task's userspace entry point member
 
 
@@ -447,7 +503,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
     let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {
-        error!("spawn_userspace(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+        error!("BUG: spawn_userspace(): TASKLIST already contained a task with the new task's ID!");
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
@@ -513,7 +569,7 @@ pub fn join(task: &TaskRef) -> Result<(), &'static str> {
 
 
 /// The entry point for all new kernel `Task`s. This does not return!
-fn kthread_wrapper<A, R, F>() -> !
+fn kthread_wrapper<F, A, R>() -> !
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -521,22 +577,22 @@ fn kthread_wrapper<A, R, F>() -> !
     let curr_task_ref = get_my_current_task().expect("kthread_wrapper(): couldn't get_my_current_task().");
     let curr_task_name = curr_task_ref.read().name.clone();
 
-    let kthread_call_stack_ptr: *mut KthreadCall<A, R, F> = {
+    let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
         let t = curr_task_ref.read();
         let kstack = t.kstack.as_ref().expect("kthread_wrapper(): failed to get current task's kstack.");
-        // in spawn_kthread() above, we use the very bottom of the stack to hold the pointer to the kthread_call
+        // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            *(kstack.bottom() as *mut *mut KthreadCall<A, R, F>) as *mut KthreadCall<A, R, F>
+            *(kstack.bottom() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
         }
     };
 
     // the pointer to the kthread_call struct (func and arg) was placed on the stack
-    let kthread_call: Box<KthreadCall<A, R, F>> = unsafe {
+    let kthread_call: Box<KthreadCall<F, A, R>> = unsafe {
         Box::from_raw(kthread_call_stack_ptr)
     };
-    let kthread_call_val: KthreadCall<A, R, F> = *kthread_call;
+    let kthread_call_val: KthreadCall<F, A, R> = *kthread_call;
 
     let arg: Box<A> = unsafe {
         Box::from_raw(kthread_call_val.arg)
