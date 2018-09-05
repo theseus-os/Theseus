@@ -31,6 +31,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
+use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use task::TaskRef;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
@@ -155,7 +156,9 @@ impl Terminal {
         let prompt_string = terminal.prompt_string.clone();
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
-        let task_ref = spawn::spawn_kthread(terminal_loop, terminal, "terminal loop".to_string(), None)?;
+        let task_ref = KernelTaskBuilder::new(terminal_loop, terminal)
+            .name("terminal loop".to_string())
+            .spawn()?;
         Ok(task_ref)
     }
 
@@ -842,7 +845,9 @@ impl Terminal {
     /// Execute the command on a new thread 
     fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<usize, &'static str> {
         let module = memory::get_module(&command_string).ok_or("Error: no module with this name found!")?;
-        let taskref = spawn::spawn_application(module, arguments, None, None)?;
+        let taskref = ApplicationTaskBuilder::new(module)
+            .argument(arguments)
+            .spawn()?;
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         let new_task_id = taskref.read().id;
         return Ok(new_task_id);
