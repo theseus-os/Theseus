@@ -68,8 +68,7 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-//use frame_buffer::text_buffer;
-
+use spawn::KernelTaskBuilder;
 
 
 
@@ -175,7 +174,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // TODO: remove this (@Ramla)
     if false {
         use e1000::test_nic_driver::test_nic_driver;
-        spawn::spawn_kthread(test_nic_driver, None, String::from("test_nic_driver"), None)?;
+        KernelTaskBuilder::new(test_nic_driver, None)
+            .name(String::from("test_nic_driver"))
+            .spawn()?;
     }  
 
     // create and jump to the first userspace thread
@@ -208,7 +209,9 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     
     // create a SIMD personality
     if false {
-        spawn::spawn_kthread(simd_personality::setup_simd_personality, (), String::from("setup_simd_personality"), None)?;
+        KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
+            .name(String::from("setup_simd_personality"))
+            .spawn()?;
     }
 
 

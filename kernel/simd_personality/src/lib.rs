@@ -64,9 +64,10 @@ extern crate spawn;
 
 
 use core::ops::DerefMut;
+use alloc::String;
 use memory::{get_kernel_mmi_ref, get_module};
 use mod_mgmt::CrateNamespace;
-use alloc::String;
+use spawn::KernelTaskBuilder;
 
 
 const SSE_KERNEL_PREFIX: &'static str = "k_sse#";
@@ -95,7 +96,10 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	let task1 = spawn::spawn_kthread(func1, (), String::from("simd_test_1-sse"), Some(2))?;
+	let task1 = KernelTaskBuilder::new(func1, ())
+		.name(String::from("simd_test_1-sse"))
+		.pin_on_core(2)
+		.spawn()?;
 	debug!("finished spawning first simd task");
 
 
@@ -108,7 +112,10 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	let task2 = spawn::spawn_kthread(func, (), String::from("simd_test_2-sse"), Some(2))?;
+	let task2 = KernelTaskBuilder::new(func, ())
+		.name(String::from("simd_test_2-sse"))
+		.pin_on_core(2)
+		.spawn()?;
 	debug!("finished spawning second simd task");
 
 
