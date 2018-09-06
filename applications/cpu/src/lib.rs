@@ -5,12 +5,12 @@
 
 extern crate apic;
 extern crate getopts;
-extern crate scheduler;
+extern crate task;
 
 use getopts::Options;
 use alloc::{Vec, String};
 use apic::get_lapics;
-use scheduler::get_runqueue;
+use task::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -36,26 +36,23 @@ pub fn main(args: Vec<String>) -> isize {
         let core_type = if is_bsp {"BSP Core"}
                         else {"AP Core"};
 
-        println!("{} (apic: {}, proc: {})", core_type, apic_id, processor); 
+        println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = get_runqueue(apic_id) {
-            let mut currently_running = String::new();
-            let mut on_runqueue = String::new();
+        if let Some(runqueue) = RunQueue::get_runqueue(apic_id).map(|rq| rq.read()) {
+            let mut runqueue_contents = String::new();
             for task_ref in runqueue.iter() {
-                if task_ref.read().running_on_cpu < 0 {
-                    on_runqueue.push_str(&task_ref.read().name);
-                    on_runqueue.push('\n');
-                }
-                if task_ref.read().running_on_cpu == apic_id as isize {
-                    currently_running.push_str(&task_ref.read().name);
-                }
+                let task = task_ref.read();
+                runqueue_contents.push_str(&format!("{} ({}) {}\n", 
+                    task.name, 
+                    task.id,
+                    if task.is_running() { "*" } else { "" },
+                ));
             }
-            print!("Task: {}\n", currently_running);
-            println!("Runqueue:\n{}",on_runqueue);
+            println!("RunQueue:\n{}", runqueue_contents);
         }
         
         else {
-            println!("Can't retrieve runqueue");
+            println!("Can't retrieve runqueue for core {}", apic_id);
             return -1;
         }
     }

@@ -2,20 +2,15 @@
 #![feature(alloc)]
 
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate atomic_linked_list;
 extern crate apic;
 extern crate task;
 
 
 use core::ops::DerefMut;
-use alloc::arc::Arc;
-use alloc::VecDeque;
-use irq_safety::{RwLockIrqSafe, disable_interrupts, RwLockIrqSafeReadGuard};
-use atomic_linked_list::atomic_map::AtomicMap;
-use task::{Task, TaskRef, get_my_current_task};
+use irq_safety::{disable_interrupts};
+use task::{Task, TaskRef, get_my_current_task, RunQueue};
 use apic::get_my_apic_id;
 
 
@@ -34,7 +29,7 @@ pub fn schedule() -> bool {
     let apic_id = match get_my_apic_id() {
         Some(id) => id,
         _ => {
-            error!("Couldn't get apic_id in schedule()");
+            error!("BUG: Couldn't get apic_id in schedule()");
             return false;
         }
     };
@@ -72,92 +67,8 @@ pub fn schedule() -> bool {
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
-
+ 
     true
-}
-
-
-type RunQueue = VecDeque<TaskRef>;
-
-lazy_static! {
-    /// There is one runqueue per core, each core can only access its own private runqueue
-    /// and select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
-
-
-/// Creates a new runqueue for the given core
-pub fn init_runqueue(which_core: u8) {
-    trace!("Created runqueue for core {}", which_core);
-    RUNQUEUES.insert(which_core, RwLockIrqSafe::new(RunQueue::new()));
-}
-
-
-/// Adds a `Task` reference to the given core's runqueue
-pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-    if let Some(ref rq) = RUNQUEUES.get(&which_core) {
-        debug!("Added task to runqueue {}, {:?}", which_core, task);
-        rq.write().push_back(task);
-        Ok(())
-    }
-    else {
-        error!("add_task_to_specific_runqueue(): couldn't get core {}'s runqueue!", which_core);
-        Err("couldn't get runqueue for requested core")
-    }
-}
-
-/// Returns the "least busy" core, which is currently very simple, based on runqueue size.
-fn get_least_busy_core() -> Option<u8> {
-    let mut min_rq: Option<(u8, usize)> = None;
-
-    for (id, rq) in RUNQUEUES.iter() {
-        let rq_size = rq.read().len();
-
-        if let Some(min) = min_rq {
-            if rq_size < min.1 {
-                min_rq = Some((*id, rq_size));
-            }
-        }
-        else {
-            min_rq = Some((*id, rq_size));
-        }
-    }
-
-    min_rq.map(|m| m.0)
-} 
-
-
-/// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
-/// and adds a `Task` reference to that core's runqueue.
-pub fn add_task_to_runqueue(task: TaskRef) -> Result<(), &'static str> {
-    let mut core_id: Option<u8> = get_least_busy_core();
-    // as a backup option, just choose the first runqueue
-    if core_id.is_none() {
-        core_id = RUNQUEUES.iter().next().map( |v| *v.0);
-    }
-
-    match core_id {
-        Some(id) => {
-            add_task_to_specific_runqueue(id, task)
-        }
-        _ => {
-            error!("Couldn't find any runqueues to add Task {:?}", task);
-            Err("couldn't find a suitable runqueue to add task!")
-        }
-    }
-}
-
-
-// TODO: test this function
-pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-    if let Some(ref rq) = RUNQUEUES.get(&which_core) {
-        rq.write().retain(|x| Arc::ptr_eq(&x, &task));
-        Ok(())
-    }
-    else {
-        error!("remove_task_from_runqueue(): couldn't get core {}'s runqueue!", which_core);
-        Err("couldn't get runqueue for requested core")
-    }
 }
 
 
@@ -166,15 +77,16 @@ pub fn remove_task_from_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'
 /// returns None if there is no schedule-able task
 fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
-    let mut runqueue_locked = match RUNQUEUES.get(&apic_id) {
+    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
-        _ => { 
+        _ => {
+            error!("BUG: select_next_task(): couldn't get runqueue for core {}", apic_id); 
             return None;
         }
     };
     
     let mut idle_task_index: Option<usize> = None;
-    let mut index_chosen: Option<usize> = None;
+    let mut chosen_task_index: Option<usize> = None;
 
     for (i, task) in runqueue_locked.iter().enumerate() {
         let t = task.read();
@@ -194,30 +106,19 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         if let Some(pinned) = t.pinned_core {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                panic!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                // continue;
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                return None;
             }
         }
             
         // found a runnable task!
-        index_chosen = Some(i);
+        chosen_task_index = Some(i);
         // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
         break; 
     }
 
     // idle task is a backup iff no other task has been chosen
-    if let Some(index) = index_chosen.or(idle_task_index) {
-        let chosen_task: TaskRef = runqueue_locked.remove(index).unwrap();
-        runqueue_locked.push_back(chosen_task.clone()); 
-        Some(chosen_task)
-    }
-    else {
-        None
-    }
-
-}
-
-/// Gets read-only runqueue 
-pub fn get_runqueue(apic_id: u8) -> Option<RwLockIrqSafeReadGuard<'static, RunQueue>> {
-    RUNQUEUES.get(&apic_id).map(|rq| rq.read())
+    chosen_task_index
+        .or(idle_task_index)
+        .and_then(|index| runqueue_locked.move_to_end(index))
 }
