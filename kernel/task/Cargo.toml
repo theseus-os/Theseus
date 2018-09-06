@@ -47,5 +47,8 @@ path = "../context_switch"
 [dependencies.context_switch_sse]
 path = "../context_switch_sse"
 
+[dependencies.vfs]
+path = "../vfs"
+
 [lib]
 crate-type = ["rlib"]

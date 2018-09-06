@@ -244,6 +244,8 @@ impl<'m> ApplicationTaskBuilder<'m> {
             pin_on_core: None,
             singleton: false,
         }
+
+        
     }
 
     /// Set the String name for the new Task.

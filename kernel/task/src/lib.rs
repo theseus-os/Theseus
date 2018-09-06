@@ -63,7 +63,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::StrongDirRef;
+use vfs::{StrongDirRef, Directory};
 use spin::Mutex;
 
 #[cfg(not(target_feature = "sse2"))]
@@ -225,8 +225,7 @@ impl Task {
     /// creates a new Task structure and initializes it to be non-Runnable.
     pub fn new() -> Task {
         // we should re-use old task IDs again, instead of simply blindly counting up
-        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
-        
+        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);        
         Task {
             id: task_id,
             runstate: RunState::Initing,
@@ -241,7 +240,7 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-            working_dir: Arc::new(Mutex::new(vfs::ROOT)),
+            working_dir: vfs::get_root(),
         }
     }
 
@@ -474,7 +473,7 @@ impl Task {
             context_switch();
         }
 
-    }lazy_static
+    }
 }
 
 impl fmt::Display for Task {

@@ -1186,26 +1186,6 @@ impl CrateNamespace {
         where I: IntoIterator<Item = &'a StrongSectionRef>,
               F: Fn(&LoadedSection) -> bool
     {
-        self.add_symbols_filtered(sections, |_sec| true, _log_replacements)
-    }
-
-
-    /// Adds symbols in the given `sections` iterator to this namespace's symbol map,
-    /// but only the symbols that correspond to *global* sections AND for which the given `filter_func` returns true. 
-    /// 
-    /// Returns the number of *new* unique symbols added.
-    /// 
-    /// # Note
-    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
-    fn add_symbols_filtered<'a, I, F>(
-        &self, 
-        sections: I,
-        filter_func: F,
-        _log_replacements: bool,
-    ) -> usize
-        where I: IntoIterator<Item = &'a StrongSectionRef>,
-              F: Fn(&LoadedSection) -> bool
-    {
         let mut existing_map = self.symbol_map.lock();
 
         // add all the global symbols to the symbol map, in a way that lets us inspect/log each one

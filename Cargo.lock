@@ -108,6 +108,7 @@ dependencies = [
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
  "spawn 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "syscall 0.1.0",
  "task 0.1.0",
  "tsc 0.1.0",
@@ -916,6 +917,7 @@ dependencies = [
  "panic_info 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
+ "vfs 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -936,6 +938,7 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
  "text_display 0.1.0",
+ "vfs 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -996,6 +999,16 @@ dependencies = [
 [[package]]
 name = "util"
 version = "0.1.0"
+
+[[package]]
+name = "vfs"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
 
 [[package]]
 name = "vga_buffer"

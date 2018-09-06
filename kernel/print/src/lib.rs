@@ -11,10 +11,6 @@ extern crate spin;
 extern crate dfqueue;
 extern crate event_types;
 extern crate input_event_manager;
-extern crate spin;
-extern crate dfqueue;
-extern crate event_types;
-#[macro_use] extern crate alloc;
 
 use core::fmt;
 use spin::Once;

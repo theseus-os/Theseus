@@ -13,14 +13,21 @@ use alloc::arc::{Arc, Weak};
 
 
 lazy_static! {
-    pub static ref ROOT: Directory = Directory {
-        name: "root".to_string(),
-        child_dirs: Vec::new(),
-        files: Vec::new(),
-        parent: Weak::new(),
+    pub static ref ROOT: StrongDirRef = {
+        let root_dir = Directory {
+            name: "/root".to_string(),
+            path: "/root".to_string(),
+            child_dirs: Vec::new(),
+            files: Vec::new(),
+            parent: Weak::new(), 
+        };
+        Arc::new(Mutex::new(root_dir))
     };
 }
 
+pub fn get_root() -> StrongDirRef {
+    Arc::clone(&ROOT)
+}
 
 pub type StrongDirRef = Arc<Mutex<Directory>>;
 pub type WeakDirRef = Weak<Mutex<Directory>>;
@@ -28,13 +35,14 @@ pub type WeakDirRef = Weak<Mutex<Directory>>;
 
 // fn test() {
 //     let dir_pointer = StrongDirRef;
-//     let parent_pointer = Arc::clone(dir_pointer);
+//     let parent_pointer = Arc::clone(dir_pointer);5
 //     dir_pointer.lock().new_dir("shit", Arc::downgrade(parent_pointer));
 // }
 
 
 pub struct Directory{
     name: String,
+    path: String,
     child_dirs: Vec<StrongDirRef>,
     files: Vec<File>,
     parent: WeakDirRef,
@@ -54,8 +62,10 @@ impl Directory {
     }   
 
     pub fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) {
+        let temp_name = name.clone();
         let directory = Directory {
-            name: &name, 
+            name: name, 
+            path: format!("{}/{}", self.path, temp_name.clone()),
             child_dirs: Vec::new(),
             files:  Vec::new(),
             parent: parent_pointer,
@@ -75,6 +85,11 @@ impl Directory {
             children_list.push_str(&format!("{}, ", file.name.to_string()));
         }
         return children_list;
+    }
+
+    /// Functions as pwd command in bash
+    pub fn get_path(&self) -> String {
+        return self.path.clone();
     }
 }
 

@@ -18,6 +18,7 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
+extern crate vfs;
 
 extern crate terminal_print;
 extern crate print;
@@ -29,10 +30,12 @@ use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::arc::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use task::TaskRef;
+use vfs::StrongDirRef;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -99,6 +102,8 @@ struct Terminal {
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
     print_producer: DFQueueProducer<Event>,
+    // the terminal's current working directory
+    working_dir: StrongDirRef,
 }
 
 
@@ -127,9 +132,9 @@ impl Terminal {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
-
-        let prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
-
+        let root = vfs::get_root();
+        let mut prompt_string = root.lock().get_path(); // ref numbers are 0-indexed
+        prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
             // internal number used to track the terminal object 
             window: window_object,
@@ -150,6 +155,7 @@ impl Terminal {
             left_shift: 0,
             print_consumer: terminal_print_consumer,
             print_producer: terminal_print_producer,
+            working_dir: root,
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -170,7 +176,8 @@ impl Terminal {
 
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
-        let prompt = self.prompt_string.clone();
+        let mut prompt = self.working_dir.lock().get_path();
+        prompt = format!("{}: ",prompt);
         self.scrollback_buffer.push_str(&prompt);
     }
 
@@ -848,6 +855,8 @@ impl Terminal {
         let taskref = ApplicationTaskBuilder::new(module)
             .argument(arguments)
             .spawn()?;
+
+        taskref.write().set_wd(Arc::clone(&self.working_dir));
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         let new_task_id = taskref.read().id;
         return Ok(new_task_id);
