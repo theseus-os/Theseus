@@ -32,12 +32,12 @@ pub fn main(args: Vec<String>) -> isize {
             Ok(task_id) => {
                 if let Some(task_ref) = task::get_task(task_id) {
                     use core::ops::Deref;
-                    if task_ref.write().kill(task::KillReason::Requested) {
+                    if task_ref.kill(task::KillReason::Requested).is_ok() {
                         println!("Killed task {} \n", task_ref.read().deref());
                         0
                     }
                     else {
-                        println!("{} was already exited \n", task_ref.read().deref());
+                        println!("Task {} was already exited.\n", task_id);
                         -1
                     }
                 }

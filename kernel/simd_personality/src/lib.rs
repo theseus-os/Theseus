@@ -125,8 +125,8 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
-	spawn::join(&task1)?;
-	spawn::join(&task2)?;
+	task1.join()?;
+	task2.join()?;
 	Ok(())
 
 }
