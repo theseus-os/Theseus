@@ -50,7 +50,7 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     };
     // waits for the terminal loop to exit before exiting the main function
-    match spawn::join(&term_task_ref) {
+    match term_task_ref.join() {
         Ok(_) => { }
         Err(err) => {error!("{}", err)}
     }
@@ -567,9 +567,9 @@ impl Terminal {
             if self.current_task_id != 0 {
                 let task_ref = task::get_task(self.current_task_id);
                 if let Some(curr_task) = task_ref {
-                    match curr_task.write().kill(task::KillReason::Requested) {
-                        true => { }
-                        false => {error!("could not kill task");}
+                    match curr_task.kill(task::KillReason::Requested) {
+                        Ok(_) => { }
+                        Err(e) => error!("Could not kill task, error: {}", e),
                     }
                 }
             } else {

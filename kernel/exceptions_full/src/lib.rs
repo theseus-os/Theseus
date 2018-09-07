@@ -14,8 +14,6 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use pmu_x86::{SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT, SAMPLE_TASK_ID, TASK_ID_LIST};
-use core::sync::atomic::Ordering;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -69,7 +67,9 @@ macro_rules! println_both {
 /// and then halts that task (another task should be scheduled in).
 fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
-        taskref.write().kill(task::KillReason::Exception(exception_number));
+        if let Err(e) = taskref.kill(task::KillReason::Exception(exception_number)) {
+            error!("kill_and_halt(): error killing curent task {:?}: {}", taskref, e);
+        }
     }
 
     loop { }

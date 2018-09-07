@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo dual_simd simd_build gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso build userspace cargo dual_simd simd_build gdb doc docs view-doc view-docs
 
 all: iso
 
