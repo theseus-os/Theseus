@@ -137,10 +137,27 @@ pub struct UsbIntfDesc
     pub inf_str: Volatile<u8>,
 }
 
+impl UsbIntfDesc{
+    pub fn default() -> UsbIntfDesc {
+        UsbIntfDesc {
+            len: Volatile::new(0),
+            desc_type: Volatile::new(0),
+            intf_num: Volatile::new(0),
+            alt_setting: Volatile::new(0),
+            endp_count: Volatile::new(0),
+            class: Volatile::new(0),
+            sub_class: Volatile::new(0),
+            protocol: Volatile::new(0),
+            inf_str: Volatile::new(0),
+        }
+    }
+}
+
 // ------------------------------------------------------------------------------------------------
 // USB Endpoint Descriptor
 
 #[repr(C,packed)]
+#[derive(Debug)]
 pub struct UsbEndpDesc
 {
     pub len: Volatile<u8>,
@@ -150,6 +167,20 @@ pub struct UsbEndpDesc
     pub maxpacketsize: Volatile<u16>,
     pub interval: Volatile<u8>,
     _padding: u16,
+}
+
+impl  UsbEndpDesc {
+    pub fn default() -> UsbEndpDesc {
+        UsbEndpDesc {
+            len: Volatile::new(0),
+            endp_type: Volatile::new(0),
+            addr: Volatile::new(0),
+            attributes: Volatile::new(0),
+            maxpacketsize: Volatile::new(0),
+            interval: Volatile::new(0),
+            _padding: 0,
+        }
+    }
 }
 
 // ------------------------------------------------------------------------------------------------

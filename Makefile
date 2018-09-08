@@ -89,7 +89,8 @@ QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device 
 ##set up usb
 QEMU_FLAGS += -usb
 QEMU_FLAGS += -device usb-ehci,id=ehci            
-QEMU_FLAGS += -device usb-kbd,bus=usb-bus.0,port=1	
+QEMU_FLAGS += -device usb-kbd,bus=usb-bus.0,port=1
+QEMU_FLAGS += -device usb-mouse,bus=usb-bus.0,port=2		
 
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int

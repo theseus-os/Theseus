@@ -26,7 +26,7 @@ use port_io::Port;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::{Once, Mutex};
 use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
-use usb_device::{UsbDevice,Controller};
+use usb_device::{UsbDevice,Controller,HIDType};
 use usb_desc::{UsbDeviceDesc,UsbConfDesc, UsbIntfDesc, UsbEndpDesc};
 use usb_req::UsbDevReq;
 
@@ -40,6 +40,7 @@ static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
 static QH_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciQH;MAX_QH]>>> = Once::new();
 static TD_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciTDRegisters;MAX_TD]>>> = Once::new();
+static UHCI_DEVICE_POOL: Once<Mutex<BoxRefMut<MappedPages, [UsbDevice;2]>>> = Once::new();
 static UHCI_FRAME_LIST: Once<Mutex<BoxRefMut<MappedPages, [Volatile<u32>;1024]>>> = Once::new();
 static DATA_BUFFER: Once<Mutex<MappedPages>> = Once::new();
 
@@ -95,6 +96,11 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     TD_POOL.call_once(||{
         Mutex::new(td_pool)
     });
+    
+    let device_pool = box_device_pool(active_table)?;
+    UHCI_DEVICE_POOL.call_once(||{
+        Mutex::new(device_pool)
+    });
 
     let buffer = map_pool(active_table)?;
     DATA_BUFFER.call_once(||{
@@ -115,6 +121,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     info!("\nUHCI PORTSC2: {:b}\n", REG_PORT2.lock().read());
     Ok(())
 }
+
 
 /// Allocate a available virtual buffer pointer for building TD
 pub fn buffer_pointer_alloc(offset:usize)-> Option<usize> {
@@ -181,6 +188,24 @@ pub fn init_qh(index:usize,horizontal_pointer:u32,element_pointer:u32){
         qh.horizontal_pointer.write(horizontal_pointer);
         qh.vertical_pointer.write(element_pointer);
 
+    });
+}
+
+/// Register the UHCI's usb device
+pub fn device_register(index:usize, device: UsbDevice){
+
+    UHCI_DEVICE_POOL.try().map(|device_pool| {
+
+        let d = &mut device_pool.lock()[index];
+        d.port = device.port;
+        d.interrupt_endpoint = device.interrupt_endpoint;
+        d.iso_endpoint = device.iso_endpoint;
+        d.control_endpoint = device.control_endpoint;
+        d.device_type = device.device_type;
+        d.addr = device.addr;
+        d.maxpacketsize = device.maxpacketsize;
+        d.speed = device.speed;
+        d.controller = device.controller;
     });
 }
 
@@ -286,7 +311,7 @@ pub fn td_status(index:usize)->Option<Result<u32,&'static str>>{
     })
 }
 
-
+/// Clean the UHCI framelist's contents, set it to default
 pub fn clean_framelist(){
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
@@ -298,6 +323,18 @@ pub fn clean_framelist(){
 
         }
     });
+}
+
+///Clean a frame in framelist
+pub fn clean_a_frame(index: usize){
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+
+        let frame =  &mut frame_list.lock()[index];
+        frame.write(0);
+    });
+
 }
 
 /// Link the TD and Queue Head to the frame list, and return the index of the frame
@@ -361,6 +398,16 @@ pub fn box_td_pool(active_table: &mut ActivePageTable)
     Ok(td_pool)
 }
 
+pub fn box_device_pool(active_table: &mut ActivePageTable)
+                       -> Result<BoxRefMut<MappedPages, [UsbDevice; 2]>, &'static str>{
+
+
+    let device_pool: BoxRefMut<MappedPages, [UsbDevice; 2]>  = BoxRefMut::new(Box::new(map_pool(active_table)?))
+        .try_map_mut(|mp| mp.as_type_mut::<[UsbDevice; 2]>(0))?;
+
+    Ok(device_pool)
+}
+
 /// Box the the frame list
 pub fn box_frame_list(active_table: &mut ActivePageTable, frame_base: PhysicalAddress)
                       -> Result<BoxRefMut<MappedPages, [Volatile<u32>;1024]>, &'static str>{
@@ -372,7 +419,6 @@ pub fn box_frame_list(active_table: &mut ActivePageTable, frame_base: PhysicalAd
 
     Ok(frame_pointer)
 }
-
 
 ///Get a physical memory page for data
 pub fn map_pool(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
@@ -472,8 +518,8 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            let desc = UsbDeviceDesc::default();
-            return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI,desc));
+            return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI,
+                                     HIDType::Unknown,0,0,0));
         }
         info!("Port 1 is not enabled");
         return Err("Port 1 is not enabled");
@@ -495,8 +541,8 @@ pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
                 speed = USB_FULL_SPEED;
             }
 
-            let desc = UsbDeviceDesc::default();
-            return Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI,desc));
+            return Ok(UsbDevice::new(2,speed,0,0,Controller::UCHI,
+                                     HIDType::Unknown,0,0,0, ));
         }
         return Err("Port 2 is not enabled");
     }
@@ -1001,7 +1047,7 @@ pub fn port2_reset() {
         if if_connect_port2() {
             port2_enable(1);
             info!("UHCI port 2 reset complete, the port is ready to use for device");
-            break;
+            return;
         }
 
         if connect_change_port2() {

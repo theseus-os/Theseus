@@ -45,9 +45,8 @@ pub enum IntType{
     UsbTransactionError,
     UsbTransactionComplete,
 
-
-
 }
+
 
 
 /// Read the current frame index, which is used to read the physical pointer
