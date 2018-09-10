@@ -41,7 +41,7 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
     
     // call this task's panic handler, if it has one. 
     let panic_handler = { 
-        curr_task.write().take_panic_handler()
+        curr_task.take_panic_handler()
     };
     if let Some(ref ph_func) = panic_handler {
         ph_func(&panic_info);
@@ -52,10 +52,11 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
         memory::stack_trace();
     }
 
-    if !curr_task.read().is_an_idle_task() {
+    if !curr_task.read().is_an_idle_task {
         // kill the offending task (the current task)
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(panic_info))?;
+        task::RunQueue::remove_task_from_all(curr_task)?;
     }
     
     // scheduler::schedule(); // yield the current task after it's done

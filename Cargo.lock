@@ -606,13 +606,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic_unwind_simple"
-version = "0.1.0"
-dependencies = [
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [

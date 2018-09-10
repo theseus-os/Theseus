@@ -208,7 +208,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     
     // create a SIMD personality
-    if false {
+    if true {
         KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
             .name(String::from("setup_simd_personality"))
             .spawn()?;
@@ -216,6 +216,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    #[cfg(feature = "dual_simd")] 
+    {
+        error!("DUAL SIMD FEATURE ENABLED!");
+    }
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)

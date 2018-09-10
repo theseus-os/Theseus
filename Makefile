@@ -377,6 +377,7 @@ loadable: run
 
 
 ### builds and runs Theseus in QEMU
+run : export RUST_FEATURES = --manifest-path "Cargo.toml" --features dual_simd
 run: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)

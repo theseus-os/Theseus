@@ -8,7 +8,7 @@
 #![feature(lang_items)]
 #![feature(alloc)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 extern crate memory;
@@ -17,9 +17,6 @@ extern crate mod_mgmt;
 
 
 use core::fmt;
-use alloc::String;
-
-
 
 
 
@@ -34,7 +31,7 @@ pub extern "C" fn eh_personality() {}
 #[lang = "panic_fmt"]
 #[no_mangle]
 #[doc(hidden)]
-pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
+pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
     
     // Since a panic could occur before the memory subsystem is initialized,
     // we must check before using alloc types or other functions that depend on the memory system (the heap).
@@ -46,7 +43,7 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
         {
             use mod_mgmt::metadata::CrateType;
             
-            type PanicWrapperFunc = fn(fmt_args: core::fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
+            type PanicWrapperFunc = fn(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
             let section_ref = kernel_mmi_ref.and_then(|kernel_mmi| {
                 mod_mgmt::get_default_namespace().get_symbol_or_load("panic_wrapper::panic_wrapper", CrateType::Kernel.prefix(), None, kernel_mmi.lock().deref_mut(), false).upgrade()
             }).ok_or("Couldn't get symbol: \"panic_wrapper::panic_wrapper\"");
@@ -88,18 +85,18 @@ pub extern "C" fn panic_fmt(fmt_args: core::fmt::Arguments, file: &'static str, 
 
 
 
-/// This function isn't used since our Theseus target.json file
-/// chooses panic=abort (as does our build process), 
-/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
-#[allow(non_snake_case)]
-#[lang = "eh_unwind_resume"]
-#[no_mangle]
-#[cfg(all(target_os = "windows", target_env = "gnu"))]
-#[doc(hidden)]
-pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
-    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    loop {}
-}
+// /// This function isn't used since our Theseus target.json file
+// /// chooses panic=abort (as does our build process), 
+// /// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
+// #[allow(non_snake_case)]
+// #[lang = "eh_unwind_resume"]
+// #[no_mangle]
+// #[cfg(all(target_os = "windows", target_env = "gnu"))]
+// #[doc(hidden)]
+// pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
+//     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
+//     loop {}
+// }
 
 
 #[allow(non_snake_case)]

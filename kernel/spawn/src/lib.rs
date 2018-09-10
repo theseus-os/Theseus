@@ -163,11 +163,10 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
               F: FnOnce(A) -> R, 
     {
         let mut new_task = Task::new();
-        let name = self.name.unwrap_or_else(|| String::from( 
+        new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
-        new_task.set_name(name);
 
         // the new kernel thread uses the same kernel address space
         new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
@@ -346,7 +345,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(name.unwrap_or(module.name().clone())));
+    new_task.name = String::from(name.unwrap_or(module.name().clone()));
 
     let mut ustack: Option<Stack> = None;
 
@@ -536,12 +535,12 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("task_wrapper(): couldn't get_my_current_task().");
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
     let curr_task_name = curr_task_ref.read().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
         let t = curr_task_ref.read();
-        let kstack = t.kstack.as_ref().expect("task_wrapper(): failed to get current task's kstack.");
+        let kstack = t.kstack.as_ref().expect("BUG: task_wrapper(): failed to get current task's kstack.");
         // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
@@ -570,18 +569,28 @@ fn task_wrapper<F, A, R>() -> !
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    // Here: now that the task is finished running, we must clean in up. 
-    // This involves puting the task into a non-runnable mode (exited),
-    // setting its exit value, removing it from its runqueue, and yielding the CPU.
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    // Here: now that the task is finished running, we must clean in up by doing three things:
+    // (1) Put the task into a non-runnable mode (exited), and set its exit value
     if curr_task_ref.exit(Box::new(exit_value)).is_err() {
         warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
     }
-    
+
+    // (2) Remove it from its runqueue
+    if let Err(e) = apic::get_my_apic_id()
+        .and_then(|id| RunQueue::get_runqueue(id))
+        .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+        .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+    {
+        error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+    }
+
+    // (3) Yield the CPU
     scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
-    panic!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!")
+    error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
+    loop { }
 }
 
 
@@ -596,7 +605,7 @@ fn userspace_wrapper() -> ! {
     let entry_func: usize; 
 
     { // scoped to release current task's RwLock before calling jump_to_userspace
-        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").read();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
     }

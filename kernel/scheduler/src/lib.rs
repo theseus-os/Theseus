@@ -92,7 +92,7 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         let t = task.read();
 
         // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.is_an_idle_task() {
+        if t.is_an_idle_task {
             idle_task_index = Some(i);
             continue;
         }
