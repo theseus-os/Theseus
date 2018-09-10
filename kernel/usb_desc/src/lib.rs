@@ -123,6 +123,7 @@ pub struct UsbStringDesc
 // USB Interface Descriptor
 
 #[repr(C,packed)]
+#[derive(Debug)]
 pub struct UsbIntfDesc
 {
 

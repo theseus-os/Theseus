@@ -107,6 +107,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         Mutex::new(buffer)
     });
 
+
     clean_framelist();
 
 
