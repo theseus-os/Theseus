@@ -6,12 +6,14 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate apic;
 extern crate task;
+extern crate runqueue;
 
 
 use core::ops::DerefMut;
 use irq_safety::{disable_interrupts};
-use task::{Task, TaskRef, get_my_current_task, RunQueue};
 use apic::get_my_apic_id;
+use task::{Task, TaskRef, get_my_current_task};
+use runqueue::RunQueue;
 
 
 /// This function performs a task switch.

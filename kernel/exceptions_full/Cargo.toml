@@ -24,6 +24,9 @@ path = "../apic"
 [dependencies.task]
 path = "../task"
 
+[dependencies.runqueue]
+path = "../runqueue"
+
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 

@@ -147,6 +147,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "runqueue 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -253,6 +254,7 @@ dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "pmu_x86 0.1.0",
  "print 0.1.0",
+ "runqueue 0.1.0",
  "task 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
@@ -446,6 +448,7 @@ name = "kill"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "runqueue 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -613,6 +616,7 @@ dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "panic_info 0.1.0",
+ "runqueue 0.1.0",
  "task 0.1.0",
 ]
 
@@ -750,6 +754,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "runqueue"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -769,6 +784,7 @@ dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -837,6 +853,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "runqueue 0.1.0",
  "scheduler 0.1.0",
  "task 0.1.0",
  "tss 0.1.0",
@@ -922,6 +939,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "print 0.1.0",
+ "runqueue 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",

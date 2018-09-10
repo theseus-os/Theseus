@@ -48,6 +48,9 @@ path = "../tss"
 [dependencies.task]
 path = "../task"
 
+[dependencies.runqueue]
+path = "../runqueue"
+
 [dependencies.gdt]
 path = "../gdt"
 

@@ -30,6 +30,9 @@ path = "../../kernel/spawn"
 [dependencies.task]
 path = "../../kernel/task"
 
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
 [dependencies.memory]
 path  = "../../kernel/memory"
 

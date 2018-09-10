@@ -1,28 +1,28 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "scheduler"
-description = "The scheduler and runqueue management"
+name = "runqueue"
+description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.4.5"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.0"
+
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 version = "0.1.1"
 
-[dependencies.apic]
-path= "../apic"
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
 
 [dependencies.task]
 path = "../task"
-
-[dependencies.runqueue]
-path = "../runqueue"
 
 [lib]
 crate-type = ["rlib"]

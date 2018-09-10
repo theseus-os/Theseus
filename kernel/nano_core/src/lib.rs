@@ -20,8 +20,11 @@
 #![feature(used)]
 
 
-
+#[cfg(feature = "loadable")] 
 #[macro_use] extern crate alloc;
+#[cfg(not(feature = "loadable"))] 
+extern crate alloc;
+
 #[macro_use] extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;

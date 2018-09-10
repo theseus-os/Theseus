@@ -6,11 +6,12 @@
 extern crate apic;
 extern crate getopts;
 extern crate task;
+extern crate runqueue;
 
 use getopts::Options;
 use alloc::{Vec, String};
 use apic::get_lapics;
-use task::RunQueue;
+use runqueue::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

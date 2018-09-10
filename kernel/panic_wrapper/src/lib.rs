@@ -12,6 +12,7 @@ extern crate panic_info;
 extern crate memory;
 extern crate apic;
 extern crate task;
+extern crate runqueue;
 
 
 use alloc::String;
@@ -56,7 +57,7 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
         // kill the offending task (the current task)
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(panic_info))?;
-        task::RunQueue::remove_task_from_all(curr_task)?;
+        runqueue::RunQueue::remove_task_from_all(curr_task)?;
     }
     
     // scheduler::schedule(); // yield the current task after it's done
