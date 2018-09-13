@@ -253,6 +253,10 @@ impl Task {
         self.working_dir = new_dir;
     }
 
+    pub fn get_wd(&mut self) -> StrongDirRef {
+        return Arc::clone(self.working_dir);
+    }
+
     /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
         self.running_on_cpu >= 0
