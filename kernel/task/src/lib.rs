@@ -73,7 +73,7 @@ use context_switch_sse::context_switch;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfo)>;
+pub type PanicHandler = Box<fn(&PanicInfo)>;
 
 
 
@@ -150,7 +150,7 @@ pub enum KillReason {
 }
 
 
-pub type ExitValue = Result<Box<Any>, KillReason>;
+pub type ExitValue = Result<Box<Any + Send>, KillReason>;
 
 #[derive(Debug)]
 pub enum RunState {
@@ -552,7 +552,7 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<Any>) -> Result<(), &'static str> {
+    pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
         self.internal_exit(Ok(exit_value))
     }
 
