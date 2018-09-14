@@ -11,9 +11,9 @@ use alloc::arc::Arc;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
-    if !args.is_empty() {
+    /* if !args.is_empty() {
         let task_ref = task::get_my_current_task_id();
-        let curr_dir = task_ref.read().get_wd();
+        let curr_dir = task_ref.read().unwrap().get_wd();
         let target = args[0];
         if target == ".." {
 
@@ -29,7 +29,7 @@ pub fn main(args: Vec<String>) -> isize {
         
         
 
-    }
+    } */
     
 
     0
