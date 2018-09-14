@@ -6,8 +6,6 @@ extern crate task;
 #[macro_use] extern crate terminal_print;
 
 use alloc::{Vec, String};
-use alloc::arc::Arc;
-
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

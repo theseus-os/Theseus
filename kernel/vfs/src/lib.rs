@@ -86,7 +86,7 @@ impl Directory {
         }
         return children_list;
     }
-
+    
     /// Functions as pwd command in bash
     pub fn get_path(&self) -> String {
         return self.path.clone();
