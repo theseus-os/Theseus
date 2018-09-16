@@ -131,7 +131,7 @@ findmode:
     ;check minimum values, really not minimums from an OS perspective but ugly for users
     cmp byte [VBEModeInfo.bitsperpixel], 32
     jb .searchmodes
-    cmp byte [VBEModeInfo.xresolution], 600
+    cmp word [VBEModeInfo.xresolution], 1400
     jb .searchmodes
 
 store_mode_info:    
