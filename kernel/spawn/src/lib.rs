@@ -125,6 +125,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
+    simd: bool,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -141,6 +142,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
+            simd: false,
         }
     }
 
@@ -156,19 +158,27 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
+        self.simd = true;
+        self
+    }
+
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> 
-        where A: Send + 'static, 
-              R: Send + 'static,
-              F: FnOnce(A) -> R, 
+        // where A: Send + 'static, 
+        //       R: Send + 'static,
+        //       F: FnOnce(A) -> R, 
     {
         let mut new_task = Task::new();
         new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
+        new_task.simd = self.simd;
 
         // the new kernel thread uses the same kernel address space
         new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
@@ -232,6 +242,7 @@ pub struct ApplicationTaskBuilder<'m> {
     argument: MainFuncArg,
     name: Option<String>,
     pin_on_core: Option<u8>,
+    simd: bool,
     singleton: bool,
 }
 
@@ -244,6 +255,7 @@ impl<'m> ApplicationTaskBuilder<'m> {
             argument: Vec::new(), // doesn't allocate yet
             name: None,
             pin_on_core: None,
+            simd: false,
             singleton: false,
         }
     }
@@ -257,6 +269,13 @@ impl<'m> ApplicationTaskBuilder<'m> {
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder<'m> {
         self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    pub fn simd(mut self) -> ApplicationTaskBuilder<'m> {
+        self.simd = true;
         self
     }
 
@@ -302,11 +321,14 @@ impl<'m> ApplicationTaskBuilder<'m> {
         // build and spawn the actual underlying kernel Task
         let ktb = KernelTaskBuilder::new(*main_func, self.argument)
             .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
+        
+        let ktb = if self.simd { ktb.simd() } else { ktb };
         let ktb = if let Some(core) = self.pin_on_core {
             ktb.pin_on_core(core)
         } else {
             ktb
         };
+
 
         let app_task = ktb.spawn()?;
         app_task.write().app_crate = Some(app_crate_ref);

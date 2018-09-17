@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "runqueue"
 description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 
@@ -23,6 +24,14 @@ path = "../../libs/atomic_linked_list"
 
 [dependencies.task]
 path = "../task"
+
+
+## This should be dependent upon 'cfg(single_simd_task_optimization)',
+## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
+## Therefore, it has to be unconditionally included.
+[dependencies.single_simd_task_optimization]
+path = "../single_simd_task_optimization"
+
 
 [lib]
 crate-type = ["rlib"]

@@ -202,6 +202,9 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core.
     pub is_an_idle_task: bool,
+    /// Whether this Task is SIMD enabled, i.e.,
+    /// whether it uses SIMD registers and instructions.
+    pub simd: bool,
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
     /// that contains the backing memory regions and sections for running this `Task`'s object file 
     pub app_crate: Option<StrongCrateRef>,
@@ -238,6 +241,7 @@ impl Task {
             new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
+            simd: false,
             app_crate: None,
             panic_handler: None,
         }
@@ -571,7 +575,7 @@ impl TaskRef {
     }
 
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
-    #[deprecated]
+    #[deprecated] // TODO FIXME since 2018-09-06
     pub fn write(&self) -> RwLockIrqSafeWriteGuard<Task> {
         self.0.write()
     }
@@ -582,3 +586,24 @@ impl PartialEq for TaskRef {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
+
+impl Eq for TaskRef { }
+
+// impl Hash for TaskRef {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         (self.0.as_ref() as *const _ as usize).hash(state);
+//     }
+// }
+
+// use core::cmp::Ord;
+// impl Ord for TaskRef {
+//     fn cmp(&self, other: &TaskRef) -> core::cmp::Ordering {
+//         (self.0.as_ref() as *const _ as usize).cmp(&(other.0.as_ref() as *const _ as usize))
+//     }
+// }
+
+// impl PartialOrd for TaskRef {
+//     fn partial_cmp(&self, other: &TaskRef) -> Option<core::cmp::Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }

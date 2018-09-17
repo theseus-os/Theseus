@@ -2,6 +2,7 @@
 name = "frame_buffer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"

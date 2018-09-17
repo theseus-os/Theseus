@@ -26,8 +26,6 @@ exclude = [
 ]
 
 
-[features]
-dual_simd = []
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 

@@ -17,7 +17,7 @@ extern crate mod_mgmt;
 
 
 use core::fmt;
-
+use core::ops::DerefMut;
 
 
 #[cfg(not(test))]
@@ -39,7 +39,7 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     let res = if kernel_mmi_ref.is_some() {
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
-        #[cfg(feature = "loadable")]
+        #[cfg(loadable)]
         {
             use mod_mgmt::metadata::CrateType;
             
@@ -60,7 +60,7 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
                     .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
             })
         }
-        #[cfg(not(feature = "loadable"))]
+        #[cfg(not(loadable))]
         {
             panic_wrapper::panic_wrapper(fmt_args, file, line, col)
         }

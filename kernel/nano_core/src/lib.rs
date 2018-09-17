@@ -20,9 +20,9 @@
 #![feature(used)]
 
 
-#[cfg(feature = "loadable")] 
+#[cfg(loadable)] 
 #[macro_use] extern crate alloc;
-#[cfg(not(feature = "loadable"))] 
+#[cfg(not(loadable))] 
 extern crate alloc;
 
 #[macro_use] extern crate log;
@@ -156,7 +156,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     }
     
     // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
-    #[cfg(feature = "loadable")] 
+    #[cfg(loadable)] 
     {
         let kernel_prefix = mod_mgmt::metadata::CrateType::Kernel.prefix();
         let core_module = try_exit!(memory::get_module(&format!("{}core", kernel_prefix)).ok_or("couldn't find core module"));
@@ -170,7 +170,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
-    #[cfg(feature = "loadable")]
+    #[cfg(loadable)]
     {
         use alloc::Vec;
         use alloc::arc::Arc;
@@ -200,7 +200,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             )
         );
     }
-    #[cfg(not(feature = "loadable"))]
+    #[cfg(not(loadable))]
     {
         try_exit!(
             captain::init(kernel_mmi_ref, identity_mapped_pages, 

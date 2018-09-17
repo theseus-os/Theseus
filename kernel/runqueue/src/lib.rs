@@ -12,6 +12,9 @@ extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
 
+#[cfg(single_simd_task_optimization)]
+extern crate single_simd_task_optimization;
+
 use alloc::VecDeque;
 use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
@@ -31,6 +34,8 @@ lazy_static! {
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
+    // #[cfg(simd_personality)]
+    // number_simd_tasks: usize,
 }
 
 impl RunQueue {
@@ -105,7 +110,21 @@ impl RunQueue {
     /// Adds a `TaskRef` to this RunQueue.
     pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        
+        #[cfg(single_simd_task_optimization)]
+        let is_simd = task.read().simd;
+
         self.queue.push_back(task);
+        
+        #[cfg(single_simd_task_optimization)]
+        {   
+            warn!("USING SIMD_PERSONALITY VERSION OF RUNQUEUE::ADD_TASK");
+            // notify simd_personality crate about runqueue change, but only for SIMD tasks
+            if is_simd {
+                single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.core);
+            }
+        }
+
         Ok(())
     }
 
@@ -119,10 +138,13 @@ impl RunQueue {
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         debug!("Removing task from runqueue {}, {:?}", self.core, task);
-        // debug!("BEFORE RUNQUEUE {}: {:?}", self.core, self.queue);
         self.queue.retain(|x| x != task);
-        // debug!("AFTER RUNQUEUE {}: {:?}", self.core, self.queue);
+
+        warn!("USING SIMD_PERSONALITY VERSION OF RUNQUEUE::REMOVE_TASK");
         Ok(())
+
+        // TODO FIXME: notify simd_personality crate about runqueue change
+        // simd_personality::task_removed_from_runqueue(&task, self);
     }
 
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
@@ -144,7 +166,9 @@ impl RunQueue {
 
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
+    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
     pub fn iter(&self) -> alloc::vec_deque::Iter<TaskRef> {
         self.queue.iter()
     }
+
 }

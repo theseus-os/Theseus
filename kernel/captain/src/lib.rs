@@ -53,7 +53,7 @@ extern crate frame_buffer;
 extern crate input_event_manager;
 extern crate exceptions_full;
 
-
+#[cfg(simd_personality)]
 extern crate simd_personality;
 
 // Here, we add pub use statements for any function or data that we want to export from the nano_core
@@ -88,7 +88,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             ap_start_realmode_begin: usize, ap_start_realmode_end: usize) 
             -> Result<(), &'static str>
 {
-    #[cfg(feature = "mirror_log_to_vga")]
+    #[cfg(mirror_log_to_vga)]
     {
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(mirror_to_vga_cb);
@@ -208,18 +208,20 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     
     // create a SIMD personality
-    if true {
+    #[cfg(simd_personality)]
+    {
+        warn!("DUAL SIMD FEATURE ENABLED!");
         KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }
 
+    #[cfg(loadable)]
+    {
+        warn!("LOADABLE FEATURE ENABLED!");
+    }
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
-    #[cfg(feature = "dual_simd")] 
-    {
-        error!("DUAL SIMD FEATURE ENABLED!");
-    }
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
     // (unless there are no other tasks available to run on the BSP core, which doesnt happen)

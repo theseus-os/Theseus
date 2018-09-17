@@ -761,6 +761,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "single_simd_task_optimization 0.1.0",
  "task 0.1.0",
 ]
 
@@ -825,6 +826,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]
@@ -833,6 +835,14 @@ version = "0.1.0"
 dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock 0.1.0",
+]
+
+[[package]]
+name = "single_simd_task_optimization"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
 ]
 
 [[package]]
@@ -976,7 +986,6 @@ dependencies = [
 name = "text_display"
 version = "0.1.0"
 dependencies = [
- "event_types 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

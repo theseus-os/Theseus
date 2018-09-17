@@ -2,6 +2,7 @@
 name = "kill"
 version = "0.1.0"
 authors = ["Christine Wang <chrissywang54@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
