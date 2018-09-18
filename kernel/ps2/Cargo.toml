@@ -1,7 +1,9 @@
 [package]
 name = "ps2"
 version = "0.1.0"
+description = "Drivers supporting the PS/2 interface, for legacy keyboard/mouse devices"
 authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"

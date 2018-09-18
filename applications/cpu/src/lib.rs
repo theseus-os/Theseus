@@ -6,11 +6,12 @@
 extern crate apic;
 extern crate getopts;
 extern crate task;
+extern crate runqueue;
 
 use getopts::Options;
 use alloc::{Vec, String};
 use apic::get_lapics;
-use task::RunQueue;
+use runqueue::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -41,7 +42,7 @@ pub fn main(args: Vec<String>) -> isize {
         if let Some(runqueue) = RunQueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task_ref in runqueue.iter() {
-                let task = task_ref.read();
+                let task = task_ref.lock();
                 runqueue_contents.push_str(&format!("{} ({}) {}\n", 
                     task.name, 
                     task.id,

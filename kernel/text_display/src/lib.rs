@@ -1,9 +1,5 @@
 #![no_std]
 
-extern crate event_types;
-
-use event_types::Event;
-
 /// Defines the methods that a TextDisplay must have
 pub struct TextDisplay {
     x:usize,

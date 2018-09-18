@@ -56,7 +56,7 @@ pub fn main(args: Vec<String>) -> isize {
         .spawn()?;
     */
     pmu_x86::init();
-    let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
+    let _sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
     /*
     pmu_x86::init();
     let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);

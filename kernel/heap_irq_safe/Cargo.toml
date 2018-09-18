@@ -9,5 +9,4 @@ linked_list_allocator = { git = "https://github.com/weclaw1/linked-list-allocato
 spin = "0.4.5"
 
 [dependencies.irq_safety]
-version = "0.1.1"
 git = "https://github.com/kevinaboos/irq_safety"

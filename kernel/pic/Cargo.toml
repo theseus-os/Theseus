@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "pic"
 description = "PIC (Programmable Interrupt Controller), support for a legacy device that isn't used much"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }

@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "input_event_manager"
 description = "Handles keyboard input and redirects to the appropriate terminal"
 version = "0.1.0"
+build = "../../build.rs"
 
 
 [dependencies]
