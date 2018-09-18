@@ -10,6 +10,7 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate kernel_config;
 extern crate task;
+extern crate runqueue;
 extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
@@ -22,6 +23,7 @@ extern crate context_switch;
 #[cfg(target_feature = "sse2")]
 extern crate context_switch_sse; 
 
+extern crate spin;
 
 use core::mem;
 use core::marker::PhantomData;
@@ -33,7 +35,8 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS, RunQueue};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS};
+use runqueue::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 
 #[cfg(not(target_feature = "sse2"))]
@@ -123,6 +126,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
+    simd: bool,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -139,6 +143,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
+            simd: false,
         }
     }
 
@@ -154,20 +159,27 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
+        self.simd = true;
+        self
+    }
+
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> 
-        where A: Send + 'static, 
-              R: Send + 'static,
-              F: FnOnce(A) -> R, 
+        // where A: Send + 'static, 
+        //       R: Send + 'static,
+        //       F: FnOnce(A) -> R, 
     {
         let mut new_task = Task::new();
-        let name = self.name.unwrap_or_else(|| String::from( 
+        new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
-        new_task.set_name(name);
+        new_task.simd = self.simd;
 
         // the new kernel thread uses the same kernel address space
         new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
@@ -231,6 +243,7 @@ pub struct ApplicationTaskBuilder<'m> {
     argument: MainFuncArg,
     name: Option<String>,
     pin_on_core: Option<u8>,
+    simd: bool,
     singleton: bool,
 }
 
@@ -243,6 +256,7 @@ impl<'m> ApplicationTaskBuilder<'m> {
             argument: Vec::new(), // doesn't allocate yet
             name: None,
             pin_on_core: None,
+            simd: false,
             singleton: false,
         }
     }
@@ -256,6 +270,13 @@ impl<'m> ApplicationTaskBuilder<'m> {
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder<'m> {
         self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    pub fn simd(mut self) -> ApplicationTaskBuilder<'m> {
+        self.simd = true;
         self
     }
 
@@ -301,14 +322,17 @@ impl<'m> ApplicationTaskBuilder<'m> {
         // build and spawn the actual underlying kernel Task
         let ktb = KernelTaskBuilder::new(*main_func, self.argument)
             .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
+        
+        let ktb = if self.simd { ktb.simd() } else { ktb };
         let ktb = if let Some(core) = self.pin_on_core {
             ktb.pin_on_core(core)
         } else {
             ktb
         };
 
+
         let app_task = ktb.spawn()?;
-        app_task.write().app_crate = Some(app_crate_ref);
+        app_task.lock_mut().app_crate = Some(app_crate_ref);
 
         Ok(app_task)
     }
@@ -346,7 +370,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(name.unwrap_or(module.name().clone())));
+    new_task.name = String::from(name.unwrap_or(module.name().clone()));
 
     let mut ustack: Option<Stack> = None;
 
@@ -536,12 +560,12 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("task_wrapper(): couldn't get_my_current_task().");
-    let curr_task_name = curr_task_ref.read().name.clone();
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
+    let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
-        let t = curr_task_ref.read();
-        let kstack = t.kstack.as_ref().expect("task_wrapper(): failed to get current task's kstack.");
+        let t = curr_task_ref.lock();
+        let kstack = t.kstack.as_ref().expect("BUG: task_wrapper(): failed to get current task's kstack.");
         // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
@@ -570,18 +594,28 @@ fn task_wrapper<F, A, R>() -> !
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    // Here: now that the task is finished running, we must clean in up. 
-    // This involves puting the task into a non-runnable mode (exited),
-    // setting its exit value, removing it from its runqueue, and yielding the CPU.
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    // Here: now that the task is finished running, we must clean in up by doing three things:
+    // (1) Put the task into a non-runnable mode (exited), and set its exit value
     if curr_task_ref.exit(Box::new(exit_value)).is_err() {
         warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
     }
-    
+
+    // (2) Remove it from its runqueue
+    if let Err(e) = apic::get_my_apic_id()
+        .and_then(|id| RunQueue::get_runqueue(id))
+        .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+        .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+    {
+        error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+    }
+
+    // (3) Yield the CPU
     scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
-    panic!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!")
+    error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
+    loop { }
 }
 
 
@@ -596,7 +630,7 @@ fn userspace_wrapper() -> ! {
     let entry_func: usize; 
 
     { // scoped to release current task's RwLock before calling jump_to_userspace
-        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").lock();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
     }

@@ -37,33 +37,34 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     // Print all tasks
-    let mut process_string = String::new();
-    for process in TASKLIST.iter() {
-        let id = process.0;
-        let name = &process.1.read().name;
-        let runstate = match &process.1.read().runstate {
-            RunState::Initing => "Initing",
-            RunState::Runnable => "Runnable",
-            RunState::Blocked => "Blocked",
-            RunState::Reaped => "Reaped",
-            _ => "Exited",
+    let mut task_string = String::new();
+    for (id, taskref) in TASKLIST.iter() {
+        let task = taskref.lock();
+        let name = &task.name;
+        let runstate = match &task.runstate {
+            RunState::Initing    => "Initing",
+            RunState::Runnable   => "Runnable",
+            RunState::Blocked    => "Blocked",
+            RunState::Reaped     => "Reaped",
+            _                    => "Exited",
         };
-        let cpu = process.1.read().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &process.1.read().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if process.1.read().is_an_idle_task {"I"}
-                    else if process.1.read().is_application() {"A"}
-                    else {" "} ;     
+        let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
+        let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let task_type = if task.is_an_idle_task {"I"}
+            else if task.is_application() {"A"}
+            else {" "} ;     
 
         if matches.opt_present("b") {
-            process_string.push_str(&format!("{0:<5}  {1}\n", id, name));
+            task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
         else {
-            process_string.push_str(
+            task_string.push_str(
                 &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
-                    id, runstate, cpu, pinned, task_type, name));
+                    id, runstate, cpu, pinned, task_type, name)
+            );
         }
     }
-    println!("{}", process_string);
+    println!("{}", task_string);
     
     0
 }

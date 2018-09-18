@@ -61,6 +61,7 @@ extern crate compiler_builtins as _compiler_builtins;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate spawn;
+extern crate task;
 
 
 use core::ops::DerefMut;
@@ -119,6 +120,23 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	debug!("finished spawning second simd task");
 
 
+	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test_short", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+		.upgrade()
+		.ok_or("no symbol: simd_test::test_short")?;
+	let mut space3 = 0;	
+	let (mapped_pages3, mapped_pages_offset3) = { 
+		let section = section_ref3.lock();
+		(section.mapped_pages.clone(), section.mapped_pages_offset)
+	};
+	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
+	let task3 = KernelTaskBuilder::new(func, ())
+		.name(String::from("simd_test_short-sse"))
+		.pin_on_core(2)
+		.simd()
+		.spawn()?;
+	debug!("finished spawning second simd task");
+
+
 	// we can't return here because the mapped pages that contain
 	// the simd_test functions being run must not be dropped 
 	// until the threads are completed.
@@ -127,6 +145,8 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 
 	task1.join()?;
 	task2.join()?;
+	task3.join()?;
+
 	Ok(())
 
 }

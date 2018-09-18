@@ -1,7 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
+description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
+build = "../../build.rs"
 
 
 [dependencies]
