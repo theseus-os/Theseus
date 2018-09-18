@@ -3,6 +3,7 @@ authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 name = "ata_pio"
 description = "Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"

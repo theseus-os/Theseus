@@ -2,6 +2,7 @@
 name = "cpu"
 version = "0.1.0"
 authors = ["Christine Wang <chrissywang54@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
@@ -14,6 +15,9 @@ path = "../../kernel/apic"
 
 [dependencies.task]
 path = "../../kernel/task"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

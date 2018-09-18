@@ -2,6 +2,7 @@
 name = "window_manager"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -26,8 +27,7 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
-version = "0.1.1"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
