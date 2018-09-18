@@ -36,8 +36,7 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
 
     // get current task to see if it has a panic_handler
     let curr_task = task::get_my_current_task();
-
-    let curr_task_name = curr_task.map(|t| t.read().name.clone()).unwrap_or(String::from("UNKNOWN!"));
+    let curr_task_name = curr_task.map(|t| t.lock().name.clone()).unwrap_or(String::from("UNKNOWN!"));
     let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
     
     // call this task's panic handler, if it has one. 
@@ -53,7 +52,7 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
         memory::stack_trace();
     }
 
-    if !curr_task.read().is_an_idle_task {
+    if !curr_task.lock().is_an_idle_task {
         // kill the offending task (the current task)
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(panic_info))?;

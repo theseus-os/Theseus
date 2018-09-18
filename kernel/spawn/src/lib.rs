@@ -23,6 +23,7 @@ extern crate context_switch;
 #[cfg(target_feature = "sse2")]
 extern crate context_switch_sse; 
 
+extern crate spin;
 
 use core::mem;
 use core::marker::PhantomData;
@@ -331,7 +332,7 @@ impl<'m> ApplicationTaskBuilder<'m> {
 
 
         let app_task = ktb.spawn()?;
-        app_task.write().app_crate = Some(app_crate_ref);
+        app_task.lock_mut().app_crate = Some(app_crate_ref);
 
         Ok(app_task)
     }
@@ -560,10 +561,10 @@ fn task_wrapper<F, A, R>() -> !
           F: FnOnce(A) -> R, 
 {
     let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
-    let curr_task_name = curr_task_ref.read().name.clone();
+    let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
-        let t = curr_task_ref.read();
+        let t = curr_task_ref.lock();
         let kstack = t.kstack.as_ref().expect("BUG: task_wrapper(): failed to get current task's kstack.");
         // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
@@ -629,7 +630,7 @@ fn userspace_wrapper() -> ! {
     let entry_func: usize; 
 
     { // scoped to release current task's RwLock before calling jump_to_userspace
-        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").read();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").lock();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
     }

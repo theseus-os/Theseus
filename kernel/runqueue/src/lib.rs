@@ -112,7 +112,7 @@ impl RunQueue {
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
         
         #[cfg(single_simd_task_optimization)]
-        let is_simd = task.read().simd;
+        let is_simd = task.lock().simd;
 
         self.queue.push_back(task);
         

@@ -6,6 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.5"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 atomic = { version = "0.3.4", features = ["nightly"]}
@@ -21,7 +22,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.owning_ref]
 # version = "0.3.3"

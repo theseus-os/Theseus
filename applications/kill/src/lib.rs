@@ -38,7 +38,7 @@ pub fn main(args: Vec<String>) -> isize {
                         .and_then(|_| RunQueue::remove_task_from_all(task_ref))
                         .is_ok() 
                     {
-                        println!("Killed task {} \n", task_ref.read().deref());
+                        println!("Killed task {} \n", task_ref.lock().deref());
                         0
                     }
                     else {

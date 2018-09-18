@@ -853,7 +853,7 @@ impl Terminal {
             .argument(arguments)
             .spawn()?;
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-        let new_task_id = taskref.read().id;
+        let new_task_id = taskref.lock().id;
         return Ok(new_task_id);
         
     }

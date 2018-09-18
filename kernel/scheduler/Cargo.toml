@@ -14,7 +14,6 @@ version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.apic]
 path= "../apic"

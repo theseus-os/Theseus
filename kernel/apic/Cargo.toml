@@ -28,7 +28,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

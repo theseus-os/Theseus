@@ -37,7 +37,7 @@ pub fn schedule() -> bool {
     };
 
     if let Some(selected_next_task) = select_next_task(apic_id) {
-        next_task = selected_next_task.write().deref_mut();  // as *mut Task;
+        next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
     else {
         // keep running the same current task
@@ -52,7 +52,7 @@ pub fn schedule() -> bool {
     // same scoping reasons as above: to release the lock around current_task
     {
         current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-                                            .write().deref_mut() as *mut Task; 
+                                            .lock_mut().deref_mut() as *mut Task; 
     }
 
     if current_task == next_task {
@@ -90,8 +90,8 @@ fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
 
-    for (i, task) in runqueue_locked.iter().enumerate() {
-        let t = task.read();
+    for (i, taskref) in runqueue_locked.iter().enumerate() {
+        let t = taskref.lock();
 
         // we skip the idle task, and only choose it if no other tasks are runnable
         if t.is_an_idle_task {

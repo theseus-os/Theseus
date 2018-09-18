@@ -33,7 +33,6 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate spin;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -55,7 +54,7 @@ use alloc::String;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
 
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
@@ -72,7 +71,7 @@ use context_switch_sse::context_switch;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfo)>;
+pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
 
 
 
@@ -122,7 +121,7 @@ pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
         .map(|taskref| {
-            taskref.0.write().set_panic_handler(handler)
+            taskref.set_panic_handler(handler)
         })
 }
 
@@ -148,7 +147,7 @@ pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
     /// and should therefore be able to downcast it appropriately.
-    Completed(Box<Any>),
+    Completed(Box<Any + Send>),
     /// The Task did NOT run to completion, and was instead killed.
     /// The reason for it being killed is enclosed. 
     Killed(KillReason),
@@ -444,19 +443,20 @@ impl fmt::Display for Task {
 /// a reference to a Task is used. 
 /// For example, task lists, task spawning, task management, scheduling, etc. 
 /// 
-/// Essentially a newtype wrapper around `Arc<[Lock]<Task>>` 
-/// where `[Lock]` is some mutex-like locking type.
-/// Currently, `[Lock]` is a `RwLockIrqSafe`.
+/// Essentially a newtype wrapper around `Arc<Lock<Task>>` 
+/// where `Lock` is some mutex-like locking type.
+/// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow
+/// multiple readers simultaneously; that will cause deadlock.
 /// 
 /// `TaskRef` implements the `PartialEq` trait; 
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 #[derive(Debug, Clone)]
-pub struct TaskRef(Arc<RwLockIrqSafe<Task>>);
+pub struct TaskRef(Arc<MutexIrqSafe<Task>>);
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     pub fn new(task: Task) -> TaskRef {
-        TaskRef(Arc::new(RwLockIrqSafe::new(task)))
+        TaskRef(Arc::new(MutexIrqSafe::new(task)))
     }
 
     /// Waits until the given `task` has finished executing, 
@@ -481,14 +481,14 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if let RunState::Exited(_) = self.0.read().runstate {
+            if let RunState::Exited(_) = self.0.lock().runstate {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            let t = self.0.read();
+            let t = self.0.lock();
             if !t.is_running() {
                 return Ok(());
             }
@@ -498,7 +498,7 @@ impl TaskRef {
 
     /// The internal routine that actually exits or kills a Task.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        let mut task = self.0.write();
+        let mut task = self.0.lock();
         if let RunState::Exited(_) = task.runstate {
             return Err("task was already exited! (did not overwrite its existing exit value)");
         }
@@ -519,7 +519,7 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<Any>) -> Result<(), &'static str> {
+    pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
         self.internal_exit(ExitValue::Completed(exit_value))
     }
 
@@ -545,15 +545,15 @@ impl TaskRef {
     /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
     /// This is okay because we want to allow any other part of the OS to read 
     /// the details of the `Task` struct.
-    pub fn read(&self) -> RwLockIrqSafeReadGuard<Task> {
-        self.0.read()
+    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
+        MutexIrqSafeGuardRef::new(self.0.lock())
     }
 
     /// Registers a function or closure that will be called if this `Task` panics.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.write().set_panic_handler(callback)
+        self.0.lock().set_panic_handler(callback)
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
@@ -562,7 +562,7 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.write().take_panic_handler()
+        self.0.lock().take_panic_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -571,13 +571,13 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_exit_value(&self) -> Option<ExitValue> {
-        self.0.write().take_exit_value()
+        self.0.lock().take_exit_value()
     }
 
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
     #[deprecated] // TODO FIXME since 2018-09-06
-    pub fn write(&self) -> RwLockIrqSafeWriteGuard<Task> {
-        self.0.write()
+    pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
+        MutexIrqSafeGuardRefMut::new(self.0.lock())
     }
 }
 

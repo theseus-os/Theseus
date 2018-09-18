@@ -210,15 +210,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // create a SIMD personality
     #[cfg(simd_personality)]
     {
-        warn!("DUAL SIMD FEATURE ENABLED!");
+        warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
         KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
             .name(String::from("setup_simd_personality"))
             .spawn()?;
-    }
-
-    #[cfg(loadable)]
-    {
-        warn!("LOADABLE FEATURE ENABLED!");
     }
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");

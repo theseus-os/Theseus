@@ -283,7 +283,7 @@ name = "frame_buffer_3d"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -403,16 +403,11 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety#90affdc92306c67f11ad99516227e6dc04050709"
+source = "git+https://github.com/kevinaboos/irq_safety#6a8c008994273603829bf83d30b41b315b5bb387"
 dependencies = [
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "irq_safety"
-version = "0.1.1"
-dependencies = [
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -865,6 +860,7 @@ dependencies = [
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "tss 0.1.0",
  "x86_64 0.1.2",
@@ -932,7 +928,6 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "panic_info 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -1047,7 +1042,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
