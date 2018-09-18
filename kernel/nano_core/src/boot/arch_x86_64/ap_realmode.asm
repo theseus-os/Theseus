@@ -112,10 +112,10 @@ findmode:
     sub si, 2
 
 .searchmodes:
-    add si, 2
+    add si, 2; si points to the next mode
     mov cx, [fs:si]
     cmp cx, 0xFFFF
-    je store_mode_info
+    je store_mode_info; if current mode is the last one, break
 
 .getmodeinfo:
     push esi
@@ -128,11 +128,10 @@ findmode:
     jne store_mode_info
 
 .foundmode:
-    ;check minimum values, really not minimums from an OS perspective but ugly for users
     cmp byte [VBEModeInfo.bitsperpixel], 32
-    jb .searchmodes
-    cmp byte [VBEModeInfo.xresolution], 600
-    jb .searchmodes
+    jne .searchmodes; if current mode is not 32-byte, continue to search
+    cmp word [VBEModeInfo.xresolution], 1280
+    jb .searchmodes; if current resolution is less than 1280, continue to search
 
 store_mode_info:    
     push di
@@ -164,8 +163,8 @@ store_mode_info:
     pop di
 
 set_graphic_mode:
-    mov ax, 0x4f02; bx 4___ is linear frame buffer 
-    mov bx, [current.mode]; 0x4f41:640*400*32bit in QEMU
+    mov ax, 0x4f02; 
+    mov bx, [current.mode]; 0x4f41:640*400*32bit in QEMU; bx 4___ is linear frame buffer 
     int 0x10;
 
     push ds
