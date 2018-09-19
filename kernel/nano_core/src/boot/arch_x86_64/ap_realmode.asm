@@ -91,6 +91,7 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
+;The graphic mode setting code is executed once. [0000:0900] indicates if it's the first time to run the code. If not, skip the graphic mode setting block.
     mov ax, 0
     mov es, ax
     mov di, 0x900
@@ -98,62 +99,67 @@ ap_start_realmode:
     cmp ax, 5
     je gdt
 
-getcardinfo:
-    mov ax, 0x4F00
-    mov di, VBECardInfo
-    int 0x10
-    cmp ax, 0x4F
-    jne gdt
+;Here we get the VESA information and set a VESA mode of a choosen resolution
+;We get a list of available modes, and pick the first mode of 32bit(RGB_) and whose x-resolution >= 1280
+;We put the mode information in physical address 0xF100 which can be read in Rust
+getcardinfo:            ;get super VGA information including available modes list
+    mov ax, 0x4F00      ;BIOS int 10, ax=4F00, get superVGA information
+    mov di, VBECardInfo ;di, buffer for returned information
+    int 0x10            ;BIOS int 10
+    cmp al, 0x4F        ;al=4f, function is supported
+    jne gdt             ;if not supported, skip the VESA mode setting block
     
-findmode:
+findmode:               ;initialize the mode pointer
     mov si, [VBECardInfo.videomodeptr]
     mov ax, [VBECardInfo.videomodeptr+2]
-    mov fs, ax
-    sub si, 2
+    mov fs, ax          ;[fs:si] pointes to the first mode
+    sub si, 2           ;initilize the pointer [fs:si] to the index before the first mode
 
+;travers the mode list to fint the first mode of intended parameters
 .searchmodes:
-    add si, 2
-    mov cx, [fs:si]
-    cmp cx, 0xFFFF
-    je store_mode_info
+    add si, 2           ;[fs:si] points to the next mode
+    mov cx, [fs:si]     ;move current mode index to cx
+    cmp cx, 0xFFFF      
+    je gdt              ;if the mode index extends the bound, skip the VESA mode setting block;
 
 .getmodeinfo:
     push esi
-    mov [current.mode], cx
-    mov ax, 0x4F01
-    mov di, VBEModeInfo
-    int 0x10
+    mov [current.mode], cx  ;set current mode
+    mov ax, 0x4F01          ;BIOS int 10, ax=4f01, get current mode information. cx:mode address
+    mov di, VBEModeInfo     ;di: returned mode information buffer
+    int 0x10                ;BIOS int 10
     pop esi
-    cmp ax, 0x4F
-    jne store_mode_info
+    cmp al, 0x4F            ;al=4f, function is supported
+    jne gdt                 ;if not supported, skip the VESA mode setting block
 
 .foundmode:
-    ;check minimum values, really not minimums from an OS perspective but ugly for users
     cmp byte [VBEModeInfo.bitsperpixel], 32
-    jb .searchmodes
-    cmp byte [VBEModeInfo.xresolution], 600
-    jb .searchmodes
+    jne .searchmodes; if current mode is not 32-byte, continue to search
+    cmp word [VBEModeInfo.xresolution], 900
+    jb .searchmodes; if current x-resolution is less than 1280, continue to search
 
+; store resolution and bufferr address to [0000:F100] so that Rust can read them
 store_mode_info:    
     push di
     mov ax, 0
     mov es, ax
     mov di, 0xF100
 
-    ;x resolution
+    ;move x resolution to [0:F100]
     mov word ax, [VBEModeInfo.xresolution]
     mov word [es:di], ax
     mov word [es:di+2], 0
     mov word [es:di+4], 0
     mov word [es:di+6], 0
 
-    ;y resolution
+    ;move y resolution to [0:F108]
     mov word ax, [VBEModeInfo.yresolution]
     mov word [es:di+8], ax
     mov word [es:di+10], 0
     mov word [es:di+12], 0
     mov word [es:di+14], 0
 
+    ;move lfb address to [0:F110]
     ;liner frame buffer address
     mov word ax, [VBEModeInfo.physbaseptr]
     mov word [es:di+16], ax
@@ -164,23 +170,12 @@ store_mode_info:
     pop di
 
 set_graphic_mode:
-    mov ax, 0x4f02; bx 4___ is linear frame buffer 
-    mov bx, [current.mode]; 0x4f41:640*400*32bit in QEMU
-    int 0x10;
+    mov ax, 0x4f02;         ;BIOS int 10, ax=4f02, set graphic mode
+    ;0x4f41:640*400*32bit in QEMU; bx 4___ is linear frame buffer 
+    mov bx, [current.mode]  ;bx: current mode 
+    int 0x10                ;BIOS int 10
 
-    push ds
-    push es
-    mov ax,0x1103
-    mov  bh,6
-    int 0x10
-    push es
-    pop ds
-    pop es
-    mov si,bp
-    mov cx,256*16/4
-    rep movsd
-    pop ds
-    
+    ;Set the flag [0000:0900] indicating that the graphic mode is set
     mov ax, 0
     mov es, ax
     mov di, 0x900

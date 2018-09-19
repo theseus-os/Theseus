@@ -1,0 +1,22 @@
+[package]
+name = "graph"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiujj@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
+
+[dependencies.acpi]
+path = "../../kernel/acpi"
+
+[dependencies.terminal_print]
+path = "../terminal_print"

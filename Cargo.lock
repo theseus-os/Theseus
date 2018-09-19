@@ -94,7 +94,6 @@ dependencies = [
  "event_types 0.1.0",
  "exceptions_full 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
  "input_event_manager 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -283,13 +282,16 @@ name = "frame_buffer_3d"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
+ "tsc 0.1.0",
+ "util 0.1.0",
+ "vga_buffer 0.1.0",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -320,6 +322,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "plain 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "scroll 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "graph"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "frame_buffer 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]

@@ -16,6 +16,8 @@ version = "0.2.1"
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
 
 [dependencies.state_store]
 path = "../state_store"
@@ -27,11 +29,17 @@ version = "0.3.7"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+[dependencies.util]
+path = "../../libs/util"
 
 [dependencies.acpi]
 path = "../acpi"
+
+[dependencies.tsc]
+path = "../tsc"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 
 
