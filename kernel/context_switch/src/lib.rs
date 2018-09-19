@@ -47,9 +47,7 @@ impl Context {
 /// Also, it must be a naked function, so there cannot be regular arguments passed into it.
 /// Instead, the caller of this function must place the first argument into the `rdi` register
 /// and the second argument into the `rsi` register right before invoking this function.
-#[allow(private_no_mangle_fns)]
 #[naked]
-#[no_mangle]
 #[inline(never)]
 pub unsafe fn context_switch() {
     

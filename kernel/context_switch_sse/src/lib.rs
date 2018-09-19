@@ -74,17 +74,15 @@ impl Context {
 /// This is the task switch routine for when SSE/SIMD extensions are enabled.
 /// 
 /// # Arguments
-/// First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
-/// Second argument (put in `rsi`): the value of the next task's stack pointer
+/// * First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
+/// * Second argument (put in `rsi`): the value of the next task's stack pointer
 /// 
 /// # Safety
 /// This function is unsafe because it changes the content on both task's stacks. 
 /// Also, it must be a naked function, so there cannot be regular arguments passed into it.
 /// Instead, the caller of this function must place the first argument into the `rdi` register
 /// and the second argument into the `rsi` register right before invoking this function.
-#[allow(private_no_mangle_fns)]
 #[naked]
-#[no_mangle]
 #[inline(never)]
 pub unsafe fn context_switch() {
 

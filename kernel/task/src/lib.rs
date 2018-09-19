@@ -41,10 +41,12 @@ extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
 
-#[cfg(not(target_feature = "sse2"))]
+// If the simd_personality cfg is enabled, then we need both context switch crates.
+// If not, we need just one of them, based on whether the build target enables "sse2".
+#[cfg(any(simd_personality, not(target_feature = "sse2")))]
 extern crate context_switch;
-#[cfg(target_feature = "sse2")]
-extern crate context_switch_sse; 
+#[cfg(any(simd_personality, target_feature = "sse2"))]
+extern crate context_switch_sse;
 
 
 use core::fmt;
@@ -61,13 +63,6 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-
-
-#[cfg(not(target_feature = "sse2"))]
-use context_switch::context_switch;
-#[cfg(target_feature = "sse2")]
-use context_switch_sse::context_switch;
-
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
@@ -201,14 +196,16 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core.
     pub is_an_idle_task: bool,
-    /// Whether this Task is SIMD enabled, i.e.,
-    /// whether it uses SIMD registers and instructions.
-    pub simd: bool,
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
     /// that contains the backing memory regions and sections for running this `Task`'s object file 
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
+    
+    #[cfg(simd_personality)]
+    /// Whether this Task is SIMD enabled, i.e.,
+    /// whether it uses SIMD registers and instructions.
+    pub simd: bool,
 }
 
 impl fmt::Debug for Task {
@@ -240,9 +237,11 @@ impl Task {
             new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
-            simd: false,
             app_crate: None,
             panic_handler: None,
+
+            #[cfg(simd_personality)]
+            simd: false,
         }
     }
 
@@ -266,6 +265,10 @@ impl Task {
         self.app_crate.is_some()
     }
 
+    /// Returns true if this is a userspace`Task`.
+    pub fn is_userspace(&self) -> bool {
+        self.ustack.is_some()
+    }
 
     /// Registers a function or closure that will be called if this `Task` panics.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
@@ -341,21 +344,17 @@ impl Task {
         }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
-                error!("BUG: Skipping context_Switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
                 my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
          
 
-        // update runstates
-        self.running_on_cpu = None; // no longer running
-        next.running_on_cpu = Some(apic_id); // now running on this core
-
-
-        // change the privilege stack (RSP0) in the TSS
-        // TODO: we can safely skip setting the TSS RSP0 when switching to kernel threads, i.e., when next is not a userspace task
-        {
+        // Change the privilege stack (RSP0) in the TSS.
+        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // i.e., when `next` is not a userspace task
+        if next.is_userspace() {
             let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
             let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
@@ -367,6 +366,11 @@ impl Task {
                 return;
             }
         }
+
+        // update runstates
+        self.running_on_cpu = None; // no longer running
+        next.running_on_cpu = Some(apic_id); // now running on this core
+
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
@@ -394,7 +398,7 @@ impl Task {
                             active_table.switch(&next_mmi_locked.page_table)
                         }
                         _ => {
-                            panic!("task_switch(): prev_table must be an ActivePageTable!");
+                            panic!("BUG: task_switch(): prev_table must be an ActivePageTable!");
                         }
                     }
                 };
@@ -412,20 +416,69 @@ impl Task {
 
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
+        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
 
-        unsafe {
-            // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-            
-            // because context_switch must be a naked function, we cannot directly pass it parameters
-            // instead, we must pass our 2 parameters in RDI and RSI respectively
-            asm!("mov rdi, $0; \
-                  mov rsi, $1;" 
-                : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                : "memory" : "intel", "volatile"
-            );
-            context_switch();
+        // If `simd_personality` is enabled, both `context_switch` and `context_switch_sse` are available,
+        // in order to allow choosing one of them based on whether the new Task is SIMD-enabled.
+        // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
+        #[cfg(simd_personality)]
+        {
+            if next.simd {
+                info!("USING SSE/SIMD context_switch_sse for Task {:?}", next);
+
+                unsafe {
+                    asm!("mov rdi, $0; \
+                        mov rsi, $1;" 
+                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    context_switch_sse::context_switch();
+                }
+            }
+            else {
+                info!("USING REGULAR context_switch for Task {:?}", next);
+
+                unsafe {
+                    asm!("mov rdi, $0; \
+                        mov rsi, $1;" 
+                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    context_switch::context_switch();
+                }
+            }
         }
+        #[cfg(not(simd_personality))]
+        {
+            #[cfg(target_feature = "sse2")]
+            {
+                info!("USING SSE/SIMD context_switch_sse for Task {:?}", next);
 
+                // no simd_personality, but yes sse2
+                unsafe {
+                    asm!("mov rdi, $0; \
+                        mov rsi, $1;" 
+                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    context_switch_sse::context_switch();
+                }
+            }
+            #[cfg(not(target_feature = "sse2"))]
+            {
+                info!("USING REGULAR context_switch for Task {:?}", next);
+
+                // no simd_personality, and no sse2
+                unsafe {
+                    asm!("mov rdi, $0; \
+                        mov rsi, $1;" 
+                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    context_switch::context_switch();
+                }
+            }
+        }
     }
 }
 
