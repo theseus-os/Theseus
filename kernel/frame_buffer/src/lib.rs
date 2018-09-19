@@ -171,6 +171,10 @@ impl Drawer {
     }
 
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
+        if (x >= self.width || y >= self.height) {
+            return
+        }
+
         let index = self.get_index_fn();
         let buffer;
         match self.buffer() {
@@ -190,7 +194,8 @@ impl Drawer {
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
             Err(err) => {
-                debug!("Fail to get frame buffer"); return;},
+                debug!("Fail to get frame buffer"); return;
+            },
         }
 
         if width.abs() > height.abs() {
@@ -308,6 +313,7 @@ impl Drawer {
         let width = self.width;
         Box::new(move |x:usize, y:usize| y * width + x )
     }
+
 
 }
 

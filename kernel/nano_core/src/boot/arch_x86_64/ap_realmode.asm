@@ -135,7 +135,7 @@ findmode:               ;initialize the mode pointer
 .foundmode:
     cmp byte [VBEModeInfo.bitsperpixel], 32
     jne .searchmodes; if current mode is not 32-byte, continue to search
-    cmp word [VBEModeInfo.xresolution], 1280
+    cmp word [VBEModeInfo.xresolution], 900
     jb .searchmodes; if current x-resolution is less than 1280, continue to search
 
 ; store resolution and bufferr address to [0000:F100] so that Rust can read them

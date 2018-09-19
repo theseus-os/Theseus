@@ -1,5 +1,4 @@
-//! This crate is frame buffer for display on screen in 3D mode
-
+//! This crate is a frame buffer for display on the screen in 2D mode
 
 #![no_std]
 #![feature(alloc)]
@@ -9,46 +8,62 @@
 #![feature(asm)]
 
 extern crate spin;
+extern crate acpi;
 
 extern crate volatile;
 extern crate serial_port;
+extern crate kernel_config;
 extern crate memory;
-extern crate irq_safety;
-extern crate alloc;
-
 #[macro_use] extern crate log;
-//#[macro_use] extern crate acpi;
+extern crate util;
+extern crate alloc;
+#[macro_use] extern crate vga_buffer;
+
 
 use core::ptr::Unique;
-use spin::Mutex;
-use alloc::vec::Vec;
+use spin::{Mutex};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref, AllocatedPages};
+    get_kernel_mmi_ref};
 use core::ops::DerefMut;
+use kernel_config::memory::KERNEL_OFFSET;
+use alloc::boxed::Box;
 
+//The buffer for text printing
+pub mod text_buffer;
+//The font for text printing
+pub mod font;
 
-const VGA_BUFFER_ADDR: usize = 0xa0000;
-const BACKGROUD_COLOR:usize = 0x000000;
+const PIXEL_BYTES:usize = 4;
+const COLOR_BITS:usize = 24;
 
+static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
-//Size of VESA mode 0x4112
-
-///The width of the screen
-pub const FRAME_BUFFER_WIDTH:usize = 640*3;
-///The height of the screen
-pub const FRAME_BUFFER_HEIGHT:usize = 480;
-
-
-static mut FRAME_BUFFER_PAGES:Option<MappedPages> = None;
-
-
-///Init the frame buffer in 3D mode. Allocate a block of memory and map it to the physical frame buffer.
+/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
+    
+    //Get the graphic mode information
+    let VESA_DISPLAY_PHYS_START:PhysicalAddress;
+    let VESA_DISPLAY_PHYS_SIZE: usize;
+    let BUFFER_WIDTH:usize;
+    let BUFFER_HEIGHT:usize;
+    {
+        let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
+        if graphic_info.physical_address == 0 {
+            return Err("Fail to get graphic mode infomation!");
+        }
+        VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
+        BUFFER_WIDTH = graphic_info.width as usize;
+        BUFFER_HEIGHT = graphic_info.height as usize;
+        VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
+    };
 
-    //Wenqiu Allocate VESA frame buffer
-    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+    // init the font for text printing
+    let rs = font::init();
+    match font::init() {
+        Ok(_) => { trace!("frame_buffer text initialized."); },
+        Err(err) => { return Err(err); }
+    }    
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -62,31 +77,27 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages:AllocatedPages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
+            let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
                 Some(pages) => { pages },
-                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
+                None => { return Err("frame_buffer::init() couldn't allocate pages."); }
             };
             
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
-            if allocator_mutex.is_none(){
-                return Err("framebuffer::init() Couldn't get frame allocator");
-            } 
-
-            let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-            if err.is_err(){
-                debug!("Fail to init frame buffer");
-                return err;
+            match allocator_mutex {
+                Some(_) => { },
+                None => { return Err("framebuffer::init() couldn't get frame allocator"); }
             }
-            let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
-            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
+
+            let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
+            let mut mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
                 Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
                 vesa_display_flags, 
                 allocator.deref_mut())
             );
 
-            unsafe { FRAME_BUFFER_PAGES = Some(mapped_frame_buffer); }
+            FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
 
             Ok(())
         }
@@ -96,168 +107,255 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-
+// Window manager uses this drawer to draw/print to the screen
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
-        start_address:0,
-        buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
-        depth: [[core::usize::MAX;FRAME_BUFFER_WIDTH/3];FRAME_BUFFER_HEIGHT],
+        width:0,
+        height:0,
+        pages:None,
     })
 };
 
 ///draw a pixel in 2D compatible mode with coordinates and color.
-pub fn draw_pixel(x:usize, y:usize, color:usize) {
-    FRAME_DRAWER.lock().draw_pixel(x, y, 0, color, true)
+pub fn draw_pixel(x:usize, y:usize, color:u32) {
+    FRAME_DRAWER.lock().draw_pixel(x, y, 0, color)
 }
 
 ///draw a pixel in 3D mode with coordinates and color.
-pub fn draw_pixel_3d(x:usize, y:usize, z:usize, color:usize, show:bool) {
-    FRAME_DRAWER.lock().draw_pixel(x, y, z, color, show)
+pub fn draw_pixel_3d(x:usize, y:usize, z:u8, color:u32) {
+    FRAME_DRAWER.lock().draw_pixel(x, y, z, color)
 }
 
 ///draw a line in 2D compatible mode with start and end coordinates and color.
 pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize,
-    color:usize) {
+    color:u32) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, 
-        end_y as i32, 0, color, true)
+        end_y as i32, 0, color)
 }
 
 ///draw a line in 3D mode with coordinates and color.
-pub fn draw_line_3d(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:usize, 
-    color:usize, show:bool) {
+pub fn draw_line_3d(start_x:usize, start_y:usize, end_x:usize, end_y:usize, z:u8, 
+    color:u32) {
     FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, 
-        end_y as i32, z, color, show)
+        end_y as i32, z, color)
 }
 
 ///draw a square in 2D compatible mode with upper left coordinates, width, height and color.
-pub fn draw_square(start_x:usize, start_y:usize, width:usize, height:usize,
-     color:usize) {
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, 0, color, true)
+pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize,
+     color:u32) {
+    FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, 0, color)
 }
 
 ///draw a square in 3D mode with upper left coordinates, width, height and color.
-pub fn draw_square_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:usize,
-     color:usize, show:bool) {
-    FRAME_DRAWER.lock().draw_square(start_x, start_y, width, height, z, color, show)
+pub fn draw_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:u8,
+     color:u32) {
+    FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, z, color)
 }
 
-struct Point {
+///draw a square in 2D compatible mode with upper left coordinates, width, height and color.
+pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize,
+     color:u32) {
+    FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, 0, color)
+}
+
+/*struct Point {
     pub x: usize,
     pub y: usize,
     pub z: usize,
     pub color: usize,
-}
+}*/
 
-struct Drawer {
-    start_address: usize,
-    buffer: Unique<Buffer>,
-    depth : [[usize; FRAME_BUFFER_WIDTH/3]; FRAME_BUFFER_HEIGHT], 
+// The drawer is responsible for drawing/printing to the screen
+pub struct Drawer {
+    pub width:usize,
+    height:usize,
+    pages:Option<MappedPages>,
 }
 
 //If z-depth is less than 0, clean this point with the color
 impl Drawer {
-    fn draw_pixel(&mut self, x:usize, y:usize, z:usize, color:usize, show:bool){
-        if x*3+2 >= FRAME_BUFFER_WIDTH || y >= FRAME_BUFFER_HEIGHT {
-            return
-        }
-        
-        if z > self.depth[y][x] {
-            return
-        }
-
-        self.depth[y][x] = if show {z} else {core::usize::MAX};
-        let color = if show {color} else {BACKGROUD_COLOR};
-
-        self.buffer().chars[y][x*3] = (color & 255) as u8;//.write((color & 255) as u8);
-        self.buffer().chars[y][x*3 + 1] = (color >> 8 & 255) as u8;//.write((color >> 8 & 255) as u8);
-        self.buffer().chars[y][x*3 + 2] = (color >> 16 & 255) as u8;//.write((color >> 16 & 255) as u8); 
-    
+    // set the graphic mode information of the buffer
+    fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
+        self.width = width;
+        self.height = height;
+        self.pages = Some(pages);
     }
 
-    fn draw_points(&mut self, points:Vec<Point>, show:bool){
-        for p in points{
-            self.draw_pixel(p.x, p.y, p.z, p.color,show);
-        }
-      
+    //get the resolution of the screen
+    fn get_resolution(&self) -> (usize, usize) {
+        (self.width, self.height)
     }
 
-    fn check_in_range(&mut self, x:usize, y:usize) -> bool {
+    fn draw_pixel(&mut self, x:usize, y:usize, z:u8, color:u32){        
+        if x > self.width || y >= self.height {
+            return
+        }
+
+        let index = self.get_index_fn();
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return; },
+        }
+
+        //self.depth[y][x] = if show {z} else {core::u8::MAX};
+        //let color = if show {color} else {BACKGROUD_COLOR};
+        draw_pixel_in_buffer(index(x, y), buffer, z, color);
+    }
+
+
+    /*fn check_in_range(&mut self, x:usize, y:usize) -> bool {
         x + 2 < FRAME_BUFFER_WIDTH && y < FRAME_BUFFER_HEIGHT
-    }
+    }*/
 
-    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, 
-        z:usize, color:usize, show:bool){
+    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, z:u8, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
-        let mut points = Vec::new();
-       
+        let (buffer_width, buffer_height) = {self.get_resolution()};
+        let index = self.get_index_fn();
+
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => {
+                debug!("Fail to get frame buffer"); return;
+            },
+        }
+
         if width.abs() > height.abs() {
             let mut y;
-            let s = core::cmp::min(start_x, end_x);
-            let e = core::cmp::max(start_x, end_x);
-            for x in s..e {
-                y = (x-start_x)*height/width+start_y;
-                if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
+            let mut x = start_x;
+            let step = if width > 0 {1} else {-1};
+
+            loop {
+                if x == end_x {
+                    break;
+                }          
+                y = (x - start_x) * height / width + start_y;
+                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
+                    draw_pixel_in_buffer(index(x as usize, y as usize), buffer, z, color);
                 }
+                x += step;
             }
         } else {
             let mut x;
-            let s = core::cmp::min(start_y, end_y);
-            let e = core::cmp::max(start_y, end_y);
-
-            for y in s..e {
-                x = (y-start_y)*width/height+start_x;
-
-                if self.check_in_range(x as usize,y as usize) {
-                    points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
-                }            
+            let mut y = start_y;
+            let step = if height > 0 {1} else {-1};
+            loop {
+                if y == end_y {
+                    break;
+                }
+                x = (y - start_y) * width / height + start_x;
+                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
+                    draw_pixel_in_buffer(index(x as usize, y as usize), buffer, z, color);
+                }
+                y += step;   
             }
         }
-        self.draw_points(points, show);
     }
 
-    fn draw_square(&mut self, start_x:usize, start_y:usize, width:usize, 
-        height:usize, z:usize, color:usize, show:bool){
-        let end_x:usize = if start_x + width < FRAME_BUFFER_WIDTH { start_x + width } 
-            else { FRAME_BUFFER_WIDTH };
-        let end_y:usize = if start_y + height < FRAME_BUFFER_HEIGHT { start_y + height } 
-            else { FRAME_BUFFER_HEIGHT };  
-        let mut points = Vec::new();
+    fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize,  z:u8, color:u32){
+        let end_x:usize = {if start_x + width < self.width { start_x + width } 
+            else { self.width }};
+        let end_y:usize = {if start_y + height < self.height { start_y + height } 
+            else { self.height }};  
+        let index = self.get_index_fn();
 
-        for x in start_x..end_x{
-            for y in start_y..end_y{
-                points.push(Point{x:x as usize, y:y as usize, z:z, color:color});
-              // draw_pixel(x, y, color);
-            }
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return;},
         }
-        self.draw_points(points, show);
+  
+        let mut x = start_x;
+        loop {
+            if x == end_x {
+                break;
+            }
+            
+            draw_pixel_in_buffer(index(x, start_y), buffer, z, color);
+            draw_pixel_in_buffer(index(x, end_y-1), buffer, z, color);
+            x += 1;
+        }
 
+        let mut y = start_y;
+        loop {
+            if y == end_y {
+                break;
+            }
+
+            draw_pixel_in_buffer(index(start_x, y), buffer, z, color);
+            draw_pixel_in_buffer(index(end_x-1, y), buffer, z, color);
+            y += 1;
+        }
     }
 
 
-    fn buffer(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
-    } 
 
-    fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
-        if self.start_address == 0 {
-            self.start_address = virtual_address;
-            match Unique::new((virtual_address) as *mut _) {
-                Some(buffer) => { 
-                    self.buffer = buffer; 
-                    trace!("Set frame buffer address {:#x}", virtual_address);
-                },
-                None => { return Err("Fail to new virtual frame buffer"); }
-            }
+    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize,
+         z:u8, color:u32){
+        let end_x:usize = {if start_x + width < self.width { start_x + width } 
+            else { self.width }};
+        let end_y:usize = {if start_y + height < self.height { start_y + height } 
+            else { self.height }};  
+
+        let mut x = start_x;
+        let mut y = start_y;
+
+        let index = self.get_index_fn();
+
+        let buffer;
+        match self.buffer() {
+            Ok(rs) => {buffer = rs;},
+            Err(err) => { debug!("Fail to get frame buffer"); return;},
         }
-        Ok(())
-    }  
+        
+        loop {
+            if x == end_x {
+                y += 1;
+                if y == end_y {
+                    break;
+                }
+                x = start_x;
+            }
+
+            draw_pixel_in_buffer(index(x, y), buffer, z, color);
+            x += 1;
+        }
+    }
+
+    // return the framebuffer
+    pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
+        match self.pages {
+            Some(ref mut pages) => {
+                let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
+                return Ok(buffer);
+            },
+            None => { return Err("no allocated pages in framebuffer") }
+        }
+    }
+
+    // get the index computation function according to the width of the buffer
+    // call it to get the index function before locking the buffer
+    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+        let width = self.width;
+        Box::new(move |x:usize, y:usize| y * width + x )
+    }
+  
 }
 
-struct Buffer {
-    //chars: [Volatile<[u8; FRAME_BUFFER_WIDTH]>;FRAME_BUFFER_HEIGHT],
-    chars: [[u8; FRAME_BUFFER_WIDTH];FRAME_BUFFER_HEIGHT],
+// Get the resolution of the screen
+pub fn get_resolution() -> (usize, usize) {
+    FRAME_DRAWER.lock().get_resolution()
 }
 
+// Check if a point is in the screen
+fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
+    x < width && y < height
+}
 
+fn draw_pixel_in_buffer(index:usize, buffer:&mut[u32], z:u8, color:u32) {
+    if  (buffer[index] >> COLOR_BITS) <= z as u32 {
+        buffer[index] = ((z as u32) << COLOR_BITS) + color;
+    }
+}
