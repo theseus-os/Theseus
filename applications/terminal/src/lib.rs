@@ -130,10 +130,9 @@ impl Terminal {
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
 
-        let prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
+        let prompt_string = "terminal:~$ ".to_string();
 
         let mut terminal = Terminal {
-            // internal number used to track the terminal object 
             window: window_object,
             input_string: String::new(),
             display_name: String::from("content"),
@@ -899,8 +898,11 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
     { 
-        match terminal.window.add_displayable(&display_name, 100, 50,
-            TextDisplay::new(&display_name, 400, 300)) {
+        let (width, height) = terminal.window.dimensions();
+        let width  = width  - 2*window_manager::WINDOW_MARGIN;
+        let height = height - 2*window_manager::WINDOW_MARGIN;
+        match terminal.window.add_displayable(&display_name, 0, 0,
+            TextDisplay::new(&display_name, width, height)) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}
         };
