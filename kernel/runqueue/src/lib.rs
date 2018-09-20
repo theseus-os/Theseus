@@ -34,8 +34,6 @@ lazy_static! {
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
-    // #[cfg(simd_personality)]
-    // number_simd_tasks: usize,
 }
 
 impl RunQueue {
@@ -108,17 +106,16 @@ impl RunQueue {
     }
 
     /// Adds a `TaskRef` to this RunQueue.
-    pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
-        
+    pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
-
+        
+        debug!("Adding task to runqueue {}, {:?}", self.core, task);
         self.queue.push_back(task);
         
         #[cfg(single_simd_task_optimization)]
         {   
-            warn!("USING SIMD_PERSONALITY VERSION OF RUNQUEUE::ADD_TASK");
+            warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::ADD_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
             if is_simd {
                 single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.core);
@@ -137,14 +134,22 @@ impl RunQueue {
 
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+        #[cfg(single_simd_task_optimization)]
+        let is_simd = task.lock().simd;
+
         debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| x != task);
 
-        warn!("USING SIMD_PERSONALITY VERSION OF RUNQUEUE::REMOVE_TASK");
-        Ok(())
+        #[cfg(single_simd_task_optimization)]
+        {   
+            warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
+            // notify simd_personality crate about runqueue change, but only for SIMD tasks
+            if is_simd {
+                single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.core);
+            }
+        }
 
-        // TODO FIXME: notify simd_personality crate about runqueue change
-        // simd_personality::task_removed_from_runqueue(&task, self);
+        Ok(())
     }
 
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.

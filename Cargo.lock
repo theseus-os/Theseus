@@ -121,6 +121,11 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "cfg-if"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "compiler_builtins"
 version = "0.1.0"
 source = "git+https://github.com/rust-lang-nursery/compiler-builtins#cdbad7225fb61b4bf255501e974b3c2dbed0db58"
@@ -128,10 +133,22 @@ source = "git+https://github.com/rust-lang-nursery/compiler-builtins#cdbad7225fb
 [[package]]
 name = "context_switch"
 version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "context_switch_regular 0.1.0",
+ "context_switch_sse 0.1.0",
+]
+
+[[package]]
+name = "context_switch_regular"
+version = "0.1.0"
 
 [[package]]
 name = "context_switch_sse"
 version = "0.1.0"
+dependencies = [
+ "context_switch_regular 0.1.0",
+]
 
 [[package]]
 name = "cow_arc"
@@ -815,6 +832,7 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -836,6 +854,7 @@ dependencies = [
 name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -860,7 +879,6 @@ dependencies = [
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "tss 0.1.0",
  "x86_64 0.1.2",
@@ -1081,6 +1099,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
 "checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
+"checksum cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "0c4e7bb64a8ebb0d856483e1e682ea3422f883c5f5615a90d51a2c82fe87fdd3"
 "checksum compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum either 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5845bf77d497f79416df39462df26d4a8b71dd6440246848ee63709476dbb9a6"
 "checksum getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)" = "<none>"
