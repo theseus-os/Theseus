@@ -18,13 +18,7 @@ extern crate mod_mgmt;
 extern crate gdt;
 extern crate owning_ref;
 extern crate apic;
-
-// If the simd_personality cfg is enabled, then we need both context switch crates.
-// If not, we need just one of them, based on whether the build target enables "sse2".
-#[cfg(any(simd_personality, not(target_feature = "sse2")))]
 extern crate context_switch;
-#[cfg(any(simd_personality, target_feature = "sse2"))]
-extern crate context_switch_sse;
 
 
 use core::mem;
@@ -346,8 +340,6 @@ impl<'m> ApplicationTaskBuilder<'m> {
 }
 
 
-
-
 #[derive(Debug)]
 struct KthreadCall<F, A, R> {
     /// comes from Box::into_raw(Box<A>)
@@ -368,7 +360,6 @@ impl<F, A, R> KthreadCall<F, A, R> {
 
 
 
-
 /// This function sets up the given new Task's stack pointer to properly redirect to given entry point
 /// when the new Task is first scheduled in. 
 /// 
@@ -380,55 +371,40 @@ impl<F, A, R> KthreadCall<F, A, R> {
 /// It also sets the given `new_task`'s saved_sp (its saved stack pointer, which holds the Context for task switching).
 /// 
 fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point_function: fn() -> !) {
-    #[cfg(any(simd_personality, not(target_feature = "sse2")))]
-    fn set_context(kstack: &mut Stack, new_task: &mut Task, entry_point_function: fn() -> !) {
-        use context_switch::Context;
-        warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
-        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
-        // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
-        unsafe {
-            *new_context_ptr = Context::new(entry_point_function as usize);
-            new_task.saved_sp = new_context_ptr as usize; 
-        }
-    }
-
-    #[cfg(any(simd_personality, target_feature = "sse2"))]
-    fn set_context_sse(kstack: &mut Stack, new_task: &mut Task, entry_point_function: fn() -> !) {
-        use context_switch_sse::Context;
-        warn!("USING SSE/SIMD CONTEXT for Task {:?}", new_task);
-        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
-        // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
-        unsafe {
-            *new_context_ptr = Context::new(entry_point_function as usize);
-            new_task.saved_sp = new_context_ptr as usize; 
-        }
+    
+    /// A private macro that actually creates the Context and sets it up in the `new_task`.
+    /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
+    /// which is useful for both the simd_personality config and regular/SSE configs.
+    macro_rules! set_context {
+        ($ContextType:ty) => (
+            let new_context_ptr = (kstack.top_usable() - mem::size_of::<$ContextType>()) as *mut $ContextType;
+            // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
+            unsafe {
+                *new_context_ptr = <($ContextType)>::new(entry_point_function as usize);
+                new_task.saved_sp = new_context_ptr as usize; 
+            }
+        );
     }
 
 
-    // If `simd_personality` is enabled, both `set_context` and `set_context_sse` are available,
-    // in order to allow choosing one of them based on whether the new Task is SIMD-enabled.
-    // If `simd_personality` is NOT enabled, then we use the context that matches the actual build target. 
+    // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
+    // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
+    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
     #[cfg(simd_personality)]
     {
         if new_task.simd {
-            set_context_sse(kstack, new_task, entry_point_function);
+            // warn!("USING SSE CONTEXT for Task {:?}", new_task);
+            set_context!(context_switch::ContextSSE);
         }
         else {
-            set_context(kstack, new_task, entry_point_function);
+            // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
+            set_context!(context_switch::ContextRegular);
         }
     }
     #[cfg(not(simd_personality))]
     {
-        #[cfg(target_feature = "sse2")]
-        {
-            // no simd_personality, but yes sse2
-            set_context_sse(kstack, new_task, entry_point_function);
-        }
-        #[cfg(not(target_feature = "sse2"))]
-        {
-            // no simd_personality, and no sse2
-            set_context(kstack, new_task, entry_point_function);
-        }
+        // The context_switch crate exposes the proper TARGET-specific `Context` type here.
+        set_context!(context_switch::Context);
     }
 }
 

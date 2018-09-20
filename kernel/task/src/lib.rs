@@ -40,13 +40,7 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
-
-// If the simd_personality cfg is enabled, then we need both context switch crates.
-// If not, we need just one of them, based on whether the build target enables "sse2".
-#[cfg(any(simd_personality, not(target_feature = "sse2")))]
 extern crate context_switch;
-#[cfg(any(simd_personality, target_feature = "sse2"))]
-extern crate context_switch_sse;
 
 
 use core::fmt;
@@ -216,7 +210,9 @@ impl fmt::Debug for Task {
 }
 
 impl Task {
-    /// creates a new Task structure and initializes it to be non-Runnable.
+    /// Creates a new Task structure and initializes it to be non-Runnable.
+    /// # Note
+    /// This does not run the task, schedule it in, or switch to it.
     pub fn new() -> Task {
         /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -417,66 +413,62 @@ impl Task {
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
+        
 
-        // If `simd_personality` is enabled, both `context_switch` and `context_switch_sse` are available,
-        // in order to allow choosing one of them based on whether the new Task is SIMD-enabled.
+        /// A private macro that actually calls the given context switch routine
+        /// by putting the arguments into the proper registers, `rdi` and `rsi`.
+        macro_rules! call_context_switch {
+            ($func:expr) => (
+                asm!("
+                    mov rdi, $0; \
+                    mov rsi, $1;" 
+                    : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                    : "memory" : "intel", "volatile"
+                );
+                $func();
+            );
+        }
+
+        // Now it's time to perform the actual context switch.
+        // If `simd_personality` is enabled, all `context_switch*` routines are available,
+        // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
         // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
         #[cfg(simd_personality)]
         {
-            if next.simd {
-                info!("USING SSE/SIMD context_switch_sse for Task {:?}", next);
-
-                unsafe {
-                    asm!("mov rdi, $0; \
-                        mov rsi, $1;" 
-                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                        : "memory" : "intel", "volatile"
-                    );
-                    context_switch_sse::context_switch();
+            match (self.simd, next.simd) {
+                (false, false) => {
+                    // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_regular);
+                    }
                 }
-            }
-            else {
-                info!("USING REGULAR context_switch for Task {:?}", next);
 
-                unsafe {
-                    asm!("mov rdi, $0; \
-                        mov rsi, $1;" 
-                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                        : "memory" : "intel", "volatile"
-                    );
-                    context_switch::context_switch();
+                (false, true)  => {
+                    // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_regular_to_sse);
+                    }
+                }
+                
+                (true, false)  => {
+                    // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_sse_to_regular);
+                    }
+                }
+
+                (true, true)   => {
+                    // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_sse);
+                    }
                 }
             }
         }
         #[cfg(not(simd_personality))]
         {
-            #[cfg(target_feature = "sse2")]
-            {
-                info!("USING SSE/SIMD context_switch_sse for Task {:?}", next);
-
-                // no simd_personality, but yes sse2
-                unsafe {
-                    asm!("mov rdi, $0; \
-                        mov rsi, $1;" 
-                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                        : "memory" : "intel", "volatile"
-                    );
-                    context_switch_sse::context_switch();
-                }
-            }
-            #[cfg(not(target_feature = "sse2"))]
-            {
-                info!("USING REGULAR context_switch for Task {:?}", next);
-
-                // no simd_personality, and no sse2
-                unsafe {
-                    asm!("mov rdi, $0; \
-                        mov rsi, $1;" 
-                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                        : "memory" : "intel", "volatile"
-                    );
-                    context_switch::context_switch();
-                }
+            unsafe {
+                call_context_switch!(context_switch::context_switch);
             }
         }
     }

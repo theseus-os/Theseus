@@ -52,9 +52,10 @@
 #![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
-// NOTE: the `cfg_if` macro makes the entire file dependent upon the below config.
+// NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(simd_personality)] {
+
 
 // This crate is required for the SIMD environment,
 // so we can resolve symbols that the core lib requires. 
