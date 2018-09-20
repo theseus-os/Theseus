@@ -47,17 +47,23 @@
 //! i.e., a classic bottom-half/top-half design.
 //!
 
+
 #![no_std]
 #![feature(alloc)]
 #![feature(compiler_builtins_lib)]
+
+// NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
+#[macro_use] extern crate cfg_if;
+cfg_if! { if #[cfg(simd_personality)] {
+
 
 // This crate is required for the SIMD environment,
 // so we can resolve symbols that the core lib requires. 
 #[cfg(target_feature = "sse2")]
 extern crate compiler_builtins as _compiler_builtins; 
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+#[macro_use] pub extern crate alloc;
+#[macro_use] pub extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate spawn;
@@ -67,7 +73,7 @@ extern crate task;
 use core::ops::DerefMut;
 use alloc::String;
 use memory::{get_kernel_mmi_ref, get_module};
-use mod_mgmt::CrateNamespace;
+use mod_mgmt::{CrateNamespace, get_default_namespace};
 use spawn::KernelTaskBuilder;
 
 
@@ -77,7 +83,7 @@ const SSE_KERNEL_PREFIX: &'static str = "k_sse#";
 pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let kernel_mmi_ref = get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
 
-	let backup_namespace = mod_mgmt::get_default_namespace();
+	let backup_namespace = get_default_namespace();
 	let simd_namespace = CrateNamespace::with_name("simd");
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
@@ -100,8 +106,9 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let task1 = KernelTaskBuilder::new(func1, ())
 		.name(String::from("simd_test_1-sse"))
 		.pin_on_core(2)
+		.simd()
 		.spawn()?;
-	debug!("finished spawning first simd task");
+	debug!("finished spawning simd_test::test1 task");
 
 
 	let section_ref2 = simd_namespace.get_symbol_or_load("simd_test::test2", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
@@ -116,8 +123,9 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let task2 = KernelTaskBuilder::new(func, ())
 		.name(String::from("simd_test_2-sse"))
 		.pin_on_core(2)
+		.simd()
 		.spawn()?;
-	debug!("finished spawning second simd task");
+	debug!("finished spawning simd_test::test2 task");
 
 
 	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test_short", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
@@ -134,7 +142,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 		.pin_on_core(2)
 		.simd()
 		.spawn()?;
-	debug!("finished spawning second simd task");
+	debug!("finished spawning simd_test::test_short task");
 
 
 	// we can't return here because the mapped pages that contain
@@ -148,5 +156,6 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	task3.join()?;
 
 	Ok(())
-
 }
+		
+}} // end of cfg_if block

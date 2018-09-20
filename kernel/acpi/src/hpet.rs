@@ -52,6 +52,11 @@ impl Hpet {
             
     }
 
+    /// Returns the period of the HPET counter in femtoseconds,
+    /// i.e., the length of time that one HPET tick takes.
+    /// 
+    /// Can be used to calculate the frequency of the HPET clock.
+    /// 
     /// Must not be zero, must be less or equal to 0x05F5E100 (100 nanoseconds)
     pub fn counter_period_femtoseconds(&self) -> u32 {
         let caps = self.general_capabilities_and_id.read();

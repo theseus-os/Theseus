@@ -17,7 +17,6 @@ extern crate mod_mgmt;
 
 
 use core::fmt;
-use core::ops::DerefMut;
 
 
 #[cfg(not(test))]
@@ -41,6 +40,7 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
         #[cfg(loadable)]
         {
+            use core::ops::DerefMut;
             use mod_mgmt::metadata::CrateType;
             
             type PanicWrapperFunc = fn(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;

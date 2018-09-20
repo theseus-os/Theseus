@@ -5,6 +5,9 @@ description = "Support for a special optimization that allows a SIMD task to avo
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies]
+cfg-if = "0.1.5"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
