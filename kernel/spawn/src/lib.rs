@@ -2,25 +2,23 @@
 #![feature(alloc)]
 #![feature(asm)]
 #![feature(core_intrinsics)]
+#![feature(stmt_expr_attributes)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate debugit;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
 extern crate kernel_config;
 extern crate task;
+extern crate runqueue;
 extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
 extern crate owning_ref;
-#[macro_use] extern crate debugit;
 extern crate apic;
-
-#[cfg(not(target_feature = "sse2"))]
 extern crate context_switch;
-#[cfg(target_feature = "sse2")]
-extern crate context_switch_sse; 
 
 
 use core::mem;
@@ -33,13 +31,9 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS, RunQueue};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS};
+use runqueue::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
-
-#[cfg(not(target_feature = "sse2"))]
-use context_switch::Context;
-#[cfg(target_feature = "sse2")]
-use context_switch_sse::Context;
 
 
 /// Initializes tasking for the given AP core, including creating a runqueue for it
@@ -123,6 +117,9 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
+
+    #[cfg(simd_personality)]
+    simd: bool,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -139,6 +136,9 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
+            
+            #[cfg(simd_personality)]
+            simd: false,
         }
     }
 
@@ -154,38 +154,43 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    #[cfg(simd_personality)]
+    pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
+        self.simd = true;
+        self
+    }
+
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> 
-        where A: Send + 'static, 
-              R: Send + 'static,
-              F: FnOnce(A) -> R, 
+        // where A: Send + 'static, 
+        //       R: Send + 'static,
+        //       F: FnOnce(A) -> R, 
     {
         let mut new_task = Task::new();
-        let name = self.name.unwrap_or_else(|| String::from( 
+        new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
-        new_task.set_name(name);
+    
+        #[cfg(simd_personality)]
+        {
+            new_task.simd = self.simd;
+        }
 
         // the new kernel thread uses the same kernel address space
         new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
 
         // create and set up a new kstack
-        let kstack: Stack = {
+        let mut kstack: Stack = {
             let mut mmi = try!(new_task.mmi.as_mut().ok_or("new_task.mmi was None!")).lock();
             try!(mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("couldn't allocate kernel stack!"))
         };
 
-        // When this new task is scheduled in, a `Context` struct will be popped off the stack,
-        // and at the end of that struct is the next instruction that will be popped off as part of the "ret" instruction. 
-        // So we need to allocate space for the saved context registers to be popped off when this task is switch to.
-        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
-        unsafe {
-            *new_context_ptr = Context::new(task_wrapper::<F, A, R> as usize);
-            new_task.saved_sp = new_context_ptr as usize; 
-        }
+        setup_context_trampoline(&mut kstack, &mut new_task, task_wrapper::<F, A, R>);
 
         // set up the kthread stuff
         let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
@@ -232,6 +237,9 @@ pub struct ApplicationTaskBuilder<'m> {
     name: Option<String>,
     pin_on_core: Option<u8>,
     singleton: bool,
+
+    #[cfg(simd_personality)]
+    simd: bool,
 }
 
 impl<'m> ApplicationTaskBuilder<'m> {
@@ -244,6 +252,9 @@ impl<'m> ApplicationTaskBuilder<'m> {
             name: None,
             pin_on_core: None,
             singleton: false,
+
+            #[cfg(simd_personality)]
+            simd: false,
         }
     }
 
@@ -256,6 +267,14 @@ impl<'m> ApplicationTaskBuilder<'m> {
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder<'m> {
         self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Mark this new Task as a SIMD-enabled Task 
+    /// that can run SIMD instructions and use SIMD registers.
+    #[cfg(simd_personality)]
+    pub fn simd(mut self) -> ApplicationTaskBuilder<'m> {
+        self.simd = true;
         self
     }
 
@@ -301,21 +320,24 @@ impl<'m> ApplicationTaskBuilder<'m> {
         // build and spawn the actual underlying kernel Task
         let ktb = KernelTaskBuilder::new(*main_func, self.argument)
             .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
+        
         let ktb = if let Some(core) = self.pin_on_core {
             ktb.pin_on_core(core)
         } else {
             ktb
         };
 
+        #[cfg(simd_personality)]
+        let ktb = if self.simd { ktb.simd() } else { ktb };
+
+
         let app_task = ktb.spawn()?;
-        app_task.write().app_crate = Some(app_crate_ref);
+        app_task.lock_mut().app_crate = Some(app_crate_ref);
 
         Ok(app_task)
     }
 
 }
-
-
 
 
 #[derive(Debug)]
@@ -338,6 +360,55 @@ impl<F, A, R> KthreadCall<F, A, R> {
 
 
 
+/// This function sets up the given new Task's stack pointer to properly redirect to given entry point
+/// when the new Task is first scheduled in. 
+/// 
+/// When a new task is first scheduled in, a `Context` struct will be popped off the stack,
+/// and at the end of that struct is the address of the next instruction that will be popped off as part of the "ret" instruction, 
+/// i.e., the entry point into the new task. 
+/// 
+/// So, this function allocates space for the saved context registers to be popped off when this task is first switched to.
+/// It also sets the given `new_task`'s saved_sp (its saved stack pointer, which holds the Context for task switching).
+/// 
+fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point_function: fn() -> !) {
+    
+    /// A private macro that actually creates the Context and sets it up in the `new_task`.
+    /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
+    /// which is useful for both the simd_personality config and regular/SSE configs.
+    macro_rules! set_context {
+        ($ContextType:ty) => (
+            let new_context_ptr = (kstack.top_usable() - mem::size_of::<$ContextType>()) as *mut $ContextType;
+            // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
+            unsafe {
+                *new_context_ptr = <($ContextType)>::new(entry_point_function as usize);
+                new_task.saved_sp = new_context_ptr as usize; 
+            }
+        );
+    }
+
+
+    // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
+    // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
+    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
+    #[cfg(simd_personality)]
+    {
+        if new_task.simd {
+            // warn!("USING SSE CONTEXT for Task {:?}", new_task);
+            set_context!(context_switch::ContextSSE);
+        }
+        else {
+            // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
+            set_context!(context_switch::ContextRegular);
+        }
+    }
+    #[cfg(not(simd_personality))]
+    {
+        // The context_switch crate exposes the proper TARGET-specific `Context` type here.
+        set_context!(context_switch::Context);
+    }
+}
+
+
 
 /// Spawns a new userspace task based on the provided `ModuleArea`, which must be an ELF executable file with a defined entry point.
 /// Optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
@@ -346,7 +417,7 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.set_name(String::from(name.unwrap_or(module.name().clone())));
+    new_task.name = String::from(name.unwrap_or(module.name().clone()));
 
     let mut ustack: Option<Stack> = None;
 
@@ -356,17 +427,12 @@ pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<Task
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
         
         // create a new kernel stack for this userspace task
-        let kstack: Stack = kernel_mmi_locked.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
-        // allocate space for the saved context registers to be popped off when this task is switch to.
-        let new_context_ptr = (kstack.top_usable() - mem::size_of::<Context>()) as *mut Context;
-        unsafe {
-            // when this new task is scheduled in, we want it to jump to the userspace_wrapper, which will then make the jump to actual userspace
-            *new_context_ptr = Context::new(userspace_wrapper as usize);
-            new_task.saved_sp = new_context_ptr as usize; 
-        }
+        let mut kstack: Stack = kernel_mmi_locked.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("spawn_userspace: couldn't alloc_stack for new kernel stack!");
+
+        setup_context_trampoline(&mut kstack, &mut new_task, userspace_wrapper);
     
         new_task.kstack = Some(kstack);
-        // unlike when spawning a kthread, we don't need to place any arguments at the bottom of the stack,
+        // unlike when spawning a kernel task, we don't need to place any arguments at the bottom of the stack,
         // because we can just utilize the task's userspace entry point member
 
 
@@ -536,12 +602,12 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("task_wrapper(): couldn't get_my_current_task().");
-    let curr_task_name = curr_task_ref.read().name.clone();
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
+    let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
-        let t = curr_task_ref.read();
-        let kstack = t.kstack.as_ref().expect("task_wrapper(): failed to get current task's kstack.");
+        let t = curr_task_ref.lock();
+        let kstack = t.kstack.as_ref().expect("BUG: task_wrapper(): failed to get current task's kstack.");
         // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
@@ -570,18 +636,28 @@ fn task_wrapper<F, A, R>() -> !
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    // Here: now that the task is finished running, we must clean in up. 
-    // This involves puting the task into a non-runnable mode (exited),
-    // setting its exit value, removing it from its runqueue, and yielding the CPU.
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    // Here: now that the task is finished running, we must clean in up by doing three things:
+    // (1) Put the task into a non-runnable mode (exited), and set its exit value
     if curr_task_ref.exit(Box::new(exit_value)).is_err() {
         warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
     }
-    
+
+    // (2) Remove it from its runqueue
+    if let Err(e) = apic::get_my_apic_id()
+        .and_then(|id| RunQueue::get_runqueue(id))
+        .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+        .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+    {
+        error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+    }
+
+    // (3) Yield the CPU
     scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
-    panic!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!")
+    error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
+    loop { }
 }
 
 
@@ -596,7 +672,7 @@ fn userspace_wrapper() -> ! {
     let entry_func: usize; 
 
     { // scoped to release current task's RwLock before calling jump_to_userspace
-        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").write();
+        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").lock();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
     }

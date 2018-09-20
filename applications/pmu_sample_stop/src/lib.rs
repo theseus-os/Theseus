@@ -27,7 +27,7 @@ pub fn main(args: Vec<String>) -> isize {
     };
     println!("We are indeed here!");
     //let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 150);
-    let mut sampler = pmu_x86::retrieve_samples();
+    let sampler = pmu_x86::retrieve_samples();
     if let Ok(mut my_sampler) = sampler {
         pmu_x86::print_samples(&mut my_sampler);
         /*

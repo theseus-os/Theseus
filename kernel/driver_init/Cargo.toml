@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "driver_init"
 description = "Code for handling the sequence required to initializing each driver"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 

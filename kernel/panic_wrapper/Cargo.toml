@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "panic_wrapper"
 description = "Wrapper functions for handling and propagating panics"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 
@@ -19,6 +20,9 @@ path = "../memory"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.runqueue]
+path = "../runqueue"
 
 [dependencies.apic]
 path = "../apic"

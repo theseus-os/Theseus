@@ -407,10 +407,11 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
         let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
 
         debug!("handle_sample(): [4] on core {:?}!", apic::get_my_apic_id());
-
-        if (requested_task_id == 0) | (requested_task_id == taskref.read().id) {
+        
+        let task_id = taskref.lock().id;
+        if (requested_task_id == 0) | (requested_task_id == task_id) {
             IP_LIST.lock().push(stack_frame.instruction_pointer);
-            TASK_ID_LIST.lock().push(taskref.read().id);
+            TASK_ID_LIST.lock().push(task_id);
         }
     } else {
 

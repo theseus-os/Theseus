@@ -3,9 +3,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "simd_personality"
 description = "Support for multiple kernel personalities: SIMD and non-SIMD"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
-# rlibc = "1.0.0"
+cfg-if = "0.1.5"
 
 [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins"
@@ -24,6 +25,9 @@ path = "../memory"
 
 [dependencies.spawn]
 path = "../spawn"
+
+[dependencies.task]
+path = "../task"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory"
 description = "The virtual memory subsystem."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -25,7 +26,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -34,7 +34,7 @@ path = "../../libs/atomic_linked_list"
 path = "../kernel_config"
 
 [dependencies.heap_irq_safe]
-path = "../../libs/heap_irq_safe"
+path = "../heap_irq_safe"
 
 [lib]
 crate-type = ["rlib"]

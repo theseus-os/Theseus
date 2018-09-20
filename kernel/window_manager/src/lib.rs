@@ -59,8 +59,8 @@ const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
 
 /// 10 pixel gap between windows 
-pub const GAP_SIZE:usize = 10;
-pub const WINDOW_MARGIN:usize = 2;
+pub const GAP_SIZE: usize = 10;
+pub const WINDOW_MARGIN: usize = 2;
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
@@ -333,6 +333,13 @@ impl WindowObj{
         inner.clean();
     }
 
+    /// Returns the dimensions of this window,
+    /// as a tuple of `(width, height)`.
+    pub fn dimensions(&self) -> (usize, usize) {
+        let inner_locked = self.inner.lock();
+        (inner_locked.width, inner_locked.height)
+    }
+
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
     pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
@@ -473,20 +480,20 @@ impl WindowObj{
 }
 
 struct WindowInner {
-    /// the upper left x-coordinate of inner:&Arc<Mutex<WindowInner>>
+    /// the upper left x-coordinate of the window
     x: usize,
-    /// the upper left y-coordinate of inner:&Arc<Mutex<WindowInner>>
-    y:usize,
+    /// the upper left y-coordinate of the window
+    y: usize,
     /// the width of the window
-    width:usize,
+    width: usize,
     /// the height of the window
-    height:usize,
+    height: usize,
     /// whether the window is active
-    active:bool,
-    /// a consumer of key input events inner:&Arc<Mutex<WindowInner>>
-    margin:usize,
+    active: bool,
+    /// a consumer of key input events to the window
+    margin: usize,
     /// the producer accepting a key event
-    key_producer:DFQueueProducer<Event>,
+    key_producer: DFQueueProducer<Event>,
 }
 
 impl WindowInner {
