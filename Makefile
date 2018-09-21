@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo clean run debug iso userspace cargo dual_simd simd_build gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -144,8 +144,12 @@ build: $(nano_core_binary)
 
 ## This target invokes the actual Rust build process
 cargo: check_rustc check_xargo
-	@echo -e "\n======== BUILDING ALL CRATES, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(PACKAGE_FEATURES) $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
+	@echo -e "\n=================== BUILDING ALL CRATES ==================="
+	@echo -e "\t TARGET: \"$(TARGET)\""
+	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
+	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
+	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -221,13 +225,14 @@ userspace:
 
 
 
-## "dual_simd" is a special target for the dual SIMD personalities.
+## "simd_personality" is a special target that enables SIMD personalities.
 ## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
 ## and then builds everything again with the regular x86_64-theseus target. 
-## The "regular" target must come last (simd_build, THEN build) to ensure that the final nano_core_binary is non-SIMD.
-dual_simd : export TARGET := x86_64-theseus
-dual_simd : export BUILD_MODE = release
-dual_simd: simd_build build
+## The "normal" target must come last ('build_simd', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
+simd_personality : export TARGET := x86_64-theseus
+simd_personality : export BUILD_MODE = release
+simd_personality : export THESEUS_CONFIG += simd_personality
+simd_personality: build_simd build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -239,14 +244,14 @@ dual_simd: simd_build build
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### simd_build is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
-### It is the latter half of the dual_simd target.
-simd_build : export TARGET := x86_64-theseus-sse
-simd_build : export RUSTFLAGS += -C no-vectorize-loops
-simd_build : export RUSTFLAGS += -C no-vectorize-slp
-simd_build : export KERNEL_PREFIX := k_sse\#
-simd_build : export APP_PREFIX := a_sse\#
-simd_build:
+### build_simd is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
+### It is the latter half of the simd_personality target.
+build_simd : export TARGET := x86_64-theseus-sse
+build_simd : export RUSTFLAGS += -C no-vectorize-loops
+build_simd : export RUSTFLAGS += -C no-vectorize-slp
+build_simd : export KERNEL_PREFIX := k_sse\#
+build_simd : export APP_PREFIX := a_sse\#
+build_simd:
 ## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
 	@$(MAKE) build
@@ -306,7 +311,7 @@ help:
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
-	@echo -e "  dual_simd:"
+	@echo -e "  simd_personality:"
 	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
 	@echo -e "\t then runs it just like the 'make run' target."
 	@echo -e "  doc:"
@@ -370,8 +375,7 @@ odebug:
 
 
 ### Currently, loadable module mode requires release build mode
-# loadable : export RUST_FEATURES = --package nano_core --features loadable
-loadable : export RUST_FEATURES = --manifest-path "kernel/nano_core/Cargo.toml" --features loadable
+loadable : export THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
@@ -396,8 +400,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-# bochs : export RUST_FEATURES = --package apic --features apic_timer_fixed
-bochs : export RUST_FEATURES = --manifest-path "kernel/apic/Cargo.toml" --features "apic_timer_fixed"
+bochs : export THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -422,8 +425,7 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-# boot : export RUST_FEATURES = --package captain --features mirror_log_to_vga
-boot : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
+boot : export THESEUS_CONFIG += mirror_log_to_vga
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
@@ -431,7 +433,7 @@ boot: check_usb $(iso)
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : export RUST_FEATURES = --manifest-path "kernel/captain/Cargo.toml" --features "mirror_log_to_vga"
+pxe : export THESEUS_CONFIG += mirror_log_to_vga
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)

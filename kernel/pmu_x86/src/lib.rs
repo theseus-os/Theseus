@@ -46,7 +46,6 @@ use x86_64::structures::idt::ExceptionStackFrame;
 use raw_cpuid::*;
 use spin::{Once, Mutex};
 use atomic_linked_list::atomic_map::*;
-use task::get_my_current_task;
 use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -210,32 +209,31 @@ impl Counter {
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    let my_core: i32;
-    
-    if let Some(my_task) = get_my_current_task() {
-        my_core = my_task.write().running_on_cpu as i32;
-        for (i, pmc) in PMC_LIST.iter().enumerate() {
-            // Counter 0 is used for sampling.
-            if i != 0 {
-                //If counter i on this core has been used before (it's present in the AtomicMap) and is currently in use (it points to false), checks the next counter
-                if let Some(core_available) = pmc.get(&my_core) {
-                    if !(core_available) {
-                        continue;
-                    }
+    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")? as i32;
+    for (i, pmc) in PMC_LIST.iter().enumerate() {
+        // Counter 0 is used for sampling.
+        if i != 0 {
+            //If counter i on this core has been used before (it's present in the AtomicMap) and is currently in use (it points to false), checks the next counter
+            if let Some(core_available) = pmc.get(&my_core) {
+                if !(core_available) {
+                    continue;
                 }
-                //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
-                pmc.insert(my_core, false);
-                unsafe{
-                    wrmsr(IA32_PMC0 + (i as u32), 0);
-                    wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
-                }
-                return Ok(Counter{start_count: 0, msr_mask: i as u32, pmc: i as i32, core: my_core});
             }
+            //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
+            pmc.insert(my_core, false);
+            unsafe{
+                wrmsr(IA32_PMC0 + (i as u32), 0);
+                wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
+            }
+            return Ok(Counter {
+                start_count: 0, 
+                msr_mask: i as u32, 
+                pmc: i as i32, 
+                core: my_core
+            });
         }
-            return Err("All programmable counters currently in use.");
-
     }
-    return Err("Task implentation not yet initialized.");
+    return Err("All programmable counters currently in use.");
 }
 
 /// Calls the rdpmc function which is a wrapper for the x86 rdpmc instruction. This function ensures that performance monitoring is 
@@ -243,19 +241,18 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
     check_pmu_availability()?;
 
-    let my_core;
-    if let Some(my_task) = get_my_current_task() {
-        my_core = my_task.write().running_on_cpu as i32;
-    } else {
-        return Err("Task structure not yet started. Must be initialized before counting events.");
-    }
-
+    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")? as i32;
     let count = rdpmc(msr_mask);
-    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: my_core});
+    return Ok(Counter {
+        start_count: count, 
+        msr_mask: msr_mask, 
+        pmc: -1, 
+        core: my_core
+    });
 }
 
 /// It's important to do the rdpmc as quickly as possible when it's called. 
-/// Calling get_my_current_task() and doing the calculations to unpack the result adds cycles, so I created a version where the core can be passed down.
+/// Getting the current core id adds cycles, so I created a version where the core id can be passed down.
 pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static str> {
     check_pmu_availability()?;
     
@@ -410,10 +407,11 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
         let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
 
         debug!("handle_sample(): [4] on core {:?}!", apic::get_my_apic_id());
-
-        if (requested_task_id == 0) | (requested_task_id == taskref.read().id) {
+        
+        let task_id = taskref.lock().id;
+        if (requested_task_id == 0) | (requested_task_id == task_id) {
             IP_LIST.lock().push(stack_frame.instruction_pointer);
-            TASK_ID_LIST.lock().push(taskref.read().id);
+            TASK_ID_LIST.lock().push(task_id);
         }
     } else {
 

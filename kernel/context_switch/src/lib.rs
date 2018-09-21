@@ -1,82 +1,94 @@
-//! This crate contains structures and routines for context switching 
-//! when SSE/SIMD extensions are not active. 
+//! This is a wrapper crate around all other context switch implementation crates
+//! that helps to manage the complex configuration options involving SIMD and personalities.
 
 #![no_std]
 #![feature(asm, naked_functions)]
 
+#[macro_use] extern crate cfg_if;
 
-/// The registers saved before a context switch and restored after a context switch.
-#[repr(C, packed)]
-pub struct Context {
-    // The order of the registers here MUST MATCH the order of 
-    // registers popped in the context_switch() function below. 
-    r15: usize, 
-    r14: usize,
-    r13: usize,
-    r12: usize,
-    rbp: usize,
-    rbx: usize,
-    rip: usize,
-}
 
-impl Context {
-    pub fn new(rip: usize) -> Context {
-        Context {
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
-            rbp: 0,
-            rbx: 0,
-            rip: rip,
+// If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
+// in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
+// If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
+cfg_if! {
+    if #[cfg(simd_personality)] {
+        #[macro_use] extern crate context_switch_sse;
+        #[macro_use] extern crate context_switch_regular;
+
+        pub use context_switch_sse::*;
+        pub use context_switch_regular::*;
+
+
+        /// Switches context from a regular Task to an SSE Task.
+        /// 
+        /// # Arguments
+        /// * First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
+        /// * Second argument (put in `rsi`): the value of the next task's stack pointer
+        /// 
+        /// # Safety
+        /// This function is unsafe because it changes the content on both task's stacks. 
+        /// Also, it must be a naked function, so there cannot be regular arguments passed into it.
+        /// Instead, the caller of this function must place the first argument into the `rdi` register
+        /// and the second argument into the `rsi` register right before invoking this function.
+        #[naked]
+        #[inline(never)]
+        pub unsafe fn context_switch_regular_to_sse() {
+            // Since this is a naked function that expects its arguments in two registers,
+            // you CANNOT place any log statements or other instructions here,
+            // or at any point before, in between, or after the following macros.
+            save_registers_regular!();
+            switch_stacks!();
+            restore_registers_sse!();
+            restore_registers_regular!();
         }
+
+
+        /// Switches context from an SSE Task to a regular Task.
+        /// 
+        /// # Arguments
+        /// * First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
+        /// * Second argument (put in `rsi`): the value of the next task's stack pointer
+        /// 
+        /// # Safety
+        /// This function is unsafe because it changes the content on both task's stacks. 
+        /// Also, it must be a naked function, so there cannot be regular arguments passed into it.
+        /// Instead, the caller of this function must place the first argument into the `rdi` register
+        /// and the second argument into the `rsi` register right before invoking this function.
+        #[naked]
+        #[inline(never)]
+        pub unsafe fn context_switch_sse_to_regular() {
+            // Since this is a naked function that expects its arguments in two registers,
+            // you CANNOT place any log statements or other instructions here,
+            // or at any point before, in between, or after the following macros.
+            save_registers_regular!();
+            save_registers_sse!();
+            switch_stacks!();
+            restore_registers_regular!();
+        }
+    }
+
+    else if #[cfg(target_feature = "sse2")] {
+        // this actually covers SSE, SSE2, SSE3, SSE4
+        extern crate context_switch_sse;
+
+        pub use context_switch_sse::ContextSSE as Context;
+        pub use context_switch_sse::context_switch_sse as context_switch;
+    }
+    
+    else {
+        // this covers only the default x86_64 registers
+        extern crate context_switch_regular;
+
+        pub use context_switch_regular::ContextRegular as Context;
+        pub use context_switch_regular::context_switch_regular as context_switch;
     }
 }
 
 
-/// Performs the actual switch from the previous (current) task to the next task.
-/// 
-/// This is the regular task switch routine for when SSE/SIMD extensions are not being used.
-/// 
-/// # Arguments
-/// First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
-/// Second argument (put in `rsi`): the value of the next task's stack pointer
-/// 
-/// # Safety
-/// This function is unsafe because it changes the content on both task's stacks. 
-/// Also, it must be a naked function, so there cannot be regular arguments passed into it.
-/// Instead, the caller of this function must place the first argument into the `rdi` register
-/// and the second argument into the `rsi` register right before invoking this function.
-#[allow(private_no_mangle_fns)]
-#[naked]
-#[no_mangle]
-#[inline(never)]
-pub unsafe fn context_switch() {
-    
-    asm!("
-        # save all general purpose registers into the previous task
-        push rbx
-        push rbp
-        push r12
-        push r13
-        push r14
-        push r15
+cfg_if! {
+    if #[cfg(simd_personality)] {
+
         
-        # switch the stack pointers
-        mov [rdi], rsp
-        mov rsp, rsi
 
-        # restore the next task's general purpose registers
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop rbp
-        pop rbx
-
-        # pops the last value off the top of the stack,
-        # so the new task's stack top must point to a target function
-        ret"
-        : : : "memory" : "intel", "volatile"
-    );
+    }
 }

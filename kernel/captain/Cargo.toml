@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "captain"
 description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -13,8 +14,6 @@ version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
-# features = ["const_fn"]  #if we need them later
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
@@ -92,12 +91,12 @@ path = "../../libs/keycodes_ascii"
 [dependencies.print]
 path = "../print"
 
+
+## This should be dependent upon 'cfg(simd_personality)',
+## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
+## Therefore, it has to be unconditionally included.
 [dependencies.simd_personality]
 path = "../simd_personality"
-
-
-[features]
-mirror_log_to_vga = []
 
 
 [lib]

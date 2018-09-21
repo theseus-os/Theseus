@@ -3,9 +3,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "simd_test"
 description = "Test code for SSE and SIMD instructions"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
-# simd = "0.2.1"
 
 [dependencies.pit_clock]
 path = "../pit_clock"

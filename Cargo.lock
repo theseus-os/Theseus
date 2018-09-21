@@ -130,6 +130,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfg-if"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "compiler_builtins"
 version = "0.1.0"
 source = "git+https://github.com/rust-lang-nursery/compiler-builtins#cdbad7225fb61b4bf255501e974b3c2dbed0db58"
@@ -137,10 +142,22 @@ source = "git+https://github.com/rust-lang-nursery/compiler-builtins#cdbad7225fb
 [[package]]
 name = "context_switch"
 version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "context_switch_regular 0.1.0",
+ "context_switch_sse 0.1.0",
+]
+
+[[package]]
+name = "context_switch_regular"
+version = "0.1.0"
 
 [[package]]
 name = "context_switch_sse"
 version = "0.1.0"
+dependencies = [
+ "context_switch_regular 0.1.0",
+]
 
 [[package]]
 name = "cow_arc"
@@ -156,7 +173,8 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
- "scheduler 0.1.0",
+ "runqueue 0.1.0",
+ "task 0.1.0",
  "terminal_print 0.1.0",
 ]
 
@@ -262,6 +280,7 @@ dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "pmu_x86 0.1.0",
  "print 0.1.0",
+ "runqueue 0.1.0",
  "task 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
@@ -290,7 +309,7 @@ name = "frame_buffer_3d"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -410,16 +429,11 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety#90affdc92306c67f11ad99516227e6dc04050709"
+source = "git+https://github.com/kevinaboos/irq_safety#6a8c008994273603829bf83d30b41b315b5bb387"
 dependencies = [
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "irq_safety"
-version = "0.1.1"
-dependencies = [
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -455,6 +469,7 @@ name = "kill"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "runqueue 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -632,13 +647,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic_unwind_simple"
-version = "0.1.0"
-dependencies = [
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
@@ -646,6 +654,7 @@ dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "panic_info 0.1.0",
+ "runqueue 0.1.0",
  "task 0.1.0",
 ]
 
@@ -783,6 +792,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "runqueue"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "single_simd_task_optimization 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -800,10 +821,9 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
- "atomic_linked_list 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -838,12 +858,14 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]
@@ -852,6 +874,15 @@ version = "0.1.0"
 dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock 0.1.0",
+]
+
+[[package]]
+name = "single_simd_task_optimization"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
 ]
 
 [[package]]
@@ -872,6 +903,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "runqueue 0.1.0",
  "scheduler 0.1.0",
  "task 0.1.0",
  "tss 0.1.0",
@@ -958,6 +990,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "print 0.1.0",
+ "runqueue 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
@@ -995,7 +1028,6 @@ dependencies = [
 name = "text_display"
 version = "0.1.0"
 dependencies = [
- "event_types 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1067,7 +1099,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1106,6 +1138,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
 "checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
+"checksum cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "0c4e7bb64a8ebb0d856483e1e682ea3422f883c5f5615a90d51a2c82fe87fdd3"
 "checksum compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum either 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5845bf77d497f79416df39462df26d4a8b71dd6440246848ee63709476dbb9a6"
 "checksum getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)" = "<none>"

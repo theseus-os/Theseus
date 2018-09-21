@@ -14,6 +14,7 @@ extern crate dfqueue;
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
+extern crate runqueue;
 extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
@@ -34,8 +35,9 @@ use alloc::arc::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use task::TaskRef;
 use vfs::StrongDirRef;
+use task::{TaskRef, ExitValue, KillReason};
+use runqueue::RunQueue;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -53,7 +55,7 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     };
     // waits for the terminal loop to exit before exiting the main function
-    match spawn::join(&term_task_ref) {
+    match term_task_ref.join() {
         Ok(_) => { }
         Err(err) => {error!("{}", err)}
     }
@@ -136,7 +138,6 @@ impl Terminal {
         let mut prompt_string = root.lock().get_path(); // ref numbers are 0-indexed
         prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
-            // internal number used to track the terminal object 
             window: window_object,
             input_string: String::new(),
             display_name: String::from("content"),
@@ -485,55 +486,53 @@ impl Terminal {
         if self.current_task_id != 0 {
             // gets the task from the current task id variable
             let result = task::get_task(self.current_task_id);
-            if let Some(ref task_result)  = result {
-                let mut end_task = task_result.write();
-                    let exit_result = end_task.take_exit_value();
-                    // match statement will see if the task has finished with an exit value yet
-                    match exit_result {
-                        Some(exit_val) => {
-                            match exit_val {
-                                Ok(exit_status) => {
-                                    // here: the task ran to completion successfully, so it has an exit value.
-                                    // we know the return type of this task is `isize`,
-                                    // so we need to downcast it from Any to isize.
-                                    let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                    warn!("task returned exit value: {:?}", val);
-                                    if let Some(val) = val {
-                                        self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
-                                    }
-                                }
-                                // If the user manually aborts the task
-                                Err(task::KillReason::Requested) => {
-                                    warn!("task was manually aborted");
-                                    self.print_to_terminal("^C\n".to_string())?;
-                                }
-                                Err(kill_reason) => {
-                                    // here: the task exited prematurely, e.g., it was killed for some reason.
-                                    warn!("task was killed, reason: {:?}", kill_reason);
-                                    self.print_to_terminal(format!("task was killed, reason: {:?}\n", kill_reason))?;
+            if let Some(ref taskref) = result {
+                let exit_result = taskref.take_exit_value();
+                // match statement will see if the task has finished with an exit value yet
+                match exit_result {
+                    Some(exit_val) => {
+                        match exit_val {
+                            ExitValue::Completed(exit_status) => {
+                                // here: the task ran to completion successfully, so it has an exit value.
+                                // we know the return type of this task is `isize`,
+                                // so we need to downcast it from Any to isize.
+                                let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                                warn!("task returned exit value: {:?}", val);
+                                if let Some(val) = val {
+                                    self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
                                 }
                             }
-                            // Removes the task_id from the task_map
-                            terminal_print::remove_child(self.current_task_id)?;
-                            // Resets the current task id to be ready for the next command
-                            self.current_task_id = 0;
-                            self.redisplay_prompt();
-                            // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
-                            if self.buffer_string.len() > 0 {
-                                let temp = self.buffer_string.clone();
-                                self.print_to_terminal(temp.clone())?;
-                                self.input_string = temp;
-                                self.buffer_string.clear();
+                            // If the user manually aborts the task
+                            ExitValue::Killed(KillReason::Requested) => {
+                                warn!("task was manually aborted");
+                                self.print_to_terminal("^C\n".to_string())?;
                             }
-                            // Resets the bool to true once the print prompt has been redisplayed
-                            self.correct_prompt_position = true;
-                            let display_name = &self.display_name.clone();
-                            self.refresh_display(display_name);
-                        },
-                        // None value indicates task has not yet finished so does nothing
-                    None => {
-                        },
-                    }
+                            ExitValue::Killed(kill_reason) => {
+                                // here: the task exited prematurely, e.g., it was killed for some reason.
+                                warn!("task was killed, reason: {:?}", kill_reason);
+                                self.print_to_terminal(format!("task was killed, reason: {:?}\n", kill_reason))?;
+                            }
+                        }
+                        // Removes the task_id from the task_map
+                        terminal_print::remove_child(self.current_task_id)?;
+                        // Resets the current task id to be ready for the next command
+                        self.current_task_id = 0;
+                        self.redisplay_prompt();
+                        // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
+                        if self.buffer_string.len() > 0 {
+                            let temp = self.buffer_string.clone();
+                            self.print_to_terminal(temp.clone())?;
+                            self.input_string = temp;
+                            self.buffer_string.clear();
+                        }
+                        // Resets the bool to true once the print prompt has been redisplayed
+                        self.correct_prompt_position = true;
+                        let display_name = &self.display_name.clone();
+                        self.refresh_display(display_name);
+                    },
+                    // None value indicates task has not yet finished so does nothing
+                    None => { },
+                }
             }   
         }
         return Ok(());
@@ -574,9 +573,13 @@ impl Terminal {
             if self.current_task_id != 0 {
                 let task_ref = task::get_task(self.current_task_id);
                 if let Some(curr_task) = task_ref {
-                    match curr_task.write().kill(task::KillReason::Requested) {
-                        true => { }
-                        false => {error!("could not kill task");}
+                    match curr_task.kill(task::KillReason::Requested) {
+                        Ok(_) => {
+                            if let Err(e) = RunQueue::remove_task_from_all(curr_task) {
+                                error!("Killed task but could not remove it from runqueue: {}", e);
+                            }
+                        }
+                        Err(e) => error!("Could not kill task, error: {}", e),
                     }
                 }
             } else {
@@ -852,13 +855,13 @@ impl Terminal {
     /// Execute the command on a new thread 
     fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<usize, &'static str> {
         let module = memory::get_module(&command_string).ok_or("Error: no module with this name found!")?;
-        let taskref = ApplicationTaskBuilder::new(module)
+        let mut taskref = ApplicationTaskBuilder::new(module)
             .argument(arguments)
             .spawn()?;
 
-        taskref.write().set_wd(Arc::clone(&self.working_dir));
+        taskref.set_wd(Arc::clone(&self.working_dir));
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-        let new_task_id = taskref.read().id;
+        let new_task_id = taskref.lock().id;
         return Ok(new_task_id);
         
     }
@@ -903,8 +906,11 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
     { 
-        match terminal.window.add_displayable(&display_name, 100, 50,
-            TextDisplay::new(&display_name, 400, 300)) {
+        let (width, height) = terminal.window.dimensions();
+        let width  = width  - 2*window_manager::WINDOW_MARGIN;
+        let height = height - 2*window_manager::WINDOW_MARGIN;
+        match terminal.window.add_displayable(&display_name, 0, 0,
+            TextDisplay::new(&display_name, width, height)) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}
         };

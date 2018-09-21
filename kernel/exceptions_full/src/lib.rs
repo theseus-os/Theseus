@@ -6,6 +6,7 @@
 
 extern crate x86_64;
 extern crate task;
+extern crate runqueue;
 extern crate apic;
 extern crate pmu_x86;
 #[macro_use] extern crate log;
@@ -14,8 +15,7 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use pmu_x86::{SAMPLE_START_VALUE, IP_LIST, SAMPLE_COUNT, SAMPLE_TASK_ID, TASK_ID_LIST};
-use core::sync::atomic::Ordering;
+use runqueue::RunQueue;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -69,7 +69,14 @@ macro_rules! println_both {
 /// and then halts that task (another task should be scheduled in).
 fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
-        taskref.write().kill(task::KillReason::Exception(exception_number));
+        match taskref.kill(task::KillReason::Exception(exception_number)) {
+            Ok(_) => {
+                if let Err(e) = RunQueue::remove_task_from_all(taskref) {
+                    error!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
+                }
+            }
+            Err(e) => error!("kill_and_halt(): error killing current task {:?}: {}", taskref, e),
+        }
     }
 
     loop { }
@@ -89,6 +96,8 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
     println_both!("\nEXCEPTION: DEBUG at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
+
+    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
 
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
@@ -139,6 +148,8 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
     println_both!("\nEXCEPTION: OVERFLOW at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
+    
+    kill_and_halt(0x4)
 }
 
 // exception 0x05
@@ -146,6 +157,8 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
     println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
+
+    kill_and_halt(0x5)
 }
 
 /// exception 0x06

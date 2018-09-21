@@ -3,6 +3,7 @@ name = "terminal"
 version = "0.1.0"
 description = "Terminal emulator that can run commands in application directory"
 authors = ["Andrew Pham <apham727@gmail.com>"]
+build = "../../build.rs"
 
 
 [dependencies]
@@ -29,6 +30,9 @@ path = "../../kernel/spawn"
 
 [dependencies.task]
 path = "../../kernel/task"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
 
 [dependencies.memory]
 path  = "../../kernel/memory"
