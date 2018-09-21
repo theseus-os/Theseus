@@ -44,6 +44,12 @@ impl RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
+
+        #[cfg(runqueue_state_spill_evaluation)] 
+        {
+            task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
+        }
+
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
             error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
             Err("runqueue already exists for this core")
@@ -110,6 +116,11 @@ impl RunQueue {
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
         
+        #[cfg(runqueue_state_spill_evaluation)]
+        {
+            task.lock_mut().on_runqueue = Some(self.core);
+        }
+
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
         self.queue.push_back(task);
         
@@ -134,6 +145,11 @@ impl RunQueue {
 
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+        // For the runqueue state spill evaluation, we disable this method because we 
+        // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
+        #[cfg(runqueue_state_spill_evaluation)]
+        return Ok(());
+
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
 
@@ -158,6 +174,20 @@ impl RunQueue {
             rq.write().remove_task(task)?;
         }
         Ok(())
+    }
+
+    #[cfg(runqueue_state_spill_evaluation)]
+    /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
+    pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
+        warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
+        task.lock_mut().on_runqueue = None;
+        RUNQUEUES.get(&core)
+            .ok_or("Couldn't get runqueue for specified core")
+            .and_then(|rq| {
+                let mut rq_locked = rq.write();
+                rq_locked.queue.retain(|x| x != task);
+                Ok(())
+            })
     }
 
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,

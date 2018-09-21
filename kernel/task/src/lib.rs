@@ -42,6 +42,12 @@ extern crate mod_mgmt;
 extern crate panic_info;
 extern crate context_switch;
 
+#[cfg(runqueue_state_spill_evaluation)]
+extern crate spin;
+
+#[cfg(runqueue_state_spill_evaluation)]
+use spin::Once;
+
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
@@ -161,6 +167,9 @@ pub enum RunState {
     Reaped,
 }
 
+#[cfg(runqueue_state_spill_evaluation)]
+pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
+
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
@@ -171,6 +180,11 @@ pub struct Task {
     /// Which cpu core the Task is currently running on.
     /// `None` if not currently running.
     pub running_on_cpu: Option<u8>,
+    
+    #[cfg(runqueue_state_spill_evaluation)]
+    /// The runqueue that this Task is on.
+    pub on_runqueue: Option<u8>,
+    
     /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
@@ -225,6 +239,10 @@ impl Task {
             id: task_id,
             runstate: RunState::Initing,
             running_on_cpu: None,
+            
+            #[cfg(runqueue_state_spill_evaluation)]
+            on_runqueue: None,
+            
             saved_sp: 0,
             name: format!("task{}", task_id),
             kstack: None,
@@ -543,11 +561,24 @@ impl TaskRef {
 
     /// The internal routine that actually exits or kills a Task.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        let mut task = self.0.lock();
-        if let RunState::Exited(_) = task.runstate {
-            return Err("task was already exited! (did not overwrite its existing exit value)");
+        {
+            let mut task = self.0.lock();
+            if let RunState::Exited(_) = task.runstate {
+                return Err("task was already exited! (did not overwrite its existing exit value)");
+            }
+            task.runstate = RunState::Exited(val);
         }
-        task.runstate = RunState::Exited(val);
+
+        #[cfg(runqueue_state_spill_evaluation)] 
+        {   
+            let task_on_rq = { self.0.lock().on_runqueue.clone() };
+            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
+                if let Some(rq) = task_on_rq {
+                    remove_from_runqueue(self, rq)?;
+                }
+            }
+        }
+
         Ok(())
     }
 
