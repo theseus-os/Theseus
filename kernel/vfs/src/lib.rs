@@ -32,14 +32,6 @@ pub fn get_root() -> StrongDirRef {
 pub type StrongDirRef = Arc<Mutex<Directory>>;
 pub type WeakDirRef = Weak<Mutex<Directory>>;
 
-
-// fn test() {
-//     let dir_pointer = StrongDirRef;
-//     let parent_pointer = Arc::clone(dir_pointer);5
-//     dir_pointer.lock().new_dir("shit", Arc::downgrade(parent_pointer));
-// }
-
-
 pub struct Directory{
     name: String,
     path: String,
@@ -70,10 +62,8 @@ impl Directory {
             files:  Vec::new(),
             parent: parent_pointer,
         };
-
         self.child_dirs.push(Arc::new(Mutex::new(directory)));
     }
-
 
     pub fn list_children(&mut self) -> String {
         let mut children_list = String::new();
@@ -93,18 +83,9 @@ impl Directory {
     }
 }
 
-
-
 pub struct File {
     name: String, 
     filepath: String,
     size: usize, 
     parent: WeakDirRef,
-}
-
-
-impl File {
-    pub fn read(self) -> String {
-        return format!("name: {}, filepath: {}, size: {}, filetype: {}", self.name, self.filepath, self.size, String::from("temp filetype"));
-    }
 }
