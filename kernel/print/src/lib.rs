@@ -32,7 +32,6 @@ macro_rules! println {
     ($fmt:expr) => (print!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
-
 /// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
 /// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
 #[macro_export]

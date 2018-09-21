@@ -6,6 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.5"
 
 [dependencies.log]
 default-features = false

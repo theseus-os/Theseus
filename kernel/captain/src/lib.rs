@@ -52,6 +52,8 @@ extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
+extern crate spin;
+
 
 #[cfg(simd_personality)]
 extern crate simd_personality;

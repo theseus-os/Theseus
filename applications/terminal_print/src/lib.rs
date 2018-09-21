@@ -48,7 +48,7 @@ macro_rules! print {
 lazy_static! {
     static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 }
-
+ 
 /// Adds the (child application's task ID, parent terminal print_producer) key-val pair to the map 
 /// Simulates connecting an output stream to the application
 pub fn add_child(child_task_id: usize, print_producer: DFQueueProducer<Event>) -> Result<(), &'static str> {

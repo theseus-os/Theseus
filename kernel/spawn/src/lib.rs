@@ -256,6 +256,8 @@ impl<'m> ApplicationTaskBuilder<'m> {
             #[cfg(simd_personality)]
             simd: false,
         }
+
+        
     }
 
     /// Set the String name for the new Task.
