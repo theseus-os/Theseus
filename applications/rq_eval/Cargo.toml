@@ -1,0 +1,29 @@
+[package]
+name = "rq_eval"
+version = "0.1.0"
+description = "A application that microbenchmarks runqueue performance"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.acpi]
+path = "../../kernel/acpi"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.terminal_print]
+path = "../terminal_print"
