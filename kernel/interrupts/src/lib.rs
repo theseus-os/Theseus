@@ -349,15 +349,18 @@ extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
 
     info!("the keyboard is typed \n\n\n\n\n");
-    if let Some(td_index) = USB_KEYBOARD_TD_INDEX.try().map(|td_index| {
+    if let Ok(()) = usb_uhci::int_status_handle(){
+        usb_keyboard::data_handler();
+        if let Some(td_index) = USB_KEYBOARD_TD_INDEX.try().map(|td_index| {
 
-        let td_index = *td_index;
-        td_index
-
-    }){
-        usb_uhci::td_clean(td_index);
-        let a = usb_keyboard::init_receive_data();
+            let td_index = *td_index;
+            td_index
+        }){
+            usb_uhci::td_clean(td_index);
+            let _a = usb_keyboard::init_receive_data();
+        }
     }
+
 
 
     // e1000::e1000_handler();

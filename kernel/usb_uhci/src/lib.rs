@@ -856,7 +856,7 @@ pub fn if_process_error() -> bool{
 
 }
 
-/// See whether UHCI t receives a “RESUME” signal from a USB device
+/// See whether UHCI receives a “RESUME” signal from a USB device
 /// Return a bool
 pub fn resume_detect() -> bool{
 
@@ -880,6 +880,35 @@ pub fn if_interrupt() -> bool{
 
     let flag = (UHCI_STS_PORT.lock().read() & STS_USBINT) == STS_USBINT;
     flag
+
+}
+
+/// Recognize IOC and then clean the corresponding bit in status
+pub fn ioc_complete(){
+
+    unsafe{UHCI_STS_PORT.lock().write(STS_USBINT)}
+}
+
+///A simple interrupt status handler
+pub fn int_status_handle() -> Result<(),&'static str>{
+
+    if if_interrupt(){
+
+        ioc_complete();
+        Ok(())
+
+    } else if if_halted(){
+        Err("The Uhci Controller is halted")
+    }else if if_process_error() {
+        Err("UHCI has serious error occurs during a host system access")
+    }else if resume_detect(){
+        Err("UHCI receives a “RESUME” signal from a USB device")
+    }else if if_error_int(){
+        Err("completion of a USB transaction results in an error condition")
+    }else{
+        Err("Unknown error causing the interrupt")
+    }
+
 
 }
 // ------------------------------------------------------------------------------------------------

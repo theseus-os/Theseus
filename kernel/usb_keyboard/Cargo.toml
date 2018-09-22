@@ -31,3 +31,6 @@ path = "../usb_desc"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"

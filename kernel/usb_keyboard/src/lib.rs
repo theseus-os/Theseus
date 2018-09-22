@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+extern crate keycodes_ascii;
 extern crate alloc;
 extern crate owning_ref;
 extern crate usb_uhci;
@@ -13,6 +14,7 @@ extern crate spin;
 extern crate volatile;
 #[macro_use] extern crate log;
 
+use keycodes_ascii::Keycode;
 use alloc::boxed::Box;
 use spin::{Once, Mutex};
 use volatile:: ReadOnly;
@@ -22,7 +24,7 @@ use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_en
 use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
 use owning_ref:: BoxRefMut;
 
-static USB_KEYBOARD_INPUT_BUFFER: Once<Mutex<BoxRefMut<MappedPages, [ReadOnly<u8>;8]>>> = Once::new();
+pub static USB_KEYBOARD_INPUT_BUFFER: Once<Mutex<BoxRefMut<MappedPages, [ReadOnly<u8>;8]>>> = Once::new();
 static USB_KEYBOARD_INPUT_BUFFER_BASE: Once<u32> = Once::new();
 pub static USB_KEYBOARD_TD_INDEX: Once<usize> = Once::new();
 static USB_KEYBOARD_TD_ADD: Once<usize> = Once::new();
@@ -127,8 +129,6 @@ pub fn init_receive_data() -> Result<(),&'static str>{
     let frame_index = usb_uhci:: td_link_to_framelist(packet_add as u32).unwrap()?;
 
 
-//    usb_uhci::td_clean(packet_index);
-
     Ok(())
 
 }
@@ -149,3 +149,19 @@ pub fn box_keyboard_buffer(active_table: &mut ActivePageTable, frame_base: Physi
     Ok(buffer)
 }
 
+///Keyboard data handler
+
+pub fn data_handler(){
+    let a = USB_KEYBOARD_INPUT_BUFFER.try().map(|td_index| {
+
+        for x in td_index.lock().iter(){
+
+            let code = x.read();
+            info!("the key :{:?}", Keycode::from_scancode_usb(code) );
+
+
+        }
+
+    });
+
+}

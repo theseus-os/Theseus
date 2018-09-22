@@ -196,8 +196,7 @@ pub enum Keycode {
 
 
 impl Keycode {
-
-    pub fn from_scancode(scancode: u8)  -> Option<Keycode> {
+    pub fn from_scancode(scancode: u8) -> Option<Keycode> {
         match scancode {
             0 => Some(Keycode::OverflowError),
             1 => Some(Keycode::Escape),
@@ -293,6 +292,103 @@ impl Keycode {
             91 => Some(Keycode::LeftGui),
             92 => Some(Keycode::RightGui),
             93 => Some(Keycode::Menu),
+
+            _ => None,
+        }
+    }
+
+
+    pub fn from_scancode_usb(scancode: u8) -> Option<Keycode> {
+        match scancode {
+            0x29 => Some(Keycode::Escape),
+            0x1e => Some(Keycode::Num1),
+            0x1f => Some(Keycode::Num2),
+            0x20 => Some(Keycode::Num3),
+            0x21 => Some(Keycode::Num4),
+            0x22 => Some(Keycode::Num5),
+            0x23 => Some(Keycode::Num6),
+            0x24 => Some(Keycode::Num7),
+            0x25 => Some(Keycode::Num8),
+            0x26 => Some(Keycode::Num9),
+            0x27 => Some(Keycode::Num0),
+            0x2d => Some(Keycode::Minus),
+            0x2e => Some(Keycode::Equals),
+            0x2a => Some(Keycode::Backspace),
+            0x2b => Some(Keycode::Tab),
+            0x14 => Some(Keycode::Q),
+            0x1a => Some(Keycode::W),
+            0x08 => Some(Keycode::E),
+            0x15 => Some(Keycode::R),
+            0x17 => Some(Keycode::T),
+            0x1c => Some(Keycode::Y),
+            0x18 => Some(Keycode::U),
+            0x0c => Some(Keycode::I),
+            0x12 => Some(Keycode::O),
+            0x13 => Some(Keycode::P),
+            0x2f => Some(Keycode::LeftBracket),
+            0x30 => Some(Keycode::RightBracket),
+            0x28 => Some(Keycode::Enter),
+            0xe0 => Some(Keycode::Control),
+            0x04 => Some(Keycode::A),
+            0x16 => Some(Keycode::S),
+            0x07 => Some(Keycode::D),
+            0x09 => Some(Keycode::F),
+            0x0a => Some(Keycode::G),
+            0x0b => Some(Keycode::H),
+            0x0d => Some(Keycode::J),
+            0x0e => Some(Keycode::K),
+            0x0f => Some(Keycode::L),
+            0x33 => Some(Keycode::Semicolon),
+            0x34 => Some(Keycode::Quote),
+            0x35 => Some(Keycode::Backtick),
+            0xe1 => Some(Keycode::LeftShift),
+            0x31 => Some(Keycode::Backslash),
+            0x1d => Some(Keycode::Z),
+            0x1b => Some(Keycode::X),
+            0x06 => Some(Keycode::C),
+            0x19 => Some(Keycode::V),
+            0x05 => Some(Keycode::B),
+            0x11 => Some(Keycode::N),
+            0x10 => Some(Keycode::M),
+            0x36 => Some(Keycode::Comma),
+            0x37 => Some(Keycode::Period),
+            0x38 => Some(Keycode::Slash),
+            0xe5 => Some(Keycode::RightShift),
+            0x55 => Some(Keycode::PadMultiply), // Also PrintScreen
+            0xe2 => Some(Keycode::Alt),
+            0x2c => Some(Keycode::Space),
+            0x39 => Some(Keycode::CapsLock),
+            0x3a => Some(Keycode::F1),
+            0x3b => Some(Keycode::F2),
+            0x3c => Some(Keycode::F3),
+            0x3d => Some(Keycode::F4),
+            0x3e => Some(Keycode::F5),
+            0x3f => Some(Keycode::F6),
+            0x40 => Some(Keycode::F7),
+            0x41 => Some(Keycode::F8),
+            0x42 => Some(Keycode::F9),
+            0x43 => Some(Keycode::F10),
+            0x53 => Some(Keycode::NumLock),
+            0x47 => Some(Keycode::ScrollLock),
+            0x4a => Some(Keycode::Home), // Also Pad7
+            0x52 => Some(Keycode::Up), // Also Pad8
+            0x4b => Some(Keycode::PageUp), // Also Pad9
+            0x56 => Some(Keycode::PadMinus),
+            0x50 => Some(Keycode::Left), // Also Pad4
+            0x5d => Some(Keycode::Pad5),
+            0x4f => Some(Keycode::Right), // Also Pad6
+            0x57 => Some(Keycode::PadPlus),
+            0x4d => Some(Keycode::End), // Also Pad1
+            0x51 => Some(Keycode::Down), // Also Pad2
+            0x4e => Some(Keycode::PageDown), // Also Pad3
+            0x49 => Some(Keycode::Insert), // Also Pad0
+            0x4c => Some(Keycode::Delete), // Also PadDecimal
+            0x44 => Some(Keycode::F11),
+            0x45 => Some(Keycode::F12),
+            0x48 => Some(Keycode::Pause),
+            0xe3 => Some(Keycode::LeftGui),
+            0xe7 => Some(Keycode::RightGui),
+            0x76 => Some(Keycode::Menu),
 
             _ => None,
         }
