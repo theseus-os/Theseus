@@ -120,7 +120,6 @@ pub fn init_receive_data() -> Result<(),&'static str>{
 
     let packet_add = td_add;
     let packet_index = td_index;
-    info!("keyboard packet_add:{:x}", packet_add);
     usb_uhci::interrupt_td(packet_index,0,0,speed ,addr, endpoint as u32,toggle, TD_PACKET_IN as u32,
                       max_size,data_buffer_pointer);
 
@@ -154,10 +153,16 @@ pub fn box_keyboard_buffer(active_table: &mut ActivePageTable, frame_base: Physi
 pub fn data_handler(){
     let a = USB_KEYBOARD_INPUT_BUFFER.try().map(|td_index| {
 
-        for x in td_index.lock().iter(){
+        for x in 2..8 {
 
-            let code = x.read();
-            info!("the key :{:?}", Keycode::from_scancode_usb(code) );
+
+            let code = td_index.lock()[x].read();;
+            if let Some(keycode) = Keycode::from_scancode_usb(code){
+
+                info!("the key :{:?}",keycode) ;
+
+            }
+
 
 
         }
