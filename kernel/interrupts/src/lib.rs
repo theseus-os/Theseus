@@ -29,6 +29,7 @@ extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
 extern crate ps2;
+extern crate usb_keyboard;
 
 
 
@@ -344,6 +345,9 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
+
+    info!("the keyboard is typed \n\n\n\n\n");
+//    usb_keyboard::init_receive_data()
     // e1000::e1000_handler();
 	eoi(Some(0x2B));
 }

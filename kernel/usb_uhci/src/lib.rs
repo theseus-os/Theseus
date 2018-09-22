@@ -33,7 +33,7 @@ use usb_req::UsbDevReq;
 pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
 pub static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
 static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
-static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
+pub static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
 static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
 static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
@@ -210,6 +210,27 @@ pub fn device_register(index:usize, device: UsbDevice){
     });
 }
 
+///Get the registered device accoding to the index
+pub fn get_registered_device (index: usize) -> Option<UsbDevice>{
+
+    UHCI_DEVICE_POOL.try().map(|device_pool| {
+
+        let device = device_pool.lock()[index].clone();
+//        let mut d = UsbDevice::default();
+//        d.port = device.port;
+//        d.interrupt_endpoint = device.interrupt_endpoint;
+//        d.iso_endpoint = device.iso_endpoint;
+//        d.control_endpoint = device.control_endpoint;
+//        d.device_type = device.device_type;
+//        d.addr = device.addr;
+//        d.maxpacketsize = device.maxpacketsize;
+//        d.speed = device.speed;
+//        d.controller = device.controller;
+//        d
+        device
+    })
+}
+
 
 /// Allocate a available Uhci TD
 pub fn td_alloc()-> Option<Result<(usize,usize),&'static str>>{
@@ -249,6 +270,35 @@ pub fn init_td(index:usize,type_select: u8, pointer: u32, speed: u8, add: u32, e
                 data_size, data_add)
 
     });
+}
+
+/// According to the given index, init the available TD be an interrupt transfer
+pub fn interrupt_td(index:usize,type_select: u8, pointer: u32, speed: u8, add: u32, endp: u32, toggle: u32, pid: u32,
+                    data_size: u32, data_add: u32){
+
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        td.init(type_select, pointer, speed, add, endp, toggle, pid,
+                data_size, data_add);
+        let status = td.control_status.read();
+        td.control_status.write(status | TD_CS_IOC)
+
+    });
+}
+
+pub fn td_clean(index:usize){
+    TD_POOL.try().map(|td_pool| {
+
+        let td = &mut td_pool.lock()[index];
+        td.control_status.write(0);
+        td.token.write(0);
+        td.link_pointer.write(0);
+        td.buffer_point.write(0);
+        td.active.write(0);
+
+    });
+
 }
 
 /// Write next data structure's physical address into given TD according to the index
@@ -338,7 +388,7 @@ pub fn clean_a_frame(index: usize){
 
 }
 
-/// Link the TD and Queue Head to the frame list, and return the index of the frame
+/// Link the Queue Head to the frame list, and return the index of the frame
 pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
@@ -360,6 +410,30 @@ pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
         Err("No empty frame, need to clean one")
         })
+}
+
+/// Link the TD to the frame list, and return the index of the frame
+pub fn td_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+        let mut index:usize = 0;
+        for x in frame_list.lock().iter_mut() {
+
+            if (x.read() == 0) || (x.read() & 0x1 == 0x1) {
+
+                x.write(pointer);
+
+                return Ok(index);
+
+            }else{
+                index += 1;
+            }
+
+        }
+
+        Err("No empty frame, need to clean one")
+    })
 }
 
 ///read frame list link pointer
@@ -389,6 +463,8 @@ pub fn box_qh_pool(active_table: &mut ActivePageTable)
 
     Ok(qh_pool)
 }
+
+
 pub fn box_td_pool(active_table: &mut ActivePageTable)
                    -> Result<BoxRefMut<MappedPages, [UhciTDRegisters; MAX_TD]>, &'static str>{
 

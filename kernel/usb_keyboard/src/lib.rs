@@ -18,71 +18,127 @@ use spin::{Once, Mutex};
 use volatile:: ReadOnly;
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
 use usb_device::{UsbControlTransfer,UsbDevice,Controller,HIDType};
-use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_endpoint_desc,map,UHCI_STS_PORT,UHCI_CMD_PORT};
+use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_endpoint_desc,map,UHCI_STS_PORT,UHCI_CMD_PORT,get_registered_device};
 use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
 use owning_ref:: BoxRefMut;
 
 static USB_KEYBOARD_INPUT_BUFFER: Once<Mutex<BoxRefMut<MappedPages, [ReadOnly<u8>;8]>>> = Once::new();
+static USB_KEYBOARD_INPUT_BUFFER_BASE: Once<u32> = Once::new();
+static USB_KEYBOARD_TD_INDEX: Once<usize> = Once::new();
+static USB_KEYBOARD_TD_ADD: Once<usize> = Once::new();
+static USB_KEYBOARD_DEVICE_ID: Once<usize> = Once::new();
 
 const TD_PACKET_IN : u8=                    0x69;
 const TD_PACKET_OUT : u8=                   0xe1;
 
-pub fn init(active_table: &mut ActivePageTable, device:& UsbDevice)-> Result<(),&'static str>{
+pub fn init(active_table: &mut ActivePageTable, index: usize)-> Result<(),&'static str>{
 
     let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(0)
         .ok_or("Couldn't get virtual memory address for the buffer pointer in get_config_desc request for device in UHCI!!")?;
     let data_buffer_pointer = active_table.translate(v_buffer_pointer as usize)
         .ok_or("Couldn't translate the virtual memory address of the buffer pointer to phys_addr!!")?;
 
-    let _x = recieve_data(active_table,device,data_buffer_pointer as u32)?;
     let k_buffer = box_keyboard_buffer(active_table,data_buffer_pointer,0)?;
+
+    USB_KEYBOARD_DEVICE_ID.call_once(||{
+        index
+    });
+
 
     USB_KEYBOARD_INPUT_BUFFER.call_once(||{
         Mutex::new(k_buffer)
     });
 
+    USB_KEYBOARD_INPUT_BUFFER_BASE.call_once(||{
+        data_buffer_pointer as u32
+    });
+
+    let (td_add,td_index) = usb_uhci::td_alloc().unwrap()?;
+
+    USB_KEYBOARD_TD_INDEX.call_once(||{
+        td_index
+    });
+
+
+    let td_add = active_table.translate(td_add).unwrap();
+
+    USB_KEYBOARD_TD_ADD.call_once(||{
+        td_add
+    });
+
+
+    init_receive_data()?;
+
+
+
+
     Ok(())
 
 }
 
-pub fn recieve_data(active_table: &mut ActivePageTable, device:& UsbDevice, data_buffer_pointer: u32)-> Result<(),&'static str>{
+pub fn init_receive_data() -> Result<(),&'static str>{
 
 
+    let data_buffer_pointer = USB_KEYBOARD_INPUT_BUFFER_BASE.try().map(|pointer| {
+
+        let pointer = *pointer;
+        pointer
+
+    }).ok_or("cannot get the base address of keyboard input buffer")?;
+
+    let td_index = USB_KEYBOARD_TD_INDEX.try().map(|td_index| {
+
+        let td_index = *td_index;
+        td_index
+
+    }).ok_or("cannot get the td index for keyboard interrupt transaction")?;
+
+    let td_add = USB_KEYBOARD_TD_ADD.try().map(|td_add| {
+
+        let td_add = *td_add;
+        td_add
+
+    }).ok_or("cannot get the td address for keyboard interrupt transaction")?;
+
+    let index = USB_KEYBOARD_DEVICE_ID.try().map(|id| {
+
+        let id = *id;
+        id
+
+    }).ok_or("cannot get the usb registered device's index for keyboard interrupt transaction")?;
+
+
+    let device = get_registered_device(index).ok_or("cannot get the registered usb device")?;
     let speed= device.speed;
     info!("speed :{:x}", speed);
     let addr = device.addr;
+    info!("keyboard aasigned address: {:x}", addr);
     let max_size = device.maxpacketsize;
+    info!("keyboard max size: {:x}", max_size);
     let endpoint = device.interrupt_endpoint;
+    info!("keyboard endpoint: {:x}", endpoint);
     let mut toggle = 0;
-    let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
-    let packet_add = active_table.translate(packet_add).unwrap();
-    usb_uhci::init_td(packet_index,0,0,speed ,addr, endpoint as u32,toggle, TD_PACKET_IN as u32,
+
+
+    let packet_add = td_add;
+    let packet_index = td_index;
+    info!("keyboard packet_add:{:x}", packet_add);
+    usb_uhci::interrupt_td(packet_index,0,0,speed ,addr, endpoint as u32,toggle, TD_PACKET_IN as u32,
                       max_size,data_buffer_pointer);
-    info!("td index: {:x}",packet_index);
 
 
-    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
-    let qh_physical_add = active_table.translate(qh_physical_add).unwrap();
-    usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,packet_add as u32);
-    info!("qh index: {:x}",qh_index);
-    let frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).unwrap()?;
 
-    for _x in 0..10{
+    let frame_index = usb_uhci:: td_link_to_framelist(packet_add as u32).unwrap()?;
 
-        let status = usb_uhci::td_status(packet_index).unwrap()?;
-        info!("data status :{:x}",status);
 
-    }
-
-    info!("frame index: {:x}", frame_index);
-    info!("see the contends: {:x}", qh_physical_add);
-    info!("see the contends: {:x}", usb_uhci::frame_link_pointer(frame_index).unwrap()?);
-    info!("\nUHCI USBSTS: {:b}\n", UHCI_STS_PORT.lock().read());
-    info!("\nUHCI USBCMD: {:b}\n", UHCI_CMD_PORT.lock().read());
+//    usb_uhci::td_clean(packet_index);
 
     Ok(())
 
 }
+
+
+
 
 
 /// Box the the keyboard input data buffer

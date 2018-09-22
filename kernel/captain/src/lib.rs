@@ -134,8 +134,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the kernel input_event_manager
     let input_event_queue_producer = input_event_manager::init()?;
 
+    driver_init::usb_init(kernel_mmi_ref.lock().deref_mut())?;
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
+
+
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
