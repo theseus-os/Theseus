@@ -24,7 +24,7 @@ use owning_ref:: BoxRefMut;
 
 static USB_KEYBOARD_INPUT_BUFFER: Once<Mutex<BoxRefMut<MappedPages, [ReadOnly<u8>;8]>>> = Once::new();
 static USB_KEYBOARD_INPUT_BUFFER_BASE: Once<u32> = Once::new();
-static USB_KEYBOARD_TD_INDEX: Once<usize> = Once::new();
+pub static USB_KEYBOARD_TD_INDEX: Once<usize> = Once::new();
 static USB_KEYBOARD_TD_ADD: Once<usize> = Once::new();
 static USB_KEYBOARD_DEVICE_ID: Once<usize> = Once::new();
 
@@ -110,13 +110,9 @@ pub fn init_receive_data() -> Result<(),&'static str>{
 
     let device = get_registered_device(index).ok_or("cannot get the registered usb device")?;
     let speed= device.speed;
-    info!("speed :{:x}", speed);
     let addr = device.addr;
-    info!("keyboard aasigned address: {:x}", addr);
     let max_size = device.maxpacketsize;
-    info!("keyboard max size: {:x}", max_size);
     let endpoint = device.interrupt_endpoint;
-    info!("keyboard endpoint: {:x}", endpoint);
     let mut toggle = 0;
 
 
