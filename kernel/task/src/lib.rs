@@ -40,8 +40,12 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
+extern crate vfs;
+extern crate spin;
 extern crate context_switch;
 
+#[cfg(not(target_feature = "sse2"))]
+use context_switch::context_switch;
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
@@ -57,7 +61,8 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-
+use vfs::{StrongDirRef, Directory};
+use spin::Mutex;
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
@@ -195,7 +200,8 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
-    
+    /// the task's working directory that it is created in
+    pub working_dir: StrongDirRef,
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
     /// whether it uses SIMD registers and instructions.
@@ -235,10 +241,18 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-
+            working_dir: vfs::get_root(),
             #[cfg(simd_personality)]
             simd: false,
         }
+    }
+
+    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
+        self.working_dir = new_dir;
+    }
+
+    pub fn get_wd(&self) -> StrongDirRef {
+        return Arc::clone(&self.working_dir);
     }
 
     /// returns true if this Task is currently running on any cpu.
@@ -617,6 +631,11 @@ impl TaskRef {
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_exit_value(&self) -> Option<ExitValue> {
         self.0.lock().take_exit_value()
+    }
+    
+    /// Sets working directory
+    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
+        self.0.lock().set_wd(new_dir);
     }
 
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
