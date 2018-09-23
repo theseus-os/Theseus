@@ -41,11 +41,7 @@ extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
 extern crate vfs;
-extern crate spin;
 extern crate context_switch;
-
-#[cfg(not(target_feature = "sse2"))]
-use context_switch::context_switch;
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
@@ -61,8 +57,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{StrongDirRef, Directory};
-use spin::Mutex;
+use vfs::StrongDirRef;
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
@@ -249,10 +244,6 @@ impl Task {
 
     pub fn set_wd(&mut self, new_dir: StrongDirRef) {
         self.working_dir = new_dir;
-    }
-
-    pub fn get_wd(&self) -> StrongDirRef {
-        return Arc::clone(&self.working_dir);
     }
 
     /// returns true if this Task is currently running on any cpu.
