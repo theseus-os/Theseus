@@ -26,7 +26,7 @@ const CONFIG: &'static str = "WITH state spill";
 #[cfg(not(runqueue_state_spill_evaluation))]
 const CONFIG: &'static str = "WITHOUT state spill";
 
-const FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
+const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
 
 #[no_mangle]
@@ -127,7 +127,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
             let task_on_rq = { taskref.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
                 if let Some(rq) = task_on_rq {
-                    remove_from_runqueue(self, rq)?;
+                    remove_from_runqueue(&taskref, rq)?;
                 }
             }
         }
@@ -150,7 +150,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
 
 
 fn whole_task(task_num: usize) -> usize {
-    warn!("in whole_task, task {}.", task_num);
+    // warn!("in whole_task, task {}.", task_num);
     task_num
 }
 

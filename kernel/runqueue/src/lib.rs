@@ -31,6 +31,7 @@ lazy_static! {
 
 /// A list of references to `Task`s (`TaskRef`s) 
 /// that is used to store the `Task`s that are runnable on a given core. 
+#[derive(Debug)]
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
@@ -121,7 +122,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
         self.queue.push_back(task);
         
         #[cfg(single_simd_task_optimization)]
@@ -148,12 +149,15 @@ impl RunQueue {
         // For the runqueue state spill evaluation, we disable this method because we 
         // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
         #[cfg(runqueue_state_spill_evaluation)]
-        return Ok(());
+        {
+            // trace!("skipping remove_task() on core {}, task {:?}", self.core, task);
+            return Ok(());
+        }
 
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
 
-        debug!("Removing task from runqueue {}, {:?}", self.core, task);
+        // debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| x != task);
 
         #[cfg(single_simd_task_optimization)]
@@ -179,13 +183,15 @@ impl RunQueue {
     #[cfg(runqueue_state_spill_evaluation)]
     /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
     pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
-        warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
+        // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
         task.lock_mut().on_runqueue = None;
         RUNQUEUES.get(&core)
             .ok_or("Couldn't get runqueue for specified core")
             .and_then(|rq| {
                 let mut rq_locked = rq.write();
+                // info!("RQ {} BEFORE: {:?}", core, &*rq_locked);
                 rq_locked.queue.retain(|x| x != task);
+                // info!("RQ {} AFTER:  {:?}", core, &*rq_locked);
                 Ok(())
             })
     }
