@@ -19,3 +19,7 @@ path = "../../kernel/mod_mgmt"
 
 [dependencies.memory]
 path = "../../kernel/memory"
+
+
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
