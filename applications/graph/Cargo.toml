@@ -20,3 +20,10 @@ path = "../../kernel/acpi"
 
 [dependencies.terminal_print]
 path = "../terminal_print"
+
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"

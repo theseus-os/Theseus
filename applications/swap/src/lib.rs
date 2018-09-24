@@ -61,17 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
     println!("mod_pairs: {:?}", mod_pairs);
 
     match swap_modules(mod_pairs, verbose) {
-        Ok(_) => {
-             // //init frame_buffer
-            let rs = frame_buffer::init();
-            match rs {
-                Ok(_) => {},
-                Err(err) => { 
-                    return -2;
-                }
-            };
-            0
-        },
+        Ok(_) => 0,
         Err(e) => {
             println!("Error: {}", e);
             -1

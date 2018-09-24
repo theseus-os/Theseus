@@ -65,6 +65,7 @@ pub fn init() -> Result<(), &'static str > {
         Err(err) => { return Err(err); }
     }    
 
+    trace!("Wenqiu::the swapping is done 1");
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
     let mut kernel_mmi_locked = kernel_mmi_ref.lock();
@@ -74,7 +75,7 @@ pub fn init() -> Result<(), &'static str > {
         page_table: ref mut kernel_page_table, 
         .. // don't need to access other stuff in kernel_mmi
     } = *kernel_mmi_locked;
-    
+    trace!("Wenqiu::the swapping is done 2");
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
             let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
