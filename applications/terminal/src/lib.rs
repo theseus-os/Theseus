@@ -14,6 +14,7 @@ extern crate dfqueue;
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
+extern crate runqueue;
 extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
@@ -32,7 +33,8 @@ use alloc::vec::Vec;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use task::TaskRef;
+use task::{TaskRef, ExitValue, KillReason};
+use runqueue::RunQueue;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -128,10 +130,9 @@ impl Terminal {
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
 
-        let prompt_string = "terminal:~$ ".to_string(); // ref numbers are 0-indexed
+        let prompt_string = "terminal:~$ ".to_string();
 
         let mut terminal = Terminal {
-            // internal number used to track the terminal object 
             window: window_object,
             input_string: String::new(),
             display_name: String::from("content"),
@@ -499,61 +500,51 @@ impl Terminal {
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
-        match self.current_task_ref {
-            Some(task_ref) => {
-                let mut end_task = task_ref.write();
-                    let exit_result = end_task.take_exit_value();
-                    // match statement will see if the task has finished with an exit value yet
-                    match exit_result {
-                        Some(exit_val) => {
-                            match exit_val {
-                                Ok(exit_status) => {
-                                    // here: the task ran to completion successfully, so it has an exit value.
-                                    // we know the return type of this task is `isize`,
-                                    // so we need to downcast it from Any to isize.
-                                    let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                    warn!("task returned exit value: {:?}", val);
-                                    if let Some(val) = val {
-                                        self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
-                                    }
-                                }
-                                // If the user manually aborts the task
-                                Err(task::KillReason::Requested) => {
-                                    warn!("task was manually aborted");
-                                    self.print_to_terminal("^C\n".to_string())?;
-                                }
-                                Err(kill_reason) => {
-                                    // here: the task exited prematurely, e.g., it was killed for some reason.
-                                    warn!("task was killed, reason: {:?}", kill_reason);
-                                    self.print_to_terminal(format!("task was killed, reason: {:?}\n", kill_reason))?;
-                                }
-                            }
-                            // Removes the task_id from the task_map
-                            let task_ref = match self.current_task_ref {
-                                Some(task) => task,
-                                None => return Err("tried to remove child without running task_ref")
-                            };
-                            terminal_print::remove_child(task_ref.read().id)?;
-                            // Resets the current task id to be ready for the next command
-                            self.current_task_ref = None;
-                            self.redisplay_prompt();
-                            // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
-                            if self.buffer_string.len() > 0 {
-                                let temp = self.buffer_string.clone();
-                                self.print_to_terminal(temp.clone())?;
-                                self.input_string = temp;
-                                self.buffer_string.clear();
-                            }
-                            // Resets the bool to true once the print prompt has been redisplayed
-                            self.correct_prompt_position = true;
-                            let display_name = &self.display_name.clone();
-                            self.refresh_display(display_name);
-                        },
-                    // None value indicates task has not yet finished so does nothing
-                    None => { },
+        let task_ref_copy = match self.current_task_ref {
+            Some(ref task_ref) => task_ref.clone(),
+            None => { return Ok(());}
+        };
+        let end_task = task_ref_copy.lock();
+        let exit_result = end_task.into_inner().take_exit_value();
+        // match statement will see if the task has finished with an exit value yet
+        match exit_result {
+            Some(exit_val) => {
+                match exit_val {
+                    ExitValue::Completed(exit_status) => {
+                        // here: the task ran to completion successfully, so it has an exit value.
+                        // we know the return type of this task is `isize`,
+                        // so we need to downcast it from Any to isize.
+                        let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                        warn!("task returned exit value: {:?}", val);
+                        if let Some(val) = val {
+                            self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
+                        }
                     }
+                    // If the user manually aborts the task
+                    ExitValue::Killed(kill_reason) => {
+                        warn!("task was killed because {:?}", kill_reason);
+                        self.print_to_terminal("^C\n".to_string())?;
+                    }
+                }
+                
+                terminal_print::remove_child(task_ref_copy.lock().id)?;
+                // Resets the current task id to be ready for the next command
+                self.current_task_ref = None;
+                self.redisplay_prompt();
+                // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
+                if self.buffer_string.len() > 0 {
+                    let temp = self.buffer_string.clone();
+                    self.print_to_terminal(temp.clone())?;
+                    self.input_string = temp;
+                    self.buffer_string.clear();
+                }
+                // Resets the bool to true once the print prompt has been redisplayed
+                self.correct_prompt_position = true;
+                let display_name = &self.display_name.clone();
+                self.refresh_display(display_name);
             },
-            None => { }
+        // None value indicates task has not yet finished so does nothing
+        None => { },
         }
         return Ok(());
     }
@@ -589,13 +580,8 @@ impl Terminal {
 
         // Ctrl+C signals the main loop to exit the task
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
-            match self.current_task_ref { 
-                Some(task_ref) => { // if there is a task currently running
-                    match task_ref.write().kill(task::KillReason::Requested) {
-                        true => { }
-                        false => {error!("could not kill task");}
-                    }
-                },
+            let task_ref_copy = match self.current_task_ref {
+                Some(ref task_ref) => task_ref.clone(), 
                 None => {
                     self.input_string.clear();
                     self.buffer_string.clear();
@@ -603,7 +589,16 @@ impl Terminal {
                     let prompt_string = self.prompt_string.clone();
                     self.print_to_terminal(prompt_string)?;
                     self.correct_prompt_position = true;
+                    return Ok(());
                 }
+            };
+            match task_ref_copy.kill(task::KillReason::Requested) {
+                Ok(_) => {
+                    if let Err(e) = RunQueue::remove_task_from_all(&task_ref_copy) {
+                        error!("Killed task but could not remove it from runqueue: {}", e);
+                    }
+                }
+                Err(e) => error!("Could not kill task, error: {}", e),
             }
             return Ok(());
         }
@@ -644,8 +639,10 @@ impl Terminal {
                 self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_ref) => { 
+                        let task_id;
+                        {task_id = new_task_ref.lock().id;}
                         self.current_task_ref = Some(new_task_ref);
-                        terminal_print::add_child(new_task_ref.read().id, self.print_producer.obtain_producer())?;
+                        terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     } Err("Error: no module with this name found!") => {
                         self.print_to_terminal(format!("\n{}: command not found\n{}",input_string, prompt_string))?;
                         self.input_string.clear();
@@ -919,8 +916,11 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     use core::ops::Deref;
     let display_name = terminal.display_name.clone();
     { 
-        match terminal.window.add_displayable(&display_name, 100, 50,
-            TextDisplay::new(&display_name, 400, 300)) {
+        let (width, height) = terminal.window.dimensions();
+        let width  = width  - 2*window_manager::WINDOW_MARGIN;
+        let height = height - 2*window_manager::WINDOW_MARGIN;
+        match terminal.window.add_displayable(&display_name, 0, 0,
+            TextDisplay::new(&display_name, width, height)) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}
         };

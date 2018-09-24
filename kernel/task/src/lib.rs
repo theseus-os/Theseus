@@ -33,7 +33,6 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate spin;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -41,22 +40,17 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
-
-#[cfg(not(target_feature = "sse2"))]
 extern crate context_switch;
-#[cfg(target_feature = "sse2")]
-extern crate context_switch_sse; 
 
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use alloc::String;
-use alloc::VecDeque;
 use alloc::boxed::Box;
 use alloc::arc::Arc;
 
-use irq_safety::{MutexIrqSafe, RwLockIrqSafe, RwLockIrqSafeReadGuard, RwLockIrqSafeWriteGuard, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use apic::get_my_apic_id;
@@ -65,15 +59,8 @@ use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
 
 
-#[cfg(not(target_feature = "sse2"))]
-use context_switch::context_switch;
-#[cfg(target_feature = "sse2")]
-use context_switch_sse::context_switch;
-
-
-
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<fn(&PanicInfo)>;
+pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
 
 
 
@@ -91,13 +78,6 @@ lazy_static! {
     /// The list of all Tasks in the system.
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
-
-lazy_static! {
-    /// There is one runqueue per core, each core can only access its own private runqueue
-    /// and select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
-
 
 
 /// Get the id of the currently running Task on a specific core
@@ -130,7 +110,7 @@ pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
         .map(|taskref| {
-            taskref.0.write().set_panic_handler(handler)
+            taskref.set_panic_handler(handler)
         })
 }
 
@@ -150,7 +130,18 @@ pub enum KillReason {
 }
 
 
-pub type ExitValue = Result<Box<Any + Send>, KillReason>;
+#[derive(Debug)]
+/// The list of ways that a Task can exit, including possible return values and conditions.
+pub enum ExitValue {
+    /// The Task ran to completion and returned the enclosed `Any` value.
+    /// The caller of this type should know what type this Task returned,
+    /// and should therefore be able to downcast it appropriately.
+    Completed(Box<Any + Send>),
+    /// The Task did NOT run to completion, and was instead killed.
+    /// The reason for it being killed is enclosed. 
+    Killed(KillReason),
+}
+
 
 #[derive(Debug)]
 pub enum RunState {
@@ -161,12 +152,8 @@ pub enum RunState {
     Runnable,
     /// blocked on something, like I/O or a wait event
     Blocked,
-    /// the `Task` has completed and is ready for cleanup.
-    /// Includes the Task's exit status, a `Result` in which an `Ok` value 
-    /// indicates that the `Task` successfully ran to completion, 
-    /// and an `Err` value indicates that the `Task` was killed and did not finish running.
-    /// An `Ok` result contains a boxed `Any` value that is the returned exit value itself,
-    /// whereas an `Err` result contains a `KillReason`.
+    /// The `Task` has exited and can no longer be run,
+    /// either by running to completion or being killed. 
     Exited(ExitValue),
     /// This `Task` had already exited and now its ExitValue has been taken;
     /// its exit value can only be taken once, and consumed by another `Task`.
@@ -184,10 +171,6 @@ pub struct Task {
     /// Which cpu core the Task is currently running on.
     /// `None` if not currently running.
     pub running_on_cpu: Option<u8>,
-    /// The core ID of the RunQueue that contains this Task.
-    /// Different than `running_on_cpu` because it's `Some` if it has ever been scheduled,
-    /// not just if it's currently running.
-    pub on_runqueue: Option<u8>,
     /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
@@ -212,6 +195,11 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
+    
+    #[cfg(simd_personality)]
+    /// Whether this Task is SIMD enabled, i.e.,
+    /// whether it uses SIMD registers and instructions.
+    pub simd: bool,
 }
 
 impl fmt::Debug for Task {
@@ -222,7 +210,9 @@ impl fmt::Debug for Task {
 }
 
 impl Task {
-    /// creates a new Task structure and initializes it to be non-Runnable.
+    /// Creates a new Task structure and initializes it to be non-Runnable.
+    /// # Note
+    /// This does not run the task, schedule it in, or switch to it.
     pub fn new() -> Task {
         /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -235,7 +225,6 @@ impl Task {
             id: task_id,
             runstate: RunState::Initing,
             running_on_cpu: None,
-            on_runqueue: None,
             saved_sp: 0,
             name: format!("task{}", task_id),
             kstack: None,
@@ -246,22 +235,15 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-        }
-    }
 
-    /// set the name of this Task
-    pub fn set_name(&mut self, n: String) {
-        self.name = n;
+            #[cfg(simd_personality)]
+            simd: false,
+        }
     }
 
     /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
         self.running_on_cpu.is_some()
-    }
-
-    /// returns the RunQueue that this `Task` is scheduled on
-    pub fn on_runqueue(&self) -> Option<&'static RwLockIrqSafe<RunQueue>> {
-        self.on_runqueue.and_then(|core| RunQueue::get_runqueue(core))
     }
 
     /// Returns true if this `Task` is Runnable, i.e., able to be scheduled in.
@@ -279,11 +261,10 @@ impl Task {
         self.app_crate.is_some()
     }
 
-    /// Returns true if this is an idle task, of which there is one per CPU core.
-    pub fn is_an_idle_task(&self) -> bool {
-        self.is_an_idle_task
+    /// Returns true if this is a userspace`Task`.
+    pub fn is_userspace(&self) -> bool {
+        self.ustack.is_some()
     }
-
 
     /// Registers a function or closure that will be called if this `Task` panics.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
@@ -359,21 +340,17 @@ impl Task {
         }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
-                error!("BUG: Skipping context_Switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
                 my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
          
 
-        // update runstates
-        self.running_on_cpu = None; // no longer running
-        next.running_on_cpu = Some(apic_id); // now running on this core
-
-
-        // change the privilege stack (RSP0) in the TSS
-        // TODO: we can safely skip setting the TSS RSP0 when switching to kernel threads, i.e., when next is not a userspace task
-        {
+        // Change the privilege stack (RSP0) in the TSS.
+        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // i.e., when `next` is not a userspace task
+        if next.is_userspace() {
             let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
             let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
@@ -385,6 +362,11 @@ impl Task {
                 return;
             }
         }
+
+        // update runstates
+        self.running_on_cpu = None; // no longer running
+        next.running_on_cpu = Some(apic_id); // now running on this core
+
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
@@ -412,7 +394,7 @@ impl Task {
                             active_table.switch(&next_mmi_locked.page_table)
                         }
                         _ => {
-                            panic!("task_switch(): prev_table must be an ActivePageTable!");
+                            panic!("BUG: task_switch(): prev_table must be an ActivePageTable!");
                         }
                     }
                 };
@@ -430,20 +412,65 @@ impl Task {
 
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
+        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
+        
 
-        unsafe {
-            // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-            
-            // because context_switch must be a naked function, we cannot directly pass it parameters
-            // instead, we must pass our 2 parameters in RDI and RSI respectively
-            asm!("mov rdi, $0; \
-                  mov rsi, $1;" 
-                : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                : "memory" : "intel", "volatile"
+        /// A private macro that actually calls the given context switch routine
+        /// by putting the arguments into the proper registers, `rdi` and `rsi`.
+        macro_rules! call_context_switch {
+            ($func:expr) => (
+                asm!("
+                    mov rdi, $0; \
+                    mov rsi, $1;" 
+                    : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                    : "memory" : "intel", "volatile"
+                );
+                $func();
             );
-            context_switch();
         }
 
+        // Now it's time to perform the actual context switch.
+        // If `simd_personality` is enabled, all `context_switch*` routines are available,
+        // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
+        // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
+        #[cfg(simd_personality)]
+        {
+            match (self.simd, next.simd) {
+                (false, false) => {
+                    // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_regular);
+                    }
+                }
+
+                (false, true)  => {
+                    // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_regular_to_sse);
+                    }
+                }
+                
+                (true, false)  => {
+                    // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_sse_to_regular);
+                    }
+                }
+
+                (true, true)   => {
+                    // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_sse);
+                    }
+                }
+            }
+        }
+        #[cfg(not(simd_personality))]
+        {
+            unsafe {
+                call_context_switch!(context_switch::context_switch);
+            }
+        }
     }
 }
 
@@ -454,23 +481,27 @@ impl fmt::Display for Task {
 }
 
 
-/// A shareable, cloneable reference to a `Task` that dereferences
-/// to the enclosed `Task` by locking it. 
+/// A shareable, cloneable reference to a `Task` that exposes more methods
+/// for task management, and accesses the enclosed `Task` by locking it. 
 /// 
 /// The `TaskRef` type is necessary because in many places across Theseus,
-/// a reference to a Task is used
-/// For example, runqueues, task lists, task spawning, task management, etc. 
+/// a reference to a Task is used. 
+/// For example, task lists, task spawning, task management, scheduling, etc. 
 /// 
-/// Essentially a newtype wrapper around `Arc<[Lock]<Task>>` 
-/// where `[Lock]` is some mutex-like locking type.
-/// Currently, `[Lock]` is a `RwLockIrqSafe`.
+/// Essentially a newtype wrapper around `Arc<Lock<Task>>` 
+/// where `Lock` is some mutex-like locking type.
+/// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow
+/// multiple readers simultaneously; that will cause deadlock.
+/// 
+/// `TaskRef` implements the `PartialEq` trait; 
+/// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 #[derive(Debug, Clone)]
-pub struct TaskRef(Arc<RwLockIrqSafe<Task>>);
+pub struct TaskRef(Arc<MutexIrqSafe<Task>>);
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     pub fn new(task: Task) -> TaskRef {
-        TaskRef(Arc::new(RwLockIrqSafe::new(task)))
+        TaskRef(Arc::new(MutexIrqSafe::new(task)))
     }
 
     /// Waits until the given `task` has finished executing, 
@@ -495,14 +526,14 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if let RunState::Exited(_) = self.0.read().runstate {
+            if let RunState::Exited(_) = self.0.lock().runstate {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            let t = self.0.read();
+            let t = self.0.lock();
             if !t.is_running() {
                 return Ok(());
             }
@@ -512,30 +543,11 @@ impl TaskRef {
 
     /// The internal routine that actually exits or kills a Task.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        let task_runqueue_core: Option<u8>;
-
-        // set the task's exit value
-        {
-            let mut task = self.0.write();
-            if let RunState::Exited(_) = task.runstate {
-                return Err("task was already exited! (did not overwrite its existing exit value)");
-            }
-            task.runstate = RunState::Exited(val);
-            task_runqueue_core = task.on_runqueue;
-        };
-        
-        // if this task was on a runqueue, we need to remove it
-        if let Some(rq_id) = task_runqueue_core {
-            let rq = RunQueue::get_runqueue(rq_id)
-                .ok_or("BUG: TaskRef::internal_exit(): couldn't get RunQueue while exiting Task")?;
-            rq.write().remove_task(self)?;
+        let mut task = self.0.lock();
+        if let RunState::Exited(_) = task.runstate {
+            return Err("task was already exited! (did not overwrite its existing exit value)");
         }
-        else {
-            // Otherwise, if this task was not on any runqueues, 
-            // we don't need to do anything because it hasn't yet been added to any runqueue.
-            // This means that we managed to kill this Task before actually adding it to a runqueue.
-        }
-
+        task.runstate = RunState::Exited(val);
         Ok(())
     }
 
@@ -553,7 +565,7 @@ impl TaskRef {
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
     pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
-        self.internal_exit(Ok(exit_value))
+        self.internal_exit(ExitValue::Completed(exit_value))
     }
 
 
@@ -571,143 +583,72 @@ impl TaskRef {
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
     pub fn kill(&self, reason: KillReason) -> Result<(), &'static str> {
-        self.internal_exit(Err(reason))
+        self.internal_exit(ExitValue::Killed(reason))
     }
 
 
     /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
-    pub fn read(&self) -> RwLockIrqSafeReadGuard<Task> {
-        self.0.read()
+    /// This is okay because we want to allow any other part of the OS to read 
+    /// the details of the `Task` struct.
+    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
+        MutexIrqSafeGuardRef::new(self.0.lock())
+    }
+
+    /// Registers a function or closure that will be called if this `Task` panics.
+    /// # Locking / Deadlock
+    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
+    pub fn set_panic_handler(&self, callback: PanicHandler) {
+        self.0.lock().set_panic_handler(callback)
+    }
+
+    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// and returns it so it can be invoked without holding this `Task`'s `RwLock`.
+    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
+    /// # Locking / Deadlock
+    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
+    pub fn take_panic_handler(&self) -> Option<PanicHandler> {
+        self.0.lock().take_panic_handler()
+    }
+
+    /// Takes ownership of this `Task`'s exit value and returns it,
+    /// if and only if this `Task` was in the `Exited` runstate.
+    /// After invoking this, the `Task`'s runstate will be `Reaped`.
+    /// # Locking / Deadlock
+    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
+    pub fn take_exit_value(&self) -> Option<ExitValue> {
+        self.0.lock().take_exit_value()
     }
 
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
-    pub fn write(&self) -> RwLockIrqSafeWriteGuard<Task> {
-        self.0.write()
+    #[deprecated] // TODO FIXME since 2018-09-06
+    pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
+        MutexIrqSafeGuardRefMut::new(self.0.lock())
     }
 }
 
-
-
-
-/// A list of references to `Task`s (`TaskRef`s) 
-/// that is used to store the `Task`s that are runnable on a given core. 
-pub struct RunQueue {
-    core: u8,
-    queue: VecDeque<TaskRef>,
-}
-
-impl RunQueue {
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-    pub fn init(which_core: u8) -> Result<(), &'static str> {
-        trace!("Created runqueue for core {}", which_core);
-        let new_rq = RwLockIrqSafe::new(RunQueue {
-            core: which_core,
-            queue: VecDeque::new(),
-        });
-        if RUNQUEUES.insert(which_core, new_rq).is_some() {
-            error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
-            Err("runqueue already exists for this core")
-        }
-        else {
-            // there shouldn't already be a RunQueue for this core
-            Ok(())
-        }
-    }
-
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
-        RUNQUEUES.get(&which_core)
-    }
-
-
-    /// Returns the "least busy" core, which is currently very simple, based on runqueue size.
-    pub fn get_least_busy_core() -> Option<u8> {
-        Self::get_least_busy_runqueue().map(|rq| rq.read().core)
-    }
-
-
-    /// Returns the `RunQueue` for the "least busy" core.
-    /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    pub fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
-        let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
-
-        for (_, rq) in RUNQUEUES.iter() {
-            let rq_size = rq.read().queue.len();
-
-            if let Some(min) = min_rq {
-                if rq_size < min.1 {
-                    min_rq = Some((rq, rq_size));
-                }
-            }
-            else {
-                min_rq = Some((rq, rq_size));
-            }
-        }
-
-        min_rq.map(|m| m.0)
-    }
-    
-
-
-    /// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
-    /// and adds the given `Task` reference to that core's runqueue.
-    pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
-        let rq = RunQueue::get_least_busy_runqueue()
-            .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
-            .ok_or("couldn't find any runqueues to add the task to!")?;
-
-        rq.write().add_task(task)
-    }
-
-    /// Convenience method that adds the given `Task` reference to given core's runqueue.
-    pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-        RunQueue::get_runqueue(which_core)
-            .ok_or("Couldn't get RunQueue for the given core")?
-            .write()
-            .add_task(task.clone())
-    }
-
-    /// Adds a `TaskRef` to this RunQueue.
-    /// 
-    /// # Locking / Deadlock
-    /// Obtains a writeable lock on the underlying `Task`. 
-    pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
-        task.write().on_runqueue = Some(self.core);
-        self.queue.push_back(task);
-        Ok(())
-    }
-
-
-    /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
-    /// Index 0 is the front of the RunQueue.
-    pub fn get(&self, index: usize) -> Option<&TaskRef> {
-        self.queue.get(index)
-    }
-
-    /// Removes a `TaskRef` to this RunQueue.
-    /// 
-    /// # Locking / Deadlock
-    /// Obtains a writeable lock on the underlying `Task`. 
-    fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        debug!("Removing task from runqueue {}, {:?}", self.core, task);
-        task.write().on_runqueue = None;
-        self.queue.retain(|x| !Arc::ptr_eq(&x.0, &task.0));
-        Ok(())
-    }
-
-    /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
-    /// and returns a cloned reference to that `TaskRef`.
-    pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.queue.remove(index).map(|taskref| {
-            self.queue.push_back(taskref.clone());
-            taskref
-        })
-    }
-
-
-    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    pub fn iter(&self) -> alloc::vec_deque::Iter<TaskRef> {
-        self.queue.iter()
+impl PartialEq for TaskRef {
+    fn eq(&self, other: &TaskRef) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
+
+impl Eq for TaskRef { }
+
+// impl Hash for TaskRef {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         (self.0.as_ref() as *const _ as usize).hash(state);
+//     }
+// }
+
+// use core::cmp::Ord;
+// impl Ord for TaskRef {
+//     fn cmp(&self, other: &TaskRef) -> core::cmp::Ordering {
+//         (self.0.as_ref() as *const _ as usize).cmp(&(other.0.as_ref() as *const _ as usize))
+//     }
+// }
+
+// impl PartialOrd for TaskRef {
+//     fn partial_cmp(&self, other: &TaskRef) -> Option<core::cmp::Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }

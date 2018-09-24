@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "spawn"
 description = "Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
@@ -20,7 +21,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.owning_ref]
 # version = "0.3.3"
@@ -47,6 +47,9 @@ path = "../tss"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.runqueue]
+path = "../runqueue"
 
 [dependencies.gdt]
 path = "../gdt"
