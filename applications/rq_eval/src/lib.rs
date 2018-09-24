@@ -1,4 +1,5 @@
-//! This application is an example of how to write applications in Theseus.
+//! This application tests the performance of the runqueue implementation,
+//! which is used to compare a standard runqueue with a state spill-free runqueue.
 
 #![no_std]
 #![feature(alloc)]
@@ -15,29 +16,41 @@ extern crate acpi;
 use alloc::{Vec, String};
 use getopts::{Matches, Options};
 use acpi::get_hpet;
+use runqueue::RunQueue;
+use task::{Task, TaskRef};
+
+
+
+#[cfg(runqueue_state_spill_evaluation)]
+const CONFIG: &'static str = "WITH state spill";
+#[cfg(not(runqueue_state_spill_evaluation))]
+const CONFIG: &'static str = "WITHOUT state spill";
+
+const FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("n", "", "number of iterations to run", "ITERATIONS");
+    opts.optopt("w", "whole", "spawn N whole empty tasks and run them each to completion", "N");
+    opts.optopt("s", "single", "spawn a single task and add/remove it from various runqueues N times", "N");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
-            print_usage(opts);
+            print_usage(&opts);
             return -1; 
         }
     };
 
     if matches.opt_present("h") {
-        print_usage(opts);
+        print_usage(&opts);
         return 0;
     }
 
-    let result = rmain(&matches);
+    let result = rmain(&matches, &opts);
     match result {
         Ok(_) => { 0 }
         Err(e) => {
@@ -48,54 +61,101 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-pub fn rmain(matches: &Matches) -> Result<(), &'static str> {
+pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
-    let iterations = if let Some(i) = matches.opt_str("n") {
-        i.parse::<usize>().map_err(|_e| "couldn't parse number of iterations")?
-    } else {
-        100
-    };
+    let mut did_work = false;
 
-    #[cfg(runqueue_state_spill_evaluation)]
-    let config = "WITH state spill";
-    #[cfg(not(runqueue_state_spill_evaluation))]
-    let config = "WITHOUT state spill";
+    if let Some(i) = matches.opt_str("w") {
+        let num_tasks = i.parse::<usize>().map_err(|_e| "couldn't parse number of num_tasks")?;
+        run_whole(num_tasks)?;
+        did_work = true;
+    }
 
-    println!("Evaluating runqueue {} for {} iterations...", config, iterations);
+    if let Some(i) = matches.opt_str("s") {
+        let iterations = i.parse::<usize>().map_err(|_e| "couldn't parse number of num_tasks")?;
+        run_single(iterations)?;
+        did_work = true;
+    }   
+
+    if did_work {
+        Ok(())
+    }
+    else {
+        println!("Nothing was done. Please specify a type of evaluation task to run.");
+        print_usage(opts);
+        Ok(())
+    }
+}
+
+
+fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
+    println!("Evaluating runqueue {} with WHOLE tasks, {} tasks...", CONFIG, num_tasks);
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     
-    run(iterations)?;
+    for i in 0..num_tasks {
+        let taskref = spawn::KernelTaskBuilder::new(whole_task, i)
+            .name(format!("rq_whole_task_{}", i))
+            .spawn()?;
+        taskref.join()?;
+    }
 
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
 
-    println!("Runqueue evaluation completed successfully.");
-    println!("HPET Period: {} femtoseconds.", hpet_period);
-    println!("Elapsed HPET ticks: {}", end - start);
-
+    println!("Completed runqueue WHOLE evaluation.");
+    let elapsed_ticks = end - start;
+    println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+        
     Ok(())
 }
 
 
-fn run(iterations: usize) -> Result<(), &'static str> {
-    for i in 0..iterations {
-        let taskref = spawn::KernelTaskBuilder::new(target_fn, i)
-            .name(format!("rq_eval_test_{}", i))
-            .spawn()?;
-        taskref.join()?;
+fn run_single(iterations: usize) -> Result<(), &'static str> {
+    println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
+    let mut task = Task::new();
+    task.name = String::from("rq_eval_single_task_unrunnable");
+    let taskref = TaskRef::new(task);
+
+    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    
+    for _i in 0..iterations {
+        RunQueue::add_task_to_any_runqueue(taskref.clone())?;
+
+        #[cfg(runqueue_state_spill_evaluation)] 
+        {   
+            let task_on_rq = { taskref.lock().on_runqueue.clone() };
+            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
+                if let Some(rq) = task_on_rq {
+                    remove_from_runqueue(self, rq)?;
+                }
+            }
+        }
+        #[cfg(not(runqueue_state_spill_evaluation))]
+        {
+            RunQueue::remove_task_from_all(&taskref)?;
+        }
     }
+
+    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+
+    println!("Completed runqueue SINGLE evaluation.");
+    let elapsed_ticks = end - start;
+    println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+
     Ok(())
 }
 
 
-fn target_fn(_iteration: usize) -> usize {
-    warn!("in target function, iteration {}.", _iteration);
-    _iteration
+fn whole_task(task_num: usize) -> usize {
+    warn!("in whole_task, task {}.", task_num);
+    task_num
 }
 
 
-
-fn print_usage(opts: Options) {
+fn print_usage(opts: &Options) {
     println!("{}", opts.usage(USAGE));
 }
 
