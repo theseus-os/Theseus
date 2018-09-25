@@ -11,8 +11,8 @@ build = "../../build.rs"
 default-features = false
 version = "0.3.7"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
+[dependencies.frame_buffer_display]
+path = "../../kernel/frame_buffer_display"
 
 
 [dependencies.acpi]

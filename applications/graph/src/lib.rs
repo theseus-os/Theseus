@@ -10,7 +10,7 @@
 
 extern crate memory;
 extern crate mod_mgmt;
-extern crate frame_buffer;
+extern crate frame_buffer_display;
 extern crate acpi;
 
 use core::ops::DerefMut;
@@ -27,9 +27,9 @@ pub fn main(_args: Vec<String>) -> isize {
     let mut swap_pairs:Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(1);
     swap_pairs.push(
         (
-            mod_mgmt::get_default_namespace().get_crate("frame_buffer").unwrap(),
-            get_module("k#frame_buffer_3d").unwrap(),
-            Some(String::from("frame_buffer"))
+            mod_mgmt::get_default_namespace().get_crate("frame_buffer_display").unwrap(),
+            get_module("k#frame_buffer_display_3d").unwrap(),
+            Some(String::from("frame_buffer_display"))
         )
     );
 
@@ -45,7 +45,7 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
 
-    let rs = frame_buffer::init();
+    let rs = frame_buffer_display::font::init();
     match rs {
         Ok(_) => {trace!("Wenqiu::the swapping is done");},
         Err(err) => {

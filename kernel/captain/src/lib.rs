@@ -49,6 +49,9 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
+extern crate frame_buffer_display;
+extern crate frame_buffer_display_3d;
+
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
@@ -142,6 +145,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         Ok(_) => { trace!("frame_buffer initialized."); }
         Err(err) => { 
             println_raw!("nano_core_start():fail to initialize frame_buffer");
+            return Err(err);
+        }
+    }
+
+    //init font
+    let rs = frame_buffer_display::font::init();
+    match rs {
+        Ok(_) => { trace!("font initialized."); }
+        Err(err) => { 
+            println_raw!("nano_core_start():fail to initialize font");
             return Err(err);
         }
     }

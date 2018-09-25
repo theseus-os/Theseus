@@ -27,7 +27,7 @@ extern crate irq_safety;
 extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
-extern crate frame_buffer;
+extern crate frame_buffer_display;
 extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
@@ -44,7 +44,7 @@ use alloc::btree_map::BTreeMap;
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
-use frame_buffer::text_buffer::{FrameTextBuffer};
+use frame_buffer_display::text_buffer::{FrameTextBuffer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -131,7 +131,7 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
 
 /// Returns the width and height (in pixels) of the screen 
 pub fn get_screen_size() -> (usize, usize) {
-    frame_buffer::get_resolution()
+    frame_buffer_display::get_resolution()
 }
 
 impl WindowAllocator{
@@ -150,7 +150,7 @@ impl WindowAllocator{
                 buffer[index(0,0)] = 0x777777;
         }*/
 
-        let (buffer_width, buffer_height) = frame_buffer::get_resolution();
+        let (buffer_width, buffer_height) = frame_buffer_display::get_resolution();
         if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
             return Err("Window size must be greater than the margin");
         }
@@ -388,7 +388,7 @@ impl WindowObj{
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return;
         }
-        frame_buffer::draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        frame_buffer_display::draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
     }
 
     /// draw a line in a window
@@ -400,7 +400,7 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return;
         }
-        frame_buffer::draw_line(start_x + inner.x + 1, start_y + inner.y + 1, 
+        frame_buffer_display::draw_line(start_x + inner.x + 1, start_y + inner.y + 1, 
             end_x + inner.x + 1, end_y + inner.y + 1, color);
     }
 
@@ -411,7 +411,7 @@ impl WindowObj{
             || y + height > inner.height - 2 {
             return;
         }
-        frame_buffer::draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+        frame_buffer_display::draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
             color);
     }
 
@@ -524,13 +524,13 @@ impl WindowInner {
 
     // clean the content of a window
     fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + self.margin, self.y + self.margin,
+        frame_buffer_display::fill_rectangle(self.x + self.margin, self.y + self.margin,
             self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
     }
 
     // draw the border of the window
     fn draw_border(&self, color:u32) {
-        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
+        frame_buffer_display::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
