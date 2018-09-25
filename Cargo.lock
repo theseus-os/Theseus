@@ -297,7 +297,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "frame_buffer_display_3d"
+name = "frame_buffer_display_2d"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",

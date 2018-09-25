@@ -425,7 +425,8 @@ endif
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export THESEUS_CONFIG += mirror_log_to_vga
+#boot : export THESEUS_CONFIG += mirror_log_to_vga
+boot : export THESEUS_CONFIG += loadable
 boot: check_usb $(iso)
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
 	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
