@@ -95,7 +95,7 @@ pub fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
 }
 
 /// read 16-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_16(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
+pub fn pci_read_16(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
     pci_read_32(bus, slot, func, offset) as u16
 } 
 
@@ -142,7 +142,7 @@ const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC;
 const PCI_VENDOR_ID:             u16 = 0x0;
 const PCI_DEVICE_ID:             u16 = 0x2;
 const PCI_COMMAND:               u16 = 0x4;
-const PCI_STATUS:                u16 = 0x6;
+pub const PCI_STATUS:                u16 = 0x6;
 const PCI_REVISION_ID:           u16 = 0x8;
 const PCI_PROG_IF:               u16 = 0x9;
 const PCI_SUBCLASS:              u16 = 0xA;
@@ -151,7 +151,7 @@ const PCI_CACHE_LINE_SIZE:       u16 = 0xC;
 const PCI_LATENCY_TIMER:         u16 = 0xD;
 const PCI_HEADER_TYPE:           u16 = 0xE;
 const PCI_BIST:                  u16 = 0xF;
-const PCI_BAR0:                  u16 = 0x10;
+pub const PCI_BAR0:                  u16 = 0x10;
 const PCI_BAR1:                  u16 = 0x14;
 const PCI_BAR2:                  u16 = 0x18;
 const PCI_BAR3:                  u16 = 0x1C;
@@ -161,12 +161,15 @@ const PCI_CARDBUS_CIS:           u16 = 0x28;
 const PCI_SUBSYSTEM_VENDOR_ID:   u16 = 0x2C;
 const PCI_SUBSYSTEM_ID:          u16 = 0x2E;
 const PCI_EXPANSION_ROM_BASE:    u16 = 0x30;
-const PCI_CAPABILITIES:          u16 = 0x34;
+pub const PCI_CAPABILITIES:          u16 = 0x34;
 // 0x35 through 0x3B are reserved
-const PCI_INTERRUPT_LINE:        u16 = 0x3C;
-const PCI_INTERRUPT_PIN:         u16 = 0x3D;
+pub const PCI_INTERRUPT_LINE:        u16 = 0x3C;
+pub const PCI_INTERRUPT_PIN:         u16 = 0x3D;
 const PCI_MIN_GRANT:             u16 = 0x3E;
 const PCI_MAX_LATENCY:           u16 = 0x3F;
+
+//PCI Capability IDs
+pub const MSI_CAPABILITY:       u16 = 0x05;
 
 
 

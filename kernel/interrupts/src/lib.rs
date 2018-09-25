@@ -45,7 +45,6 @@ use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
 
-// use drivers::e1000;
 
 
 /// The single system-wide IDT
@@ -147,6 +146,8 @@ pub fn init_handlers_apic() {
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
 
+        // idt[0x3B].set_handler_fn(nic_handler);
+
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
         idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
@@ -188,6 +189,7 @@ pub fn init_handlers_pic() {
 
         idt[0x2E].set_handler_fn(primary_ata);
         // 0x2F missing right now
+        // idt[0x3B].set_handler_fn(nic_handler);
 
     }
 
@@ -339,7 +341,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
-    // e1000::e1000_handler();
+    ixgbe::ixgbe_handler();
 	eoi(Some(0x2B));
 }
 

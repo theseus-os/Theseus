@@ -37,7 +37,7 @@ impl fmt::Debug for e1000_tx_desc {
         }
 }
 
-/// Advanced Descriptors
+/// Advanced Descriptors. Section 7.1.6 of 82599 datasheet
 /// Advanced Receive Descriptor
 
 #[repr(packed)]

@@ -3,7 +3,7 @@
 #![feature(untagged_unions)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
-
+#![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
@@ -15,6 +15,8 @@ extern crate memory;
 extern crate pci; 
 extern crate pit_clock;
 extern crate bit_field;
+// extern crate interrupts;
+extern crate x86_64;
 
 pub mod test_tx;
 pub mod descriptors;
@@ -27,11 +29,13 @@ use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter,PhysicalMemoryArea};
-use pci::{PciDevice,pci_read_32, pci_read_8, pci_write, get_pci_device_vd, pci_set_command_bus_master_bit};
+use pci::{PciDevice,pci_read_32, pci_read_8, pci_read_16, pci_write, pci_set_command_bus_master_bit, PCI_INTERRUPT_PIN, PCI_INTERRUPT_LINE, PCI_BAR0, PCI_CAPABILITIES, PCI_STATUS, MSI_CAPABILITY};
 use kernel_config::memory::PAGE_SIZE;
 use descriptors::*;
 use registers::*;
 use bit_field::BitField;
+// use interrupts::{eoi,register_interrupt};
+use x86_64::structures::idt::{ExceptionStackFrame};
 
 //parameter that determine size of tx and rx descriptor queues
 const NUM_RX_DESC:        usize = 8;
@@ -40,7 +44,7 @@ const NUM_TX_DESC:        usize = 8;
 const SIZE_RX_DESC:       usize = 16;
 const SIZE_TX_DESC:       usize = 16;
 
-const SIZE_RX_BUFFER:     usize = 8192;
+const SIZE_RX_BUFFER:     usize = 4096;
 const SIZE_RX_HEADER:     usize = 256;
 const SIZE_TX_BUFFER:     usize = 256;
 
@@ -49,6 +53,9 @@ const NO_RX_QUEUES:       usize = 16;
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
+
+///to hold interrupt number
+static INTERRUPT_NO: Once<u8> = Once::new();
 
 /// struct that stores addresses for memory allocated for DMA
 pub struct DmaAllocator{
@@ -257,7 +264,7 @@ impl Nic{
                 
                 let num_pages;
                 let num_frames;
-                let bytes_required = (NUM_RX_DESC * SIZE_RX_BUFFER * NO_RX_QUEUES) + (NUM_RX_DESC * SIZE_RX_HEADER * NO_RX_QUEUES) + (NUM_RX_DESC * SIZE_RX_DESC * NO_RX_QUEUES) + (NUM_TX_DESC * SIZE_TX_DESC); //to make sure its 128 byte aligned
+                let bytes_required = (NUM_RX_DESC * SIZE_RX_BUFFER * NO_RX_QUEUES) + (NUM_RX_DESC * SIZE_RX_HEADER * NO_RX_QUEUES) + (NUM_RX_DESC * SIZE_RX_DESC * NO_RX_QUEUES) + (NUM_TX_DESC * SIZE_TX_DESC) + PAGE_SIZE; //to make sure its 128 byte aligned
                 if bytes_required % PAGE_SIZE == 0 {
                         num_pages =  bytes_required / PAGE_SIZE;
                         num_frames =  bytes_required / PAGE_SIZE;
@@ -583,17 +590,61 @@ impl Nic{
                 }
         } */
 
-        pub fn handle_receive_mq(&mut self, queue: usize, mut wb: AdvancedReceiveDescriptorWB) {
+        pub fn handle_receive_mq(&mut self, queue: usize, mut wb: AdvancedReceiveDescriptorWB) -> Result<(), &'static str> {
                 //print status of all packets until EoP
-                while(wb.get_ext_status()& 0x3) !=0{
-                        debug!("rx desc status {}",wb.get_ext_status());
-                        self.rx_descs[queue][self.rx_cur[queue] as usize].set_packet_buffer_address(0);
+                let mut status = wb.get_ext_status();
+                while(status & 0x1) != 0{
+                        debug!("rx desc status {:#X}",wb.get_ext_status());
+
+                        let buf_addr = try!(translate_v2p(self.rx_buf_addr[queue][self.rx_cur[queue] as usize]));
+                        self.rx_descs[queue][self.rx_cur[queue] as usize].set_packet_buffer_address(buf_addr as u64);
                         self.rx_descs[queue][self.rx_cur[queue] as usize].set_header_buffer_address(0);
                         let old_cur = self.rx_cur[queue] as u32;
                         self.rx_cur[queue] = (self.rx_cur[queue] + 1) % NUM_RX_DESC as u16;
                         self.write_command(REG_RDT + (0x40*queue) as u32, old_cur);
-                        wb = AdvancedReceiveDescriptorWB:: from(self.rx_descs[queue][self.rx_cur[queue] as usize])
+                        wb = AdvancedReceiveDescriptorWB:: from(self.rx_descs[queue][self.rx_cur[queue] as usize]);
+
+                        if (status & 0x2) == 0x2 {
+                                break;
+                        }
+
+                        status = wb.get_ext_status();
                 }
+
+                Ok(())
+        }
+
+        fn enable_interrupts(&self) {
+                //set IVAR reg for eaach queue used
+                self.write_command(REG_IVAR, 0x81); // for rxq 0
+                debug!("IVAR: {:#X}", self.read_command(REG_IVAR));
+                
+                //enable clear on read of EICR
+                self.write_command(REG_GPIE, (self.read_command(REG_GPIE) & 0xFFFFFFDF) | 0x40); //bit 5
+                debug!("GPIE: {:#X}", self.read_command(REG_GPIE));
+
+                //clears eicr by writing 1 to clear old interrupt causes
+                self.read_command(REG_EICR);
+                debug!("EICR: {:#X}", self.read_command(REG_EICR));
+
+                //set eims to enable required interrupt
+                self.write_command(REG_EIMS, 0xFFFF);
+                debug!("EIMS: {:#X}", self.read_command(REG_EIMS));
+        }
+
+
+        fn handle_interrupt(&self) {
+                debug!("In handle_interrupt");
+
+                let status = self.read_command(REG_EICR); //reads status and clears interrupt
+                if (status & 0x01 ) == 0x01 { //Rx0
+                        debug!("Interrupt:packet received");
+
+                }
+                else{
+                        debug!("Unhandled interrupt!");
+                }
+                
         }
 
         
@@ -609,11 +660,11 @@ lazy_static! {
                         //mem_space : 0;
                         eeprom_exists: false,
                         mac: [0,0,0,0,0,0],
-                        rx_descs: [Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC)],
+                        rx_descs: [Vec::with_capacity(NUM_RX_DESC)],// Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC), Vec::with_capacity(NUM_RX_DESC)],
                         tx_descs: Vec::with_capacity(NUM_TX_DESC),
                         rx_cur: [0; NO_RX_QUEUES],
                         tx_cur: 0,
-                        rx_buf_addr: [[0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC]],
+                        rx_buf_addr: [[0;NUM_RX_DESC]],// [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC], [0;NUM_RX_DESC]],
                         nic_dma_allocator: DmaAllocator{
                                                 start: 0,
                                                 end: 0,
@@ -629,8 +680,8 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         let mut nic = NIC_82599.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
-        //pci_write(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE,0x2B);
-        debug!("Int line: {}" ,pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE));
+        INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
+        debug!("Int line: {}  Int pin: {}" , *INTERRUPT_NO.try().unwrap_or(&0), pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_PIN) );
 
         nic.init(dev_pci);
         try!(nic.mem_map(dev_pci));
@@ -698,7 +749,10 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
 
         //Initialize statistics
 
-
+        //Enable Interrupts
+        nic.enable_interrupts();
+        //register_interrupt(*INTERRUPT_NO.try().unwrap() + 32, ixgbe_handler);
+        
         //Initialize transmit .. legacy descriptors
 
         try!(nic.tx_init());
@@ -708,7 +762,7 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         try!(nic.rx_init_mq());
 
         //nic.set_filters();
-        nic.set_rss();
+        // nic.set_rss();
 
        Ok(())
 }
@@ -741,11 +795,76 @@ pub fn rx_poll_mq(_: Option<u64>){
        
                 for queue in 0..NO_RX_QUEUES{
                         let mut a = AdvancedReceiveDescriptorWB:: from(nic.rx_descs[queue][nic.rx_cur[queue] as usize]);
-                        if (a.get_ext_status()&0xF) != 0 {    
+                        if (a.get_ext_status()&0x1) != 0 {    
                                 debug!("Packet received in QUEUE{}!", queue);
-                                //nic.handle_receive_mq(queue, a);                    
+                                let _ = nic.handle_receive_mq(queue, a);                    
                         }       
-                }               
+                }        
+                   
         }
         
+}
+
+// extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) {
+//     let nic = NIC_82599.lock();
+//     debug!("nic handler called");
+//     nic.handle_interrupt();
+//     eoi(Some(*(INTERRUPT_NO.try().unwrap())));
+// }
+
+pub fn check_eicr(_ : Option<u64>){
+        loop {
+                let nic = NIC_82599.lock();
+                debug!("EICR: {:#X}", nic.read_command(REG_EICR));
+        }
+}
+
+pub fn cause_interrupt(_ : Option<u64>) {
+        let nic = NIC_82599.lock();
+        nic.write_command(REG_EICS,0xFFFF);
+}
+
+pub fn ixgbe_handler() {
+        let nic = NIC_82599.lock();
+        nic.handle_interrupt();
+}
+
+pub fn pci_config_space(dev_pci: &PciDevice) {
+
+        debug!("NIC PCI CONFIG SPACE");
+
+        let status = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_STATUS);
+
+        debug!("status: {:#X}", status);
+
+        if (status >> 4 & 1) == 1 {
+                let capabilities = pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_CAPABILITIES);
+                debug!("capabilities pointer: {:#X}", capabilities);
+
+                let mut node= pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, capabilities as u16 & 0xFFFC);
+                let mut node_next= 1;
+                let mut node_id;
+
+                while node_next != 0 {
+
+                        node_id = node & 0xFF;
+                        
+
+                        if node_id == MSI_CAPABILITY {
+                                let msi_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+                                debug!("msi control: {:#X}", msi_control);// (msi_control>>16) & 0xFFFF);
+                        }
+
+                        node_next = (node >> 8) & 0xFF;
+
+                        debug!("node_id: {:#X}, node_next: {:#X}", node_id, node_next);
+                        
+                        node= pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next as u16);
+
+                }
+        }
+
+        
+
 }

@@ -70,5 +70,8 @@ path = "../scheduler"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.ixgbe]
+path = "../ixgbe"
+
 [lib]
 crate-type = ["rlib"]

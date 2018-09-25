@@ -1,12 +1,9 @@
 
 pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
 pub const INTEL_82599:              u16 = 0x10FB;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-pub const PCI_BAR0:                 u16 = 0x10;
-pub const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
 pub const REG_CTRL:                 u32 = 0x0000;
 pub const REG_STATUS:               u32 = 0x0008;
-pub const REG_EIMC:                 u32 = 0x0888;
 
 pub const REG_FCTTV:                u32 = 0x3200; //+4*n with n=0..3
 pub const REG_FCRTL:                u32 = 0x3220; //+4*n with n=0..7
@@ -55,6 +52,16 @@ pub const REG_RXDCTL:               u32 = 0x1028;
 pub const REG_SRRCTL:               u32 = 0x1014; //specify descriptor type
 pub const REG_RXCTRL:               u32 = 0x3000;
 pub const REG_FCTRL:                u32 = 0x5080;
+
+//Interrupt registers
+pub const REG_EICR:                 u32 = 0x800;
+pub const REG_EICS:                 u32 = 0x808; // set bits in eicr register 
+pub const REG_EIMS:                 u32 = 0x880; // enables interrupt in eicr register
+pub const REG_EIMC:                 u32 = 0x888; // clears bit in eims reg, disabling that interrupt
+pub const REG_EIAC:                 u32 = 0x810; // enables auto-clear
+pub const REG_EIAM:                 u32 = 0x890; // enables auto set and clear
+pub const REG_IVAR:                 u32 = 0x900; // maps interrupt causes from Rx and Tx queues to eicr entries (0x900 + 4*n, n = 0..63)
+pub const REG_GPIE:                 u32 = 0x898; // enable clear on read
 
 pub const REG_MRQC:                 u32 = 0xEC80;
 pub const REG_ETQF:                 u32 = 0x5128;
