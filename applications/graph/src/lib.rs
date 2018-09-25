@@ -44,15 +44,8 @@ pub fn main(_args: Vec<String>) -> isize {
         ).map_err(|e| e.to_string());
     }
 
+    frame_buffer_display::draw_rectangle(200, 100, 300, 300, 0x233879);
 
-    let rs = frame_buffer_display::font::init();
-    match rs {
-        Ok(_) => {trace!("Wenqiu::the swapping is done");},
-        Err(err) => {
-            trace!("Wenqiu: the err is {}", err);
-            return -2;
-        }
-    };
 
     /*let mut size = 100;
     while size <= 600 {

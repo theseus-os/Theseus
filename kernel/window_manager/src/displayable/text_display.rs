@@ -1,7 +1,7 @@
 
 use super::super::{FrameTextBuffer, WindowObj, frame_buffer_display};
 use super::super::{String};
-use frame_buffer_display::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use frame_buffer_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 /// A displayable component for text display
 pub struct TextDisplay {

@@ -30,10 +30,6 @@ use kernel_config::memory::KERNEL_OFFSET;
 use alloc::boxed::Box;
 use frame_buffer::{FRAME_DRAWER};
 
-//The buffer for text printing
-pub mod text_buffer;
-//The font for text printing
-pub mod font;
 
 const PIXEL_BYTES:usize = 4;
 

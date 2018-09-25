@@ -27,6 +27,7 @@ extern crate irq_safety;
 extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
+extern crate frame_buffer_text;
 extern crate frame_buffer_display;
 extern crate event_types;
 extern crate spawn;
@@ -44,7 +45,7 @@ use alloc::btree_map::BTreeMap;
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::arc::{Arc, Weak};
-use frame_buffer_display::text_buffer::{FrameTextBuffer};
+use frame_buffer_text::{FrameTextBuffer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 

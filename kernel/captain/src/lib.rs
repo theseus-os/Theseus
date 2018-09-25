@@ -49,8 +49,7 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-extern crate frame_buffer_display;
-extern crate frame_buffer_display_3d;
+extern crate frame_buffer_text;
 
 #[macro_use] extern crate print;
 extern crate input_event_manager;
@@ -150,7 +149,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     //init font
-    let rs = frame_buffer_display::font::init();
+    let rs = frame_buffer_text::font::init();
     match rs {
         Ok(_) => { trace!("font initialized."); }
         Err(err) => { 

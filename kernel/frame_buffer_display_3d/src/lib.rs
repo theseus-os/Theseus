@@ -28,11 +28,6 @@ use kernel_config::memory::KERNEL_OFFSET;
 use alloc::boxed::Box;
 use frame_buffer::{FRAME_DRAWER};
 
-//The buffer for text printing
-pub mod text_buffer;
-//The font for text printing
-pub mod font;
-
 const PIXEL_BYTES:usize = 4;
 const COLOR_BITS:usize = 24;
 
@@ -120,6 +115,7 @@ pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize,
 ///draw a square in 3D mode with upper left coordinates, width, height and color.
 pub fn draw_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:u8,
      color:u32) {
+    trace!("WEnqiu: draw in 3d");
     let mut drawer = FRAME_DRAWER.lock();
     let (buffer_width, buffer_height) = {drawer.get_resolution()};
     let index = drawer.get_index_fn();

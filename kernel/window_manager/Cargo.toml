@@ -36,6 +36,9 @@ version = "0.1.0"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.frame_buffer_text]
+path = "../frame_buffer_text"
+
 [dependencies.frame_buffer_display]
 path = "../frame_buffer_display"
 

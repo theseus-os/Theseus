@@ -30,12 +30,8 @@ path = "../vga_buffer"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.frame_buffer_display]
-path = "../frame_buffer_display"
-
-
-[dependencies.frame_buffer_display_3d]
-path = "../frame_buffer_display_3d"
+[dependencies.frame_buffer_text]
+path = "../frame_buffer_text"
 
 [dependencies.window_manager]
 path = "../window_manager"

@@ -52,12 +52,6 @@ pub fn init() -> Result<(), &'static str > {
         VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
     };
 
-    // init the font for text printing
-    /*let rs = font::init();
-    match font::init() {
-        Ok(_) => { trace!("frame_buffer text initialized."); },
-        Err(err) => { return Err(err); }
-    }*/   
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
