@@ -90,6 +90,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.print]
 path = "../print"
 
+[dependencies.vfs]
+path = "../vfs"
+
 
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

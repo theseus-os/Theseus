@@ -79,6 +79,13 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
+/// Initializes task node in vfs and adds procfs as a file
+pub fn init(root_dir: StrongDirRef) -> Result<(), &'static str> {
+    use alloc::string::ToString;
+    let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
+    task_dir.lock().new_file("procfs".to_string(), "/root/task/procfs".to_string(), Arc::downgrade(&task_dir));
+    Ok(())
+}
 
 /// Get the id of the currently running Task on a specific core
 pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
@@ -195,7 +202,7 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
-    /// the task's working directory that it is created in
+    /// A reference to the working directory of the task
     pub working_dir: StrongDirRef,
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
@@ -627,6 +634,25 @@ impl TaskRef {
     /// Sets working directory
     pub fn set_wd(&mut self, new_dir: StrongDirRef) {
         self.0.lock().set_wd(new_dir);
+    }
+
+    pub fn get_wd(&self) -> StrongDirRef {
+        return Arc::clone(&self.lock().working_dir);
+    }
+
+    /// Looks for the child directory specified by dirname and returns a reference to it 
+    pub fn set_chdir_as_wd(&self, dirname: String) -> Result<(), &'static str> {
+        let wd = self.get_wd();
+        let locked_wd = wd.lock();
+        match locked_wd.get_child_dir(dirname).clone() {
+            Some(dir) => {
+                self.0.lock().set_wd(dir);
+                return Ok(());
+            }
+            None => {
+                return Err("no such directory");
+            }
+        }
     }
 
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
