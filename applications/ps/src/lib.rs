@@ -37,8 +37,10 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     // Print all tasks
+    let mut num_tasks = 0;
     let mut task_string = String::new();
     for (id, taskref) in TASKLIST.iter() {
+        num_tasks += 1;
         let task = taskref.lock();
         let name = &task.name;
         let runstate = match &task.runstate {
@@ -64,7 +66,8 @@ pub fn main(args: Vec<String>) -> isize {
             );
         }
     }
-    println!("{}", task_string);
+    print!("{}", task_string);
+    println!("Total number of tasks: {}", num_tasks);
     
     0
 }

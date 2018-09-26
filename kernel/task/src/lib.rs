@@ -8,7 +8,7 @@
 //! ```
 //! spawn::join(&taskref)); // taskref is the task that we're waiting on
 //! let locked_task = taskref.read();
-//! if let Some(exit_result) = locked_task.get_exit_value() {
+//! if let Some(exit_result) = locked_task.take_exit_value() {
 //!     match exit_result {
 //!         Ok(exit_value) => {
 //!             // here: the task ran to completion successfully, so it has an exit value.
@@ -167,7 +167,10 @@ pub enum RunState {
     Reaped,
 }
 
+
 #[cfg(runqueue_state_spill_evaluation)]
+/// A callback that will be invoked to remove a specific task from a specific runqueue.
+/// Should be initialized by the runqueue crate.
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
 
@@ -310,7 +313,9 @@ impl Task {
 
     /// Takes ownership of this `Task`'s exit value and returns it,
     /// if and only if this `Task` was in the `Exited` runstate.
-    /// After invoking this, the `Task`'s runstate will be `Reaped`.
+    /// # Note
+    /// After invoking this, the `Task`'s runstate will be `Reaped`,
+    /// and this `Task` will be removed from the system task list.
     pub fn take_exit_value(&mut self) -> Option<ExitValue> {
         match self.runstate {
             RunState::Exited(_) => { }

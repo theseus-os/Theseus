@@ -144,24 +144,15 @@ impl RunQueue {
         self.queue.get(index)
     }
 
-    /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        // For the runqueue state spill evaluation, we disable this method because we 
-        // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
-        #[cfg(runqueue_state_spill_evaluation)]
-        {
-            // trace!("skipping remove_task() on core {}, task {:?}", self.core, task);
-            return Ok(());
-        }
 
-        #[cfg(single_simd_task_optimization)]
-        let is_simd = task.lock().simd;
-
+    /// The internal function that actually removes the task from the runqueue.
+    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| x != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
+            let is_simd = { task.lock().simd };
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
             if is_simd {
@@ -172,7 +163,24 @@ impl RunQueue {
         Ok(())
     }
 
+
+    /// Removes a `TaskRef` from this RunQueue.
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+        #[cfg(runqueue_state_spill_evaluation)]
+        {
+            // For the runqueue state spill evaluation, we disable this method because we 
+            // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
+            // trace!("skipping remove_task() on core {}, task {:?}", self.core, task);
+            return Ok(());
+        }
+
+        self.remove_internal(task)
+    }
+
+
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
     pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
@@ -180,19 +188,21 @@ impl RunQueue {
         Ok(())
     }
 
+
     #[cfg(runqueue_state_spill_evaluation)]
     /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
+    /// Note: This method is only used by the state spillful runqueue implementation.
     pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
         // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
         task.lock_mut().on_runqueue = None;
         RUNQUEUES.get(&core)
             .ok_or("Couldn't get runqueue for specified core")
             .and_then(|rq| {
-                let mut rq_locked = rq.write();
-                // info!("RQ {} BEFORE: {:?}", core, &*rq_locked);
-                rq_locked.queue.retain(|x| x != task);
-                // info!("RQ {} AFTER:  {:?}", core, &*rq_locked);
-                Ok(())
+                // Instead of calling `remove_task`, we directly call `remove_internal`
+                // because we want to actually remove the task from the runqueue,
+                // as calling `remove_task` would do nothing due to it skipping the actual removal
+                // when the `runqueue_state_spill_evaluation` cfg is enabled.
+                rq.write().remove_internal(task)
             })
     }
 
