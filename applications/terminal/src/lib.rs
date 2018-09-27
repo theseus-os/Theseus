@@ -234,7 +234,6 @@ impl Terminal {
                     return (start_idx, buffer_height * buffer_width -1);
                 }
 
-                let mut counter = 0;
                 let mut last_line_chars = 0;
                 // Case where the last newline does not occur at the end of the slice
                 if new_line_indices[0].0 != slice.len() - 1 {
@@ -255,7 +254,6 @@ impl Terminal {
                     }  
                     start_idx -= num_chars;
                     total_lines += num_lines;
-                    counter += 1;
                 }
 
                 // tracks the characters between the beginning of the slice and the first new line character
@@ -291,7 +289,7 @@ impl Terminal {
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> usize {
+    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, &'static str> {
         let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
@@ -313,7 +311,11 @@ impl Terminal {
                 if new_line_indices.len() == 0 {
                     // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                     end_idx += buffer_height * buffer_width;
-                    return end_idx; 
+                    if end_idx <= self.scrollback_buffer.len() -1 {
+                        return Ok(end_idx); 
+                    } else {
+                        return Err("exceeded end bound");
+                    }
                 }
 
                 let mut counter = 0;
@@ -349,9 +351,14 @@ impl Terminal {
                 } else {
                     end_idx += last_line_chars;
                 }
-                    return end_idx;
+
+                if end_idx <= self.scrollback_buffer.len() -1 {
+                    return Ok(end_idx); 
+                } else {
+                    return Err("exceeded end bound");
+                }
             },
-            None => self.scrollback_buffer.len() - 1,
+            None => Ok(self.scrollback_buffer.len() - 1),
         }
     }
 
@@ -398,16 +405,23 @@ impl Terminal {
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
+            debug!("RETURNED THAT SCROLL END IS TRUE?");
             return;
         } else {
             prev_start_idx = self.scroll_start_idx;
         }
-        let mut end_idx = self.calc_end_idx(prev_start_idx, display_name);
+        let result = self.calc_end_idx(prev_start_idx, display_name);
+        let mut end_idx = match result {
+            Ok(end_idx) => end_idx,
+            Err("exceeded end bound") => self.scrollback_buffer.len() -1,
+            Err(err) => {error!("{}", err); return}
+        };
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
             let new_start = self.calc_start_idx(end_idx, display_name).0;
             self.scroll_start_idx = new_start;
+            debug!("RETURNED ON 426");
             return;
         }
         end_idx += 1; // Advances to the next character for the calculation
@@ -431,12 +445,15 @@ impl Terminal {
                     None => { end_idx + slice_len}, // If no newline is found, moves the end index forward by the buffer width value
                 }; 
             } else {
+                debug!("RETURNED ON LINE 449");
                 return;
             }
         }
         // Recalculates new starting index
         let start_idx = self.calc_start_idx(new_end_idx, display_name).0;
+        debug!("is prev start and new start the same: {}", self.scroll_start_idx == start_idx);
         self.scroll_start_idx = start_idx;
+        debug!("got to the end of the function");
     }
     
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
@@ -449,8 +466,30 @@ impl Terminal {
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
     fn page_down(&mut self, display_name:&str) {
         let start_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_end_idx(start_idx, display_name) + 1;
-        let new_end_idx = self.calc_end_idx(new_start_idx, display_name);
+        let result = self.calc_end_idx(start_idx, display_name);
+        let new_start_idx = match result {
+            Ok(idx) => idx+ 1, 
+            Err("exceeded end bound") => {
+                let scrollback_buffer_len = self.scrollback_buffer.len();
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
+                self.scroll_start_idx = new_start_idx;
+                self.is_scroll_end = true;
+                return;
+            },
+            Err(err) => {error!("{}", err); return}
+        };
+        let result = self.calc_end_idx(new_start_idx, display_name);
+        let new_end_idx = match result {
+            Ok(end_idx) => end_idx,
+            Err("exceeded end bound") => {
+                let scrollback_buffer_len = self.scrollback_buffer.len();
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
+                self.scroll_start_idx = new_start_idx;
+                self.is_scroll_end = true;
+                return;
+            },
+            Err(err) => {error!("{}", err); return}
+        };
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
@@ -461,8 +500,18 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, display_name:&str, start_idx: usize) -> Result<(), &'static str> {
-        let end_idx = self.calc_end_idx(start_idx, display_name); 
         self.scroll_start_idx = start_idx;
+        let result= self.calc_end_idx(start_idx, display_name); 
+        let end_idx = match result {
+            Ok(end_idx) => end_idx,
+            Err("exceeded end bound") => {
+                let new_end_idx = self.scrollback_buffer.len() -1;
+                let new_start_idx = self.calc_start_idx(new_end_idx, display_name).0;
+                self.scroll_start_idx = new_start_idx;
+                new_end_idx
+            },
+            Err(err) => {return Err(err);}
+        };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             if let Some(text_display) = self.window.get_displayable(display_name){
@@ -879,10 +928,10 @@ impl Terminal {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
-            let buffer_len = self.scrollback_buffer.len();
+            let buffer_len = self.scrollback_buffer.len()-1;
             match self.update_display_backwards(display_name, buffer_len) {
                 Ok(_) => { }
-                Err(err) => {error!("could not update display forwards: {}", err); return}
+                Err(err) => {error!("could not update display backwards: {}", err); return}
             }
             match self.cursor_handler(display_name) {
                 Ok(_) => { }

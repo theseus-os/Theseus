@@ -115,7 +115,7 @@ $(iso): build
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
-	
+
 iso: $(iso)
 
 
