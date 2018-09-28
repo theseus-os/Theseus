@@ -631,12 +631,12 @@ fn task_wrapper<F, A, R>() -> !
     
     enable_interrupts();
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
-    // debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
+    debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
 
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    // debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // (1) Put the task into a non-runnable mode (exited), and set its exit value
     // (2) Remove it from its runqueue
