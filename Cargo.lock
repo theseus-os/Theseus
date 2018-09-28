@@ -752,6 +752,19 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rq_eval"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
+ "spawn 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "rtc"
 version = "0.1.0"
 dependencies = [
@@ -867,7 +880,6 @@ dependencies = [
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
- "context_switch_sse 0.1.0",
  "debugit 0.1.0",
  "gdt 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -939,7 +951,6 @@ dependencies = [
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
- "context_switch_sse 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",

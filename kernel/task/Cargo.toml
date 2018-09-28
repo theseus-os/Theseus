@@ -43,8 +43,6 @@ path = "../mod_mgmt"
 [dependencies.context_switch]
 path = "../context_switch"
 
-[dependencies.context_switch_sse]
-path = "../context_switch_sse"
 
 [lib]
 crate-type = ["rlib"]
