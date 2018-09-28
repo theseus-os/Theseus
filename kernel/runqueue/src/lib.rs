@@ -31,6 +31,7 @@ lazy_static! {
 
 /// A list of references to `Task`s (`TaskRef`s) 
 /// that is used to store the `Task`s that are runnable on a given core. 
+#[derive(Debug)]
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
@@ -44,6 +45,12 @@ impl RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
+
+        #[cfg(runqueue_state_spill_evaluation)] 
+        {
+            task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
+        }
+
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
             error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
             Err("runqueue already exists for this core")
@@ -110,7 +117,12 @@ impl RunQueue {
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
         
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        #[cfg(runqueue_state_spill_evaluation)]
+        {
+            task.lock_mut().on_runqueue = Some(self.core);
+        }
+
+        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
         self.queue.push_back(task);
         
         #[cfg(single_simd_task_optimization)]
@@ -132,16 +144,15 @@ impl RunQueue {
         self.queue.get(index)
     }
 
-    /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(single_simd_task_optimization)]
-        let is_simd = task.lock().simd;
 
-        debug!("Removing task from runqueue {}, {:?}", self.core, task);
+    /// The internal function that actually removes the task from the runqueue.
+    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+        // debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| x != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
+            let is_simd = { task.lock().simd };
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
             if is_simd {
@@ -152,12 +163,47 @@ impl RunQueue {
         Ok(())
     }
 
+
+    /// Removes a `TaskRef` from this RunQueue.
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+        #[cfg(runqueue_state_spill_evaluation)]
+        {
+            // For the runqueue state spill evaluation, we disable this method because we 
+            // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
+            // trace!("skipping remove_task() on core {}, task {:?}", self.core, task);
+            return Ok(());
+        }
+
+        self.remove_internal(task)
+    }
+
+
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
     pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
         }
         Ok(())
+    }
+
+
+    #[cfg(runqueue_state_spill_evaluation)]
+    /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
+    /// Note: This method is only used by the state spillful runqueue implementation.
+    pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
+        // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
+        task.lock_mut().on_runqueue = None;
+        RUNQUEUES.get(&core)
+            .ok_or("Couldn't get runqueue for specified core")
+            .and_then(|rq| {
+                // Instead of calling `remove_task`, we directly call `remove_internal`
+                // because we want to actually remove the task from the runqueue,
+                // as calling `remove_task` would do nothing due to it skipping the actual removal
+                // when the `runqueue_state_spill_evaluation` cfg is enabled.
+                rq.write().remove_internal(task)
+            })
     }
 
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
