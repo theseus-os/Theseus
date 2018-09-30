@@ -40,7 +40,7 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     };
     
-    let color = match _args.get(0) {
+/*    let color = match _args.get(0) {
         Some(color) => {
             match color.parse::<usize>() {
                 Ok(i) => i,
@@ -56,37 +56,150 @@ pub fn main(_args: Vec<String>) -> isize {
             return -1
         }
     };
-
+*/
+    let timeslice = 41666667/round as u64;
     let (width, height) = frame_buffer_display::get_resolution();
 
-    let hpet_lock = acpi::get_hpet();
-    let STARTING_TIME = unsafe { hpet_lock.as_ref().unwrap().get_counter()};
-    frame_buffer_display::fill_rectangle(0, 0, width, height, 0xe3b4b8);
-    //render(round, color);
-    unsafe {
-        let hpet_lock = acpi::get_hpet();
-        let TIME = hpet_lock.as_ref().unwrap().get_counter() - STARTING_TIME;
-        println!("3D: {}", TIME);
-    }
+    //println!("The screen is {}*{}", width, height);
+
+    let mut mode_3d = true;
 
     let hpet_lock = acpi::get_hpet();
-    let STARTING_TIME = unsafe { hpet_lock.as_ref().unwrap().get_counter()};
-    match swap_frame_buffer("frame_buffer_display_2d"){
-        Ok(_) =>{},
-        Err(_) =>{ return -2; }
-    };
-//    render(round, color);
-    frame_buffer_display::fill_rectangle(0, 0, width, height, 0xe3b4b8);
-    unsafe {
-        let hpet_lock = acpi::get_hpet();
-        let TIME = hpet_lock.as_ref().unwrap().get_counter() - STARTING_TIME; 
-        println!("SWAP+2D: {}", TIME);
+    let mut STARTING_TIME = unsafe { hpet_lock.as_ref().unwrap().get_counter()};
+    let mut END_TIME = STARTING_TIME;
+
+    let mut color_2d = 0x00FF;
+    let mut color_3d = 0x00FF;
+
+    let START = STARTING_TIME;
+    while (color_2d <= 0xFF00 || color_3d <= 0xFF00) {
+        
+        if (color_2d <= 0xFF00 && color_3d <= 0xFF00 ) {
+            let END_TIME = match hpet_lock.as_ref() {
+                Some(hpet) => {
+                    hpet.get_counter()
+                },
+                None => {
+                    return -2;
+                }
+            };
+            
+            if (END_TIME - STARTING_TIME > timeslice) {
+                STARTING_TIME = END_TIME;
+                mode_3d = !mode_3d;
+                if mode_3d {
+                    match swap_frame_buffer("frame_buffer_display"){
+                        Ok(_) =>{},
+                        Err(_) =>{ return -2; }
+                    };
+                } else {
+                    match swap_frame_buffer("frame_buffer_display_2d"){
+                        Ok(_) =>{},
+                        Err(_) =>{ return -2; }
+                    };
+                }
+            }
+        }
+
+        if mode_3d {
+            frame_buffer_display::fill_rectangle(100, 500, 800, 800, color_3d);
+            color_3d += 0x100 - 1;
+            if color_3d > 0xFF00 {
+                frame_buffer_display::fill_rectangle(100, 500, 800, 800, 0xFF0000);
+                mode_3d = !mode_3d;
+                match swap_frame_buffer("frame_buffer_display_2d"){
+                    Ok(_) =>{},
+                    Err(_) =>{ return -2;}
+                }
+            }
+        } else {
+            frame_buffer_display::fill_rectangle(1000, 500, 800, 800, color_2d);
+            color_2d += 0x100 - 1;
+            if color_2d > 0xFF00 {
+                frame_buffer_display::fill_rectangle(1000, 500, 800, 800, 0xFF0000);
+                mode_3d = !mode_3d;
+                match swap_frame_buffer("frame_buffer_display"){
+                    Ok(_) =>{},
+                    Err(_) =>{ return -2;}
+                }
+            }
+        }
     }
+
+    let END_TIME = match hpet_lock.as_ref() {
+        Some(hpet) => {
+            hpet.get_counter()
+        },
+        None => {
+            return -2;
+        }
+    };
+
+    println!("SWAP: The time is {}", END_TIME - START);
+
+//====================================
 
     match swap_frame_buffer("frame_buffer_display"){
         Ok(_) =>{},
-        Err(_) =>{ println!("Fail to recover the display mode"); return -2; }
+        Err(_) =>{ return -2; }
     };
+
+    let mut mode_3d = true;
+
+    let hpet_lock = acpi::get_hpet();
+    let mut STARTING_TIME = unsafe { hpet_lock.as_ref().unwrap().get_counter()};
+    let mut END_TIME = STARTING_TIME;
+
+    let mut color_2d = 0x00FF;
+    let mut color_3d = 0x00FF;
+
+    let START = STARTING_TIME;
+    while (color_2d <= 0xFF00 || color_3d <= 0xFF00) {
+        
+        if (color_2d <= 0xFF00 && color_3d <= 0xFF00 ) {
+            let END_TIME = match hpet_lock.as_ref() {
+                Some(hpet) => {
+                    hpet.get_counter()
+                },
+                None => {
+                    return -2;
+                }
+            };
+            
+            if (END_TIME - STARTING_TIME > timeslice) {
+                STARTING_TIME = END_TIME;
+                mode_3d = !mode_3d;
+            }
+        }
+
+        if mode_3d {
+            frame_buffer_display::fill_rectangle(100, 500, 800, 800, color_3d);
+            color_3d += 0x100 - 1;
+            if color_3d > 0xFF00 {
+                frame_buffer_display::fill_rectangle(100, 500, 800, 800, 0xFF0000);
+                mode_3d = !mode_3d;
+            }
+        } else {
+            frame_buffer_display::fill_rectangle(1000, 500, 800, 800, color_2d);
+            color_2d += 0x100 - 1;
+            if color_2d > 0xFF00 {
+                frame_buffer_display::fill_rectangle(1000, 500, 800, 800, 0xFF0000);
+                mode_3d = !mode_3d;
+            }
+        }
+    }
+
+    let END_TIME = match hpet_lock.as_ref() {
+        Some(hpet) => {
+            hpet.get_counter()
+        },
+        None => {
+            return -2;
+        }
+    };
+
+    println!("SWAP: The time is {}", END_TIME - START); 
+ 
     0
 }
 
@@ -126,15 +239,16 @@ fn swap_frame_buffer(new_module:&str) -> Result<(), &'static str>{
     return rs;
 }   
 
-fn render(round:usize, color_max:u32) {
-    let size = 600;
+fn render(round:usize, width:usize, height:usize) {
+    //let size = 600;
+    let mut color = 0x00FF;
     for i in 0..round {
-        let mut color:u32 = 0x0000FF;
+        //let mut color:u32 = 0x0000FF;
 
-        while color < 0xFF00 {
-            frame_buffer_display::fill_rectangle(200, 100, size, size, color);
+        //while color < 0xFF00 {
+            frame_buffer_display::fill_rectangle(0, 0, width, height, color);
             color = color - 1 + 0x000100;
-        }
+        //}
         //size += 50;
     }
             //frame_buffer::fill_rectangle(200, 100, size, size, color);
