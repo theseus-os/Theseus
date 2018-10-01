@@ -23,6 +23,7 @@ extern crate vfs;
 
 extern crate terminal_print;
 extern crate print;
+extern crate environment;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -38,6 +39,8 @@ use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use vfs::StrongDirRef;
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueue;
+use environment::Environment;
+use spin::Mutex;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -104,8 +107,8 @@ struct Terminal {
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
     print_producer: DFQueueProducer<Event>,
-    // the terminal's current working directory
-    working_dir: StrongDirRef,
+    /// The terminal's current environment
+    env: Arc<Mutex<Environment>>
 }
 
 
@@ -134,7 +137,13 @@ impl Terminal {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
+        
         let root = vfs::get_root();
+        
+        let env = Environment {
+            working_dir: vfs::get_root(), 
+        };
+
         let mut prompt_string = root.lock().get_path(); // ref numbers are 0-indexed
         prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
@@ -156,7 +165,7 @@ impl Terminal {
             left_shift: 0,
             print_consumer: terminal_print_consumer,
             print_producer: terminal_print_producer,
-            working_dir: root,
+            env: Arc::new(Mutex::new(env))
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -177,7 +186,8 @@ impl Terminal {
 
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
-        let mut prompt = self.working_dir.lock().get_path();
+        let curr_env = self.env.lock();
+        let mut prompt = curr_env.working_dir.lock().get_path();
         prompt = format!("{}: ",prompt);
         self.scrollback_buffer.push_str(&prompt);
     }
@@ -855,15 +865,16 @@ impl Terminal {
     /// Execute the command on a new thread 
     fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<usize, &'static str> {
         let module = memory::get_module(&command_string).ok_or("Error: no module with this name found!")?;
-        let mut taskref = ApplicationTaskBuilder::new(module)
+        let taskref = ApplicationTaskBuilder::new(module)
             .argument(arguments)
             .spawn()?;
+        
+        taskref.set_env(Arc::clone(&self.env)); // Set environment variable of application to the same as terminal task
 
-        taskref.set_wd(Arc::clone(&self.working_dir));
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         let new_task_id = taskref.lock().id;
         return Ok(new_task_id);
-        
+
     }
     
     fn refresh_display(&mut self, display_name:&str) {

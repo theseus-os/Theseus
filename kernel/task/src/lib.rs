@@ -42,6 +42,8 @@ extern crate mod_mgmt;
 extern crate panic_info;
 extern crate vfs;
 extern crate context_switch;
+extern crate environment;
+extern crate spin;
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
@@ -58,6 +60,8 @@ use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
 use vfs::StrongDirRef;
+use environment::Environment;
+use spin::Mutex;
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
@@ -202,8 +206,8 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
-    /// A reference to the working directory of the task
-    pub working_dir: StrongDirRef,
+    /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
+    pub env: Arc<Mutex<Environment>>,
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
     /// whether it uses SIMD registers and instructions.
@@ -228,7 +232,12 @@ impl Task {
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
-        
+
+        // TODO - change to option and initialize environment to none
+        let env = Environment {
+            working_dir: vfs::get_root(), 
+        };
+
         Task {
             id: task_id,
             runstate: RunState::Initing,
@@ -243,14 +252,14 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-            working_dir: vfs::get_root(),
+            env: Arc::new(Mutex::new(env)), 
             #[cfg(simd_personality)]
             simd: false,
         }
     }
 
-    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
-        self.working_dir = new_dir;
+    pub fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
+        self.env = new_env;
     }
 
     /// returns true if this Task is currently running on any cpu.
@@ -630,31 +639,12 @@ impl TaskRef {
     pub fn take_exit_value(&self) -> Option<ExitValue> {
         self.0.lock().take_exit_value()
     }
+
+    /// Sets environment
+    pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
+        self.0.lock().set_env(new_env);
+    }
     
-    /// Sets working directory
-    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
-        self.0.lock().set_wd(new_dir);
-    }
-
-    pub fn get_wd(&self) -> StrongDirRef {
-        return Arc::clone(&self.lock().working_dir);
-    }
-
-    /// Looks for the child directory specified by dirname and returns a reference to it 
-    pub fn set_chdir_as_wd(&self, dirname: String) -> Result<(), &'static str> {
-        let wd = self.get_wd();
-        let locked_wd = wd.lock();
-        match locked_wd.get_child_dir(dirname).clone() {
-            Some(dir) => {
-                self.0.lock().set_wd(dir);
-                return Ok(());
-            }
-            None => {
-                return Err("no such directory");
-            }
-        }
-    }
-
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
     #[deprecated] // TODO FIXME since 2018-09-06
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {

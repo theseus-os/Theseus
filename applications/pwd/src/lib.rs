@@ -13,8 +13,8 @@ use alloc::string::ToString;
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     if let Some(taskref) = task::get_my_current_task() {
-        let curr_dir = &taskref.lock().working_dir;
-        print!("{} \n",curr_dir.lock().get_path());
+        let curr_env = &taskref.lock().env;
+        print!("{} \n", curr_env.lock().get_wd_path());
     } else {
         println!("failed to get task ref");    
     }

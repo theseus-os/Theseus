@@ -57,6 +57,9 @@ path = "../../kernel/print"
 [dependencies.vfs]
 path = "../../kernel/vfs"
 
+[dependencies.environment]
+path = "../../kernel/environment"
+
 [lib]
 crate-type = ["rlib"]
 

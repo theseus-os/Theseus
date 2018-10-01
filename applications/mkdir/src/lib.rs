@@ -16,13 +16,15 @@ pub fn main(args: Vec<String>) -> isize {
         for dir_name in args.iter() {
             // add child dir to current directory
             if let Some(taskref) = task::get_my_current_task() {
-                let curr_dir = &taskref.lock().working_dir;
+                let locked_task = &taskref.lock();
+                let curr_env = locked_task.env.lock();
+                let curr_dir = &curr_env.working_dir;
                 curr_dir.lock().new_dir(dir_name.to_string(), Arc::downgrade(&curr_dir));
             } else {
                 println!("failed to get task ref");    
             }
         }
-    }
+    } 
 
     0
 }

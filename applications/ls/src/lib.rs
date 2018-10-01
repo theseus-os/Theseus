@@ -10,8 +10,9 @@ use alloc::{Vec, String};
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     if let Some(taskref) = task::get_my_current_task() {
-        let curr_dir = &taskref.lock().working_dir;
-        println!("{}", curr_dir.lock().list_children());
+        let locked_task = &taskref.lock();
+        let curr_env = locked_task.env.lock();
+        println!("{}", curr_env.working_dir.lock().list_children());
     }
     0
 }

@@ -31,22 +31,23 @@ pub fn main(args: Vec<String>) -> isize {
     } else {
         // navigate to the first directory passed in as arguments
         let target_dirname = &matches.free[0];
-        if let Some(taskref) = task::get_my_current_task() {
-            match taskref.set_chdir_as_wd(target_dirname.to_string()) {
+        let taskref = match task::get_my_current_task() {
+            Some(t) => t,
+            None => {
+                println!("failed to get current task");
+                return -1;
+            }
+        };
+        let locked_task = taskref.lock();
+        match locked_task.env.lock().set_chdir_as_wd(target_dirname.to_string()) {
                 Ok(()) => {
-                    let wd = &taskref.lock().working_dir;
-                    println!("current directory is set to {}", wd.lock().basename);
-                    return 0
+                    return 0;
                 }, 
                 Err(_f) => {
                  println!("{}", _f);
-                 return -1
+                 return -1;
                 }
             };
-        } else {
-            println!("Failed to get task ref");    
-            return -1; 
-        }
     }
     return -1;    
 }
