@@ -156,12 +156,16 @@ pub fn draw_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize
 ///draw a square in 2D compatible mode with upper left coordinates, width, height and color.
 pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize,
      color:u32) {
+                 trace!("Wenqiu:3D fill rectangle");
+
     fill_rectangle_3d(start_x, start_y, width, height, 0, color)
 }
 
 ///draw a square in 2D compatible mode with upper left coordinates, width, height and color.
 pub fn fill_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:u8,
      color:u32) {
+        trace!("Wenqiu:3D fill rectangle");
+
     let mut drawer = FRAME_DRAWER.lock();
     let (buffer_width, buffer_height) = {drawer.get_resolution()};
     let index = drawer.get_index_fn();
@@ -178,8 +182,7 @@ pub fn fill_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize
 
     let mut x = start_x;
     let mut y = start_y;
-//    trace!("Wenqiu:3D fill rectangle {} {} {} {} {} {} {} {}", start_x, start_y, width,  height, 
-//        buffer_width, buffer_height, end_x, end_y);
+    trace!("Wenqiu:3D fill rectangle");
     loop {
         if x == end_x {
             y += 1;

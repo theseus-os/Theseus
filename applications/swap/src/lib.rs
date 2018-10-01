@@ -110,7 +110,7 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option
 
 /// Performs the actual swapping of modules.
 fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> Result<(), String> {
-    let swap_pairs = {
+    /*let swap_pairs = {
         let mut mods: Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(pairs.len());
         for (o, n, override_name) in pairs {
             println!("   Looking for ({},{})  [override: {:?}]", o, n, override_name);
@@ -118,7 +118,8 @@ fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> 
                 (
                     mod_mgmt::get_default_namespace().get_crate(o).ok_or_else(|| format!("Couldn't find old crate \"{}\".", o))?,
                     get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?,
-                    override_name
+                    override_name,
+                    None
                 )
             );
         }
@@ -130,8 +131,11 @@ fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> 
     mod_mgmt::get_default_namespace().swap_crates(
         swap_pairs, 
         kernel_mmi.deref_mut(), 
-        verbose_log
+        verbose_log,
+        true
     ).map_err(|e| e.to_string())
+    */
+    Ok(())
 }
 
 

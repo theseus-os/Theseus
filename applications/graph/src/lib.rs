@@ -39,7 +39,25 @@ pub fn main(_args: Vec<String>) -> isize {
             return -1;
         }
     };
-    
+
+    match swap_frame_buffer("frame_buffer_display_2d", "frame_buffer_display_3d", true){
+        Ok(_) =>{},
+        Err(_) =>{ return -2; }
+    };
+            frame_buffer_display::fill_rectangle(100, 500, 800, 800, 0xFF0000);
+
+    trace!("To swap !");
+    match swap_frame_buffer("frame_buffer_display_3d", "frame_buffer_display_2d", false){
+        Ok(_) =>{},
+        Err(_) =>{ return -2; }
+    }; 
+                frame_buffer_display::fill_rectangle(100, 500, 800, 800, 0x0000FF);
+
+    match swap_frame_buffer("frame_buffer_display_2d", "frame_buffer_display_3d", false){
+        Ok(_) =>{},
+        Err(_) =>{ return -2; }
+    };
+            frame_buffer_display::fill_rectangle(100, 500, 800, 800, 0xFF0000);
 /*    let color = match _args.get(0) {
         Some(color) => {
             match color.parse::<usize>() {
@@ -57,7 +75,7 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     };
 */
-    let timeslice = 41666667/round as u64;
+/*    let timeslice = 41666667/round as u64;
     let (width, height) = frame_buffer_display::get_resolution();
 
     //println!("The screen is {}*{}", width, height);
@@ -198,13 +216,13 @@ pub fn main(_args: Vec<String>) -> isize {
         }
     };
 
-    println!("SWAP: The time is {}", END_TIME - START); 
+    println!("SWAP: The time is {}", END_TIME - START); */
  
     0
 }
 
-fn swap_frame_buffer(new_module:&str) -> Result<(), &'static str>{
-    let mut swap_pairs:Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(1);
+fn swap_frame_buffer(new_module:&str, old_override_name:&str, load_new:bool) -> Result<(), &'static str>{
+    let mut swap_pairs:Vec<(StrongCrateRef, Option<&ModuleArea>, String, Option<String>, Option<String>)> = Vec::with_capacity(1);
     swap_pairs.push(
         (
             match mod_mgmt::get_default_namespace().get_crate("frame_buffer_display"){
@@ -214,15 +232,10 @@ fn swap_frame_buffer(new_module:&str) -> Result<(), &'static str>{
                     return Err("Fail to get the new module");
                 } 
             },
-            match get_module(&format!("k#{}", new_module)){
-                Some(new_module) => {new_module},
-                None => {
-                    println!("Fail to get the new {} module", new_module);
-                    return Err("Fail to get the new module");
-                }
-
-            },
-            Some(String::from("frame_buffer_display"))
+            get_module(&format!("k#{}", new_module)),
+            format!("k#{}", new_module),
+            Some(String::from("frame_buffer_display")),
+            Some(String::from(old_override_name)),
         )
     );
 
@@ -233,7 +246,8 @@ fn swap_frame_buffer(new_module:&str) -> Result<(), &'static str>{
     let rs = mod_mgmt::get_default_namespace().swap_crates(
         swap_pairs, 
         kernel_mmi.deref_mut(), 
-        false
+        false,
+        load_new,
     );
     
     return rs;

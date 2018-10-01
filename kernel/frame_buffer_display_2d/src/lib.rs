@@ -135,6 +135,8 @@ pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, c
 
 /// fill a rectangle with upper left coordinates, width, height and color
 pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
+    
+        trace!("Wenqiu:2D fill rectangle");
     let mut drawer = FRAME_DRAWER.lock();
     let (buffer_width, buffer_height) = {drawer.get_resolution()};
     let index = drawer.get_index_fn();
