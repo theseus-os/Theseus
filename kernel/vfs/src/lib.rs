@@ -13,9 +13,9 @@ use alloc::arc::{Arc, Weak};
 
 
 lazy_static! {
+    /// The root directory
     pub static ref ROOT: StrongDirRef = {
         let root_dir = Directory {
-            basename: "/root".to_string(),
             path: "/root".to_string(),
             child_dirs: Vec::new(),
             files: Vec::new(),
@@ -29,25 +29,29 @@ pub fn get_root() -> StrongDirRef {
     Arc::clone(&ROOT)
 }
 
+/// An strong reference (Arc) and a Mutex wrapper around Directory
 pub type StrongDirRef = Arc<Mutex<Directory>>;
+/// An weak reference (Weak) and a Mutex wrapper around Directory
 pub type WeakDirRef = Weak<Mutex<Directory>>;
 
 pub struct Directory{
-    pub basename: String,
     /// The absolute path of the file from the root
     path: String,
+    /// A list of StrongDirRefs or pointers to the child directories 
     child_dirs: Vec<StrongDirRef>,
+    /// A list of files within this directory
     files: Vec<File>,
+    /// A weak reference to the parent directory 
     parent: WeakDirRef,
 }
 
 
 impl Directory {
     /// Assumes you actually want to open the file upon creation
-    pub fn new_file(&mut self, name: String, filepath: String, parent_pointer: WeakDirRef)  {
+    pub fn new_file(&mut self, name: String, parent_pointer: WeakDirRef)  {
+        let new_path = format!("{}/{}", self.get_path(), name);
         let file = File {
-            basename: name,
-            filepath: filepath,
+            path: new_path,
             size: 0,
             parent: parent_pointer,
         };
@@ -56,10 +60,8 @@ impl Directory {
 
     /// Creates a new directory and passes a reference to the new directory created as output
     pub fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) -> StrongDirRef {
-        let temp_name = name.clone();
         let directory = Directory {
-            basename: name, 
-            path: format!("{}/{}", self.path, temp_name.clone()),
+            path: format!("{}/{}", self.path, name),
             child_dirs: Vec::new(),
             files:  Vec::new(),
             parent: parent_pointer,
@@ -70,42 +72,54 @@ impl Directory {
     }
     
     /// Looks for the child directory specified by dirname and returns a reference to it 
-    pub fn get_child_dir(&self, dirname: String) -> Option<StrongDirRef> {
+    pub fn get_child_dir(&self, chdirname: String) -> Option<StrongDirRef> {
         for dir in self.child_dirs.iter() {
-            if dir.lock().basename == dirname {
+            if dir.lock().get_basename() == chdirname {
                 return Some(Arc::clone(dir));
             }
         }
         return None;
     }
+    
     /// Returns a string listing all the children in the directory
     pub fn list_children(&mut self) -> String {
         let mut children_list = String::new();
         for dir in self.child_dirs.iter() {
-            children_list.push_str(&format!("{}, ",dir.lock().basename.to_string()));
+            children_list.push_str(&format!("{}, ",dir.lock().get_basename()));
         }
 
         for file in self.files.iter() {
-            children_list.push_str(&format!("{}, ", file.basename.to_string()));
+            children_list.push_str(&format!("{}, ", file.get_basename()));
         }
         return children_list;
     }
     
-    /// Functions as pwd command in bash
+    /// Functions as pwd command in bash, returns the full path as a string
     pub fn get_path(&self) -> String {
         return self.path.clone();
+    }
+    
+    /// Gets the basename, last part of path
+    pub fn get_basename(&self) -> String {
+        let path: Vec<&str> = self.path.split("/").collect();
+        return path[path.len() - 1].to_string();
     }
 }
 
 pub struct File {
-    basename: String, 
-    filepath: String,
+    path: String,
     size: usize, 
     parent: WeakDirRef,
 }
 
 impl File {
-     pub fn read(self) -> String {
-        return format!("name: {}, filepath: {}, size: {}, filetype: {}", self.basename, self.filepath, self.size, String::from("temp filetype"));
+    pub fn read(self) -> String {
+        return format!("filepath: {}, size: {}, filetype: {}", self.path, self.size, String::from("temp filetype"));
+    }
+    
+    /// Gets the basename, last part of path
+    pub fn get_basename(&self) -> String {
+        let path: Vec<&str> = self.path.split("/").collect();
+        return path[path.len() - 1].to_string();
     }
 }

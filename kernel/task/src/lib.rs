@@ -83,11 +83,11 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-/// Initializes task node in vfs and adds procfs as a file
+/// Initializes task node in vfs and adds procfs as a file 
 pub fn init(root_dir: StrongDirRef) -> Result<(), &'static str> {
     use alloc::string::ToString;
     let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
-    task_dir.lock().new_file("procfs".to_string(), "/root/task/procfs".to_string(), Arc::downgrade(&task_dir));
+    task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
 

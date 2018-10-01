@@ -15,7 +15,7 @@ pub struct Environment {
 impl Environment {
     pub fn get_wd_path(&self) -> String {
         let wd = self.working_dir.lock();
-        wd.basename.clone()
+        wd.get_basename().clone()
     }
 
     /// Sets working directory
