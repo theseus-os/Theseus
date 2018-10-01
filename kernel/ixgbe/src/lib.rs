@@ -15,7 +15,7 @@ extern crate memory;
 extern crate pci; 
 extern crate pit_clock;
 extern crate bit_field;
-// extern crate interrupts;
+extern crate interrupts;
 extern crate x86_64;
 
 pub mod test_tx;
@@ -29,12 +29,12 @@ use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter,PhysicalMemoryArea};
-use pci::{PciDevice,pci_read_32, pci_read_8, pci_read_16, pci_write, pci_set_command_bus_master_bit, PCI_INTERRUPT_PIN, PCI_INTERRUPT_LINE, PCI_BAR0, PCI_CAPABILITIES, PCI_STATUS, MSI_CAPABILITY};
+use pci::{get_pci_device_vd,PciDevice,pci_read_32, pci_read_8, pci_read_16, pci_write, pci_set_command_bus_master_bit, pci_set_interrupt_disable_bit, PCI_COMMAND, PCI_INTERRUPT_PIN, PCI_INTERRUPT_LINE, PCI_BAR0, PCI_CAPABILITIES, PCI_STATUS, MSI_CAPABILITY, MSIX_CAPABILITY, pci_set_interrupt_status_bit};
 use kernel_config::memory::PAGE_SIZE;
 use descriptors::*;
 use registers::*;
 use bit_field::BitField;
-// use interrupts::{eoi,register_interrupt};
+use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 
 //parameter that determine size of tx and rx descriptor queues
@@ -616,7 +616,7 @@ impl Nic{
 
         fn enable_interrupts(&self) {
                 //set IVAR reg for eaach queue used
-                self.write_command(REG_IVAR, 0x81); // for rxq 0
+                self.write_command(REG_IVAR, 0x80); // for rxq 0
                 debug!("IVAR: {:#X}", self.read_command(REG_IVAR));
                 
                 //enable clear on read of EICR
@@ -628,7 +628,7 @@ impl Nic{
                 debug!("EICR: {:#X}", self.read_command(REG_EICR));
 
                 //set eims to enable required interrupt
-                self.write_command(REG_EIMS, 0xFFFF);
+                self.write_command(REG_EIMS, 0xFFFF); // Rx0
                 debug!("EIMS: {:#X}", self.read_command(REG_EIMS));
         }
 
@@ -638,11 +638,11 @@ impl Nic{
 
                 let status = self.read_command(REG_EICR); //reads status and clears interrupt
                 if (status & 0x01 ) == 0x01 { //Rx0
-                        debug!("Interrupt:packet received");
+                        debug!("Interrupt:packet received, status {:#X}", status);
 
                 }
                 else{
-                        debug!("Unhandled interrupt!");
+                        debug!("Unhandled interrupt!, status {:#X}", status);
                 }
                 
         }
@@ -680,8 +680,10 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         let mut nic = NIC_82599.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
-        INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
+        // INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
         debug!("Int line: {}  Int pin: {}" , *INTERRUPT_NO.try().unwrap_or(&0), pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_PIN) );
+
+        INTERRUPT_NO.call_once(|| 0x30 );
 
         nic.init(dev_pci);
         try!(nic.mem_map(dev_pci));
@@ -751,7 +753,7 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
 
         //Enable Interrupts
         nic.enable_interrupts();
-        //register_interrupt(*INTERRUPT_NO.try().unwrap() + 32, ixgbe_handler);
+        register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
         
         //Initialize transmit .. legacy descriptors
 
@@ -805,12 +807,12 @@ pub fn rx_poll_mq(_: Option<u64>){
         
 }
 
-// extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) {
-//     let nic = NIC_82599.lock();
-//     debug!("nic handler called");
-//     nic.handle_interrupt();
-//     eoi(Some(*(INTERRUPT_NO.try().unwrap())));
-// }
+extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) {
+    let nic = NIC_82599.lock();
+    debug!("nic handler called");
+    nic.handle_interrupt();
+    eoi(Some(*(INTERRUPT_NO.try().unwrap())));
+}
 
 pub fn check_eicr(_ : Option<u64>){
         loop {
@@ -821,21 +823,48 @@ pub fn check_eicr(_ : Option<u64>){
 
 pub fn cause_interrupt(_ : Option<u64>) {
         let nic = NIC_82599.lock();
-        nic.write_command(REG_EICS,0xFFFF);
+
+        for i in 0..16{
+                nic.write_command(REG_EIMS, 1<<i);
+                nic.write_command(REG_EICS, 1<<i);
+
+                //wait 10 ms
+                let _ =pit_clock::pit_wait(10000);
+                
+                if let Some(pci_dev_82599) = get_pci_device_vd(INTEL_VEND, INTEL_82599) {
+                        debug!("status: {:#X}", pci_read_16(pci_dev_82599.bus, pci_dev_82599.slot, pci_dev_82599.func, PCI_STATUS));
+                }
+
+
+                debug!("EICR: {:#X}", nic.read_command(REG_EICR));
+        }
+        
 }
 
-pub fn ixgbe_handler() {
-        let nic = NIC_82599.lock();
-        nic.handle_interrupt();
-}
+// pub fn ixgbe_handler() {
+//         let nic = NIC_82599.lock();
+//         nic.handle_interrupt();
+// }
 
 pub fn pci_config_space(dev_pci: &PciDevice) {
 
         debug!("NIC PCI CONFIG SPACE");
 
-        let status = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_STATUS);
+        debug!("PCI command: {:#X}", pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND));
+
+        let status = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND);
 
         debug!("status: {:#X}", status);
+
+        // pci_set_interrupt_status_bit(dev_pci.bus, dev_pci.slot, dev_pci.func);
+
+        // pci_set_interrupt_disable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func);
+
+        // pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND, (status | 0x0008_0000));
+
+        // let status = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND);
+
+        // debug!("Updated status: {:#X}", status);
 
         if (status >> 4 & 1) == 1 {
                 let capabilities = pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_CAPABILITIES);
@@ -853,7 +882,21 @@ pub fn pci_config_space(dev_pci: &PciDevice) {
                         if node_id == MSI_CAPABILITY {
                                 let msi_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
 
-                                debug!("msi control: {:#X}", msi_control);// (msi_control>>16) & 0xFFFF);
+                                debug!("MSI control: {:#X}", msi_control);// (msi_control>>16) & 0xFFFF);
+                        }
+
+                        if node_id == MSIX_CAPABILITY {
+                                let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+                                debug!("MSIX control: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
+
+                                // pci_unset_msix_enable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+                                pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next, msix_control&0x7FFF_FFFF);
+
+                                let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+                                debug!("MSIX control_updated: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
                         }
 
                         node_next = (node >> 8) & 0xFF;

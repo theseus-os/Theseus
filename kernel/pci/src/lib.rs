@@ -126,6 +126,32 @@ pub fn pci_set_command_bus_master_bit(pci_dev: &PciDevice) {
     }
 }
 
+/// sets the PCI device's bit 3 in the Command portion, which is apparently needed to activate DMA (??)
+pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
+    unsafe { 
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
+        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+        trace!("pci_set_interrupt_disable_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
+                bus, slot, func, inval);
+        PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 10));
+        trace!("pci_set_interrupt_disable_bit: PciDevice: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
+                bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
+    }
+}
+
+/// 
+pub fn pci_set_interrupt_status_bit(bus: u16, slot: u16, func: u16) {
+    unsafe { 
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
+        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+        trace!("pci_set_interrupt_status_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
+                bus, slot, func, inval);
+        PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 19));
+        trace!("pci_set_interrupt_status_bit:: PciDevice: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
+                bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
+    }
+}
+
 /// struct representing a PCI Bus, containing an array of PCI Devices
 #[derive(Debug)]
 pub struct PciBus{
@@ -141,7 +167,7 @@ const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC;
 // see this: http://wiki.osdev.org/PCI#PCI_Device_Structure
 const PCI_VENDOR_ID:             u16 = 0x0;
 const PCI_DEVICE_ID:             u16 = 0x2;
-const PCI_COMMAND:               u16 = 0x4;
+pub const PCI_COMMAND:               u16 = 0x4;
 pub const PCI_STATUS:                u16 = 0x6;
 const PCI_REVISION_ID:           u16 = 0x8;
 const PCI_PROG_IF:               u16 = 0x9;
@@ -170,6 +196,7 @@ const PCI_MAX_LATENCY:           u16 = 0x3F;
 
 //PCI Capability IDs
 pub const MSI_CAPABILITY:       u16 = 0x05;
+pub const MSIX_CAPABILITY:       u16 = 0x11;
 
 
 

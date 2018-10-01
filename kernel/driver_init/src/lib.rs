@@ -1,0 +1,104 @@
+#![no_std]
+
+#[macro_use] extern crate log;
+extern crate event_types;
+extern crate ata_pio;
+extern crate e1000;
+extern crate ixgbe;
+extern crate memory;
+extern crate dfqueue; 
+extern crate apic;
+extern crate acpi;
+extern crate keyboard;
+extern crate pci;
+extern crate mouse;
+
+extern crate spin;
+
+use dfqueue::DFQueueProducer;
+use event_types::Event;
+use memory::{MemoryManagementInfo, PageTable};
+use pci::get_pci_device_vd;
+use spin::Once;
+
+
+pub static NIC_82599_PRESENT: Once<bool> = Once::new();
+
+/// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
+pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
+    // destructure the kernel's MMI so we can access its page table and vmas
+    let &mut MemoryManagementInfo { 
+        page_table: ref mut kernel_page_table, 
+        ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
+    } = kernel_mmi;
+
+    match kernel_page_table {
+        &mut PageTable::Active(ref mut active_table) => {
+            // first, init the local apic info
+            try!(apic::init(active_table));
+            
+            // then init/parse the ACPI tables to fill in the APIC details, among other things
+            // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
+            let madt_iter = try!(acpi::init(active_table));
+
+            Ok(madt_iter)
+        }
+        _ => {
+            error!("drivers::early_init(): couldn't get kernel's active_table!");
+            Err("Couldn't get kernel's active_table")
+        }
+    }
+}
+
+
+
+pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
+    keyboard::init(keyboard_producer);
+    mouse::init();
+
+    
+    /* for dev in pci::pci_device_iter() {
+        debug!("Found pci device: {:?}", dev);
+    } */
+
+    if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
+        debug!("82599 Device found: {:?}", pci_dev_82599);
+        try!(ixgbe::init_nic(pci_dev_82599));
+        NIC_82599_PRESENT.call_once(|| true);
+
+        // ixgbe::pci_config_space(pci_dev_82599);
+    }
+    else {
+        warn!("No 82599 device found on this system.");
+        NIC_82599_PRESENT.call_once(|| false);
+    }
+    
+
+    // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
+    /*
+    ata_pio::init_ata_devices();
+    let test_arr: [u16; 256] = [630;256];
+    println!("Value from ATA identification function: {}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
+    let begin = ata_pio::pio_read(0xE0,0);
+    //only use value if Result is ok
+    if begin.is_ok(){
+        println!("Value from drive at sector 0 before write:  {}", begin.unwrap()[0]);
+    }
+    ata_pio::pio_write(0xE0,0,test_arr);
+    let end = ata_pio::pio_read(0xE0,0);
+    if end.is_ok(){
+    println!("Value from drive at sector 0 after write: {}", end.unwrap()[0]);
+    }
+    */
+
+    /*
+    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
+    let ref bus_zero = bus_array[0];
+    let slot_zero = bus_zero.connected_devices[0]; 
+    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
+    println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
+    println!("{:?}", bus_zero);
+    */
+    Ok(())
+
+}

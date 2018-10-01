@@ -156,6 +156,62 @@ pub fn init(
         // clear the 0th P4 entry, which covers any existing identity mappings
         kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0); 
     }
+<<<<<<< 60ab3acb96ce8b9c0ad56d6f0bb224c1722f017c
+=======
+
+    // testing nic
+    // TODO: remove this (@Ramla)
+    if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
+        use ixgbe::test_tx::test_nic_ixgbe_driver;
+        KernelTaskBuilder::new(test_nic_ixgbe_driver, None)
+            .name(String::from("test_nic_ixgbe_driver"))
+            .spawn()?;
+    }  
+
+    // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
+    //     use ixgbe::rx_poll_mq;
+    //     KernelTaskBuilder::new(rx_poll_mq, None)
+    //         .name(String::from("rx_poll_mq"))
+    //         .spawn()?;
+    // }
+
+    // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
+    //     use ixgbe::check_eicr;
+    //     KernelTaskBuilder::new(check_eicr, None)
+    //         .name(String::from("check_eicr"))
+    //         .spawn()?;
+    // }
+
+    
+
+    // create and jump to the first userspace thread
+    if false {
+        debug!("trying to jump to userspace");
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
+        spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
+    }
+
+    if false {
+        debug!("trying to jump to userspace 2nd time");
+        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
+        spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
+    }
+
+    // create and jump to a userspace thread that tests syscalls
+    if false {
+        debug!("trying out a system call module");
+        let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
+        spawn::spawn_userspace(module, None)?;
+    }
+
+    // a second duplicate syscall test user task
+    if false {
+        debug!("trying out a receive system call module");
+        let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
+        spawn::spawn_userspace(module, None)?;
+    }
+
+>>>>>>> self gernerated interrupts working
     
     // create a SIMD personality
     #[cfg(simd_personality)]
@@ -174,6 +230,12 @@ pub fn init(
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
     // (unless there are no other tasks available to run on the BSP core, which never happens)
     
+    // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
+    //     use ixgbe::cause_interrupt;
+    //     KernelTaskBuilder::new(cause_interrupt, None)
+    //         .name(String::from("cause interrupt"))
+    //         .spawn()?;
+    // }
 
     loop { 
         spin_loop_hint();
