@@ -28,7 +28,7 @@ use core::sync::atomic::{Ordering, AtomicBool, compiler_fence};
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use alloc::boxed::Box;
-use irq_safety::{MutexIrqSafe, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS};
@@ -194,14 +194,14 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
         // set up the kthread stuff
         let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
-        debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
+        // debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
 
         // currently we're using the very bottom of the kstack for kthread arguments
         let arg_ptr = kstack.bottom();
         let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
         unsafe {
             *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
-            debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
+            // debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
         }
 
         new_task.kstack = Some(kstack);
@@ -639,17 +639,30 @@ fn task_wrapper<F, A, R>() -> !
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // (1) Put the task into a non-runnable mode (exited), and set its exit value
-    if curr_task_ref.exit(Box::new(exit_value)).is_err() {
-        warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
-    }
-
     // (2) Remove it from its runqueue
-    if let Err(e) = apic::get_my_apic_id()
-        .and_then(|id| RunQueue::get_runqueue(id))
-        .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-        .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
-    {
-        error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+    // (3) Yield the CPU
+    // The first two need to be done "atomically" (without interruption), so we must disable preemption.
+    // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
+    // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
+    { 
+        // (0) disable preemption (currently just disabling interrupts altogether)
+        let _held_interrupts = hold_interrupts();
+        
+        // (1) Put the task into a non-runnable mode (exited), and set its exit value
+        if curr_task_ref.exit(Box::new(exit_value)).is_err() {
+            warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+        }
+
+        // (2) Remove it from its runqueue
+        if let Err(e) = apic::get_my_apic_id()
+            .and_then(|id| RunQueue::get_runqueue(id))
+            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+            .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+        {
+            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+        }
+
+        // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
 
     // (3) Yield the CPU
