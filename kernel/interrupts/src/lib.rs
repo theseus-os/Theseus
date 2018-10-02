@@ -152,6 +152,11 @@ pub fn init_handlers_apic() {
         idt[0x32].set_handler_fn(apic_irq_0x32_handler);
         idt[0x33].set_handler_fn(apic_irq_0x33_handler);
 
+        idt[0x34].set_handler_fn(apic_irq_0x34_handler);
+        idt[0x35].set_handler_fn(apic_irq_0x35_handler);
+        idt[0x36].set_handler_fn(apic_irq_0x36_handler);
+        idt[0x37].set_handler_fn(apic_irq_0x37_handler);
+
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
         idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
@@ -244,7 +249,7 @@ static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x21");
+    // debug!("In handler 0x21");
     let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60
@@ -609,6 +614,39 @@ extern "x86-interrupt" fn apic_irq_0x33_handler(_stack_frame: &mut ExceptionStac
 
     eoi(Some(0x33));
 }
+
+/// 0x34
+extern "x86-interrupt" fn apic_irq_0x34_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    debug!("In handler 0x34");
+
+    eoi(Some(0x34));
+}
+
+/// 0x35
+extern "x86-interrupt" fn apic_irq_0x35_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    debug!("In handler 0x35");
+
+    eoi(Some(0x35));
+}
+
+/// 0x36
+extern "x86-interrupt" fn apic_irq_0x36_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    debug!("In handler 0x36");
+
+    eoi(Some(0x36));
+}
+
+/// 0x37
+extern "x86-interrupt" fn apic_irq_0x37_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    debug!("In handler 0x37");
+
+    eoi(Some(0x37));
+}
+
 
 
 

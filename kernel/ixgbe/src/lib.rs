@@ -616,7 +616,7 @@ impl Nic{
 
         fn enable_interrupts(&self) {
                 //set IVAR reg for eaach queue used
-                self.write_command(REG_IVAR, 0x80); // for rxq 0
+                self.write_command(REG_IVAR, self.read_command(REG_IVAR) & !(0xFF)); // for rxq 0
                 debug!("IVAR: {:#X}", self.read_command(REG_IVAR));
                 
                 //enable clear on read of EICR
@@ -753,7 +753,7 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
 
         //Enable Interrupts
         nic.enable_interrupts();
-        register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
+        // register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
         
         //Initialize transmit .. legacy descriptors
 
@@ -822,18 +822,21 @@ pub fn check_eicr(_ : Option<u64>){
 }
 
 pub fn cause_interrupt(_ : Option<u64>) {
+        
         let nic = NIC_82599.lock();
-
         for i in 0..16{
-                nic.write_command(REG_EIMS, 1<<i);
-                nic.write_command(REG_EICS, 1<<i);
+                
+                        
+                        nic.write_command(REG_EIMS, i<<1);
+                        nic.write_command(REG_EICS, i<<1);
+                
 
                 //wait 10 ms
                 let _ =pit_clock::pit_wait(10000);
                 
-                if let Some(pci_dev_82599) = get_pci_device_vd(INTEL_VEND, INTEL_82599) {
-                        debug!("status: {:#X}", pci_read_16(pci_dev_82599.bus, pci_dev_82599.slot, pci_dev_82599.func, PCI_STATUS));
-                }
+                // if let Some(pci_dev_82599) = get_pci_device_vd(INTEL_VEND, INTEL_82599) {
+                //         debug!("status: {:#X}", pci_read_16(pci_dev_82599.bus, pci_dev_82599.slot, pci_dev_82599.func, PCI_STATUS));
+                // }
 
 
                 debug!("EICR: {:#X}", nic.read_command(REG_EICR));
