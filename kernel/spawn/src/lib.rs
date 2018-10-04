@@ -231,8 +231,8 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
 /// A struct that uses the Builder pattern to create and customize new application `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
-pub struct ApplicationTaskBuilder<'m> {
-    module: &'m ModuleArea,
+pub struct ApplicationTaskBuilder {
+    module: &'static ModuleArea,
     argument: MainFuncArg,
     name: Option<String>,
     pin_on_core: Option<u8>,
@@ -242,10 +242,10 @@ pub struct ApplicationTaskBuilder<'m> {
     simd: bool,
 }
 
-impl<'m> ApplicationTaskBuilder<'m> {
+impl ApplicationTaskBuilder {
     /// Creates a new application `Task` from the given `module`, 
     /// which must have an entry point called `main`.
-    pub fn new(module: &'m ModuleArea) -> ApplicationTaskBuilder<'m> {
+    pub fn new(module: &'static ModuleArea) -> ApplicationTaskBuilder {
         ApplicationTaskBuilder {
             module: module,
             argument: Vec::new(), // doesn't allocate yet
@@ -259,13 +259,13 @@ impl<'m> ApplicationTaskBuilder<'m> {
     }
 
     /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> ApplicationTaskBuilder<'m> {
+    pub fn name(mut self, name: String) -> ApplicationTaskBuilder {
         self.name = Some(name);
         self
     }
 
     /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder<'m> {
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder {
         self.pin_on_core = Some(core_apic_id);
         self
     }
@@ -273,13 +273,13 @@ impl<'m> ApplicationTaskBuilder<'m> {
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self) -> ApplicationTaskBuilder<'m> {
+    pub fn simd(mut self) -> ApplicationTaskBuilder {
         self.simd = true;
         self
     }
 
     /// Set the argument strings for this Task.
-    pub fn argument(mut self, argument: MainFuncArg) -> ApplicationTaskBuilder<'m> {
+    pub fn argument(mut self, argument: MainFuncArg) -> ApplicationTaskBuilder {
         self.argument = argument;
         self
     }
@@ -290,7 +290,7 @@ impl<'m> ApplicationTaskBuilder<'m> {
     /// This also prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
     /// 
     /// In general, for regular applications, you likely should *not* use this. 
-    pub fn singleton(mut self) -> ApplicationTaskBuilder<'m> {
+    pub fn singleton(mut self) -> ApplicationTaskBuilder {
         self.singleton = true;
         self
     }
