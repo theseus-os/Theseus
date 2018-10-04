@@ -14,7 +14,7 @@ use xmas_elf::ElfFile;
 use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 
-use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, ModuleArea, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use metadata::{CrateType, LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 
 
@@ -102,9 +102,9 @@ pub fn parse_nano_core(
         };
 
         let new_crate_ref = if PARSE_NANO_CORE_SYMBOL_FILE {
-            parse_nano_core_symbol_file(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
+            parse_nano_core_symbol_file(temp_module_mapping, module, text_pages, rodata_pages, data_pages, size)?
         } else {
-            parse_nano_core_binary(temp_module_mapping, text_pages, rodata_pages, data_pages, size)?
+            parse_nano_core_binary(temp_module_mapping, module, text_pages, rodata_pages, data_pages, size)?
         };
 
         let default_namespace = super::get_default_namespace();
@@ -131,6 +131,7 @@ pub fn parse_nano_core(
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
 fn parse_nano_core_symbol_file(
     mut mapped_pages: MappedPages,
+    nano_core_object_file: &'static ModuleArea,
     text_pages:   Arc<Mutex<MappedPages>>,
     rodata_pages: Arc<Mutex<MappedPages>>,
     data_pages:   Arc<Mutex<MappedPages>>,
@@ -152,6 +153,7 @@ fn parse_nano_core_symbol_file(
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:   crate_name, 
+        object_file:  nano_core_object_file,
         sections:     BTreeMap::new(),
         text_pages:   Some(text_pages.clone()),
         rodata_pages: Some(rodata_pages.clone()),
@@ -432,6 +434,7 @@ fn parse_nano_core_symbol_file(
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
 fn parse_nano_core_binary(
     mapped_pages: MappedPages, 
+    nano_core_object_file: &'static ModuleArea,
     text_pages:   Arc<Mutex<MappedPages>>, 
     rodata_pages: Arc<Mutex<MappedPages>>, 
     data_pages:   Arc<Mutex<MappedPages>>, 
@@ -531,6 +534,7 @@ fn parse_nano_core_binary(
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:   crate_name, 
+        object_file:  nano_core_object_file,
         sections:     BTreeMap::new(),
         text_pages:   Some(text_pages.clone()),
         rodata_pages: Some(rodata_pages.clone()),

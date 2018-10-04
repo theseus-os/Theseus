@@ -90,6 +90,12 @@ impl<T> CowArc<T> {
         Arc::strong_count(&self.arc.inner_arc) > 1
     }
 
+    /// Returns true if the two `CowArc`s point to the same value
+    /// (not just values that compare as equal).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.arc, &other.arc)
+    }
+
 
     /// Creates a shallow clone of this `CowArc` that **does not** affect its `Shared` state.
     /// This means that it will not change it to `Shared` if it was `Exclusive,

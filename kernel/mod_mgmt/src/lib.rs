@@ -16,6 +16,7 @@ extern crate util;
 extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
+extern crate hashmap_core;
 
 
 use core::ops::DerefMut;
@@ -32,9 +33,9 @@ use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
 use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
+use hashmap_core::HashMap;
 
 
 pub mod demangle;
@@ -80,6 +81,44 @@ pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
 }
 
 
+/// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
+pub type SwapRequestList = Vec<SwapRequest>;
+  
+/// This struct includes the detail of a crate-swapping operation,
+/// in which an "old" crate is removed and replaced with a "new" crate
+/// that is then used in place of that old crate. 
+/// 
+/// To override the new crate's name (which will consequently override the section names in the new crate),
+/// simply specify a `new_crate_name` that is different than the crate name
+/// that would be derived from the `new_crate_module_area`.
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct SwapRequest {
+    /// The name of the old crate that will be replaced by the new crate.
+    /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
+    old_crate_name: String,
+    /// The `ModuleArea` containing the object file for the new crate that will replace the old crate. 
+    new_crate_module_area: &'static ModuleArea,
+    /// The name that will be used for the new crate.
+    /// If this differs from the crate name derived from the `new_crate_module_area`,
+    /// then the derived crate name will be overridden with this `new_crate_name`. 
+    new_crate_name: String,
+}
+impl SwapRequest {
+    /// Create a new `SwapRequest` that, when given to `swap_crates()`, 
+    /// will swap the given old crate with the given new crate,
+    /// and optionally replace the new crate's name with the given override name.
+    pub fn new(
+        old_crate_name: String, 
+        new_crate_module_area: &'static ModuleArea, 
+        new_crate_name: String,
+    ) -> SwapRequest {
+        SwapRequest {
+            old_crate_name, new_crate_module_area, new_crate_name
+        }
+    }
+}
+
+
 /// A "symbol map" from a fully-qualified demangled symbol String  
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
@@ -111,18 +150,25 @@ pub struct CrateNamespace {
     /// which is guaranteed to be part of one of the crates in this `CrateNamespace`.  
     /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
     symbol_map: Mutex<SymbolMap>,
+
+    /// The set of crates that have been previously unloaded (e.g., swapped out) from this namespace. 
+    /// These are kept in memory as a performance optimization, such that if 
+    /// they are ever requested to be swapped in again, we can swap them back in 
+    /// almost instantly by avoiding the  expensive procedure of re-loading them into memory.
+    /// 
+    /// The unloaded cached crates are stored in the form of a CrateNamespace itself,
+    /// such that we can easily query the cache for crates and symbols by name.
+    /// 
+    /// This is soft state that can be removed at any time with no effect on correctness.
+    unloaded_crate_cache: Mutex<HashMap<SwapRequestList, CrateNamespace>>,
 }
 
 impl CrateNamespace {
     /// Creates a new `CrateNamespace` that is completely empty. 
     pub fn new() -> CrateNamespace {
-        CrateNamespace {
-            name: String::from(""),
-            crate_tree: Mutex::new(BTreeMap::new()),
-            symbol_map: Mutex::new(SymbolMap::new()),
-        }
+        CrateNamespace::with_name("")
     } 
-    
+
 
     /// Creates a new `CrateNamespace` that is completely empty, and is given the specified `name`.
     pub fn with_name(name: &str) -> CrateNamespace {
@@ -130,6 +176,7 @@ impl CrateNamespace {
             name: String::from(name),
             crate_tree: Mutex::new(BTreeMap::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
+            unloaded_crate_cache: Mutex::new(HashMap::new()),
         }
     } 
 
@@ -163,7 +210,7 @@ impl CrateNamespace {
     /// Returns a Result containing the new crate itself.
     pub fn load_application_crate(
         &self, 
-        crate_module: &ModuleArea, 
+        crate_module: &'static ModuleArea, 
         kernel_mmi: &mut MemoryManagementInfo, 
         load_symbols_as_singleton: bool,
         verbose_log: bool
@@ -177,7 +224,7 @@ impl CrateNamespace {
         
         debug!("load_application_crate: trying to load \"{}\" application module", crate_module.name());
         let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
         self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
@@ -214,7 +261,7 @@ impl CrateNamespace {
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_kernel_crate(
         &self,
-        crate_module: &ModuleArea, 
+        crate_module: &'static ModuleArea, 
         backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi: &mut MemoryManagementInfo, 
         verbose_log: bool
@@ -229,7 +276,7 @@ impl CrateNamespace {
 
         debug!("load_kernel_crate: trying to load \"{}\" kernel crate", crate_name);
         let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
         self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
@@ -254,14 +301,14 @@ impl CrateNamespace {
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
-    pub fn load_kernel_crates<'m, I>(
+    pub fn load_kernel_crates<I>(
         &self,
         new_modules: I,
         backup_namespace: Option<&CrateNamespace>,
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
-        where I: Iterator<Item = &'m ModuleArea> + Clone
+        where I: Iterator<Item = &'static ModuleArea> + Clone
     {
         // first we map all of the crates' ModuleAreas
         let mappings = {
@@ -280,6 +327,7 @@ impl CrateNamespace {
             let temp_module_mapping = mappings.get(i).ok_or("BUG: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
             let (new_crate, elf_file) = self.load_crate_sections(
                 temp_module_mapping, 
+                crate_module,
                 crate_module.size(),
                 CrateType::from_module_name(crate_module.name())?.1,
                 kernel_mmi, 
@@ -331,6 +379,7 @@ impl CrateNamespace {
             name: self.name.clone(),
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
+            unloaded_crate_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -341,7 +390,7 @@ impl CrateNamespace {
     /// such as a new crate linking against an old crate that already exists in this namespace
     /// instead of linking against the new one that we want to replace that old crate with. 
     /// 
-    /// In general, the strategy for replacing and old module `C` with a new module `C2` consists of three simple steps:
+    /// In general, the strategy for replacing an old module `C` with a new module `C2` consists of three simple steps:
     /// 1) Load the new replacement module `C2`.
     /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C2`.
     /// 3) Remove module `C` and clean it up, e.g., removing its entries from the symbol map.
@@ -357,195 +406,423 @@ impl CrateNamespace {
     /// other crates will be swapped alongside that one -- that responsibility is currently left to the caller.
     pub fn swap_crates(
         &self,
-        swap_pairs: Vec<(StrongCrateRef, &ModuleArea, Option<String>)>,
+        swap_requests: SwapRequestList,
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool,
     ) -> Result<(), &'static str> {
-        // create a new CrateNamespace and load all of the new crate modules into it
-        let new_namespace = {
-            let nn = CrateNamespace::with_name(&format!("temp_swap--{:?}", swap_pairs));
-            let module_iter = swap_pairs.iter().map(|tup| tup.1);
+
+        // debug!("swap_crates() [0]: swap_requests: {:?}", swap_requests);
+
+        // First, before we perform any expensive crate loading, let's try an optimization
+        // based on cached crates that were unloaded during a previous swap operation. 
+        let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
+            // info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+            (cached_crates, true)
+        } else {
+            // If no optimization is possible (no cached crates exist for this swap request), 
+            // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
+            let nn = CrateNamespace::with_name(&format!("temp_swap--{:?}", swap_requests));
+            let module_iter = swap_requests.iter().map(|swap_req| swap_req.new_crate_module_area);
             nn.load_kernel_crates(module_iter, Some(self), kernel_mmi, verbose_log)?;
-            nn
+            (nn, false)
         };
 
-        // for (crate_name, crate_ref) in new_namespace.crate_tree.lock().iter() {
-        //     debug!("====================== Loaded new crate \"{}\"  ===========================", crate_name);
-        //     let krate = crate_ref.read();
-        //     krate.text_pages.as_ref().map(|tp|   debug!("    text_pages  : {:#X} ({} pages)", tp.start_address(), tp.size_in_pages()));
-        //     krate.rodata_pages.as_ref().map(|rp| debug!("    rodata_pages: {:#X} ({} pages)", rp.start_address(), rp.size_in_pages()));
-        //     krate.data_pages.as_ref().map(|dp|   debug!("    data_pages  : {:#X} ({} pages)\n\n", dp.start_address(), dp.size_in_pages()));
-        // }
+        let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
+        let cached_crates: CrateNamespace = CrateNamespace::new();
+
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to remove all of the old crates
         // and fix up all of the relocations `WeakDependents` for each of the existing sections
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
-        for (old_crate_ref, new_module, override_new_crate_name) in swap_pairs {
+        for req in swap_requests {
+            let SwapRequest { old_crate_name, new_crate_module_area, new_crate_name } = req;
+            let old_crate_ref = self.get_crate(&old_crate_name).ok_or_else(|| {
+                error!("swap_crates(): couldn't find requested old_crate {:?}", old_crate_name);
+                "swap_crates(): couldn't find requested old crate"
+            })?;
             let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
                 error!("TODO FIXME: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exlusive mutable instance", old_crate_ref);
                 "TODO FIXME: swap_crates() doesn't yet support deep copying shared crates to get a new exlusive mutable instance"
             })?;
-            let (_new_crate_type, new_crate_name) = CrateType::from_module_name(new_module.name())?;
-            debug!("trying to get_crate({})", new_crate_name);
-            debug!("new_namespace crates: {:?}", &*new_namespace.crate_tree.lock());
-            let new_crate_ref = new_namespace.get_crate(new_crate_name)
-                .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?;
-            let mut new_crate = new_crate_ref.lock_as_mut()
-                .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
 
-            // if requested, override the new crate's name and section prefixes and symbol prefixes
-            let new_crate_name = if let Some(override_name) = override_new_crate_name {
-                debug!("Overriding new crate name \"{}\" with \"{}\"", new_crate_name, override_name);
-                for new_sec_ref in new_crate.sections.values() {
-                    let mut new_sec = new_sec_ref.lock();
-                    // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
-                    if let Some(new_name) = replace_containing_crate_name(&new_sec.name, &new_crate.crate_name, &override_name) {
-                        debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
-                        if new_sec.global {
-                            new_namespace.replace_symbol_key(&new_sec.name, &new_name)?;
-                        }
-                        new_sec.name = new_name;
-                    }
-                }
-                new_crate.crate_name = override_name.clone();
-                override_name
+            let new_crate_ref = if is_optimized {
+                // debug!("trying to get cached crate {:?}", new_crate_name);
+                namespace_of_new_crates.get_crate(&new_crate_name)
+                    .ok_or_else(|| "BUG: swap_crates(): Couldn't get new crate from cache")?
             } else {
-                // if no override name was supplied, then the new crate's name is derived from its module name.
-                new_crate_name.to_string()
+                let (_new_crate_type, new_crate_derived_name) = CrateType::from_module_name(new_crate_module_area.name())?;
+                // debug!("trying to get newly-loaded crate {:?} from temp namespace", new_crate_derived_name);
+                let new_crate_ref = namespace_of_new_crates.get_crate(new_crate_derived_name)
+                    .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?;
+                
+                // scoped to release new_crate lock
+                {
+                    let mut new_crate = new_crate_ref.lock_as_mut()
+                        .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
+
+                    // If requested, override the new crate's name and section prefixes and symbol prefixes.
+                    // Note that we don't need to do this if optimized, 
+                    // because the section names in the cached crate would have already been overridden when it was first loaded.
+                    if new_crate_derived_name != new_crate_name {
+                        debug!("Overriding new crate name, original {:?} to new {:?}", new_crate_derived_name, new_crate_name);
+                        for new_sec_ref in new_crate.sections.values() {
+                            let mut new_sec = new_sec_ref.lock();
+                            // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
+                            if let Some(new_name) = replace_containing_crate_name(&new_sec.name, &new_crate_derived_name, &new_crate_name) {
+                                debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
+                                if new_sec.global {
+                                    namespace_of_new_crates.replace_symbol_key(&new_sec.name, &new_name)?;
+                                }
+                                new_sec.name = new_name;
+                            }
+                        }
+                        new_crate.crate_name = new_crate_name.clone();
+                    } else {
+                        // if new_crate_name was the same as the name derived from the new crate's module, 
+                        // then there is no override action being requested, and we have nothing to do. 
+                    }
+                } // release new_crate lock
+
+                new_crate_ref
             };
 
-            debug!("====================== Replacing old_crate \"{}\"  ===========================", old_crate.crate_name);
+            {
+                let mut new_crate = new_crate_ref.lock_as_mut()
+                    .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;           
 
-            
-            // debug!("  Dependent crates:");
-            // dump_dependent_crates(&*old_crate, String::from("    "));
-            // for sec_ref in &old_crate.sections {
-            //     let sec = sec_ref.lock();
-            //     if false {
-            //         if !sec.sections_i_depend_on.is_empty() {
-            //             debug!("  Section \"{}\": sections i depend on (strong dependencies):", sec.name);
-            //             for strong_dep in &sec.sections_i_depend_on {
-            //                 debug!("        {}", strong_dep.section.lock().name);
-            //             }
-            //         }
-            //     }
-            //     if true {
-            //         if !sec.sections_dependent_on_me.is_empty() {
-            //             let prefix = String::from("  ");
-            //             dump_weak_dependents(&*sec, prefix.clone())
-            //         }
-            //     }
-            // }
 
-            debug!("Rewriting relocation dependencies for {} -> {}", old_crate.crate_name, new_crate_name);
+                // debug!("====================== Replacing old_crate \"{}\"  ===========================", old_crate.crate_name);
+                // debug!("  Dependent crates:");
+                // dump_dependent_crates(&*old_crate, String::from("    "));
+                // for sec_ref in &old_crate.sections {
+                //     let sec = sec_ref.lock();
+                //     if false {
+                //         if !sec.sections_i_depend_on.is_empty() {
+                //             debug!("  Section \"{}\": sections i depend on (strong dependencies):", sec.name);
+                //             for strong_dep in &sec.sections_i_depend_on {
+                //                 debug!("        {}", strong_dep.section.lock().name);
+                //             }
+                //         }
+                //     }
+                //     if true {
+                //         if !sec.sections_dependent_on_me.is_empty() {
+                //             let prefix = String::from("  ");
+                //             dump_weak_dependents(&*sec, prefix.clone())
+                //         }
+                //     }
+                // }
 
-            // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
-            // and replace them by rewriting their relocation entries to point to that section in the new_crate.
-            // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
-            for old_sec_ref in old_crate.sections.values() {
 
-                let mut old_sec = old_sec_ref.lock();
-                for weak_dep in &old_sec.sections_dependent_on_me {
-                    let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
-                    let relocation_entry = weak_dep.relocation;
 
-                    // Use the new namespace to find the new source_sec that old target_sec should point to.
-                    // The new source_sec must have the same name as the old one (old_sec here),
-                    // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
-                    // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
-                    // if not, the swapping action was never going to work and we shouldn't go through with it
-                    let source_sec_ref = new_namespace.get_symbol(&old_sec.name).upgrade().ok_or_else(|| 
-                        "couldn't find replacement source section in new namespace that the target section needs to point to, perhaps the target section must also be swapped?"
-                    )?;
-                    let mut source_sec = source_sec_ref.lock();
+                // debug!("Rewriting relocation dependencies for {:?} -> {:?} ({:?})", old_crate.crate_name, new_crate_name, new_crate_module_area.name());
 
-                    // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
-                    // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
-                    let mut target_sec = target_sec_ref.lock();
-                    {
-                        let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
-                        let target_sec_initial_flags = target_sec_mapped_pages.flags();
-                        if !target_sec_initial_flags.is_writable() {
-                            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                                target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
+                // and replace them by rewriting their relocation entries to point to that section in the new_crate.
+                // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
+                for old_sec_ref in old_crate.sections.values() {
+
+                    let mut old_sec = old_sec_ref.lock();
+                    for weak_dep in &old_sec.sections_dependent_on_me {
+                        let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+                        let mut target_sec = target_sec_ref.lock();
+                        let relocation_entry = weak_dep.relocation;
+
+                        // Use the new namespace to find the new source_sec that old target_sec should point to.
+                        // The new source_sec must have the same name as the old one (old_sec here),
+                        // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
+                        // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
+                        // if not, the swapping action was never going to work and we shouldn't go through with it
+                        let source_sec_ref = namespace_of_new_crates.get_symbol(&old_sec.name).upgrade().ok_or_else(|| {
+                            error!("swap_crates(): couldn't find replacement source section {:?} in new namespace that the target section {:?} needs to point to. Perhaps the target section's crate must also be swapped",
+                                old_sec.name, target_sec.name);
+                            "couldn't find replacement source section in new namespace that the target section needs to point to, perhaps the target section must also be swapped?"
+                        })?;
+                        let mut source_sec = source_sec_ref.lock();
+
+                        // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+                        // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+                        {
+                            let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                            let target_sec_initial_flags = target_sec_mapped_pages.flags();
+                            if !target_sec_initial_flags.is_writable() {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                    target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                                }
+                                else {
+                                    return Err("couldn't get kernel's active page table");
+                                }
                             }
-                            else {
-                                return Err("couldn't get kernel's active page table");
-                            }
+
+                            write_relocation(
+                                relocation_entry, 
+                                &mut target_sec_mapped_pages, 
+                                target_sec.mapped_pages_offset, 
+                                source_sec.virt_addr(), 
+                                verbose_log
+                            )?;
+
+                            // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+                            if !target_sec_initial_flags.is_writable() {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                    target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                                }
+                                else {
+                                    return Err("couldn't get kernel's active page table");
+                                }
+                            };
                         }
 
-                        write_relocation(
-                            relocation_entry, 
-                            &mut target_sec_mapped_pages, 
-                            target_sec.mapped_pages_offset, 
-                            source_sec.virt_addr(), 
-                            true || verbose_log
-                        )?;
+                        
+                        // Tell the new source_sec that the existing target_sec depends on it.
+                        // Note that we don't need to do this if we're re-swapping in a cached crate,
+                        // because that crate's sections' dependents are already properly set up from when it was first swapped in.
+                        if !is_optimized {
+                            source_sec.sections_dependent_on_me.push(WeakDependent {
+                                section: Arc::downgrade(&target_sec_ref),
+                                relocation: relocation_entry,
+                            });
+                        }
 
-                        // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
-                        if !target_sec_initial_flags.is_writable() {
-                            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                                target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                        // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
+                        // and that it now depends on the new source_sec.
+                        let mut found_strong_dependency = false;
+                        for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
+                            if Arc::ptr_eq(&old_sec_ref, &strong_dep.section) {
+                                strong_dep.section = Arc::clone(&source_sec_ref);
+                                strong_dep.relocation = relocation_entry;
+                                found_strong_dependency = true;
                             }
-                            else {
-                                return Err("couldn't get kernel's active page table");
-                            }
-                        };
+                        }
+                        if !found_strong_dependency {
+                            return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
+                        }
                     }
 
-                    // Tell the old source_sec that it no longer has the existing target_sec as a dependent
-                        // this is performed all at once at the end of this loop: we clear the whole old_sec.sections_dependent_on_me
-                    // Tell the new source_sec that the existing target_sec depends on it.
-                    source_sec.sections_dependent_on_me.push(WeakDependent {
-                        section: Arc::downgrade(&target_sec_ref),
-                        relocation: relocation_entry,
-                    });
-
-                    // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
-                    // and that it now depends on the new source_sec.
-                    let index = target_sec.find_strong_dependency(&old_sec_ref)
-                        .ok_or("Couldn't find/remove the target_sec's StrongDependency on the old crate section")?;
-                    target_sec.sections_i_depend_on.remove(index);
-                    target_sec.sections_i_depend_on.push(StrongDependency {
-                        section: Arc::clone(&source_sec_ref),
-                        relocation: relocation_entry,
-                    });      
+                
+                    // Currently we just copy over the old_sec into the new source_sec,
+                    // if they represent a static variable (state spill that would otherwise result in a loss of data).
+                    // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
+                    if old_sec.typ == SectionType::Bss {
+                        let new_dest_sec = new_crate.find_section(|sec| sec.name == old_sec.name).ok_or_else(|| 
+                            "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
+                        )?;
+                        old_sec.copy_section_data_to(&mut new_dest_sec.lock())?;
+                    }
+                }
+                
+                // Remove the old crate from this namespace, and remove its sections' symbols too
+                self.remove_symbols(old_crate.sections.values(), verbose_log);
+                if let Some(removed_old_crate) = self.crate_tree.lock().remove(&old_crate.crate_name) {
+                    // info!("  Removed old crate {}", old_crate.crate_name);
+                    // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                    // This removed old crate will be useful when a future swap request includes the following:
+                    // (1) the current `old_crate.object_file` == the future `new_crate_module_area`
+                    // (2) the current `old_crate.crate_name`  == the future crate_name from the `override_new_crate_name`/`new_crate_module_area`.
+                    // (3) the current `new_crate_name`        == the future `old_crate_name`
+                    //     -- to ensure that in the future, we won't use a cached crate to replace a crate different from what we originally replaced
+                    let future_swap_req = SwapRequest::new(new_crate_name.clone(), old_crate.object_file, old_crate_name);
+                    future_swap_requests.push(future_swap_req);
+                    
+                    // Here, `old_crate` and `removed_old_crate` are the same, but `old_crate` is already locked, 
+                    // so we used that instead of trying to lock `removed_old_crate` again, because it'd cause deadlock.
+                    cached_crates.add_symbols(old_crate.sections.values(), verbose_log);
+                    cached_crates.crate_tree.lock().insert(old_crate.crate_name.clone(), removed_old_crate);
+                }
+                else {
+                    error!("  Failed to remove old crate {}", old_crate.crate_name);
                 }
 
-                // As described in the above loop, we must tell the old section (the one we're replacing)
-                // that no other sections rely on it. 
-                old_sec.sections_dependent_on_me.clear();
-            
-                // Currently we are just copying over the old_sec into the new source_sec,
-                // if they represent a static variable (state spill that would otherwise result in a loss of data).
-                // Currently, static variables (states) are only .bss sections
-                if old_sec.typ == SectionType::Bss {
-                    let new_dest_sec = new_crate.find_section(|sec| sec.name == old_sec.name).ok_or_else(|| 
-                        "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
-                    )?;
-                    old_sec.copy_section_data_to(&mut new_dest_sec.lock())?;
-                }
-            }
-            
-            // remove the old crate from this namespace, and remove its sections' symbols too
-            self.remove_symbols(old_crate.sections.values(), true);
-            if self.crate_tree.lock().remove(&old_crate.crate_name).is_some() {
-                info!("  Removed old crate {}", old_crate.crate_name);
-            }
+                // add the new crate and its sections' symbols to this namespace
+                self.add_symbols(new_crate.sections.values(), verbose_log);
+            } // end of scope, drops lock on new_crate
 
-            // add the new crate and its sections' symbols to this namespace
-            self.add_symbols(new_crate.sections.values(), verbose_log);
-            self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone());
-            // Although we used a shared CowArc above, it will go back to being exclusive after this function
-            // because the `new_namespace` will be dropped.
+            self.crate_tree.lock().insert(new_crate_name, new_crate_ref);
         }
 
+        // debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+        //     future_swap_requests, cached_crates.crate_names());
+        self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         Ok(())
-
-        // here, "new_namespace is dropped, but its crates have already been added to the current namespace 
+        // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
     }
+
+
+
+    // /// Implements an optimized swapping routine that uses this namespace's cache of previously-unloaded crates
+    // /// to swap them back in, rather than re-loading them from scratch. 
+    // /// 
+    // /// This shouldn't be called directly, but is for internal use from within the `swap_crates()` method.
+    // fn optimized_swap(
+    //     &self, 
+    //     swap_requests: SwapRequestList, 
+    //     cached_crates: UnloadedCrateSet, 
+    //     kernel_mmi: &mut MemoryManagementInfo,
+    //     verbose_log: bool
+    // ) -> Result<(), &'static str> {
+
+    //     if swap_requests.len() != cached_crates.len() {
+    //         return Err("BUG: the number of cached_crates did not match the number of swap requests.");
+    //     }
+
+    //     let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
+    //     let mut cached_crates: UnloadedCrateSet = UnloadedCrateSet::new();
+
+
+    //     for (swap_request, new_crate_cached) in swap_requests.iter().zip(cached_crates.into_iter()) {
+    //         debug!("optimized_swap(): swap_request: {:?}, new_crate_cached: {:?}", swap_request, new_crate_cached);
+    //         let SwapRequest { old_crate_name, new_crate_name, .. } = swap_request;
+
+    //         // sanity check: the cached new crate should have the same name as the one requested in the swap request
+    //         if new_crate_name != &new_crate_cached.lock_as_ref().crate_name {
+    //             return Err("BUG: optimized_swap(): requested new crate name didn't match cached new crate name");
+    //         }
+            
+    //         // get the old_crate, which will be replaced by the new cached crate
+    //         let old_crate_ref = self.get_crate(&old_crate_name).ok_or_else(|| {
+    //             error!("optimized_swap(): couldn't find requested old_crate {:?}", old_crate_name);
+    //             "optimized_swap(): couldn't find requested old crate"
+    //         })?;
+    //         let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
+    //             error!("TODO FIXME: optimized_swap(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exlusive mutable instance", old_crate_ref);
+    //             "TODO FIXME: optimized_swap() doesn't yet support deep copying shared crates to get a new exlusive mutable instance"
+    //         })?;
+
+
+    //         debug!("Rewriting relocation dependencies for {} -> {}", old_crate.crate_name, new_crate_name);
+    //         {
+    //             let new_crate = new_crate_cached.lock_as_ref();
+
+    //             // Here, the contents of the new_crate *itself* are already fully correct (since it was cached), including its overridden name.
+    //             // However, all of the sections in foreign crates that depend upon it must be fixed up again,
+    //             // and redirected to "point" to the new_crate's sections, because they currently point to the old_crate's sections.
+    //             //
+    //             // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
+    //             for new_sec_ref in new_crate.sections.values() {
+    //                 let mut new_sec = new_sec_ref.lock();
+    //                 let mut old_sec_ref: Option<StrongSectionRef> = None;
+
+    //                 for weak_dep in &new_sec.sections_dependent_on_me {
+
+    //                     let relocation_entry = weak_dep.relocation;
+    //                     let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+    //                     let mut target_sec = target_sec_ref.lock();
+
+    //                     debug!("optimized_swap(): Rewriting dependency to target section {:?} -> source section {:?}",
+    //                         target_sec.name, new_sec.name);
+
+    //                     // With a cached new_crate, we know that the current new_sec is indeed the source_sec (no need to search for it)
+    //                     // because we got the target_sec directly from the new_sec's dependents.
+    //                     // Thus, we use `new_sec` below instead of `source_sec` (they're the same).
+
+
+    //                     // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+    //                     // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+    //                     {
+    //                         let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+    //                         let target_sec_initial_flags = target_sec_mapped_pages.flags();
+    //                         if !target_sec_initial_flags.is_writable() {
+    //                             if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+    //                                 target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+    //                             }
+    //                             else {
+    //                                 return Err("couldn't get kernel's active page table");
+    //                             }
+    //                         }
+
+    //                         write_relocation(
+    //                             relocation_entry, 
+    //                             &mut target_sec_mapped_pages, 
+    //                             target_sec.mapped_pages_offset, 
+    //                             new_sec.virt_addr(), 
+    //                             true || verbose_log
+    //                         )?;
+
+    //                         // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+    //                         if !target_sec_initial_flags.is_writable() {
+    //                             if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+    //                                 target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+    //                             }
+    //                             else {
+    //                                 return Err("couldn't get kernel's active page table");
+    //                             }
+    //                         };
+    //                     }
+
+                        
+    //                     // The new_sec/source_sec already knows that the target_sec depends upon it,
+    //                     // so we don't need to change the source_sec's `sections_depenedent_on_me` list. 
+
+    //                     // Tell the existing target_sec that it now (once again) depends on the source_sec (new_sec).
+    //                     let mut found = false;
+    //                     for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
+    //                         if old_sec_ref.is_none() {
+    //                             old_sec_ref = old_crate.find_section(|sec| sec.name == new_sec.name);
+    //                         }
+    //                         if let Some(ref old_sec_ref) = old_sec_ref {
+    //                             if Arc::ptr_eq(old_sec_ref, &strong_dep.section) {
+    //                                 // relocation entry is unchanged, only the section should be redirected
+    //                                 strong_dep.section = Arc::clone(&new_sec_ref);
+    //                                 found = true;
+    //                             }
+    //                         } else {
+    //                             error!("BUG: optimized_swap(): couldn't find corresponding old section for the new section {:?}", new_sec.name);
+    //                             return Err("BUG: optimized_swap(): couldn't find corresponding old section for the new section");
+    //                         }
+    //                     }
+    //                     if !found {
+    //                         return Err("Couldn't find/edit the target_sec's StrongDependency on the old crate section");
+    //                     }
+    //                 }
+                
+    //                 // Currently we just copy over the old_sec into the new source_sec,
+    //                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
+    //                 // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
+    //                 if new_sec.typ == SectionType::Bss {
+    //                     if old_sec_ref.is_none() {
+    //                         old_sec_ref = old_crate.find_section(|sec| sec.name == new_sec.name);
+    //                     }
+    //                     if let Some(ref old_sec_ref) = old_sec_ref {
+    //                         old_sec_ref.lock().copy_section_data_to(&mut new_sec)?;
+                            
+    //                     } else {
+    //                         error!("BUG: optimized_swap(): couldn't find corresponding old section for the new section {:?}", new_sec.name);
+    //                         return Err("BUG: optimized_swap(): couldn't find corresponding old section for the new section");
+    //                     }
+    //                 }
+    //             }
+                
+    //             // Remove the old crate from this namespace, and remove its sections' symbols too
+    //             self.remove_symbols(old_crate.sections.values(), true);
+    //             if let Some(removed_old_crate) = self.crate_tree.lock().remove(&old_crate.crate_name) {
+    //                 info!("  Removed old crate {:?}", &*old_crate);
+    //                 // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+    //                 // This removed old crate will be useful when a future swap request includes the following:
+    //                 // (1) the current `old_crate.object_file` == the future `new_crate_module_area`
+    //                 // (2) the current `old_crate.crate_name`  == the future crate_name from the `override_new_crate_name`/`new_crate_module_area`.
+    //                 // (3) the current `new_crate_name`        == the future `old_crate_name`
+    //                 //     -- to ensure that in the future, we won't use a cached crate to replace a crate different from what we originally replaced
+    //                 cached_crates.push(removed_old_crate);
+    //                 let future_swap_req = SwapRequest::new(new_crate_name.clone(), old_crate.object_file, old_crate_name.to_string());
+    //                 future_swap_requests.push(future_swap_req);
+    //             }
+    //             else {
+    //                 error!("  Failed to remove old crate {}", old_crate.crate_name);
+    //             }
+
+    //             // add the new crate and its sections' symbols to this namespace
+    //             self.add_symbols(new_crate.sections.values(), verbose_log);
+    //         } // end of scope, drops lock on new_crate_cached
+            
+    //         self.crate_tree.lock().insert(new_crate_name.to_string(), new_crate_cached);
+    //     }
+
+    //     debug!("optimized_swap() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+    //         future_swap_requests, cached_crates);
+    //     self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
+    //     Ok(())
+    // }
 
 
 
@@ -563,6 +840,7 @@ impl CrateNamespace {
     fn load_crate_sections<'e>(
         &self,
         mapped_pages: &'e MappedPages, 
+        object_file: &'static ModuleArea,
         size_in_bytes: usize, 
         crate_name: &str, 
         kernel_mmi: &mut MemoryManagementInfo,
@@ -638,6 +916,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:   String::from(crate_name),
+            object_file:  object_file,
             sections:     BTreeMap::new(),
             text_pages:   text_pages  .as_ref().map(|r| Arc::clone(r)),
             rodata_pages: rodata_pages.as_ref().map(|r| Arc::clone(r)),
