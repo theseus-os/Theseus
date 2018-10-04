@@ -24,6 +24,7 @@ extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
+extern crate hashmap_core;
 
 mod area_frame_allocator;
 mod paging;
@@ -39,9 +40,10 @@ use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
-use alloc::{Vec, String};
+use alloc::{Vec, String, boxed::Box};
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
+use hashmap_core::HashMap;
 
 
 pub type PhysicalAddress = usize;
@@ -75,8 +77,10 @@ pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
 }
 
 
-/// A copy of the set of modules loaded by the bootloader
-static MODULE_AREAS: Once<Vec<ModuleArea>> = Once::new();
+/// A copy of the set of modules loaded by the bootloader. 
+/// Note that here we use `Once` instead of `lazy_static`, because we need to ensure that 
+/// the enclosed collection (HashMap) is NOT allocated until virtual memory and the heap is setup.
+static MODULE_AREAS: Once<HashMap<String, ModuleArea>> = Once::new();
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -188,9 +192,9 @@ impl PhysicalMemoryArea {
 //     }
 // }
 
-/// An area of physical memory that contains a userspace module
-/// as provided by the multiboot2-compliant bootloader
-#[derive(Clone, Default)]
+/// An area of physical memory that contains a file that the bootloader 
+/// (e.g., GRUB) loaded from the OS image.
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleArea {
     mod_start_paddr: u32,
     mod_end_paddr: u32,
@@ -219,10 +223,13 @@ impl ModuleArea {
 
 
 /// Returns an iterator over all of the [`ModuleArea`](struct.ModuleArea.html)s that exist.
-pub fn module_iterator() -> impl Iterator<Item = &'static ModuleArea> {
-    MODULE_AREAS.try().map(|modules| modules.iter()).unwrap_or([].iter())
+pub fn module_iterator() -> Box<Iterator<Item = &'static ModuleArea>> {
+    if let Some(modules) = MODULE_AREAS.try() {
+        Box::new(modules.values())
+    } else {
+        Box::new(core::iter::empty())
+    }
 }
-
 
 
 /// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
@@ -450,7 +457,7 @@ pub fn init(boot_info: BootInformation)
 
     MODULE_AREAS.call_once( || {
         // parse the list of multiboot modules 
-        let mut modules: Vec<ModuleArea> = Vec::new();
+        let mut modules: HashMap<String, ModuleArea> = HashMap::new();
         for m in boot_info.module_tags() {
             let mod_area = ModuleArea {
                 mod_start_paddr: m.start_address().clone(), 
@@ -459,10 +466,10 @@ pub fn init(boot_info: BootInformation)
             };
             // print_early!("ModuleArea: {:?}\n", mod_area);
             info!("ModuleArea: {:?}", mod_area);
-            modules.push(mod_area);
+            modules.insert(mod_area.name.clone(), mod_area);
         }
         modules
-    });   
+    });
     debug!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try());
     
     // init the kernel stack allocator, a singleton
@@ -489,18 +496,10 @@ pub fn init(boot_info: BootInformation)
 }
 
 
-/// returns the `ModuleArea` corresponding to the given `index`
-pub fn get_module_index(index: usize) -> Option<&'static ModuleArea> {
-    debug!("get_module_index(): looking for module at index {}", index);
-    MODULE_AREAS.try().and_then(|modules| modules.get(index))
-}
-
 
 /// returns the `ModuleArea` corresponding to the given module name.
 pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    debug!("get_module(): looking for module {}", name);
-    // debug!("get_module(): modules: {:?}", MODULE_AREAS.try().unwrap());
-    MODULE_AREAS.try().and_then(|modules| modules.iter().filter(|&m| m.name == name).next())
+    MODULE_AREAS.try().and_then(|modules| modules.get(name))
 }
 
 
