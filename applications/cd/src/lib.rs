@@ -26,11 +26,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
     
-    if matches.free.is_empty() {
-        // navigate to root directory
-    } else {
-        // navigate to the first directory passed in as arguments
-        let target_dirname = &matches.free[0];
+    if !matches.free.is_empty() {
         let taskref = match task::get_my_current_task() {
             Some(t) => t,
             None => {
@@ -38,18 +34,39 @@ pub fn main(args: Vec<String>) -> isize {
                 return -1;
             }
         };
+
+        // navigate to the filepath specified by first argument
+        let path: Vec<String> = matches.free[0].split("/").map(|s| s.to_string()).collect();
         let locked_task = taskref.lock();
-        match locked_task.env.lock().set_chdir_as_wd(target_dirname.to_string()) {
-                Ok(()) => {
-                    return 0;
-                }, 
-                Err(_f) => {
-                 println!("{}", _f);
-                 return -1;
-                }
-            };
+        let mut curr_env = locked_task.env.lock();
+        let mut new_wd = Arc::clone(&curr_env.working_dir);
+        for dirname in path.iter() {
+            // navigate to parent directory
+            if dirname == ".." {
+                let dir = match new_wd.lock().get_parent_dir() {
+                    Some(dir) => dir,
+                    None => {
+                        print!("directory does not exist \n");
+                        return -1;
+                    }
+                };
+                new_wd = dir;
+            }
+            // navigate to child directory
+            else {
+                let dir = match new_wd.lock().get_child_dir(dirname.to_string()) {
+                    Some(dir) => dir,
+                    None => {
+                        print!("directory does not exist \n");
+                        return -1;
+                    }
+                };
+                new_wd = dir;
+            }
+        }
+        curr_env.set_wd(new_wd);
     }
-    return -1;    
+    return 0;    
 }
 
 fn print_usage(opts: Options) {

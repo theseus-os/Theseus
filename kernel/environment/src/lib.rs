@@ -8,30 +8,22 @@ use alloc::String;
 use alloc::arc::Arc;
 use vfs::StrongDirRef;
 
+/// A structure that contains Environmnt variables for a given task
 pub struct Environment {
-    pub working_dir: StrongDirRef
+    /// The working directory for given tasks
+    pub working_dir: StrongDirRef, 
 }
 
 impl Environment {
+    /// Gets the absolute file path of the working directory
     pub fn get_wd_path(&self) -> String {
         let wd = self.working_dir.lock();
-        wd.get_basename().clone()
+        wd.get_path()
     }
 
     /// Sets working directory
     pub fn set_wd(&mut self, new_dir: StrongDirRef) {
         self.working_dir = Arc::clone(&new_dir);
     }
-    
-    /// Looks for the child directory specified by dirname and sets it as the current directory
-    pub fn set_chdir_as_wd(&mut self, dirname: String) -> Result<(), &'static str> {
-        let wd = match self.working_dir.lock().get_child_dir(dirname).clone() {
-            Some(dir) => dir,
-            None => {
-                return Err("no such directory");
-            }
-        };
-        self.working_dir = wd;
-        return Ok(());
-    }
+
 }
