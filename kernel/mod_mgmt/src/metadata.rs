@@ -407,7 +407,6 @@ pub enum SectionType {
 /// Represents a .text, .rodata, .data, or .bss section
 /// that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
-#[derive(Debug)]
 pub struct LoadedSection {
     /// The type of this section: .text, .rodata, .data, or .bss.
     pub typ: SectionType,
@@ -549,6 +548,12 @@ impl LoadedSection {
                 self.name, self.size, destination_section.name, destination_section.size);
             Err("this source section has a different length than the destination section")
         }
+    }
+}
+
+impl fmt::Debug for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LoadedSection(name: {:?})", self.name)
     }
 }
 
