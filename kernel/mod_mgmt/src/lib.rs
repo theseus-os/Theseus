@@ -466,12 +466,11 @@ impl CrateNamespace {
                     // Note that we don't need to do this if optimized, 
                     // because the section names in the cached crate would have already been overridden when it was first loaded.
                     if new_crate_derived_name != new_crate_name {
-                        debug!("Overriding new crate name, original {:?} to new {:?}", new_crate_derived_name, new_crate_name);
+                        // debug!("Overriding new crate name, original {:?} to new {:?}", new_crate_derived_name, new_crate_name);
                         for new_sec_ref in new_crate.sections.values() {
                             let mut new_sec = new_sec_ref.lock();
-                            // debug!("  Looking at {:?} section \"{}#{:?}\" (global: {})", new_sec.typ, new_sec.name, new_sec.hash, new_sec.global);
                             if let Some(new_name) = replace_containing_crate_name(&new_sec.name, &new_crate_derived_name, &new_crate_name) {
-                                debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
+                                // debug!("    Overriding new section name: \"{}\" --> \"{}\"", new_sec.name, new_name);
                                 if new_sec.global {
                                     namespace_of_new_crates.replace_symbol_key(&new_sec.name, &new_name)?;
                                 }
@@ -589,13 +588,15 @@ impl CrateNamespace {
                         // and that it now depends on the new source_sec.
                         let mut found_strong_dependency = false;
                         for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
-                            if Arc::ptr_eq(&old_sec_ref, &strong_dep.section) {
+                            if Arc::ptr_eq(&strong_dep.section, &old_sec_ref) && strong_dep.relocation == relocation_entry {
                                 strong_dep.section = Arc::clone(&source_sec_ref);
-                                strong_dep.relocation = relocation_entry;
                                 found_strong_dependency = true;
+                                break;
                             }
                         }
                         if !found_strong_dependency {
+                            error!("Couldn't find/remove the existing StrongDependency from target_sec {:?} to old_sec {:?}",
+                                target_sec.name, old_sec.name);
                             return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
                         }
                     }
