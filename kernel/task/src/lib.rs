@@ -293,7 +293,7 @@ impl Task {
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
-    /// and returns it so it can be invoked without holding this `Task`'s `RwLock`.
+    /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
     /// After invoking this, the `Task`'s `panic_handler` will be `None`.
     pub fn take_panic_handler(&mut self) -> Option<PanicHandler> {
         self.panic_handler.take()
@@ -638,7 +638,7 @@ impl TaskRef {
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
-    /// and returns it so it can be invoked without holding this `Task`'s `RwLock`.
+    /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
     /// After invoking this, the `Task`'s `panic_handler` will be `None`.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
