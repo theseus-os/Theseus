@@ -123,7 +123,6 @@ impl Mapper {
 
 
     /// the internal function that actually does the mapping, if frames were NOT provided.
-    #[inline(always)]
     fn internal_map<A>(&mut self, pages: PageIter, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
@@ -157,7 +156,6 @@ impl Mapper {
     }
 
     /// the internal function that actually does all of the mapping from pages to frames.
-    #[inline(always)]
     fn internal_map_to<A>(&mut self, pages: PageIter, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
