@@ -25,10 +25,10 @@ use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
 use alloc::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
-use spin::{RwLock, Once};
+use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
-use irq_safety::hold_interrupts;
+use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
@@ -47,7 +47,7 @@ pub enum InterruptChip {
 
 
 lazy_static! {
-    static ref LOCAL_APICS: AtomicMap<u8, RwLock<LocalApic>> = AtomicMap::new();
+    static ref LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 }
 
 static APIC_REGS: Once<BoxRef<MappedPages, ApicRegisters>> = Once::new();
@@ -75,7 +75,7 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core
-pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<u8, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
@@ -102,7 +102,7 @@ pub fn get_my_apic_id() -> Option<u8> {
 
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
-pub fn get_my_apic() -> Option<&'static RwLock<LocalApic>> {
+pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
     get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
 }
 
@@ -736,8 +736,8 @@ pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 lazy_static! {
     /// The virtual addresses used for TLB shootdown IPIs
-    pub static ref TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES: RwLock<Vec<VirtualAddress>> = 
-        RwLock::new(Vec::new());
+    pub static ref TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES: RwLockIrqSafe<Vec<VirtualAddress>> = 
+        RwLockIrqSafe::new(Vec::new());
 }
 
 
@@ -746,6 +746,7 @@ lazy_static! {
 /// which will invoke it as needed (on remap/unmap operations).
 pub fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
     if let Some(my_lapic) = get_my_apic() {
+        // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
         my_lapic.write().send_tlb_shootdown_ipi(virtual_addresses);
     }
 }
@@ -756,7 +757,7 @@ pub fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
 /// DO not invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
     // let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs {:?}", apic_id, virtual_addresses);
+    // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs: {:?}", apic_id, virtual_addresses);
 
     for vaddr in virtual_addresses {
         x86_64::instructions::tlb::flush(x86_64::VirtualAddress(*vaddr));

@@ -123,6 +123,7 @@ impl Mapper {
 
 
     /// the internal function that actually does the mapping, if frames were NOT provided.
+    #[inline(always)]
     fn internal_map<A>(&mut self, pages: PageIter, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
@@ -156,6 +157,7 @@ impl Mapper {
     }
 
     /// the internal function that actually does all of the mapping from pages to frames.
+    #[inline(always)]
     fn internal_map_to<A>(&mut self, pages: PageIter, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
@@ -472,7 +474,7 @@ impl MappedPages {
     /// 
     /// Returns a new `MappedPages` object with the same in-memory contents
     /// as this object, but at a completely new memory region.
-    pub fn deep_copy<A: FrameAllocator>(&self, new_flags: Option<EntryFlags>, active_table: &mut ActivePageTable, allocator: &mut A) -> Result<MappedPages, &'static str> {
+    pub fn deep_copy<A: FrameAllocator>(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper, allocator: &mut A) -> Result<MappedPages, &'static str> {
         let size_in_pages = self.size_in_pages();
 
         use paging::allocate_pages;
@@ -481,7 +483,7 @@ impl MappedPages {
         // we must temporarily map the new pages as Writable, since we're about to copy data into them
         let new_flags = new_flags.unwrap_or(self.flags);
         let needs_remapping = new_flags.is_writable(); 
-        let mut new_mapped_pages = active_table.map_allocated_pages(
+        let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
             new_pages, 
             new_flags | EntryFlags::WRITABLE, // force writable
             allocator
@@ -496,7 +498,7 @@ impl MappedPages {
         }
 
         if needs_remapping {
-            new_mapped_pages.remap(active_table, new_flags)?;
+            new_mapped_pages.remap(active_table_mapper, new_flags)?;
         }
         
         Ok(new_mapped_pages)
@@ -504,7 +506,7 @@ impl MappedPages {
 
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
-    pub fn remap(&mut self, active_table: &mut ActivePageTable, new_flags: EntryFlags) -> Result<(), &'static str> {
+    pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if new_flags == self.flags {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
@@ -518,7 +520,7 @@ impl MappedPages {
         };
 
         for page in self.pages.clone() {
-            let p1 = try!(active_table.p4_mut()
+            let p1 = try!(active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
@@ -546,7 +548,7 @@ impl MappedPages {
 
     /// Remove the virtual memory mapping for the given `Page`s.
     /// This is NOT PUBLIC because it should only be invoked when a `MappedPages` object is dropped.
-    fn unmap<A>(&mut self, active_table: &mut ActivePageTable, _allocator: &mut A) -> Result<(), &'static str> 
+    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
         let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
@@ -557,12 +559,12 @@ impl MappedPages {
         };
 
         for page in self.pages.clone() {
-            if active_table.translate_page(page).is_none() {
+            if active_table_mapper.translate_page(page).is_none() {
                 error!("unmap(): page {:?} was not mapped!", page);
                 return Err("unmap(): page was not mapped");
             }
             
-            let p1 = try!(active_table.p4_mut()
+            let p1 = try!(active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
@@ -823,9 +825,9 @@ impl MappedPages {
 impl Drop for MappedPages {
     fn drop(&mut self) {
         // skip logging temp page unmapping, since it's the most common
-        if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
-        }
+        // if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
+        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
+        // }
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
@@ -852,3 +854,4 @@ impl Drop for MappedPages {
         // we do not need to call anything to make that happen
     }
 }
+

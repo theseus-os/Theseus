@@ -4,12 +4,12 @@ use core::sync::atomic::Ordering;
 use core::ptr::{read_volatile, write_volatile};
 use alloc::boxed::Box;
 use alloc::arc::Arc;
-use spin::{Mutex, RwLock};
+use spin::Mutex;
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
-use irq_safety::MutexIrqSafe;
+use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use pit_clock;
 
 use super::sdt::Sdt;
@@ -150,7 +150,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                 
                 // add the BSP lapic to the list (should be empty until here)
                 assert!(all_lapics.iter().next().is_none(), "LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                all_lapics.insert(lapic_entry.apic_id, RwLock::new(bsp_lapic));
+                all_lapics.insert(lapic_entry.apic_id, RwLockIrqSafe::new(bsp_lapic));
 
                 // there's only ever one BSP, so we can exit the loop here
                 break;

@@ -1,0 +1,26 @@
+[package]
+name = "mm_eval"
+version = "0.1.0"
+description = "A application that microbenchmarks various memory mapping implementations"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+cfg-if = "0.1.5"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.acpi]
+path = "../../kernel/acpi"
+
+[dependencies.kernel_config]
+path = "../../kernel/kernel_config"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.terminal_print]
+path = "../terminal_print"
