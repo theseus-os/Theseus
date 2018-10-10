@@ -1,6 +1,6 @@
 use core::ptr::Unique;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-use super::super::{Page, PageIter, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameIter, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE, TEMPORARY_PAGE_VIRT_ADDR};
+use super::super::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
 use super::table::{self, Table, Level4};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -12,6 +12,8 @@ lazy_static! {
     /// The global list of VirtualMemoryAreas 
     static ref VMAS: MutexIrqSafe<Vec<VirtualMemoryArea>> = MutexIrqSafe::new(Vec::new());
 }
+
+const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 
 
 
@@ -129,19 +131,18 @@ impl MapperSpillful {
         };
 
         for page in pages {
-            let p1 = try!(self.p4_mut()
+            let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")
-            );
+                .ok_or("mapping code does not support huge pages")?;
             
             let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
-            if broadcast_tlb_shootdown.is_some() {
+            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
         }
@@ -201,7 +202,7 @@ impl MapperSpillful {
 
             let vaddr = page.start_address();
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
-            if broadcast_tlb_shootdown.is_some() {
+            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
         }

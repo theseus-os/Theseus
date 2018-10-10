@@ -13,7 +13,7 @@ use core::mem;
 use core::slice;
 use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
-use paging::{PageIter, get_current_p4, ActivePageTable};
+use paging::{PageIter, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
@@ -282,7 +282,7 @@ const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 /// while that Mutex's lock is held. 
 #[derive(Debug)]
 pub struct MappedPages {
-    /// The P4 Frame of the ActivePageTable that this MappedPages was originally mapped into. 
+    /// The P4 Frame of the page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
     /// The actual range of pages contained by this mapping
     pages: PageIter,
@@ -520,14 +520,13 @@ impl MappedPages {
         };
 
         for page in self.pages.clone() {
-            let p1 = try!(active_table_mapper.p4_mut()
+            let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")
-            );
+                .ok_or("mapping code does not support huge pages")?;
             
-            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
+            let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
@@ -547,7 +546,7 @@ impl MappedPages {
 
 
     /// Remove the virtual memory mapping for the given `Page`s.
-    /// This is NOT PUBLIC because it should only be invoked when a `MappedPages` object is dropped.
+    /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
     fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
@@ -558,18 +557,12 @@ impl MappedPages {
             Vec::new() // avoids allocation if we're not going to use it
         };
 
-        for page in self.pages.clone() {
-            if active_table_mapper.translate_page(page).is_none() {
-                error!("unmap(): page {:?} was not mapped!", page);
-                return Err("unmap(): page was not mapped");
-            }
-            
-            let p1 = try!(active_table_mapper.p4_mut()
+        for page in self.pages.clone() {            
+            let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")
-            );
+                .ok_or("mapping code does not support huge pages")?;
             
             let _frame = try!(p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped"));
             p1[page.p1_index()].set_unused();
@@ -822,20 +815,37 @@ impl MappedPages {
 }
 
 
+/// A convenience function that exposes the `MappedPages::unmap` function
+/// (which is normally hidden/non-public because it's typically called from the Drop handler)
+/// for usage from testing/benchmark code for the memory mapping evaluation.
+#[cfg(mapper_spillful)]
+pub fn mapped_pages_unmap<A: FrameAllocator>(
+    mapped_pages: &mut MappedPages,
+    mapper: &mut Mapper,
+    allocator: &mut A, 
+) -> Result<(), &'static str> {
+    mapped_pages.unmap(mapper, allocator)
+}
+
+
 impl Drop for MappedPages {
     fn drop(&mut self) {
         // skip logging temp page unmapping, since it's the most common
-        // if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
-        // }
+        if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
+            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
+        }
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
         
-        assert!(get_current_p4() == self.page_table_p4, 
-                "MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
-                 cannot unmap MappedPages from a different page table than they were originally mapped to!",
-                 get_current_p4(), self.page_table_p4);
+        let mut mapper = Mapper::new();
+        if mapper.target_p4 != self.page_table_p4 {
+            error!("BUG: MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
+                cannot unmap MappedPages from a different page table than they were originally mapped to!",
+                get_current_p4(), self.page_table_p4
+            );
+            return;
+        }   
 
         let mut frame_allocator = match FRAME_ALLOCATOR.try() {
             Some(fa) => fa.lock(),
@@ -845,8 +855,7 @@ impl Drop for MappedPages {
             }
         };
         
-        let mut active_table = ActivePageTable::new(get_current_p4()); // already checked the P4 value
-        if let Err(e) = self.unmap(&mut active_table, frame_allocator.deref_mut()) {
+        if let Err(e) = self.unmap(&mut mapper, frame_allocator.deref_mut()) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

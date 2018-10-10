@@ -29,7 +29,7 @@ use acpi::get_hpet;
 use kernel_config::memory::PAGE_SIZE;
 
 
-use memory::{FRAME_ALLOCATOR, FrameAllocator, VirtualAddress, Mapper, MappedPages, Page, EntryFlags};
+use memory::{FRAME_ALLOCATOR, FrameAllocator, VirtualAddress, Mapper, MappedPages, Page, EntryFlags, mapped_pages_unmap};
 use memory::mapper_spillful::MapperSpillful;
 
 
@@ -166,17 +166,27 @@ fn remap_spillful(
 }
 
 
-fn unmap_normal(mapped_pages: Vec<MappedPages>) -> Result<(), &'static str> {
+fn unmap_normal(mapper_normal: &mut Mapper, mut mapped_pages: Vec<MappedPages>) -> Result<(), &'static str> {
+    let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
+    let frame_allocator = frame_allocator_ref.deref_mut();
     let num_mappings = mapped_pages.len();
 
     let ticks = {
         let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
-        drop(mapped_pages);
+        for mp in &mut mapped_pages {
+            mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
+        }
 
         let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
         end_time - start_time
     };
+
+    // To avoid measuring the (irrelevant) overhead of vector allocation/deallocation, we manually unmapped the MappedPages above. 
+    // Thus, here we "forget" each MappedPages from the vector to ensure that their Drop handlers aren't called.
+    while let Some(mp) = mapped_pages.pop() {
+        core::mem::forget(mp); 
+    }
 
     println!("Unmapped {} mappings ({}) in {} ticks.", 
         num_mappings, 
@@ -301,7 +311,7 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
             
         // (3) perform unmappings
         match result {
-            Some(mapped_pages) => unmap_normal(mapped_pages)?,
+            Some(mapped_pages) => unmap_normal(&mut mapper_normal, mapped_pages)?,
             _                  => unmap_spillful(&mut mapper_spillful, start_vaddr, size_in_pages, num_mappings)?,
         };
     }
