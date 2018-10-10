@@ -18,7 +18,7 @@ impl Environment {
     /// Gets the absolute file path of the working directory
     pub fn get_wd_path(&self) -> String {
         let wd = self.working_dir.lock();
-        wd.get_path()
+        wd.get_path_as_string()
     }
 
     /// Sets working directory
