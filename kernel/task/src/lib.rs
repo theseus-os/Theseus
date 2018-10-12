@@ -753,9 +753,9 @@ struct TaskLocalData {
 }
 
 
-/// Returns a reference to the current task id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
-pub fn get_my_current_task() -> Option<&'static TaskRef> {
+/// Returns a reference to the current task's `TaskLocalData` 
+/// by using the `TaskLocalData` pointer stored in the FS base MSR register.
+fn get_task_local_data() -> Option<&'static TaskLocalData> {
     // SAFE: it's safe to cast this as a static reference
     // because it will always be valid for the life of a given Task's execution.
     let tld: &'static TaskLocalData = unsafe {
@@ -765,7 +765,7 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
         }
         &*tld_ptr
     };
-    Some(&tld.current_taskref)
+    Some(&tld)
 
     // let tld2: &TaskLocalData = unsafe {
     //     let tld_ptr: u64;
@@ -777,39 +777,14 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
     // };
 }
 
+/// Returns a reference to the current task id by using the `TaskLocalData` pointer
+/// stored in the FS base MSR register.
+pub fn get_my_current_task() -> Option<&'static TaskRef> {
+    get_task_local_data().map(|tld| &tld.current_taskref)
+}
 
 /// Returns the current Task's id by using the `TaskLocalData` pointer
 /// stored in the FS base MSR register.
 pub fn get_my_current_task_id() -> Option<usize> {
-    // SAFE: it's safe to cast this as a static reference
-    // because it will always be valid for the life of a given Task's execution.
-    let tld: &'static TaskLocalData = unsafe {
-        &*(rdmsr(IA32_FS_BASE) as *const TaskLocalData)
-    };
-
-    Some(tld.current_task_id)
+    get_task_local_data().map(|tld| tld.current_task_id)
 }
-
-
-// /// Instantly retrieves a reference to the current task id by using the `TaskLocalData` pointer
-// /// stored in the FS base MSR register.
-// pub fn current_task_id() -> usize {
-//     let tld: &TaskLocalData = unsafe {
-//         &*(rdmsr(IA32_FS_BASE) as *const TaskLocalData)
-//     };
-
-//     warn!("current_task_id(): tld: {:?}", tld);
-
-//     let tld2: &TaskLocalData = unsafe {
-//         let tld_ptr: u64;
-//         asm!("mov $0, fs:[0x8]" : "=r"(tld_ptr) : : "memory" : "intel", "volatile");
-//         let fs_base: u64;
-//         asm!("mov $0, fs:[0x0]" : "=r"(fs_base) : : "memory" : "intel", "volatile");
-//         warn!("current_task_id(): fs_base: {:#X}", fs_base);
-//         &*(tld_ptr as *const TaskLocalData)
-//     };
-//     warn!("current_task_id(): tld2: {:?}", tld2);
-
-//     tld.current_task_id
-// }
-
