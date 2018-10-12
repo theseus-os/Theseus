@@ -56,9 +56,6 @@ extern crate exceptions_full;
 #[cfg(simd_personality)]
 extern crate simd_personality;
 
-// Here, we add pub use statements for any function or data that we want to export from the nano_core
-// and make visible/accessible to other modules that depend on nano_core functions.
-// Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
 
 use alloc::arc::Arc;
 use alloc::{String, Vec};
@@ -93,8 +90,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
-    // at this point, we no longer *need* to use println_raw, because we can see the logs,
-    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
 
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
@@ -124,13 +119,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
-    
+
     // create the initial `Task`, i.e., task_zero
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
-
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;

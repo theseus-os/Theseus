@@ -31,7 +31,7 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS, CURRENT_TASKS};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use runqueue::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 
@@ -46,53 +46,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 
     RunQueue::init(apic_id)?;
     
-    init_idle_task(kernel_mmi_ref, apic_id, stack_bottom, stack_top)
-                .map( |t| t.clone())
-}
-
-
-/// initialize an idle task, of which there is one per processor core/AP/LocalApic.
-/// The idle task is a task that runs by default (one per core) when no other task is running.
-/// 
-/// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
-fn init_idle_task(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
-                      apic_id: u8, stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
-                      -> Result<TaskRef, &'static str> {
-
-    let mut idle_task = Task::new();
-    idle_task.name = format!("idle_task_ap{}", apic_id);
-    idle_task.is_an_idle_task = true;
-    idle_task.runstate = RunState::Runnable;
-    idle_task.running_on_cpu = Some(apic_id); 
-    idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    idle_task.mmi = Some(kernel_mmi_ref);
-    idle_task.kstack = Some( 
-        Stack::new( 
-            stack_top, 
-            stack_bottom, 
-            MappedPages::from_existing(
-                Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom),
-                EntryFlags::WRITABLE | EntryFlags::PRESENT
-            ),
-        )
-    );
-    debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
-    let idle_task_id = idle_task.id;
-
-    // set this as this core's current task, since it's obviously running
-    CURRENT_TASKS.insert(apic_id, idle_task_id); 
-
-
-    let task_ref = TaskRef::new(idle_task);
-    let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
-    // insert should return None, because that means there was no other 
-    if old_task.is_some() {
-        error!("init_idle_task(): Fatal Error: TASKLIST already contained a task with the same id {} as idle_task_ap{}!", idle_task_id, apic_id);
-        return Err("TASKLIST already contained a task with the new idle_task's ID");
-    }
-
+    let task_ref = task::create_idle_task(apic_id, stack_bottom, stack_top, kernel_mmi_ref)?;
     RunQueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
-
     Ok(task_ref)
 }
 
@@ -715,7 +670,7 @@ unsafe fn jump_to_userspace(stack_ptr: usize, function_ptr: usize) {
     // 3) push rflags, the control flags we wish to use
     // 4) push the code segment selector (cs), i.e., the user_code segment selector
     // 5) push the instruction pointer (rip) for the start of userspace, e.g., the function pointer
-    // 6) set all other segment registers (ds, es, fs, gs) to the user_data segment, same as (ss)
+    // 6) set other segment registers (ds, es) to the user_data segment, same as (ss)
     // 7) issue iret to return to userspace
 
     // debug!("Jumping to userspace with stack_ptr: {:#x} and function_ptr: {:#x}",
@@ -737,8 +692,7 @@ unsafe fn jump_to_userspace(stack_ptr: usize, function_ptr: usize) {
 
     asm!("mov ds, $0" : : "r"(ss) : "memory" : "intel", "volatile");
     asm!("mov es, $0" : : "r"(ss) : "memory" : "intel", "volatile");
-    //asm!("mov fs, $0" : : "r"(ss) : "memory" : "intel", "volatile");
-
+    // NOTE: we do not set fs and gs here because they're used by the kernel for other purposes
 
     asm!("push $0" : : "r"(ss as usize) : "memory" : "intel", "volatile");
     asm!("push $0" : : "r"(stack_ptr) : "memory" : "intel", "volatile");

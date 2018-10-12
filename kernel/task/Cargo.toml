@@ -31,9 +31,6 @@ path = "../tss"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.panic_info]
 path = "../panic_info"
 
