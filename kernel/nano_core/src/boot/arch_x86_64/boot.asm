@@ -274,6 +274,16 @@ start_high:
 	mov fs, ax
 	mov gs, ax
 
+	; clear out the FS/GS base MSRs
+	xor eax, eax          ; set to 0
+	xor edx, edx          ; set to 0
+	mov ecx, 0xc0000100   ; FS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000101   ; GS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
+	wrmsr
+
 
 	; Save the multiboot address
 	push rdi

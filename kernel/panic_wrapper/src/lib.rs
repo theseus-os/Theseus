@@ -36,6 +36,7 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
 
     // get current task to see if it has a panic_handler
     let curr_task = task::get_my_current_task();
+    trace!("panic_wrapper(): curr_task {:?}", curr_task);
     let curr_task_name = curr_task.map(|t| t.lock().name.clone()).unwrap_or(String::from("UNKNOWN!"));
     let curr_task = curr_task.ok_or("get_my_current_task() failed")?;
     
@@ -57,9 +58,9 @@ pub fn panic_wrapper(fmt_args: core::fmt::Arguments, file: &'static str, line: u
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(panic_info))?;
         runqueue::RunQueue::remove_task_from_all(curr_task)?;
+        Ok(())
     }
-    
-    // scheduler::schedule(); // yield the current task after it's done
-
-    Ok(())
+    else {
+        Err("")
+    }
 }
