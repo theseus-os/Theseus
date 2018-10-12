@@ -6,18 +6,17 @@
 //! # Examples
 //! How to wait for a `Task` to complete (using `join()`) and get its exit value.
 //! ```
-//! spawn::join(&taskref)); // taskref is the task that we're waiting on
-//! let locked_task = taskref.read();
-//! if let Some(exit_result) = locked_task.take_exit_value() {
+//! taskref.join(); // taskref is the task that we're waiting on
+//! if let Some(exit_result) = taskref.take_exit_value() {
 //!     match exit_result {
-//!         Ok(exit_value) => {
+//!         ExitValue::Completed(exit_value) => {
 //!             // here: the task ran to completion successfully, so it has an exit value.
-//!             // we know the return type of this task is `isize`,
-//!             // so we need to downcast it from Any to isize.
+//!             // We should know the return type of this task, e.g., if `isize`,
+//!             // we would need to downcast it from Any to isize.
 //!             let val: Option<&isize> = exit_value.downcast_ref::<isize>();
 //!             warn!("task returned exit value: {:?}", val);
 //!         }
-//!         Err(kill_reason) => {
+//!         ExitValue::Killed(kill_reason) => {
 //!             // here: the task exited prematurely, e.g., it was killed for some reason.
 //!             warn!("task was killed, reason: {:?}", kill_reason);
 //!         }
@@ -37,10 +36,10 @@ extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
-extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
 extern crate context_switch;
+extern crate x86_64;
 
 #[cfg(runqueue_state_spill_evaluation)]
 extern crate spin;
@@ -57,23 +56,16 @@ use alloc::boxed::Box;
 use alloc::arc::Arc;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{PageTable, Stack, MemoryManagementInfo, VirtualAddress};
+use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
-use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-
+use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
 
-
-
-lazy_static! {
-    /// The id of the currently executing `Task`, per-core.
-    pub static ref CURRENT_TASKS: AtomicMap<u8, usize> = AtomicMap::new();
-}
 
 lazy_static! {
     /// Used to ensure that task switches are done atomically on each core
@@ -85,25 +77,6 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-
-/// Get the id of the currently running Task on a specific core
-pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
-    CURRENT_TASKS.get(&apic_id).cloned()
-}
-
-/// Get the id of the currently running Task on this core.
-pub fn get_my_current_task_id() -> Option<usize> {
-    get_my_apic_id().and_then(|id| {
-        get_current_task_id(id)
-    })
-}
-
-/// returns a shared reference to the current `Task` running on this core.
-pub fn get_my_current_task() -> Option<&'static TaskRef> {
-    get_my_current_task_id().and_then(|id| {
-        TASKLIST.get(&id)
-    })
-}
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
@@ -192,6 +165,8 @@ pub struct Task {
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
+    /// the virtual address of the `TaskLocalData` struct that points back to this `Task` struct.
+    pub task_local_data_ptr: VirtualAddress,
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
     pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
@@ -212,6 +187,7 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
+    
     
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
@@ -247,6 +223,7 @@ impl Task {
             on_runqueue: None,
             
             saved_sp: 0,
+            task_local_data_ptr: 0,
             name: format!("task{}", task_id),
             kstack: None,
             ustack: None,
@@ -328,6 +305,16 @@ impl Task {
         } 
         else {
             None
+        }
+    }
+
+    /// Sets this `Task` as this core's current task.
+    /// 
+    /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
+    /// into the FS segment register base MSR.
+    fn set_as_current_task(&self) {
+        unsafe {
+            wrmsr(IA32_FS_BASE, self.task_local_data_ptr as u64);
         }
     }
 
@@ -431,7 +418,7 @@ impl Task {
         }
        
         // update the current task to `next`
-        CURRENT_TASKS.insert(apic_id, next.id); 
+        next.set_as_current_task();
 
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
@@ -523,8 +510,19 @@ pub struct TaskRef(Arc<MutexIrqSafe<Task>>);
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
+    /// 
+    /// Also establishes the `TaskLocalData` struct that will be used 
+    /// to determine the current `Task` on each processor core.
     pub fn new(task: Task) -> TaskRef {
-        TaskRef(Arc::new(MutexIrqSafe::new(task)))
+        let task_id = task.id;
+        let taskref = TaskRef(Arc::new(MutexIrqSafe::new(task)));
+        let tld = TaskLocalData {
+            current_taskref: taskref.clone(),
+            current_task_id: task_id,
+        };
+        let tld_ptr = Box::into_raw(Box::new(tld));
+        taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
+        taskref
     }
 
     /// Waits until the given `task` has finished executing, 
@@ -688,3 +686,105 @@ impl Eq for TaskRef { }
 //         Some(self.cmp(other))
 //     }
 // }
+
+
+/// Create and initialize an idle task, of which there is one per processor core/LocalApic.
+/// The idle task is a task that runs by default (one per core) when no other task is running.
+/// 
+/// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
+/// 
+/// # Note
+/// This function does not make the new idle task runnable, nor add it to any runqueue.
+pub fn create_idle_task(
+    apic_id: u8, 
+    stack_bottom: VirtualAddress, 
+    stack_top: VirtualAddress,
+    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>
+) -> Result<TaskRef, &'static str> {
+
+    let mut idle_task = Task::new();
+    idle_task.name = format!("idle_task_ap{}", apic_id);
+    idle_task.is_an_idle_task = true;
+    idle_task.runstate = RunState::Runnable;
+    idle_task.running_on_cpu = Some(apic_id); 
+    idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
+    idle_task.mmi = Some(kernel_mmi_ref);
+    // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
+    idle_task.kstack = Some( 
+        Stack::new( 
+            stack_top, 
+            stack_bottom, 
+            MappedPages::from_existing(
+                Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom),
+                EntryFlags::WRITABLE | EntryFlags::PRESENT
+            ),
+        )
+    );
+
+    let idle_task_id = idle_task.id;
+    let task_ref = TaskRef::new(idle_task);
+
+    // set this as this core's current task, since it's obviously running
+    task_ref.0.lock().set_as_current_task();
+    warn!("create_idle_task(): current_task() {:?}", get_my_current_task());
+
+    // insert the new task into the task list
+    let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
+    if old_task.is_some() {
+        error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
+            idle_task_id, apic_id);
+        return Err("TASKLIST already contained a task with the new idle_task's ID");
+    }
+
+    Ok(task_ref)
+}
+
+
+
+/// The structure that holds information local to each Task,
+/// effectively a form of thread-local storage (TLS).
+/// A pointer to this structure is stored in the `FS` segment register,
+/// such that any task can easily and quickly access their local data.
+// #[repr(C)]
+#[derive(Debug)]
+struct TaskLocalData {
+    current_taskref: TaskRef,
+    current_task_id: usize,
+}
+
+
+/// Returns a reference to the current task's `TaskLocalData` 
+/// by using the `TaskLocalData` pointer stored in the FS base MSR register.
+fn get_task_local_data() -> Option<&'static TaskLocalData> {
+    // SAFE: it's safe to cast this as a static reference
+    // because it will always be valid for the life of a given Task's execution.
+    let tld: &'static TaskLocalData = unsafe {
+        let tld_ptr = rdmsr(IA32_FS_BASE) as *const TaskLocalData;
+        if tld_ptr.is_null() {
+            return None;
+        }
+        &*tld_ptr
+    };
+    Some(&tld)
+
+    // let tld2: &TaskLocalData = unsafe {
+    //     let tld_ptr: u64;
+    //     asm!("mov $0, fs:[0x8]" : "=r"(tld_ptr) : : "memory" : "intel", "volatile");
+    //     let fs_base: u64;
+    //     asm!("mov $0, fs:[0x0]" : "=r"(fs_base) : : "memory" : "intel", "volatile");
+    //     warn!("current_task_id(): fs_base: {:#X}", fs_base);
+    //     &*(tld_ptr as *const TaskLocalData)
+    // };
+}
+
+/// Returns a reference to the current task id by using the `TaskLocalData` pointer
+/// stored in the FS base MSR register.
+pub fn get_my_current_task() -> Option<&'static TaskRef> {
+    get_task_local_data().map(|tld| &tld.current_taskref)
+}
+
+/// Returns the current Task's id by using the `TaskLocalData` pointer
+/// stored in the FS base MSR register.
+pub fn get_my_current_task_id() -> Option<usize> {
+    get_task_local_data().map(|tld| tld.current_task_id)
+}

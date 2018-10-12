@@ -71,8 +71,8 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
 
     if let Err(_e) = res {
         // basic early panic printing with no dependencies
-        error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
         println_raw!("\nPANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
+        error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
     }
 
     // if we failed to handle the panic, there's not really much we can do about it
