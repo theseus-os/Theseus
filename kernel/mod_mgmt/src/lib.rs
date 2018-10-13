@@ -17,12 +17,11 @@ extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
 extern crate hashmap_core;
+extern crate qp_trie;
 
 
 use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
-use alloc::string::ToString;
-use alloc::btree_map::Entry;
 use alloc::arc::{Arc, Weak};
 use spin::Mutex;
 
@@ -36,6 +35,7 @@ use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Fram
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashmap_core::HashMap;
+use qp_trie::{wrapper::BString, Trie, Entry};
 
 
 pub mod demangle;
@@ -48,10 +48,6 @@ use self::metadata::*;
 use self::dependency::*;
 
 use demangle::demangle_symbol;
-
-
-// Can also try this crate: https://crates.io/crates/goblin
-// ELF RESOURCE: http://www.cirosantilli.com/elf-hello-world
 
 
 lazy_static! {
@@ -122,7 +118,7 @@ impl SwapRequest {
 /// A "symbol map" from a fully-qualified demangled symbol String  
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
-pub type SymbolMap = BTreeMap<String, WeakSectionRef>;
+pub type SymbolMap = Trie<BString, WeakSectionRef>;
 
 
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
@@ -1227,7 +1223,7 @@ impl CrateNamespace {
         new_section_key: String,
         new_section_ref: &StrongSectionRef
     ) -> bool {
-        match existing_symbol_map.entry(new_section_key) {
+        match existing_symbol_map.entry(new_section_key.into()) {
             Entry::Occupied(_old_val) => {
                 false
                 // if log_replacements {
@@ -1322,7 +1318,7 @@ impl CrateNamespace {
         let mut existing_map = self.symbol_map.lock();
         for sec_ref in sections {
             let ref sec_name = sec_ref.lock().name;
-            if existing_map.remove(sec_name).is_some() {
+            if existing_map.remove_str(sec_name).is_some() {
                 count += 1;
                 if log_removals {
                     debug!("  removed symbol: {}", sec_name);
@@ -1336,8 +1332,8 @@ impl CrateNamespace {
 
     fn replace_symbol_key(&self, old_symbol_key: &str, new_symbol_key: &str) -> Result<(), &'static str> {
         let mut existing_map = self.symbol_map.lock();
-        if let Some(symbol_value) = existing_map.remove(old_symbol_key) {
-            if existing_map.insert(new_symbol_key.to_string(), symbol_value).is_some() {
+        if let Some(symbol_value) = existing_map.remove_str(old_symbol_key) {
+            if existing_map.insert_str(new_symbol_key, symbol_value).is_some() {
                 warn!("replace_symbol_key(): overwrote existing symbol with new key \"{}\"", new_symbol_key);
             }
             Ok(())
@@ -1354,7 +1350,7 @@ impl CrateNamespace {
     /// that matches the given name (`demangled_full_symbol`), if it exists in the symbol map.
     /// Otherwise, it returns None if the symbol does not exist.
     fn get_symbol_internal(&self, demangled_full_symbol: &str) -> Option<WeakSectionRef> {
-        self.symbol_map.lock().get(demangled_full_symbol).cloned()
+        self.symbol_map.lock().get_str(demangled_full_symbol).cloned()
     }
 
 
@@ -1486,9 +1482,9 @@ impl CrateNamespace {
         use core::fmt::Write;
         let mut output: String = String::new();
         let sysmap = self.symbol_map.lock();
-        match write!(&mut output, "{:?}", sysmap.keys().collect::<Vec<&String>>()) {
+        match write!(&mut output, "{:?}", sysmap.keys().collect::<Vec<_>>()) {
             Ok(_) => output,
-            _ => String::from("error"),
+            _ => String::from("(error)"),
         }
     }
 

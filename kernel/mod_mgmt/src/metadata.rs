@@ -375,10 +375,10 @@ pub fn symbol_map<'a, I, F>(
     where F: Fn(&LoadedSection) -> bool, 
             I: IntoIterator<Item = &'a StrongSectionRef> 
 {
-    let mut map: SymbolMap = BTreeMap::new();
+    let mut map: SymbolMap = SymbolMap::new();
     for sec in sections.into_iter().filter(|sec| predicate(sec.lock().deref())) {
         let key = sec.lock().name.clone();
-        if let Some(old_val) = map.insert(key.clone(), Arc::downgrade(&sec)) {
+        if let Some(old_val) = map.insert_str(&key, Arc::downgrade(&sec)) {
             if key.ends_with("_LOC") || crate_name == "nano_core" {
                 // ignoring these special cases currently
             }
