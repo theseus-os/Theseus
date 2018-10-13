@@ -38,7 +38,6 @@ use cow_arc::CowArc;
 use hashmap_core::HashMap;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, Entry, wrapper::BString};
-use owning_ref::MutexGuardRef;
 
 
 pub mod elf_executable;

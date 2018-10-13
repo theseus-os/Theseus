@@ -92,9 +92,11 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let new_modules = vec![compiler_builtins_simd, core_lib_simd];
 	simd_namespace.load_kernel_crates(new_modules.into_iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 
+	let simd_test_module = get_module("k_sse#simd_test").ok_or_else(|| "couldn't get k_sse#simd_test module")?;
+	simd_namespace.load_kernel_crate(simd_test_module, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 	
 	type SimdTestFunc = fn(());
-	let section_ref1 = simd_namespace.get_symbol_or_load("simd_test::test1", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test1\"")?;
 	let mut space1 = 0;	
@@ -111,7 +113,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	debug!("finished spawning simd_test::test1 task");
 
 
-	let section_ref2 = simd_namespace.get_symbol_or_load("simd_test::test2", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref2 = simd_namespace.get_symbol_starting_with("simd_test::test2")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test2\"")?;
 	let mut space2 = 0;	
@@ -128,7 +130,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	debug!("finished spawning simd_test::test2 task");
 
 
-	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test_short", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref3 = simd_namespace.get_symbol_starting_with("simd_test::test_short")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
 	let mut space3 = 0;	

@@ -4,7 +4,7 @@
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate debugit;
 extern crate irq_safety;
