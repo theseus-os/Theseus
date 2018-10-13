@@ -22,6 +22,7 @@ extern crate qp_trie;
 
 use core::ops::DerefMut;
 use alloc::{Vec, BTreeMap, BTreeSet, String};
+use alloc::string::ToString;
 use alloc::arc::{Arc, Weak};
 use spin::Mutex;
 
@@ -35,10 +36,11 @@ use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Fram
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashmap_core::HashMap;
-use qp_trie::{wrapper::BString, Trie, Entry};
+use rustc_demangle::demangle;
+use qp_trie::{Trie, Entry, wrapper::BString};
+use owning_ref::MutexGuardRef;
 
 
-pub mod demangle;
 pub mod elf_executable;
 pub mod parse_nano_core;
 pub mod metadata;
@@ -46,8 +48,6 @@ pub mod dependency;
 
 use self::metadata::*;
 use self::dependency::*;
-
-use demangle::demangle_symbol;
 
 
 lazy_static! {
@@ -119,6 +119,7 @@ impl SwapRequest {
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
 pub type SymbolMap = Trie<BString, WeakSectionRef>;
+pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
 
 
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
@@ -808,7 +809,7 @@ impl CrateNamespace {
 
                 if sec_name.starts_with(TEXT_PREFIX) {
                     if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
-                        let demangled = demangle_symbol(name);
+                        let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
                             error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                             return Err(".text section had wrong flags!");
@@ -835,8 +836,7 @@ impl CrateNamespace {
                             loaded_sections.insert(shndx, 
                                 Arc::new(Mutex::new(LoadedSection::new(
                                     SectionType::Text,
-                                    demangled.no_hash,
-                                    demangled.hash,
+                                    demangled,
                                     Arc::clone(tp_ref),
                                     text_offset,
                                     dest_addr,
@@ -860,7 +860,7 @@ impl CrateNamespace {
 
                 else if sec_name.starts_with(RODATA_PREFIX) {
                     if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
-                        let demangled = demangle_symbol(name);
+                        let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
                             error!(".rodata section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                             return Err(".rodata section had wrong flags!");
@@ -887,8 +887,7 @@ impl CrateNamespace {
                             loaded_sections.insert(shndx, 
                                 Arc::new(Mutex::new(LoadedSection::new(
                                     SectionType::Rodata,
-                                    demangled.no_hash,
-                                    demangled.hash,
+                                    demangled,
                                     Arc::clone(rp_ref),
                                     rodata_offset,
                                     dest_addr,
@@ -919,7 +918,7 @@ impl CrateNamespace {
                         else {
                             name
                         };
-                        let demangled = demangle_symbol(name);
+                        let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                             error!(".data section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                             return Err(".data section had wrong flags!");
@@ -946,8 +945,7 @@ impl CrateNamespace {
                             loaded_sections.insert(shndx, 
                                 Arc::new(Mutex::new(LoadedSection::new(
                                     SectionType::Data,
-                                    demangled.no_hash,
-                                    demangled.hash,
+                                    demangled,
                                     Arc::clone(dp_ref),
                                     data_offset,
                                     dest_addr,
@@ -971,7 +969,7 @@ impl CrateNamespace {
 
                 else if sec_name.starts_with(BSS_PREFIX) {
                     if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        let demangled = demangle_symbol(name);
+                        let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                             error!(".bss section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                             return Err(".bss section had wrong flags!");
@@ -990,8 +988,7 @@ impl CrateNamespace {
                             loaded_sections.insert(shndx, 
                                 Arc::new(Mutex::new(LoadedSection::new(
                                     SectionType::Bss,
-                                    demangled.no_hash,
-                                    demangled.hash,
+                                    demangled,
                                     Arc::clone(dp_ref),
                                     data_offset,
                                     dest_addr,
@@ -1136,10 +1133,10 @@ impl CrateNamespace {
                                 else {
                                     source_sec_name
                                 };
-                                let demangled = demangle_symbol(source_sec_name);
+                                let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled.no_hash, CrateType::Kernel.prefix(), backup_namespace, kernel_mmi, verbose_log)
+                                self.get_symbol_or_load(&demangled, CrateType::Kernel.prefix(), backup_namespace, kernel_mmi, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1376,7 +1373,7 @@ impl CrateNamespace {
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
     /// 
     /// # Arguments
-    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo".
+    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
     /// * `kernel_crate_prefix`: the prefix string that goes in front of crate module names, 
     ///   which is generally `"k#"`. 
     ///   You can specify the default by passing in `CrateType::Kernel.prefix()`, or specify another prefix
@@ -1398,7 +1395,6 @@ impl CrateNamespace {
         if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
             return sec;
         }
-
 
         // If not, our second try is to check the backup_namespace
         // to see if that namespace already has the section we want
@@ -1434,7 +1430,6 @@ impl CrateNamespace {
             }
         }
 
-
         // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
         // We are only able to do this for mangled symbols, those that have a leading crate name,
         // such as "my_crate::foo". 
@@ -1469,11 +1464,54 @@ impl CrateNamespace {
             }
         }
 
-
         error!("Symbol \"{}\" not found, cannot determine its containing crate (no leading crate name). Try loading the crate manually first.", 
             demangled_full_symbol);    
-        // effectively the same as returning None, since it must be upgraded to an Arc before being used
-        Weak::default()
+    
+        Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+    }
+
+
+    /// Returns a copied list of the corresponding `LoadedSection`s 
+    /// with names that start with the given `symbol_prefix`.
+    /// 
+    /// This method causes allocation because it creates a copy
+    /// of the matching entries in the symbol map.
+    /// 
+    /// # Example
+    /// The symbol map contains `my_crate::foo::h843a613894da0c24` and 
+    /// `my_crate::foo::h933a635894ce0f12`. 
+    /// Calling `find_symbols_starting_with("my_crate::foo")` will return 
+    /// a vector containing both sections, which can then be iterated through.
+    pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
+        self.symbol_map.lock()
+            .iter_prefix_str(symbol_prefix)
+            .map(|(k, v)| (String::from(k.as_str()), v.clone()))
+            .collect()
+    }
+
+
+    /// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
+    /// *if and only if* the symbol map only contains a single possible matching symbol.
+    /// 
+    /// # Example
+    /// * The symbol map contains `my_crate::foo::h843a613894da0c24` 
+    ///   and no other symbols that start with `my_crate::foo`. 
+    ///   Calling `get_symbol_starting_with("my_crate::foo")` will return 
+    ///   a weak reference to the section `my_crate::foo::h843a613894da0c24`.
+    /// * The symbol map contains `my_crate::foo::h843a613894da0c24` and 
+    ///   `my_crate::foo::h933a635894ce0f12`. 
+    ///   Calling `get_symbol_starting_with("my_crate::foo")` will return 
+    ///   an empty (default) weak reference, which is the same as returing None.
+    pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
+        let map = self.symbol_map.lock();
+        let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
+        let only = iter.next();
+        let should_be_none = iter.next(); 
+        if should_be_none.is_none() {
+            only.cloned().unwrap_or_else(|| Weak::default())
+        } else {
+            Weak::default()
+        }
     }
 
     

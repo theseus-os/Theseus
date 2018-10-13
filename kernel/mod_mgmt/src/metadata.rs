@@ -258,7 +258,6 @@ impl LoadedCrate {
             let new_sec = LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
                 old_sec.name.clone(),                   // name is the same
-                old_sec.hash.clone(),                   // hash is the same
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
@@ -411,21 +410,24 @@ pub struct LoadedSection {
     /// The type of this section: .text, .rodata, .data, or .bss.
     pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
-    /// e.g., `<crate>::<module>::<struct>::<fn_name>`
-    /// For example, test_lib::MyStruct::new
-    pub name: String,
-    /// the unique hash generated for this section by the Rust compiler,
+    /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
+    /// The unique hash is generated for each section by the Rust compiler,
     /// which can be used as a version identifier. 
-    /// Not all symbols will have a hash, like those that are not mangled.
-    pub hash: Option<String>,
+    /// Not all symbols will have a hash, e.g., ones that are not mangled.
+    /// 
+    /// # Examples
+    /// * `test_lib::MyStruct::new::h843a613894da0c24`
+    /// * `my_crate::my_function::hbce878984534ceda`   
+    pub name: String,
     /// The `MappedPages` that cover this section.
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
     /// The `VirtualAddress` of this section, cached here as a performance optimization
     /// so we can avoid doing the calculation based on this section's mapped_pages and mapped_pages_offset.
-    /// This address value should not be used for accessing this section's data through a non-safe dereference,
-    /// rather it's just here to help speed up and simply relocations.
+    /// This address value should not be used for accessing this section's data through 
+    /// a non-safe dereference or transmute operation. 
+    /// Instead, it's just here to help speed up and simply relocations.
     virt_addr: VirtualAddress, 
     /// The size in bytes of this section
     pub size: usize,
@@ -454,7 +456,6 @@ impl LoadedSection {
     pub fn new(
         typ: SectionType, 
         name: String, 
-        hash: Option<String>, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -462,14 +463,13 @@ impl LoadedSection {
         global: bool, 
         parent_crate: WeakCrateRef,
     ) -> LoadedSection {
-        LoadedSection::with_dependencies(typ, name, hash, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, Vec::new(), Vec::new(), Vec::new())
+        LoadedSection::with_dependencies(typ, name, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, Vec::new(), Vec::new(), Vec::new())
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
     pub fn with_dependencies(
         typ: SectionType, 
         name: String, 
-        hash: Option<String>, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -481,7 +481,7 @@ impl LoadedSection {
         internal_dependencies: Vec<InternalDependency>,
     ) -> LoadedSection {
         LoadedSection {
-            typ, name, hash, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me, internal_dependencies
+            typ, name, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me, internal_dependencies
         }
     }
 

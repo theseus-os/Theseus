@@ -96,7 +96,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	type SimdTestFunc = fn(());
 	let section_ref1 = simd_namespace.get_symbol_or_load("simd_test::test1", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
 		.upgrade()
-		.ok_or("no symbol: simd_test::test1")?;
+		.ok_or("no single symbol matching \"simd_test::test1\"")?;
 	let mut space1 = 0;	
 	let (mapped_pages1, mapped_pages_offset1) = { 
 		let section = section_ref1.lock();
@@ -113,7 +113,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 
 	let section_ref2 = simd_namespace.get_symbol_or_load("simd_test::test2", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
 		.upgrade()
-		.ok_or("no symbol: simd_test::test2")?;
+		.ok_or("no single symbol matching \"simd_test::test2\"")?;
 	let mut space2 = 0;	
 	let (mapped_pages2, mapped_pages_offset2) = { 
 		let section = section_ref2.lock();
@@ -130,7 +130,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 
 	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test_short", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
 		.upgrade()
-		.ok_or("no symbol: simd_test::test_short")?;
+		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
 	let mut space3 = 0;	
 	let (mapped_pages3, mapped_pages_offset3) = { 
 		let section = section_ref3.lock();
