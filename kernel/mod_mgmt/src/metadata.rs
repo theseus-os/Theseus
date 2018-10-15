@@ -7,7 +7,7 @@ use core::ops::{Deref};
 use spin::Mutex;
 use alloc::{Vec, String, BTreeMap};
 use alloc::arc::{Arc, Weak};
-use memory::{MappedPages, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
+use memory::{MappedPages, ModuleArea, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
@@ -100,6 +100,9 @@ impl CrateType {
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
+    /// The unique identifier of the object file that this crate was loaded from.
+    /// Currently, this is a reference to the corresponding `ModuleArea`.
+    pub object_file: &'static ModuleArea,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -119,7 +122,7 @@ pub struct LoadedCrate {
 use core::fmt;
 impl fmt::Debug for LoadedCrate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedCrate{{{}}}", self.crate_name)
+        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", self.crate_name, self.object_file)
     }
 }
 
@@ -146,10 +149,6 @@ impl LoadedCrate {
         }).next().cloned()
     }
 
-
-    pub fn crates_i_depend_on(&self) -> Vec<StrongCrateRef> {
-        unimplemented!();
-    }
 
     /// Currently may contain duplicates!
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
@@ -223,6 +222,7 @@ impl LoadedCrate {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:   self.crate_name.clone(),
+            object_file:  self.object_file,
             sections:     BTreeMap::new(),
             text_pages:   new_text_pages_ref.clone(),
             rodata_pages: new_rodata_pages_ref.clone(),
@@ -407,7 +407,6 @@ pub enum SectionType {
 /// Represents a .text, .rodata, .data, or .bss section
 /// that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
-#[derive(Debug)]
 pub struct LoadedSection {
     /// The type of this section: .text, .rodata, .data, or .bss.
     pub typ: SectionType,
@@ -511,17 +510,6 @@ impl LoadedSection {
         self.typ == SectionType::Bss
     }
 
-    /// Returns the index of the first `StrongDependency` object with a section
-    /// that matches the given `matching_section` in this `LoadedSection`'s `sections_i_depend_on` list.
-    pub fn find_strong_dependency(&self, matching_section: &StrongSectionRef) -> Option<usize> {
-        for (index, strong_dep) in self.sections_i_depend_on.iter().enumerate() {
-            if Arc::ptr_eq(matching_section, &strong_dep.section) {
-                return Some(index);
-            }
-        }
-        None
-    }
-
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
     pub fn find_weak_dependent(&self, matching_section: &StrongSectionRef) -> Option<usize> {
@@ -551,8 +539,8 @@ impl LoadedSection {
 
         if dest_sec_data.len() == source_sec_data.len() {
             dest_sec_data.copy_from_slice(source_sec_data);
-            debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
-                self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
+            // debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
+            //     self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
             Ok(())
         }
         else {
@@ -560,6 +548,12 @@ impl LoadedSection {
                 self.name, self.size, destination_section.name, destination_section.size);
             Err("this source section has a different length than the destination section")
         }
+    }
+}
+
+impl fmt::Debug for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LoadedSection(name: {:?})", self.name)
     }
 }
 

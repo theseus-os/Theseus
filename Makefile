@@ -407,13 +407,20 @@ bochs: $(iso)
 
 
 
+IS_WSL = $(shell grep 'Microsoft' /proc/version)
+
+### Checks that the supplied usb device (for usage with the boot/pxe targets).
+### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
 check_usb:
-ifneq (,$(findstring sd, $(usb)))
-ifeq ("$(wildcard /dev/$(usb))", "")
+## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app
+ifeq ($(IS_WSL), ) ## if we're not on WSL...
+ifneq (,$(findstring sd, $(usb))) ## if the specified USB device properly contained "sd"...
+ifeq ("$(wildcard /dev/$(usb))", "") ## if a non-existent "/dev/sd*" drive was specified...
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
 	@exit 1
-endif
-else
+endif 
+else 
+## if the specified USB device didn't contain "sd", then it wasn't a proper removable block device.
 	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
@@ -421,15 +428,23 @@ else
 	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
 	@echo ""
 	@exit 1
-endif
+endif  ## end of checking for "sd"
+endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 boot : export THESEUS_CONFIG += mirror_log_to_vga
 boot: check_usb $(iso)
+ifneq ($(IS_WSL), )
+## building on WSL
+	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
+	@echo -e "The ISO file is available at \"$(iso)\"."
+else
+## building on regular linux
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
-	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
+	@sudo dd bs=4M if=$(iso) of=/dev/$(usb)
 	@sync
+endif
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
@@ -441,7 +456,6 @@ ifdef $(ip)
 endif
 	@sudo sudo ifconfig $(netdev) 192.168.1.105
 endif
-	
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa

@@ -13,14 +13,18 @@ extern crate itertools;
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate acpi;
 
 use core::ops::DerefMut;
 use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
 use alloc::string::ToString;
 use getopts::Options;
-use memory::{get_module, ModuleArea};
-use mod_mgmt::metadata::StrongCrateRef;
+use memory::get_module;
+use mod_mgmt::SwapRequest;
+use mod_mgmt::metadata::CrateType;
+use acpi::get_hpet;
+
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -69,8 +73,8 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-/// Takes a string of arguments and parses it into a series of pairs, formatted as 
-/// `(OLD,NEW) (OLD,NEW) (OLD,NEW)...`
+/// Takes a string of arguments and parses it into a series of triples, formatted as 
+/// `(OLD,NEW,OVERRIDE) (OLD,NEW,OVERRIDE) (OLD,NEW,OVERRIDE)...`
 fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option<String>)>, String> {
     let mut v: Vec<(&str, &str, Option<String>)> = Vec::new();
     let mut open_paren_iter = args.match_indices('(');
@@ -108,29 +112,42 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option
 
 
 /// Performs the actual swapping of modules.
-fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> Result<(), String> {
-    let swap_pairs = {
-        let mut mods: Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(pairs.len());
-        for (o, n, override_name) in pairs {
+fn swap_modules(tuples: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> Result<(), String> {
+    let swap_requests = {
+        let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
+        for (o, n, override_name) in tuples {
             println!("   Looking for ({},{})  [override: {:?}]", o, n, override_name);
-            mods.push(
-                (
-                    mod_mgmt::get_default_namespace().get_crate(o).ok_or_else(|| format!("Couldn't find old crate \"{}\".", o))?,
-                    get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?,
-                    override_name
-                )
-            );
+            let new_crate_module = get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?;
+            let new_crate_name = if let Some(new_name) = override_name {
+                new_name
+            } else {
+                CrateType::from_module_name(new_crate_module.name())?.1.to_string()
+            };
+            mods.push(SwapRequest::new(String::from(o), new_crate_module, new_crate_name));
         }
         mods
     };
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    mod_mgmt::get_default_namespace().swap_crates(
-        swap_pairs, 
+    
+    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+    let swap_result = mod_mgmt::get_default_namespace().swap_crates(
+        swap_requests, 
         kernel_mmi.deref_mut(), 
         verbose_log
-    ).map_err(|e| e.to_string())
+    );
+    
+    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+
+    let elapsed_ticks = end - start;
+    println!("Swap operation complete. Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+
+
+    swap_result.map_err(|e| e.to_string())
 }
 
 

@@ -83,7 +83,7 @@ pub struct WeakDependent {
 /// The information necessary to calculate and write a relocation value,
 /// based on a source section and a target section, in which a value 
 /// based on the location of the source section is written somwhere in the target section.
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct RelocationEntry {
     /// The type of relocation calculation that is performed 
     /// to connect the target section to the source section.
@@ -95,6 +95,16 @@ pub struct RelocationEntry {
     /// that specifies where the relocation value should be written.
     pub offset: usize,
 }
+
+use core::fmt;
+impl fmt::Debug for RelocationEntry {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Relocation Entry {{ typ: {:#X}, addend: {:#X}, offset: {:#X}}}",
+                self.typ, self.addend, self.offset
+            )
+        }
+}
+
 impl RelocationEntry {
     pub fn from_elf_relocation(rela_entry: &xmas_elf::sections::Rela<u64>) -> RelocationEntry {
         RelocationEntry {
@@ -116,6 +126,7 @@ impl RelocationEntry {
         }
     }
 }
+
 
 
 /// A representation that the section that owns this struct 

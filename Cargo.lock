@@ -340,6 +340,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashmap_core"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "heap_irq_safe"
 version = "0.1.0"
 dependencies = [
@@ -452,6 +457,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyboard_new"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "event_types 0.1.0",
+ "keycodes_ascii 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ps2 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "keycodes_ascii"
 version = "0.1.0"
 
@@ -519,6 +536,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashmap_core 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "heap_irq_safe 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -532,11 +550,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "mm_eval"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "kernel_config 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
  "cow_arc 0.1.0",
  "goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashmap_core 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -752,6 +784,19 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rq_eval"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
+ "spawn 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "rtc"
 version = "0.1.0"
 dependencies = [
@@ -867,7 +912,6 @@ dependencies = [
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
- "context_switch_sse 0.1.0",
  "debugit 0.1.0",
  "gdt 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -881,7 +925,6 @@ dependencies = [
  "scheduler 0.1.0",
  "task 0.1.0",
  "tss 0.1.0",
- "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -910,6 +953,7 @@ dependencies = [
 name = "swap"
 version = "0.1.0"
 dependencies = [
+ "acpi 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -935,11 +979,9 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic 0.1.0",
  "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
- "context_switch_sse 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1104,6 +1146,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum either 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5845bf77d497f79416df39462df26d4a8b71dd6440246848ee63709476dbb9a6"
 "checksum getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)" = "<none>"
 "checksum goblin 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)" = "b9c41a5d6172009a2dddc6e1d8f48472e6d01aab6f8b4db9cb6703596047885c"
+"checksum hashmap_core 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c60fb5be3a617897e88dab9423f04419c723bb8c88727756959127f53cdd226e"
 "checksum irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)" = "<none>"
 "checksum itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)" = "f58856976b776fedd95533137617a02fb25719f40e7d9b01c7043cd65474f450"
 "checksum lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "49247ec2a285bb3dcb23cbd9c35193c025e7251bfce77c1d5da97e6362dffe7f"
