@@ -229,12 +229,16 @@ impl Terminal {
                 // Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur
                 let new_line_indices: Vec<(usize, &str)> = slice.rmatch_indices('\n').collect();
                 // if there are no new lines in the slice
-                if new_line_indices.len() == 0 {
-                    start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
-                    return (start_idx, buffer_height * buffer_width -1);
+                if new_line_indices.is_empty() {
+                    if buffer_height * buffer_width > end_idx {
+                        return (0,buffer_height * buffer_width -1);
+                    } else {
+                        start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
+                        return (start_idx, buffer_height * buffer_width -1);
+                    }
                 }
 
-                let mut last_line_chars = 0;
+                let mut last_line_chars = 1;
                 // Case where the last newline does not occur at the end of the slice
                 if new_line_indices[0].0 != slice.len() - 1 {
                     start_idx -= slice.len() -1 - new_line_indices[0].0;
@@ -264,17 +268,21 @@ impl Terminal {
                 if total_lines > buffer_height {
                     start_idx += (total_lines - buffer_height) * buffer_width; // adds back the overcounted lines to the starting index
                     total_lines = buffer_height;
+                    debug!("caught first");
                 // covers the case where the text between the last newline and the end of the slice overflow the text buffer
                 } else if first_chars_lines + total_lines > buffer_height {
                     let diff = buffer_height - total_lines;
                     total_lines += diff;
                     start_idx -= diff * buffer_width;
+                    debug!("caught second");
                 // covers the case where the text between the last newline and the end of the slice exactly fits the text buffer
                 } else if first_chars_lines + total_lines == buffer_height {
                     total_lines += first_chars_lines;
                     start_idx -= first_chars;
+                    debug!("caught third");
                 // covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)
                 } else {
+                    debug!("caught last");
                     return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
                 }
 
@@ -405,17 +413,15 @@ impl Terminal {
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
-            debug!("RETURNED THAT SCROLL END IS TRUE?");
-            return;
-        } else {
-            prev_start_idx = self.scroll_start_idx;
-        }
+            return;} 
+        prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx, display_name);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
             Err("exceeded end bound") => self.scrollback_buffer.len() -1,
             Err(err) => {error!("{}", err); return}
         };
+
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
@@ -451,9 +457,9 @@ impl Terminal {
         }
         // Recalculates new starting index
         let start_idx = self.calc_start_idx(new_end_idx, display_name).0;
+        debug!("old end idx was {} while new end idx is {}", end_idx, new_end_idx);
         debug!("is prev start and new start the same: {}", self.scroll_start_idx == start_idx);
         self.scroll_start_idx = start_idx;
-        debug!("got to the end of the function");
     }
     
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
@@ -928,7 +934,7 @@ impl Terminal {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
-            let buffer_len = self.scrollback_buffer.len()-1;
+            let buffer_len = self.scrollback_buffer.len();
             match self.update_display_backwards(display_name, buffer_len) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
