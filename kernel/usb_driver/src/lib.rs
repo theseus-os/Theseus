@@ -82,9 +82,8 @@ pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str
         match device_2.device_type{
 
             HIDType::Keyboard => {
-//            if let Err(e) = usb_keyboard::init(active_table,device_2){
-//                return Err(e);
-//            }
+                if let Err(e) = usb_keyboard::init(active_table,index){
+                    return Err(e);}
             },
             HIDType::Mouse =>{
 
@@ -107,6 +106,8 @@ pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str
 
 }
 
+
+/// Configure the device attached to the UCHI's port 1
 fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'static str>{
 
     usb_uhci::port1_reset();
@@ -211,6 +212,7 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
 
 }
 
+/// Configure the device attached to the UCHI's port 2
 fn port_2_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'static str>{
 
     usb_uhci::port2_reset();
@@ -397,7 +399,8 @@ pub fn get_report(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: u
 
     Ok(new_off)
 }
-/// Get the all descriptions
+
+/// Get the complete USB device descriptions
 pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut ActivePageTable, offset: usize)-> Result<(BoxRefMut<MappedPages, UsbConfDesc>,usize),&'static str>{
 
     let (request_pointer,mut new_offset) = build_request(active_table,0x80, usb_req::REQ_GET_DESC,
@@ -468,7 +471,7 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
 
 
 
-/// Get the device description
+/// Get the USB device description
 pub fn get_device_desc(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: usize)-> Result<(BoxRefMut<MappedPages, UsbDeviceDesc>,usize),&'static str>{
 
 

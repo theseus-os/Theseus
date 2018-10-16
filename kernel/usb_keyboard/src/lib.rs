@@ -36,6 +36,8 @@ static USB_KEYBOARD_DEVICE_ID: Once<usize> = Once::new();
 const TD_PACKET_IN : u8=                    0x69;
 const TD_PACKET_OUT : u8=                   0xe1;
 
+
+/// Initialize the USB keyboard
 pub fn init(active_table: &mut ActivePageTable, index: usize)-> Result<(),&'static str>{
 
     let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(0)
@@ -90,6 +92,8 @@ pub fn init(active_table: &mut ActivePageTable, index: usize)-> Result<(),&'stat
 
 }
 
+
+/// Initialize the USB keyboard's data transactions
 pub fn init_receive_data() -> Result<(),&'static str>{
 
 
@@ -160,7 +164,8 @@ pub fn box_keyboard_buffer(active_table: &mut ActivePageTable, frame_base: Physi
     Ok(buffer)
 }
 
-///Keyboard data handler
+///Read the current input of the usb keyboard
+/// Return an array contains the scancodes (last 6 bytes)
 fn read_current_input() -> [u8;6]{
 
     let mut list = [0;6];
@@ -181,6 +186,7 @@ fn read_current_input() -> [u8;6]{
 
 }
 
+///Read and return the current modifier of the input
 fn read_modifier() -> Result<u8,&'static str>{
 
 
@@ -193,7 +199,8 @@ fn read_modifier() -> Result<u8,&'static str>{
 
 }
 
-
+///Read the previous input of the usb keyboard
+/// Return an array contains the scancodes (last 6 bytes)
 fn read_previous_input() -> [u8;6]{
 
     let mut list = [0;6];
@@ -214,8 +221,8 @@ fn read_previous_input() -> [u8;6]{
 
 }
 
-
-
+///Read the oldest input of the usb keyboard
+/// Return an array contains the scancodes (last 6 bytes)
 fn read_oldest_input() -> [u8;6]{
 
     let mut list = [0;6];
@@ -236,6 +243,7 @@ fn read_oldest_input() -> [u8;6]{
 
 }
 
+///Update the previous input to be the current input
 fn update_previous_input(list: [u8;6]){
 
     FIRST_INPUT.try().map(|previous_input| {
@@ -251,6 +259,7 @@ fn update_previous_input(list: [u8;6]){
     });
 }
 
+///Clean the previous input
 fn clean_previous_input(){
 
     SECOND_INPUT.try().map(|oldest_input| {
@@ -266,6 +275,7 @@ fn clean_previous_input(){
     });
 }
 
+///Update the oldest input to be the previous input
 fn update_oldest_input(list: [u8;6]){
 
     SECOND_INPUT.try().map(|oldest_input| {
@@ -281,6 +291,7 @@ fn update_oldest_input(list: [u8;6]){
     });
 }
 
+///Clean the previous input
 fn clean_oldest_input(){
 
     SECOND_INPUT.try().map(|oldest_input| {
@@ -296,6 +307,8 @@ fn clean_oldest_input(){
     });
 }
 
+///If no new scancode appears in the current input compare to the
+///previous input, return false, else return true
 fn check_input_1(current: [u8;6], previous: [u8;6]) -> Vec<u8>{
 
     let mut new_codes: Vec<u8> = Vec::new();
@@ -316,6 +329,7 @@ fn check_input_1(current: [u8;6], previous: [u8;6]) -> Vec<u8>{
     new_codes
 }
 
+/// If three consecutive inputs are same, return true, else return false
 fn check_input_2(list: [u8;6], list_1: [u8;6], list_2: [u8;6]) -> bool{
 
     let mut flag = false;
@@ -326,9 +340,12 @@ fn check_input_2(list: [u8;6], list_1: [u8;6], list_2: [u8;6]) -> bool{
     flag
 }
 
+/// Handle the input data from usb keyboard and print the key
 pub fn data_handler() -> Result<(),&'static str>{
 
     let current_input = read_current_input();
+
+    //if no data, print nothing
     if current_input[0] == 0{
         clean_oldest_input();
         clean_previous_input();
@@ -336,16 +353,12 @@ pub fn data_handler() -> Result<(),&'static str>{
     }
 
     let modi = read_modifier()?;
-
     let previous_input = read_previous_input();
     let oldest_input = read_oldest_input();
-//    info!("the key :{:?}", current_input);
-//    info!("the key :{:?}", previous_input);
-//    info!("the key :{:?}", oldest_input);
-
     let new_codes = check_input_1(current_input,previous_input);
-//    info!("the key :{:?}", new_codes);
 
+
+    //whether a single key is typed in consecutive times
     let mut only_one = true;
     for i in 1..6{
         if current_input[i] != 0 || previous_input[i] != 0{
@@ -369,6 +382,8 @@ pub fn data_handler() -> Result<(),&'static str>{
 
         }
     }else if check_input_2(current_input, previous_input,oldest_input){
+        //if the same input is sent three consecutive times, some keys are being typed
+        //print them
         if let Some(modifier) = Keycode::from_modifier_usb(modi) {
             info!("the modifier :{:?}", modifier);
         }
@@ -379,6 +394,8 @@ pub fn data_handler() -> Result<(),&'static str>{
             }
         }
     }else if new_codes.len() != 0{
+        //if no new scan codes, some keys are typed too fast so that they are typed at same time
+        //unconsciously. Only print them once
         if let Some(modifier) = Keycode::from_modifier_usb(modi) {
             info!("the modifier :{:?}", modifier);
         }
