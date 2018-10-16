@@ -268,21 +268,17 @@ impl Terminal {
                 if total_lines > buffer_height {
                     start_idx += (total_lines - buffer_height) * buffer_width; // adds back the overcounted lines to the starting index
                     total_lines = buffer_height;
-                    debug!("caught first");
                 // covers the case where the text between the last newline and the end of the slice overflow the text buffer
                 } else if first_chars_lines + total_lines > buffer_height {
                     let diff = buffer_height - total_lines;
                     total_lines += diff;
                     start_idx -= diff * buffer_width;
-                    debug!("caught second");
                 // covers the case where the text between the last newline and the end of the slice exactly fits the text buffer
                 } else if first_chars_lines + total_lines == buffer_height {
                     total_lines += first_chars_lines;
                     start_idx -= first_chars;
-                    debug!("caught third");
                 // covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)
                 } else {
-                    debug!("caught last");
                     return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
                 }
 
@@ -427,7 +423,6 @@ impl Terminal {
             self.is_scroll_end = true;
             let new_start = self.calc_start_idx(end_idx, display_name).0;
             self.scroll_start_idx = new_start;
-            debug!("RETURNED ON 426");
             return;
         }
         end_idx += 1; // Advances to the next character for the calculation
@@ -451,14 +446,11 @@ impl Terminal {
                     None => { end_idx + slice_len}, // If no newline is found, moves the end index forward by the buffer width value
                 }; 
             } else {
-                debug!("RETURNED ON LINE 449");
                 return;
             }
         }
         // Recalculates new starting index
         let start_idx = self.calc_start_idx(new_end_idx, display_name).0;
-        debug!("old end idx was {} while new end idx is {}", end_idx, new_end_idx);
-        debug!("is prev start and new start the same: {}", self.scroll_start_idx == start_idx);
         self.scroll_start_idx = start_idx;
     }
     
