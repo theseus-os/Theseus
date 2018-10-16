@@ -32,7 +32,7 @@ use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, get_module, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, get_module_starting_with, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashmap_core::HashMap;
@@ -1438,9 +1438,9 @@ impl CrateNamespace {
                 demangled_full_symbol, crate_dependency_name);
             
             // module names have a prefix like "k#", so we need to prepend that to the crate name
-            let crate_dependency_name = format!("{}{}", kernel_crate_prefix, crate_dependency_name);
+            let crate_dependency_name = format!("{}{}-", kernel_crate_prefix, crate_dependency_name);
  
-            if let Some(dependency_module) = get_module(&crate_dependency_name) {
+            if let Some(dependency_module) = get_module_starting_with(&crate_dependency_name) {
                 // try to load the missing symbol's containing crate
                 if let Ok(_num_new_syms) = self.load_kernel_crate(dependency_module, backup_namespace, kernel_mmi, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
@@ -1453,7 +1453,7 @@ impl CrateNamespace {
                     }
                 }
                 else {
-                    error!("Found symbol's (\"{}\") containing crate, but load_kernel_crate failed for that crate module {:?}.",
+                    error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate module {:?}.",
                         demangled_full_symbol, dependency_module);
                 }
             }
@@ -1463,8 +1463,7 @@ impl CrateNamespace {
             }
         }
 
-        error!("Symbol \"{}\" not found, cannot determine its containing crate (no leading crate name). Try loading the crate manually first.", 
-            demangled_full_symbol);    
+        error!("Symbol \"{}\" not found. Try loading the crate manually first.", demangled_full_symbol);    
     
         Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
     }
@@ -1492,6 +1491,11 @@ impl CrateNamespace {
     /// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
     /// *if and only if* the symbol map only contains a single possible matching symbol.
     /// 
+    /// # Important Usage Note
+    /// To avoid greedily matching more symbols than expected, you may wish to end the `symbol_prefix` with `"::"`.
+    /// This may provide results more in line with the caller's expectations; see the last example below about a trailing `"::"`. 
+    /// This works because the delimiter between a symbol and its trailing hash value is `"::"`.
+    /// 
     /// # Example
     /// * The symbol map contains `my_crate::foo::h843a613894da0c24` 
     ///   and no other symbols that start with `my_crate::foo`. 
@@ -1501,6 +1505,13 @@ impl CrateNamespace {
     ///   `my_crate::foo::h933a635894ce0f12`. 
     ///   Calling `get_symbol_starting_with("my_crate::foo")` will return 
     ///   an empty (default) weak reference, which is the same as returing None.
+    /// * (Important) The symbol map contains `my_crate::foo::h843a613894da0c24` and 
+    ///   `my_crate::foo_new::h933a635894ce0f12`. 
+    ///   Calling `get_symbol_starting_with("my_crate::foo")` will return 
+    ///   an empty (default) weak reference, which is the same as returing None,
+    ///   because it will match both `foo` and `foo_new`. 
+    ///   To match only `foo`, call this function as `get_symbol_starting_with("my_crate::foo::")`
+    ///   (note the trailing `"::"`).
     pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
         let map = self.symbol_map.lock();
         let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);

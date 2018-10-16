@@ -159,14 +159,14 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(loadable)] 
     {
         let kernel_prefix = mod_mgmt::metadata::CrateType::Kernel.prefix();
-        let core_module = try_exit!(memory::get_module(&format!("{}core", kernel_prefix)).ok_or("couldn't find core module"));
+        let core_module = try_exit!(memory::get_module_starting_with(&format!("{}core-", kernel_prefix)).ok_or("couldn't find k#core* module"));
         let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
 
-        let captain_module = try_exit!(memory::get_module(&format!("{}captain", kernel_prefix)).ok_or("couldn't find captain module"));
+        let captain_module = try_exit!(memory::get_module_starting_with(&format!("{}captain-", kernel_prefix)).ok_or("couldn't find k#captain* module"));
         let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
         
-        let panic_wrapper_module = try_exit!(memory::get_module(&format!("{}panic_wrapper", kernel_prefix)).ok_or("couldn't find panic_wrapper module"));
+        let panic_wrapper_module = try_exit!(memory::get_module_starting_with(&format!("{}panic_wrapper-", kernel_prefix)).ok_or("couldn't find k#panic_wrapper* module"));
         let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(panic_wrapper_module, None, kernel_mmi_ref.lock().deref_mut(), false));
     }
 
@@ -181,7 +181,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use memory::{MappedPages, MemoryManagementInfo};
 
         let section_ref = try_exit!(
-            mod_mgmt::get_default_namespace().get_symbol_starting_with("captain::init")
+            mod_mgmt::get_default_namespace().get_symbol_starting_with("captain::init::")
             .upgrade()
             .ok_or("no single symbol matching \"captain::init\"")
         );

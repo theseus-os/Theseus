@@ -42,7 +42,7 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
         {
             type PanicWrapperFunc = fn(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
             let section_ref = mod_mgmt::get_default_namespace()
-                    .get_symbol_starting_with("panic_wrapper::panic_wrapper")
+                    .get_symbol_starting_with("panic_wrapper::panic_wrapper::")
                     .upgrade()
                     .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
 
