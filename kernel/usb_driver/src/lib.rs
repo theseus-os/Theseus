@@ -111,16 +111,12 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
 
     usb_uhci::port1_reset();
     if let Ok(mut device) = usb_uhci::port1_device_init(){
-
+        info!("port_1_enum: speed {:?}", device.speed);
 
         let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(0)
             .ok_or("Couldn't get virtual memory address for the buffer pointer in get_config_desc request for device in UHCI!!")?;
         let data_buffer_pointer = active_table.translate(v_buffer_pointer as usize)
             .ok_or("Couldn't translate the virtual memory address of the buffer pointer to phys_addr!!")?;
-
-        let a = box_endpoint_desc(active_table,data_buffer_pointer,0)?;
-        debug!("see the data buffer is empty or not{:?}",a);
-
 
 
         device.maxpacketsize = 8;
@@ -265,7 +261,7 @@ fn port_2_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
         if device.device_type == HIDType::Mouse || device.device_type == HIDType::Keyboard{
 
             let (request_pointer,new_offset) = build_request(active_table,0x21, usb_req::REQ_SET_IDLE,
-                                                             0, 0,0,offset)?;
+                                                             0xff00, 0,0,offset)?;
             set_request(&mut device, request_pointer as u32,active_table)?;
 
             offset = new_offset;
@@ -443,6 +439,8 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
         let end_desc = box_endpoint_desc(active_table, data_buffer_pointer,new_offset)?;
         let endpoint_len = end_desc.len.read();
         let endpoint_add = end_desc.addr.read() & 0xf;
+        let endpoint_interval = end_desc.interval.read();
+
         new_offset += (endpoint_len as usize);
         let desc_type = end_desc.endp_type.read();
         let attribute = end_desc.attributes.read()  & 0b11;
@@ -450,8 +448,10 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
         if desc_type == 5{
             match attribute{
                 0b00 => dev.control_endpoint = endpoint_add,
+
                 0b01 => dev.iso_endpoint = endpoint_add,
-                0b11 => dev.interrupt_endpoint = endpoint_add,
+                0b11 => {dev.interrupt_endpoint = endpoint_add;
+                    info!("\n\n\nthe end point interrupt interval: {:x} \n\n\n", endpoint_interval)},
                 _ => {},
             }
         }
@@ -625,7 +625,6 @@ pub fn set_request(dev: &mut UsbDevice, request_pointer: u32, active_table: &mut
         let status = usb_uhci::td_status(setup_index).unwrap()?;
 
         if status & usb_uhci::TD_CS_ACTIVE == 0{
-            info!("sending data stage's status : {:x} ", status);
             break
         }
     }

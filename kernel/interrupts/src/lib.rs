@@ -346,9 +346,9 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("nic handler called");
+//    debug!("nic handler called");
 
-    usb_keyboard::data_handler();
+    let result = usb_keyboard::data_handler();
     if let Ok(()) = usb_uhci::int_status_handle(){
 
         if let Some(td_index) = USB_KEYBOARD_TD_INDEX.try().map(|td_index| {

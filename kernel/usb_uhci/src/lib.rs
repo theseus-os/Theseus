@@ -216,17 +216,6 @@ pub fn get_registered_device (index: usize) -> Option<UsbDevice>{
     UHCI_DEVICE_POOL.try().map(|device_pool| {
 
         let device = device_pool.lock()[index].clone();
-//        let mut d = UsbDevice::default();
-//        d.port = device.port;
-//        d.interrupt_endpoint = device.interrupt_endpoint;
-//        d.iso_endpoint = device.iso_endpoint;
-//        d.control_endpoint = device.control_endpoint;
-//        d.device_type = device.device_type;
-//        d.addr = device.addr;
-//        d.maxpacketsize = device.maxpacketsize;
-//        d.speed = device.speed;
-//        d.controller = device.controller;
-//        d
         device
     })
 }
@@ -435,6 +424,25 @@ pub fn td_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
         Err("No empty frame, need to clean one")
     })
 }
+
+
+pub fn td_link_keyboard_framelist(pointer: u32){
+
+    UHCI_FRAME_LIST.try().map(|frame_list|{
+
+        for x in 0..103 {
+            let frame =  &mut frame_list.lock()[(10*x) as usize];
+            if (frame.read() == 0) || (frame.read() & 0x1 == 0x1) {
+
+                frame.write(pointer);
+            }
+        }
+
+
+
+    } );
+}
+
 
 ///read frame list link pointer
 pub fn frame_link_pointer(index: usize) -> Option<Result<u32,&'static str>>{
@@ -1015,7 +1023,7 @@ pub fn port1_reset() {
 /// Return a bool
 pub fn low_speed_attach_port1() -> bool{
 
-    let flag = (REG_PORT1.lock().read() & PORT_LSDA) != 0;
+    let flag = (REG_PORT1.lock().read() & PORT_LSDA) == 0;
     flag
 
 

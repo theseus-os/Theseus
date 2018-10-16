@@ -394,7 +394,15 @@ impl Keycode {
         }
     }
 
+    pub fn from_modifier_usb(scancode: u8) -> Option<Keycode>{
 
+        match scancode{
+            0x02 => Some(Keycode::LeftShift),
+            0x20 => Some(Keycode::RightShift),
+            _=> None,
+        }
+
+    }
 
     // obtains the ascii value for a keycode under the given modifiers
     pub fn to_ascii(&self, modifiers: KeyboardModifiers) -> Option<char> {
