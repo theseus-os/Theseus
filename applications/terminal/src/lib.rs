@@ -252,7 +252,10 @@ impl Terminal {
                         break;
                     }
                     let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
-                    let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {(num_chars-1) / buffer_width + 1 } else {(num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
+                    let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {
+                                        (num_chars-1) / buffer_width + 1 
+                                    } else {
+                                        (num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
                     if num_chars > start_idx { // prevents subtraction overflow
                         return (0, total_lines * buffer_width + last_line_chars);
                     }  
@@ -686,8 +689,7 @@ impl Terminal {
                 self.history_index = 0;
                 match self.run_command_new_thread(command_structure) {
                     Ok(new_task_ref) => { 
-                        let task_id;
-                        {task_id = new_task_ref.lock().id;}
+                        let task_id = {new_task_ref.lock().id};
                         self.current_task_ref = Some(new_task_ref);
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     } Err("Error: no module with this name found!") => {
