@@ -168,12 +168,12 @@ pub fn init(
             .spawn()?;
     }  
 
-    if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
-        use ixgbe::rx_poll_mq;
-        KernelTaskBuilder::new(rx_poll_mq, None)
-            .name(String::from("rx_poll_mq"))
-            .spawn()?;
-    }
+    // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
+    //     use ixgbe::rx_poll_mq;
+    //     KernelTaskBuilder::new(rx_poll_mq, None)
+    //         .name(String::from("rx_poll_mq"))
+    //         .spawn()?;
+    // }
 
     // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
     //     use ixgbe::check_eicr;

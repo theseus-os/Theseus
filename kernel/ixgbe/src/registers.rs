@@ -62,6 +62,7 @@ pub const REG_EIAC:                 u32 = 0x810; // enables auto-clear
 pub const REG_EIAM:                 u32 = 0x890; // enables auto set and clear
 pub const REG_IVAR:                 u32 = 0x900; // maps interrupt causes from Rx and Tx queues to eicr entries (0x900 + 4*n, n = 0..63)
 pub const REG_GPIE:                 u32 = 0x898; // enable clear on read
+pub const REG_EITR:                 u32 = 0x820; // Interrupt throttle registers
 
 pub const REG_MRQC:                 u32 = 0xEC80;
 pub const REG_ETQF:                 u32 = 0x5128;

@@ -383,7 +383,7 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mu
 
     loop {
         debug!("In loop");
-     }
+    }
 
     // eoi(None);
 }

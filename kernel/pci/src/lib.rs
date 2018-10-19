@@ -126,7 +126,7 @@ pub fn pci_set_command_bus_master_bit(pci_dev: &PciDevice) {
     }
 }
 
-/// sets the PCI device's bit 3 in the Command portion, which is apparently needed to activate DMA (??)
+/// sets the PCI device's command bit 10 to disable legacy interrupts
 pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
     unsafe { 
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
@@ -139,18 +139,114 @@ pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
     }
 }
 
-/// 
-pub fn pci_set_interrupt_status_bit(bus: u16, slot: u16, func: u16) {
-    unsafe { 
-        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
-        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
-        trace!("pci_set_interrupt_status_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
-                bus, slot, func, inval);
-        PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 19));
-        trace!("pci_set_interrupt_status_bit:: PciDevice: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
-                bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
+/// Explore the pci config space and return address of capability
+pub fn pci_config_space(dev_pci: &PciDevice, capability_pci: u16) -> Option<u16> {
+
+    debug!("NIC PCI CONFIG SPACE");
+
+    debug!("PCI command: {:#X}", pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND));
+
+    let status = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_STATUS);
+
+    debug!("status: {:#X}", status);
+
+    // capabilities only valid if bit 4 of STATUS reg is set to 1
+    if (status >> 4 & 1) == 1 {
+        // finding capabilities pointer
+        let capabilities = pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_CAPABILITIES);
+        debug!("capabilities pointer: {:#X}", capabilities);
+
+        //botttom two bits of capability pointer need to be masked
+        let mut cap_addr = capabilities as u16 & 0xFFFC;
+        let mut cap_header = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
+        let mut cap_id;
+
+        while cap_addr != 0 {
+            cap_id = cap_header & 0xFF;
+
+            if cap_id == capability_pci {
+                    debug!("Found capability: {:#X} at {:#X}", capability_pci, cap_addr);// (msi_control>>16) & 0xFFFF);
+                    return Some(cap_addr);
+            }
+
+            // if node_id == MSIX_CAPABILITY {
+            //         let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+            //         debug!("MSIX control: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
+
+            //         // pci_unset_msix_enable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+            //         pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next, msix_control&0x7FFF_FFFF);
+
+            //         let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+            //         debug!("MSIX control_updated: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
+            // }
+
+            //find address of next capability
+            cap_addr = (cap_header >> 8) & 0xFF;            
+            cap_header= pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr as u16);
+
+        }
     }
+
+    None
 }
+
+pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
+
+    let cap_addr = try!(pci_config_space(dev_pci, MSI_CAPABILITY).ok_or("Device not MSI capable"));
+
+    let ctrl = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
+    let addr = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 4);
+    let data = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 12);
+
+    debug!("MSI HEADER BEFORE ENABLE");
+    debug!("MSI CAPABILTIY ID: {:#X}", ctrl & 0xFF);
+    debug!("MSI NEXT: {:#X}", ctrl>>8 & 0xFF);
+    debug!("MSI CTRL: {:#X}", ctrl>>16 & 0xFFFF);
+    debug!("MSI ADDR: {:#X}", addr);
+    debug!("MSI DATA: {:#X}", data);
+
+    //write to MSI Addr... Intel Arch SDM, vol3, 10.11
+    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20);
+
+    //write to MSI data, TODO: should add this as a function arg, vector num
+    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+12, 0x30);
+
+    //enable MSI in ctrl
+    let msi_enable = 1<<16;
+    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr, ctrl|msi_enable);
+
+    let ctrl = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
+    let addr = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 4);
+    let data = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 12);
+
+
+    debug!("MSI HEADER AFTER ENABLE");
+    debug!("MSI CAPABILTIY ID: {:#X}", ctrl & 0xFF);
+    debug!("MSI NEXT: {:#X}", ctrl>>8 & 0xFF);
+    debug!("MSI CTRL: {:#X}", ctrl>>16 & 0xFFFF);
+    debug!("MSI ADDR: {:#X}", addr);
+    debug!("MSI DATA: {:#X}", data);
+
+    Ok(())  
+
+}
+
+
+
+// pub fn pci_get_interrupt_status_bit(bus: u16, slot: u16, func: u16) {
+//     unsafe { 
+//         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
+//         let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+//         trace!("pci_set_interrupt_status_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
+//                 bus, slot, func, inval);
+//         PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 19));
+//         trace!("pci_set_interrupt_status_bit:: PciDevice: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
+//                 bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
+//     }
+// }
 
 /// struct representing a PCI Bus, containing an array of PCI Devices
 #[derive(Debug)]

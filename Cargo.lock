@@ -231,6 +231,15 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "check_nic_int"
+version = "0.1.0"
+dependencies = [
+ "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "ixgbe 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "compiler_builtins"
 version = "0.1.11"
 source = "git+https://github.com/rust-lang-nursery/compiler-builtins#045de6e5166ebaf8b74ad9d97b6bb09d5d28c982"
