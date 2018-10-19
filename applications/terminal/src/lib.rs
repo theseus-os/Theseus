@@ -39,6 +39,8 @@ use runqueue::RunQueue;
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
 
+
+
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -59,6 +61,9 @@ pub fn main(_args: Vec<String>) -> isize {
     return 0;
 }
 
+enum TerminalError {
+    offEndBound
+}
 
 struct Terminal {
     /// The terminal's own window
@@ -223,80 +228,79 @@ impl Terminal {
             result = self.scrollback_buffer.get(0..end_idx);
         }
 
-        match result {
-            Some(slice) => {
-                let mut total_lines = 0;
-                // Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur
-                let new_line_indices: Vec<(usize, &str)> = slice.rmatch_indices('\n').collect();
-                // if there are no new lines in the slice
-                if new_line_indices.is_empty() {
-                    if buffer_height * buffer_width > end_idx {
-                        return (0,buffer_height * buffer_width -1);
-                    } else {
-                        start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
-                        return (start_idx, buffer_height * buffer_width -1);
-                    }
-                }
-
-                let mut last_line_chars = 1;
-                // Case where the last newline does not occur at the end of the slice
-                if new_line_indices[0].0 != slice.len() - 1 {
-                    start_idx -= slice.len() -1 - new_line_indices[0].0;
-                    total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
-                    last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
-                }
-
-                // covers everything *up to* the characters between the beginning of the slice and the first new line character
-                for i in 0..new_line_indices.len()-1 {
-                    if total_lines >= buffer_height {
-                        break;
-                    }
-                    let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
-                    let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {
-                                        (num_chars-1) / buffer_width + 1 
-                                    } else {
-                                        (num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
-                    if num_chars > start_idx { // prevents subtraction overflow
-                        return (0, total_lines * buffer_width + last_line_chars);
-                    }  
-                    start_idx -= num_chars;
-                    total_lines += num_lines;
-                }
-
-                // tracks the characters between the beginning of the slice and the first new line character
-                let first_chars = new_line_indices[new_line_indices.len() -1].0;
-                let first_chars_lines = first_chars/buffer_width + 1;
-
-                // covers the case where the text inside the new_lines_indices array overflow the text buffer 
-                if total_lines > buffer_height {
-                    start_idx += (total_lines - buffer_height) * buffer_width; // adds back the overcounted lines to the starting index
-                    total_lines = buffer_height;
-                // covers the case where the text between the last newline and the end of the slice overflow the text buffer
-                } else if first_chars_lines + total_lines > buffer_height {
-                    let diff = buffer_height - total_lines;
-                    total_lines += diff;
-                    start_idx -= diff * buffer_width;
-                // covers the case where the text between the last newline and the end of the slice exactly fits the text buffer
-                } else if first_chars_lines + total_lines == buffer_height {
-                    total_lines += first_chars_lines;
-                    start_idx -= first_chars;
-                // covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)
+        if let Some(slice) = result {
+            let mut total_lines = 0;
+            // Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur
+            let new_line_indices: Vec<(usize, &str)> = slice.rmatch_indices('\n').collect();
+            // if there are no new lines in the slice
+            if new_line_indices.is_empty() {
+                if buffer_height * buffer_width > end_idx {
+                    return (0,buffer_height * buffer_width -1);
                 } else {
-                    return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
+                    start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
+                    return (start_idx, buffer_height * buffer_width -1);
                 }
+            }
 
-                // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-                return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
+            let mut last_line_chars = 1;
+            // Case where the last newline does not occur at the end of the slice
+            if new_line_indices[0].0 != slice.len() - 1 {
+                start_idx -= slice.len() -1 - new_line_indices[0].0;
+                total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
+                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
+            }
 
-            },
-            None => (0,0)
-        }        
+            // covers everything *up to* the characters between the beginning of the slice and the first new line character
+            for i in 0..new_line_indices.len()-1 {
+                if total_lines >= buffer_height {
+                    break;
+                }
+                let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
+                let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {
+                                    (num_chars-1) / buffer_width + 1 
+                                } else {
+                                    (num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
+                if num_chars > start_idx { // prevents subtraction overflow
+                    return (0, total_lines * buffer_width + last_line_chars);
+                }  
+                start_idx -= num_chars;
+                total_lines += num_lines;
+            }
+
+            // tracks the characters between the beginning of the slice and the first new line character
+            let first_chars = new_line_indices[new_line_indices.len() -1].0;
+            let first_chars_lines = first_chars/buffer_width + 1;
+
+            // covers the case where the text inside the new_lines_indices array overflow the text buffer 
+            if total_lines > buffer_height {
+                start_idx += (total_lines - buffer_height) * buffer_width; // adds back the overcounted lines to the starting index
+                total_lines = buffer_height;
+            // covers the case where the text between the last newline and the end of the slice overflow the text buffer
+            } else if first_chars_lines + total_lines > buffer_height {
+                let diff = buffer_height - total_lines;
+                total_lines += diff;
+                start_idx -= diff * buffer_width;
+            // covers the case where the text between the last newline and the end of the slice exactly fits the text buffer
+            } else if first_chars_lines + total_lines == buffer_height {
+                total_lines += first_chars_lines;
+                start_idx -= first_chars;
+            // covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)
+            } else {
+                return (0, total_lines * buffer_width + last_line_chars); // In  the case that an end index argument corresponded to a string slice that underfits the text display
+            }
+
+            // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
+            return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
+
+        } else {
+            return (0,0);
+        }   
     }
 
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, &'static str> {
+    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, TerminalError> {
         let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
@@ -309,63 +313,62 @@ impl Terminal {
         }
 
         // calculate the starting index for the slice
-        match result {
-            Some(slice) => {
-                let mut total_lines = 0;
-                // Obtains a vector of the indices of the slice where newlines occur in ascending order
-                let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
-                // if there are no new lines in the slice
-                if new_line_indices.len() == 0 {
-                    // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
-                    end_idx += buffer_height * buffer_width;
-                    if end_idx <= self.scrollback_buffer.len() -1 {
-                        return Ok(end_idx); 
-                    } else {
-                        return Err("exceeded end bound");
-                    }
-                }
-
-                let mut counter = 0;
-                // Covers the case where the start idx argument corresponds to a string that does not start on a newline 
-                if new_line_indices[0].0 != 0 {
-                    end_idx += new_line_indices[0].0;
-                    total_lines += new_line_indices[0].0/buffer_width + 1;
-                }
-                // the characters between the last newline and the end of the slice
-                let last_line_chars = slice.len() -1 - new_line_indices[new_line_indices.len() -1].0;  
-                let num_last_lines = last_line_chars%buffer_width + 1; // +1 to account for the physical line that the last characters will take up
-
-                for i in 0..new_line_indices.len()-1 {
-                    if total_lines >= buffer_height {
-                        break;
-                    }
-                    let num_chars = new_line_indices[i+1].0 - new_line_indices[i].0;
-                    let num_lines = num_chars/buffer_width + 1;
-                    end_idx += num_chars;
-                    total_lines += num_lines;
-                    counter += 1;
-                }
-                // covers the case where the text inside the new_line_indices array overflows the text buffer capacity            
-                if total_lines > buffer_height {
-                    let num_chars = new_line_indices[counter].0 - new_line_indices[counter -1].0;
-                    end_idx -= num_chars;
-                    end_idx += buffer_width;
-                // covers the case where the characters between the last newline and the end of the slice overflow the text buffer capacity
-                } else if total_lines + num_last_lines >= total_lines {
-                    let diff = buffer_height - total_lines;
-                    end_idx += diff * buffer_width;
-                // covers the case where the entire slice exactly fits or is smaller than the text buffer capacity
-                } else {
-                    end_idx += last_line_chars;
-                }
-
+        if let Some(slice) = result {
+            let mut total_lines = 0;
+            // Obtains a vector of the indices of the slice where newlines occur in ascending order
+            let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
+            // if there are no new lines in the slice
+            if new_line_indices.len() == 0 {
+                // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
+                end_idx += buffer_height * buffer_width;
                 if end_idx <= self.scrollback_buffer.len() -1 {
                     return Ok(end_idx); 
                 } else {
-                    return Err("exceeded end bound");
+                    return Err(TerminalError::offEndBound);
                 }
-            },
-            None => Ok(self.scrollback_buffer.len() - 1),
+            }
+
+            let mut counter = 0;
+            // Covers the case where the start idx argument corresponds to a string that does not start on a newline 
+            if new_line_indices[0].0 != 0 {
+                end_idx += new_line_indices[0].0;
+                total_lines += new_line_indices[0].0/buffer_width + 1;
+            }
+            // the characters between the last newline and the end of the slice
+            let last_line_chars = slice.len() -1 - new_line_indices[new_line_indices.len() -1].0;  
+            let num_last_lines = last_line_chars%buffer_width + 1; // +1 to account for the physical line that the last characters will take up
+
+            for i in 0..new_line_indices.len()-1 {
+                if total_lines >= buffer_height {
+                    break;
+                }
+                let num_chars = new_line_indices[i+1].0 - new_line_indices[i].0;
+                let num_lines = num_chars/buffer_width + 1;
+                end_idx += num_chars;
+                total_lines += num_lines;
+                counter += 1;
+            }
+            // covers the case where the text inside the new_line_indices array overflows the text buffer capacity            
+            if total_lines > buffer_height {
+                let num_chars = new_line_indices[counter].0 - new_line_indices[counter -1].0;
+                end_idx -= num_chars;
+                end_idx += buffer_width;
+            // covers the case where the characters between the last newline and the end of the slice overflow the text buffer capacity
+            } else if total_lines + num_last_lines >= total_lines {
+                let diff = buffer_height - total_lines;
+                end_idx += diff * buffer_width;
+            // covers the case where the entire slice exactly fits or is smaller than the text buffer capacity
+            } else {
+                end_idx += last_line_chars;
+            }
+
+            if end_idx <= self.scrollback_buffer.len() -1 {
+                return Ok(end_idx); 
+            } else {
+                return Err(TerminalError::offEndBound);
+            }
+        } else {
+            return Ok(self.scrollback_buffer.len() - 1)
         }
     }
 
@@ -391,16 +394,15 @@ impl Terminal {
         }
         // Searches this slice for a newline
 
-        match result {
-            Some(slice) => {
-                let index = slice.rfind('\n');   
-                new_start_idx = match index {
-                    Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
-                    None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
-                }; 
-            },
-            None => return
-        }  
+        if let Some(slice) = result {
+            let index = slice.rfind('\n');   
+            new_start_idx = match index {
+                Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
+                None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
+            }; 
+        } else {
+            return;
+        }
         self.scroll_start_idx = new_start_idx;
         // Recalculates the end index after the new starting index is found
         self.is_scroll_end = false;
@@ -417,8 +419,7 @@ impl Terminal {
         let result = self.calc_end_idx(prev_start_idx, display_name);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err("exceeded end bound") => self.scrollback_buffer.len() -1,
-            Err(err) => {error!("{}", err); return}
+            Err(TerminalError::offEndBound) => self.scrollback_buffer.len() -1,
         };
 
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
@@ -470,26 +471,24 @@ impl Terminal {
         let result = self.calc_end_idx(start_idx, display_name);
         let new_start_idx = match result {
             Ok(idx) => idx+ 1, 
-            Err("exceeded end bound") => {
+            Err(TerminalError::offEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
             },
-            Err(err) => {error!("{}", err); return}
         };
         let result = self.calc_end_idx(new_start_idx, display_name);
         let new_end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err("exceeded end bound") => {
+            Err(TerminalError::offEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
             },
-            Err(err) => {error!("{}", err); return}
         };
         if new_end_idx == self.scrollback_buffer.len() -1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
@@ -505,13 +504,12 @@ impl Terminal {
         let result= self.calc_end_idx(start_idx, display_name); 
         let end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err("exceeded end bound") => {
+            Err(TerminalError::offEndBound) => {
                 let new_end_idx = self.scrollback_buffer.len() -1;
                 let new_start_idx = self.calc_start_idx(new_end_idx, display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 new_end_idx
             },
-            Err(err) => {return Err(err);}
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
@@ -550,12 +548,11 @@ impl Terminal {
 
     /// Called by the main loop to handle the exiting of tasks initiated in the terminal
     fn task_handler(&mut self) -> Result<(), &'static str> {
-        let task_ref_copy = match self.current_task_ref {
-            Some(ref task_ref) => task_ref.clone(),
+        let task_ref_copy = match self.current_task_ref.clone() {
+            Some(task_ref) => task_ref,
             None => { return Ok(());}
         };
-        let end_task = task_ref_copy.lock();
-        let exit_result = end_task.into_inner().take_exit_value();
+        let exit_result = task_ref_copy.take_exit_value();
         // match statement will see if the task has finished with an exit value yet
         match exit_result {
             Some(exit_val) => {
