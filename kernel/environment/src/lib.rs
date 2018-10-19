@@ -11,7 +11,7 @@ use vfs::{StrongDirRef, FileDirectory, VFSDirectory};
 /// A structure that contains Environmnt variables for a given task
 pub struct Environment {
     /// The working directory for given tasks
-    pub working_dir: StrongDirRef<VFSDirectory>, 
+    pub working_dir: StrongDirRef, 
 }
 
 impl Environment {

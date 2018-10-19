@@ -14,27 +14,27 @@ use alloc::arc::{Arc, Weak};
 
 lazy_static! {
     /// The root directory
-    pub static ref ROOT: StrongDirRef<VFSDirectory> = {
+    pub static ref ROOT: StrongAnyDirRef = {
         let root_dir = VFSDirectory {
             name: "/root".to_string(),
             child_dirs: Vec::new(),
             files: Vec::new(),
             parent: None, 
         };
-        Arc::new(Mutex::new(root_dir))
+        Arc::new(Mutex::new(Box::new(root_dir)))
     };
 }
 
-pub fn get_root() -> StrongDirRef {
+pub fn get_root() -> StrongAnyDirRef {
     Arc::clone(&ROOT)
 }
 
 /// An strong reference (Arc) and a Mutex wrapper around VFSDirectory
-pub type StrongDirRef<D:Directory> = Arc<Mutex<D>>;
-pub type StrongRefAnyDirectory = StrongDirRef<Box<Directory + 'static>>;
+pub type StrongDirRef<D: Directory + Send> = Arc<Mutex<D>>;
+pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
 // type StrongVFSDirectoryRef = StrongDirRef<VFSDirectory>;
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
-pub type WeakDirRef = Weak<Mutex<Directory>>;
+pub type WeakDirRef<D: Directory> = Weak<Mutex<D>>;
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
@@ -45,11 +45,11 @@ pub trait File : FileDirectory {
 }
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
-pub trait Directory : FileDirectory {
-    fn new_dir(&mut self, name: String, parent_pointer:WeakDirRef) -> StrongRefAnyDirectory; 
-    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef); 
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongRefAnyDirectory>;
-    fn get_parent_dir(&self) -> Option<StrongRefAnyDirectory>;
+pub trait Directory : FileDirectory + Send {
+    fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>) -> StrongAnyDirRef; 
+    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>); 
+    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> String;
     fn get_name(&self) -> String;
 }
@@ -65,29 +65,29 @@ pub struct VFSDirectory {
     /// The name of the directory
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
-    child_dirs: Vec<StrongRefAnyDirectory>,
+    child_dirs: Vec<StrongAnyDirRef>,
     /// A list of files within this directory
     files: Vec<VFSFile>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: Option<WeakDirRef>,
+    parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
 
 impl Directory for VFSDirectory {
     /// Creates a new directory and passes a reference to the new directory created as output
-    fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) -> StrongRefAnyDirectory {
+    fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
             child_dirs: Vec::new(),
             files:  Vec::new(),
             parent: Some(parent_pointer),
         };
-        let dir_ref = Arc::new(Mutex::new(Box::new(directory)));
+        let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         self.child_dirs.push(dir_ref.clone());
         dir_ref
     }
 
     /// Creates a new file with the parent_pointer as the enclosing directory
-    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef)  {
+    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>)  {
         let file = VFSFile {
             name: name,
             size: 0,
@@ -97,7 +97,7 @@ impl Directory for VFSDirectory {
     }
  
     /// Looks for the child directory specified by dirname and returns a reference to it 
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongDirRef> {
+    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
         for dir in self.child_dirs.iter() {
             if dir.lock().get_name() == child_dir {
                 return Some(Arc::clone(dir));
@@ -107,9 +107,9 @@ impl Directory for VFSDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongDirRef> {
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
         match self.parent {
-            Some(parent) => parent.upgrade(),
+            Some(ref dir) => dir.upgrade(),
             None => None
         }
     }
@@ -128,7 +128,7 @@ impl Directory for VFSDirectory {
     }
 
     fn get_name(&self) -> String {
-        self.name
+        self.name.clone()
     }
     // TODO - return iterator of children rather than a string
     // fn children(&self) -> Iterator {
@@ -165,7 +165,7 @@ pub struct VFSFile {
     /// The file size 
     size: usize, 
     /// A weak reference to the parent directory
-    parent: WeakDirRef,
+    parent: WeakDirRef<Box<Directory + Send>>,
 }
 
 impl File for VFSFile {
@@ -271,7 +271,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongDirRef) -> Option<StrongDirRef> {
+    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<StrongAnyDirRef> {
         let current_path = wd.lock().get_path();
         // Get the shortest path from self to working directory by first finding the canonical path then the relative path
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
