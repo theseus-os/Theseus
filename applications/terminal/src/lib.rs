@@ -203,9 +203,10 @@ impl Terminal {
     }
 
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
-        match self.window.get_displayable(name) {
-            Some(text_display) => text_display.get_dimensions(),
-            None => (0,0)
+        if let Some(text_display) = self.window.get_displayable(name){
+            text_display.get_dimensions()
+        } else {
+            (0, 0)
         }
     }
 
