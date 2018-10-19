@@ -61,7 +61,7 @@ pub fn main(_args: Vec<String>) -> isize {
     return 0;
 }
 
-enum TerminalError {
+enum ScrollError {
     offEndBound
 }
 
@@ -301,7 +301,7 @@ impl Terminal {
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, TerminalError> {
+    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, ScrollError> {
         let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
@@ -325,7 +325,7 @@ impl Terminal {
                 if end_idx <= self.scrollback_buffer.len() -1 {
                     return Ok(end_idx); 
                 } else {
-                    return Err(TerminalError::offEndBound);
+                    return Err(ScrollError::offEndBound);
                 }
             }
 
@@ -366,7 +366,7 @@ impl Terminal {
             if end_idx <= self.scrollback_buffer.len() -1 {
                 return Ok(end_idx); 
             } else {
-                return Err(TerminalError::offEndBound);
+                return Err(ScrollError::offEndBound);
             }
         } else {
             return Ok(self.scrollback_buffer.len() - 1)
@@ -420,7 +420,7 @@ impl Terminal {
         let result = self.calc_end_idx(prev_start_idx, display_name);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(TerminalError::offEndBound) => self.scrollback_buffer.len() -1,
+            Err(ScrollError::offEndBound) => self.scrollback_buffer.len() -1,
         };
 
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
@@ -472,7 +472,7 @@ impl Terminal {
         let result = self.calc_end_idx(start_idx, display_name);
         let new_start_idx = match result {
             Ok(idx) => idx+ 1, 
-            Err(TerminalError::offEndBound) => {
+            Err(ScrollError::offEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
@@ -483,7 +483,7 @@ impl Terminal {
         let result = self.calc_end_idx(new_start_idx, display_name);
         let new_end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(TerminalError::offEndBound) => {
+            Err(ScrollError::offEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
@@ -505,7 +505,7 @@ impl Terminal {
         let result= self.calc_end_idx(start_idx, display_name); 
         let end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(TerminalError::offEndBound) => {
+            Err(ScrollError::offEndBound) => {
                 let new_end_idx = self.scrollback_buffer.len() -1;
                 let new_start_idx = self.calc_start_idx(new_end_idx, display_name).0;
                 self.scroll_start_idx = new_start_idx;
