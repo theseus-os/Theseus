@@ -5,10 +5,12 @@
 extern crate alloc;
 extern crate task;
 extern crate getopts;
+extern crate vfs;
 
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
+use vfs::Directory;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

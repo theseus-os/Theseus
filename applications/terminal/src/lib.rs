@@ -36,7 +36,7 @@ use alloc::arc::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use vfs::StrongDirRef;
+use vfs::{StrongDirRef, FileDirectory};
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueue;
 use environment::Environment;

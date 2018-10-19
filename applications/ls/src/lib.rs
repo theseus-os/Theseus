@@ -4,8 +4,10 @@
 extern crate alloc;
 extern crate task;
 #[macro_use] extern crate terminal_print;
+extern crate vfs;
 
 use alloc::{Vec, String};
+use vfs::Directory;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
