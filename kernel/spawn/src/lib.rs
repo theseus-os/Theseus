@@ -263,7 +263,7 @@ impl ApplicationTaskBuilder {
 
         // get the LoadedSection for the "main" function in the app_crate
         let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
-            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function!")?;
+            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function!")?.clone();
 
         let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
         let main_func = {

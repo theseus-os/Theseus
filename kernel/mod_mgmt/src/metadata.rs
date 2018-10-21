@@ -5,7 +5,7 @@
 
 use core::ops::{Deref};
 use spin::Mutex;
-use alloc::{Vec, String, BTreeMap};
+use alloc::{Vec, String, BTreeMap, BTreeSet};
 use alloc::arc::{Arc, Weak};
 use memory::{MappedPages, ModuleArea, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
@@ -94,8 +94,6 @@ impl CrateType {
 }
 
 
-
-
 /// Represents a single crate object file that has been loaded into the system.
 pub struct LoadedCrate {
     /// The name of this crate.
@@ -117,6 +115,25 @@ pub struct LoadedCrate {
     /// The `MappedPages` that include the data and bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<Mutex<MappedPages>>>,
+    
+    /// The list of symbols in this crate that **do not** have the `crate_name` as their prefix.
+    /// For example, `no_mangle` symbols do not have the crate_name prefix.
+    pub non_prefixed_symbols: BTreeSet<String>,
+
+    /// An optional prefix that all of this crate's public symbols will be reexported under,
+    /// i.e., they will be added to the enclosing `CrateNamespace`'s symbol map with this prefix
+    /// substituted in place of the regular `crate_name` prefix.
+    /// 
+    /// This is primarily used when swapping crates, and it is useful in the following way. 
+    /// If this crate is the new crate that is swapped in to replace another crate, 
+    /// and the caller of the `swap_crates()` function specifies that this crate 
+    /// should expose its symbols with names that match the old crate it's replacing, 
+    /// then will be set to the name of the old crate that it replaced, e.g., "keyboard::".
+    /// 
+    /// When a crate is first loaded, this will be `None` by default, 
+    /// because this crate will only have its one standard prefix: its crate_name 
+    /// without the hash and with a trailing "`::`", e.g., "`keyboard_new::`".
+    pub reexported_prefix: Option<String>,
 }
 
 use core::fmt;
@@ -135,25 +152,40 @@ impl Drop for LoadedCrate {
 impl LoadedCrate {
     /// Returns the `LoadedSection` of type `SectionType::Text` that matches the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
-    pub fn get_function_section(&self, func_name: &str) -> Option<StrongSectionRef> {
+    pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| sec.is_text() && sec.name == func_name)
     }
 
     /// Returns the first `LoadedSection` that matches the given predicate
-    pub fn find_section<F>(&self, predicate: F) -> Option<StrongSectionRef> 
+    pub fn find_section<F>(&self, predicate: F) -> Option<&StrongSectionRef> 
         where F: Fn(&LoadedSection) -> bool
     {
-        self.sections.values().filter(|sec_ref| {
-            let sec = sec_ref.lock();
-            predicate(&sec)
-        }).next().cloned()
+        self.sections.values()
+            .filter(|sec_ref| predicate(&sec_ref.lock()))
+            .next()
     }
 
+    /// Returns the substring of this crate's name that excludes the trailing hash. 
+    /// If there is no hash, then it returns the entire name. 
+    pub fn crate_name_without_hash(&self) -> &str {
+        // the hash identifier (delimiter) is "-"
+        self.crate_name.split("-")
+            .next()
+            .unwrap_or_else(|| &self.crate_name)
+    }
+
+    /// Returns this crate name as a symbol prefix, including a trailing "`::`".
+    /// If there is no hash, then it returns the entire name with a trailing "`::`".
+    /// # Example
+    /// * Crate name: "`driver_init-e3769b63863a4030`", return value: "`driver_init::`"
+    /// * Crate name: "`hello`"` return value: "`hello::`"
+    pub fn crate_name_as_prefix(&self) -> String {
+        format!("{}::", self.crate_name_without_hash())
+    }
 
     /// Currently may contain duplicates!
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
-
         for sec in self.sections.values() {
             let sec_locked = sec.lock();
             for dep_sec in &sec_locked.sections_dependent_on_me {
@@ -164,7 +196,6 @@ impl LoadedCrate {
                 }
             }
         }
-
         results
     }
 
@@ -221,12 +252,14 @@ impl LoadedCrate {
         let mut new_data_pages_locked   = new_data_pages_ref  .as_ref().map(|dp| dp.lock());
 
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:   self.crate_name.clone(),
-            object_file:  self.object_file,
-            sections:     BTreeMap::new(),
-            text_pages:   new_text_pages_ref.clone(),
-            rodata_pages: new_rodata_pages_ref.clone(),
-            data_pages:   new_data_pages_ref.clone(),
+            crate_name:              self.crate_name.clone(),
+            object_file:             self.object_file,
+            sections:                BTreeMap::new(),
+            text_pages:              new_text_pages_ref.clone(),
+            rodata_pages:            new_rodata_pages_ref.clone(),
+            data_pages:              new_data_pages_ref.clone(),
+            reexported_prefix:       self.reexported_prefix.clone(),
+            non_prefixed_symbols:    self.non_prefixed_symbols.clone(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
@@ -508,6 +541,21 @@ impl LoadedSection {
     /// Whether this `LoadedSection` is a .bss section
     pub fn is_bss(&self) -> bool {
         self.typ == SectionType::Bss
+    }
+
+    /// Returns the substring of this section's name that excludes the trailing hash,
+    /// but includes the hash delimiter "`::h`". 
+    /// If there is no hash, then it returns the entire name. 
+    /// 
+    /// # Examples
+    /// name: "`keyboard_new::init::h832430094f98e56b`", return value: "`keyboard_new::init::h`"
+    /// name: "`start_me`", return value: "`start_me`"
+    pub fn name_without_hash(&self) -> &str {
+        // the hash identifier (delimiter) is "::h"
+        const HASH_DELIMITER: &'static str = "::h";
+        self.name.rfind("::h")
+            .and_then(|end| self.name.get(0 .. (end + HASH_DELIMITER.len())))
+            .unwrap_or_else(|| &self.name)
     }
 
     /// Returns the index of the first `WeakDependent` object with a section

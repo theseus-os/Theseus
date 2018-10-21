@@ -3,7 +3,7 @@
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
 use core::ops::DerefMut;
-use alloc::{BTreeMap, String};
+use alloc::{BTreeMap, BTreeSet, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
 use spin::Mutex;
@@ -112,7 +112,7 @@ pub fn parse_nano_core(
         trace!("parse_nano_core(): adding symbols to namespace...");
         let new_syms = default_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
         trace!("parse_nano_core(): finished adding symbols.");
-        default_namespace.crate_tree.lock().insert(crate_name, new_crate_ref);
+        default_namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
         info!("parsed nano_core crate, {} new symbols.", new_syms);
         Ok(new_syms)
 
@@ -153,12 +153,14 @@ fn parse_nano_core_symbol_file(
     }
 
     let new_crate = CowArc::new(LoadedCrate {
-        crate_name:   crate_name, 
-        object_file:  nano_core_object_file,
-        sections:     BTreeMap::new(),
-        text_pages:   Some(text_pages.clone()),
-        rodata_pages: Some(rodata_pages.clone()),
-        data_pages:   Some(data_pages.clone()),
+        crate_name:              crate_name,
+        object_file:             nano_core_object_file,
+        sections:                BTreeMap::new(),
+        text_pages:              Some(text_pages.clone()),
+        rodata_pages:            Some(rodata_pages.clone()),
+        data_pages:              Some(data_pages.clone()),
+        non_prefixed_symbols:    BTreeSet::new(),
+        reexported_prefix:       None,
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
@@ -514,12 +516,14 @@ fn parse_nano_core_binary(
     let bss_shndx    = try_mp!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"), text_pages, rodata_pages, data_pages);
 
     let new_crate = CowArc::new(LoadedCrate {
-        crate_name:   crate_name, 
-        object_file:  nano_core_object_file,
-        sections:     BTreeMap::new(),
-        text_pages:   Some(text_pages.clone()),
-        rodata_pages: Some(rodata_pages.clone()),
-        data_pages:   Some(data_pages.clone()),
+        crate_name:              crate_name, 
+        object_file:             nano_core_object_file,
+        sections:                BTreeMap::new(),
+        text_pages:              Some(text_pages.clone()),
+        rodata_pages:            Some(rodata_pages.clone()),
+        data_pages:              Some(data_pages.clone()),
+        non_prefixed_symbols:    BTreeSet::new(),
+        reexported_prefix:       None,
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
