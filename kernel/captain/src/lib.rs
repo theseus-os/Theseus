@@ -130,7 +130,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // creates the procfs
-    task::init(vfs::get_root())?;
+    // task::init(vfs::get_root())?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);

@@ -6,12 +6,12 @@ extern crate vfs;
 
 use alloc::String;
 use alloc::arc::Arc;
-use vfs::{StrongDirRef, FileDirectory, VFSDirectory};
+use vfs::{StrongAnyDirRef, FileDirectory, VFSDirectory};
 
 /// A structure that contains Environmnt variables for a given task
 pub struct Environment {
     /// The working directory for given tasks
-    pub working_dir: StrongDirRef, 
+    pub working_dir: StrongAnyDirRef, 
 }
 
 impl Environment {
@@ -22,7 +22,7 @@ impl Environment {
     }
 
     /// Sets working directory
-    pub fn set_wd(&mut self, new_dir: StrongDirRef<VFSDirectory>) {
+    pub fn set_wd(&mut self, new_dir: StrongAnyDirRef) {
         self.working_dir = Arc::clone(&new_dir);
     }
 

@@ -84,7 +84,7 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
+/*/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
 pub fn init(root_dir: StrongDirRef<TaskDirectory>) -> Result<(), &'static str> {
     use alloc::string::ToString;
     let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
@@ -193,7 +193,7 @@ impl Directory for TaskDirectory {
         }
         return children_list;
     }
-}
+} */
 
 /// Get the id of the currently running Task on a specific core
 pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
