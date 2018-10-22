@@ -5,10 +5,12 @@
 
 extern crate task;
 extern crate getopts;
+extern crate vfs;
 
 use getopts::Options;
 use alloc::{Vec, String};
 use task::{TASKLIST, RunState};
+use vfs::File;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -39,30 +41,7 @@ pub fn main(args: Vec<String>) -> isize {
     // Print all tasks
     let mut task_string = String::new();
     for (id, taskref) in TASKLIST.iter() {
-        let task = taskref.lock();
-        let name = &task.name;
-        let runstate = match &task.runstate {
-            RunState::Initing    => "Initing",
-            RunState::Runnable   => "Runnable",
-            RunState::Blocked    => "Blocked",
-            RunState::Reaped     => "Reaped",
-            _                    => "Exited",
-        };
-        let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if task.is_an_idle_task {"I"}
-            else if task.is_application() {"A"}
-            else {" "} ;     
-
-        if matches.opt_present("b") {
-            task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
-        }
-        else {
-            task_string.push_str(
-                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
-                    id, runstate, cpu, pinned, task_type, name)
-            );
-        }
+        task_string.push_str(&taskref.lock().read());
     }
     println!("{}", task_string);
     

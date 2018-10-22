@@ -1,11 +1,17 @@
 [package]
-name = "ps"
+name = "cat"
 version = "0.1.0"
-authors = ["Christine Wang <chrissywang54@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 
 [dependencies.terminal_print]
 path = "../terminal_print"

@@ -35,10 +35,11 @@ pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
 // type StrongVFSDirectoryRef = StrongDirRef<VFSDirectory>;
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
 pub type WeakDirRef<D: Directory> = Weak<Mutex<D>>;
+pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
-    fn read(&self);
+    fn read(&self) -> String;
     fn write(&mut self);
     fn seek(&self); 
     fn delete(&self);
@@ -51,13 +52,14 @@ pub trait Directory : FileDirectory + Send {
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> String;
-    fn get_name(&self) -> String;
+    fn get_children_files(&self) -> Vec<StrongFileRef>;
 }
 
 /// Traits that both files and directories share
 pub trait FileDirectory {
     fn get_path_as_string(&self) -> String;
     fn get_path(&self) -> Path;
+    fn get_name(&self) -> String;
 }
 
 /// A struct that represents a node in the VFS 
@@ -67,7 +69,7 @@ pub struct VFSDirectory {
     /// A list of StrongDirRefs or pointers to the child directories 
     child_dirs: Vec<StrongAnyDirRef>,
     /// A list of files within this directory
-    files: Vec<VFSFile>,
+    files: Vec<StrongFileRef>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -93,7 +95,7 @@ impl Directory for VFSDirectory {
             size: 0,
             parent: parent_pointer,
         };
-        self.files.push(file);
+        self.files.push(Arc::new(Mutex::new(Box::new(file))));
     }
  
     /// Looks for the child directory specified by dirname and returns a reference to it 
@@ -118,29 +120,23 @@ impl Directory for VFSDirectory {
     fn list_children(&mut self) -> String {
         let mut children_list = String::new();
         for dir in self.child_dirs.iter() {
-            children_list.push_str(&format!("{}, ",dir.lock().get_name()));
+            children_list.push_str(&format!("{}\n",dir.lock().get_name()));
         }
 
         for file in self.files.iter() {
-            children_list.push_str(&format!("{}, ", file.name));
+            children_list.push_str(&format!("{}\n", file.lock().get_name()));
         }
         return children_list;
     }
-
-    fn get_name(&self) -> String {
-        self.name.clone()
-    }
+    
     // TODO - return iterator of children rather than a string
-    // fn children(&self) -> Iterator {
-    //     let mut children: Vec<&FileDirectory> = Vec::new();
-    //     for file in self.files.iter() {
-    //         children.push(file);
-    //     }
-    //     for dir in self.child_dirs.iter() {
-    //         children.push(dir);
-    //     }
-    //     children.iter()
-    // }
+    fn get_children_files(&self) -> Vec<StrongFileRef> {
+        let mut children: Vec<StrongFileRef> = Vec::new();
+        for file in self.files.iter() {
+            children.push(file.clone());
+        }
+        children
+    }
 }
 
 impl FileDirectory for VFSDirectory {
@@ -157,6 +153,9 @@ impl FileDirectory for VFSDirectory {
     fn get_path(&self) -> Path {
         Path::new(self.get_path_as_string())
     }
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 pub struct VFSFile {
@@ -169,7 +168,7 @@ pub struct VFSFile {
 }
 
 impl File for VFSFile {
-    fn read(&self) { unimplemented!(); }
+    fn read(&self) -> String { unimplemented!(); }
     fn write(&mut self) { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
     fn delete(&self) { unimplemented!(); }
@@ -189,6 +188,9 @@ impl FileDirectory for VFSFile {
     fn get_path(&self) -> Path {
         Path::new(self.get_path_as_string())
     }
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 /// A structure that represents a file path
@@ -205,7 +207,7 @@ impl Path {
     }
     
     /// Returns the components of the path 
-    fn components(&self) -> Vec<String> {
+    pub fn components(&self) -> Vec<String> {
         let components = self.path.split("/").map(|s| s.to_string()).collect();
         return components;
     } 

@@ -60,7 +60,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path};
+use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef};
 use environment::Environment;
 use spin::Mutex;
 
@@ -84,8 +84,9 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-/*/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
-pub fn init(root_dir: StrongDirRef<TaskDirectory>) -> Result<(), &'static str> {
+
+/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
+pub fn init(root_dir: StrongAnyDirRef) -> Result<(), &'static str> {
     use alloc::string::ToString;
     let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
     task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
@@ -94,106 +95,79 @@ pub fn init(root_dir: StrongDirRef<TaskDirectory>) -> Result<(), &'static str> {
 
 
 
-pub struct TaskDirectory {
-    /// The name of the directory
-    name: String,
-    /// A list of StrongDirRefs or pointers to the child directories 
-    child_dirs: Vec<StrongDirRef>,
-    /// A list of files within this directory
-    files: Vec<TaskFile>,
-    /// A weak reference to the parent directory 
-    parent: WeakDirRef,
-}
+// pub struct TaskDirectory {
+//     /// The name of the directory
+//     name: String,
+//     /// A list of StrongDirRefs or pointers to the child directories 
+//     child_dirs: Vec<StrongDirRef>,
+//     /// A list of files within this directory
+//     files: Vec<TaskFile>,
+//     /// A weak reference to the parent directory 
+//     parent: WeakDirRef,
+// }
 
-pub struct TaskFile {
-    /// The name of the file
-    name: String,
-    /// The file size 
-    size: usize, 
-    /// A weak reference to the parent directory
-    parent: WeakDirRef,
-}
+// pub struct TaskFile {
+//     /// The name of the file
+//     name: String,
+//     /// The file size 
+//     size: usize, 
+//     /// A weak reference to the parent directory
+//     parent: WeakDirRef,
+// }
 
-impl File for TaskFile {
-    fn read(&self) -> String { 
-        // Print all tasks
-        let mut task_string = String::new();
-        for (id, taskref) in TASKLIST.iter() {
-            let task = taskref.lock();
 
-            let name = &task.name;
-            let runstate = match &task.runstate {
-                RunState::Initing    => "Initing",
-                RunState::Runnable   => "Runnable",
-                RunState::Blocked    => "Blocked",
-                RunState::Reaped     => "Reaped",
-                _                    => "Exited",
-            };
-            let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-            let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-            let task_type = match {
-                task.is_an_idle_task => "I", 
-                task.is_application() => "A", 
-                _ => " "};
-        task_string
-    }
-    fn write(&mut self) { unimplemented!() }
-    fn seek(&self) { unimplemented!() }
-    fn delete(&self) { unimplemented!() }
-}
+// impl Directory for TaskDirectory {
+//     /// Creates a new directory and passes a reference to the new directory created as output
+//     fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) -> StrongDirRef {
+//         let directory = TaskDirectory {
+//             name: name,
+//             child_dirs: Vec::new(),
+//             files:  Vec::new(),
+//             parent: parent_pointer,
+//         };
+//         let dir_ref = Arc::new(Mutex::new(directory));
+//         self.child_dirs.push(dir_ref.clone());
+//         dir_ref
+//     }
 
-impl Directory for TaskDirectory {
-    /// Creates a new directory and passes a reference to the new directory created as output
-    fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef) -> StrongDirRef {
-        let directory = TaskDirectory {
-            name: name,
-            child_dirs: Vec::new(),
-            files:  Vec::new(),
-            parent: parent_pointer,
-        };
-        let dir_ref = Arc::new(Mutex::new(directory));
-        self.child_dirs.push(dir_ref.clone());
-        dir_ref
-    }
-
-    /// Creates a new file with the parent_pointer as the enclosing directory
-    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<TaskDirectory>)  {
-        let file = TaskFile {
-            name: name,
-            size: 0,
-            parent: parent_pointer,
-        };
-        self.files.push(file);
-    }
+//     /// Creates a new file with the parent_pointer as the enclosing directory
+//     fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<TaskDirectory>)  {
+//         let file = TaskFile {
+//             name: name,
+//             size: 0,
+//             parent: parent_pointer,
+//         };
+//         self.files.push(file);
+//     }
  
-    /// Looks for the child directory specified by dirname and returns a reference to it 
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongDirRef> {
-        for dir in self.child_dirs.iter() {
-            if dir.lock().name == child_dir {
-                return Some(Arc::clone(dir));
-            }
-        }
-        return None;
-    }
+//     /// Looks for the child directory specified by dirname and returns a reference to it 
+//     fn get_child_dir(&self, child_dir: String) -> Option<StrongDirRef> {
+//         for dir in self.child_dirs.iter() {
+//             if dir.lock().name == child_dir {
+//                 return Some(Arc::clone(dir));
+//             }
+//         }
+//         return None;
+//     }
 
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongDirRef> {
-        self.parent.upgrade()
-    }
+//     /// Returns a pointer to the parent if it exists
+//     fn get_parent_dir(&self) -> Option<StrongDirRef> {
+//         self.parent.upgrade()
+//     }
 
-    /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> String {
-        let mut children_list = String::new();
-        for dir in self.child_dirs.iter() {
-            children_list.push_str(&format!("{}, ",dir.lock().name));
-        }
+//     /// Returns a string listing all the children in the directory
+//     fn list_children(&mut self) -> String {
+//         let mut children_list = String::new();
+//         for dir in self.child_dirs.iter() {
+//             children_list.push_str(&format!("{}, ",dir.lock().name));
+//         }
 
-        for file in self.files.iter() {
-            children_list.push_str(&format!("{}, ", file.name));
-        }
-        return children_list;
-    }
-} */
+//         for file in self.files.iter() {
+//             children_list.push_str(&format!("{}, ", file.name));
+//         }
+//         return children_list;
+//     }
+// } 
 
 /// Get the id of the currently running Task on a specific core
 pub fn get_current_task_id(apic_id: u8) -> Option<usize> {
@@ -432,7 +406,13 @@ impl Task {
             None
         }
     }
-
+/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
+// pub fn init(root_dir: StrongDirRef<TaskDirectory>) -> Result<(), &'static str> {
+//     use alloc::string::ToString;
+//     let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
+//     task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
+//     Ok(())
+// }
     /// Switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
@@ -782,3 +762,46 @@ impl Eq for TaskRef { }
 //         Some(self.cmp(other))
 //     }
 // }
+
+impl FileDirectory for Task {
+    fn get_path_as_string(&self) -> String {
+        unimplemented!()
+    }
+    fn get_path(&self) -> Path {
+        unimplemented!()
+    }
+        fn get_name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+impl File for Task {
+ fn read(&self) -> String { 
+        // Print all tasks
+        let mut task_string = String::new();
+        let name = &self.name;
+        let runstate = match &self.runstate {
+            RunState::Initing    => "Initing",
+            RunState::Runnable   => "Runnable",
+            RunState::Blocked    => "Blocked",
+            RunState::Reaped     => "Reaped",
+            _                    => "Exited",
+        };
+        let cpu = self.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
+        let pinned = &self.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let task_type = if self.is_an_idle_task {"I"}
+        else if self.is_application() {"A"}
+        else {" "} ;  
+
+        task_string.push_str(
+            &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
+                self.id, runstate, cpu, pinned, task_type, name)
+        );
+    
+        return task_string;
+    }
+
+    fn write(&mut self) { unimplemented!() }
+    fn seek(&self) { unimplemented!() }
+    fn delete(&self) { unimplemented!() }
+}
