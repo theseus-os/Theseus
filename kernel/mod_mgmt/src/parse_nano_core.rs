@@ -17,6 +17,7 @@ use rustc_demangle::demangle;
 
 use memory::{FRAME_ALLOCATOR, ModuleArea, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use metadata::{CrateType, LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
+use qp_trie::Trie;
 
 
 /// Decides which parsing technique to use, either the symbol file or the actual binary file.
@@ -159,8 +160,9 @@ fn parse_nano_core_symbol_file(
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
         data_pages:              Some(data_pages.clone()),
-        non_prefixed_symbols:    BTreeSet::new(),
-        reexported_prefix:       None,
+        global_symbols:          BTreeSet::new(),
+        bss_sections:            Trie::new(),
+        reexported_symbols:      BTreeSet::new(),
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
@@ -522,8 +524,9 @@ fn parse_nano_core_binary(
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
         data_pages:              Some(data_pages.clone()),
-        non_prefixed_symbols:    BTreeSet::new(),
-        reexported_prefix:       None,
+        global_symbols:          BTreeSet::new(),
+        bss_sections:            Trie::new(),
+        reexported_symbols:      BTreeSet::new(),
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 

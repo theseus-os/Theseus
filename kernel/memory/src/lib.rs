@@ -259,13 +259,9 @@ pub fn find_modules_starting_with(module_name_prefix: &str) -> qp_trie::Iter<'st
 ///   (note the trailing `"-"`).
 pub fn get_module_starting_with(module_name_prefix: &str) -> Option<&'static ModuleArea> { 
     let mut iter = find_modules_starting_with(module_name_prefix);
-    let only = iter.next();
-    let should_be_none = iter.next(); 
-    if should_be_none.is_none() {
-        only.map(|(_key, val)| val)
-    } else {
-        None
-    }
+    iter.next()
+        .filter(|_| iter.next().is_none()) // ensure single element
+        .map(|(_key, val)| val)
 }
 
 

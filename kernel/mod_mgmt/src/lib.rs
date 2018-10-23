@@ -93,7 +93,7 @@ pub type SwapRequestList = Vec<SwapRequest>;
 /// This satisfies other crates' dependenices on the old crate while allowing the new crate to exist normally,
 /// which means that the new crate's symbols appear both as those from the new crate itself 
 /// in addition to those from the old crate that was replaced. 
-/// To do this, set the `export_new_symbols_as_old` option to `true`.
+/// To do this, set the `reexport_new_symbols_as_old` option to `true`.
 /// 
 /// However, **enabling this option is potentially dangerous**, as you must take responsibility 
 /// for ensuring that the new crate can safely and correctly replace the old crate, 
@@ -123,7 +123,7 @@ pub struct SwapRequest {
     new_crate_module_area: &'static ModuleArea,
     /// Whether to expose the new crate's sections with symbol names that match those from the old crate.
     /// For more details, see the above docs for this struct.
-    export_new_symbols_as_old: bool,
+    reexport_new_symbols_as_old: bool,
 }
 impl SwapRequest {
     /// Create a new `SwapRequest` that, when given to `swap_crates()`, 
@@ -132,10 +132,10 @@ impl SwapRequest {
     pub fn new(
         old_crate_name: String, 
         new_crate_module_area: &'static ModuleArea, 
-        export_new_symbols_as_old: bool,
+        reexport_new_symbols_as_old: bool,
     ) -> SwapRequest {
         SwapRequest {
-            old_crate_name, new_crate_module_area, export_new_symbols_as_old
+            old_crate_name, new_crate_module_area, reexport_new_symbols_as_old,
         }
     }
 }
@@ -240,13 +240,9 @@ impl CrateNamespace {
     pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<StrongCrateRef> { 
         let crates = self.crate_tree.lock();
         let mut iter = crates.iter_prefix_str(crate_name_prefix);
-        let only = iter.next();
-        let should_be_none = iter.next(); 
-        if should_be_none.is_none() {
-            only.map(|(_key, val)| val).cloned()
-        } else {
-            None
-        }
+        iter.next()
+            .filter(|_| iter.next().is_none()) // ensure single element
+            .map(|(_key, val)| val.clone())
     }
 
 
@@ -469,8 +465,6 @@ impl CrateNamespace {
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
-        // debug!("swap_crates() [0]: swap_requests: {:?}", swap_requests);
-
         // First, before we perform any expensive crate loading, let's try an optimization
         // based on cached crates that were unloaded during a previous swap operation. 
         let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
@@ -488,21 +482,24 @@ impl CrateNamespace {
         let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
         let cached_crates: CrateNamespace = CrateNamespace::new();
 
-
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to remove all of the old crates
         // and fix up all of the relocations `WeakDependents` for each of the existing sections
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
         for req in swap_requests {
-            let SwapRequest { old_crate_name, new_crate_module_area, export_new_symbols_as_old } = req;
+            let SwapRequest { old_crate_name, new_crate_module_area, reexport_new_symbols_as_old } = req;
             let (_new_crate_type, new_crate_name) = CrateType::from_module_name(new_crate_module_area.name())?;
-
+            if self.get_crate(new_crate_name).is_some() {
+                error!("swap_crates(): the requested new crate {:?} was already loaded into this namespace!", new_crate_name);
+                return Err("swap_crates(): the requested new crate was already loaded into this namespace!");
+            }
+            
             let old_crate_ref = self.get_crate(&old_crate_name).ok_or_else(|| {
                 error!("swap_crates(): couldn't find requested old_crate {:?}", old_crate_name);
                 "swap_crates(): couldn't find requested old crate"
             })?;
-            let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
+            let mut old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
                 error!("TODO FIXME: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exlusive mutable instance", old_crate_ref);
                 "TODO FIXME: swap_crates() doesn't yet support deep copying shared crates to get a new exlusive mutable instance"
             })?;
@@ -517,86 +514,82 @@ impl CrateNamespace {
                     .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
             };
 
+
+            // scope the lock for `self.symbol_map` and `new_crate_ref`
             {
+                let mut this_symbol_map = self.symbol_map.lock();
                 let mut new_crate = new_crate_ref.lock_as_mut()
-                    .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;           
+                    .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
+                
+                // currently we're always clearing out the new crate's reexports because we recalculate them every time
+                new_crate.reexported_symbols.clear();
 
-                if export_new_symbols_as_old {
-                    new_crate.reexported_prefix = Some(old_crate.crate_name_as_prefix());
-                }
+                let old_crate_name_without_hash = String::from(old_crate.crate_name_without_hash());
+                let new_crate_name_without_hash = String::from(new_crate.crate_name_without_hash());
+                let crates_have_same_name = old_crate_name_without_hash == new_crate_name_without_hash;
 
-
-                // debug!("====================== Replacing old_crate \"{}\"  ===========================", old_crate.crate_name);
-                // debug!("  Dependent crates:");
-                // dump_dependent_crates(&*old_crate, String::from("    "));
-                // for sec_ref in &old_crate.sections {
-                //     let sec = sec_ref.lock();
-                //     if false {
-                //         if !sec.sections_i_depend_on.is_empty() {
-                //             debug!("  Section \"{}\": sections i depend on (strong dependencies):", sec.name);
-                //             for strong_dep in &sec.sections_i_depend_on {
-                //                 debug!("        {}", strong_dep.section.lock().name);
-                //             }
-                //         }
-                //     }
-                //     if true {
-                //         if !sec.sections_dependent_on_me.is_empty() {
-                //             let prefix = String::from("  ");
-                //             dump_weak_dependents(&*sec, prefix.clone())
-                //         }
-                //     }
-                // }
+                // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
+                // and replace them by rewriting their relocation entries to point to that section in the new_crate.
+                // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
+                // 
+                // Note that we only need to iterate through sections from the old crate that are public/global,
+                // i.e., those that were previously added to this namespace's symbol map,
+                // because other crates could not possibly depend on non-public sections in the old crate.
+                for old_sec_name in &old_crate.global_symbols {
+                    let old_sec_ref = this_symbol_map.get(old_sec_name)
+                        .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
+                        .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
+                    // debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
+                    let mut old_sec = old_sec_ref.lock();
+                    let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
-                // debug!("Rewriting relocation dependencies for {:?} -> {:?} ({:?})", old_crate.crate_name, new_crate_name, new_crate_module_area.name());
+                    // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
+                    // And, if enabled, it will reexport that new section under the same name as the `old_sec`.
+                    // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
+                    let mut find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<BString>| {
+                        // Use the new namespace to find the new source_sec that old target_sec should point to.
+                        // The new source_sec must have the same name as the old one (old_sec here),
+                        // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
+                        // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
+                        // if not, the swapping action was never going to work and we shouldn't go through with it.
 
-
-                // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
-                // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
-                let find_corresponding_new_section = |old_sec: &LoadedSection| -> Result<StrongSectionRef, &'static str> {
-                    // Use the new namespace to find the new source_sec that old target_sec should point to.
-                    // The new source_sec must have the same name as the old one (old_sec here),
-                    // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
-                    // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
-                    // if not, the swapping action was never going to work and we shouldn't go through with it.
-                    if export_new_symbols_as_old {
-                        // If we're asked to allow the new crate to satisfy the old crate's dependents (i.e., if export_new_symbols_as_old is true),
-                        // we need to find a section in the new crate that "fuzzily" matches the current section from the old crate.
-                        let old_sec_name_without_hash = old_sec.name_without_hash();
-                        let search_str = replace_containing_crate_name(old_sec_name_without_hash, old_crate.crate_name_without_hash(), new_crate.crate_name_without_hash())
-                            .unwrap_or_else(|| String::from(old_sec_name_without_hash));
-                        // debug!("swap_crates(): looking for fuzzy-match for symbol {:?} in new crate", search_str);
-                        let new_crate_source_sec = namespace_of_new_crates.get_symbol_starting_with(&search_str)
-                            .upgrade()
-                            .ok_or_else(|| {
-                                error!("swap_crates(): couldn't find section in the new crate that corresponds to a fuzzy match of the old section {:?}", old_sec.name);
-                                "couldn't find section in the new crate that corresponds to a fuzzy match of the old section"
-                            })?;
+                        // Find the section in the new crate that "fuzzily" matches the current section from the old crate. There should only be one possible match.
+                        let new_crate_source_sec = if crates_have_same_name {
+                            namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash)
+                        } else {
+                            if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
+                                namespace_of_new_crates.get_symbol_starting_with(&s)
+                            } else {
+                                namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash)
+                            }
+                        }.upgrade().ok_or_else(|| {
+                            error!("swap_crates(): couldn't find section in the new crate that corresponds to a fuzzy match of the old section {:?}", old_sec.name);
+                            "couldn't find section in the new crate that corresponds to a fuzzy match of the old section"
+                        })?;
                         // debug!("swap_crates(): found fuzzy match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
-                        if old_sec.global {
+                        if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
-                            let _old_val = self.symbol_map.lock().insert_str(&old_sec.name, Arc::downgrade(&new_crate_source_sec));
+                            let reexported_name = BString::from(old_sec.name.as_str());
+                            new_crate_reexported_symbols.insert(reexported_name.clone());
+                            let _old_val = this_symbol_map.insert(reexported_name, Arc::downgrade(&new_crate_source_sec));
                             if _old_val.is_none() { 
                                 warn!("swap_crates(): reexported new crate section that replaces old section {:?}, but that old section unexpectedly didn't exist in the symbol map", old_sec.name);
                             }
                         }
                         Ok(new_crate_source_sec)
-                    } else {
-                        namespace_of_new_crates.get_symbol(&old_sec.name)
-                            .upgrade()
-                            .ok_or_else(|| {
-                                error!("swap_crates(): couldn't find section in the new crate that corresponds to an exact match of the old section {:?}", old_sec.name);
-                                "couldn't find section in the new crate that corresponds to an exact match of the old section"
-                            })
-                    }
-                };
 
+                        // We aren't using exact matches right now, since that basically never happens across 2 different crates, even with the same crate name
+                        // else {
+                        //     namespace_of_new_crates.get_symbol(&old_sec.name)
+                        //         .upgrade()
+                        //         .ok_or_else(|| {
+                        //             error!("swap_crates(): couldn't find section in the new crate that corresponds to an exact match of the old section {:?}", old_sec.name);
+                        //             "couldn't find section in the new crate that corresponds to an exact match of the old section"
+                        //         })
+                        // }
+                    };
 
-                // We need to find all of the weak dependents (sections that depend on sections in the old crate that we're removing)
-                // and replace them by rewriting their relocation entries to point to that section in the new_crate.
-                // We also use this loop to remove all of the old_crate's symbols from this namespace's symbol map.
-                for old_sec_ref in old_crate.sections.values() {
-                    let mut old_sec = old_sec_ref.lock();
 
                     // the section from the `new_crate` that corresponds to the `old_sec_ref` from the `old_crate`
                     let mut new_sec_ref: Option<StrongSectionRef> = None;
@@ -612,7 +605,7 @@ impl CrateNamespace {
                             nsr
                         } else {
                             // trace!("calculating new source section from scratch");
-                            let nsr = find_corresponding_new_section(&old_sec)?;
+                            let nsr = find_corresponding_new_section(&mut new_crate.reexported_symbols)?;
                             new_sec_ref.get_or_insert(nsr)
                         };
                         let mut new_source_sec = new_source_sec_ref.lock();
@@ -677,36 +670,37 @@ impl CrateNamespace {
                             return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
                         }
                     }
-                
-                    // Currently we just copy over the old_sec into the new source_sec,
-                    // if they represent a static variable (state spill that would otherwise result in a loss of data).
-                    // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
-                    if old_sec.typ == SectionType::Bss {
-                        // get the section from the new crate that corresponds to the `old_sec`
-                        let new_dest_sec_ref = if old_sec.global {
-                            // if the BSS section is global, we can use the new namespace's symbol map to search for the fuzzy-matching section.
-                            if let Some(ref nsr) = new_sec_ref {
-                                // trace!("using cached version of new source section, for BSS");
-                                nsr
-                            } else {
-                                // trace!("calculating new source section from scratch, for BSS");
-                                let nsr = find_corresponding_new_section(&old_sec)
-                                    .map_err(|_| "couldn't find new destination section for copying old_sec's data into (BSS state transfer)")?;
-                                new_sec_ref.get_or_insert(nsr)
-                            }
-                        } else {
-                            // Otherwise, we have to search through each section in the new crate to find one that fuzzily matches
-                            let old_sec_name_without_hash = old_sec.name_without_hash();
-                            let search_str = replace_containing_crate_name(old_sec_name_without_hash, old_crate.crate_name_without_hash(), new_crate.crate_name_without_hash())
-                                .unwrap_or_else(|| String::from(old_sec_name_without_hash));
-                            new_crate.find_section(|sec| sec.name.starts_with(&search_str)).ok_or_else(|| 
-                                "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
-                            )?
-                        };
-
-                        old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
-                    }
                 }
+
+
+                // Go through all the BSS sections and copy over the old_sec into the new source_sec,
+                // if they represent a static variable (state spill that would otherwise result in a loss of data).
+                // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
+                for old_sec_ref in old_crate.bss_sections.values() {
+                    let old_sec = old_sec_ref.lock();
+                    let old_sec_name_without_hash = old_sec.name_without_hash();
+                    // get the section from the new crate that corresponds to the `old_sec`
+                    let new_dest_sec_ref = {
+                        let mut iter = if crates_have_same_name {
+                            new_crate.bss_sections.iter_prefix_str(old_sec_name_without_hash)
+                        } else {
+                            if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
+                                new_crate.bss_sections.iter_prefix_str(&s)
+                            } else {
+                                new_crate.bss_sections.iter_prefix_str(old_sec_name_without_hash)
+                            }
+                        };
+                        iter.next()
+                            .filter(|_| iter.next().is_none()) // ensure single element
+                            .map(|(_key, val)| val)
+                    }.ok_or_else(|| 
+                        "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
+                    )?;
+
+                    // debug!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
+                    old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
+                }
+
                 
                 // Remove the old crate from this namespace, and remove its sections' symbols too
                 if let Some(removed_old_crate) = self.crate_tree.lock().remove_str(&old_crate.crate_name) {
@@ -717,29 +711,31 @@ impl CrateNamespace {
 
                     // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
                     // This removed old crate will be useful when a future swap request includes the following:
-                    // (1) the future `new_crate_module_area`      ==  the current `old_crate.object_file`
-                    // (2) the future `old_crate_name`             ==  the current `new_crate_name`
-                    // (3) the future `export_new_symbols_as_old`  ==  true if the old crate had an additional prefix
+                    // (1) the future `new_crate_module_area`        ==  the current `old_crate.object_file`
+                    // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                    // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
                     //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                    let future_swap_req = SwapRequest::new(String::from(new_crate_name), old_crate.object_file, old_crate.reexported_prefix.is_some());
+                    let future_swap_req = SwapRequest::new(String::from(new_crate_name), old_crate.object_file, !old_crate.reexported_symbols.is_empty());
                     future_swap_requests.push(future_swap_req);
                     
                     // Remove all of the symbols belonging to the old crate from this namespace.
-                    // If export_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
-                    // because we already replaced them above with mappings that redirect to the corresponding new crate sections
-                    if !export_new_symbols_as_old {
-                        let mut this_symbol_map = self.symbol_map.lock();
-                        this_symbol_map.remove_prefix_str(&old_crate.crate_name_as_prefix());
-                        if let Some(ref prefix) = old_crate.reexported_prefix {
-                            this_symbol_map.remove_prefix_str(prefix);
+                    // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
+                    // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
+                    if !reexport_new_symbols_as_old {
+                        for symbol in &old_crate.global_symbols {
+                            if this_symbol_map.remove(symbol).is_none() {
+                                error!("swap_crates(): couldn't find old symbol {:?} in this namespace's symbol map!", symbol);
+                                return Err("couldn't find old symbol {:?} in this namespace's symbol map!");
+                            }
                         }
-                        // for symbol in &old_crate.non_prefixed_symbols {
-                        //     if this_symbol_map.remove_str(symbol).is_none() {
-                        //         error!("swap_crates(): couldn't find old symbol {:?} in this namespace's symbol map!", symbol);
-                        //         return Err("couldn't find old symbol {:?} in this namespace's symbol map!");
-                        //     }
-                        // }
                     }
+
+                    // If the old crate had reexported its symbols, we should remove those reexports here,
+                    // because they're no longer active since the old crate is being removed. 
+                    for sym in &old_crate.reexported_symbols {
+                        this_symbol_map.remove(sym);
+                    }
+
                     // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
                     //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
                     //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
@@ -749,12 +745,10 @@ impl CrateNamespace {
                 else {
                     error!("BUG: swap_crates(): failed to remove old crate {}", old_crate.crate_name);
                 }
+            } // end of scope, drops lock for `self.symbol_map` and `new_crate_ref`
 
-                // add the new crate and its sections' symbols to this namespace
-                self.add_symbols(new_crate.sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
-
-            } // end of scope, drops lock on new_crate
-
+            // add the new crate and its sections' symbols to this namespace
+            self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
             self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref);
         }
 
@@ -858,17 +852,18 @@ impl CrateNamespace {
             text_pages:              text_pages  .as_ref().map(|r| Arc::clone(r)),
             rodata_pages:            rodata_pages.as_ref().map(|r| Arc::clone(r)),
             data_pages:              data_pages  .as_ref().map(|r| Arc::clone(r)),
-            non_prefixed_symbols:    BTreeSet::new(),
-            reexported_prefix:       None,
+            global_symbols:          BTreeSet::new(),
+            bss_sections:            Trie::new(),
+            reexported_symbols:      BTreeSet::new(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
         
         // this maps section header index (shndx) to LoadedSection
         let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); 
-
-        // the list of other symbols in this crate that are no_mangle and public (global) 
-        let mut non_prefixed_symbols: BTreeSet<String> = BTreeSet::new();
-        const MANGLED_PREFIX: &'static str = "_ZN"; 
+        // the list of all symbols in this crate that are public (global) 
+        let mut global_symbols: BTreeSet<BString> = BTreeSet::new();
+        // the map of BSS section names to the actual BSS section
+        let mut bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
 
         for (shndx, sec) in elf_file.section_iter().enumerate() {
             // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
@@ -934,7 +929,6 @@ impl CrateNamespace {
 
                 if sec_name.starts_with(TEXT_PREFIX) {
                     if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
-                        let is_no_mangle = !name.starts_with(MANGLED_PREFIX);
                         let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
                             error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
@@ -960,11 +954,8 @@ impl CrateNamespace {
                             }
 
                             let is_global = global_sections.contains(&shndx);
-                            if is_global && is_no_mangle {
-                                if name != "main" {  // every app crate has a no_mangle function called main, so that's not interesting.
-                                    warn!("load_crate_sections(): crate {:?} had global no_mangle symbol: {:?} ({:?})", crate_name, name, demangled);
-                                }
-                                non_prefixed_symbols.insert(demangled.clone());
+                            if is_global {
+                                global_symbols.insert(demangled.clone().into());
                             }
 
                             loaded_sections.insert(shndx, 
@@ -994,7 +985,6 @@ impl CrateNamespace {
 
                 else if sec_name.starts_with(RODATA_PREFIX) {
                     if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
-                        let is_no_mangle = !name.starts_with(MANGLED_PREFIX);
                         let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
                             error!(".rodata section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
@@ -1020,9 +1010,8 @@ impl CrateNamespace {
                             }
 
                             let is_global = global_sections.contains(&shndx);
-                            if is_global && is_no_mangle {
-                                warn!("load_crate_sections(): crate {:?} had global no_mangle symbol: {:?} ({:?})", crate_name, name, demangled);
-                                non_prefixed_symbols.insert(demangled.clone());
+                            if is_global {
+                                global_symbols.insert(demangled.clone().into());
                             }
                             
                             loaded_sections.insert(shndx, 
@@ -1059,7 +1048,6 @@ impl CrateNamespace {
                         else {
                             name
                         };
-                        let is_no_mangle = !name.starts_with(MANGLED_PREFIX);
                         let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                             error!(".data section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
@@ -1085,9 +1073,8 @@ impl CrateNamespace {
                             }
 
                             let is_global = global_sections.contains(&shndx);
-                            if is_global && is_no_mangle {
-                                warn!("load_crate_sections(): crate {:?} had global no_mangle symbol: {:?} ({:?})", crate_name, name, demangled);
-                                non_prefixed_symbols.insert(demangled.clone());
+                            if is_global {
+                                global_symbols.insert(demangled.clone().into());
                             }
                             
                             loaded_sections.insert(shndx, 
@@ -1117,7 +1104,6 @@ impl CrateNamespace {
 
                 else if sec_name.starts_with(BSS_PREFIX) {
                     if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        let is_no_mangle = !name.starts_with(MANGLED_PREFIX);
                         let demangled = demangle(name).to_string();
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                             error!(".bss section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
@@ -1135,23 +1121,22 @@ impl CrateNamespace {
                             };
 
                             let is_global = global_sections.contains(&shndx);
-                            if is_global && is_no_mangle {
-                                warn!("load_crate_sections(): crate {:?} had global no_mangle symbol: {:?} ({:?})", crate_name, name, demangled);
-                                non_prefixed_symbols.insert(demangled.clone());
+                            if is_global {
+                                global_symbols.insert(demangled.clone().into());
                             }
                             
-                            loaded_sections.insert(shndx, 
-                                Arc::new(Mutex::new(LoadedSection::new(
-                                    SectionType::Bss,
-                                    demangled,
-                                    Arc::clone(dp_ref),
-                                    data_offset,
-                                    dest_addr,
-                                    sec_size,
-                                    is_global,
-                                    new_crate_weak_ref.clone(),
-                                )))
-                            );
+                            let sec_ref = Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Bss,
+                                demangled.clone(),
+                                Arc::clone(dp_ref),
+                                data_offset,
+                                dest_addr,
+                                sec_size,
+                                is_global,
+                                new_crate_weak_ref.clone(),
+                            )));
+                            loaded_sections.insert(shndx, sec_ref.clone());
+                            bss_sections.insert(demangled.into(), sec_ref);
 
                             data_offset += round_up_power_of_two(sec_size, sec_align);
                         }
@@ -1178,7 +1163,8 @@ impl CrateNamespace {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
             new_crate_mut.sections = loaded_sections;
-            new_crate_mut.non_prefixed_symbols = non_prefixed_symbols;
+            new_crate_mut.global_symbols = global_symbols;
+            new_crate_mut.bss_sections = bss_sections;
         }
 
         Ok((new_crate, elf_file))
@@ -1631,13 +1617,10 @@ impl CrateNamespace {
     pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
         let map = self.symbol_map.lock();
         let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
-        let only = iter.next();
-        let should_be_none = iter.next(); 
-        if should_be_none.is_none() {
-            only.cloned().unwrap_or_else(|| Weak::default())
-        } else {
-            Weak::default()
-        }
+        iter.next()
+            .filter(|_| iter.next().is_none()) // ensure single element
+            .cloned()
+            .unwrap_or_default()
     }
 
     

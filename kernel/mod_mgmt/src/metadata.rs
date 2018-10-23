@@ -13,6 +13,7 @@ use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
 
 use super::SymbolMap;
+use qp_trie::{Trie, wrapper::BString};
 
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
@@ -116,24 +117,30 @@ pub struct LoadedCrate {
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<Mutex<MappedPages>>>,
     
-    /// The list of symbols in this crate that **do not** have the `crate_name` as their prefix.
-    /// For example, `no_mangle` symbols do not have the crate_name prefix.
-    pub non_prefixed_symbols: BTreeSet<String>,
+    // The members below are most used to accelerate crate swapping //
 
-    /// An optional prefix that all of this crate's public symbols will be reexported under,
-    /// i.e., they will be added to the enclosing `CrateNamespace`'s symbol map with this prefix
-    /// substituted in place of the regular `crate_name` prefix.
+    /// The set of global symbols in this crate, including regular ones 
+    /// that are prefixed with the `crate_name` and `no_mangle` symbols that are not.
+    pub global_symbols: BTreeSet<BString>,
+    /// The set of BSS sections in this crate.
+    /// The key is the section name and the value is a reference to the section;
+    /// these sections are also in the `sections` member above.
+    pub bss_sections: Trie<BString, StrongSectionRef>,
+    /// The set of symbols that this crate's global symbols are reexported under,
+    /// i.e., they have been added to the enclosing `CrateNamespace`'s symbol map under these names.
     /// 
     /// This is primarily used when swapping crates, and it is useful in the following way. 
     /// If this crate is the new crate that is swapped in to replace another crate, 
     /// and the caller of the `swap_crates()` function specifies that this crate 
     /// should expose its symbols with names that match the old crate it's replacing, 
-    /// then will be set to the name of the old crate that it replaced, e.g., "keyboard::".
+    /// then this will be populated with the names of corresponding symbols from the old crate that its replacing.
+    /// For example, if this crate has a symbol `keyboard::init::h456`, and it replaced an older crate
+    /// that had the symbol `keyboard::init::123`, and `reexport_new_symbols_as_old` was true,
+    /// then `keyboard::init::h123` will be added to this set.
     /// 
-    /// When a crate is first loaded, this will be `None` by default, 
-    /// because this crate will only have its one standard prefix: its crate_name 
-    /// without the hash and with a trailing "`::`", e.g., "`keyboard_new::`".
-    pub reexported_prefix: Option<String>,
+    /// When a crate is first loaded, this will be empty by default, 
+    /// because this crate will only have populated its `global_symbols` set during loading. 
+    pub reexported_symbols: BTreeSet<BString>,
 }
 
 use core::fmt;
@@ -258,8 +265,9 @@ impl LoadedCrate {
             text_pages:              new_text_pages_ref.clone(),
             rodata_pages:            new_rodata_pages_ref.clone(),
             data_pages:              new_data_pages_ref.clone(),
-            reexported_prefix:       self.reexported_prefix.clone(),
-            non_prefixed_symbols:    self.non_prefixed_symbols.clone(),
+            global_symbols:          self.global_symbols.clone(),
+            bss_sections:            Trie::new(),
+            reexported_symbols:      self.reexported_symbols.clone(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
@@ -267,7 +275,8 @@ impl LoadedCrate {
         // 1) The parent_crate reference itself, since we're replacing that with a new one,
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
         // 3) The section's virt_addr, which is based on its new mapped_pages
-        let mut new_sections = BTreeMap::new();
+        let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
+        let mut new_bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
         for (shndx, old_sec_ref) in self.sections.iter() {
             let old_sec = old_sec_ref.lock();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
@@ -288,7 +297,7 @@ impl LoadedCrate {
             };
             let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
 
-            let new_sec = LoadedSection::with_dependencies(
+            let new_sec_ref = Arc::new(Mutex::new(LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
                 old_sec.name.clone(),                   // name is the same
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
@@ -300,9 +309,12 @@ impl LoadedCrate {
                 old_sec.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
                 Vec::new(),                             // no sections can possibly depend on this one, since we just created it
                 old_sec.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
-            );
+            )));
 
-            new_sections.insert(shndx, Arc::new(Mutex::new(new_sec)));
+            if old_sec.typ == SectionType::Bss {
+                new_bss_sections.insert_str(&old_sec.name, new_sec_ref.clone());
+            }
+            new_sections.insert(*shndx, new_sec_ref);
         }
 
 
@@ -384,6 +396,14 @@ impl LoadedCrate {
         }
         else {
             return Err("couldn't get kernel's active page table");
+        }
+
+        // set the new_crate's section-related lists, since we didn't do it earlier
+        {
+            let mut new_crate_mut = new_crate.lock_as_mut()
+                .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to copied new_crate")?;
+            new_crate_mut.sections = new_sections;
+            new_crate_mut.bss_sections = new_bss_sections;
         }
 
         Ok(new_crate)

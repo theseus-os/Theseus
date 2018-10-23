@@ -173,4 +173,4 @@ The OLD value is a crate name (\"my_crate-<hash>\"), whereas the NEW value is a 
 Both the old crate name and the new module name can be autocompleted, e.g., \"my_cra\" will find \"my_crate-<hash>\" 
 if there is only ONE crate or module file that matched \"my_cra\".
 A third element of each tuple is the optional 'reexport_new_symbols_as_old' boolean, which if true, 
-will fuzzily match symbols across the old and new crate to equivocate symbols that are equal except for their hashes.";
+will reexport new symbols under their old names, if those symbols match (excluding hashes).";
