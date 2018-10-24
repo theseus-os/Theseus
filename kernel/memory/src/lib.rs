@@ -24,7 +24,7 @@ extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
-extern crate hashmap_core;
+extern crate qp_trie;
 
 mod area_frame_allocator;
 mod paging;
@@ -40,10 +40,10 @@ use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
-use alloc::{Vec, String, boxed::Box};
+use alloc::{Vec, String};
 use alloc::arc::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use hashmap_core::HashMap;
+use qp_trie::{Trie, wrapper::BString};
 
 
 pub type PhysicalAddress = usize;
@@ -75,12 +75,6 @@ pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
     let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
     frame_allocator.allocate_frames(num_frames)
 }
-
-
-/// A copy of the set of modules loaded by the bootloader. 
-/// Note that here we use `Once` instead of `lazy_static`, because we need to ensure that 
-/// the enclosed collection (HashMap) is NOT allocated until virtual memory and the heap is setup.
-static MODULE_AREAS: Once<HashMap<String, ModuleArea>> = Once::new();
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -192,6 +186,13 @@ impl PhysicalMemoryArea {
 //     }
 // }
 
+
+/// A copy of the set of modules loaded by the bootloader. 
+/// Note that here we use `Once` instead of `lazy_static`, because we need to ensure that 
+/// the enclosed collection (Trie) is NOT allocated until virtual memory and the heap is setup.
+static MODULE_AREAS: Once<Trie<BString, ModuleArea>> = Once::new();
+
+
 /// An area of physical memory that contains a file that the bootloader 
 /// (e.g., GRUB) loaded from the OS image.
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -222,13 +223,53 @@ impl ModuleArea {
 }
 
 
+
+/// Returns the `ModuleArea` corresponding to the given `module_name`.
+pub fn get_module(module_name: &str) -> Option<&'static ModuleArea> {
+    MODULE_AREAS.try().and_then(|modules| modules.get_str(module_name))
+}
+
+
+/// Returns an iterator over the `ModuleArea`s with names that start with the given `module_name_prefix` string.
+/// Each item in the returned iterator will be a tuple of type `(BString, &ModuleArea)`,
+/// in which the `BString` is the `ModuleArea`'s name.
+pub fn find_modules_starting_with(module_name_prefix: &str) -> qp_trie::Iter<'static, BString, ModuleArea> { 
+    MODULE_AREAS.try()
+        .map(|modules| modules.iter_prefix_str(module_name_prefix))
+        .unwrap_or_default()
+}
+
+
+/// Returns the `ModuleArea` corresponding to the given module_name_prefix,
+/// *if and only if* the list of `ModuleArea`s only contains a single possible match.
+/// 
+/// # Important Usage Note
+/// To avoid greedily matching more modules than expected, you may wish to end the `module_name_prefix` with `"-"`.
+/// This may provide results more in line with the caller's expectations; see the last example below about a trailing `"-"`. 
+/// This works because the delimiter between a crate name and its trailing hash value is `"-"`.
+/// 
+/// Also, the `module_name_prefix` must include the kernel prefix, e.g., `k#` at the beginning. 
+/// 
+/// # Example
+/// * The module list contains `k#my_crate-843a613894da0c24` and 
+///   `k#my_crate_new-933a635894ce0f12`. 
+///   Calling `get_module_starting_with("k#my_crate::foo")` will return None,
+///   because it will match both `my_crate` and `my_crate_new`. 
+///   To match only `my_crate`, call this function as `get_module_starting_with("k#my_crate-")`
+///   (note the trailing `"-"`).
+pub fn get_module_starting_with(module_name_prefix: &str) -> Option<&'static ModuleArea> { 
+    let mut iter = find_modules_starting_with(module_name_prefix);
+    iter.next()
+        .filter(|_| iter.next().is_none()) // ensure single element
+        .map(|(_key, val)| val)
+}
+
+
 /// Returns an iterator over all of the [`ModuleArea`](struct.ModuleArea.html)s that exist.
-pub fn module_iterator() -> Box<Iterator<Item = &'static ModuleArea>> {
-    if let Some(modules) = MODULE_AREAS.try() {
-        Box::new(modules.values())
-    } else {
-        Box::new(core::iter::empty())
-    }
+pub fn module_iterator() -> impl Iterator<Item = &'static ModuleArea> {
+    MODULE_AREAS.try()
+        .map(|modules| modules.values())
+        .unwrap_or_default()
 }
 
 
@@ -457,7 +498,7 @@ pub fn init(boot_info: BootInformation)
 
     MODULE_AREAS.call_once( || {
         // parse the list of multiboot modules 
-        let mut modules: HashMap<String, ModuleArea> = HashMap::new();
+        let mut modules: Trie<BString, ModuleArea> = Trie::new();
         for m in boot_info.module_tags() {
             let mod_area = ModuleArea {
                 mod_start_paddr: m.start_address().clone(), 
@@ -466,7 +507,7 @@ pub fn init(boot_info: BootInformation)
             };
             // print_early!("ModuleArea: {:?}\n", mod_area);
             info!("ModuleArea: {:?}", mod_area);
-            modules.insert(mod_area.name.clone(), mod_area);
+            modules.insert(mod_area.name.clone().into(), mod_area);
         }
         modules
     });
@@ -493,13 +534,6 @@ pub fn init(boot_info: BootInformation)
     });
 
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
-}
-
-
-
-/// returns the `ModuleArea` corresponding to the given module name.
-pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    MODULE_AREAS.try().and_then(|modules| modules.get(name))
 }
 
 

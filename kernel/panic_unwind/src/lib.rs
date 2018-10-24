@@ -40,13 +40,11 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
         #[cfg(loadable)]
         {
-            use core::ops::DerefMut;
-            use mod_mgmt::metadata::CrateType;
-            
             type PanicWrapperFunc = fn(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
-            let section_ref = kernel_mmi_ref.and_then(|kernel_mmi| {
-                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_wrapper::panic_wrapper", CrateType::Kernel.prefix(), None, kernel_mmi.lock().deref_mut(), false).upgrade()
-            }).ok_or("Couldn't get symbol: \"panic_wrapper::panic_wrapper\"");
+            let section_ref = mod_mgmt::get_default_namespace()
+                    .get_symbol_starting_with("panic_wrapper::panic_wrapper::")
+                    .upgrade()
+                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
