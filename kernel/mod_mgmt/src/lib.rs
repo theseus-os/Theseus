@@ -470,7 +470,7 @@ impl CrateNamespace {
         let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
             // info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
             (cached_crates, true)
-        } else { 
+        } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
             let nn = CrateNamespace::with_name(&format!("temp_swap--{:?}", swap_requests));
@@ -499,7 +499,7 @@ impl CrateNamespace {
                 error!("swap_crates(): couldn't find requested old_crate {:?}", old_crate_name);
                 "swap_crates(): couldn't find requested old crate"
             })?;
-            let mut old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
+            let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
                 error!("TODO FIXME: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exlusive mutable instance", old_crate_ref);
                 "TODO FIXME: swap_crates() doesn't yet support deep copying shared crates to get a new exlusive mutable instance"
             })?;
