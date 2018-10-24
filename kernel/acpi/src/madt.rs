@@ -121,6 +121,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                 let mut bsp_lapic = try!(LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
                 let bsp_id = bsp_lapic.id();
 
+                debug!("BSP ID: {}", bsp_id);
+
                 // redirect every IoApic's interrupts to the one BSP
                 // TODO FIXME: I'm unsure if this is actually correct!
                 for ioapic in ioapic::get_ioapics().iter() {
@@ -145,7 +147,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0xf, bsp_id, PIC_MASTER_OFFSET + 0xf);
 
                     //set pci irqs 16..19
-                    ioapic_ref.set_irq(0x10, bsp_id, PIC_MASTER_OFFSET + 0x10);
+                    //ioapic_ref.set_irq(0x10, bsp_id, PIC_MASTER_OFFSET + 0x10);
+                    ioapic_ref.set_irq(0x10, 119, PIC_MASTER_OFFSET + 0x10);
                     ioapic_ref.set_irq(0x11, bsp_id, PIC_MASTER_OFFSET + 0x11);
                     ioapic_ref.set_irq(0x12, bsp_id, PIC_MASTER_OFFSET + 0x12);
                     ioapic_ref.set_irq(0x13, bsp_id, PIC_MASTER_OFFSET + 0x13);

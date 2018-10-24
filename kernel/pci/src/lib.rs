@@ -208,8 +208,8 @@ pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
     debug!("MSI ADDR: {:#X}", addr);
     debug!("MSI DATA: {:#X}", data);
 
-    //write to MSI Addr... Intel Arch SDM, vol3, 10.11
-    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20);
+    //write to MSI Addr... Intel Arch SDM, vol3, 10.11, TODO: need to add dest id as an argument
+    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20 | 119<<12);
 
     //write to MSI data, TODO: should add this as a function arg, vector num
     pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+12, 0x30);

@@ -17,6 +17,7 @@ extern crate pit_clock;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
+extern crate apic;
 
 pub mod test_tx;
 pub mod descriptors;
@@ -36,6 +37,7 @@ use registers::*;
 use bit_field::BitField;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
+use apic::get_my_apic_id;
 
 //parameter that determine size of tx and rx descriptor queues
 const NUM_RX_DESC:        usize = 8;
@@ -691,9 +693,10 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         let mut nic = NIC_82599.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
-        // INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
+        //INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
         debug!("Int line: {}  Int pin: {}" , *INTERRUPT_NO.try().unwrap_or(&0), pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_PIN) );
 
+        //TODO: set as constant
         INTERRUPT_NO.call_once(|| 0x30 );
 
         nic.init(dev_pci);
@@ -766,7 +769,7 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         pci_enable_msi(dev_pci)?;
         pci_set_interrupt_disable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func);
         nic.enable_interrupts();
-        // register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
+        register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
         
         //Initialize transmit .. legacy descriptors
 
@@ -822,7 +825,7 @@ pub fn rx_poll_mq(_: Option<u64>){
 
 extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) {
     let nic = NIC_82599.lock();
-    debug!("nic handler called");
+    debug!("nic handler called in core: {}", get_my_apic_id().unwrap());
     nic.handle_interrupt();
     eoi(Some(*(INTERRUPT_NO.try().unwrap())));
 }
