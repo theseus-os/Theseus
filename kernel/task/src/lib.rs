@@ -726,14 +726,18 @@ pub fn create_idle_task(
 
     // set this as this core's current task, since it's obviously running
     task_ref.0.lock().set_as_current_task();
-    warn!("create_idle_task(): current_task() {:?}", get_my_current_task());
+    if get_my_current_task().is_none() {
+        error!("BUG: create_idle_task(): failed to properly set the new idle task as the current task on AP {}", 
+            apic_id);
+        return Err("BUG: create_idle_task(): failed to properly set the new idle task as the current task");
+    }
 
     // insert the new task into the task list
     let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
     if old_task.is_some() {
         error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
             idle_task_id, apic_id);
-        return Err("TASKLIST already contained a task with the new idle_task's ID");
+        return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
 
     Ok(task_ref)

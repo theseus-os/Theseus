@@ -120,23 +120,19 @@ iso: $(iso)
 
 
 
-## This first calls the cargo target, but then copies all object files into the build dir. 
+## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy the object files from the target/ directory into the object files build directory, and give EVERY file the kernel prefix
-	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  \
-		-v --prefix $(KERNEL_PREFIX) ./target/$(TARGET)/$(BUILD_MODE)/deps/  $(OBJECT_FILES_BUILD_DIR)
-## (the old way: just copying all files directly)
-# @for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
-# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)-.*/$(KERNEL_PREFIX)\1\.o/p'`   2> /dev/null ; \
-# done
+## Copy the object files from the target/ directory, and the core library, into the main build directory and prepend the kernel prefix
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o; do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
+	done
 
-## Copy the core library's object file
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)core.o
-	
-## Since we gave ALL object files the kernel prefix, we need to rename the application object files with the proper app prefix
+## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix
+## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
+##            if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
-		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
 
