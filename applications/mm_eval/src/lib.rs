@@ -13,6 +13,7 @@ extern crate memory;
 extern crate getopts;
 extern crate acpi;
 extern crate kernel_config;
+extern crate tsc;
 
 
 use alloc::{Vec, String};
@@ -53,11 +54,12 @@ fn create_mappings(
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
 
-    let ticks = {
+    let (tsc_ticks, hpet_ticks) = {
         let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
         let frame_allocator = frame_allocator_ref.deref_mut();
 
-        let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_tsc = tsc::tsc_ticks();
 
         for i in 0..num_mappings {
             let vaddr = start_vaddr + i*size_in_bytes;
@@ -79,19 +81,22 @@ fn create_mappings(
             }
         }
 
-        let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        end_time - start_time
+        let end_tsc = tsc::tsc_ticks();
+        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
     };
     
 
-    println!("Created {} {}-byte mappings ({}) in {} ticks.", 
+    println!("Created {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
         num_mappings, 
         size_in_bytes, 
         match mapper { 
             MapperType::Normal(_)   =>  "NORMAL",
             MapperType::Spillful(_) =>  "SPILLFUL",
         },
-        ticks,
+        tsc_ticks,
+        hpet_ticks,
     );
 
   
@@ -110,22 +115,25 @@ fn remap_normal(
 
     let num_mappings = mapped_pages.len();
 
-    let ticks = {
-        let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let (tsc_ticks, hpet_ticks) = {
+        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_tsc = tsc::tsc_ticks();
 
         for mut mp in mapped_pages.iter_mut() {
             let _res = mp.remap(mapper_normal, EntryFlags::PRESENT)?;
         }
 
-        let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        end_time - start_time
+        let end_tsc = tsc::tsc_ticks();
+        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
     };
     
 
-    println!("Remapped {} mappings ({}) in {} ticks.", 
+    println!("Remapped {} mappings ({}) in {} TSC ticks, {} HPET ticks.", 
         num_mappings, 
         "NORMAL",
-        ticks,
+        tsc_ticks,
+        hpet_ticks
     );
 
     Ok(())
@@ -142,24 +150,27 @@ fn remap_spillful(
 
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
-    let ticks = {
-        let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let (tsc_ticks, hpet_ticks) = {
+        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_tsc = tsc::tsc_ticks();
 
         for i in 0..num_mappings {
             let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
             let _res = mapper_spillful.remap(vaddr, EntryFlags::PRESENT)?;
         }
 
-        let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        end_time - start_time
+        let end_tsc = tsc::tsc_ticks();
+        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
     };
     
 
-    println!("Remapped {} {}-byte mappings ({}) in {} ticks.", 
+    println!("Remapped {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
         num_mappings, 
         size_in_bytes, 
         "SPILLFUL",
-        ticks,
+        tsc_ticks,
+        hpet_ticks
     );
 
     Ok(())
@@ -171,15 +182,17 @@ fn unmap_normal(mapper_normal: &mut Mapper, mut mapped_pages: Vec<MappedPages>) 
     let frame_allocator = frame_allocator_ref.deref_mut();
     let num_mappings = mapped_pages.len();
 
-    let ticks = {
-        let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let (tsc_ticks, hpet_ticks) = {
+        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_tsc = tsc::tsc_ticks();
 
         for mp in &mut mapped_pages {
             mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
         }
 
-        let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        end_time - start_time
+        let end_tsc = tsc::tsc_ticks();
+        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
     };
 
     // To avoid measuring the (irrelevant) overhead of vector allocation/deallocation, we manually unmapped the MappedPages above. 
@@ -188,10 +201,11 @@ fn unmap_normal(mapper_normal: &mut Mapper, mut mapped_pages: Vec<MappedPages>) 
         core::mem::forget(mp); 
     }
 
-    println!("Unmapped {} mappings ({}) in {} ticks.", 
+    println!("Unmapped {} mappings ({}) in {} TSC ticks, {} HPET ticks.", 
         num_mappings, 
         "NORMAL",
-        ticks,
+        tsc_ticks,
+        hpet_ticks
     );
 
     Ok(())
@@ -210,24 +224,27 @@ fn unmap_spillful(
 
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
-    let ticks = {
-        let start_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let (tsc_ticks, hpet_ticks) = {
+        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start_tsc = tsc::tsc_ticks();
 
         for i in 0..num_mappings {
             let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
             let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
         }
 
-        let end_time = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        end_time - start_time
+        let end_tsc = tsc::tsc_ticks();
+        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
     };
     
 
-    println!("Unmapped {} {}-byte mappings ({}) in {} ticks.", 
+    println!("Unmapped {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
         num_mappings, 
         size_in_bytes, 
         "SPILLFUL",
-        ticks,
+        tsc_ticks,
+        hpet_ticks
     );
 
     Ok(())
@@ -317,7 +334,7 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
     }
 
     let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
-    println!("HPET Period: {} femtoseconds)", hpet_period);
+    println!("TSC period: {:?}, HPET Period: {} femtoseconds)", tsc::get_tsc_frequency(), hpet_period);
 
     Ok(())
 
