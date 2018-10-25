@@ -133,14 +133,14 @@ impl Mapper {
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         for page in pages.clone() {
-            let frame = try!(allocator.allocate_frame().ok_or("map_internal(): couldn't allocate new frame, out of memory!"));
+            let frame = try!(allocator.allocate_frame().ok_or("Mapper::internal_map(): couldn't allocate new frame, out of memory!"));
 
             let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
             let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
-                error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                error!("Mapper::internal_map(): page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                 return Err("page was already in use");
             } 
 

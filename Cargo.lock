@@ -560,6 +560,7 @@ dependencies = [
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "terminal_print 0.1.0",
+ "tsc 0.1.0",
 ]
 
 [[package]]

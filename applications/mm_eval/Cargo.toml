@@ -16,6 +16,9 @@ version = "0.3.7"
 [dependencies.acpi]
 path = "../../kernel/acpi"
 
+[dependencies.tsc]
+path = "../../kernel/tsc"
+
 [dependencies.kernel_config]
 path = "../../kernel/kernel_config"
 
