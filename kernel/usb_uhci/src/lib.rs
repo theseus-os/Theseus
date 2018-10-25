@@ -20,20 +20,20 @@ extern crate usb_req;
 
 
 use core::ops::DerefMut;
-use volatile::{Volatile, ReadOnly, WriteOnly};
+use volatile::Volatile;
 use alloc::boxed::Box;
 use port_io::Port;
-use owning_ref::{BoxRef, BoxRefMut};
+use owning_ref::BoxRefMut;
 use spin::{Once, Mutex};
-use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
+use memory::{Frame,ActivePageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 use usb_device::{UsbDevice,Controller,HIDType};
 use usb_desc::{UsbDeviceDesc,UsbConfDesc, UsbIntfDesc, UsbEndpDesc};
 use usb_req::UsbDevReq;
 
-pub static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
-pub static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
+static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
+static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
 static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
-pub static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
+static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
 static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
 static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
@@ -139,21 +139,21 @@ pub fn buffer_pointer_alloc(offset:usize)-> Option<usize> {
 
 
 /// Read allocated td's link pointer
-pub fn qh_pointers(index:usize)->Option<Result<(u32,u32),&'static str>>{
+pub fn qh_pointers(index:usize)->Option<(u32,u32)>{
 
-    QH_POOL.try().map(|qh_pool| {
+    QH_POOL.try().and_then(|qh_pool| {
 
         let qh = &mut qh_pool.lock()[index];
-        Ok((qh.vertical_pointer.read(),qh.horizontal_pointer.read()))
+        Some((qh.vertical_pointer.read(),qh.horizontal_pointer.read()))
 
     })
 }
 
 /// Allocate a available Uhci Queue Head
 /// Return the available Queue Head's physical address and index in the pool
-pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
+pub fn qh_alloc()-> Option<(usize,usize)>{
 
-    QH_POOL.try().map(|qh_pool| {
+    QH_POOL.try().and_then(|qh_pool| {
 
 
         let mut index:usize = 0;
@@ -166,7 +166,7 @@ pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
                 let add: *mut UhciQH = x;
 
 
-                return Ok((add as usize, index));
+                return Some((add as usize, index));
 
 
             }else{
@@ -174,8 +174,7 @@ pub fn qh_alloc()-> Option<Result<(usize,usize),&'static str>>{
             }
         }
 
-        warn!("No available Queue head for transfer");
-        Err("No available Queue head for transfer")
+        None
 
     })
 }
@@ -222,9 +221,9 @@ pub fn get_registered_device (index: usize) -> Option<UsbDevice>{
 
 
 /// Allocate a available Uhci TD
-pub fn td_alloc()-> Option<Result<(usize,usize),&'static str>>{
+pub fn td_alloc()-> Option<(usize,usize)>{
 
-    TD_POOL.try().map(|td_pool| {
+    TD_POOL.try().and_then(|td_pool| {
 
         let mut index:usize = 0;
         for x in td_pool.lock().iter_mut(){
@@ -235,7 +234,7 @@ pub fn td_alloc()-> Option<Result<(usize,usize),&'static str>>{
 
                 let add: *mut UhciTDRegisters = x;
 
-                return Ok((add as usize,index));
+                return Some((add as usize,index));
 
             }else{
 
@@ -243,7 +242,7 @@ pub fn td_alloc()-> Option<Result<(usize,usize),&'static str>>{
             }
         }
 
-        Err("No available Queue head for transfer")
+        None
 
     })
 }
@@ -316,12 +315,12 @@ pub fn td_link_vf(index:usize, type_select: u8, pointer: u32){
 }
 
 /// Read allocated td's link pointer
-pub fn td_link_pointer(index:usize)->Option<Result<u32,&'static str>>{
+pub fn td_link_pointer(index:usize)->Option<u32>{
 
-    TD_POOL.try().map(|td_pool| {
+    TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        Ok(td.link_pointer.read())
+        Some(td.link_pointer.read())
 
 
 
@@ -329,24 +328,24 @@ pub fn td_link_pointer(index:usize)->Option<Result<u32,&'static str>>{
 }
 
 /// Read allocated td's link pointer
-pub fn td_token(index:usize)->Option<Result<u32,&'static str>>{
+pub fn td_token(index:usize)->Option<u32>{
 
-    TD_POOL.try().map(|td_pool| {
+    TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        Ok(td.token.read())
+        Some(td.token.read())
 
     })
 }
 
 /// Read allocated td's link pointer
-pub fn td_status(index:usize)->Option<Result<u32,&'static str>>{
+pub fn td_status(index:usize)->Option<u32>{
 
-    TD_POOL.try().map(|td_pool| {
+    TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
         let status = td.control_status.read();
-        Ok(status)
+        Some(status)
 
     })
 }
@@ -356,7 +355,7 @@ pub fn clean_framelist(){
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
 
-        let mut index:usize = 0;
+
         for x in frame_list.lock().iter_mut() {
 
             x.write(1);
@@ -378,9 +377,9 @@ pub fn clean_a_frame(index: usize){
 }
 
 /// Link the Queue Head to the frame list, and return the index of the frame
-pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
+pub fn qh_link_to_framelist(pointer: u32) -> Option<usize>{
 
-    UHCI_FRAME_LIST.try().map(|frame_list|{
+    UHCI_FRAME_LIST.try().and_then(|frame_list|{
 
         let mut index:usize = 0;
         for x in frame_list.lock().iter_mut() {
@@ -389,7 +388,7 @@ pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
                 x.write(pointer | TD_PTR_QH);
 
-                return Ok(index);
+                return Some(index);
 
             }else{
                 index += 1;
@@ -397,14 +396,14 @@ pub fn qh_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
         }
 
-        Err("No empty frame, need to clean one")
+        None
         })
 }
 
 /// Link the TD to the frame list, and return the index of the frame
-pub fn td_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
+pub fn td_link_to_framelist(pointer: u32) -> Option<usize>{
 
-    UHCI_FRAME_LIST.try().map(|frame_list|{
+    UHCI_FRAME_LIST.try().and_then(|frame_list|{
 
         let mut index:usize = 0;
         for x in frame_list.lock().iter_mut() {
@@ -413,7 +412,7 @@ pub fn td_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
                 x.write(pointer);
 
-                return Ok(index);
+                return Some(index);
 
             }else{
                 index += 1;
@@ -421,8 +420,9 @@ pub fn td_link_to_framelist(pointer: u32) -> Option<Result<usize,&'static str>>{
 
         }
 
-        Err("No empty frame, need to clean one")
+        return None;
     })
+
 }
 
 
@@ -445,12 +445,12 @@ pub fn td_link_keyboard_framelist(pointer: u32){
 
 
 ///read frame list link pointer
-pub fn frame_link_pointer(index: usize) -> Option<Result<u32,&'static str>>{
+pub fn frame_link_pointer(index: usize) -> Option<u32>{
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
 
         let pointer = frame_list.lock()[index].read();
-        Ok(pointer)
+        pointer
     })
 }
 
@@ -606,10 +606,8 @@ pub fn port1_device_init() -> Result<UsbDevice,&'static str>{
             return Ok(UsbDevice::new(1,speed,0,0,Controller::UCHI,
                                      HIDType::Unknown,0,0,0));
         }
-        info!("Port 1 is not enabled");
         return Err("Port 1 is not enabled");
     }
-    info!("No device is connected to the port 1");
     Err("No device is connected to the port 1")
 
 
@@ -993,7 +991,6 @@ pub fn port1_reset() {
 
     for _x in 0..20{
 
-        let port_status = REG_PORT1.lock().read();
 
         if if_connect_port1(){
             port1_enable(1);
@@ -1156,7 +1153,7 @@ pub fn port2_reset() {
     unsafe { REG_PORT2.lock().write(reset_command); }
 
     for _x in 0..20 {
-        let port_status = REG_PORT2.lock().read();
+
 
         if if_connect_port2() {
             port2_enable(1);

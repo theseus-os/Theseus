@@ -14,13 +14,12 @@ extern crate usb_keyboard;
 #[macro_use] extern crate log;
 
 use owning_ref::BoxRefMut;
-use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
-use usb_req::UsbDevReq;
+use usb_desc::{UsbDeviceDesc,UsbConfDesc};
 use usb_keyboard::box_keyboard_buffer;
-use usb_device::{UsbControlTransfer,UsbDevice,Controller,HIDType};
+use usb_device::{UsbDevice,HIDType};
 use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_endpoint_desc,clean_a_frame};
-use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
-use core::mem::size_of_val;
+use memory::{ActivePageTable,MappedPages};
+
 
 
 const TD_PACKET_IN : u8=                    0x69;
@@ -57,28 +56,35 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str>{
 
     let mut index: usize = 0;
-    let device_1 = port_1_enum(active_table)?;
-    usb_uhci::device_register(index, device_1);
-    match device_1.device_type{
+    if let Ok(device_1) = port_1_enum(active_table){
+        usb_uhci::device_register(index, device_1);
+        match device_1.device_type{
 
-        HIDType::Keyboard => {
-            if let Err(e) = usb_keyboard::init(active_table,index){
-                return Err(e);
+            HIDType::Keyboard => {
+                if let Err(e) = usb_keyboard::init(active_table,index){
+                    return Err(e);
+                }
+            },
+            HIDType::Mouse =>{
+
+            },
+            HIDType::Unknown =>{
+
+                return Err("Only support USB Mice & Keyboards currently")
             }
-        },
-        HIDType::Mouse =>{
 
-        },
-        HIDType::Unknown =>{
-
-            return Err("Only support USB Mice & Keyboards currently")
         }
+        index += 1;
+    }else{
 
+        info!("No device is attached to port 1")
     }
 
-    index += 1;
+
+
 
     if let Ok(device_2) = port_2_enum(active_table){
+        usb_uhci::device_register(index, device_2);
         match device_2.device_type{
 
             HIDType::Keyboard => {
@@ -110,14 +116,9 @@ pub fn device_init(active_table: &mut ActivePageTable) -> Result<(),&'static str
 /// Configure the device attached to the UCHI's port 1
 fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'static str>{
 
-    usb_uhci::port1_reset();
     if let Ok(mut device) = usb_uhci::port1_device_init(){
         info!("port_1_enum: speed {:?}", device.speed);
 
-        let v_buffer_pointer = usb_uhci::buffer_pointer_alloc(0)
-            .ok_or("Couldn't get virtual memory address for the buffer pointer in get_config_desc request for device in UHCI!!")?;
-        let data_buffer_pointer = active_table.translate(v_buffer_pointer as usize)
-            .ok_or("Couldn't translate the virtual memory address of the buffer pointer to phys_addr!!")?;
 
 
         device.maxpacketsize = 8;
@@ -166,26 +167,12 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
 
         offset = new_offset;
 
-        info!("check the configuration value");
-        let (origin, value, new_offset) = get_config(&device,active_table,offset)?;
-        info!("test: {:x}, value: {:x}", origin, value);
-        offset = new_offset;
 
-
-        info!("set the configuaration for this device, value : {:x}", config_value);
         let (request_pointer,new_offset) = build_request(active_table,0x00, usb_req::REQ_SET_CONF,
                                                          config_value as u16, 0,0,offset)?;
         set_request(&mut device, request_pointer as u32,active_table)?;
 
         offset = new_offset;
-
-        info!("check the configuration value");
-        let (origin, value, new_offset) = get_config(&device,active_table,offset)?;
-        info!("test: {:x}, value: {:x}", origin, value);
-        offset = new_offset;
-
-
-
 
         info!("{:?}", device);
         if device.device_type == HIDType::Mouse || device.device_type == HIDType::Keyboard{
@@ -196,16 +183,10 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
 
             offset = new_offset;
 
-
-            debug!{"request the data report!!! to test"}
-            let new_offset = get_report(&device, active_table,offset)?;
-
-
-
         }
         info!("USB {:?} is registered",device.device_type);
 
-        Ok((device))
+        Ok(device)
     }else{
         Err("No device attached to port 1 of UHCI")
     }
@@ -215,12 +196,13 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
 /// Configure the device attached to the UCHI's port 2
 fn port_2_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'static str>{
 
-    usb_uhci::port2_reset();
     if let Ok(mut device) = usb_uhci::port2_device_init(){
+
         device.maxpacketsize = 8;
 
 
         let mut offset:usize = 0;
+
 
         let (dev_desc,new_offset) = get_device_desc(& device,active_table,offset)?;
         offset = new_offset;
@@ -233,46 +215,56 @@ fn port_2_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
         device.maxpacketsize = maxi as u32;
 
 
+
+
         let add:u16 = 2;
         let new_offset = set_device_address(&mut device,add,active_table,offset)?;
         offset = new_offset;
 
+
         let (config_desc,new_offset) = get_config_desc(& device,active_table,offset)?;
         offset = new_offset;
-        let config_value = config_desc.conf_value.read();
+
+
+
+
+
+
         let total_len = config_desc.total_len.read();
-        let inter_num = config_desc.intf_count.read();
-        info!("Number of interfaces supported by this configuration:{:b}", inter_num);
         let (config_desc,new_offset) = set_device(&mut device,total_len,active_table,offset)?;
+        offset = new_offset;
+        let config_value = config_desc.conf_value.read();
+        let inter_num = config_desc.intf_count.read();
+        info!("Configuration value : {:x}", config_value);
+        info!("Number of interfaces supported by this configuration:{:b}", inter_num);
+
+        let (request_pointer,new_offset) = build_request(active_table,0x00, usb_req::REQ_SET_CONF,
+                                                         0 as u16, 0,0,offset)?;
+        set_request(&mut device, request_pointer as u32,active_table)?;
+
         offset = new_offset;
 
 
-        info!("set the configuaration for this device, value : {:x}", config_value);
         let (request_pointer,new_offset) = build_request(active_table,0x00, usb_req::REQ_SET_CONF,
                                                          config_value as u16, 0,0,offset)?;
         set_request(&mut device, request_pointer as u32,active_table)?;
 
         offset = new_offset;
 
-        info!("check the configuration value");
-        let (origin, value, new_offset) = get_config(&device,active_table,offset)?;
-        info!("test: {:x}, value: {:x}", origin, value);
-        offset = new_offset;
 
         info!("{:?}", device);
         if device.device_type == HIDType::Mouse || device.device_type == HIDType::Keyboard{
 
             let (request_pointer,new_offset) = build_request(active_table,0x21, usb_req::REQ_SET_IDLE,
-                                                             0xff00, 0,0,offset)?;
+                                                             0, 0,0,offset)?;
             set_request(&mut device, request_pointer as u32,active_table)?;
 
             offset = new_offset;
 
-
         }
         info!("USB {:?} is registered",device.device_type);
 
-        Ok((device))
+        Ok(device)
     }else{
         Err("No device attached to port 2 of UHCI")
     }
@@ -291,7 +283,7 @@ pub fn set_device_address(dev: &mut UsbDevice,add: u16, active_table: &mut Activ
 
 
     let (request_pointer,new_offset) = build_request(active_table,0x00, usb_req::REQ_SET_ADDR, add, 0,0,offset)?;
-    let frame_index = set_request(dev, request_pointer as u32,active_table)?;
+    let _result = set_request(dev, request_pointer as u32,active_table)?;
     dev.addr = add as u32;
     Ok(new_offset)
 }
@@ -309,7 +301,7 @@ pub fn get_config_desc(dev: &UsbDevice, active_table: &mut ActivePageTable, offs
     let new_off = get_request(dev, request_pointer as u32, data_buffer_pointer as u32,9,new_offset,active_table)?;
 
 
-    let mut config_desc = box_config_desc(active_table,data_buffer_pointer,new_offset)?;
+    let config_desc = box_config_desc(active_table,data_buffer_pointer,new_offset)?;
     Ok((config_desc,new_off))
 
 
@@ -338,7 +330,7 @@ pub fn get_config(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: u
 }
 
 /// Get the data report of a hid device
-/// Use to test whether the device is ready to send data (ready to use)
+/// Use to test whether the device is ready to send data
 pub fn get_report(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: usize)-> Result<(usize), &'static str>{
 
     let data_size: u16 = 8;
@@ -359,33 +351,33 @@ pub fn get_report(dev: &UsbDevice, active_table: &mut ActivePageTable, offset: u
     let speed = dev.speed;
     let addr = dev.addr;
     let endpoint = dev.interrupt_endpoint  as u32;
-    let max_size = dev.maxpacketsize;
+
 
     let mut toggle = 0;
 
     // build the set up transaction within a TD
-    let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
+    let (setup_add,setup_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
     let setup_add = active_table.translate(setup_add).unwrap();
     usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,toggle, TD_PACKET_SETUP as u32,
                       8,request_pointer as u32);
 
     toggle ^= 1;
-    let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
+    let (packet_add,packet_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
     let packet_add = active_table.translate(packet_add).unwrap();
     usb_uhci::init_td(packet_index,0,0,speed ,addr, endpoint,toggle, TD_PACKET_IN as u32,
                       data_size as u32,data_buffer_pointer as u32);
     usb_uhci::td_link_vf(setup_index,0,packet_add as u32);
     new_off += data_size as usize;
 
-    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().ok_or("Cannot allocate new uchi queue head")?;
     let qh_physical_add = active_table.translate(qh_physical_add).unwrap();
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
 
 
-    let frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).unwrap()?;
+    let _frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).ok_or("Cannot find available frame for the queue head")?;
 
     loop{
-        let status = usb_uhci::td_status(setup_index).unwrap()?;
+        let status = usb_uhci::td_status(setup_index).ok_or("Cannot read the td status")?;
 
         if status & usb_uhci::TD_CS_ACTIVE == 0{
             info!("get report last packet status bowen: {:x}", status);
@@ -414,14 +406,14 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
                               data_buffer_pointer as u32,total_len as u32,new_offset,active_table)?;
 
 
-    let mut config_desc = box_config_desc(active_table,data_buffer_pointer,new_offset)?;
-    new_offset +=  (config_desc.len.read() as usize);
-    let inter_num = config_desc.intf_count.read();
-    let conf_value = config_desc.conf_value.read();
+    let config_desc = box_config_desc(active_table,data_buffer_pointer,new_offset)?;
+    new_offset +=  config_desc.len.read() as usize;
 
-    let mut inter_desc = box_inter_desc(active_table,data_buffer_pointer,new_offset)?;
+
+
+    let inter_desc = box_inter_desc(active_table,data_buffer_pointer,new_offset)?;
     let endpoint_num = inter_desc.endp_count.read() + 2;
-    new_offset += (inter_desc.len.read() as usize);
+    new_offset += inter_desc.len.read() as usize;
     let class_code = inter_desc.class.read();
     let sub_class_code = inter_desc.sub_class.read();
     let protocal = inter_desc.protocol.read();
@@ -438,13 +430,13 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
 
         return Err("The usb driver right now only supports the HID device: Mouse and Keyboard");
     }
-    for y in 0..endpoint_num{
+    for _y in 0..endpoint_num{
         let end_desc = box_endpoint_desc(active_table, data_buffer_pointer,new_offset)?;
         let endpoint_len = end_desc.len.read();
         let endpoint_add = end_desc.addr.read() & 0xf;
-        let endpoint_interval = end_desc.interval.read();
 
-        new_offset += (endpoint_len as usize);
+
+        new_offset += endpoint_len as usize;
         let desc_type = end_desc.endp_type.read();
         let attribute = end_desc.attributes.read()  & 0b11;
 
@@ -453,8 +445,7 @@ pub fn set_device(dev: &mut UsbDevice, total_len: u16, active_table: &mut Active
                 0b00 => dev.control_endpoint = endpoint_add,
 
                 0b01 => dev.iso_endpoint = endpoint_add,
-                0b11 => {dev.interrupt_endpoint = endpoint_add;
-                    info!("\n\n\nthe end point interrupt interval: {:x} \n\n\n", endpoint_interval)},
+                0b11 => dev.interrupt_endpoint = endpoint_add,
                 _ => {},
             }
         }
@@ -484,7 +475,7 @@ pub fn get_device_desc(dev: &UsbDevice, active_table: &mut ActivePageTable, offs
     let new_off =
         get_request(dev, request_pointer as u32, data_buffer_pointer as u32,18,new_offset,active_table)?;
 
-    let mut device_desc = box_device_desc(active_table,data_buffer_pointer,new_offset)?;
+    let device_desc = box_device_desc(active_table,data_buffer_pointer,new_offset)?;
 
     Ok((device_desc,new_off))
 
@@ -508,7 +499,7 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
     let mut toggle = 0;
 
     // build the set up transaction within a TD
-    let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
+    let (setup_add,setup_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
     let setup_add = active_table.translate(setup_add).unwrap();
     usb_uhci::init_td(setup_index,0,0,speed ,addr, 0,toggle, TD_PACKET_SETUP as u32,
                       8,request_pointer);
@@ -516,13 +507,13 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
     // build the following data transaction within a TD
     let mut data_size = data_size;
     let mut link_index = setup_index;
-    let mut report_index: usize;
+    let report_index: usize;
 
     loop{
         toggle ^= 1;
         if data_size > max_size{
 
-            let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
+            let (packet_add,packet_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
             let packet_add = active_table.translate(packet_add).unwrap();
             usb_uhci::init_td(packet_index,0,0,speed ,addr, 0,toggle, TD_PACKET_IN as u32,
                               max_size,data_buffer_pointer);
@@ -537,7 +528,7 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
 
 
         }else{
-            let (packet_add,packet_index) = usb_uhci::td_alloc().unwrap()?;
+            let (packet_add,packet_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
             let packet_add = active_table.translate(packet_add).unwrap();
             usb_uhci::init_td(packet_index,0,0,speed ,addr, 0,toggle, TD_PACKET_IN as u32,
                               data_size,data_buffer_pointer);
@@ -546,7 +537,7 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
 
 
             link_index = packet_index;
-            let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
+            let (end_add,end_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
             let end_add = active_table.translate(end_add).unwrap();
             usb_uhci::init_td(end_index,0,1,speed ,addr, 0,1, TD_PACKET_OUT as u32,
                               NO_DATA,0);
@@ -561,25 +552,23 @@ pub fn get_request(dev: &UsbDevice,request_pointer: u32,data_buffer_pointer: u32
 
     }
 
-    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let (qh_physical_add,qh_index) = usb_uhci::qh_alloc().ok_or("Cannot allocate new uchi queue head")?;
     let qh_physical_add = active_table.translate(qh_physical_add).unwrap();
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
 
-    let frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).unwrap()?;
+    let frame_index = usb_uhci:: qh_link_to_framelist(qh_physical_add as u32).ok_or("Cannot find available frame for the queue head")?;
 
     // wait for the transfer to be completed
     // Currently the get config transfer is stalled
     // wait for the transfer to be completed
     loop{
-        let status = usb_uhci::td_status(link_index).unwrap()?;
-
+        let status = usb_uhci::td_status(link_index).ok_or("Cannot read the td status")?;
         if status & usb_uhci::TD_CS_ACTIVE == 0{
-            info!("get request last packet status: {:x}", status);
             break
         }
     }
     loop{
-        let status = usb_uhci::td_status(report_index).unwrap()?;
+        let status = usb_uhci::td_status(report_index).ok_or("Cannot read the td status")?;
 
         if status & usb_uhci::TD_CS_ACTIVE == 0{
             break
@@ -598,34 +587,34 @@ pub fn set_request(dev: &mut UsbDevice, request_pointer: u32, active_table: &mut
     // read necessary information to build TDs
     let speed = dev.speed;
     let addr = dev.addr;
-    let max_size = dev.maxpacketsize;
+
 
 
     // build the setup transaction
-    let (setup_add,setup_index) = usb_uhci::td_alloc().unwrap()?;
+    let (setup_add,setup_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
     let setup_add = active_table.translate(setup_add).unwrap();
     usb_uhci::init_td(setup_index,0,1,speed ,addr, 0,0, TD_PACKET_SETUP as u32,
                       8,request_pointer);
 
 
     // build the end transaction
-    let (end_add,end_index) = usb_uhci::td_alloc().unwrap()?;
+    let (end_add,end_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
     let end_add = active_table.translate(end_add).unwrap();
     usb_uhci::init_td(end_index,0,1,speed ,addr, 0,1, TD_PACKET_IN as u32,
                       NO_DATA,0);
     usb_uhci::td_link_vf(setup_index,0,end_add as u32);
 
     //build the queue head
-    let (qh_add,qh_index) = usb_uhci::qh_alloc().unwrap()?;
+    let (qh_add,qh_index) = usb_uhci::qh_alloc().ok_or("Cannot allocate new uchi queue head")?;
     let qh_add = active_table.translate(qh_add).unwrap();
     usb_uhci::init_qh(qh_index,usb_uhci::TD_PTR_TERMINATE,setup_add as u32);
-    let frame_index = usb_uhci:: qh_link_to_framelist(qh_add as u32).unwrap()?;
+    let frame_index = usb_uhci:: qh_link_to_framelist(qh_add as u32).ok_or("Cannot find available frame for the queue head")?;
 
 
     // wait for the transfer to be completed
     // Currently no error check
     loop{
-        let status = usb_uhci::td_status(setup_index).unwrap()?;
+        let status = usb_uhci::td_status(setup_index).ok_or("Cannot read the td status")?;
 
         if status & usb_uhci::TD_CS_ACTIVE == 0{
             break

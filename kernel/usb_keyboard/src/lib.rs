@@ -8,7 +8,7 @@ extern crate alloc;
 extern crate owning_ref;
 extern crate usb_uhci;
 extern crate usb_desc;
-extern crate usb_device;
+
 extern crate memory;
 extern crate spin;
 extern crate volatile;
@@ -19,9 +19,9 @@ use alloc::boxed::Box;
 use spin::{Once, Mutex};
 use volatile:: {ReadOnly,Volatile};
 use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
-use usb_device::{UsbControlTransfer,UsbDevice,Controller,HIDType};
-use usb_uhci::{box_dev_req,box_config_desc,box_device_desc,box_inter_desc,box_endpoint_desc,map,UHCI_STS_PORT,UHCI_CMD_PORT,get_registered_device};
-use memory::{get_kernel_mmi_ref,MemoryManagementInfo,FRAME_ALLOCATOR,Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages ,allocate_frame};
+
+use usb_uhci::{map,get_registered_device};
+use memory::{ActivePageTable, PhysicalAddress, MappedPages};
 use owning_ref:: BoxRefMut;
 use alloc::vec::Vec;
 
@@ -69,7 +69,7 @@ pub fn init(active_table: &mut ActivePageTable, index: usize)-> Result<(),&'stat
         data_buffer_pointer as u32
     });
 
-    let (td_add,td_index) = usb_uhci::td_alloc().unwrap()?;
+    let (td_add,td_index) = usb_uhci::td_alloc().ok_or("Cannot allocate a new Transfer Head")?;
 
     USB_KEYBOARD_TD_INDEX.call_once(||{
         td_index
@@ -131,7 +131,7 @@ pub fn init_receive_data() -> Result<(),&'static str>{
     let addr = device.addr;
     let max_size = device.maxpacketsize;
     let endpoint = device.interrupt_endpoint;
-    let mut toggle = 0;
+    let toggle = 0;
 
 
     let packet_add =  td_add;
@@ -141,7 +141,7 @@ pub fn init_receive_data() -> Result<(),&'static str>{
 
 
 
-    usb_uhci:: td_link_keyboard_framelist(packet_add as u32);
+    let _index = usb_uhci:: td_link_to_framelist(packet_add as u32).ok_or("Cannot assign a frame to usb keyboard transfer.");
 
 
     Ok(())
@@ -251,7 +251,7 @@ fn update_previous_input(list: [u8;6]){
         for x in 0..6 {
 
 
-            let code = previous_input.lock()[x].write(list[x]);
+            previous_input.lock()[x].write(list[x]);
 
         }
 
@@ -267,7 +267,7 @@ fn clean_previous_input(){
         for x in 0..6 {
 
 
-            let code = oldest_input.lock()[x].write(0);
+            oldest_input.lock()[x].write(0);
 
         }
 
@@ -283,7 +283,7 @@ fn update_oldest_input(list: [u8;6]){
         for x in 0..6 {
 
 
-            let code = oldest_input.lock()[x].write(list[x]);
+            oldest_input.lock()[x].write(list[x]);
 
         }
 
@@ -299,7 +299,7 @@ fn clean_oldest_input(){
         for x in 0..6 {
 
 
-            let code = oldest_input.lock()[x].write(0);
+            oldest_input.lock()[x].write(0);
 
         }
 

@@ -56,26 +56,7 @@ pub struct UsbDeviceDesc
     pub conf_count: Volatile<u8>,
 }
 
-impl UsbDeviceDesc {
-    pub fn default() -> UsbDeviceDesc {
-        UsbDeviceDesc {
-            len: Volatile::new(0),
-            device_type: Volatile::new(0),
-            usb_version: Volatile::new(0),
-            class: Volatile::new(0),
-            sub_class: Volatile::new(0),
-            protocol: Volatile::new(0),
-            max_packet_size: Volatile::new(0),
-            vendor_id: Volatile::new(0),
-            product_id: Volatile::new(0),
-            device_version: Volatile::new(0),
-            vendor_str: Volatile::new(0),
-            product_str: Volatile::new(0),
-            serial_str: Volatile::new(0),
-            conf_count: Volatile::new(0),
-        }
-    }
-}
+
 
 
 
@@ -93,17 +74,6 @@ pub struct UsbConfDesc
     pub conf_str: Volatile<u8>,
     pub attributes: Volatile<u8>,
     pub max_power: Volatile<u8>,
-}
-
-/// Box the the frame pointer
-pub fn box_config_desc(active_table: &mut ActivePageTable,page: MappedPages)
-                      -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
-
-
-    let config_desc: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
-        .try_map_mut(|mp| mp.as_type_mut::<UsbConfDesc>(0))?;
-
-    Ok(config_desc)
 }
 
 
@@ -138,21 +108,6 @@ pub struct UsbIntfDesc
     pub inf_str: Volatile<u8>,
 }
 
-impl UsbIntfDesc{
-    pub fn default() -> UsbIntfDesc {
-        UsbIntfDesc {
-            len: Volatile::new(0),
-            desc_type: Volatile::new(0),
-            intf_num: Volatile::new(0),
-            alt_setting: Volatile::new(0),
-            endp_count: Volatile::new(0),
-            class: Volatile::new(0),
-            sub_class: Volatile::new(0),
-            protocol: Volatile::new(0),
-            inf_str: Volatile::new(0),
-        }
-    }
-}
 
 // ------------------------------------------------------------------------------------------------
 // USB Endpoint Descriptor
@@ -170,18 +125,14 @@ pub struct UsbEndpDesc
     _padding: u16,
 }
 
-impl  UsbEndpDesc {
-    pub fn default() -> UsbEndpDesc {
-        UsbEndpDesc {
-            len: Volatile::new(0),
-            endp_type: Volatile::new(0),
-            addr: Volatile::new(0),
-            attributes: Volatile::new(0),
-            maxpacketsize: Volatile::new(0),
-            interval: Volatile::new(0),
-            _padding: 0,
-        }
-    }
+/// Box the endpoint description
+pub fn box_endpoint_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
+                         -> Result<BoxRefMut<MappedPages, UsbEndpDesc>, &'static str> {
+    let page = map(active_table, phys_addr)?;
+    let endpoint_desc: BoxRefMut<MappedPages, UsbEndpDesc> = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbEndpDesc>(offset))?;
+
+    Ok(endpoint_desc)
 }
 
 // ------------------------------------------------------------------------------------------------
