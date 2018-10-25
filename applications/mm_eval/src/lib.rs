@@ -316,6 +316,8 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
         };
     }
 
+    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+    println!("HPET Period: {} femtoseconds)", hpet_period);
 
     Ok(())
 
