@@ -212,7 +212,7 @@ impl Path {
         return components;
     } 
 
-    /// Returns a canonical and absolute form of the current path
+    /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
     fn canonicalize(&self, current_path: &Path) -> Path {
         let mut new_components = Vec::new();
         // Push the components of the working directory to the components of the new path
@@ -232,6 +232,7 @@ impl Path {
         for component in new_components.iter() {
             new_path.push_str(&format!("{}/",  component));
         }
+        debug!("canonical {}", new_path.clone());
         return Path::new(new_path);
     }
     
@@ -248,10 +249,13 @@ impl Path {
                 (None, None) => break,
                 (Some(a), None) => {
                     comps.push(a.to_string());
+                    for remaining_a in ita_iter {
+                        comps.push(remaining_a.to_string());
+                    }
                     break;
                 }
                 (None, _) => comps.push("..".to_string()),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
+                (Some(a), Some(b)) if comps.is_empty() && a == b => continue,
                 (Some(a), Some(b)) if b == &".".to_string() => comps.push("..".to_string()),
                 (Some(_), Some(b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
@@ -260,6 +264,9 @@ impl Path {
                         comps.push("..".to_string());
                     }
                     comps.push(a.to_string());
+                    for remaining_a in ita_iter {
+                        comps.push(remaining_a.to_string());
+                    }
                     break;
                 }
             }
@@ -269,18 +276,21 @@ impl Path {
         for component in comps.iter() {
             new_path.push_str(&format!("{}/",  component));
         }
+        debug!("relative {}", new_path.clone());
         return Some(Path::new(new_path));
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
     pub fn get(&self, wd: &StrongAnyDirRef) -> Option<StrongAnyDirRef> {
         let current_path = wd.lock().get_path();
-        // Get the shortest path from self to working directory by first finding the canonical path then the relative path
+        debug!("current path {}", current_path.path);
+        // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
-            Some(dir) => dir,
+            Some(dir) => dir, 
             None => return None
         };
         let mut new_wd = Arc::clone(&wd);
+        debug!("components {:?}", shortest_path.components());
         for dirname in shortest_path.components().iter() {
             // Navigate to parent directory
             if dirname == ".." {
@@ -290,16 +300,17 @@ impl Path {
                 };
                 new_wd = dir;
             }
-            // Ignore if there is no directory specified at any point in path
+            // Ignore if no directory is specified 
             else if dirname == "" {
                 continue;
             }
             // Navigate to child directory
             else {
-                let dir = match wd.lock().get_child_dir(dirname.to_string()) {
+                let dir = match new_wd.lock().get_child_dir(dirname.to_string()) {
                     Some(dir) => dir, 
                     None => return None,
                 };
+                debug!("dir {}", dir.lock().get_name());
                 new_wd = dir;
             }
         }
