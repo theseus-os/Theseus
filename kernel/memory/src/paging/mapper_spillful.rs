@@ -85,13 +85,19 @@ impl MapperSpillful {
     pub fn map<A>(&mut self, vaddr: VirtualAddress, size: usize, flags: EntryFlags, allocator: &mut A) -> Result<(), &'static str>
         where A: FrameAllocator
     {
-        for page in Page::range_inclusive_addr(vaddr, size) {
+        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        let mut top_level_flags = flags.clone();
+        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
+
+        for page in Page::range_inclusive_addr(vaddr, size).clone() {
             let frame = allocator.allocate_frame().ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), flags, allocator);
+            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
+                error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                 return Err("page was already mapped");
             }
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
