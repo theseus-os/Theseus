@@ -70,7 +70,7 @@ use spawn::KernelTaskBuilder;
 
 
 /// the callback use in the logger crate for mirroring log functions to the input_event_manager
-pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
+pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
     println!("{} {}", prefix, args);
 }
 
@@ -145,6 +145,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
+
+    // TODO FIXME: test this
+    #[cfg(mirror_log_to_network)] 
+    // Setup log mirroring to the network
+    {
+        logger::mirror_to_udp_server(network::server::send_debug_msg_udp);
+        use network::server::server_init;
+        spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
+    }
+
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings

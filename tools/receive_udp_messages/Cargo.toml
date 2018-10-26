@@ -1,0 +1,6 @@
+[package]
+name = "test_udp_server"
+version = "0.1.0"
+authors = ["nisalmenuka2 <nisalmenuka@gmail.com>"]
+
+[dependencies]
