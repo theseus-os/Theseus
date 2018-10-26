@@ -31,8 +31,14 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.pic]
+path = "../pic"
+
 [dependencies.pci]
 path = "../pci"
+
+[dependencies.acpi]
+path = "../acpi"
 
 [dependencies.pit_clock]
 path = "../pit_clock"

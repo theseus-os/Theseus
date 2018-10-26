@@ -147,8 +147,8 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0xf, bsp_id, PIC_MASTER_OFFSET + 0xf);
 
                     //set pci irqs 16..19
-                    //ioapic_ref.set_irq(0x10, bsp_id, PIC_MASTER_OFFSET + 0x10);
-                    ioapic_ref.set_irq(0x10, 119, PIC_MASTER_OFFSET + 0x10);
+                    ioapic_ref.set_irq(0x10, bsp_id, PIC_MASTER_OFFSET + 0x10);
+                    //ioapic_ref.set_irq(0x10, 119, PIC_MASTER_OFFSET + 0x10);
                     ioapic_ref.set_irq(0x11, bsp_id, PIC_MASTER_OFFSET + 0x11);
                     ioapic_ref.set_irq(0x12, bsp_id, PIC_MASTER_OFFSET + 0x12);
                     ioapic_ref.set_irq(0x13, bsp_id, PIC_MASTER_OFFSET + 0x13);
@@ -202,6 +202,21 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
     Ok(())
 }
 
+
+/// Redirects the given input to the given core
+/// Input IRQ number should be given without the offset of 0x20 
+pub fn redirect_interrupt(irq_num: u8, core_id: u8) {
+    use pic::PIC_MASTER_OFFSET;
+
+    for ioapic in ioapic::get_ioapics().iter() {
+        let mut ioapic_ref = ioapic.1.lock();
+
+        // set the BSP to receive regular PIC interrupts routed through the IoApic
+        ioapic_ref.set_irq(irq_num, core_id, PIC_MASTER_OFFSET + irq_num);
+      
+    }
+
+}
 
 
 /// Starts up and sets up AP cores based on the given APIC system table (`madt_iter`).

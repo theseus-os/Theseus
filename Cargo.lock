@@ -707,6 +707,7 @@ dependencies = [
 name = "ixgbe"
 version = "0.1.0"
 dependencies = [
+ "acpi 0.1.0",
  "apic 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "interrupts 0.1.0",
@@ -716,6 +717,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pci 0.1.0",
+ "pic 0.1.0",
  "pit_clock 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",

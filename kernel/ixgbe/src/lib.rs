@@ -18,6 +18,8 @@ extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
 extern crate apic;
+extern crate pic;
+extern crate acpi;
 
 pub mod test_tx;
 pub mod descriptors;
@@ -38,6 +40,8 @@ use bit_field::BitField;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use apic::get_my_apic_id;
+use pic::PIC_MASTER_OFFSET;
+use acpi::madt::redirect_interrupt;
 
 //parameter that determine size of tx and rx descriptor queues
 const NUM_RX_DESC:        usize = 8;
@@ -616,10 +620,6 @@ impl Nic{
                 Ok(())
         }
 
-        fn enable_msi (dev_pci: &PciDevice) {
-
-        }
-
         fn enable_interrupts(&self) {
                 //set IVAR reg for each queue used
                 self.write_command(REG_IVAR, 0x81808180); // for rxq 0
@@ -693,11 +693,8 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         let mut nic = NIC_82599.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
-        //INTERRUPT_NO.call_once(|| pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_LINE) );
-        debug!("Int line: {}  Int pin: {}" , *INTERRUPT_NO.try().unwrap_or(&0), pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_INTERRUPT_PIN) );
-
-        //TODO: set as constant
-        INTERRUPT_NO.call_once(|| 0x30 );
+        //TODO: should get from ACPI tables, not a constant
+        INTERRUPT_NO.call_once(|| 0x10 );
 
         nic.init(dev_pci);
         try!(nic.mem_map(dev_pci));
@@ -769,7 +766,8 @@ pub fn init_nic(dev_pci: &PciDevice) -> Result<(), &'static str>{
         pci_enable_msi(dev_pci)?;
         pci_set_interrupt_disable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func);
         nic.enable_interrupts();
-        register_interrupt(*INTERRUPT_NO.try().unwrap(), ixgbe_handler);
+        register_interrupt(*INTERRUPT_NO.try().unwrap() + PIC_MASTER_OFFSET, ixgbe_handler);
+        redirect_interrupt(*INTERRUPT_NO.try().unwrap(), 119);
         
         //Initialize transmit .. legacy descriptors
 
