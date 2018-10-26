@@ -164,23 +164,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    // testing nic
-    // TODO: remove this (@Ramla)
-    if true {
-        use e1000::test_e1000_driver::test_nic_driver;
-        KernelTaskBuilder::new(test_nic_driver, None)
-            .name(String::from("test_nic_driver"))
-            .spawn()?;
-    }  
-
-    // if true {
-    //     use e1000::rx_poll;
-    //     KernelTaskBuilder::new(rx_poll, None)
-    //         .name(String::from("rx_poll"))
-    //         .spawn()?;
-    // }  
-
-
     // create and jump to the first userspace thread
     if false {
         debug!("trying to jump to userspace");

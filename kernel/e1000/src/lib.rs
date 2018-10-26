@@ -55,6 +55,9 @@ const E1000_SIZE_TX_BUFFER:     usize = 256;
 pub const RX_EOP:               u8 = 1<<1; //End of Packet
 pub const RX_DD:                u8 = 1<<0; //Descriptor Done
 
+///Tx Status bits
+pub const TX_DD:                u8 = 1<<0; //Descriptor Done
+
 ///Interrupts types
 pub const INT_LSC:              u32 = 0x04; //Link Status Change
 pub const INT_RX:               u32 = 0x80; //Receive Timer interrupt
@@ -540,15 +543,6 @@ impl Nic{
                 if self.bar_type == 0 
                 {
                         unsafe { write_volatile((self.mem_base+p_address as usize) as *mut u32, p_value) };
-                        //MMIOUtils::write32(mem_base+p_address,p_value);
-                }
-                //change port functions (later, not needed right now)
-                else
-                {
-                        /*let IO_BASE_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(self.io_base));
-                        let IO_BASE_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(self.io_base+4));
-                        IO_BASE_ADDRESS_PORT.lock().write(p_address); 
-                        IO_BASE_DATA_PORT.lock().write(p_value); */
                 }
 
         }
@@ -560,19 +554,8 @@ impl Nic{
                 if self.bar_type == 0 
                 {
                         val = unsafe { read_volatile((self.mem_base+p_address as usize) as *const u32) };
-                        //return MMIOUtils::read32(mem_base+p_address);
-                }
-                else
-                {
-                       /* let IO_BASE_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(self.io_base));
-                        let IO_BASE_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(self.io_base+4));
-                        IO_BASE_ADDRESS_PORT.lock().write(p_address);
-                        val = IO_BASE_DATA_PORT.lock().read(); 
-                        //Ports::outportl(io_base, p_address);
-                        //return Ports::inportl(io_base + 4);*/
                 }
                 val
-
         }
 
         /// Read MAC Address
@@ -868,7 +851,15 @@ impl Nic{
                 }
                 //regs.icr.read(); //clear interrupt
                 Ok(())
-        }                               
+        }     
+
+        pub fn has_packet_arrived(&mut self) -> bool {
+               (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 
+        }         
+
+        pub fn has_packet_sent(&mut self) -> bool {
+                (self.tx_descs[self.tx_cur as usize].status & TX_DD) != 0
+        }                 
 
 }
 
