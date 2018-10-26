@@ -5,7 +5,7 @@
 
 
 extern crate alloc;
-#[macro_use] extern crate console;
+#[macro_use] extern crate terminal_print;
 extern crate rtc;
 
 use alloc::{Vec, String};

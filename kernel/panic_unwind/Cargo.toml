@@ -1,0 +1,27 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "panic_unwind"
+description = "Entry points for panics and unwinding, as required by the Rust compiler."
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.panic_wrapper]
+path = "../panic_wrapper"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
+[lib]
+crate-type = ["rlib"]

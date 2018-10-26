@@ -154,7 +154,7 @@ unsafe extern "C" fn syscall_handler() {
     asm!("mov rax, $0" : : "r"(result) : : "intel", "volatile"); //  put result in rax for returning to userspace
 
     // we don't need to save the current kernel rsp back into the UserTaskGsData struct's kernel_stack member (gs:[0x0]), 
-    // because we can just re-use the same rsp that was originally placed into TSS RSP0 (which is set on a context switch)
+    // because we can just re-use the same rsp that was originally placed into TSS RSP0 (which is set on a task switch)
     asm!("
           mov rsp, gs:[0x8];  \
           mov rcx, gs:[0x10]; \

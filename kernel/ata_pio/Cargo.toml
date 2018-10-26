@@ -1,8 +1,9 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 name = "ata_pio"
 description = "Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -23,4 +24,4 @@ path = "../pit_clock"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

@@ -1,7 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "vga_buffer"
+description = "Support for the simple 80x25 text-only VGA display mode"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -13,6 +15,9 @@ features = ["const_fn"]
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.text_display]
+path = "../text_display"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 
@@ -23,7 +28,8 @@ path = "../../libs/port_io"
 default-features = false
 version = "0.3.7"
 
-
+[dependencies.event_types]
+path = "../event_types"
 
 [lib]
-crate-type = ["lib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

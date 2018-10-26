@@ -2,6 +2,7 @@
 name = "hello"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 
@@ -11,8 +12,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.terminal_print]
+path = "../terminal_print"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

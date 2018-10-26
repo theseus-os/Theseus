@@ -2,17 +2,20 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(integer_atomics)]
 
 extern crate x86_64;
 extern crate task;
+extern crate runqueue;
 extern crate apic;
+extern crate pmu_x86;
+#[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate console; // for regular println!()
-
+#[macro_use] extern crate print; // for regular println!()
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
-use core::sync::atomic::Ordering;
-
+use x86_64::registers::msr::*;
+use runqueue::RunQueue;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -20,16 +23,16 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
+        idt.debug.set_handler_fn(debug_handler);
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
+        idt.overflow.set_handler_fn(overflow_handler);
+        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
         idt.double_fault.set_handler_fn(double_fault_handler);
         // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
+        idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
         // missing: 0x0c stack segment exception
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
@@ -52,12 +55,12 @@ pub fn init(idt_ref: &'static LockedIdt) {
 /// calls println!() and then println_raw!()
 macro_rules! println_both {
     ($fmt:expr) => {
-        print!(concat!($fmt, "\n"));
         print_raw!(concat!($fmt, "\n"));
+        print!(concat!($fmt, "\n"));
     };
     ($fmt:expr, $($arg:tt)*) => {
-        print!(concat!($fmt, "\n"), $($arg)*);
         print_raw!(concat!($fmt, "\n"), $($arg)*);
+        print!(concat!($fmt, "\n"), $($arg)*);
     };
 }
 
@@ -66,7 +69,14 @@ macro_rules! println_both {
 /// and then halts that task (another task should be scheduled in).
 fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
-        taskref.write().kill(task::KillReason::Exception(exception_number));
+        match taskref.kill(task::KillReason::Exception(exception_number)) {
+            Ok(_) => {
+                if let Err(e) = RunQueue::remove_task_from_all(taskref) {
+                    error!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
+                }
+            }
+            Err(e) => error!("kill_and_halt(): error killing current task {:?}: {}", taskref, e),
+        }
     }
 
     loop { }
@@ -81,18 +91,41 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
     kill_and_halt(0x0)
 }
 
+/// exception 0x01
+pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFrame) {
+    println_both!("\nEXCEPTION: DEBUG at {:#x}\n{:#?}\n",
+             stack_frame.instruction_pointer,
+             stack_frame);
 
-/// exception 0x02, also used for TLB Shootdown IPIs
+    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
+}
+
+/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
+    let mut expected_nmi = false;
+    
+    // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
+    if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
+        // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
+        unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
+        // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
+
+        pmu_x86::handle_sample(stack_frame);
+        expected_nmi = true;
+    }
+
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
-    if vaddr != 0 {
+    let vaddrs = apic::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
+    if !vaddrs.is_empty() {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(vaddr);
+        apic::handle_tlb_shootdown_ipi(&vaddrs);
+        expected_nmi = true;
+    }
+
+    if expected_nmi {
         return;
     }
-    
-    // if vaddr is 0, then it's a regular NMI    
+
     println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
@@ -108,6 +141,24 @@ pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStac
              stack_frame);
 
     // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
+}
+
+/// exception 0x04
+pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackFrame) {
+    println_both!("\nEXCEPTION: OVERFLOW at {:#x}\n{:#?}\n",
+             stack_frame.instruction_pointer,
+             stack_frame);
+    
+    kill_and_halt(0x4)
+}
+
+// exception 0x05
+pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut ExceptionStackFrame) {
+    println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED at {:#x}\n{:#?}\n",
+             stack_frame.instruction_pointer,
+             stack_frame);
+
+    kill_and_halt(0x5)
 }
 
 /// exception 0x06
@@ -129,14 +180,23 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
     kill_and_halt(0x7)
 }
 
-
+/// exception 0x08
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
     kill_and_halt(0x8)
 }
 
+/// exception 0x0a
+pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
+    println_both!("\nEXCEPTION: INVALID_TSS FAULT\nerror code: \
+                                  {:#b}\n{:#?}\n",
+             error_code,
+             stack_frame);
+    kill_and_halt(0xA)
+}
 
+/// exception 0x0b
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}\n",
@@ -146,7 +206,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
     kill_and_halt(0xB)
 }
 
-
+/// exception 0x0d
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
                                   {:#X}\n{:#?}\n",
@@ -156,7 +216,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
     kill_and_halt(0xD)
 }
 
-
+/// exception 0x0e
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
     println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \

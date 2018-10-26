@@ -23,11 +23,12 @@ use core::ops::DerefMut;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
+use alloc::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
-use spin::{RwLock, Once};
+use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
-use irq_safety::hold_interrupts;
+use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
@@ -46,7 +47,7 @@ pub enum InterruptChip {
 
 
 lazy_static! {
-    static ref LOCAL_APICS: AtomicMap<u8, RwLock<LocalApic>> = AtomicMap::new();
+    static ref LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 }
 
 static APIC_REGS: Once<BoxRef<MappedPages, ApicRegisters>> = Once::new();
@@ -74,8 +75,13 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core
-pub fn get_lapics() -> &'static AtomicMap<u8, RwLock<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<u8, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
+}
+
+/// Returns the number of processor core (local APICs) that exist on this system.
+pub fn core_count() -> usize {
+    get_lapics().iter().count()
 }
 
 
@@ -96,7 +102,7 @@ pub fn get_my_apic_id() -> Option<u8> {
 
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
-pub fn get_my_apic() -> Option<&'static RwLock<LocalApic>> {
+pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
     get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
 }
 
@@ -303,6 +309,9 @@ impl LocalApic {
         if is_bsp {
             BSP_PROCESSOR_ID.call_once( || apic_id); 
         }
+        else {
+            memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
+        }
 
 
         if has_x2apic() { 
@@ -435,7 +444,7 @@ impl LocalApic {
 
     fn init_timer(&mut self) -> Result<(), &'static str> {
         assert!(!has_x2apic(), "an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.");
-        let apic_period = if cfg!(feature = "apic_timer_fixed") {
+        let apic_period = if cfg!(apic_timer_fixed) {
             info!("apic_timer_fixed config: overriding APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do apic periods right
         } else {
@@ -466,7 +475,7 @@ impl LocalApic {
 
     fn init_timer_x2apic(&mut self) {
         assert!(has_x2apic(), "an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.");
-        let x2apic_period = if cfg!(feature = "apic_timer_fixed") {
+        let x2apic_period = if cfg!(apic_timer_fixed) {
             info!("apic_timer_fixed config: overriding X2APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do x2apic periods right
         } else {
@@ -577,24 +586,16 @@ impl LocalApic {
 
 
     /// Sends an IPI to all other cores (except me) to trigger 
-    /// a TLB flush of the given `VirtualAddress`
-    pub fn send_tlb_shootdown_ipi(&mut self, vaddr: VirtualAddress) {
-
-        // temporary page is not shared across cores
-        use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
-        const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
-        if vaddr == TEMPORARY_PAGE_FRAME { 
-            return;
-        }
-        
+    /// a TLB flush of the given `VirtualAddress`es
+    pub fn send_tlb_shootdown_ipi(&mut self, virtual_addresses: Vec<VirtualAddress>) {        
+        // skip sending IPIs if there are no other cores running
         let core_count = get_lapics().iter().count();
         if core_count <= 1 {
-            return; // skip sending IPIs if there are no other cores running
+            return;
         }
 
-        // trace!("send_tlb_shootdown_ipi(): from AP {}, vaddr: {:#X}, core_count: {}", 
-        //         get_my_apic_id().unwrap_or(0xff), vaddr, core_count);
-        
+        // trace!("send_tlb_shootdown_ipi(): from AP {}, core_count: {}, {:?}", self.apic_id, core_count, virtual_addresses);
+
         // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
         // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
         let _held_ints = hold_interrupts(); 
@@ -605,12 +606,11 @@ impl LocalApic {
             spin_loop_hint();
         }
 
-        TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(vaddr, Ordering::Release);
-        TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // - 1 to exclude this core 
+        *TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write() = virtual_addresses;
+        TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // -1 to exclude this core 
 
         // let's try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling
         self.send_nmi_ipi(LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
-        // self.send_ipi(TLB_SHOOTDOWN_IPI_IRQ, LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
 
         // wait for all other cores to handle this IPI
         // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
@@ -620,7 +620,7 @@ impl LocalApic {
         }
     
         // clear TLB shootdown data
-        TLB_SHOOTDOWN_IPI_VIRT_ADDR.store(0, Ordering::Release);
+        TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write().clear();
 
         // release lock
         TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
@@ -730,32 +730,37 @@ impl LocalApic {
 
 /// The IRQ number used for IPIs
 pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
-/// The virtual address used for TLB shootdown IPIs
-pub static TLB_SHOOTDOWN_IPI_VIRT_ADDR: AtomicUsize = AtomicUsize::new(0); 
 /// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0); 
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
+lazy_static! {
+    /// The virtual addresses used for TLB shootdown IPIs
+    pub static ref TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES: RwLockIrqSafe<Vec<VirtualAddress>> = 
+        RwLockIrqSafe::new(Vec::new());
+}
 
 
 /// Broadcasts TLB shootdown IPI to all other AP cores.
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
-pub fn broadcast_tlb_shootdown(vaddr: VirtualAddress) {
+pub fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
     if let Some(my_lapic) = get_my_apic() {
-        // trace!("remap(): (AP {}) sending tlb shootdown ipi for vaddr {:#X}", my_lapic.apic_id, vaddr);
-        my_lapic.write().send_tlb_shootdown_ipi(vaddr);
+        // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
+        my_lapic.write().send_tlb_shootdown_ipi(virtual_addresses);
     }
 }
 
 
-/// Handles a TLB shootdown ipi by flushing the VirtualAddress 
-/// currently stored in TLB_SHOOTDOWN_IPI_VIRT_ADDR.
+/// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
+/// currently stored in `TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES`.
 /// DO not invoke this directly, it will be called by an IPI interrupt handler.
-pub fn handle_tlb_shootdown_ipi(vaddr: VirtualAddress) {
+pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
     // let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    // trace!("handle_tlb_shootdown_ipi(): (AP {}) flushing vaddr {:#X}", apic_id, vaddr);
+    // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs: {:?}", apic_id, virtual_addresses);
 
-    x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+    for vaddr in virtual_addresses {
+        x86_64::instructions::tlb::flush(x86_64::VirtualAddress(*vaddr));
+    }
     TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }

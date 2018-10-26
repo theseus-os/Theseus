@@ -3,10 +3,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "apic"
 description = "APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
-raw-cpuid = "3.0.0"
 volatile = "0.2.4"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
@@ -28,7 +28,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -42,10 +41,13 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[dependencies.raw-cpuid]
+version = "5.0.0"
+features = [ "use_arch" ]
 
 [features]
 apic_timer_fixed = []
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

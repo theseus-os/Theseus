@@ -1,7 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
+description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
+build = "../../build.rs"
 
 
 [dependencies]
@@ -24,12 +26,6 @@ path = "../kernel_config"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-# [dependencies.frame_buffer]
-# path = "../frame_buffer"
-
-# [dependencies.frame_buffer_3d]
-# path = "../frame_buffer_3d"
-
 [dependencies.logger]
 path = "../logger"
 
@@ -42,20 +38,14 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.exceptions_early]
 path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.panic_handling]
-path = "../panic_handling"
+[dependencies.panic_unwind]
+path = "../panic_unwind"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"

@@ -1,8 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler"
-description = "The scheduler and runqueue management"
+description = "Provides scheduling functionality for selecting the next task and causing a task switch"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -11,16 +12,8 @@ spin = "0.4.5"
 default-features = false
 version = "0.3.7"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
-
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
-
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
 
 [dependencies.apic]
 path= "../apic"
@@ -28,5 +21,8 @@ path= "../apic"
 [dependencies.task]
 path = "../task"
 
+[dependencies.runqueue]
+path = "../runqueue"
+
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

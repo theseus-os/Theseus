@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "captain"
 description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 
@@ -12,8 +13,6 @@ version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
-# features = ["const_fn"]  #if we need them later
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
@@ -40,8 +39,11 @@ path = "../window_manager"
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.input_event_manager]
+path = "../input_event_manager"
+
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.memory]
 path = "../memory"
@@ -76,9 +78,6 @@ path = "../driver_init"
 [dependencies.e1000]
 path = "../e1000"
 
-[dependencies.console]
-path = "../console"
-
 [dependencies.task]
 path = "../task"
 
@@ -88,15 +87,16 @@ path = "../scheduler"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-
-## reference here: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies
-[target.'cfg(target_feature = "sse2")'.dependencies.simd_test]
-path = "../simd_test"
+[dependencies.print]
+path = "../print"
 
 
-[features]
-mirror_serial = []
+## This should be dependent upon 'cfg(simd_personality)',
+## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
+## Therefore, it has to be unconditionally included.
+[dependencies.simd_personality]
+path = "../simd_personality"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

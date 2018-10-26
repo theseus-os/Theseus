@@ -1,7 +1,8 @@
 [package]
 name = "frame_buffer_3d"
 version = "0.1.0"
-authors = ["snoword <qiuj@mail.bnu.edu.cn>"]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -27,8 +28,7 @@ version = "0.3.7"
 path = "../memory"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
-version = "0.1.1"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.acpi]
 path = "../acpi"
@@ -40,4 +40,4 @@ path = "../acpi"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "driver_init"
 description = "Code for handling the sequence required to initializing each driver"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 
@@ -14,8 +15,8 @@ version = "0.3.7"
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.ata_pio]
 path = "../ata_pio"
@@ -45,4 +46,4 @@ path = "../mouse"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

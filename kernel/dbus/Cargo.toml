@@ -1,8 +1,9 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 name = "dbus"
-description = "Simple dbus-like IPC support for Theseus"
+description = "Simple dbus-like IPC support"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -20,4 +21,4 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

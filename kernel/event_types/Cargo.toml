@@ -1,0 +1,12 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "event_types"
+description = "A temporary way to move the input_event_manager typedefs out of the input_event_manager crate"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[lib]
+crate-type = ["rlib"]

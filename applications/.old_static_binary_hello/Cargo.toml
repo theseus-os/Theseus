@@ -12,11 +12,8 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.console]
-path = "../../kernel/console"
-
-# [lib]
-# crate-type = ["rlib"] # "lib" does the same thing I think
+[dependencies.print]
+path = "../../kernel/print"
 
 
 [profile.dev]

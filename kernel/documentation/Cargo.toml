@@ -1,0 +1,8 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "documentation"
+description = "A crate with no code that only includes top-level documentation that doesn't belong in other crates."
+version = "0.1.0"
+build = "../../build.rs"
+
+[lib]

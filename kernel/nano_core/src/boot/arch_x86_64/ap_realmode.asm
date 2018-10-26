@@ -1,6 +1,60 @@
+ABSOLUTE 0x5000
+VBECardInfo:
+	.signature resb 4
+	.version resw 1
+	.oemstring resd 1
+	.capabilities resd 1
+	.videomodeptr resd 1
+	.totalmemory resw 1
+	.oemsoftwarerev resw 1
+	.oemvendornameptr resd 1
+	.oemproductnameptr resd 1
+	.oemproductrevptr resd 1
+	.reserved resb 222
+	.oemdata resb 256
+
+ABSOLUTE 0x5200
+VBEModeInfo:
+	.attributes resw 1
+	.winA resb 1
+	.winB resb 1
+	.granularity resw 1
+	.winsize resw 1
+	.segmentA resw 1
+	.segmentB resw 1
+	.winfuncptr resd 1
+	.bytesperscanline resw 1
+	.xresolution resw 1
+	.yresolution resw 1
+	.xcharsize resb 1
+	.ycharsize resb 1
+	.numberofplanes resb 1
+	.bitsperpixel resb 1
+	.numberofbanks resb 1
+	.memorymodel resb 1
+	.banksize resb 1
+	.numberofimagepages resb 1
+	.unused resb 1
+	.redmasksize resb 1
+	.redfieldposition resb 1
+	.greenmasksize resb 1
+	.greenfieldposition resb 1
+	.bluemasksize resb 1
+	.bluefieldposition resb 1
+	.rsvdmasksize resb 1
+	.rsvdfieldposition resb 1
+	.directcolormodeinfo resb 1
+	.physbaseptr resd 1
+	.offscreenmemoryoffset resd 1
+	.offscreenmemsize resw 1
+	.reserved resb 206
+
+ABSOLUTE 0x5400
+current:
+    .mode resd 1
+
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
-
 
 global ap_start_realmode
 
@@ -37,47 +91,97 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
-; set graphic mode
-;    mov ax, 0x4f02
-;    mov bx, 0x4112
-;    int 0x10
+;The graphic mode setting code is executed once. [0000:0900] indicates if it's the first time to run the code. If not, skip the graphic mode setting block.
+    mov ax, 0
+    mov es, ax
+    mov di, 0x900
+    mov ax, [es:di]
+    cmp ax, 5
+    je gdt
 
+;Here we get the VESA information and set a VESA mode of a choosen resolution
+;We get a list of available modes, and pick the first mode of 32bit(RGB_) and whose x-resolution >= 1280
+;We put the mode information in physical address 0xF100 which can be read in Rust
+getcardinfo:            ;get super VGA information including available modes list
+    mov ax, 0x4F00      ;BIOS int 10, ax=4F00, get superVGA information
+    mov di, VBECardInfo ;di, buffer for returned information
+    int 0x10            ;BIOS int 10
+    cmp al, 0x4F        ;al=4f, function is supported
+    jne gdt             ;if not supported, skip the VESA mode setting block
+    
+findmode:               ;initialize the mode pointer
+    mov si, [VBECardInfo.videomodeptr]
+    mov ax, [VBECardInfo.videomodeptr+2]
+    mov fs, ax          ;[fs:si] pointes to the first mode
+    sub si, 2           ;initilize the pointer [fs:si] to the index before the first mode
 
-;    push ds
-;    push es
-;    mov ax,0x1103
-;    mov  bh,6
-;    int 0x10
-;    push es
-;    pop ds
-;    pop es
-;    mov si,bp
-;    mov cx,256*16/4
-;    rep movsd
-;    pop ds
+;travers the mode list to fint the first mode of intended parameters
+.searchmodes:
+    add si, 2           ;[fs:si] points to the next mode
+    mov cx, [fs:si]     ;move current mode index to cx
+    cmp cx, 0xFFFF      
+    je gdt              ;if the mode index extends the bound, skip the VESA mode setting block;
 
-    ;test code to find lfb address
-    ;mov ax, 0xb
-    ;mov es, ax
-    ;mov ax, 0x8000
-    ;mov di, ax
-    ;mov ax, 0x4f01
-    ;mov cx, 0x4112    
-    ;int 0x10
+.getmodeinfo:
+    push esi
+    mov [current.mode], cx  ;set current mode
+    mov ax, 0x4F01          ;BIOS int 10, ax=4f01, get current mode information. cx:mode address
+    mov di, VBEModeInfo     ;di: returned mode information buffer
+    int 0x10                ;BIOS int 10
+    pop esi
+    cmp al, 0x4F            ;al=4f, function is supported
+    jne gdt                 ;if not supported, skip the VESA mode setting block
 
-    ;mov ax, [es:di+0x2b]
+.foundmode:
+    cmp byte [VBEModeInfo.bitsperpixel], 32
+    jne .searchmodes; if current mode is not 32-byte, continue to search
+    cmp word [VBEModeInfo.xresolution], 1280
+    jb .searchmodes; if current x-resolution is less than 1280, continue to search
 
-    ;mov ah, 0x00
-    ;cmp ax, 0x00fd
-    ;je next
-    ;mov ah, 0x13
-    ;next:
+; store resolution and bufferr address to [0000:F100] so that Rust can read them
+store_mode_info:    
+    push di
+    mov ax, 0
+    mov es, ax
+    mov di, 0xF100
 
-    ;mov al, ah
-    ;mov ah, 0x00
-    ;int 0x10
+    ;move x resolution to [0:F100]
+    mov word ax, [VBEModeInfo.xresolution]
+    mov word [es:di], ax
+    mov word [es:di+2], 0
+    mov word [es:di+4], 0
+    mov word [es:di+6], 0
 
+    ;move y resolution to [0:F108]
+    mov word ax, [VBEModeInfo.yresolution]
+    mov word [es:di+8], ax
+    mov word [es:di+10], 0
+    mov word [es:di+12], 0
+    mov word [es:di+14], 0
 
+    ;move lfb address to [0:F110]
+    ;liner frame buffer address
+    mov word ax, [VBEModeInfo.physbaseptr]
+    mov word [es:di+16], ax
+    mov word ax, [VBEModeInfo.physbaseptr+2]
+    mov word [es:di+18], ax
+    mov word [es:di+20], 0000
+    mov word [es:di+22], 0000
+    pop di
+
+set_graphic_mode:
+    mov ax, 0x4f02;         ;BIOS int 10, ax=4f02, set graphic mode
+    ;0x4f41:640*400*32bit in QEMU; bx 4___ is linear frame buffer 
+    mov bx, [current.mode]  ;bx: current mode 
+    int 0x10                ;BIOS int 10
+
+    ;Set the flag [0000:0900] indicating that the graphic mode is set
+    mov ax, 0
+    mov es, ax
+    mov di, 0x900
+    mov byte [es:di], 5
+
+gdt:
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
     ; since this code will be forcibly loaded by GRUB multiboot above 1MB, and we're in 16-bit real mode,
     ; we cannot create a gdt regularly. We have to 
@@ -165,6 +269,7 @@ prot_mode:
     mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
+    
  
     jmp 0x08:ap_start_protected_mode
     

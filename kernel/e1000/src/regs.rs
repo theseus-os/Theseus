@@ -91,3 +91,4 @@ const TSTA_DD:                  u32 = (1 << 0);    // Descriptor Done
 const TSTA_EC:                  u32 = (1 << 1);    // Excess Collisions
 const TSTA_LC:                  u32 = (1 << 2);    // Late Collision
 const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
+

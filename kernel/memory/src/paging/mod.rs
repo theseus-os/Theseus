@@ -13,6 +13,9 @@ mod table;
 mod temporary_page;
 mod mapper;
 
+#[cfg(mapper_spillful)]
+pub mod mapper_spillful;
+
 
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;
@@ -137,6 +140,7 @@ pub struct PageIter {
 }
 
 impl PageIter {
+    /// Same as `Page::range_inclusive(start, end)`.
     pub fn new(start: Page, end: Page) -> PageIter {
         PageIter {
             start: start,
@@ -145,6 +149,7 @@ impl PageIter {
         }
     }
 
+    /// Returns a PageIter that will always yield `None`.
     pub fn empty() -> PageIter {
         PageIter::new(Page { number: 1 }, Page { number: 0 })
     }
@@ -162,6 +167,13 @@ impl PageIter {
 
     pub fn start_address(&self) -> VirtualAddress {
         self.start.start_address()
+    }
+
+    /// Returns the number of pages covered by this iterator. 
+    /// This is instantly fast, because it doesn't need to iterate over each entry, unlike normal iterators.
+    pub fn size_in_pages(&self) -> usize {
+        // add 1 because it's an inclusive range
+        self.end.number - self.start.number + 1 
     }
 }
 
@@ -217,7 +229,7 @@ impl ActivePageTable {
     /// so that we can set up new mappings on the new `table` before actually switching to it.
     /// Accepts a closure that is given a `Mapper` such that it can set up new mappins on the given `InactivePageTable`.
     /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
-    /// Note: THIS DOES NOT PERFORM ANY CONTEXT SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
+    /// Note: THIS DOES NOT PERFORM ANY TASK SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
     pub fn with<F>(&mut self,
                    table: &mut InactivePageTable,
                    mut temporary_page: temporary_page::TemporaryPage,

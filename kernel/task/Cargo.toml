@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "task"
 description = "Task types and structure definitions"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
@@ -20,7 +21,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -31,14 +31,15 @@ path = "../tss"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.panic_info]
 path = "../panic_info"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
+[dependencies.context_switch]
+path = "../context_switch"
+
+
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

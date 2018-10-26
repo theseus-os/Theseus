@@ -24,7 +24,7 @@ use spin::Mutex;
 use alloc::vec::Vec;
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref};
+    get_kernel_mmi_ref, AllocatedPages};
 use core::ops::DerefMut;
 
 
@@ -42,16 +42,6 @@ pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 static mut FRAME_BUFFER_PAGES:Option<MappedPages> = None;
 
-///try to unwrap an option. return error result if fails.
-#[macro_export]
-macro_rules! try_opt_err {
-    ($e:expr, $s:expr) =>(
-        match $e {
-            Some(v) => v,
-            None => return Err($s),
-        }
-    )
-}
 
 ///Init the frame buffer in 3D mode. Allocate a block of memory and map it to the physical frame buffer.
 pub fn init() -> Result<(), &'static str > {
@@ -72,7 +62,11 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages = try_opt_err!(allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE), "frame_buffer_3d::init() couldn't allocate pages.");
+            let pages:AllocatedPages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
+                Some(pages) => { pages },
+                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
+            };
+            
             let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             let allocator_mutex = FRAME_ALLOCATOR.try();
             if allocator_mutex.is_none(){
@@ -249,10 +243,14 @@ impl Drawer {
     fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
         if self.start_address == 0 {
             self.start_address = virtual_address;
-            self.buffer = try_opt_err!(Unique::new((virtual_address) as *mut _), "Error in init frame buffer"); 
-            trace!("Set frame buffer address {:#x}", virtual_address);
+            match Unique::new((virtual_address) as *mut _) {
+                Some(buffer) => { 
+                    self.buffer = buffer; 
+                    trace!("Set frame buffer address {:#x}", virtual_address);
+                },
+                None => { return Err("Fail to new virtual frame buffer"); }
+            }
         }
-
         Ok(())
     }  
 }

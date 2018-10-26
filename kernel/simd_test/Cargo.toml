@@ -3,9 +3,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "simd_test"
 description = "Test code for SSE and SIMD instructions"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
-# simd = "0.2.1"
 
 [dependencies.pit_clock]
 path = "../pit_clock"
@@ -16,4 +16,4 @@ version = "0.3.7"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

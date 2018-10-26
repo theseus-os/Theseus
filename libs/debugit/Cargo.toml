@@ -1,0 +1,8 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "debugit"
+description = "A port of the debugit crate to no_std environments"
+version = "0.1.0"
+
+[lib]
+crate-type = ["rlib"]

@@ -42,6 +42,10 @@ pub struct arp_packet{
 //will only receive a response if user is mentioned in qemu flags
 //QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 
+//or else use a tap interface (default)
+//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+//will receive a DHCP messgae from 00:1f:c6:9c:89:4c
+
 pub fn dhcp_request_packet(){
     let mut e1000_nc = E1000_NIC.lock();
     let packet:[u8;314] = [0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x1f,0xc6,0x9c,0x89,0x4c,0x08,0x00,0x45,0x00,

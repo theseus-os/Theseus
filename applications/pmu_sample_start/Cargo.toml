@@ -1,0 +1,18 @@
+[package]
+name = "pmu_sample_start"
+version = "0.1.0"
+description = "A basic application that retrieves samples."
+authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"

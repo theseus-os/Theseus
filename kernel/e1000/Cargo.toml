@@ -1,8 +1,9 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "e1000"
 description = "Support for the e1000 NIC and driver"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -31,11 +32,17 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.pic]
+path = "../pic"
+
 [dependencies.pci]
 path = "../pci"
+
+[dependencies.interrupts]
+path = "../interrupts"
 
 [dependencies.owning_ref]
 git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

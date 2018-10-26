@@ -2,12 +2,13 @@
 name = "date"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
 
 [dependencies]
 
 
-[dependencies.console]
-path = "../../kernel/console"
+[dependencies.terminal_print]
+path = "../terminal_print"
 
 [dependencies.rtc]
 path = "../../kernel/rtc"

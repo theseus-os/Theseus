@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "keyboard"
 description = "The keyboard driver"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
@@ -19,8 +20,8 @@ path = "../../libs/keycodes_ascii"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.console_types]
-path = "../console_types"
+[dependencies.event_types]
+path = "../event_types"
 
 [dependencies.ps2]
 path = "../ps2"
@@ -37,4 +38,4 @@ path = "../ps2"
 
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

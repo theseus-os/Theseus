@@ -3,11 +3,14 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "mod_mgmt"
 description = "Module management, including parsing, loading, linking, unloading, and metadata management."
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.5"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 rustc-demangle = "0.1.7" 
+hashmap_core = "=0.1.4"
+qp-trie = "0.7.3"
 
 
 [dependencies.lazy_static]
@@ -16,7 +19,6 @@ version = "1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-version = "0.1.1"
 
 [dependencies.goblin]  ## for linker relocation typedefs
 version = "0.0.13"
@@ -26,6 +28,9 @@ features = ["elf64", "goblin"]
 [dependencies.util]
 path = "../../libs/util"
 
+[dependencies.cow_arc]
+path = "../../libs/cow_arc"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 
@@ -33,8 +38,13 @@ path = "../kernel_config"
 default-features = false
 version = "0.3.7"
 
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 [dependencies.memory]
 path = "../memory"
 
 [lib]
-crate-type = ["rlib"] # "lib" does the same thing I think
+crate-type = ["rlib"]

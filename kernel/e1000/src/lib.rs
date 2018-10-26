@@ -4,6 +4,7 @@
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 #![feature(rustc_private)]
+#![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
@@ -15,6 +16,9 @@ extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
+extern crate interrupts;
+extern crate pic;
+extern crate x86_64;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -30,6 +34,8 @@ use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalA
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
+use interrupts::{eoi,register_interrupt};
+use x86_64::structures::idt::{ExceptionStackFrame};
 
 pub const INTEL_VEND:               u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:                u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -44,6 +50,14 @@ const E1000_SIZE_TX_DESC:       usize = 16;
 
 const E1000_SIZE_RX_BUFFER:     usize = 2048;
 const E1000_SIZE_TX_BUFFER:     usize = 256;
+
+///Rx Status bits
+pub const RX_EOP:               u8 = 1<<1; //End of Packet
+pub const RX_DD:                u8 = 1<<0; //Descriptor Done
+
+///Interrupts types
+pub const INT_LSC:              u32 = 0x04; //Link Status Change
+pub const INT_RX:               u32 = 0x80; //Receive Timer interrupt
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -125,9 +139,16 @@ pub struct IntelEthRegisters {
     _padding9:                      [u8;4],                 // 0x380C - 0x380F
     pub tdh:                        Volatile<u32>,          // 0x3810
     _padding10:                     [u8;4],                 // 0x3814 - 0x3817
-    pub tdt:                        Volatile<u32>,          // 0x3818  
-    _padding11:                     [u8;116708],            // 0x381C - 0x1FFFF END: 0x20000 (128 KB)
+    pub tdt:                        Volatile<u32>,          // 0x3818
+    _padding11:                     [u8;7140],              // 0x381C - 0x53FF
+    
+    //Receive Address
+    pub ral:                        Volatile<u32>,          // 0x5400
+    pub rah:                        Volatile<u32>,          // 0x5404
+    _padding12:                     [u8;109560],            // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
 }
+
+
 
 ///trait for network functions
 trait NetworkCard {
@@ -145,6 +166,8 @@ pub struct Nic {
         mem_base: usize,   
         /// A flag indicating if eeprom exists
         eeprom_exists: bool,
+        ///interrupt number
+        interrupt_num: u8,
         /// A buffer for storing the mac address  
         mac: [u8;6],       
         /// Receive Descriptors
@@ -270,8 +293,9 @@ impl NetworkCard for Nic {
         /// Handle a packet reception.
         fn handle_receive(&mut self) -> Result<(), &'static str> {
                 //print status of all packets until EoP
-                while(self.rx_descs[self.rx_cur as usize].status&0xF) !=0{
-                        debug!("rx desc status {}",self.rx_descs[self.rx_cur as usize].status);
+                while(self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+                        let status = self.rx_descs[self.rx_cur as usize].status;
+                        debug!("Packet Received: rx desc status {}", status);
                         self.rx_descs[self.rx_cur as usize].status = 0;
                         let old_cur = self.rx_cur as u32;
                         self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
@@ -282,6 +306,11 @@ impl NetworkCard for Nic {
                         else {
                                 error!("e1000: check_state(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
                                 return Err("e1000: check_state(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
+                        }
+
+                        //check if EOP
+                        if (status & RX_EOP) == RX_EOP {
+                                break;
                         }
                 }
 
@@ -545,88 +574,31 @@ impl Nic{
                 val
 
         }
- 
-        /// sets the eeprom_exists data member
-        /* pub fn detect_eeprom(&mut self) {
-
-                let mut val: u32;
-                let mut i: u16 = 0;
-                self.write_command(REG_EEPROM, 0x1);    
-                
-                while i < 1000 && ! self.eeprom_exists //???
-                {
-                        val = self.read_command( REG_EEPROM);
-                        if (val & 0x10)==0x10 {
-                                self.eeprom_exists = true;
-                        }
-                        else{
-                                self.eeprom_exists = false;
-                        }
-                        i = i+1;
-                }
-                debug!("eeprom_exists: {}",self.eeprom_exists);     
-        }  */
-        
-        /// Read 4 bytes from a specific EEProm Address
-        /* pub fn eeprom_read( &self,addr: u16) -> u32 {
-                let mut tmp: u32 = 0;
-                if self.eeprom_exists
-                {
-                        let x = ((addr) << 8) as u32;//addr bits are 15:8
-                        self.write_command( REG_EEPROM, (1) | x ); //write addr to eeprom read register and simulatenously write 1 to start read bit
-                        while (tmp & 0x10) != 0x10 { //check read done bit
-                                tmp = self.read_command(REG_EEPROM);
-                        }
-                }
-                else //why?
-                {
-                        let x = ((addr) << 2) as u32;//read 4 bytes (1 word)
-                        self.write_command( REG_EEPROM, (1) | x); 
-                        while (tmp & 0x02) != 0x02 {
-                                tmp = self.read_command(REG_EEPROM);
-                        }
-                }
-                let data = (tmp >> 16) & 0x0000_FFFF; // data bits are 31:16
-                data
-
-        } */
 
         /// Read MAC Address
-        /* pub fn read_mac_addr(&mut self) -> bool {
-                if self.eeprom_exists
-                {
-                        let mut temp: u32 = self.eeprom_read(0);
-                        self.mac[0] = temp as u8 & 0xff;
-                        self.mac[1] = (temp >> 8) as u8;
-                        temp = self.eeprom_read(1);
-                        self.mac[2] = temp as u8 & 0xff;
-                        self.mac[3] = (temp >> 8) as u8;
-                        temp = self.eeprom_read(2);
-                        self.mac[4] = temp as u8 & 0xff;
-                        self.mac[5] = (temp >> 8) as u8;
-                }
-                else
-                {
-                        let mac_32_low = self.read_command(0x5400);
-                        let mac_32_high = self.read_command(0x5404);
-                        if mac_32_low != 0 
-                        {
-                                self.mac[0] = mac_32_low as u8;
-                                self.mac[1] = (mac_32_low >> 8) as u8;
-                                self.mac[2] = (mac_32_low >> 16) as u8;
-                                self.mac[3] = (mac_32_low >> 24) as u8;
-                                self.mac[4] = mac_32_high as u8;
-                                self.mac[5] = (mac_32_high >> 8) as u8;
-                                
-                        }
-                        else {
-                                return false;
-                        }
-                }
-                debug!("MAC address: {:?}",self.mac);
-                return true;
+        pub fn read_mac_addr(&mut self) -> Result<(), &'static str> {
 
-        }  */  
+                if let Some(ref mut regs) = self.regs {
+                        let mac_32_low = regs.ral.read();
+                        let mac_32_high = regs.rah.read();
+
+                        self.mac[0] = mac_32_low as u8;
+                        self.mac[1] = (mac_32_low >> 8) as u8;
+                        self.mac[2] = (mac_32_low >> 16) as u8;
+                        self.mac[3] = (mac_32_low >> 24) as u8;
+                        self.mac[4] = mac_32_high as u8;
+                        self.mac[5] = (mac_32_high >> 8) as u8;
+
+                        debug!("MAC address: {:#X?}",self.mac);
+
+                        Ok(())
+                }
+                else {
+                        error!("e1000: start_link(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
+                        Err("e1000: start_link(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?")
+                } 
+
+        }   
 
         /// Start up the network
         pub fn start_link (&mut self) -> Result<(), &'static str> { 
@@ -818,7 +790,7 @@ impl Nic{
                 //self.write_command(REG_IMASK ,0xff & !4);
                 
                 if let Some(ref mut regs) = self.regs {
-                        regs.ims.write(0x84); //RXT and LSC
+                        regs.ims.write(INT_LSC|INT_RX); //RXT and LSC
                         regs.icr.read(); // clear all interrupts
                         Ok(())
                 }
@@ -864,7 +836,39 @@ impl Nic{
                 Ok(())
         }
 
-                                    
+        fn get_int_status(&mut self) -> Result<u32, &'static str> {
+                if let Some(ref mut regs) = self.regs {
+                        //reads status and clears interrupt
+                        Ok(regs.icr.read())
+                }
+                else {
+                        error!("e1000: handle_interrupt(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
+                        Err("e1000: handle_interrupt(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?")
+                }
+
+        }
+
+        //Interrupt handler for nic
+        pub fn handle_interrupt(&mut self) -> Result<(), &'static str> {
+                debug!("e1000 handler");
+                let status = self.get_int_status()?;                
+
+                if (status & INT_LSC ) == INT_LSC //link status change
+                {
+                        debug!("Interrupt:link status changed");
+                        self.start_link()?;
+                }
+                else if (status & INT_RX) == INT_RX //receiver timer interrupt
+                {
+                        debug!("Interrupt: RXT");
+                        self.handle_receive()?;
+                }
+                else{
+                        debug!("Unhandled interrupt!");
+                }
+                //regs.icr.read(); //clear interrupt
+                Ok(())
+        }                               
 
 }
 
@@ -874,8 +878,8 @@ lazy_static! {
                         bar_type : 0, 
                         io_base : 0,   
                         mem_base : 0, 
-                        //mem_space : 0;
                         eeprom_exists: false,
+                        interrupt_num: 0,
                         mac: [0,0,0,0,0,0],
                         rx_descs: Vec::with_capacity(E1000_NUM_RX_DESC),
                         tx_descs: Vec::with_capacity(E1000_NUM_TX_DESC),
@@ -894,55 +898,38 @@ lazy_static! {
 
 /// initialize the nic
 pub fn init_nic(e1000_pci: &PciDevice) -> Result<(), &'static str>{
+        use pic::PIC_MASTER_OFFSET;
 
         let mut e1000_nc = E1000_NIC.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
-        //pci_write(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE,0x2B);
-        debug!("Int line: {}" ,pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func, PCI_INTERRUPT_LINE));
+        //Get interrupt number
+        e1000_nc.interrupt_num = pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func, PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
+        debug!("Int line: {}", e1000_nc.interrupt_num );
 
         e1000_nc.init(e1000_pci);
         e1000_nc.mem_map(e1000_pci)?;
         e1000_nc.mem_map_dma()?;
         
-        //e1000_nc.detect_eeprom();
-        //e1000_nc.read_mac_addr();
-        
         e1000_nc.start_link()?;
         
+        e1000_nc.read_mac_addr()?;
         //e1000_nc.clear_multicast();
         //e1000_nc.clear_statistics();
         
-        //e1000_nc.enable_interrupts()?;
+        e1000_nc.enable_interrupts()?;
+        register_interrupt(e1000_nc.interrupt_num, e1000_handler);
+
         e1000_nc.rx_init()?;
         e1000_nc.tx_init()?;
 
        Ok(())
 }
 
-//Interrupt handler for nic
-pub fn e1000_handler () -> Result<(), &'static str> {
-        debug!("e1000 handler");
-        let mut e1000_nc = E1000_NIC.lock();
-
-        let status = e1000_nc.read_command(0xc0); //reads status and clears interrupt
-        if (status & 0x04 ) == 0x04 //link status change
-        {
-                debug!("Interrupt:link status changed");
-                e1000_nc.start_link()?;
-        }
-        else if (status & 0x80 ) == 0x80 //receiver timer interrupt
-        {
-                debug!("Interrupt: RXT");
-                e1000_nc.handle_receive()?;
-        }
-        else{
-                debug!("Unhandled interrupt!");
-        }
-        e1000_nc.read_command(0xc0); //clear interrupt
-        
-        Ok(())
-
+extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
+    let mut nic = E1000_NIC.lock();
+    let _ = nic.handle_interrupt();
+    eoi(Some(nic.interrupt_num));
 }
 
 /// Poll for recieved messages
@@ -951,14 +938,8 @@ pub fn rx_poll(_: Option<u64>) -> Result<(), &'static str> {
         //debug!("e1000e poll function");
         loop {
                 let mut e1000_nc = E1000_NIC.lock();
-
-                //detect if a packet has beem received
-                //debug!("E1000E_RX POLL");
-                /* for i in 0..E1000_NUM_RX_DESC {
-                        debug!("rx desc status {}",self.rx_descs[i].status);
-                } */
-                //debug!("E1000E RCTL{:#X}",self.read_command(REG_RCTRL));
-                if (e1000_nc.rx_descs[e1000_nc.rx_cur as usize].status&0xF) != 0 {                        
+                //debug!("Rx status: {:#X}", e1000_nc.rx_descs[e1000_nc.rx_cur as usize].status);
+                if (e1000_nc.rx_descs[e1000_nc.rx_cur as usize].status & RX_DD) != 0 {                        
                         e1000_nc.handle_receive()?;
                 }
         }
