@@ -39,11 +39,11 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     // Print all tasks
-    let mut task_string = String::new();
-    for (id, taskref) in TASKLIST.iter() {
-        task_string.push_str(&taskref.lock().read());
-    }
-    println!("{}", task_string);
+    // let mut task_string = String::new();
+    // for (id, taskref) in TASKLIST.iter() {
+    //     task_string.push_str(&taskref.read());
+    // }
+    // println!("{}", task_string);
     
     0
 }
