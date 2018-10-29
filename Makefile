@@ -218,8 +218,9 @@ userspace:
 # compiler_plugins:
 # 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
 
-
-
+## dual_simd target for qemu
+dual_simd_run: simd_personality
+	qemu-system-x86_64 $(QEMU_FLAGS)
 
 ## "simd_personality" is a special target that enables SIMD personalities.
 ## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
