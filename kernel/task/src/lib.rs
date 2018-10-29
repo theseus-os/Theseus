@@ -49,6 +49,7 @@ use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use alloc::String;
+use alloc::String::ToString;
 use alloc::boxed::Box;
 use alloc::arc::{Arc, Weak};
 use alloc::vec::Vec;
@@ -748,5 +749,111 @@ impl<'a> File for TaskFile<'a> {
 }
 
 
+use vfs::StrongFileRef;
 
-pub struct TaskDirectory
+pub struct TaskDirectory {
+    /// A list of StrongDirRefs or pointers to the child directories 
+    child_dirs: Vec<StrongAnyDirRef>,
+    /// A list of files within this directory
+    files: Vec<StrongFileRef>,
+    /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
+    parent: Option<WeakDirRef<Box<Directory + Send>>>,
+}
+
+impl TaskDirectory {
+    fn new_dir(&mut self, name: String)  -> StrongAnyDirRef {
+        let directory = TaskDirectory {
+            child_dirs: Vec::new(),
+            files:  Vec::new(),
+            parent: None,
+        };
+        let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
+        self.child_dirs.push(dir_ref.clone());
+        dir_ref
+    }
+}
+
+impl FileDirectory for TaskDirectory {
+        /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    fn get_path_as_string(&self) -> String {
+        let mut path = String::from("/root/tasks");
+        if let Some(cur_dir) =  self.get_parent_dir() {
+            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            return path;
+        }
+        return path;
+    }
+    /// Gets the absolute pathname as a Path struct
+    fn get_path(&self) -> Path {
+        Path::new(self.get_path_as_string())
+    }
+    fn get_name(&self) -> String {
+        return String::from("tasks");
+    }
+}
+
+impl Directory for TaskDirectory {
+    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
+        return Err("cannot manually add directories to Task Directory");
+    }
+
+    fn add_file(&mut self, new_file: StrongFileRef) -> Result<(), &'static str> {
+        return Err("cannot manually add files to Task Directory");
+    }
+
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
+    }
+
+    /// Creates a new file with the parent_pointer as the enclosing directory
+    /// 
+    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>)  {
+        () // does nothing because this doesnt make sense in this context and we'll prob delete later
+    }
+ 
+    /// Looks for the child directory specified by dirname and returns a reference to it 
+    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
+        for dir in self.child_dirs.iter() {
+            if dir.lock().get_name() == child_dir {
+                return Some(Arc::clone(dir));
+            }
+        }
+        return None;
+    }
+
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
+        match self.parent {
+            Some(ref dir) => dir.upgrade(),
+            None => None
+        }
+    }
+
+    /// Returns a string listing all the children in the directory
+    fn list_children(&mut self) -> String {
+        for task in TASKLIST.iter() {
+            
+        }
+    }
+    
+    // TODO - return iterator of children rather than a string
+    fn get_children_files(&self) -> Vec<StrongFileRef> {
+        let mut children: Vec<StrongFileRef> = Vec::new();
+        for file in self.files.iter() {
+            children.push(file.clone());
+        }
+        children
+    }
+
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+        let weak_parent = match self.parent.clone() {
+            Some(parent) => parent, 
+            None => return None
+        };
+        let parent = match Weak::upgrade(&weak_parent) {
+            Some(weak_ref) => weak_ref,
+            None => return None
+        };
+        return parent.lock().get_child_dir(self.name.clone());
+    }
+}

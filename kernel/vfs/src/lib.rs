@@ -43,11 +43,13 @@ pub trait File : FileDirectory {
     fn write(&mut self);
     fn seek(&self); 
     fn delete(&self);
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
 }
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
     fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str>;
+    fn add_file(&mut self, new_dir: StrongFileRef) -> Result<(), &'static str>;
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>); 
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
@@ -99,6 +101,16 @@ impl Directory for VFSDirectory {
         };
         new_dir.lock().set_parent(Arc::downgrade(&self_pointer));
         self.child_dirs.push(new_dir);
+        Ok(())
+    }
+
+    fn add_file(&mut self, new_file: StrongFileRef) -> Result<(), &'static str> {
+        let self_pointer = match self.get_self_pointer() {
+            Some(self_ptr) => self_ptr,
+            None => return Err("Couldn't obtain pointer to self")
+        };
+        new_file.lock().set_parent(Arc::downgrade(&self_pointer));
+        self.files.push(new_file);
         Ok(())
     }
 
@@ -202,6 +214,9 @@ impl File for VFSFile {
     fn write(&mut self) { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
     fn delete(&self) { unimplemented!(); }
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = parent_pointer;
+    }
 }
 
 impl FileDirectory for VFSFile {
