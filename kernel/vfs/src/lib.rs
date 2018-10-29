@@ -47,13 +47,14 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_directory(&mut self, new_dir: StrongAnyDirRef);
+    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str>;
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>); 
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> String;
     fn get_children_files(&self) -> Vec<StrongFileRef>;
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef>;
 }
 
 /// Traits that both files and directories share
@@ -76,7 +77,7 @@ pub struct VFSDirectory {
 }
 
 impl VFSDirectory {
-        /// Creates a new directory and passes a reference to the new directory created as output
+    /// Creates a new directory and passes a reference to the new directory created as output
     fn new_dir(&mut self, name: String)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
@@ -91,8 +92,14 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn add_directory(&mut self, new_dir: StrongAnyDirRef) {
-        
+    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
+        let self_pointer = match self.get_self_pointer() {
+            Some(self_ptr) => self_ptr,
+            None => return Err("Couldn't obtain pointer to self")
+        };
+        new_dir.lock().set_parent(Arc::downgrade(&self_pointer));
+        self.child_dirs.push(new_dir);
+        Ok(())
     }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
@@ -147,6 +154,18 @@ impl Directory for VFSDirectory {
             children.push(file.clone());
         }
         children
+    }
+
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+        let weak_parent = match self.parent.clone() {
+            Some(parent) => parent, 
+            None => return None
+        };
+        let parent = match Weak::upgrade(&weak_parent) {
+            Some(weak_ref) => weak_ref,
+            None => return None
+        };
+        return parent.lock().get_child_dir(self.name.clone());
     }
 }
 
