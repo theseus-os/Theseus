@@ -48,6 +48,7 @@ pub trait File : FileDirectory {
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
     fn add_directory(&mut self, new_dir: StrongAnyDirRef);
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>); 
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
@@ -76,12 +77,12 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
         /// Creates a new directory and passes a reference to the new directory created as output
-    fn new_dir(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>)  -> StrongAnyDirRef {
+    fn new_dir(&mut self, name: String)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
             child_dirs: Vec::new(),
             files:  Vec::new(),
-            parent: Some(parent_pointer),
+            parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         self.child_dirs.push(dir_ref.clone());
@@ -92,6 +93,10 @@ impl VFSDirectory {
 impl Directory for VFSDirectory {
     fn add_directory(&mut self, new_dir: StrongAnyDirRef) {
         
+    }
+
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
     }
 
     /// Creates a new file with the parent_pointer as the enclosing directory
