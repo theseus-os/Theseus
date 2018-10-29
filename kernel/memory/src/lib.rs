@@ -65,15 +65,13 @@ pub static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new()
 
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
-    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
-    frame_allocator.allocate_frame()
+    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
 }
 
 
 /// Convenience method for allocating several contiguous Frames.
 pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
-    let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock(); 
-    frame_allocator.allocate_frames(num_frames)
+    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
 
@@ -110,24 +108,20 @@ impl MemoryManagementInfo {
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
     
-        match page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                let mut frame_allocator = FRAME_ALLOCATOR.try().unwrap().lock();
-
-                if let Some( (stack, stack_vma) ) = stack_allocator.alloc_stack(active_table, frame_allocator.deref_mut(), size_in_pages) {
-                    vmas.push(stack_vma);
-                    Some(stack)
-                }
-                else {
-                    error!("MemoryManagementInfo::alloc_stack: failed to allocate stack!");
-                    None
-                }
+        if let PageTable::Active(ref mut active_table) = page_table {
+            if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(active_table, fa.lock().deref_mut(), size_in_pages)) {
+                vmas.push(stack_vma);
+                Some(stack)
             }
-            _ => {
-                error!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable! \
-                        You must not call alloc_stack on an MMI page table that isn't currently the ActivePageTable.");
+            else {
+                error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
                 None
             }
+        }
+        else {
+            error!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable! \
+                    You must not call alloc_stack on an MMI page table that isn't currently the ActivePageTable.");
+            None
         }
     }
 }
@@ -137,13 +131,13 @@ impl MemoryManagementInfo {
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct PhysicalMemoryArea {
-    pub base_addr: usize,
+    pub base_addr: PhysicalAddress,
     pub size_in_bytes: usize,
     pub typ: u32,
     pub acpi: u32
 }
 impl PhysicalMemoryArea {
-    pub fn new(paddr: usize, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
+    pub fn new(paddr: PhysicalAddress, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
         PhysicalMemoryArea {
             base_addr: paddr,
             size_in_bytes: size_in_bytes,
