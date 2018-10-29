@@ -13,6 +13,9 @@ mod table;
 mod temporary_page;
 mod mapper;
 
+#[cfg(mapper_spillful)]
+pub mod mapper_spillful;
+
 
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;

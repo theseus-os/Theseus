@@ -12,8 +12,7 @@ extern crate kernel_config;
 extern crate apic;
 
 use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
-use spin::RwLock;
-use irq_safety::{enable_interrupts};
+use irq_safety::{enable_interrupts, RwLockIrqSafe};
 use memory::{VirtualAddress, MemoryManagementInfo, PageTable, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics, get_my_apic_id};
@@ -82,7 +81,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     if get_my_apic_id() != Some(apic_id) {
         error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
     }
-    get_lapics().insert(apic_id, RwLock::new(lapic));
+    get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
 
 
     info!("Entering idle_task loop on AP {} ...", apic_id);

@@ -14,6 +14,7 @@ multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our loca
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 once = "0.3.2"
+qp-trie = "0.7.3"
 
 
 [dependencies.log]
