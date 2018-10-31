@@ -3,14 +3,10 @@
 
 #![allow(dead_code)]
 
-extern crate alloc;
+
 extern crate volatile;
-extern crate owning_ref;
 
-
-use alloc::boxed::Box;
-use owning_ref::{BoxRef, BoxRefMut};
-use volatile::{Volatile, ReadOnly, WriteOnly};
+use volatile::{Volatile};
 
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types

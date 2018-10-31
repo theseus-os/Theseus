@@ -7,7 +7,7 @@ extern crate keycodes_ascii;
 extern crate alloc;
 extern crate owning_ref;
 extern crate usb_uhci;
-extern crate usb_desc;
+
 
 extern crate memory;
 extern crate spin;
@@ -17,8 +17,8 @@ extern crate volatile;
 use keycodes_ascii::Keycode;
 use alloc::boxed::Box;
 use spin::{Once, Mutex};
-use volatile:: {ReadOnly,Volatile};
-use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
+use volatile:: Volatile;
+
 
 use usb_uhci::{map,get_registered_device};
 use memory::{ActivePageTable, PhysicalAddress, MappedPages};

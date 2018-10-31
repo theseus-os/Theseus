@@ -181,7 +181,6 @@ fn port_1_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
                                                              0, 0,0,offset)?;
             set_request(&mut device, request_pointer as u32,active_table)?;
 
-            offset = new_offset;
 
         }
         info!("USB {:?} is registered",device.device_type);
@@ -258,8 +257,6 @@ fn port_2_enum(active_table: &mut ActivePageTable) -> Result<(UsbDevice),&'stati
             let (request_pointer,new_offset) = build_request(active_table,0x21, usb_req::REQ_SET_IDLE,
                                                              0, 0,0,offset)?;
             set_request(&mut device, request_pointer as u32,active_table)?;
-
-            offset = new_offset;
 
         }
         info!("USB {:?} is registered",device.device_type);

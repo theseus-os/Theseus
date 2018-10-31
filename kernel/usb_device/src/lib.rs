@@ -3,11 +3,9 @@
 
 #![allow(dead_code)]
 
-extern crate usb_desc;
+
 extern crate usb_req;
 
-
-use usb_desc::{UsbEndpDesc,UsbDeviceDesc,UsbConfDesc,UsbIntfDesc};
 use usb_req::{UsbDevReq};
 
 #[derive(Debug,Eq, PartialEq, Copy, Clone)]
