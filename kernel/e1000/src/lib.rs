@@ -318,7 +318,7 @@ impl NetworkCard for Nic {
 
     /// Handle a packet reception.
     /// Returns a vector of mapped pages that contain the received packet and the length of the packet.
-    /// packet should start from the beginning of the first mapped page 
+    /// packet starts from the beginning of the first mapped page 
     fn handle_receive(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str> {
         let mut packet_received : Vec<MappedPages> = Vec::new();
         let mut packet_length : u16 = 0;
@@ -326,6 +326,18 @@ impl NetworkCard for Nic {
         while(self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
             let status = self.rx_descs[self.rx_cur as usize].status;
             debug!("Packet Received: rx desc status {}", status);
+
+            // //print packet
+            // let length = self.rx_descs[self.rx_cur as usize].length;
+            // let packet = self.rx_buf_mapped[self.rx_cur as usize].start_address() as *const u8;
+            // //print packet of length bytes
+            // debug!("Packet {}: ", self.rx_cur);
+
+            // for i in 0..length {
+            //     let points_at = unsafe{ *packet.offset(i as isize ) };
+            //     //debug!("{}",points_at);
+            //     debug!("{:x}",points_at);
+            // }  
 
             //get length of packet in current rx buffer
             packet_length += self.rx_descs[self.rx_cur as usize].length;
@@ -846,6 +858,7 @@ impl Nic{
         {
             debug!("Interrupt: RXT");
             let pkt = self.handle_receive()?;
+
             let mut pkt_mp = pkt.0;
             debug!("Length of packet received is : {}", pkt.1);
             debug!("Mapped Paged address is: {:#X}", pkt_mp.pop().unwrap().start_address());
