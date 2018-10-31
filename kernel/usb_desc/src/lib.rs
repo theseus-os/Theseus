@@ -6,13 +6,12 @@
 extern crate alloc;
 extern crate volatile;
 extern crate owning_ref;
-extern crate memory;
+
 
 use alloc::boxed::Box;
 use owning_ref::{BoxRef, BoxRefMut};
 use volatile::{Volatile, ReadOnly, WriteOnly};
-use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags,
-             MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
+
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types
 
@@ -77,6 +76,7 @@ pub struct UsbConfDesc
 }
 
 
+
 // ------------------------------------------------------------------------------------------------
 // USB String Descriptor
 
@@ -125,15 +125,6 @@ pub struct UsbEndpDesc
     _padding: u16,
 }
 
-/// Box the endpoint description
-pub fn box_endpoint_desc(active_table: &mut ActivePageTable,phys_addr: PhysicalAddress,offset: PhysicalAddress)
-                         -> Result<BoxRefMut<MappedPages, UsbEndpDesc>, &'static str> {
-    let page = map(active_table, phys_addr)?;
-    let endpoint_desc: BoxRefMut<MappedPages, UsbEndpDesc> = BoxRefMut::new(Box::new(page))
-        .try_map_mut(|mp| mp.as_type_mut::<UsbEndpDesc>(offset))?;
-
-    Ok(endpoint_desc)
-}
 
 // ------------------------------------------------------------------------------------------------
 // USB HID Desciptor
