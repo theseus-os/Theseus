@@ -25,3 +25,9 @@
 	path = libs/stable_deref_trait
 	url = https://github.com/kevinaboos/stable_deref_trait.git
 	ignore = dirty
+[submodule "mpmc"]
+	path = mpmc
+	url = https://github.com/theseus-os/mpmc
+[submodule "libs/mpmc"]
+	path = libs/mpmc
+	url = https://github.com/theseus-os/mpmc

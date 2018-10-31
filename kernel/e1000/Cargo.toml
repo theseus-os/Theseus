@@ -44,5 +44,8 @@ path = "../interrupts"
 [dependencies.owning_ref]
 git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
 [lib]
 crate-type = ["rlib"]
