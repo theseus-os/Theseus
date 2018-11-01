@@ -692,7 +692,8 @@ impl Eq for TaskRef { }
 
 pub struct TaskFile<'a> {
     task: &'a TaskRef,
-    path: Path
+    path: Path, 
+    parent: Option<WeakDirRef<Box<Directory + Send>>>
 }
 
 impl<'a> TaskFile<'a> {
@@ -700,7 +701,8 @@ impl<'a> TaskFile<'a> {
         let task_name = task.lock().name.clone();
         return TaskFile {
             task: task,
-            path: Path::new(format!("/root/task/{}", task_name))
+            path: Path::new(format!("/root/task/{}", task_name)), 
+            parent: None
         };
     }
 }
@@ -746,6 +748,9 @@ impl<'a> File for TaskFile<'a> {
     fn write(&mut self) { unimplemented!() }
     fn seek(&self) { unimplemented!() }
     fn delete(&self) { unimplemented!() }
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
+    }
 }
 
 
