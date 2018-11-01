@@ -690,14 +690,14 @@ impl Eq for TaskRef { }
 // }
 
 
-pub struct TaskFile<'a> {
-    task: &'a Task,
+pub struct TaskFile {
+    task: TaskRef,
     path: Path
 }
 
-impl<'a> TaskFile<'a> {
-    fn new(task: &Task) -> TaskFile {
-        let task_name = task.name.clone();
+impl<'a> TaskFile {
+    fn new(task: TaskRef) -> TaskFile {
+        let task_name = task.lock().name.clone();
         return TaskFile {
             task: task,
             path: Path::new(format!("/root/task/{}", task_name))
@@ -705,9 +705,9 @@ impl<'a> TaskFile<'a> {
     }
 }
 
-impl<'a> FileDirectory for TaskFile<'a> {
+impl<'a> FileDirectory for TaskFile {
     fn get_path_as_string(&self) -> String {
-        unimplemented!()
+        return format!("/root/tasks/{}", self.get_name());
     }
     fn get_path(&self) -> Path {
         return self.path.clone();
@@ -717,27 +717,27 @@ impl<'a> FileDirectory for TaskFile<'a> {
     }
 }
 
-impl<'a> File for TaskFile<'a> {
+impl<'a> File for TaskFile {
      fn read(&self) -> String { 
         // Print all tasks
         let mut task_string = String::new();
-        let name = &self.task.name;
-        let runstate = match &self.task.runstate {
+        let name = &self.task.lock().name;
+        let runstate = match &self.task.lock().runstate {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",
             RunState::Blocked    => "Blocked",
             RunState::Reaped     => "Reaped",
             _                    => "Exited",
         };
-        let cpu = self.task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if self.task.is_an_idle_task {"I"}
-        else if self.task.is_application() {"A"}
+        let cpu = self.task.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
+        let pinned = &self.task.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let task_type = if self.task.lock().is_an_idle_task {"I"}
+        else if self.task.lock().is_application() {"A"}
         else {" "} ;  
 
         task_string.push_str(
             &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
-                self.task.id, runstate, cpu, pinned, task_type, name)
+                self.task.lock().id, runstate, cpu, pinned, task_type, name)
         );
     
         return task_string;
@@ -752,10 +752,9 @@ impl<'a> File for TaskFile<'a> {
 use vfs::StrongFileRef;
 
 pub struct TaskDirectory {
+    name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
     child_dirs: Vec<StrongAnyDirRef>,
-    /// A list of files within this directory
-    files: Vec<StrongFileRef>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -763,8 +762,8 @@ pub struct TaskDirectory {
 impl TaskDirectory {
     fn new_dir(&mut self, name: String)  -> StrongAnyDirRef {
         let directory = TaskDirectory {
+            name: name,
             child_dirs: Vec::new(),
-            files:  Vec::new(),
             parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
@@ -839,8 +838,10 @@ impl Directory for TaskDirectory {
     // TODO - return iterator of children rather than a string
     fn get_children_files(&self) -> Vec<StrongFileRef> {
         let mut children: Vec<StrongFileRef> = Vec::new();
-        for file in self.files.iter() {
-            children.push(file.clone());
+        for task in TASKLIST.iter() {
+            let new_task = TaskFile::new(task.1.lock());
+            let task_file_ref = Arc::new(Mutex::new(Box::new(new_task) as Box<File + Send>));
+            children.push(task_file_ref);
         }
         children
     }
