@@ -690,13 +690,13 @@ impl Eq for TaskRef { }
 // }
 
 
-pub struct TaskFile {
-    task: TaskRef,
+pub struct TaskFile<'a> {
+    task: &'a TaskRef,
     path: Path
 }
 
-impl<'a> TaskFile {
-    fn new(task: TaskRef) -> TaskFile {
+impl<'a> TaskFile<'a> {
+    fn new(task: &'a TaskRef) -> TaskFile<'a> {
         let task_name = task.lock().name.clone();
         return TaskFile {
             task: task,
@@ -705,7 +705,7 @@ impl<'a> TaskFile {
     }
 }
 
-impl<'a> FileDirectory for TaskFile {
+impl<'a> FileDirectory for TaskFile<'a> {
     fn get_path_as_string(&self) -> String {
         return format!("/root/tasks/{}", self.get_name());
     }
@@ -717,7 +717,7 @@ impl<'a> FileDirectory for TaskFile {
     }
 }
 
-impl<'a> File for TaskFile {
+impl<'a> File for TaskFile<'a> {
      fn read(&self) -> String { 
         // Print all tasks
         let mut task_string = String::new();
@@ -839,7 +839,7 @@ impl Directory for TaskDirectory {
     fn get_children_files(&self) -> Vec<StrongFileRef> {
         let mut children: Vec<StrongFileRef> = Vec::new();
         for task in TASKLIST.iter() {
-            let new_task = TaskFile::new(task.1.lock());
+            let new_task = TaskFile::new(task.1);
             let task_file_ref = Arc::new(Mutex::new(Box::new(new_task) as Box<File + Send>));
             children.push(task_file_ref);
         }
