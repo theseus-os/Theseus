@@ -83,6 +83,11 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "byteorder"
+version = "1.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "captain"
 version = "0.1.0"
 dependencies = [
@@ -104,6 +109,7 @@ dependencies = [
  "logger 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "network 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
@@ -225,13 +231,17 @@ name = "e1000"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "pci 0.1.0",
+ "pic 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
 ]
 
@@ -433,6 +443,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irq_safety"
+version = "0.1.1"
+dependencies = [
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
 name = "itertools"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,18 +465,6 @@ version = "0.1.0"
 
 [[package]]
 name = "keyboard"
-version = "0.1.0"
-dependencies = [
- "dfqueue 0.1.0",
- "event_types 0.1.0",
- "keycodes_ascii 0.1.0",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "ps2 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "keyboard_new"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
@@ -529,6 +536,11 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "terminal_print 0.1.0",
 ]
+
+[[package]]
+name = "managed"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "memory"
@@ -623,6 +635,22 @@ dependencies = [
  "state_store 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
+]
+
+[[package]]
+name = "network"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "dfqueue 0.1.0",
+ "e1000 0.1.0",
+ "irq_safety 0.1.1",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "smoltcp 0.4.0 (git+https://github.com/kevinaboos/smoltcp)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tsc 0.1.0",
 ]
 
 [[package]]
@@ -924,6 +952,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "smoltcp"
+version = "0.4.0"
+source = "git+https://github.com/kevinaboos/smoltcp#c135a6d22d3132de0727165f6aecef778552d0f9"
+dependencies = [
+ "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "managed 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "spawn"
 version = "0.1.0"
 dependencies = [
@@ -1172,6 +1210,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6945bb928733f277215e12824ca9e31ce2016b6231dfc4816ed877df189cc17e"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
+"checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
 "checksum cc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7db2f146208d7e0fbee761b09cd65a7f51ccc38705d4e7262dad4d73b12a76b1"
 "checksum cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "0c4e7bb64a8ebb0d856483e1e682ea3422f883c5f5615a90d51a2c82fe87fdd3"
 "checksum compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
@@ -1185,6 +1224,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c8f31047daa365f19be14b47c29df4f7c3b581832407daabe6ae77397619237d"
 "checksum linked_list_allocator 0.5.0 (git+https://github.com/weclaw1/linked-list-allocator)" = "<none>"
 "checksum log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "5141eca02775a762cc6cd564d8d2c50f67c0ea3a372cbf1c51592b3e029e10ad"
+"checksum managed 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b5d48e8c30a4363e2981fe4db20527f6ab0f32a243bbc75379dea5a64f60dae4"
 "checksum new_debug_unreachable 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0cdc457076c78ab54d5e0d6fa7c47981757f1e34dc39ff92787f217dede586c4"
 "checksum once 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1ae5868dd493edd93941c182240a2c019dfe84c7d2de51d4659da32e58688ce9"
 "checksum owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)" = "<none>"
@@ -1197,6 +1237,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum scroll 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b13864e1e0b3ed661d7206d512b8d1c4970f7fd9de23ae4e9b4331f0c25559e8"
 "checksum semver 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7a3186ec9e65071a2095434b1f5bb24838d4e8e130f584c790f6033c79943537"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+"checksum smoltcp 0.4.0 (git+https://github.com/kevinaboos/smoltcp)" = "<none>"
 "checksum spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7e4deb3c2455c73779e6d3eebceae9599fc70957e54c69fe88f93aa48e62f432"
 "checksum stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)" = "<none>"
 "checksum unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"

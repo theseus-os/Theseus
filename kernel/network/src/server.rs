@@ -16,39 +16,17 @@ use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
 use smoltcp::phy::Device;
-use e1000::{E1000_NIC,get_mac};
+use e1000::E1000_NIC;
 use e1000_to_smoltcp_interface::{EthernetDevice};
-use config::*;
+use logger::LogColor;
 
 
-/// Static instance of the DFQueueProducer for the UDP_TEST_SERVER
-/// When enquedued here, message will be sent to 
-/// default mode: IP address 192.168.69.100, Port 5901
-/// otherwise custom address
-pub static UDP_TEST_SERVER: Once<DFQueueProducer<String>> = Once::new();
+static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 
-pub static CONFIG_IFACE: Once<DFQueueProducer<nw_iface_config>> = Once::new();
 
-// Forwarding (host) IP address
-pub static HOST_PORT: Once<u16> = Once::new();
-pub static HOST_IP: Once<[u8;4]> = Once::new();
-
-// Guest (machine) IP address
-pub static GUEST_IP: Once<[u8;4]> = Once::new();
-
-// Max buffer size for UDP socket buffers, can be tuned to get better performance
-pub static UDP_SOCKET_BUFFER_SIZE: Once<usize> = Once::new();
-
-/// Initializing the test_server
-/// This is invoked by the captain when the udp_server feature is set
-/// default is used for IP address and port 
 pub fn server_init(_: Option<u64>) {
     let startup_time = get_hpet().as_ref().unwrap().get_counter();;
-    // Setting up udp buffer size, default size fis set to 8KB
-    let mut skb_size:usize = 8*1024;
-    if let Some(x_size) = UDP_SOCKET_BUFFER_SIZE.try(){
-        skb_size = *x_size;
-    } 
+    let mut skb_size = 8*1024; // 8KiB 
 
     // For UDP
     let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
@@ -66,13 +44,11 @@ pub fn server_init(_: Option<u64>) {
 
     let arp_cache = SliceArpCache::new(vec![Default::default(); 8]);
 
-    let mut sockets:SocketSet = SocketSet::new(vec![]);
+    let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
 
-    let udp_handle  = sockets.add(udp_socket);
+    let udp_handle = sockets.add(udp_socket);
     // let tcp1_handle = sockets.add(tcp1_socket);
     // let tcp2_handle = sockets.add(tcp2_socket);
-
-    let mut tcp_6970_active = false;
 
     let device = EthernetDevice{
         tx_next: 0,
@@ -81,149 +57,92 @@ pub fn server_init(_: Option<u64>) {
 
 
     // getting the mac address from the ethernet device
-    let mac             = get_mac();
-    let hardware_addr   = EthernetAddress(mac);
+    let hardware_mac_addr = EthernetAddress(E1000_NIC.lock().mac_address());
 
-    // initializing forwarding address (host)
-    // default is set to 192.168.69.1:5901
-    let mut forwarding_port:u16 = 5901;
-    if let Some(port) = HOST_PORT.try(){
-        forwarding_port = *port;
-    } 
-    let mut host_addrs = IpAddress::v4(192, 168, 69, 100);
-    if let Some(addr) = HOST_IP.try(){
-        host_addrs = IpAddress::v4(addr[0], addr[1], addr[2], addr[3]);
-    }  
+    // setup destination address and port
+    let dest_addr = IpAddress::v4(192, 168, 69, 100); // the default gateway (router?)
+    let dest_port = 5901;
 
-    // Initializing GUEST IP address
-    // default set to 192.168.69.100 and any port
-    let mut protocol_addrs = [IpAddress::v4(192, 168, 69, 1)];
-    if let Some(addr) = GUEST_IP.try(){
-        protocol_addrs = [IpAddress::v4(addr[0], addr[1], addr[2], addr[3])];
-    }    
+    // setup host ip address (this machine)
+    let local_addr = [IpAddress::v4(192, 168, 69, 1)];
+    let local_port = 6969;
 
     // Initializing the Ethernet interface
-    let mut iface      = EthernetInterface::new(
+    let mut iface = EthernetInterface::new(
         Box::new(device), Box::new(arp_cache) as Box<ArpCache>,
-        hardware_addr, protocol_addrs);  
+        hardware_mac_addr, local_addr);  
     let mut timestamp_ms = 0;
 
 
-    let destination = IpEndpoint{
-        addr: host_addrs,
-        port: forwarding_port,
+    let dest_endpoint = IpEndpoint {
+        addr: dest_addr,
+        port: dest_port,
     };
-
-    let mut client_endpoint:Option<IpEndpoint> = None;
-    client_endpoint = Some(destination);
 
     //code to initialize the DFQ
     let udpserver_dfq: DFQueue<String> = DFQueue::new();
     let udpserver_consumer = udpserver_dfq.into_consumer();
     let udpserver_producer = udpserver_consumer.obtain_producer();
-    UDP_TEST_SERVER.call_once(|| {
+    MSG_QUEUE.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
 
-    // Configuring the queue for the iface config
-	let config_iface_dfq: DFQueue<nw_iface_config> = DFQueue::new();
-    let config_iface_consumer = config_iface_dfq.into_consumer();
-    let config_iface_producer = config_iface_consumer.obtain_producer();
+    #[cfg(test_network)] {
+        send_msg_udp("FIRST UDP TEST MESSAGE");
+        send_msg_udp("SECOND UDP TEST MESSAGE");
+    }
 
-    CONFIG_IFACE.call_once(|| {
-       config_iface_consumer.obtain_producer()
-    });
-    
+    // bind the udp socket to a local port
+    {
+        let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
+        if let Err(_e) = udp_socket.bind(local_port) {
+            error!("server_init(): error binding UDP socket: {:?}", _e);
+        }
+    }
+
     // Main loop for the server
     loop {
 
-        {   
-			/// Configuring the mirror log server
-			let element = config_iface_consumer.peek();
-			if !element.is_none() {
-				let element = element.unwrap();
-				let config = element.deref(); // event.deref() is the equivalent of   &*event  
-                if config.get_iface() == IFACE_MIRROR_LOG_TO_NW {
-                    match config.get_cmd() {
-                        SET_DESTINATION_IP => {
-                            if let Some(endpoint) = client_endpoint{
-                                let new_destination = IpEndpoint{
-                                    addr: config.get_ip(),
-                                    port: endpoint.port,
-                                };
-                                client_endpoint = Some(new_destination);
-                            }                         
-                        }
-                        SET_DESTINATION_PORT => {
-                            if let Some(endpoint) = client_endpoint{
-                                let new_destination = IpEndpoint{
-                                    addr: endpoint.addr,
-                                    port: config.get_port(),
-                                };
-                                client_endpoint = Some(new_destination);
-                            }  
-                        }
-                        SET_HOST_IP => {
-  
-                        }
-                        SET_HOST_PORT => {
-
-                        }
-                        _ => {
-                            debug!("Incorrect filed for mirror_log_to_nw configuration");
-                        }
-                    }
-                }
-                else {
-                    debug!{"Only Mirror_log_to_nw interface can be configured here"};
-                }
-
-				element.mark_completed();
-				//client_endpoint = None;                     
-			}			
-
-            /// UDP       
-            let socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
-            if !socket.is_open() {
-                socket.bind(6969).unwrap()
-            }
+        {
+            let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
 
             // Receiving packets
-            let tuple = match socket.recv() {
+            let tuple = match udp_socket.recv() {
                 Ok((data, endpoint)) => {
                     let mut data2 = data.to_owned();
                     let mut s = String::from_utf8(data2.to_owned()).unwrap();
                     //echoing the received udp msg
-                    udpserver_producer.enqueue(s);                   
-                    Some((data2, endpoint))
+                    udpserver_producer.enqueue(s);
+                    let tuple = (data2, endpoint);
+                    debug!("Received tuple: {:?}", tuple);
+                    Some(tuple)
                 }
-                Err(_) => {
-                    None
-                }
+                _ => None,
             };
 
             // Sending packets
-            if let Some(endpoint) = client_endpoint{
-                let element = udpserver_consumer.peek();
-                if !element.is_none() {
-                    let element = element.unwrap();
-                    let data = element.deref(); // event.deref() is the equivalent of   &*event     
-                    let ret = match socket.send_slice(data.as_bytes(), endpoint){
-                        Ok(_) => (),
-                        Err(err) => debug!("UDP sending error {}",err.to_string()),
-                    };
+            match udpserver_consumer.peek() {
+                Some(element) => {
+                    debug!("server_init(): about to send UDP packet {:?}", &*element);
+                    if let Err(_e) = udp_socket.send_slice(element.as_bytes(), dest_endpoint) {
+                        error!("server_init(): UDP sending error {}", _e);
+                        // break;
+                    }
                     element.mark_completed();
-                    //client_endpoint = None;                     
                 }
-            }                  
+                _ => { }
+            }
         }
 
-        // polling the ethernet interface
+        // polling (flush?) the ethernet interface
         let timestamp = millis_since(startup_time);
-        let poll_at = match iface.poll(&mut sockets, timestamp){
-            Ok(_) => (),
-            Err(err) => debug!("poll error {}",err.to_string()),
-        };     
+        let _next_poll_time = match iface.poll(&mut sockets, timestamp){
+            Ok(t) => t,
+            Err(err) => { 
+                error!("server_init(): poll error: {}", err);
+                break;
+            }
+        };  
     }
 }
 
@@ -237,57 +156,16 @@ pub fn millis_since(start_time:u64)-> u64 {
 
 /// Function to send debug messages using UDP to configured destination
 /// Used to mirror debug messages 
-pub fn send_debug_msg_udp(msg: fmt::Arguments){
-    if let Some(producer) = UDP_TEST_SERVER.try(){
-        let s = format!("{}", msg);
+pub fn send_log_msg_udp(_color: &LogColor, prefix: &'static str, msg: fmt::Arguments){
+    if let Some(producer) = MSG_QUEUE.try(){
+        let s = format!("{}{}", prefix, msg);
         producer.enqueue(s.to_string());  
     }
 }
 
 /// Function to send a message using UDP to configured destination
-pub fn send_msg_udp<T:ToString>(msg: T){
-    if let Some(producer) = UDP_TEST_SERVER.try(){
+pub fn send_msg_udp<T: ToString>(msg: T){
+    if let Some(producer) = MSG_QUEUE.try(){
         producer.enqueue(msg.to_string());  
     }
 }
-
-
-/// Add to network processing queue
-pub fn add_nw_config_queue(config: nw_iface_config){
-    if let Some(producer) = CONFIG_IFACE.try(){
-        producer.enqueue(config);  
-    }
-}
-
-
-// Intializing (host) IP address and port
-pub fn set_host_ip_port (port:u16){
-    HOST_PORT.call_once(|| {
-            port
-    });
-}
-pub fn set_host_ip_address (ip0:u8,ip1:u8,ip2:u8,ip3:u8){
-    HOST_IP.call_once(|| {
-           [ip0,ip1,ip2,ip3]
-    });
-}
-
-// Intializing guest IP address
-pub fn set_guest_ip_address (ip0:u8,ip1:u8,ip2:u8,ip3:u8){
-    GUEST_IP.call_once(|| {
-           [ip0,ip1,ip2,ip3]
-    });
-}
-
-// Initializing udp socket buffer size
-pub fn set_udp_skb_size(skb_size:usize){
-    UDP_SOCKET_BUFFER_SIZE.call_once(|| {
-            skb_size
-    });
-}
-
-
-
-
-
-

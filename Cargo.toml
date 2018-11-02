@@ -28,6 +28,7 @@ exclude = [
 
 [patch.crates-io]
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
+smoltcp = { git = "https://github.com/kevinaboos/smoltcp" }
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 

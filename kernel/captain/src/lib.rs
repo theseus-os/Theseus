@@ -56,10 +56,12 @@ extern crate exceptions_full;
 #[cfg(simd_personality)]
 extern crate simd_personality;
 
+#[cfg(any(mirror_log_to_network, test_network))]
+extern crate network;
+
 
 use alloc::arc::Arc;
 use alloc::{String, Vec};
-use core::fmt;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
@@ -69,9 +71,10 @@ use spawn::KernelTaskBuilder;
 
 
 
+#[cfg(mirror_log_to_vga)]
 /// the callback use in the logger crate for mirroring log functions to the input_event_manager
-pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
-    println!("{} {}", prefix, args);
+pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: core::fmt::Arguments) {
+    println!("{}{}", prefix, args);
 }
 
 
@@ -146,13 +149,22 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
 
-    // TODO FIXME: test this
     #[cfg(mirror_log_to_network)] 
-    // Setup log mirroring to the network
     {
-        logger::mirror_to_udp_server(network::server::send_debug_msg_udp);
+        // Setup log mirroring to the network
+        logger::mirror_to_network(network::server::send_log_msg_udp);
         use network::server::server_init;
-        spawn::spawn_kthread(server_init, None, String::from("starting up udp server"), None).unwrap();
+        KernelTaskBuilder::new(server_init, None)
+            .name(String::from("log_to_udp_server"))
+            .spawn()?;
+    }
+
+    #[cfg(test_network)]
+    {
+        use network::server::server_init;
+        KernelTaskBuilder::new(server_init, None)
+            .name(String::from("test_network_server"))
+            .spawn()?;
     }
 
 
@@ -173,15 +185,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
         }
     }
-
-    // testing nic
-    // TODO: remove this (@Ramla)
-    if false {
-        use e1000::test_nic_driver::test_nic_driver;
-        KernelTaskBuilder::new(test_nic_driver, None)
-            .name(String::from("test_nic_driver"))
-            .spawn()?;
-    }  
 
     // create and jump to the first userspace thread
     if false {

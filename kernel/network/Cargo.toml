@@ -25,6 +25,9 @@ path = "../e1000"
 [dependencies.tsc]
 path = "../tsc"
 
+[dependencies.logger]
+path = "../logger"
+
 [dependencies.acpi]
 path = "../acpi"
 
