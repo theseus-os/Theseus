@@ -671,25 +671,6 @@ impl PartialEq for TaskRef {
 
 impl Eq for TaskRef { }
 
-// impl Hash for TaskRef {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         (self.0.as_ref() as *const _ as usize).hash(state);
-//     }
-// }
-
-// use core::cmp::Ord;
-// impl Ord for TaskRef {
-//     fn cmp(&self, other: &TaskRef) -> core::cmp::Ordering {
-//         (self.0.as_ref() as *const _ as usize).cmp(&(other.0.as_ref() as *const _ as usize))
-//     }
-// }
-
-// impl PartialOrd for TaskRef {
-//     fn partial_cmp(&self, other: &TaskRef) -> Option<core::cmp::Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
-
 
 pub struct TaskFile<'a> {
     task: &'a TaskRef,
@@ -724,7 +705,7 @@ impl<'a> File for TaskFile<'a> {
      fn read(&self) -> String { 
         // Print all tasks
         let mut task_string = String::new();
-        let name = &self.task.lock().name;
+        let name = &self.task.lock().name.clone();
         let runstate = match &self.task.lock().runstate {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",
@@ -797,22 +778,21 @@ impl FileDirectory for TaskDirectory {
 }
 
 impl Directory for TaskDirectory {
-    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
+    /// this is a noop because TaskDirectories automatically generate TaskFiles
+    fn add_directory(&mut self, _new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
         return Err("cannot manually add directories to Task Directory");
     }
 
-    fn add_file(&mut self, new_file: StrongFileRef) -> Result<(), &'static str> {
+    /// this is a noop because TaskDirectories automatically generate TaskFiles
+    fn add_file(&mut self, _new_file: StrongFileRef) -> Result<(), &'static str> {
         return Err("cannot manually add files to Task Directory");
     }
 
+    /// Sets the parent directory of the Task Directory
+    /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
+    /// We should consider making this function private
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
         self.parent = Some(parent_pointer);
-    }
-
-    /// Creates a new file with the parent_pointer as the enclosing directory
-    /// 
-    fn new_file(&mut self, name: String, parent_pointer: WeakDirRef<Box<Directory + Send>>)  {
-        () // does nothing because this doesnt make sense in this context and we'll prob delete later
     }
  
     /// Looks for the child directory specified by dirname and returns a reference to it 
@@ -836,16 +816,14 @@ impl Directory for TaskDirectory {
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> String {
         let mut tasks_string = String::new();
+        tasks_string.push_str("Running Tasks:\n\n");
         for taskref in TASKLIST.iter() {
-            if taskref.1.eq(get_my_current_task().unwrap()) {
-                continue;
-            }
             tasks_string.push_str(&format!("{}\n", taskref.1.lock().name));
         }
         tasks_string
     }
     
-    // TODO - return iterator of children rather than a string
+    /// Returns a vector of StrongFileRefs
     fn get_children_files(&self) -> Vec<StrongFileRef> {
         let mut children: Vec<StrongFileRef> = Vec::new();
         for task in TASKLIST.iter() {
@@ -855,7 +833,11 @@ impl Directory for TaskDirectory {
         }
         children
     }
-
+    
+    /// This function returns an Arc<Mutex<>> pointer to a directory by navigating up one directory 
+    /// and then cloning itself via the parent's get_child_dir() method
+    /// 
+    /// Note that this function cannot be used on the root becuase the root doesn't have a parent directory
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 

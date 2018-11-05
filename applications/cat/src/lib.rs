@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
+#[macro_use] extern crate log;
 
 extern crate alloc;
 extern crate task;
@@ -38,25 +39,30 @@ pub fn main(args: Vec<String>) -> isize {
                 return -1;
             }
         };
-        // navigate to the filepath specified by first argument
-        let locked_task = taskref.lock();
-        let mut curr_env = locked_task.env.lock();
+
+        // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
+        let curr_wr = {
+            let locked_task = taskref.lock();
+            let curr_env = locked_task.env.lock();
+            Arc::clone(&curr_env.working_dir)
+        };
         let path = Path::new(matches.free[0].to_string());
         
-        // let mut new_wd = Arc::clone(&curr_env.working_dir);
-        match path.get(&curr_env.working_dir) {
+        // navigate to the filepath specified by first argument
+        match path.get(&curr_wr) {
             Some(file_dir_enum) => {
                 match file_dir_enum {
                     FileDir::Dir(_) => {
                         println!("why tf would this ever be a dir");
                     },
                     FileDir::File(file) => {
+                        debug!("about to read this shit");
                         println!("{}", file.lock().read());
                     }
                 }
 
             },
-            None => {println!("Directory does not exist");
+            None => {println!("file with this name does not exist");
                         return -1;}
         };
 

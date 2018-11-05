@@ -38,16 +38,25 @@ pub fn main(args: Vec<String>) -> isize {
                 return -1;
             }
         };
-        // navigate to the filepath specified by first argument
-        let locked_task = taskref.lock();
-        let mut curr_env = locked_task.env.lock();
+        // grabs the current environment pointer; this is scoped so that we drop the lock on the "cd" task
+        let curr_env = {
+            let locked_task = taskref.lock();
+            Arc::clone(&locked_task.env)
+        };
+
+        // grabs the current working directory pointer; this is scoped so that we drop the lock on the "cd" task
+        let curr_wr = {
+            let locked_task = taskref.lock();
+            let curr_env = locked_task.env.lock();
+            Arc::clone(&curr_env.working_dir)
+        };
+
         let path = Path::new(matches.free[0].to_string());
-        
-        // let mut new_wd = Arc::clone(&curr_env.working_dir);
-        match path.get(&curr_env.working_dir) {
+        // navigate to the filepath specified by first argument
+        match path.get(&curr_wr) {
             Some(file_dir_enum) => {
                 match file_dir_enum {
-                    FileDir::Dir(dir) => curr_env.set_wd(dir),
+                    FileDir::Dir(dir) => curr_env.lock().set_wd(dir),
                     FileDir::File(_) => {
                         println!("can't cd into file");
                         return -1;
