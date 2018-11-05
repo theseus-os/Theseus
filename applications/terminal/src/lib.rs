@@ -173,7 +173,7 @@ impl Terminal {
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         let task_ref = KernelTaskBuilder::new(terminal_loop, terminal)
-            .name("terminal loop".to_string())
+            .name("terminal_loop".to_string())
             .spawn()?;
         Ok(task_ref)
     }
