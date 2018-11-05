@@ -5,6 +5,10 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 
 [dependencies]
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 
 [dependencies.terminal_print]
 path = "../terminal_print"

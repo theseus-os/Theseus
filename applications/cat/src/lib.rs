@@ -13,7 +13,7 @@ use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
 use vfs::Path;
-
+use vfs::FileDir;
 
 
 #[no_mangle]
@@ -44,23 +44,24 @@ pub fn main(args: Vec<String>) -> isize {
         let path = Path::new(matches.free[0].to_string());
         
         // let mut new_wd = Arc::clone(&curr_env.working_dir);
-        let child_files = match path.get(&curr_env.working_dir) {
-            Some(dir) => {
-                dir.lock().get_children_files()
+        match path.get(&curr_env.working_dir) {
+            Some(file_dir_enum) => {
+                match file_dir_enum {
+                    FileDir::Dir(_) => {
+                        println!("why tf would this ever be a dir");
+                    },
+                    FileDir::File(file) => {
+                        println!("{}", file.lock().read());
+                    }
+                }
+
             },
             None => {println!("Directory does not exist");
                         return -1;}
         };
 
-        for child_file in child_files.iter() {
-            if child_file.lock().get_name() == path.components()[path.components().len()-1] {
-                println!("{}", child_file.lock().read());
-                return 0;
-            }
-        }
-
     }
-    return -1;
+    return 0;
 }
 
 fn print_usage(opts: Options) {

@@ -13,6 +13,8 @@ use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
 use vfs::Path;
+use vfs::FileDir;
+
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -43,8 +45,14 @@ pub fn main(args: Vec<String>) -> isize {
         
         // let mut new_wd = Arc::clone(&curr_env.working_dir);
         match path.get(&curr_env.working_dir) {
-            Some(dir) => {
-                curr_env.set_wd(dir);
+            Some(file_dir_enum) => {
+                match file_dir_enum {
+                    FileDir::Dir(dir) => curr_env.set_wd(dir),
+                    FileDir::File(_) => {
+                        println!("can't cd into file");
+                        return -1;
+                    }
+                }
             },
             None => println!("Directory does not exist")
         };

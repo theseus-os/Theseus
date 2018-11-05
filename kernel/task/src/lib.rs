@@ -49,7 +49,6 @@ use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use alloc::String;
-use alloc::String::ToString;
 use alloc::boxed::Box;
 use alloc::arc::{Arc, Weak};
 use alloc::vec::Vec;
@@ -87,10 +86,12 @@ lazy_static! {
 
 
 /// Initializes the task filesystem by creating a directory called task and by creating a file for each task
-pub fn init(root_dir: StrongAnyDirRef) -> Result<(), &'static str> {
-    use alloc::string::ToString;
-    let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
-    task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
+pub fn init() -> Result<(), &'static str> {
+    // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
+    let root = vfs::get_root();
+    let task_dir = TaskDirectory::new(String::from("tasks"));
+    root.lock().add_directory(task_dir)?;
+    // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
 
@@ -715,7 +716,7 @@ impl<'a> FileDirectory for TaskFile<'a> {
         return self.path.clone();
     }
     fn get_name(&self) -> String {
-        unimplemented!()
+        return self.task.lock().name.clone();
     }
 }
 
@@ -765,14 +766,13 @@ pub struct TaskDirectory {
 }
 
 impl TaskDirectory {
-    fn new_dir(&mut self, name: String)  -> StrongAnyDirRef {
+    fn new(name: String)  -> StrongAnyDirRef {
         let directory = TaskDirectory {
             name: name,
             child_dirs: Vec::new(),
             parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        self.child_dirs.push(dir_ref.clone());
         dir_ref
     }
 }
@@ -780,7 +780,7 @@ impl TaskDirectory {
 impl FileDirectory for TaskDirectory {
         /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        let mut path = String::from("/root/tasks");
+        let mut path = String::from("tasks");
         if let Some(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
@@ -835,9 +835,14 @@ impl Directory for TaskDirectory {
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> String {
-        for task in TASKLIST.iter() {
-            
+        let mut tasks_string = String::new();
+        for taskref in TASKLIST.iter() {
+            if taskref.1.eq(get_my_current_task().unwrap()) {
+                continue;
+            }
+            tasks_string.push_str(&format!("{}\n", taskref.1.lock().name));
         }
+        tasks_string
     }
     
     // TODO - return iterator of children rather than a string

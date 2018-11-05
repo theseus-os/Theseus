@@ -29,6 +29,8 @@ pub fn get_root() -> StrongAnyDirRef {
     Arc::clone(&ROOT)
 }
 
+// pub type StrongFileDirRef = Arc<Mutex<Box<FileDirectory + Send>>>;
+
 /// An strong reference (Arc) and a Mutex wrapper around VFSDirectory
 pub type StrongDirRef<D: Directory + Send> = Arc<Mutex<D>>;
 pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
@@ -64,6 +66,11 @@ pub trait FileDirectory {
     fn get_path_as_string(&self) -> String;
     fn get_path(&self) -> Path;
     fn get_name(&self) -> String;
+}
+
+pub enum FileDir {
+    File(StrongFileRef),
+    Dir(StrongAnyDirRef),
 }
 
 /// A struct that represents a node in the VFS 
@@ -169,14 +176,22 @@ impl Directory for VFSDirectory {
     }
 
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+        if self.parent.is_none() {
+            debug!("fix this jank ass shit later");
+            return Some(get_root());
+        }
+
+        debug!("in get self pointer");
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
             None => return None
         };
+        debug!("got weak parent");
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
             None => return None
         };
+        debug!("about to return");
         return parent.lock().get_child_dir(self.name.clone());
     }
 }
@@ -254,7 +269,7 @@ impl Path {
     
     /// Returns the components of the path 
     pub fn components(&self) -> Vec<String> {
-        let components = self.path.split("/").map(|s| s.to_string()).collect();
+        let components = self.path.split("/").map(|s| s.to_string()).filter(|x| x != "").collect();
         return components;
     } 
 
@@ -327,7 +342,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<StrongAnyDirRef> {
+    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<FileDir> {
         let current_path = wd.lock().get_path();
         debug!("current path {}", current_path.path);
         // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
@@ -337,9 +352,11 @@ impl Path {
         };
         let mut new_wd = Arc::clone(&wd);
         debug!("components {:?}", shortest_path.components());
-        for dirname in shortest_path.components().iter() {
+        let mut counter: isize = -1;
+        for component in shortest_path.components().iter() {
+            counter += 1; 
             // Navigate to parent directory
-            if dirname == ".." {
+            if component == ".." {
                 let dir = match new_wd.lock().get_parent_dir() {
                     Some(dir) => dir, 
                     None => return None,
@@ -347,20 +364,38 @@ impl Path {
                 new_wd = dir;
             }
             // Ignore if no directory is specified 
-            else if dirname == "" {
+            else if component == "" {
                 continue;
             }
+
+
+            else if counter as usize == shortest_path.components().len() - 1  && shortest_path.components()[0] != ".." { // FIX LATER
+                debug!("ENTERED THE THIRD ELSE STATEMNT");
+                let files = new_wd.lock().get_children_files();
+                for file_ref in files.iter() {
+                        debug!("file ref name: {}", file_ref.lock().get_name());
+                        debug!("component name: {}", component.to_string());
+                    if file_ref.lock().get_name() == component.to_string() {
+                        return Some(FileDir::File(Arc::clone(file_ref)));
+                    }
+                }
+            }
+
+
             // Navigate to child directory
             else {
-                let dir = match new_wd.lock().get_child_dir(dirname.to_string()) {
+                let dir = match new_wd.lock().get_child_dir(component.to_string()) {
                     Some(dir) => dir, 
                     None => return None,
                 };
-                debug!("dir {}", dir.lock().get_name());
                 new_wd = dir;
             }
+
         }
-        return Some(new_wd);
+        
+    
+
+        return Some(FileDir::Dir(new_wd));
     }
 }
 
