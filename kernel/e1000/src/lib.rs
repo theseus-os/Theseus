@@ -19,6 +19,7 @@ extern crate owning_ref;
 extern crate interrupts;
 extern crate pic;
 extern crate x86_64;
+extern crate mpmc;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -36,6 +37,7 @@ use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
+use mpmc:: *;
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -48,22 +50,29 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_SIZE_RX_DESC:       usize = 16;
 const E1000_SIZE_TX_DESC:       usize = 16;
 
-const E1000_SIZE_RX_BUFFER:     usize = 2048;
+const E1000_SIZE_RX_BUFFER:     usize = 4096;
 const E1000_SIZE_TX_BUFFER:     usize = 256;
 
-///Rx Status bits
-pub const RX_EOP:               u8 = 1<<1; //End of Packet
-pub const RX_DD:                u8 = 1<<0; //Descriptor Done
+/// Rx Status: End of Packet
+pub const RX_EOP:               u8 =  1 << 1;
+/// Rx Status: Descriptor done
+pub const RX_DD:                u8 =  1 << 0;
 
-///Tx Status bits
-pub const TX_DD:                u8 = 1<<0; //Descriptor Done
+/// Tx Status: Descriptor done
+pub const TX_DD:                u8 =  1 << 0;
 
-///Interrupts types
-pub const INT_LSC:              u32 = 0x04; //Link Status Change
-pub const INT_RX:               u32 = 0x80; //Receive Timer interrupt
+/// Interrupt type: Link Status Change
+pub const INT_LSC:              u32 = 0x04;
+/// Interrupt type: Receive Timer Interrupt
+pub const INT_RX:               u32 = 0x80;
 
 /// to hold memory mappings
 static NIC_DMA_PAGES: Once<MappedPages> = Once::new();
+
+lazy_static! {
+    /// static variable to store the memory pool
+    static ref NIC_MEM_POOL: Queue<MappedPages> = Queue::with_capacity(2000);
+}
 
 /// struct to represent receive descriptors
 #[repr(C,packed)]
@@ -163,7 +172,7 @@ pub trait NetworkCard {
     ///                and/or is something that can be represented as a slice of bytes.
     /// * `size_in_bytes`: the size in bytes of the packet to be sent.
     fn send_packet(&mut self, packet_vaddr: VirtualAddress, size_in_bytes: u16) -> Result<(), &'static str>;
-    fn handle_receive(&mut self) -> Result<(), &'static str>;
+    fn handle_receive(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str>;
 }
 
 /// struct to hold information for the network card
@@ -188,8 +197,8 @@ pub struct Nic {
     rx_cur: u16,      
     /// Current Transmit Descriptor Buffer
     tx_cur: u16,
-    /// stores the virtual address of rx buffers
-    rx_buf_addr: [VirtualAddress; E1000_NUM_RX_DESC],
+    /// stores the MappedPages object of rx buffers
+    rx_buf_mapped: Vec<MappedPages>,
     /// The DMA allocator for the nic 
     nic_dma_allocator: DmaAllocator,
     /// registers
@@ -223,6 +232,25 @@ impl DmaAllocator{
             None
         }
 
+    }
+}
+
+///get the required number of pages, call once for each descriptor
+pub fn get_mapped_pages(num_pages: usize) -> Result<MappedPages, &'static str> {
+    // get a reference to the kernel's memory mapping information       
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("e1000: get_mapped_pages(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    let allocated_pages = allocate_pages(num_pages).ok_or("e1000: get_mapped_pages(): couldn't allocate pages!")?;
+    let mapping_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+
+    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("e1000: get_mapped_pages(): couldnt get FRAME_ALLOCATOR")?.lock();
+        let frames = frame_allocator.allocate_frames(num_pages).ok_or("e1000: get_mapped_pages(): couldnt allocate a new frame")?;
+        let result = active_table.map_allocated_pages_to(allocated_pages, frames, mapping_flags, frame_allocator.deref_mut())?;
+        return Ok(result);
+    } else {
+        return Err("e1000: get_mapped_pages(): Couldn't get kernel's active_table"); 
     }
 }
 
@@ -283,11 +311,45 @@ impl NetworkCard for Nic {
     }   
 
     /// Handle a packet reception.
-    fn handle_receive(&mut self) -> Result<(), &'static str> {
+    /// Returns a vector of mapped pages that contain the received packet and the length of the packet.
+    /// packet starts from the beginning of the first mapped page 
+    fn handle_receive(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str> {
+        let mut packet_received : Vec<MappedPages> = Vec::new();
+        let mut packet_length : u16 = 0;
         //print status of all packets until EoP
         while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
             let status = self.rx_descs[self.rx_cur as usize].status;
             debug!("Packet Received: rx desc status {}", status);
+
+            // //print packet
+            // let length = self.rx_descs[self.rx_cur as usize].length;
+            // let packet = self.rx_buf_mapped[self.rx_cur as usize].start_address() as *const u8;
+            // //print packet of length bytes
+            // debug!("Packet {}: ", self.rx_cur);
+
+            // for i in 0..length {
+            //     let points_at = unsafe{ *packet.offset(i as isize ) };
+            //     //debug!("{}",points_at);
+            //     debug!("{:x}",points_at);
+            // }  
+
+            //get length of packet in current rx buffer
+            packet_length += self.rx_descs[self.rx_cur as usize].length;
+
+            //assign a new mapped page object to the descriptor
+            let mp = NIC_MEM_POOL.pop();
+            let new_mp;
+            match mp{
+                    Some(_) => new_mp = mp.unwrap(),
+                    None => new_mp = get_mapped_pages(E1000_SIZE_RX_BUFFER/PAGE_SIZE)?,
+            }
+            self.rx_descs[self.rx_cur as usize].addr = translate_v2p(new_mp.start_address())? as u64;
+
+            // obtain MappedPages containing the packet
+            self.rx_buf_mapped.push(new_mp);
+            let old_mp = self.rx_buf_mapped.swap_remove(self.rx_cur as usize); 
+            packet_received.push(old_mp);
+            
             self.rx_descs[self.rx_cur as usize].status = 0;
             let old_cur = self.rx_cur as u32;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
@@ -334,7 +396,7 @@ impl NetworkCard for Nic {
         //     }
         // }
         
-        Ok(())
+        Ok((packet_received, packet_length))
     }
 
 }
@@ -454,7 +516,7 @@ impl Nic{
         
         let num_pages;
         let num_frames;
-        let bytes_required = (E1000_NUM_RX_DESC*E1000_SIZE_RX_BUFFER) + (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + E1000_SIZE_RX_DESC; //add an additional desc so we can make sure its 16-byte aligned
+        let bytes_required = (E1000_NUM_RX_DESC * E1000_SIZE_RX_DESC) + (E1000_NUM_TX_DESC * E1000_SIZE_TX_DESC) + E1000_SIZE_RX_DESC; //add an additional desc so we can make sure its 16-byte aligned
         if bytes_required % PAGE_SIZE == 0 {
             num_pages =  bytes_required / PAGE_SIZE;
             num_frames =  bytes_required / PAGE_SIZE;
@@ -488,6 +550,15 @@ impl Nic{
         else {
             Err("e1000:mem_map_dma Couldn't get kernel's active_table")
         }
+    }
+
+    pub fn init_mem_pool(&self, num_items: usize) -> Result<(), &'static str> {
+        for _ in 0..num_items {
+            let mp = get_mapped_pages(E1000_SIZE_RX_BUFFER/PAGE_SIZE)?; 
+            let _ = NIC_MEM_POOL.push(mp);
+        }
+
+        Ok(())
     }
 
     /// write to an NIC register
@@ -598,15 +669,12 @@ impl Nic{
         //unsafe{debug!("Address of Rx desc: {:?}, value: {:?}",ptr, *pr1);}
         debug!("rx_descs: {:?}, capacity: {}", self.rx_descs, self.rx_descs.capacity());
 
-        
-
         for i in 0..E1000_NUM_RX_DESC
         {
-            self.rx_buf_addr[i] = self.nic_dma_allocator
-                .allocate_dma_mem(NO_BYTES)
-                .ok_or("e1000:tx_init Couldn't allocate DMA mem for tx descriptor")?;
+            let buf_mapped = get_mapped_pages(E1000_SIZE_RX_BUFFER/PAGE_SIZE)?; //Right now giving each descriptor just 1 page as a rx buffer
+            let buf_addr = try!(translate_v2p(buf_mapped.start_address()));
+            self.rx_buf_mapped.push(buf_mapped);
 
-            let buf_addr = try!(translate_v2p(self.rx_buf_addr[i]));
             let mut var = e1000_rx_desc {
                 addr: buf_addr as u64,
                 length: 0,
@@ -618,7 +686,6 @@ impl Nic{
                     
             debug!("packet buffer: {:x}",var.addr);
             self.rx_descs.push(var);
-        
         }
         
         
@@ -655,7 +722,7 @@ impl Nic{
     }           
     
     /// Initialize transmit descriptors 
-    pub fn tx_init(&mut self) -> Result<(), &'static str>  {
+    pub fn tx_init(&mut self) -> Result<(), &'static str> {
         const NO_BYTES: usize = 16*(E1000_NUM_TX_DESC+1);
         
         let ptr = self.nic_dma_allocator
@@ -760,61 +827,63 @@ impl Nic{
     }
 
     /// Poll for recieved messages
-    /// Can be used as analternative to interrupts
-    pub fn rx_poll(&mut self) -> Result<(), &'static str> {
-        //detect if a packet has been received
-        if (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {            
-            self.handle_receive()?
+    /// Can be used as an alternative to interrupts
+    pub fn rx_poll(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str> {
+        // detect if a packet has been received
+        if (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+            self.handle_receive()
+        } else {
+            Err("no packet received")
         }
-
-        Ok(())
     }
 
     fn get_int_status(&mut self) -> Result<u32, &'static str> {
         if let Some(ref mut regs) = self.regs {
-            //reads status and clears interrupt
+            // reads status and clears interrupt
             Ok(regs.icr.read())
         }
         else {
-            error!("e1000: handle_interrupt(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
-            Err("e1000: handle_interrupt(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?")
+            error!("e1000: get_int_status(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
+            Err("e1000: get_int_status(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?")
         }
 
     }
 
-    //Interrupt handler for nic
+    // Interrupt handler for nic
     fn handle_interrupt(&mut self) -> Result<(), &'static str> {
-        debug!("e1000 handler");
+        debug!("e1000::handle_interrupt");
         let status = self.get_int_status()?;        
 
-        if (status & INT_LSC ) == INT_LSC //link status change
-        {
-            debug!("Interrupt:link status changed");
+        // a link status change
+        if (status & INT_LSC) == INT_LSC {
+            debug!("e1000::handle_interrupt(): link status changed");
             self.start_link()?;
         }
-        else if (status & INT_RX) == INT_RX //receiver timer interrupt
-        {
-            debug!("Interrupt: RXT");
-            self.handle_receive()?;
+        // receiver timer interrupt
+        else if (status & INT_RX) == INT_RX {
+            debug!("e1000::handle_interrupt(): receive interrupt");
+            let pkt = self.handle_receive()?;
+
+            let mut pkt_mp = pkt.0;
+            debug!("Length of packet received is : {}", pkt.1);
+            debug!("Mapped Paged address is: {:#X}", pkt_mp.pop().unwrap().start_address());
         }
-        else{
-            debug!("Unhandled interrupt!");
+        else {
+            warn!("e1000::handle_interrupt(): unhandled interrupt!");
         }
         //regs.icr.read(); //clear interrupt
         Ok(())
     }     
 
-    pub fn get_latest_received_packet(&self) -> &[u8] {
+    pub fn get_latest_received_packet(&self) -> (&MappedPages, u16) {
         // let rx_prev = if self.rx_cur == 0 { self.rx_descs.len() - 1 } else { self.rx_cur as usize - 1 };
         let rx_prev = self.rx_cur as usize;
         debug!("get_latest_received_packet(): rx_prev: {}", rx_prev);
 
-        let length = self.rx_descs[rx_prev].length as usize;
-        let vaddr = self.rx_buf_addr[rx_prev] as *mut u8;                 
-        
-        unsafe { 
-            core::slice::from_raw_parts(vaddr, length)
-        }
+        let length = self.rx_descs[rx_prev].length;
+        let mp = &self.rx_buf_mapped[rx_prev];
+
+        (mp, length)
     }
 
     pub fn has_packet_arrived(&self) -> bool {
@@ -839,7 +908,7 @@ lazy_static! {
             tx_descs: Vec::with_capacity(E1000_NUM_TX_DESC),
             rx_cur: 0,
             tx_cur: 0,
-            rx_buf_addr: [0;E1000_NUM_RX_DESC],
+            rx_buf_mapped: Vec::with_capacity(E1000_NUM_RX_DESC),
             nic_dma_allocator: DmaAllocator{
                         start: 0,
                         end: 0,

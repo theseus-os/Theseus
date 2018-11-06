@@ -42,8 +42,13 @@ impl Device for EthernetDevice {
         let nic = E1000_NIC.lock();
         if nic.has_packet_arrived() {
             debug!("EthernetDevice::receive() packet has arrived");
-            let byte_slice = nic.get_latest_received_packet();
-            Ok(byte_slice.to_vec())
+            let (mp, len) = nic.get_latest_received_packet();
+            mp.as_slice::<u8>(0, len as usize)
+                .map(|slice| slice.to_vec())
+                .map_err(|e| {
+                error!("EthernetDevice::receive(): error converting MappedPages to slice: {:?}", e);
+                Error::Exhausted
+            })
         } else {
             // debug!("EthernetDevice::receive() packet has NOT arrived");
             Err(Error::Exhausted)

@@ -237,6 +237,7 @@ dependencies = [
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "mpmc 0.1.6-pre",
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "pci 0.1.0",
  "pic 0.1.0",
@@ -608,6 +609,14 @@ dependencies = [
 [[package]]
 name = "mouse_data"
 version = "0.1.0"
+
+[[package]]
+name = "mpmc"
+version = "0.1.6-pre"
+dependencies = [
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spawn 0.1.0",
+]
 
 [[package]]
 name = "multiboot2"
