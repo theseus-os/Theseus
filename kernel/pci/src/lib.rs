@@ -114,9 +114,10 @@ pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
 }
 
 /// sets the PCI device's bit 3 in the Command portion, which is apparently needed to activate DMA (??)
-pub fn pci_set_command_bus_master_bit(bus: u16, slot: u16, func: u16) {
+pub fn pci_set_command_bus_master_bit(pci_dev: &PciDevice) {
     unsafe { 
-        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, PCI_COMMAND));
+        let PciDevice { bus, slot, func, ..} = pci_dev;
+        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(*bus, *slot, *func, PCI_COMMAND));
         let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
         trace!("pci_set_command_bus_master_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
                 bus, slot, func, inval);

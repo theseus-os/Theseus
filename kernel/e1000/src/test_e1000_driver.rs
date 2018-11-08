@@ -1,9 +1,11 @@
 use super::E1000_NIC;
 use super::NetworkCard;
 
-pub fn test_nic_driver(_: Option<u64>) {
-    debug!("TESTING e1000 NIC DRIVER!!");
-    dhcp_request_packet();
+pub fn test_e1000_nic_driver(_: Option<u64>) {
+    match dhcp_request_packet() {
+        Ok(_) => debug!("test_e1000_nic_driver(): sent DHCP request packet successfully!"),
+        Err(e) => error!("test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}", e),
+    };
 }
 
 #[repr(C, packed)]
@@ -44,8 +46,8 @@ pub struct arp_packet {
 //QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
 //will receive a DHCP messgae from 00:1f:c6:9c:89:4c
 
-pub fn dhcp_request_packet() {
-    let mut e1000_nc = E1000_NIC.lock();
+pub fn dhcp_request_packet() -> Result<(), &'static str> {
+    let mut e1000_nc = E1000_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
     let packet: [u8; 314] = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x08, 0x00, 0x45,
         0x00, 0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
@@ -72,5 +74,5 @@ pub fn dhcp_request_packet() {
     let addr = &packet as *const u8;
     let addr: usize = addr as usize;
     let length: u16 = 314;
-    let _result = e1000_nc.send_packet(addr, length);
+    e1000_nc.send_packet(addr, length)
 }

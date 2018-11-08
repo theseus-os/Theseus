@@ -16,7 +16,7 @@ fn tx_empty() -> bool {
 /// platform-specific code to send a buffer with a packet 
 fn tx_setup(buf: *const u8, length: usize) {
     let addr: usize = buf as usize;
-    E1000_NIC.lock().send_packet(addr, length as u16).unwrap();
+    E1000_NIC.try().unwrap().lock().send_packet(addr, length as u16).unwrap();
 }
 
 pub struct EthernetDevice{
@@ -39,7 +39,7 @@ impl Device for EthernetDevice {
     }
 
     fn receive(&mut self, _timestamp: u64) -> Result<Self::RxBuffer, Error> {
-        let nic = E1000_NIC.lock();
+        let nic = E1000_NIC.try().ok_or(Error::Exhausted)?.lock();
         if nic.has_packet_arrived() {
             debug!("EthernetDevice::receive() packet has arrived");
             let (mp, len) = nic.get_latest_received_packet();

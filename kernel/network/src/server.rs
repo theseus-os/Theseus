@@ -16,7 +16,7 @@ use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
 use smoltcp::wire::{IpProtocol, IpEndpoint};
 use smoltcp::phy::Device;
-use e1000::E1000_NIC;
+use e1000;
 use e1000_to_smoltcp_interface::{EthernetDevice};
 use logger::LogColor;
 
@@ -25,6 +25,15 @@ static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 
 
 pub fn server_init(_: Option<u64>) {
+
+    let e1000_nic_ref = match e1000::E1000_NIC.try() {
+        Some(nic) => nic,
+        None => {
+            error!("server_init(): E1000 NIC has not been initialized yet!");
+            return;
+        }
+    };
+
     let startup_time = get_hpet().as_ref().unwrap().get_counter();;
     let mut skb_size = 8*1024; // 8KiB 
 
@@ -57,7 +66,7 @@ pub fn server_init(_: Option<u64>) {
 
 
     // getting the mac address from the ethernet device
-    let hardware_mac_addr = EthernetAddress(E1000_NIC.lock().mac_address());
+    let hardware_mac_addr = EthernetAddress(e1000_nic_ref.lock().mac_address());
 
     // setup destination address and port
     let dest_addr = IpAddress::v4(192, 168, 69, 100); // the default gateway (router?)
