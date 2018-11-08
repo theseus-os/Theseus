@@ -680,10 +680,10 @@ pub struct TaskFile<'a> {
 
 impl<'a> TaskFile<'a> {
     fn new(task: &'a TaskRef) -> TaskFile<'a> {
-        let task_name = task.lock().name.clone();
+        let task_id = task.lock().id.clone();
         return TaskFile {
             task: task,
-            path: Path::new(format!("/root/task/{}", task_name)), 
+            path: Path::new(format!("/root/task/{}", task_id)), 
             parent: None
         };
     }
@@ -720,8 +720,9 @@ impl<'a> File for TaskFile<'a> {
         else {" "} ;  
 
         task_string.push_str(
-            &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
-                self.task.lock().id, runstate, cpu, pinned, task_type, name)
+
+            &format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
+                "name", name, "task id",  self.task.lock().id, "runstate", runstate, "cpu",cpu, "pinned", pinned, "task type", task_type)
         );
     
         return task_string;
@@ -805,6 +806,21 @@ impl Directory for TaskDirectory {
         return None;
     }
 
+    /// Looks for the child file specified by dirname and returns a reference to it 
+    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
+        let id = match child_file.parse::<usize>() {
+            Ok(id) => id, 
+            Err(_err) => return None,
+        };
+        let task_ref = match TASKLIST.get(&id)  {
+            Some(task_ref) => task_ref,
+            None => return None,
+        };
+        let task_file_ref = Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>));
+        return Some(task_file_ref);
+    }
+
+
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
         match self.parent {
@@ -814,11 +830,10 @@ impl Directory for TaskDirectory {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> String {
-        let mut tasks_string = String::new();
-        tasks_string.push_str("Running Tasks:\n\n");
-        for taskref in TASKLIST.iter() {
-            tasks_string.push_str(&format!("{}\n", taskref.1.lock().name));
+    fn list_children(&mut self) -> Vec<String> {
+        let mut tasks_string = Vec::new();
+        for (id, _taskref) in TASKLIST.iter() {
+            tasks_string.push(format!("{}", id));
         }
         tasks_string
     }

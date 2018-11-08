@@ -1,9 +1,9 @@
 #![no_std]
 #![feature(alloc)]
 
-extern crate alloc;
 extern crate task;
 #[macro_use] extern crate terminal_print;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 extern crate vfs;
 
@@ -20,7 +20,13 @@ pub fn main(_args: Vec<String>) -> isize {
             let curr_env = locked_task.env.lock();
             Arc::clone(&curr_env.working_dir)
         };
-        println!("{}", curr_wr.lock().list_children())
+        let mut child_string = String::new();
+        let mut child_list = curr_wr.lock().list_children();
+        child_list.reverse();
+        for child in child_list.iter() {
+            child_string.push_str(&format!("{}\n", child));
+        }
+        println!("{}",child_string);
     }
     0
 }

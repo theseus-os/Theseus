@@ -54,8 +54,9 @@ pub trait Directory : FileDirectory + Send {
     fn add_file(&mut self, new_dir: StrongFileRef) -> Result<(), &'static str>;
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
+    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef>;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
-    fn list_children(&mut self) -> String;
+    fn list_children(&mut self) -> Vec<String>;
     fn get_children_files(&self) -> Vec<StrongFileRef>;
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef>;
 }
@@ -133,6 +134,15 @@ impl Directory for VFSDirectory {
         return None;
     }
 
+    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
+        for file in self.files.iter() {
+            if file.lock().get_name() == child_file {
+                return Some(Arc::clone(file));
+            }
+        }
+        return None;
+    }
+
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
         match self.parent {
@@ -142,14 +152,14 @@ impl Directory for VFSDirectory {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> String {
-        let mut children_list = String::new();
+    fn list_children(&mut self) -> Vec<String> {
+        let mut children_list = Vec::new();
         for dir in self.child_dirs.iter() {
-            children_list.push_str(&format!("{}\n",dir.lock().get_name()));
+            children_list.push(format!("{}\n",dir.lock().get_name()));
         }
 
         for file in self.files.iter() {
-            children_list.push_str(&format!("{}\n", file.lock().get_name()));
+            children_list.push(format!("{}\n", file.lock().get_name()));
         }
         return children_list;
     }
@@ -363,14 +373,17 @@ impl Path {
                 // if no matching file is found, advances to the next match block
                 if counter as usize == shortest_path.components().len() - 1  && shortest_path.components()[0] != ".." { // FIX LATER
                     debug!("entered third else");
-                    let files = new_wd.lock().get_children_files();
+                    let files = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
                     debug!("new wd is not deadlocked");
-                    for file_ref in files.iter() {
+                    for file_name in files.iter() {
                             // debug!("file ref name: {}", file_ref.lock().get_name());
                             // debug!("c2omponent name: {}", component.to_string());
-                        if file_ref.lock().get_name() == component.to_string() {
-                            debug!("MATCHED");
-                            return Some(FileDir::File(Arc::clone(file_ref)));
+                        if file_name == component {
+                            let child_file = match new_wd.lock().get_child_file(file_name.to_string()) {
+                                Some(file) => file,
+                                None => return None,
+                            };                        
+                            return Some(FileDir::File(Arc::clone(&child_file)));
                         }
                     }
                 }
