@@ -49,9 +49,9 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_fs_node(&mut self, new_node: FileDir) -> Result<(), &'static str>;
+    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
-    fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir>; 
+    fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode>; 
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> Vec<String>;
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef>;
@@ -64,7 +64,7 @@ pub trait FileDirectory {
     fn get_name(&self) -> String;
 }
 
-pub enum FileDir {
+pub enum FSNode{
     File(StrongFileRef),
     Dir(StrongAnyDirRef),
 }
@@ -74,7 +74,7 @@ pub struct VFSDirectory {
     /// The name of the directory
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
-    children: Vec<FileDir>,
+    children: Vec<FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -93,19 +93,19 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn add_fs_node(&mut self, new_fs_node: FileDir) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_fs_node: FSNode) -> Result<(), &'static str> {
         let self_pointer = match self.get_self_pointer() {
             Some(self_ptr) => self_ptr,
             None => return Err("Couldn't obtain pointer to self")
         };
         match new_fs_node {
-            FileDir::Dir(dir) => {
+            FSNode::Dir(dir) => {
                 dir.lock().set_parent(Arc::downgrade(&self_pointer));
-                self.children.push(FileDir::Dir(dir))
+                self.children.push(FSNode::Dir(dir))
                 },
-            FileDir::File(file) => {
+            FSNode::File(file) => {
                 file.lock().set_parent(Arc::downgrade(&self_pointer));
-                self.children.push(FileDir::File(file))
+                self.children.push(FSNode::File(file))
                 },
         }
         Ok(())
@@ -117,17 +117,17 @@ impl Directory for VFSDirectory {
     }
 
 
-    fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir> {
+    fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode> {
         for child in self.children.iter() {
             match child {
-                FileDir::File(file) => {
+                FSNode::File(file) => {
                     if file.lock().get_name() == child_name && is_file { 
-                        return Some(FileDir::File(Arc::clone(file)));
+                        return Some(FSNode::File(Arc::clone(file)));
                     }
                 }
-                FileDir::Dir(dir) => {
+                FSNode::Dir(dir) => {
                     if dir.lock().get_name() == child_name && !is_file { 
-                        return Some(FileDir::Dir(Arc::clone(dir)));
+                        return Some(FSNode::Dir(Arc::clone(dir)));
                     }
                 }
             }
@@ -149,8 +149,8 @@ impl Directory for VFSDirectory {
         let mut children_list = Vec::new();
         for child in self.children.iter() {
             match child {
-                FileDir::Dir(dir) => children_list.push(format!("{}\n",dir.lock().get_name())),
-                FileDir::File(file) => children_list.push(format!("{}\n", file.lock().get_name()))
+                FSNode::Dir(dir) => children_list.push(format!("{}\n",dir.lock().get_name())),
+                FSNode::File(file) => children_list.push(format!("{}\n", file.lock().get_name()))
             }
         }
         return children_list;
@@ -175,8 +175,8 @@ impl Directory for VFSDirectory {
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => {
                 match child {
-                    FileDir::Dir(dir) => Some(dir),
-                    FileDir::File(_file) => None,
+                    FSNode::Dir(dir) => Some(dir),
+                    FSNode::File(_file) => None,
                 }
             },
             None => None,
@@ -330,7 +330,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<FileDir> {
+    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<FSNode> {
         let current_path;
         { current_path = wd.lock().get_path();}
         debug!("current path {}", current_path.path);
@@ -367,8 +367,8 @@ impl Path {
                         if child_name == component {
                             let child = match new_wd.lock().get_child(child_name.to_string(), true) {
                                 Some(child) => match child {
-                                    FileDir::File(file) => return Some(FileDir::File(Arc::clone(&file))),
-                                    FileDir::Dir(dir) => return Some(FileDir::Dir(Arc::clone(&dir)))
+                                    FSNode::File(file) => return Some(FSNode::File(Arc::clone(&file))),
+                                    FSNode::Dir(dir) => return Some(FSNode::Dir(Arc::clone(&dir)))
                                 },
                                 None => return None,
                             };                        
@@ -378,8 +378,8 @@ impl Path {
                                
                 let dir = match new_wd.lock().get_child(component.to_string(), false) {
                     Some(child) => match child {
-                        FileDir::Dir(dir) => dir,
-                        FileDir::File(file) => return None,
+                        FSNode::Dir(dir) => dir,
+                        FSNode::File(file) => return None,
                     }, 
                     None => return None,
                 };
@@ -390,7 +390,7 @@ impl Path {
         
     
 
-        return Some(FileDir::Dir(new_wd));
+        return Some(FSNode::Dir(new_wd));
     }
 }
 

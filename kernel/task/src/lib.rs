@@ -60,7 +60,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef, FileDir};
+use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef, FSNode};
 use environment::Environment;
 use spin::Mutex;
 
@@ -90,7 +90,7 @@ pub fn init() -> Result<(), &'static str> {
     // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
     let root = vfs::get_root();
     let task_dir = TaskDirectory::new(String::from("tasks"));
-    root.lock().add_fs_node(FileDir::Dir(task_dir))?;
+    root.lock().add_fs_node(FSNode::Dir(task_dir))?;
     // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
@@ -742,7 +742,7 @@ use vfs::StrongFileRef;
 pub struct TaskDirectory {
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
-    children: Vec<FileDir>,
+    children: Vec<FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -780,7 +780,7 @@ impl FileDirectory for TaskDirectory {
 
 impl Directory for TaskDirectory {
     /// this is a noop because you can't manually add files to task directory
-    fn add_fs_node(&mut self, new_node: FileDir) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
         return Ok(())
     }
     
@@ -802,7 +802,7 @@ impl Directory for TaskDirectory {
     //     return None;
     // }
 
-    fn get_child(&self, child: String, is_file: bool) -> Option<FileDir> {
+    fn get_child(&self, child: String, is_file: bool) -> Option<FSNode> {
         if is_file {
             let id = match child.parse::<usize>() {
                 Ok(id) => id, 
@@ -812,7 +812,7 @@ impl Directory for TaskDirectory {
                 Some(task_ref) => task_ref,
                 None => return None,
             };
-            let task_file_ref = FileDir::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
+            let task_file_ref = FSNode::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
             return Some(task_file_ref);
         } else {
             None
@@ -861,8 +861,8 @@ impl Directory for TaskDirectory {
         let locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => match child {
-                FileDir::File(_file) => None,
-                FileDir::Dir(dir) => return Some(dir)
+                FSNode::File(_file) => None,
+                FSNode::Dir(dir) => return Some(dir)
             },
             None => None,
         }

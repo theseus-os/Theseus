@@ -14,7 +14,7 @@ use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
 use vfs::Path;
-use vfs::FileDir;
+use vfs::FSNode;
 
 
 #[no_mangle]
@@ -52,10 +52,10 @@ pub fn main(args: Vec<String>) -> isize {
         match path.get(&curr_wr) {
             Some(file_dir_enum) => {
                 match file_dir_enum {
-                    FileDir::Dir(_) => {
+                    FSNode::Dir(_) => {
                         println!("why tf would this ever be a dir");
                     },
-                    FileDir::File(file) => {
+                    FSNode::File(file) => {
                         debug!("about to read this shit");
                         println!("{}", file.lock().read());
                     }

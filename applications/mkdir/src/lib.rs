@@ -10,7 +10,7 @@ extern crate vfs;
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
-use vfs::{VFSDirectory, FileDir};
+use vfs::{VFSDirectory, FSNode};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -24,7 +24,7 @@ pub fn main(args: Vec<String>) -> isize {
                     let curr_env = locked_task.env.lock();
                     Arc::clone(&curr_env.working_dir)};
                 let new_dir = VFSDirectory::new_dir(dir_name.to_string());
-                match curr_dir.lock().add_fs_node(FileDir::Dir(new_dir)) {
+                match curr_dir.lock().add_fs_node(FSNode::Dir(new_dir)) {
                     Ok(()) => { },
                     Err(err) => {println!("{}", err);
                                 return -1;}
