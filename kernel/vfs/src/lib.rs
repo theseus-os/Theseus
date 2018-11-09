@@ -19,6 +19,7 @@ lazy_static! {
             name: "/root".to_string(),
             child_dirs: Vec::new(),
             files: Vec::new(),
+            children: Vec::new(), 
             parent: None, 
         };
         Arc::new(Mutex::new(Box::new(root_dir)))
@@ -55,6 +56,8 @@ pub trait Directory : FileDirectory + Send {
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
     fn get_child_file(&self, child_file: String) -> Option<StrongFileRef>;
+    fn get_children(&self) -> Vec<FileDir>;
+    fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir>; 
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> Vec<String>;
     fn get_children_files(&self) -> Vec<StrongFileRef>;
@@ -81,6 +84,7 @@ pub struct VFSDirectory {
     child_dirs: Vec<StrongAnyDirRef>,
     /// A list of files within this directory
     files: Vec<StrongFileRef>,
+    children: Vec<FileDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -92,6 +96,7 @@ impl VFSDirectory {
             name: name,
             child_dirs: Vec::new(),
             files:  Vec::new(),
+            children: Vec::new(),
             parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
@@ -134,6 +139,24 @@ impl Directory for VFSDirectory {
         return None;
     }
 
+    fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir> {
+        for child in self.children.iter() {
+            match child {
+                FileDir::File(file) => {
+                    if file.lock().get_name() == child_name && is_file { 
+                        return Some(FileDir::File(Arc::clone(file)));
+                    }
+                }
+                FileDir::Dir(dir) => {
+                    if dir.lock().get_name() == child_name && !is_file { 
+                        return Some(FileDir::Dir(Arc::clone(dir)));
+                    }
+                }
+            }
+        }
+        return None;
+    }
+
     fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
         for file in self.files.iter() {
             if file.lock().get_name() == child_file {
@@ -164,6 +187,10 @@ impl Directory for VFSDirectory {
         return children_list;
     }
     
+    fn get_children(&self) -> Vec<FileDir> {
+        return self.children;
+    }
+
     // TODO - return iterator of children rather than a string
     fn get_children_files(&self) -> Vec<StrongFileRef> {
         let mut children: Vec<StrongFileRef> = Vec::new();
