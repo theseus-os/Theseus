@@ -3,21 +3,17 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::borrow::{ToOwned};
 use alloc::string::ToString;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use spin::{Once, Mutex};
+use dfqueue::{DFQueue, DFQueueProducer};
+use spin::Once;
 use core::fmt;
-use core::ops::Deref;
 use acpi::get_hpet;
-use smoltcp::Error;
 use smoltcp::wire::{EthernetAddress, IpAddress};
 use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
-use smoltcp::socket::{AsSocket, SocketSet,SocketHandle}; 
+use smoltcp::socket::{AsSocket, SocketSet}; 
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
-use smoltcp::socket::{TcpSocket, TcpSocketBuffer};
-use smoltcp::wire::{IpProtocol, IpEndpoint};
-use smoltcp::phy::Device;
+use smoltcp::wire::IpEndpoint;
 use e1000;
-use e1000_to_smoltcp_interface::{EthernetDevice};
+use e1000_to_smoltcp_interface::E1000Device;
 use logger::LogColor;
 
 
@@ -59,14 +55,8 @@ pub fn server_init(_: Option<u64>) {
     // let tcp1_handle = sockets.add(tcp1_socket);
     // let tcp2_handle = sockets.add(tcp2_socket);
 
-    let device = EthernetDevice{
-        tx_next: 0,
-        rx_next: 0,
-    };
-
-
-    // getting the mac address from the ethernet device
-    let hardware_mac_addr = EthernetAddress(e1000_nic_ref.lock().mac_address());
+    // create a device that connects the smoltcp data link layer to our e1000 driver
+    let device = E1000Device::new();
 
     // setup destination address and port
     let dest_addr = IpAddress::v4(192, 168, 69, 100); // the default gateway (router?)
@@ -77,6 +67,7 @@ pub fn server_init(_: Option<u64>) {
     let local_port = 6969;
 
     // Initializing the Ethernet interface
+    let hardware_mac_addr = EthernetAddress(e1000_nic_ref.lock().mac_address());
     let mut iface = EthernetInterface::new(
         Box::new(device), Box::new(arp_cache) as Box<ArpCache>,
         hardware_mac_addr, local_addr);  

@@ -24,8 +24,9 @@ extern crate mpmc;
 pub mod test_e1000_driver;
 mod regs;
 
-use core::ptr::{read_volatile, write_volatile};
+// use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
+use core::fmt;
 use spin::Once; 
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
@@ -72,18 +73,20 @@ lazy_static! {
     static ref RX_BUFFER_POOL: Queue<MappedPages> = Queue::with_capacity(2000);
 }
 
-/// struct to represent receive descriptors
+/// This struct is an E1000 Receive Descriptor as defined by the e1000 spec.
+/// There is one instance of this struct per receive buffer.
 #[repr(C,packed)]
 #[derive(Default)]
 pub struct E1000RxDesc {
-    phys_addr: u64,      
+    /// The starting physical address of the receive buffer
+    phys_addr: u64,
+    /// Length of the receive buffer in bytes
     length: u16,
     checksum: u16,
     status: u8,
     errors: u8,
     special: u16,
 }
-use core::fmt;
 impl fmt::Debug for E1000RxDesc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{phys_addr: {:#X}, length: {:#X}, checksum: {:#X}, status: {:#X}, errors: {:#X}, special: {:#X}}}",
@@ -91,11 +94,14 @@ impl fmt::Debug for E1000RxDesc {
     }
 }
 
-/// struct to represent transmission descriptors
+/// This struct is an E1000 Transmit Descriptor as defined by the e1000 spec.
+/// There is one instance of this struct per buffer to be transmitted.
 #[repr(C, packed)]
 #[derive(Default)]
 pub struct E1000TxDesc {
+    /// The starting physical address of the transmit buffer
     phys_addr: u64,
+    /// Length of the transmit buffer in bytes
     length: u16,
     cso: u8,
     cmd: u8,
@@ -113,54 +119,59 @@ impl fmt::Debug for E1000TxDesc {
 
 ///struct to hold mapping of registers
 #[repr(C)]
-pub struct IntelEthRegisters {
+pub struct IntelE1000Registers {
     pub ctrl:                       Volatile<u32>,          // 0x0
-    _padding0:                      [u8;4],                 // 0x4 - 0x7
+    _padding0:                      [u8; 4],                // 0x4 - 0x7
     pub status:                     ReadOnly<u32>,          // 0x8
-    _padding1:                      [u8;180],               // 0xC - 0xBF
+    _padding1:                      [u8; 180],              // 0xC - 0xBF
     
-    //Interrupt registers
+    /// Interrupt control registers
     pub icr:                        ReadOnly<u32>,          // 0xC0   
-    _padding2:                      [u8;12],                // 0xC4 - 0xCF
+    _padding2:                      [u8; 12],               // 0xC4 - 0xCF
     pub ims:                        Volatile<u32>,          // 0xD0
-    _padding3:                      [u8;44],                // 0xD4 - 0xFF 
+    _padding3:                      [u8; 44],               // 0xD4 - 0xFF 
 
-    //Receive control
+    /// Receive control register
     pub rctl:                       Volatile<u32>,          // 0x100
-    _padding4:                      [u8;764],               // 0x104 - 0x3FF
+    _padding4:                      [u8; 764],              // 0x104 - 0x3FF
 
-    //Transmit control
+    /// Transmit control register
     pub tctl:                       Volatile<u32>,          // 0x400
-    _padding5:                      [u8;9212],              // 0x404 - 0x27FF
+    _padding5:                      [u8; 9212],             // 0x404 - 0x27FF
 
-    //Receive    
-    /// The lower (least significant) 32-bits of the physical address of the array of receive descriptors.
+    /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
     pub rdbal:                      Volatile<u32>,          // 0x2800
-    /// The higher (most significant) 32-bits of the physical address of the array of receive descriptors.
+    /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
     pub rdbah:                      Volatile<u32>,          // 0x2804
     /// The length in bytes of the array of receive descriptors.
     pub rdlen:                      Volatile<u32>,          // 0x2808
-    _padding6:                      [u8;4],                 // 0x280C - 0x280F
-    /// The head index 
+    _padding6:                      [u8; 4],                // 0x280C - 0x280F
+    /// The receive descriptor head index, which points to the next available receive descriptor.
     pub rdh:                        Volatile<u32>,          // 0x2810
-    _padding7:                      [u8;4],                 // 0x2814 - 0x2817
+    _padding7:                      [u8; 4],                // 0x2814 - 0x2817
+    /// The receive descriptor tail index, which points to the last available receive descriptor.
     pub rdt:                        Volatile<u32>,          // 0x2818  
-    _padding8:                      [u8;4068],              // 0x281C - 0x37FF
+    _padding8:                      [u8; 4068],             // 0x281C - 0x37FF
 
-    //Transmit
+    /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
     pub tdbal:                      Volatile<u32>,          // 0x3800
+    /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
     pub tdbah:                      Volatile<u32>,          // 0x3804
+    /// The length in bytes of the array of transmit descriptors.
     pub tdlen:                      Volatile<u32>,          // 0x3808
-    _padding9:                      [u8;4],                 // 0x380C - 0x380F
+    _padding9:                      [u8; 4],                // 0x380C - 0x380F
+    /// The transmit descriptor head index, which points to the next available transmit descriptor.
     pub tdh:                        Volatile<u32>,          // 0x3810
-    _padding10:                     [u8;4],                 // 0x3814 - 0x3817
+    _padding10:                     [u8; 4],                // 0x3814 - 0x3817
+    /// The transmit descriptor tail index, which points to the last available transmit descriptor.
     pub tdt:                        Volatile<u32>,          // 0x3818
-    _padding11:                     [u8;7140],              // 0x381C - 0x53FF
+    _padding11:                     [u8; 7140],             // 0x381C - 0x53FF
     
-    //Receive Address
+    /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
     pub ral:                        Volatile<u32>,          // 0x5400
+    /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
     pub rah:                        Volatile<u32>,          // 0x5404
-    _padding12:                     [u8;109560],            // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
+    _padding12:                     [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
 }
 
 
@@ -176,6 +187,10 @@ pub trait NetworkCard {
     ///                and/or is something that can be represented as a slice of bytes.
     /// * `size_in_bytes`: the size in bytes of the packet to be sent.
     fn send_packet(&mut self, packet_vaddr: VirtualAddress, size_in_bytes: u16) -> Result<(), &'static str>;
+
+    /// Handle a packet reception.
+    /// Returns a vector of mapped pages that contain the received packet and the length of the packet.
+    /// packet starts from the beginning of the first mapped page 
     fn handle_receive(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str>;
 }
 
@@ -207,7 +222,7 @@ pub struct E1000Nic {
     /// For example, `rx_buf_mapped[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).
     rx_buf_mapped: Vec<MappedPages>,
     /// memory-mapped control registers
-    regs: BoxRefMut<MappedPages, IntelEthRegisters>,
+    regs: BoxRefMut<MappedPages, IntelE1000Registers>,
 }
 
 
@@ -286,30 +301,27 @@ impl NetworkCard for E1000Nic {
         Ok(())
     }   
 
-    /// Handle a packet reception.
-    /// Returns a vector of mapped pages that contain the received packet and the length of the packet.
-    /// packet starts from the beginning of the first mapped page 
     fn handle_receive(&mut self) -> Result<(Vec<MappedPages>, u16), &'static str> {
-        let mut frames_received_in_packet: Vec<MappedPages> = Vec::new();
+        let mut receive_buffers_in_packet: Vec<MappedPages> = Vec::new();
         let mut total_packet_length: u16 = 0;
-        //print status of all packets until EoP
+        // print status of all rx buffers until EoP
         while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
             let status = self.rx_descs[self.rx_cur as usize].status;
-            debug!("Packet Received: rx desc status {}", status);
+            debug!("Rx buffer Received: rx desc status {}", status);
 
-            // //print packet
+            // //print rx_buf
             // let length = self.rx_descs[self.rx_cur as usize].length;
-            // let packet = self.rx_buf_mapped[self.rx_cur as usize].start_address() as *const u8;
-            // //print packet of length bytes
-            // debug!("Packet {}: ", self.rx_cur);
+            // let rx_buf = self.rx_buf_mapped[self.rx_cur as usize].start_address() as *const u8;
+            // //print rx_buf of length bytes
+            // debug!("rx_buf {}: ", self.rx_cur);
 
             // for i in 0..length {
-            //     let points_at = unsafe{ *packet.offset(i as isize ) };
+            //     let points_at = unsafe{ *rx_buf.offset(i as isize ) };
             //     //debug!("{}",points_at);
             //     debug!("{:x}",points_at);
             // }  
 
-            //get length of packet in current rx buffer
+            // get length of current rx_buf
             total_packet_length += self.rx_descs[self.rx_cur as usize].length;
 
             // assign a new mapped page object to the descriptor
@@ -325,10 +337,10 @@ impl NetworkCard for E1000Nic {
             };
             self.rx_descs[self.rx_cur as usize].phys_addr = new_mp_phys_addr as u64;
 
-            // obtain MappedPages containing the packet
+            // obtain MappedPages containing the rx_buf
             self.rx_buf_mapped.push(new_mp);
-            let current_received_frame = self.rx_buf_mapped.swap_remove(self.rx_cur as usize); 
-            frames_received_in_packet.push(current_received_frame);
+            let current_rx_buf = self.rx_buf_mapped.swap_remove(self.rx_cur as usize); 
+            receive_buffers_in_packet.push(current_rx_buf);
             
             self.rx_descs[self.rx_cur as usize].status = 0;
             let old_cur = self.rx_cur as u32;
@@ -336,41 +348,13 @@ impl NetworkCard for E1000Nic {
 
             self.regs.rdt.write(old_cur);
 
-            // check if this frame is the last frame in the packet (EOP)
+            // check if this rx buffer is the last one in the packet (EOP)
             if (status & RX_EOP) == RX_EOP {
                 break;
             }
         }
 
-        // // Print packets
-        // while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
-        //     //got_packet = true;
-        //     let length = self.rx_descs[self.rx_cur as usize].length;
-        //     let packet = self.rx_buf_addr[self.rx_cur as usize] as *const u8;
-        //     //print packet of length bytes
-        //     debug!("Packet {}: ", self.rx_cur);
-
-        //     for i in 0..length {
-        //         let points_at = unsafe{ *packet.offset(i as isize ) };
-        //         //debug!("{}",points_at);
-        //         debug!("{:x}"#,points_at);
-        //     }            
-            
-
-        //     self.rx_descs[self.rx_cur as usize].status = 0;
-        //     let old_cur = self.rx_cur as u32;
-        //     self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-
-        //     if let Some(ref mut regs) = self.regs {
-        //         regs.rdt.write(old_cur);
-        //     }
-        //     else {
-        //         error!("e1000: check_state(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
-        //         return Err("e1000: check_state(): FATAL ERROR: regs (IntelEthRegisters) were None! Were they initialized right?");
-        //     }
-        // }
-        
-        Ok((frames_received_in_packet, total_packet_length))
+        Ok((receive_buffers_in_packet, total_packet_length))
     }
 
 }
@@ -432,6 +416,9 @@ impl E1000Nic {
     
     ///find out amount of space needed for device's registers
     fn determine_mem_size(dev: &PciDevice) -> u32 {
+        // Here's what we do: 
+        // 1) read pci reg
+        // 2) bitwise not and add 1 because ....
         pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, 0xFFFF_FFFF);
         let mut mem_size = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
         //debug!("mem_size_read: {:x}", mem_size);
@@ -449,7 +436,7 @@ impl E1000Nic {
 
 
     /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
-    fn mem_map(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, IntelEthRegisters>, &'static str> {
+    fn mem_map(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, IntelE1000Registers>, &'static str> {
         // set the bust mastering bit for this PciDevice, which allows it to use DMA
         pci_set_command_bus_master_bit(dev);
 
@@ -476,7 +463,7 @@ impl E1000Nic {
             let nic_mapped_page = active_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
             
             BoxRefMut::new(Box::new(nic_mapped_page))
-                .try_map_mut(|mp| mp.as_type_mut::<IntelEthRegisters>(0))?
+                .try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?
         } else {
             return Err("e1000:mem_map Couldn't get kernel's active_table");
         };
@@ -530,7 +517,7 @@ impl E1000Nic {
     }
 
     /// Reads the actual MAC address burned into the NIC hardware.
-    fn read_mac_address_from_nic(regs: &mut IntelEthRegisters) -> [u8; 6] {
+    fn read_mac_address_from_nic(regs: &mut IntelE1000Registers) -> [u8; 6] {
         let mac_32_low = regs.ral.read();
         let mac_32_high = regs.rah.read();
 
@@ -547,7 +534,7 @@ impl E1000Nic {
     }   
 
     /// Start up the network
-    fn start_link(regs: &mut IntelEthRegisters) {
+    fn start_link(regs: &mut IntelE1000Registers) {
         //for i217 just check that bit1 is set of reg status
         let val = regs.ctrl.read();
         regs.ctrl.write(val | 0x40 | 0x20);
@@ -576,7 +563,7 @@ impl E1000Nic {
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
-    fn rx_init(regs: &mut IntelEthRegisters) -> Result<(BoxRefMut<MappedPages, [E1000RxDesc]>, Vec<MappedPages>), &'static str> {
+    fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [E1000RxDesc]>, Vec<MappedPages>), &'static str> {
         let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<E1000RxDesc>();
 
         // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -618,7 +605,7 @@ impl E1000Nic {
     }           
     
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut IntelEthRegisters) -> Result<BoxRefMut<MappedPages, [E1000TxDesc]>, &'static str> {
+    fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [E1000TxDesc]>, &'static str> {
         let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<E1000TxDesc>();
 
         // Tx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -653,7 +640,7 @@ impl E1000Nic {
     }       
     
     /// Enable Interrupts 
-    fn enable_interrupts(regs: &mut IntelEthRegisters) {
+    fn enable_interrupts(regs: &mut IntelE1000Registers) {
         //self.write_command(REG_IMASK ,0x1F6DC);
         //self.write_command(REG_IMASK ,0xff & !4);
     

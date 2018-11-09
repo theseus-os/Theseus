@@ -1,75 +1,79 @@
 
 use alloc::slice;
 use alloc::vec::Vec;
+use alloc::vec_deque::VecDeque;
 use smoltcp::Error;
 use smoltcp::phy::{Device, DeviceLimits};
 use e1000::{E1000_NIC, NetworkCard};
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 
-/// platform-specific code to check if the outgoing packet was sent 
-/// Always true as we are checking this in the server itself
-fn tx_empty() -> bool {
-    true
-    // E1000_NIC.lock().has_packet_been_sent()
+/// An implementation of smoltcp's `Device` trait, which enables smoltcp
+/// to use our existing e1000 ethernet driver.
+/// An instance of this `E1000Device` can be used in smoltcp's `EthernetInterface`.
+pub struct E1000Device {
+    tx_queue: Rc<RefCell<VecDeque<Vec<u8>>>>,
+}
+impl E1000Device {
+    /// Create a new instance of the `E1000Device` with an empty transmit buffer.
+    pub fn new() -> E1000Device {
+        E1000Device {
+            tx_queue: Rc::new(RefCell::new(VecDeque::new()))
+        }
+    }
 }
 
-/// platform-specific code to send a buffer with a packet 
-fn tx_setup(buf: *const u8, length: usize) {
-    let addr: usize = buf as usize;
-    E1000_NIC.try().unwrap().lock().send_packet(addr, length as u16).unwrap();
-}
 
-pub struct EthernetDevice{
-    pub tx_next: usize,
-    pub rx_next: usize
-}
-
-
-/// Device trait for EthernetDEvice
+/// Device trait for E1000Device
 /// Implementing transmit and receive
-impl Device for EthernetDevice {
+impl Device for E1000Device {
     type RxBuffer = Vec<u8>;
     type TxBuffer = TxBuffer;
 
     fn limits(&self) -> DeviceLimits {
-        let mut limits = DeviceLimits::default();
-        limits.max_transmission_unit = 1536;
-        limits.max_burst_size = Some(2);
-        limits
+        DeviceLimits {
+            max_transmission_unit: 1536, // TODO: why 1536?
+            ..DeviceLimits::default()
+        }
     }
 
     fn receive(&mut self, _timestamp: u64) -> Result<Self::RxBuffer, Error> {
         let nic = E1000_NIC.try().ok_or(Error::Exhausted)?.lock();
         if nic.has_packet_arrived() {
-            debug!("EthernetDevice::receive() packet has arrived");
+            debug!("E1000Device::receive() packet has arrived");
             let (mp, len) = nic.get_latest_received_packet();
             mp.as_slice::<u8>(0, len as usize)
                 .map(|slice| slice.to_vec())
                 .map_err(|e| {
-                error!("EthernetDevice::receive(): error converting MappedPages to slice: {:?}", e);
-                Error::Exhausted
-            })
+                    error!("E1000Device::receive(): error converting MappedPages to slice: {:?}", e);
+                    Error::Exhausted
+                })
         } else {
-            // debug!("EthernetDevice::receive() packet has NOT arrived");
+            // debug!("E1000Device::receive() packet has NOT arrived");
             Err(Error::Exhausted)
         }
     }
 
     fn transmit(&mut self, _timestamp: u64, length: usize) -> Result<Self::TxBuffer, Error> {
         if tx_empty() {
-            debug!("EthernetDevice::transmit() tx was empty");
+            debug!("E1000Device::transmit() tx was empty");
             let index = self.tx_next;
             Ok(TxBuffer {
                buffer : vec![0;length],
             })
         } else {
-            debug!("EthernetDevice::transmit() tx was full");
+            debug!("E1000Device::transmit() tx was full");
             Err(Error::Exhausted)
         }
     }
 }
 
+/// The transmit buffer type used by smoltcp, which must implement two things:
+/// * it must be representable as a slice of bytes, e.g., it must impl AsRef<[u8]>.
+/// * it must actually send the packet when it is dropped.
 pub struct TxBuffer {
+    queue:  Rc<RefCell<VecDeque<Vec<u8>>>>,
     buffer: Vec<u8>
 }
 
@@ -82,8 +86,18 @@ impl AsMut<[u8]> for TxBuffer {
 }
 
 impl Drop for TxBuffer {
-    fn drop(&mut self) { 
-        tx_setup(self.buffer.as_ptr(), self.buffer.len()) 
+    fn drop(&mut self) {
+        if let Some(e1000_nic) = E1000_NIC.try() {
+            let res = e1000_nic.lock().send_packet(
+                self.buffer.as_ptr() as usize, 
+                self.buffer.len() as u16
+            );
+            if let Err(e) = res {
+                error!("e1000_smoltcp: error sending Ethernet packet: {:?}", e);
+            }
+        } else {
+            error!("BUG: e1000_smoltcp: E1000 NIC wasn't yet initialized!");
+        }
     }
 
 }
