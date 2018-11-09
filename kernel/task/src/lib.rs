@@ -60,7 +60,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef};
+use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef, FileDir};
 use environment::Environment;
 use spin::Mutex;
 
@@ -90,7 +90,7 @@ pub fn init() -> Result<(), &'static str> {
     // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
     let root = vfs::get_root();
     let task_dir = TaskDirectory::new(String::from("tasks"));
-    root.lock().add_directory(task_dir)?;
+    root.lock().add_fs_node(FileDir::Dir(task_dir))?;
     // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
@@ -742,7 +742,7 @@ use vfs::StrongFileRef;
 pub struct TaskDirectory {
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
-    child_dirs: Vec<StrongAnyDirRef>,
+    children: Vec<FileDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -751,7 +751,7 @@ impl TaskDirectory {
     fn new(name: String)  -> StrongAnyDirRef {
         let directory = TaskDirectory {
             name: name,
-            child_dirs: Vec::new(),
+            children: Vec::new(),
             parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
@@ -779,15 +779,11 @@ impl FileDirectory for TaskDirectory {
 }
 
 impl Directory for TaskDirectory {
-    /// this is a noop because TaskDirectories automatically generate TaskFiles
-    fn add_directory(&mut self, _new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
-        return Err("cannot manually add directories to Task Directory");
+    /// this is a noop because you can't manually add files to task directory
+    fn add_fs_node(&mut self, new_node: FileDir) -> Result<(), &'static str> {
+        return Ok(())
     }
-
-    /// this is a noop because TaskDirectories automatically generate TaskFiles
-    fn add_file(&mut self, _new_file: StrongFileRef) -> Result<(), &'static str> {
-        return Err("cannot manually add files to Task Directory");
-    }
+    
 
     /// Sets the parent directory of the Task Directory
     /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
@@ -797,28 +793,36 @@ impl Directory for TaskDirectory {
     }
  
     /// Looks for the child directory specified by dirname and returns a reference to it 
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
-        for dir in self.child_dirs.iter() {
-            if dir.lock().get_name() == child_dir {
-                return Some(Arc::clone(dir));
-            }
-        }
-        return None;
+    // fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
+    //     for dir in self.child_dirs.iter() {
+    //         if dir.lock().get_name() == child_dir {
+    //             return Some(Arc::clone(dir));
+    //         }
+    //     }
+    //     return None;
+    // }
+
+    fn get_child(&self, child: String, is_file: bool) -> Option<FileDir> {
+        if is_file {
+            let id = match child.parse::<usize>() {
+                Ok(id) => id, 
+                Err(_err) => return None,
+            };
+            let task_ref = match TASKLIST.get(&id)  {
+                Some(task_ref) => task_ref,
+                None => return None,
+            };
+            let task_file_ref = FileDir::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
+            return Some(task_file_ref);
+        } else {
+            None
+        }  
     }
 
     /// Looks for the child file specified by dirname and returns a reference to it 
-    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
-        let id = match child_file.parse::<usize>() {
-            Ok(id) => id, 
-            Err(_err) => return None,
-        };
-        let task_ref = match TASKLIST.get(&id)  {
-            Some(task_ref) => task_ref,
-            None => return None,
-        };
-        let task_file_ref = Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>));
-        return Some(task_file_ref);
-    }
+    // fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
+
+    // }
 
 
     /// Returns a pointer to the parent if it exists
@@ -837,17 +841,8 @@ impl Directory for TaskDirectory {
         }
         tasks_string
     }
-    
-    /// Returns a vector of StrongFileRefs
-    fn get_children_files(&self) -> Vec<StrongFileRef> {
-        let mut children: Vec<StrongFileRef> = Vec::new();
-        for task in TASKLIST.iter() {
-            let new_task = TaskFile::new(task.1);
-            let task_file_ref = Arc::new(Mutex::new(Box::new(new_task) as Box<File + Send>));
-            children.push(task_file_ref);
-        }
-        children
-    }
+
+
     
     /// This function returns an Arc<Mutex<>> pointer to a directory by navigating up one directory 
     /// and then cloning itself via the parent's get_child_dir() method
@@ -862,6 +857,14 @@ impl Directory for TaskDirectory {
             Some(weak_ref) => weak_ref,
             None => return None
         };
-        return parent.lock().get_child_dir(self.name.clone());
+
+        let locked_parent = parent.lock();
+        match locked_parent.get_child(self.name.clone(), false) {
+            Some(child) => match child {
+                FileDir::File(_file) => None,
+                FileDir::Dir(dir) => return Some(dir)
+            },
+            None => None,
+        }
     }
 }

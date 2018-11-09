@@ -17,8 +17,6 @@ lazy_static! {
     pub static ref ROOT: StrongAnyDirRef = {
         let root_dir = VFSDirectory {
             name: "/root".to_string(),
-            child_dirs: Vec::new(),
-            files: Vec::new(),
             children: Vec::new(), 
             parent: None, 
         };
@@ -51,16 +49,11 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str>;
-    fn add_file(&mut self, new_dir: StrongFileRef) -> Result<(), &'static str>;
+    fn add_fs_node(&mut self, new_node: FileDir) -> Result<(), &'static str>;
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef>;
-    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef>;
-    fn get_children(&self) -> Vec<FileDir>;
     fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir>; 
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> Vec<String>;
-    fn get_children_files(&self) -> Vec<StrongFileRef>;
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef>;
 }
 
@@ -81,9 +74,6 @@ pub struct VFSDirectory {
     /// The name of the directory
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories 
-    child_dirs: Vec<StrongAnyDirRef>,
-    /// A list of files within this directory
-    files: Vec<StrongFileRef>,
     children: Vec<FileDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
@@ -94,8 +84,6 @@ impl VFSDirectory {
     pub fn new_dir(name: String)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
-            child_dirs: Vec::new(),
-            files:  Vec::new(),
             children: Vec::new(),
             parent: None,
         };
@@ -105,39 +93,29 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn add_directory(&mut self, new_dir: StrongAnyDirRef) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_fs_node: FileDir) -> Result<(), &'static str> {
         let self_pointer = match self.get_self_pointer() {
             Some(self_ptr) => self_ptr,
             None => return Err("Couldn't obtain pointer to self")
         };
-        new_dir.lock().set_parent(Arc::downgrade(&self_pointer));
-        self.child_dirs.push(new_dir);
+        match new_fs_node {
+            FileDir::Dir(dir) => {
+                dir.lock().set_parent(Arc::downgrade(&self_pointer));
+                self.children.push(FileDir::Dir(dir))
+                },
+            FileDir::File(file) => {
+                file.lock().set_parent(Arc::downgrade(&self_pointer));
+                self.children.push(FileDir::File(file))
+                },
+        }
         Ok(())
     }
 
-    fn add_file(&mut self, new_file: StrongFileRef) -> Result<(), &'static str> {
-        let self_pointer = match self.get_self_pointer() {
-            Some(self_ptr) => self_ptr,
-            None => return Err("Couldn't obtain pointer to self")
-        };
-        new_file.lock().set_parent(Arc::downgrade(&self_pointer));
-        self.files.push(new_file);
-        Ok(())
-    }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
         self.parent = Some(parent_pointer);
     }
- 
-    /// Looks for the child directory specified by dirname and returns a reference to it 
-    fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
-        for dir in self.child_dirs.iter() {
-            if dir.lock().get_name() == child_dir {
-                return Some(Arc::clone(dir));
-            }
-        }
-        return None;
-    }
+
 
     fn get_child(&self, child_name: String, is_file: bool) -> Option<FileDir> {
         for child in self.children.iter() {
@@ -157,14 +135,6 @@ impl Directory for VFSDirectory {
         return None;
     }
 
-    fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
-        for file in self.files.iter() {
-            if file.lock().get_name() == child_file {
-                return Some(Arc::clone(file));
-            }
-        }
-        return None;
-    }
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
@@ -177,47 +147,40 @@ impl Directory for VFSDirectory {
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut children_list = Vec::new();
-        for dir in self.child_dirs.iter() {
-            children_list.push(format!("{}\n",dir.lock().get_name()));
-        }
-
-        for file in self.files.iter() {
-            children_list.push(format!("{}\n", file.lock().get_name()));
+        for child in self.children.iter() {
+            match child {
+                FileDir::Dir(dir) => children_list.push(format!("{}\n",dir.lock().get_name())),
+                FileDir::File(file) => children_list.push(format!("{}\n", file.lock().get_name()))
+            }
         }
         return children_list;
     }
-    
-    fn get_children(&self) -> Vec<FileDir> {
-        return self.children;
-    }
 
-    // TODO - return iterator of children rather than a string
-    fn get_children_files(&self) -> Vec<StrongFileRef> {
-        let mut children: Vec<StrongFileRef> = Vec::new();
-        for file in self.files.iter() {
-            children.push(file.clone());
-        }
-        children
-    }
 
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
         if self.parent.is_none() {
-            debug!("fix this jank ass shit later");
+            debug!("fix this jank ass shit later cuz we cant call on root");
             return Some(get_root());
         }
-
-        debug!("in get self pointer");
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
             None => return None
         };
-        debug!("got weak parent");
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
             None => return None
         };
-        debug!("about to return");
-        return parent.lock().get_child_dir(self.name.clone());
+
+        let locked_parent = parent.lock();
+        match locked_parent.get_child(self.name.clone(), false) {
+            Some(child) => {
+                match child {
+                    FileDir::Dir(dir) => Some(dir),
+                    FileDir::File(_file) => None,
+                }
+            },
+            None => None,
+        }
     }
 }
 
@@ -399,23 +362,25 @@ impl Path {
                 // this checks the last item in the components to check if it's a file
                 // if no matching file is found, advances to the next match block
                 if counter as usize == shortest_path.components().len() - 1  && shortest_path.components()[0] != ".." { // FIX LATER
-                    debug!("entered third else");
-                    let files = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
-                    debug!("new wd is not deadlocked");
-                    for file_name in files.iter() {
-                            // debug!("file ref name: {}", file_ref.lock().get_name());
-                            // debug!("c2omponent name: {}", component.to_string());
-                        if file_name == component {
-                            let child_file = match new_wd.lock().get_child_file(file_name.to_string()) {
-                                Some(file) => file,
+                    let children = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
+                    for child_name in children.iter() {
+                        if child_name == component {
+                            let child = match new_wd.lock().get_child(child_name.to_string(), true) {
+                                Some(child) => match child {
+                                    FileDir::File(file) => return Some(FileDir::File(Arc::clone(&file))),
+                                    FileDir::Dir(dir) => return Some(FileDir::Dir(Arc::clone(&dir)))
+                                },
                                 None => return None,
                             };                        
-                            return Some(FileDir::File(Arc::clone(&child_file)));
                         }
                     }
                 }
-                let dir = match new_wd.lock().get_child_dir(component.to_string()) {
-                    Some(dir) => dir, 
+                               
+                let dir = match new_wd.lock().get_child(component.to_string(), false) {
+                    Some(child) => match child {
+                        FileDir::Dir(dir) => dir,
+                        FileDir::File(file) => return None,
+                    }, 
                     None => return None,
                 };
                 new_wd = dir;
