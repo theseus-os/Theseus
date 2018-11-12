@@ -699,6 +699,25 @@ impl<'a> FileDirectory for TaskFile<'a> {
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
+
+        /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
+        match self.parent {
+            Some(ref dir) => dir.upgrade(),
+            None => None
+        }
+    }
+
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+        unimplemented!();
+    }
+
+    /// Sets the parent directory of the Task Directory
+    /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
+    /// We should consider making this function private
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
+    }
 }
 
 impl<'a> File for TaskFile<'a> {
@@ -731,9 +750,6 @@ impl<'a> File for TaskFile<'a> {
     fn write(&mut self) { unimplemented!() }
     fn seek(&self) { unimplemented!() }
     fn delete(&self) { unimplemented!() }
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
-        self.parent = Some(parent_pointer);
-    }
 }
 
 
@@ -776,54 +792,6 @@ impl FileDirectory for TaskDirectory {
     fn get_name(&self) -> String {
         return String::from("tasks");
     }
-}
-
-impl Directory for TaskDirectory {
-    /// this is a noop because you can't manually add files to task directory
-    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
-        return Ok(())
-    }
-    
-
-    /// Sets the parent directory of the Task Directory
-    /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
-    /// We should consider making this function private
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
-        self.parent = Some(parent_pointer);
-    }
- 
-    /// Looks for the child directory specified by dirname and returns a reference to it 
-    // fn get_child_dir(&self, child_dir: String) -> Option<StrongAnyDirRef> {
-    //     for dir in self.child_dirs.iter() {
-    //         if dir.lock().get_name() == child_dir {
-    //             return Some(Arc::clone(dir));
-    //         }
-    //     }
-    //     return None;
-    // }
-
-    fn get_child(&self, child: String, is_file: bool) -> Option<FSNode> {
-        if is_file {
-            let id = match child.parse::<usize>() {
-                Ok(id) => id, 
-                Err(_err) => return None,
-            };
-            let task_ref = match TASKLIST.get(&id)  {
-                Some(task_ref) => task_ref,
-                None => return None,
-            };
-            let task_file_ref = FSNode::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
-            return Some(task_file_ref);
-        } else {
-            None
-        }  
-    }
-
-    /// Looks for the child file specified by dirname and returns a reference to it 
-    // fn get_child_file(&self, child_file: String) -> Option<StrongFileRef> {
-
-    // }
-
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
@@ -833,17 +801,6 @@ impl Directory for TaskDirectory {
         }
     }
 
-    /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
-        let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.iter() {
-            tasks_string.push(format!("{}", id));
-        }
-        tasks_string
-    }
-
-
-    
     /// This function returns an Arc<Mutex<>> pointer to a directory by navigating up one directory 
     /// and then cloning itself via the parent's get_child_dir() method
     /// 
@@ -867,4 +824,62 @@ impl Directory for TaskDirectory {
             None => None,
         }
     }
+
+
+    /// Sets the parent directory of the Task Directory
+    /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
+    /// We should consider making this function private
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
+    }
+}
+
+impl Directory for TaskDirectory {
+    /// this is a noop because you can't manually add files to task directory
+    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
+        return Ok(())
+    }
+    
+    fn get_child(&self, child: String, is_file: bool) -> Option<FSNode> {
+        if is_file {
+            let id = match child.parse::<usize>() {
+                Ok(id) => id, 
+                Err(_err) => return None,
+            };
+            let task_ref = match TASKLIST.get(&id)  {
+                Some(task_ref) => task_ref,
+                None => return None,
+            };
+            let task_file_ref = FSNode::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
+            return Some(task_file_ref);
+        } else {
+            None
+        }  
+    }
+
+    /// Returns a string listing all the children in the directory
+    fn list_children(&mut self) -> Vec<String> {
+        let mut tasks_string = Vec::new();
+        for (id, _taskref) in TASKLIST.iter() {
+            tasks_string.push(format!("{}", id));
+        }
+        tasks_string
+    }
+
+}
+
+
+fn create_mmi(taskref: TaskRef) -> Result<FSNode, &'static str> {
+    let mmi_dir: StrongAnyDirRef = vfs::VFSDirectory::new_dir(String::from("mmi"));
+    // obtain information from the MemoryManagementInfo struct of the Task
+    let mut page_table_info = String::from("Virtual Addresses:\n");
+    let mmi_info = taskref.lock().mmi.clone().unwrap(); // FIX THIS UNWRAP AND DON'T CLONE
+    let vmas = mmi_info.lock().vmas.clone();   
+    // gets the start addresses of the virtual memory areas
+    for vma in vmas.iter() {
+        page_table_info.push_str(&format!("{}\n", vma.start_address()));
+    }
+    let page_table_file = vfs::VFSFile::new(String::from("memoryManagementInfo"), 0, page_table_info, None);
+    mmi_dir.lock().add_fs_node(vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
+    return Ok(vfs::FSNode::Dir(mmi_dir));
 }

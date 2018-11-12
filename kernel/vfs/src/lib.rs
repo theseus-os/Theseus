@@ -44,17 +44,13 @@ pub trait File : FileDirectory {
     fn write(&mut self);
     fn seek(&self); 
     fn delete(&self);
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
 }
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
     fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>);
     fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode>; 
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn list_children(&mut self) -> Vec<String>;
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef>;
 }
 
 /// Traits that both files and directories share
@@ -62,6 +58,9 @@ pub trait FileDirectory {
     fn get_path_as_string(&self) -> String;
     fn get_path(&self) -> Path;
     fn get_name(&self) -> String;
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef>; // DON'T CALL THIS (add_fs_node performs this function)
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>); // DON'T CALL THIS (add_fs_node performs this function)
 }
 
 pub enum FSNode{
@@ -111,12 +110,6 @@ impl Directory for VFSDirectory {
         Ok(())
     }
 
-
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
-        self.parent = Some(parent_pointer);
-    }
-
-
     fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode> {
         for child in self.children.iter() {
             match child {
@@ -135,15 +128,6 @@ impl Directory for VFSDirectory {
         return None;
     }
 
-
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
-        }
-    }
-
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut children_list = Vec::new();
@@ -155,7 +139,33 @@ impl Directory for VFSDirectory {
         }
         return children_list;
     }
+}
 
+impl FileDirectory for VFSDirectory {
+    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    fn get_path_as_string(&self) -> String {
+        let mut path = self.name.clone();
+        if let Some(cur_dir) =  self.get_parent_dir() {
+            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            return path;
+        }
+        return path;
+    }
+    /// Gets the absolute pathname as a Path struct
+    fn get_path(&self) -> Path {
+        Path::new(self.get_path_as_string())
+    }
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
+        match self.parent {
+            Some(ref dir) => dir.upgrade(),
+            None => None
+        }
+    }
 
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
         if self.parent.is_none() {
@@ -182,24 +192,9 @@ impl Directory for VFSDirectory {
             None => None,
         }
     }
-}
 
-impl FileDirectory for VFSDirectory {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        let mut path = self.name.clone();
-        if let Some(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
-        }
-        return path;
-    }
-    /// Gets the absolute pathname as a Path struct
-    fn get_path(&self) -> Path {
-        Path::new(self.get_path_as_string())
-    }
-    fn get_name(&self) -> String {
-        self.name.clone()
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
     }
 }
 
@@ -208,25 +203,37 @@ pub struct VFSFile {
     name: String,
     /// The file size 
     size: usize, 
+    /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
+    contents: String,
     /// A weak reference to the parent directory
-    parent: WeakDirRef<Box<Directory + Send>>,
+    parent: Option<WeakDirRef<Box<Directory + Send>>>,
+}
+
+impl VFSFile {
+    pub fn new(name: String, size: usize, contents: String, parent: Option<WeakDirRef<Box<Directory + Send>>>) -> VFSFile {
+        VFSFile {
+            name: name, 
+            size: size, 
+            contents: contents,
+            parent: parent
+        }
+    }
 }
 
 impl File for VFSFile {
-    fn read(&self) -> String { unimplemented!(); }
+    fn read(&self) -> String { 
+        return self.contents.clone();
+     }
     fn write(&mut self) { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
     fn delete(&self) { unimplemented!(); }
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
-        self.parent = parent_pointer;
-    }
 }
 
 impl FileDirectory for VFSFile {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.name.clone();
-        if let Some(cur_dir) =  self.parent.upgrade() {
+        if let Some(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
         }
@@ -238,6 +245,44 @@ impl FileDirectory for VFSFile {
     }
     fn get_name(&self) -> String {
         self.name.clone()
+    }
+    
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
+        match self.parent {
+            Some(ref dir) => dir.upgrade(),
+            None => None
+        }
+    }
+
+    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+        if self.parent.is_none() {
+            debug!("fix this jank ass shit later cuz we cant call on root");
+            return Some(get_root());
+        }
+        let weak_parent = match self.parent.clone() {
+            Some(parent) => parent, 
+            None => return None
+        };
+        let parent = match Weak::upgrade(&weak_parent) {
+            Some(weak_ref) => weak_ref,
+            None => return None
+        };
+
+        let locked_parent = parent.lock();
+        match locked_parent.get_child(self.name.clone(), false) {
+            Some(child) => {
+                match child {
+                    FSNode::Dir(dir) => Some(dir),
+                    FSNode::File(_file) => None,
+                }
+            },
+            None => None,
+        }
+    }
+
+    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+        self.parent = Some(parent_pointer);
     }
 }
 
