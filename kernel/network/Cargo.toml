@@ -28,11 +28,17 @@ path = "../tsc"
 [dependencies.logger]
 path = "../logger"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.acpi]
 path = "../acpi"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
+
+[dependencies.owning_ref]
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 [dependencies.smoltcp]
 version = "0.4.0"

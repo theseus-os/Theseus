@@ -25,14 +25,14 @@ pub mod test_e1000_driver;
 mod regs;
 
 // use core::ptr::{read_volatile, write_volatile};
-use core::ops::DerefMut;
+use core::ops::{Deref, DerefMut};
 use core::fmt;
 use spin::Once; 
 use alloc::Vec;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, VirtualAddress, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, allocate_pages_by_bytes, MappedPages, FrameIter, PhysicalMemoryArea};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, VirtualAddress, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
@@ -47,9 +47,6 @@ const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
 const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
-
-// const E1000_SIZE_RX_DESC:       usize = 16;
-// const E1000_SIZE_TX_DESC:       usize = 16;
 
 /// Currently, each receive buffer is a single page.
 const E1000_RX_BUFFER_SIZE_IN_BYTES:     usize = PAGE_SIZE;
@@ -175,18 +172,51 @@ pub struct IntelE1000Registers {
 }
 
 
+/// A buffer that stores a packet to be transmitted through the NIC
+/// and is guaranteed to be contiguous in physical memory. 
+/// Auto-dereferences into a `MappedPages` object that holds its underlying memory. 
+pub struct TransmitBuffer {
+    mp: MappedPages,
+    phys_addr: PhysicalAddress,
+    length: u16,
+}
+impl TransmitBuffer {
+    /// Creates a new TransmitBuffer with the specified size in bytes.
+    /// The size is a `u16` because that is the maximum size of an NIC transmit buffer. 
+    pub fn new(size_in_bytes: u16) -> Result<TransmitBuffer, &'static str> {
+        let (mp, starting_phys_addr) = create_contiguous_mapping(size_in_bytes as usize)?;
+        Ok(TransmitBuffer {
+            mp: mp,
+            phys_addr: starting_phys_addr,
+            length: size_in_bytes,
+        })
+    }
+
+    pub fn send<N: NetworkInterfaceCard>(&self, nic: &mut N) -> Result<(), &'static str> {
+        nic.send_packet(self)
+    }
+}
+impl Deref for TransmitBuffer {
+    type Target = MappedPages;
+    fn deref(&self) -> &MappedPages {
+        &self.mp
+    }
+}
+impl DerefMut for TransmitBuffer {
+    fn deref_mut(&mut self) -> &mut MappedPages {
+        &mut self.mp
+    }
+}
+
+
+
 
 ///trait for network functions
-pub trait NetworkCard {
-    /// Sends a packet out through this NetworkCard. 
-    /// TODO: should use a byte slice or something safer instead. 
-    /// # Arguments
-    /// * `packet_vaddr`: the VirtualAddress of the packet buffer to be transmitted. 
-    ///   THIS MUST POINT TO A BUFFER THAT IS CONTIGUOUS IN PHYSICAL MEMORY. 
-    ///   TODO FIXME:  we should use a special type or trait that guarantees the underlying memory is physically contiguous
-    ///                and/or is something that can be represented as a slice of bytes.
-    /// * `size_in_bytes`: the size in bytes of the packet to be sent.
-    fn send_packet(&mut self, packet_vaddr: VirtualAddress, size_in_bytes: u16) -> Result<(), &'static str>;
+pub trait NetworkInterfaceCard {
+
+    /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
+    /// Blocks until the packet has been successfully sent by the networking card hardware.
+    fn send_packet(&mut self, transmit_buffer: &TransmitBuffer) -> Result<(), &'static str>;
 
     /// Handle a packet reception.
     /// Returns a vector of mapped pages that contain the received packet and the length of the packet.
@@ -265,16 +295,13 @@ fn create_contiguous_mapping(size_in_bytes: usize) -> Result<(MappedPages, Physi
 }
 
 
-impl NetworkCard for E1000Nic {
-    
-    fn send_packet(&mut self, packet_vaddr: VirtualAddress, size_in_bytes: u16) -> Result<(), &'static str> {
-        
-        let packet_paddr = translate_v2p(packet_vaddr)?;
-        //debug!("Value of tx descriptor address_translated: {:x}",packet_paddr);
+impl NetworkInterfaceCard for E1000Nic {
 
-        self.tx_descs[self.tx_cur as usize].phys_addr = packet_paddr as u64;
-        self.tx_descs[self.tx_cur as usize].length = size_in_bytes;
-        self.tx_descs[self.tx_cur as usize].cmd = (regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8; //(1<<0)|(1<<1)|(1<<3)
+    fn send_packet(&mut self, transmit_buffer: &TransmitBuffer) -> Result<(), &'static str> {
+        
+        self.tx_descs[self.tx_cur as usize].phys_addr = transmit_buffer.phys_addr as u64;
+        self.tx_descs[self.tx_cur as usize].length = transmit_buffer.length;
+        self.tx_descs[self.tx_cur as usize].cmd = (regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8;
         self.tx_descs[self.tx_cur as usize].status = 0;
 
         let old_cur: u8 = self.tx_cur as u8;

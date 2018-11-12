@@ -13,7 +13,8 @@ extern crate spin;
 extern crate dfqueue;
 extern crate acpi;
 extern crate logger;
-
+extern crate memory;
+extern crate owning_ref;
 
 pub mod server;
 pub mod e1000_to_smoltcp_interface;

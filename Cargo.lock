@@ -657,6 +657,8 @@ dependencies = [
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
+ "memory 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "smoltcp 0.4.0 (git+https://github.com/kevinaboos/smoltcp)",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsc 0.1.0",

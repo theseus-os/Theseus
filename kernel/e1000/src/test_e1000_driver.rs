@@ -1,5 +1,4 @@
-use super::E1000_NIC;
-use super::NetworkCard;
+use super::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
 
 pub fn test_e1000_nic_driver(_: Option<u64>) {
     match dhcp_request_packet() {
@@ -47,7 +46,6 @@ pub struct arp_packet {
 //will receive a DHCP messgae from 00:1f:c6:9c:89:4c
 
 pub fn dhcp_request_packet() -> Result<(), &'static str> {
-    let mut e1000_nc = E1000_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
     let packet: [u8; 314] = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x08, 0x00, 0x45,
         0x00, 0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
@@ -71,8 +69,11 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         0x3d, 0x07, 0x01, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x32, 0x04, 0x00, 0x00, 0x00, 0x00,
         0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
-    let addr = &packet as *const u8;
-    let addr: usize = addr as usize;
-    let length: u16 = 314;
-    e1000_nc.send_packet(addr, length)
+    let mut transmit_buffer = TransmitBuffer::new(packet.len() as u16)?;
+    { 
+        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
+        buffer.copy_from_slice(&packet);
+    }
+    let mut e1000_nc = E1000_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
+    e1000_nc.send_packet(&transmit_buffer)
 }

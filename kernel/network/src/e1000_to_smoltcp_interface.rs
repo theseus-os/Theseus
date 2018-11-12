@@ -1,12 +1,14 @@
 
-use alloc::slice;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::vec_deque::VecDeque;
 use smoltcp::Error;
 use smoltcp::phy::{Device, DeviceLimits};
-use e1000::{E1000_NIC, NetworkCard};
+use e1000::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use owning_ref::BoxRefMut;
+use memory::MappedPages;
 
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp
@@ -39,6 +41,11 @@ impl Device for E1000Device {
     }
 
     fn receive(&mut self, _timestamp: u64) -> Result<Self::RxBuffer, Error> {
+        // According to the smoltcp documentation, this function must poll the ethernet driver
+        // to see if a new packet (Ethernet frame) has arrived, and if so, take ownership of it
+        // and return it. Otherwise, if no new packets have arrived, return Error::Exhausted. 
+        // Then, once the `RxBuffer` type that we return here gets dropped, we should allow the
+        // ethernet driver to re-take ownership of that buffer (e.g., return it to the pool of rx buffers).
         let nic = E1000_NIC.try().ok_or(Error::Exhausted)?.lock();
         if nic.has_packet_arrived() {
             debug!("E1000Device::receive() packet has arrived");
@@ -56,42 +63,48 @@ impl Device for E1000Device {
     }
 
     fn transmit(&mut self, _timestamp: u64, length: usize) -> Result<Self::TxBuffer, Error> {
-        if tx_empty() {
-            debug!("E1000Device::transmit() tx was empty");
-            let index = self.tx_next;
-            Ok(TxBuffer {
-               buffer : vec![0;length],
-            })
-        } else {
-            debug!("E1000Device::transmit() tx was full");
-            Err(Error::Exhausted)
+        // According to the smoltcp documentation, this function must obtain a transmit buffer 
+        // with the requested `length` (or one at least that big) and then return it. 
+        // Because we can dynamically allocate transmit buffers, we just do that here.
+        if length > (u16::max_value() as usize) {
+            error!("e1000_smoltcp: transmit(): requested tx buffer size {} exceeds the max size of u16!", length);
+            return Err(Error::Exhausted)
         }
+
+        /// create a new TransmitBuffer, cast it as a slice of bytes, and wrap it in a TxBuffer
+        TransmitBuffer::new(length as u16)
+            .and_then(|transmit_buf| transmit_buf.try_map_mut(|mp| mp.as_slice_mut::<u8>(0, length)))
+            .map(|transmit_buf_bytes| TxBuffer(transmit_buf_bytes))
+            .map_err(|e| {
+                error!("e1000_smoltcp: couldn't allocate TransmitBuffer of length {}, error {:?}", length, e);
+                Error::Exhausted
+            })    
     }
 }
 
+
+
 /// The transmit buffer type used by smoltcp, which must implement two things:
-/// * it must be representable as a slice of bytes, e.g., it must impl AsRef<[u8]>.
+/// * it must be representable as a slice of bytes, e.g., it must impl AsRef<[u8]> and AsMut<[u8]>.
 /// * it must actually send the packet when it is dropped.
-pub struct TxBuffer {
-    queue:  Rc<RefCell<VecDeque<Vec<u8>>>>,
-    buffer: Vec<u8>
-}
-
+/// Internally, we use `BoxRefMut<_, [u8]>` because it implements both AsRef<[u8]> and AsMut<[u8]>.
+pub struct TxBuffer(BoxRefMut<TransmitBuffer, [u8]>);
 impl AsRef<[u8]> for TxBuffer {
-    fn as_ref(&self) -> &[u8] { self.buffer.as_ref() }
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+impl AsMut<[u8]> for TxBuffer {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.0.as_mut()
+    }
 }
 
-impl AsMut<[u8]> for TxBuffer {
-    fn as_mut(&mut self) -> &mut [u8] { self.buffer.as_mut() }
-}
 
 impl Drop for TxBuffer {
     fn drop(&mut self) {
         if let Some(e1000_nic) = E1000_NIC.try() {
-            let res = e1000_nic.lock().send_packet(
-                self.buffer.as_ptr() as usize, 
-                self.buffer.len() as u16
-            );
+            let res = e1000_nic.lock().send_packet(self.0.owner());
             if let Err(e) = res {
                 error!("e1000_smoltcp: error sending Ethernet packet: {:?}", e);
             }
