@@ -31,10 +31,11 @@ pub fn server_init(_: Option<u64>) {
     };
 
     let startup_time = get_hpet().as_ref().unwrap().get_counter();;
-    let mut skb_size = 8*1024; // 8KiB 
+    let skb_size = 8*1024; // 8KiB 
 
     // For UDP
-    let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
+    let udp_rx_buffer = UdpSocketBuffer::new( 
+        vec![  UdpPacketBuffer::new(vec![0; skb_size])]);
     let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
     let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
     
@@ -71,7 +72,6 @@ pub fn server_init(_: Option<u64>) {
     let mut iface = EthernetInterface::new(
         Box::new(device), Box::new(arp_cache) as Box<ArpCache>,
         hardware_mac_addr, local_addr);  
-    let mut timestamp_ms = 0;
 
 
     let dest_endpoint = IpEndpoint {
@@ -82,7 +82,7 @@ pub fn server_init(_: Option<u64>) {
     //code to initialize the DFQ
     let udpserver_dfq: DFQueue<String> = DFQueue::new();
     let udpserver_consumer = udpserver_dfq.into_consumer();
-    let udpserver_producer = udpserver_consumer.obtain_producer();
+    let _udpserver_producer = udpserver_consumer.obtain_producer();
     MSG_QUEUE.call_once(|| {
        udpserver_consumer.obtain_producer()
     });
@@ -107,28 +107,28 @@ pub fn server_init(_: Option<u64>) {
             let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
 
             // Receiving packets
-            let tuple = match udp_socket.recv() {
+            match udp_socket.recv() {
                 Ok((data, endpoint)) => {
-                    let mut data2 = data.to_owned();
-                    let mut s = String::from_utf8(data2.to_owned()).unwrap();
-                    //echoing the received udp msg
-                    udpserver_producer.enqueue(s);
-                    let tuple = (data2, endpoint);
-                    debug!("Received tuple: {:?}", tuple);
-                    Some(tuple)
+                    warn!("Received UDP packet from endpoint {:?}:\n{:?}", endpoint, data);
                 }
-                _ => None,
-            };
+                _ => { }
+            }
 
             // Sending packets
             match udpserver_consumer.peek() {
                 Some(element) => {
                     debug!("server_init(): about to send UDP packet {:?}", &*element);
-                    if let Err(_e) = udp_socket.send_slice(element.as_bytes(), dest_endpoint) {
-                        error!("server_init(): UDP sending error {}", _e);
-                        // break;
+                    debug!("server_init(): can_send: {:?}, can_recv: {:?}", udp_socket.can_send(), udp_socket.can_recv());
+                    if udp_socket.can_send() {
+                        debug!("server_init(): sending UDP packet...");
+                        if let Err(_e) = udp_socket.send_slice(element.as_bytes(), dest_endpoint) {
+                            error!("server_init(): UDP sending error {}", _e);
+                            break;
+                        }
+                        element.mark_completed();
+                    } else {
+                        warn!("server_init(): UDP socket wasn't ready to send, skipping....")
                     }
-                    element.mark_completed();
                 }
                 _ => { }
             }
@@ -139,8 +139,8 @@ pub fn server_init(_: Option<u64>) {
         let _next_poll_time = match iface.poll(&mut sockets, timestamp){
             Ok(t) => t,
             Err(err) => { 
-                error!("server_init(): poll error: {}", err);
-                break;
+                warn!("server_init(): poll error: {}", err);
+                continue;
             }
         };  
     }
@@ -151,7 +151,7 @@ pub fn millis_since(start_time:u64)-> u64 {
     let end_time : u64 = get_hpet().as_ref().unwrap().get_counter();
     let hpet_freq : u64 = get_hpet().as_ref().unwrap().counter_period_femtoseconds() as u64;
     // Converting to ms
-    (end_time-start_time)*hpet_freq/1000000000
+    (end_time-start_time)*hpet_freq/1_000_000_000_000
 }
 
 /// Function to send debug messages using UDP to configured destination
