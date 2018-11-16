@@ -49,7 +49,7 @@ pub trait File : FileDirectory {
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
     fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
-    fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode>; 
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode>; 
     fn list_children(&mut self) -> Vec<String>;
 }
 
@@ -110,7 +110,7 @@ impl Directory for VFSDirectory {
         Ok(())
     }
 
-    fn get_child(&self, child_name: String, is_file: bool) -> Option<FSNode> {
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode> {
         for child in self.children.iter() {
             match child {
                 FSNode::File(file) => {
@@ -119,7 +119,11 @@ impl Directory for VFSDirectory {
                     }
                 }
                 FSNode::Dir(dir) => {
-                    if dir.lock().get_name() == child_name && !is_file { 
+                    debug!("is it ever reaching here to get child from root? "); // deadlock here
+                    let dir_name = dir.lock().get_name();
+                    debug!("dirname {}", dir_name);
+                    if dir_name == child_name && !is_file { 
+                        debug!("lmao here is the deadlock?");
                         return Some(FSNode::Dir(Arc::clone(dir)));
                     }
                 }
@@ -181,7 +185,7 @@ impl FileDirectory for VFSDirectory {
             None => return None
         };
 
-        let locked_parent = parent.lock();
+        let mut locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => {
                 match child {
@@ -269,7 +273,7 @@ impl FileDirectory for VFSFile {
             None => return None
         };
 
-        let locked_parent = parent.lock();
+        let mut locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => {
                 match child {
@@ -410,13 +414,16 @@ impl Path {
                     let children = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
                     for child_name in children.iter() {
                         if child_name == component {
-                            let child = match new_wd.lock().get_child(child_name.to_string(), true) {
+                            debug!("on this child! {}", child_name); // `tasks` is being locked here
+                            match new_wd.lock().get_child(child_name.to_string(), false) {
                                 Some(child) => match child {
                                     FSNode::File(file) => return Some(FSNode::File(Arc::clone(&file))),
-                                    FSNode::Dir(dir) => return Some(FSNode::Dir(Arc::clone(&dir)))
+                                    FSNode::Dir(dir) => {
+                                        return Some(FSNode::Dir(Arc::clone(&dir)));
+                                    }
                                 },
                                 None => return None,
-                            };                        
+                            };                       
                         }
                     }
                 }

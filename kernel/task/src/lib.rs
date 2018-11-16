@@ -60,7 +60,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{Directory, File, FileDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef, FSNode};
+use vfs::{Directory, File, FileDirectory, VFSDirectory, StrongDirRef, WeakDirRef, Path, StrongAnyDirRef, FSNode};
 use environment::Environment;
 use spin::Mutex;
 
@@ -815,7 +815,7 @@ impl FileDirectory for TaskDirectory {
             None => return None
         };
 
-        let locked_parent = parent.lock();
+        let mut locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => match child {
                 FSNode::File(_file) => None,
@@ -837,11 +837,28 @@ impl FileDirectory for TaskDirectory {
 impl Directory for TaskDirectory {
     /// this is a noop because you can't manually add files to task directory
     fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
-        return Ok(())
+        let self_pointer = match self.get_self_pointer() {
+            Some(self_ptr) => self_ptr,
+            None => return Err("Couldn't obtain pointer to self")
+        };
+        match new_node {
+            FSNode::Dir(dir) => {
+                dir.lock().set_parent(Arc::downgrade(&self_pointer));
+                self.children.push(FSNode::Dir(dir))
+                },
+            FSNode::File(file) => {
+                file.lock().set_parent(Arc::downgrade(&self_pointer));
+                self.children.push(FSNode::File(file))
+                },
+        }
+        Ok(())
     }
     
-    fn get_child(&self, child: String, is_file: bool) -> Option<FSNode> {
+    fn get_child(&mut self, child: String, is_file: bool) -> Option<FSNode> {
         if is_file {
+            return None;
+        } 
+        else {
             let id = match child.parse::<usize>() {
                 Ok(id) => id, 
                 Err(_err) => return None,
@@ -850,11 +867,13 @@ impl Directory for TaskDirectory {
                 Some(task_ref) => task_ref,
                 None => return None,
             };
-            let task_file_ref = FSNode::File(Arc::new(Mutex::new(Box::new(TaskFile::new(task_ref)) as Box<File + Send>)));
-            return Some(task_file_ref);
-        } else {
-            None
-        }  
+            use alloc::string::ToString;
+            let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string());
+            debug!("maybe it is this task ref lock? {}", task_ref.lock().name);
+            self.add_fs_node(vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
+            
+            return Some(FSNode::Dir(task_dir));
+        }
     }
 
     /// Returns a string listing all the children in the directory

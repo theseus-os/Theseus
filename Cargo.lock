@@ -137,6 +137,7 @@ name = "cd"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
  "vfs 0.1.0",

@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
+#[macro_use] extern crate log;
 
 extern crate alloc;
 extern crate task;
@@ -56,7 +57,12 @@ pub fn main(args: Vec<String>) -> isize {
         match path.get(&curr_wr) {
             Some(file_dir_enum) => {
                 match file_dir_enum {
-                    FSNode::Dir(dir) => curr_env.lock().set_wd(dir),
+                    FSNode::Dir(dir) => {
+                        debug!("hello?");
+                        curr_env.lock().set_wd(dir);
+                        debug!("ohh sht");
+                        return 0;
+                    },
                     FSNode::File(_) => {
                         println!("can't cd into file");
                         return -1;
