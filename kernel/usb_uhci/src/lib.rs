@@ -17,8 +17,10 @@ extern crate spawn;
 extern crate usb_device;
 extern crate usb_desc;
 extern crate usb_req;
+extern crate pci;
 
 
+use pci::PCI_BUSES;
 use core::ops::DerefMut;
 use volatile::Volatile;
 use alloc::boxed::Box;
@@ -38,6 +40,14 @@ static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
 static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
 static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
 static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
+static UHCI_CMD_PORT_O:  Once<Mutex<Port<u16>>>= Once::new();
+static UHCI_STS_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_INT_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_FRNUM_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_FRBASEADD_PORT_O: Once<Mutex<Port<u32>>> = Once::new();
+static UHCI_SOFMD_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
+static REG_PORT1_O:  Once<Mutex<Port<u16>>> = Once::new();
+static REG_PORT2_O:  Once<Mutex<Port<u16>>> = Once::new();
 static QH_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciQH;MAX_QH]>>> = Once::new();
 static TD_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciTDRegisters;MAX_TD]>>> = Once::new();
 static UHCI_DEVICE_POOL: Once<Mutex<BoxRefMut<MappedPages, [UsbDevice;2]>>> = Once::new();
@@ -62,7 +72,7 @@ static USB_HIGH_SPEED:u8=                  0x02;
 /// Initialize the USB 1.1 host controller
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
-
+    let _s = read_uhci_address();
 
     run(0);
     short_packet_int(1);
@@ -123,7 +133,58 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     Ok(())
 }
 
+pub fn read_uhci_address() -> Result<(), &'static str> {
 
+    let mut flag: bool = false;
+    PCI_BUSES.try().map(|pci_buses| {
+
+        for pci_bus in pci_buses{
+            for device in &pci_bus.devices{
+                if device.class == 0x0C && device.subclass == 0x03 && device.prof_if == 0x00{
+                    let base = (device.bars[4] & 0xFFF0) as u16;
+                    info!("UHCI base addrees: {:x}",base);
+                    UHCI_CMD_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base))
+                    });
+                    UHCI_STS_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x2))
+                    });
+                    UHCI_INT_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x4))
+                    });
+                    UHCI_FRNUM_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x6))
+                    });
+                    UHCI_FRBASEADD_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x8))
+                    });
+                    UHCI_SOFMD_PORT_O.call_once(||{
+                        Mutex::new(Port::new(base + 0xC))
+                    });
+                    REG_PORT1_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x10))
+                    });
+                    REG_PORT2_O.call_once(||{
+                        Mutex::new(Port::new(base + 0x12))
+                    });
+                    flag = true;
+                    break;
+
+                }
+            }
+            if flag{
+                break;
+            }
+        }
+    });
+
+    if flag{
+        return Ok(());
+    }else{
+        return Err("Cannot find the UCHI controller on PCI bus, Fail to read the base address");
+    }
+
+}
 /// Allocate a available virtual buffer pointer for building TD
 pub fn buffer_pointer_alloc(offset:usize)-> Option<usize> {
 
@@ -321,8 +382,6 @@ pub fn td_link_pointer(index:usize)->Option<u32>{
 
         let td = &mut td_pool.lock()[index];
         Some(td.link_pointer.read())
-
-
 
     })
 }
@@ -664,6 +723,7 @@ const CMD_MAXP: u16 =                   (1 << 7);    // Max Packet (0 = 32, 1 = 
 /// Run or Stop the UHCI
 /// Param: 1 -> Run; 0 -> Stop
  pub fn run(value: u8){
+
 
     if value == 1{
 
