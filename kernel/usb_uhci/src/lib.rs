@@ -32,22 +32,22 @@ use usb_device::{UsbDevice,Controller,HIDType};
 use usb_desc::{UsbDeviceDesc,UsbConfDesc, UsbIntfDesc, UsbEndpDesc};
 use usb_req::UsbDevReq;
 
-static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
-static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
-static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
-static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
-static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
-static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
-static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
-static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
-static UHCI_CMD_PORT_O:  Once<Mutex<Port<u16>>>= Once::new();
-static UHCI_STS_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
-static UHCI_INT_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
-static UHCI_FRNUM_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
-static UHCI_FRBASEADD_PORT_O: Once<Mutex<Port<u32>>> = Once::new();
-static UHCI_SOFMD_PORT_O:  Once<Mutex<Port<u16>>> = Once::new();
-static REG_PORT1_O:  Once<Mutex<Port<u16>>> = Once::new();
-static REG_PORT2_O:  Once<Mutex<Port<u16>>> = Once::new();
+//static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
+//static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
+//static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
+//static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
+//static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
+//static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
+//static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
+//static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
+static UHCI_CMD_PORT:  Once<Mutex<Port<u16>>>= Once::new();
+static UHCI_STS_PORT:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_INT_PORT:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_FRNUM_PORT:  Once<Mutex<Port<u16>>> = Once::new();
+static UHCI_FRBASEADD_PORT: Once<Mutex<Port<u32>>> = Once::new();
+static UHCI_SOFMD_PORT:  Once<Mutex<Port<u16>>> = Once::new();
+static REG_PORT1:  Once<Mutex<Port<u16>>> = Once::new();
+static REG_PORT2:  Once<Mutex<Port<u16>>> = Once::new();
 static QH_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciQH;MAX_QH]>>> = Once::new();
 static TD_POOL: Once<Mutex<BoxRefMut<MappedPages, [UhciTDRegisters;MAX_TD]>>> = Once::new();
 static UHCI_DEVICE_POOL: Once<Mutex<BoxRefMut<MappedPages, [UsbDevice;2]>>> = Once::new();
@@ -72,7 +72,13 @@ static USB_HIGH_SPEED:u8=                  0x02;
 /// Initialize the USB 1.1 host controller
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
-    let _s = read_uhci_address();
+//    if let Err(e) = read_uhci_address(){
+//
+//        info!("{}",e);
+//        return Ok(());
+//    }
+
+    let _e = read_uhci_address()?;
 
     run(0);
     short_packet_int(1);
@@ -91,8 +97,15 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         port2_enable(1);
     }
 
+    let mut base_add: u32 = 0;
+    
+    UHCI_FRBASEADD_PORT.try().map(|base_port| {
+
+        base_add = base_port.lock().read()
+    });
+
     let frame_list = box_frame_list(active_table,
-                                    UHCI_FRBASEADD_PORT.lock().read() as PhysicalAddress)?;
+                                    base_add as PhysicalAddress)?;
     UHCI_FRAME_LIST.call_once(|| {
         Mutex::new(frame_list)
     });
@@ -122,14 +135,6 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
 
     run(1);
-    info!("\nUHCI USBCMD: {:b}\n", UHCI_CMD_PORT.lock().read());
-    info!("\nUHCI USBSTS: {:b}\n", UHCI_STS_PORT.lock().read());
-    info!("\nUHCI USBINTR: {:b}\n", UHCI_INT_PORT.lock().read());
-    info!("\nUHCI FRNUM: {:b}\n", frame_number());
-    info!("\nUHCI FAME BASE: {:b}\n", UHCI_FRBASEADD_PORT.lock().read());
-    info!("\nUHCI SOFMOD: {:b}\n", UHCI_SOFMD_PORT.lock().read());
-    info!("\nUHCI PORTSC1: {:b}\n", REG_PORT1.lock().read());
-    info!("\nUHCI PORTSC2: {:b}\n", REG_PORT2.lock().read());
     Ok(())
 }
 
@@ -143,33 +148,32 @@ pub fn read_uhci_address() -> Result<(), &'static str> {
                 if device.class == 0x0C && device.subclass == 0x03 && device.prof_if == 0x00{
                     let base = (device.bars[4] & 0xFFF0) as u16;
                     info!("UHCI base addrees: {:x}",base);
-                    UHCI_CMD_PORT_O.call_once(||{
+                    UHCI_CMD_PORT.call_once(||{
                         Mutex::new(Port::new(base))
                     });
-                    UHCI_STS_PORT_O.call_once(||{
+                    UHCI_STS_PORT.call_once(||{
                         Mutex::new(Port::new(base + 0x2))
                     });
-                    UHCI_INT_PORT_O.call_once(||{
+                    UHCI_INT_PORT.call_once(||{
                         Mutex::new(Port::new(base + 0x4))
                     });
-                    UHCI_FRNUM_PORT_O.call_once(||{
+                    UHCI_FRNUM_PORT.call_once(||{
                         Mutex::new(Port::new(base + 0x6))
                     });
-                    UHCI_FRBASEADD_PORT_O.call_once(||{
+                    UHCI_FRBASEADD_PORT.call_once(||{
                         Mutex::new(Port::new(base + 0x8))
                     });
-                    UHCI_SOFMD_PORT_O.call_once(||{
+                    UHCI_SOFMD_PORT.call_once(||{
                         Mutex::new(Port::new(base + 0xC))
                     });
-                    REG_PORT1_O.call_once(||{
+                    REG_PORT1.call_once(||{
                         Mutex::new(Port::new(base + 0x10))
                     });
-                    REG_PORT2_O.call_once(||{
+                    REG_PORT2.call_once(||{
                         Mutex::new(Port::new(base + 0x12))
                     });
                     flag = true;
                     break;
-
                 }
             }
             if flag{
@@ -205,7 +209,13 @@ pub fn qh_pointers(index:usize)->Option<(u32,u32)>{
     QH_POOL.try().and_then(|qh_pool| {
 
         let qh = &mut qh_pool.lock()[index];
-        Some((qh.vertical_pointer.read(),qh.horizontal_pointer.read()))
+        let v_pointer:u32; 
+        let h_pointer:u32;
+        unsafe {
+            v_pointer = qh.vertical_pointer.read();
+            h_pointer= qh.horizontal_pointer.read();
+        }
+        Some((v_pointer,h_pointer))
 
     })
 }
@@ -219,10 +229,12 @@ pub fn qh_alloc()-> Option<(usize,usize)>{
 
         let mut index:usize = 0;
         for x in qh_pool.lock().iter_mut(){
+            
+            let act:u32;
+            unsafe {act = x.active.read();}
+            if act == 0{
 
-            if x.active.read() == 0{
-
-                x.active.write(1);
+                unsafe{x.active.write(1)};
 
                 let add: *mut UhciQH = x;
 
@@ -234,9 +246,7 @@ pub fn qh_alloc()-> Option<(usize,usize)>{
                 index += 1;
             }
         }
-
         None
-
     })
 }
 
@@ -246,9 +256,10 @@ pub fn init_qh(index:usize,horizontal_pointer:u32,element_pointer:u32){
     QH_POOL.try().map(|qh_pool| {
 
         let qh = &mut qh_pool.lock()[index];
-        qh.horizontal_pointer.write(horizontal_pointer);
-        qh.vertical_pointer.write(element_pointer);
-
+        unsafe {
+            qh.horizontal_pointer.write(horizontal_pointer);
+            qh.vertical_pointer.write(element_pointer);
+        }
     });
 }
 
@@ -289,22 +300,23 @@ pub fn td_alloc()-> Option<(usize,usize)>{
         let mut index:usize = 0;
         for x in td_pool.lock().iter_mut(){
 
-            if x.active.read() == 0{
+            unsafe{
 
-                x.active.write(1);
+                if x.active.read() == 0{
 
-                let add: *mut UhciTDRegisters = x;
+                    x.active.write(1);
 
-                return Some((add as usize,index));
+                    let add: *mut UhciTDRegisters = x;
 
-            }else{
+                    return Some((add as usize,index));
 
-                index += 1;
+                }else{
+
+                    index += 1;
+                }
             }
         }
-
         None
-
     })
 }
 
@@ -330,8 +342,11 @@ pub fn interrupt_td(index:usize,type_select: u8, pointer: u32, speed: u8, add: u
         let td = &mut td_pool.lock()[index];
         td.init(type_select, pointer, speed, add, endp, toggle, pid,
                 data_size, data_add);
-        let status = td.control_status.read();
-        td.control_status.write(status | TD_CS_IOC)
+        unsafe {
+            let status = td.control_status.read();
+            td.control_status.write(status | TD_CS_IOC);
+        }
+
 
     });
 }
@@ -340,12 +355,13 @@ pub fn td_clean(index:usize){
     TD_POOL.try().map(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        td.control_status.write(0);
-        td.token.write(0);
-        td.link_pointer.write(0);
-        td.buffer_point.write(0);
-        td.active.write(0);
-
+        unsafe {
+            td.control_status.write(0);
+            td.token.write(0);
+            td.link_pointer.write(0);
+            td.buffer_point.write(0);
+            td.active.write(0);
+        }
     });
 
 }
@@ -359,9 +375,9 @@ pub fn td_link(index:usize, type_select: u8, pointer: u32){
 
         let td = &mut td_pool.lock()[index];
         if type_select == 1{
-            td.link_pointer.write(pointer|TD_PTR_QH);
+            unsafe{td.link_pointer.write(pointer|TD_PTR_QH);}
         }else{
-            td.link_pointer.write(pointer);
+            unsafe{td.link_pointer.write(pointer);}
         }
 
     });
@@ -381,7 +397,9 @@ pub fn td_link_pointer(index:usize)->Option<u32>{
     TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        Some(td.link_pointer.read())
+        let pointer:u32;
+        unsafe {pointer = td.link_pointer.read();}
+        Some(pointer)
 
     })
 }
@@ -392,7 +410,9 @@ pub fn td_token(index:usize)->Option<u32>{
     TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        Some(td.token.read())
+        let token: u32;
+        unsafe {token = td.token.read();}
+        Some(token)
 
     })
 }
@@ -403,7 +423,8 @@ pub fn td_status(index:usize)->Option<u32>{
     TD_POOL.try().and_then(|td_pool| {
 
         let td = &mut td_pool.lock()[index];
-        let status = td.control_status.read();
+        let status:u32;
+        unsafe {status = td.control_status.read();}
         Some(status)
 
     })
@@ -414,11 +435,8 @@ pub fn clean_framelist(){
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
 
-
         for x in frame_list.lock().iter_mut() {
-
             x.write(1);
-
         }
     });
 }
@@ -427,7 +445,6 @@ pub fn clean_framelist(){
 pub fn clean_a_frame(index: usize){
 
     UHCI_FRAME_LIST.try().map(|frame_list|{
-
 
         let frame =  &mut frame_list.lock()[index];
         frame.write(0);
@@ -496,9 +513,6 @@ pub fn td_link_keyboard_framelist(pointer: u32){
                 frame.write(pointer);
             }
         }
-
-
-
     } );
 }
 
@@ -697,15 +711,16 @@ pub fn port2_device_init() -> Result<UsbDevice,&'static str>{
 ///  64 stands for 1 ms Frame Period (default value)
 pub fn get_sof_timing() -> u16{
 
-    UHCI_SOFMD_PORT.lock().read() & 0xEF
+    let mut timing:u16 = 0;
+    UHCI_SOFMD_PORT.try().map(|sofmd_port| {
+
+        timing = sofmd_port.lock().read() & 0xEF;
+
+    });
+
+    timing
 
 }
-
-
-
-
-
-
 
 // ------------------------------------------------------------------------------------------------
 // UHCI Command Register
@@ -723,19 +738,22 @@ const CMD_MAXP: u16 =                   (1 << 7);    // Max Packet (0 = 32, 1 = 
 /// Run or Stop the UHCI
 /// Param: 1 -> Run; 0 -> Stop
  pub fn run(value: u8){
+    UHCI_CMD_PORT.try().map(|cmd_port| {
+
+        if value == 1{
+
+            let command = cmd_port.lock().read() | CMD_RS;
+            unsafe{cmd_port.lock().write(command);}
+
+        }else if value == 0{
+
+            let command = cmd_port.lock().read() & (!CMD_RS);
+            unsafe{cmd_port.lock().write(command);}
+        }
 
 
-    if value == 1{
 
-        let command = UHCI_CMD_PORT.lock().read() | CMD_RS;
-        unsafe{UHCI_CMD_PORT.lock().write(command);}
-
-    }else if value == 0{
-
-        let command = UHCI_CMD_PORT.lock().read() & (!CMD_RS);
-        unsafe{UHCI_CMD_PORT.lock().write(command);}
-    }
-
+    });
 }
 
 /// Enter the normal mode or debug mode
@@ -744,17 +762,22 @@ pub fn mode(value: u8) -> Result<(), &'static str>{
 
     if if_halted(){
 
-        if value == 1{
+        UHCI_CMD_PORT.try().map(|cmd_port| {
 
-            let command = UHCI_CMD_PORT.lock().read() | CMD_SWDBG;
-            unsafe{UHCI_CMD_PORT.lock().write(command);}
+            if value == 1{
 
-        } else if value == 0{
+                let command = cmd_port.lock().read() | CMD_SWDBG;
+                unsafe{cmd_port.lock().write(command);}
 
-            let command = UHCI_CMD_PORT.lock().read() & (!CMD_SWDBG);
-            unsafe{UHCI_CMD_PORT.lock().write(command);}
-        }
+            }else if value == 0{
 
+                let command = cmd_port.lock().read() & (!CMD_SWDBG);
+                unsafe{cmd_port.lock().write(command);}
+            }
+
+
+
+        });
         Ok(())
     }else{
         Err("The controller is not halted. Fail to change mode")
@@ -768,16 +791,22 @@ pub fn packet_size(value:u8) -> Result<(), &'static str>{
 
     if if_halted(){
 
-        if value == 1{
+        UHCI_CMD_PORT.try().map(|cmd_port| {
 
-            let command = UHCI_CMD_PORT.lock().read() | CMD_MAXP;
-            unsafe{UHCI_CMD_PORT.lock().write(command);}
+            if value == 1{
 
-        } else if value == 0{
+                let command = cmd_port.lock().read() | CMD_MAXP;
+                unsafe{cmd_port.lock().write(command);}
 
-            let command = UHCI_CMD_PORT.lock().read() & (!CMD_MAXP);
-            unsafe{UHCI_CMD_PORT.lock().write(command);}
-        }
+            }else if value == 0{
+
+                let command = cmd_port.lock().read() & (!CMD_MAXP);
+                unsafe{cmd_port.lock().write(command);}
+            }
+
+
+
+        });
         Ok(())
     }else{
 
@@ -789,8 +818,12 @@ pub fn packet_size(value:u8) -> Result<(), &'static str>{
 /// End the global resume signaling
 pub fn end_global_resume(){
 
-    let command = UHCI_CMD_PORT.lock().read() & (!CMD_FGR);
-    unsafe{UHCI_CMD_PORT.lock().write(command);}
+    UHCI_CMD_PORT.try().map(|cmd_port| {
+
+        let command = cmd_port.lock().read() & (!CMD_FGR);
+            unsafe{cmd_port.lock().write(command);}
+
+    });
 }
 
 /// End the global suspend mode
@@ -798,8 +831,12 @@ pub fn end_global_suspend() -> Result<(), &'static str>{
 
     if if_halted(){
 
-        let command = UHCI_CMD_PORT.lock().read() & (!CMD_EGSM);
-        unsafe{UHCI_CMD_PORT.lock().write(command);}
+        UHCI_CMD_PORT.try().map(|cmd_port| {
+
+            let command = cmd_port.lock().read() & (!CMD_EGSM);
+            unsafe{cmd_port.lock().write(command);}
+
+        });
         Ok(())
     }else {
 
@@ -811,8 +848,11 @@ pub fn end_global_suspend() -> Result<(), &'static str>{
 /// Reset the UHCI
 pub fn reset(){
 
-    unsafe{UHCI_CMD_PORT.lock().write(CMD_HCRESET);}
+    UHCI_CMD_PORT.try().map(|cmd_port| {
 
+        unsafe{cmd_port.lock().write(CMD_HCRESET);}
+
+    });
 }
 
 
@@ -831,66 +871,89 @@ const INTR_SP: u16 =                         (1 << 3);    // Short Packet Interr
 /// Param: 1 -> enable; 0 -> disable
 pub fn short_packet_int(value: u8){
 
-    if value == 1{
 
-        let command = UHCI_INT_PORT.lock().read() | INTR_SP;
-        unsafe{UHCI_INT_PORT.lock().write(command);}
+    UHCI_INT_PORT.try().map(|int_port| {
 
-    } else if value == 0{
+        if value == 1{
 
-        let command = UHCI_INT_PORT.lock().read() & (!INTR_SP);
-        unsafe{UHCI_INT_PORT.lock().write(command);}
-    }
+            let command = int_port.lock().read() | INTR_SP;
+            unsafe{int_port.lock().write(command);}
+
+        }else if value == 0{
+
+            let command = int_port.lock().read() & (!INTR_SP);
+            unsafe{int_port.lock().write(command);}
+        }
 
 
+
+    });
 }
 
 /// Enable / Disable the Resume Interrupt
 /// Param: 1 -> enable; 0 -> disable
 pub fn resume_int(value: u8){
 
-    if value == 1{
+    UHCI_INT_PORT.try().map(|int_port| {
 
-        let command = UHCI_INT_PORT.lock().read() | INTR_RESUME;
-        unsafe{UHCI_INT_PORT.lock().write(command);}
+        if value == 1{
 
-    } else if value == 0{
+            let command = int_port.lock().read() | INTR_RESUME;
+            unsafe{int_port.lock().write(command);}
 
-        let command = UHCI_INT_PORT.lock().read() & (!INTR_RESUME);
-        unsafe{UHCI_INT_PORT.lock().write(command);}
-    }
+        }else if value == 0{
+
+            let command = int_port.lock().read() & (!INTR_RESUME);
+            unsafe{int_port.lock().write(command);}
+        }
+
+
+
+    });
 }
 
 /// Enable / Disable the Interrupt On Complete
 /// Param: 1 -> enable; 0 -> disable
 pub fn ioc_int(value: u8){
 
-    if value == 1{
+    UHCI_INT_PORT.try().map(|int_port| {
 
-        let command = UHCI_INT_PORT.lock().read() | INTR_IOC;
-        unsafe{UHCI_INT_PORT.lock().write(command);}
+        if value == 1{
 
-    } else if value == 0{
+            let command = int_port.lock().read() | INTR_IOC;
+            unsafe{int_port.lock().write(command);}
 
-        let command = UHCI_INT_PORT.lock().read() & (!INTR_IOC);
-        unsafe{UHCI_INT_PORT.lock().write(command);}
-    }
+        }else if value == 0{
+
+            let command = int_port.lock().read() & (!INTR_IOC);
+            unsafe{int_port.lock().write(command);}
+        }
+
+
+
+    });
 }
 
 /// Enable / Disable the Interrupt On Timeout/CRC
 /// Param: 1 -> enable; 0 -> disable
 pub fn tcrc_int(value: u8){
 
-    if value == 1{
+    UHCI_INT_PORT.try().map(|int_port| {
 
-        let command = UHCI_INT_PORT.lock().read() | INTR_TIMEOUT;
-        unsafe{UHCI_INT_PORT.lock().write(command);}
+        if value == 1{
 
-    } else if value == 0{
+            let command = int_port.lock().read() | INTR_TIMEOUT;
+            unsafe{int_port.lock().write(command);}
 
-        let command = UHCI_INT_PORT.lock().read() & (!INTR_TIMEOUT);
-        unsafe{UHCI_INT_PORT.lock().write(command);}
-    }
+        }else if value == 0{
+
+            let command = int_port.lock().read() & (!INTR_TIMEOUT);
+            unsafe{int_port.lock().write(command);}
+        }
+
+
+
+    });
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -908,8 +971,14 @@ const STS_HCH: u16 =                         (1 << 5);    // HC Halted
 /// See whether the UHCI is Halted
 /// Return a bool
 pub fn if_halted() -> bool{
+    let mut flag: bool = false;
 
-    let flag = (UHCI_STS_PORT.lock().read() & STS_HCH) == STS_HCH;
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        flag = (sts_port.lock().read() & STS_HCH) == STS_HCH;
+
+    });
+
     flag
 }
 
@@ -917,42 +986,73 @@ pub fn if_halted() -> bool{
 /// Return a bool
 pub fn if_process_error() -> bool{
 
-    let flag = (UHCI_STS_PORT.lock().read() & STS_HSE) == STS_HSE;
-    flag
+    let mut flag: bool = false;
 
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        flag = (sts_port.lock().read() & STS_HSE) == STS_HSE;
+
+    });
+
+    flag
 }
 
 /// See whether UHCI receives a “RESUME” signal from a USB device
 /// Return a bool
 pub fn resume_detect() -> bool{
 
-    let flag = (UHCI_STS_PORT.lock().read() & STS_RD) == STS_RD;
-    flag
+    let mut flag: bool = false;
 
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        flag = (sts_port.lock().read() & STS_RD) == STS_RD;
+
+    });
+
+    flag
 }
 
 /// See whether completion of a USB transaction results in an error condition
 /// Return a bool
 pub fn if_error_int() -> bool{
 
-    let flag = (UHCI_STS_PORT.lock().read() & STS_ERROR) == STS_ERROR;
-    flag
 
+    let mut flag: bool = false;
+
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        flag = (sts_port.lock().read() & STS_ERROR) == STS_ERROR;
+
+    });
+
+    flag
 }
 
 /// See whether an interrupt is a completion of a transaction
 /// Return a bool
 pub fn if_interrupt() -> bool{
 
-    let flag = (UHCI_STS_PORT.lock().read() & STS_USBINT) == STS_USBINT;
-    flag
+    let mut flag: bool = false;
 
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        flag = (sts_port.lock().read() & STS_USBINT) == STS_USBINT;
+
+    });
+
+    flag
 }
 
 /// Recognize IOC and then clean the corresponding bit in status
 pub fn ioc_complete(){
 
-    unsafe{UHCI_STS_PORT.lock().write(STS_USBINT)}
+    UHCI_STS_PORT.try().map(|sts_port| {
+
+        unsafe{sts_port.lock().write(STS_USBINT)}
+
+
+
+    });
 }
 
 ///A simple interrupt status handler
@@ -1001,8 +1101,12 @@ const PORT_RWC: u16 =                        (PORT_CONNECTION_CHANGE | PORT_ENAB
 /// Return a bool
 pub fn if_port1_suspend() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
-    let flag = (REG_PORT1.lock().read() & PORT_SUSP) != 0;
+        flag = (port1.lock().read() & PORT_SUSP) != 0;
+    });
+
     flag
 
 }
@@ -1010,19 +1114,20 @@ pub fn if_port1_suspend() -> bool{
 /// Suspend or Activate the port
 /// value: 1 -> suspend, 0 -> activate
 pub fn port1_suspend(value: u8){
+    REG_PORT1.try().map(|port1| {
 
-    let bits = REG_PORT1.lock().read();
-    if value == 1{
-        unsafe{
-            REG_PORT1.lock().write(bits | PORT_SUSP);
+        let bits = port1.lock().read();
+        if value == 1{
+            unsafe{
+                port1.lock().write(bits | PORT_SUSP);
+            }
+        } else if value == 0{
+
+            unsafe{
+                port1.lock().write(bits & (!PORT_SUSP));
+            }
         }
-    } else if value == 0{
-
-        unsafe{
-            REG_PORT1.lock().write(bits & (!PORT_SUSP));
-        }
-    }
-
+    });
 }
 
 /// See whether the port 1 is in reset state
@@ -1030,24 +1135,29 @@ pub fn port1_suspend(value: u8){
 /// Return a bool
 pub fn if_port1_reset() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
-    let flag = (REG_PORT1.lock().read() & PORT_RESET) != 0;
+        flag = (port1.lock().read() & PORT_RESET) != 0;
+    });
+
     flag
-
-
 }
 
 /// Reset the port 1
 pub fn port1_reset() {
 
-    let reset_command = REG_PORT1.lock().read() | PORT_RESET;
-    unsafe { REG_PORT1.lock().write(reset_command); }
+    REG_PORT1.try().map(|port1| {
 
-    //use better way to delay, need 60 ms
-    for _x in 0..300{}
+        let reset_command = port1.lock().read() | PORT_RESET;
+        unsafe { port1.lock().write(reset_command); }
 
-    let reset_command = REG_PORT1.lock().read() & (!PORT_RESET);
-    unsafe { REG_PORT1.lock().write(reset_command); }
+        //use better way to delay, need 60 ms
+        for _x in 0..300{}
+
+        let reset_command = port1.lock().read() & (!PORT_RESET);
+        unsafe { port1.lock().write(reset_command); }
+    });
 
     for _x in 0..20{
 
@@ -1080,10 +1190,14 @@ pub fn port1_reset() {
 /// Return a bool
 pub fn low_speed_attach_port1() -> bool{
 
-    let flag = (REG_PORT1.lock().read() & PORT_LSDA) == 0;
+
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
+
+        flag = (port1.lock().read() & PORT_LSDA) != 0;
+    });
+
     flag
-
-
 }
 
 /// See whether Port enbale/disable state changes
@@ -1091,26 +1205,34 @@ pub fn low_speed_attach_port1() -> bool{
 /// Return a bool
 pub fn enable_change_port1() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
-    let flag = (REG_PORT1.lock().read() & PORT_ENABLE_CHANGE) != 0;
+        flag = (port1.lock().read() & PORT_ENABLE_CHANGE) != 0;
+    });
+
     flag
-
-
 }
 
 /// Clear Enable Change bit of port 1
 pub fn enable_change_clear_port1() {
+    REG_PORT1.try().map(|port1| {
 
-        unsafe { REG_PORT1.lock().write(PORT_ENABLE_CHANGE); }
+        unsafe { port1.lock().write(PORT_ENABLE_CHANGE); }
+    });
+
 }
 
 
 /// See whether the port 1 is in enable state
 /// Return a bool
 pub fn if_enable_port1() -> bool{
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
+        flag = (port1.lock().read() & PORT_ENABLE) != 0;
+    });
 
-    let flag = (REG_PORT1.lock().read() & PORT_ENABLE) != 0;
     flag
 
 
@@ -1119,73 +1241,85 @@ pub fn if_enable_port1() -> bool{
 /// Enable or Disable the port 1
 /// value: 1 -> enable; 0 -> disable
 pub fn port1_enable(value: u8) {
+    REG_PORT1.try().map(|port1| {
 
-    let bits = REG_PORT1.lock().read();
-    if value == 1{
-        unsafe{
-            REG_PORT1.lock().write(bits | PORT_ENABLE);
+        let bits = port1.lock().read();
+        if value == 1{
+            unsafe{
+                port1.lock().write(bits | PORT_ENABLE);
+            }
+        } else if value == 0{
+            unsafe{
+                port1.lock().write(bits & (!PORT_ENABLE));
+            }
         }
-    } else if value == 0{
-        unsafe{
-            REG_PORT1.lock().write(bits & (!PORT_ENABLE));
-        }
-    }
-
+    });
 }
 
 /// See whether Port 1 connect state changes
 /// Return a bool
 pub fn connect_change_port1() -> bool{
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
+        flag = (port1.lock().read() &  PORT_CONNECTION_CHANGE) != 0;
+    });
 
-    let flag = (REG_PORT1.lock().read() & PORT_CONNECTION_CHANGE) != 0;
     flag
-
 
 }
 
 /// Clear Connect Change bit in port 1
 pub fn connect_change_clear_port1() {
 
+    REG_PORT1.try().map(|port1| {
 
-    unsafe { REG_PORT1.lock().write(PORT_CONNECTION_CHANGE); }
-
+        unsafe { port1.lock().write(PORT_CONNECTION_CHANGE); }
+    });
 }
 
 /// See whether a device is connected to this port
 pub fn if_connect_port1() -> bool{
+    let mut flag: bool = false;
+    REG_PORT1.try().map(|port1| {
 
-    let flag = (REG_PORT1.lock().read() & PORT_CONNECTION) != 0;
+        flag = (port1.lock().read() &  PORT_CONNECTION) != 0;
+    });
+
     flag
-
-
 }
 
 /// See whether the port 2 is in suspend state
 /// Return a bool
 pub fn if_port2_suspend() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
-    let flag = (REG_PORT2.lock().read() & PORT_SUSP) != 0;
+        flag = (port2.lock().read() & PORT_SUSP) != 0;
+    });
+
     flag
 
 }
 
 /// Suspend or Activate the port
-/// value: 1 -> suspend, 0 -> activate
+/// value: 2 -> suspend, 0 -> activate
 pub fn port2_suspend(value: u8){
+    REG_PORT2.try().map(|port2| {
 
-    let bits = REG_PORT2.lock().read();
-    if value == 1{
-        unsafe{
-            REG_PORT2.lock().write(bits | PORT_SUSP);
-        }
-    } else if value == 0{
+        let bits = port2.lock().read();
+        if value == 2{
+            unsafe{
+                port2.lock().write(bits | PORT_SUSP);
+            }
+        } else if value == 0{
 
-        unsafe{
-            REG_PORT2.lock().write(bits & (!PORT_SUSP));
+            unsafe{
+                port2.lock().write(bits & (!PORT_SUSP));
+            }
         }
-    }
+    });
 
 }
 
@@ -1194,57 +1328,70 @@ pub fn port2_suspend(value: u8){
 /// Return a bool
 pub fn if_port2_reset() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
-    let flag = (REG_PORT2.lock().read() & PORT_RESET) != 0;
+        flag = (port2.lock().read() & PORT_RESET) != 0;
+    });
+
     flag
-
 
 }
 
 /// Reset the port 2
 pub fn port2_reset() {
-    let reset_command = REG_PORT2.lock().read() | PORT_RESET;
-    unsafe { REG_PORT2.lock().write(reset_command); }
 
-    //use better way to delay, need 60 ms
-    for _x in 0..300 {}
+    REG_PORT2.try().map(|port2| {
 
-    let reset_command = REG_PORT2.lock().read() & (!PORT_RESET);
-    unsafe { REG_PORT2.lock().write(reset_command); }
+        let reset_command = port2.lock().read() | PORT_RESET;
+        unsafe { port2.lock().write(reset_command); }
 
-    for _x in 0..20 {
+        //use better way to delay, need 60 ms
+        for _x in 0..300{}
+
+        let reset_command = port2.lock().read() & (!PORT_RESET);
+        unsafe { port2.lock().write(reset_command); }
+    });
+
+    for _x in 0..20{
 
 
-        if if_connect_port2() {
-            port2_enable(1);
+        if if_connect_port2(){
+            port2_enable(2);
             info!("UHCI port 2 reset complete, the port is ready to use for device");
             return;
         }
 
-        if connect_change_port2() {
+        if connect_change_port2(){
             connect_change_clear_port2();
             info!("UHCI port 2 connect status changed after port reset");
             continue;
         }
 
-        if enable_change_port2() {
+        if enable_change_port2(){
             enable_change_clear_port2();
             info!("UHCI port 2 enable status changed after port reset");
             continue;
         }
-
     }
 
     info!("UHCI port 2 reset complete, no device is attached");
 }
 
+
+
 /// See whether low speed device attached to port 2
 /// Return a bool
 pub fn low_speed_attach_port2() -> bool{
 
-    let flag = (REG_PORT2.lock().read() & PORT_LSDA) != 0;
-    flag
 
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
+
+        flag = (port2.lock().read() & PORT_LSDA) != 0;
+    });
+
+    flag
 
 }
 
@@ -1253,54 +1400,69 @@ pub fn low_speed_attach_port2() -> bool{
 /// Return a bool
 pub fn enable_change_port2() -> bool{
 
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
-    let flag = (REG_PORT2.lock().read() & PORT_ENABLE_CHANGE) != 0;
+        flag = (port2.lock().read() & PORT_ENABLE_CHANGE) != 0;
+    });
+
     flag
-
 
 }
 
 /// Clear Enable Change bit of port 2
 pub fn enable_change_clear_port2() {
+    REG_PORT2.try().map(|port2| {
 
-    unsafe { REG_PORT2.lock().write(PORT_ENABLE_CHANGE); }
+        unsafe { port2.lock().write(PORT_ENABLE_CHANGE); }
+    });
+
 }
 
 
 /// See whether the port 2 is in enable state
 /// Return a bool
 pub fn if_enable_port2() -> bool{
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
+        flag = (port2.lock().read() & PORT_ENABLE) != 0;
+    });
 
-    let flag = (REG_PORT2.lock().read() & PORT_ENABLE) != 0;
     flag
 
 
 }
 
 /// Enable or Disable the port 2
-/// value: 1 -> enable; 0 -> disable
+/// value: 2 -> enable; 0 -> disable
 pub fn port2_enable(value: u8) {
+    REG_PORT2.try().map(|port2| {
 
-    let bits = REG_PORT2.lock().read();
-    if value == 1{
-        unsafe{
-            REG_PORT2.lock().write(bits | PORT_ENABLE);
+        let bits = port2.lock().read();
+        if value == 2{
+            unsafe{
+                port2.lock().write(bits | PORT_ENABLE);
+            }
+        } else if value == 0{
+            unsafe{
+                port2.lock().write(bits & (!PORT_ENABLE));
+            }
         }
-    } else if value == 0{
-        unsafe{
-            REG_PORT2.lock().write(bits & (!PORT_ENABLE));
-        }
-    }
+    });
+
 
 }
 
-/// See whether port 2 connect state changes
+/// See whether Port 2 connect state changes
 /// Return a bool
 pub fn connect_change_port2() -> bool{
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
+        flag = (port2.lock().read() &  PORT_CONNECTION_CHANGE) != 0;
+    });
 
-    let flag = (REG_PORT2.lock().read() & PORT_CONNECTION_CHANGE) != 0;
     flag
 
 
@@ -1309,18 +1471,22 @@ pub fn connect_change_port2() -> bool{
 /// Clear Connect Change bit in port 2
 pub fn connect_change_clear_port2() {
 
+    REG_PORT2.try().map(|port2| {
 
-    unsafe { REG_PORT2.lock().write(PORT_CONNECTION_CHANGE); }
+        unsafe { port2.lock().write(PORT_CONNECTION_CHANGE); }
+    });
 
 }
 
 /// See whether a device is connected to this port
 pub fn if_connect_port2() -> bool{
+    let mut flag: bool = false;
+    REG_PORT2.try().map(|port2| {
 
-    let flag = (REG_PORT2.lock().read() & PORT_CONNECTION) != 0;
+        flag = (port2.lock().read() &  PORT_CONNECTION) != 0;
+    });
+
     flag
-
-
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1331,18 +1497,33 @@ pub fn if_connect_port2() -> bool{
 /// Read the frame list base address
 pub fn frame_list_base() -> u32{
 
-    UHCI_FRBASEADD_PORT.lock().read() & 0xFFFFF000
+    let mut a:u32 = 0;
+    UHCI_FRBASEADD_PORT.try().map(|base_port| {
+
+        a = base_port.lock().read() & 0xFFFFF000;
+    });
+
+    a
+
 }
 
 /// Read the current frame number
 pub fn frame_number() -> u16{
 
-    UHCI_FRNUM_PORT.lock().read() & 0x3FF
+    let mut a:u16 = 0;
+    UHCI_FRNUM_PORT.try().map(|frame_port| {
+
+        a = frame_port.lock().read() & 0x3FF;
+    });
+
+    a
+
 }
 
 /// Read the Frame List current index
 /// The return value corresponds to memory address signals [11:2].
 pub fn current_index() -> u16{
+
 
     let index = (frame_number() & 0x3FF) << 2;
     index
@@ -1353,7 +1534,11 @@ pub fn current_index() -> u16{
 /// Param: base [11:0] must be 0s
 pub fn assign_frame_list_base(base: u32){
 
-    unsafe{UHCI_FRBASEADD_PORT.lock().write(base);}
+    UHCI_FRBASEADD_PORT.try().map(|base_port| {
+
+        unsafe{base_port.lock().write(base);}
+    });
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1439,22 +1624,21 @@ impl UhciTDRegisters {
                 cs |= TD_CS_LOW_SPEED;
             }
         if pointer == 0{
-            self.link_pointer.write(TD_PTR_TERMINATE);
+            unsafe{self.link_pointer.write(TD_PTR_TERMINATE);}
         }else{
             if type_select == 1{
-                self.link_pointer.write(pointer|TD_PTR_QH);
+                unsafe{self.link_pointer.write(pointer|TD_PTR_QH);}
             }else{
-                self.link_pointer.write(pointer);
+                unsafe{self.link_pointer.write(pointer);}
             }
         }
 
 
-        self.control_status.write(cs);
-;
-
-        self.token.write(token);
-
-        self.buffer_point.write(data_add);
+        unsafe{
+            self.control_status.write(cs);
+            self.token.write(token);
+            self.buffer_point.write(data_add);
+        }
 
     }
 
@@ -1467,37 +1651,41 @@ impl UhciTDRegisters {
 
     /// get the horizotal pointer to next data struct
     pub fn next_pointer(&self) -> PhysicalAddress {
-        let pointer = self.link_pointer.read() & 0xFFFFFFF0;
+        let pointer: u32;
+
+        unsafe {pointer = self.link_pointer.read() & 0xFFFFFFF0;}
         pointer as PhysicalAddress
     }
 
     /// get the pointer to the data buffer
     pub fn read_buffer_pointer(&self) -> PhysicalAddress {
+        let pointer: usize;
 
-        let pointer = self.buffer_point.read() as PhysicalAddress;
+        unsafe {pointer = self.buffer_point.read() as PhysicalAddress;}
         pointer
+
     }
 
 
     /// get the endpointer number
     pub fn read_endp(& self) -> u8{
-
-        let num = (self.token.read() & TD_TOK_ENDP_MASK) as u8;
+        let num:u8;
+        unsafe{num = (self.token.read() & TD_TOK_ENDP_MASK) as u8;}
         num
     }
 
     /// get the device address
     pub fn read_address(& self) -> u8{
-
-        let add = (self.token.read() & TD_TOK_DEVADDR_MASK) as u8;
+        let add:u8;
+        unsafe{add = (self.token.read() & TD_TOK_DEVADDR_MASK) as u8;}
         add
     }
 
     ///  get the Packet ID
     ///  Return: ( [7:4] bits of pid, [3:0] bits of pid )
     pub fn read_pid(& self) -> (u8,u8){
-
-        let pid = (self.token.read() & TD_TOK_PID_MASK) as u8;
+        let pid:u8;
+        unsafe {pid = (self.token.read() & TD_TOK_PID_MASK) as u8;}
         (pid & 0xF0, pid & 0xF)
 
     }
