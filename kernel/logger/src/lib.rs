@@ -12,7 +12,7 @@ static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
 pub type LogOutputFunc = fn(&LogColor, &'static str, fmt::Arguments);
 static MIRROR_VGA_FUNC:     Once<LogOutputFunc> = Once::new();
-static MIRROR_NETWORK_FUNC: Once<LogOutputFunc> = Once::new();
+// static MIRROR_NETWORK_FUNC: Once<LogOutputFunc> = Once::new();
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
@@ -50,10 +50,10 @@ pub fn mirror_to_vga(func: LogOutputFunc) {
     MIRROR_VGA_FUNC.call_once(|| func);
 }
 
-/// Call this to enable mirroring logging macros to the network
-pub fn mirror_to_network(func: LogOutputFunc) {
-    MIRROR_VGA_FUNC.call_once(|| func);
-}
+// /// Call this to enable mirroring logging macros to the network
+// pub fn mirror_to_network(func: LogOutputFunc) {
+//     MIRROR_VGA_FUNC.call_once(|| func);
+// }
 
 /// A dummy struct that exists so we can implement the Log trait's methods.
 struct Logger { }
@@ -84,9 +84,9 @@ impl Log for Logger {
             func(&color, prefix, record.args().clone());
         }
 
-        if let Some(func) = MIRROR_NETWORK_FUNC.try() {
-            func(&color, prefix, record.args().clone());
-        }
+        // if let Some(func) = MIRROR_NETWORK_FUNC.try() {
+        //     func(&color, prefix, record.args().clone());
+        // }
     }
 }
 

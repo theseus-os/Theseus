@@ -47,5 +47,8 @@ git = "https://github.com/kevinaboos/owning-ref-rs.git"
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 
+[dependencies.network_interface_card]
+path = "../network_interface_card"
+
 [lib]
 crate-type = ["rlib"]

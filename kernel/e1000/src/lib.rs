@@ -20,26 +20,28 @@ extern crate interrupts;
 extern crate pic;
 extern crate x86_64;
 extern crate mpmc;
+extern crate network_interface_card;
 
 pub mod test_e1000_driver;
 mod regs;
 
-// use core::ptr::{read_volatile, write_volatile};
-use core::ops::{Deref, DerefMut};
 use core::fmt;
+use core::ops::DerefMut;
 use spin::Once; 
 use alloc::vec::Vec;
 use alloc::vec_deque::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, VirtualAddress, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, Frame, PageTable, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use mpmc:: *;
+use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
+
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -65,11 +67,27 @@ pub const INT_LSC:              u32 = 0x04;
 /// Interrupt type: Receive Timer Interrupt
 pub const INT_RX:               u32 = 0x80;
 
+
+/// The single instance of the E1000 NIC.
+/// TODO: in the future, we should support multiple NICs all stored elsewhere,
+/// e.g., on the PCI bus or somewhere else.
+pub static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+
+
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the E1000 NIC
     /// and temporarily given to higher layers in the networking stack.
     static ref RX_BUFFER_POOL: Queue<ReceiveBuffer> = Queue::with_capacity(2000);
 }
+
+
+
+/// The mapping flags used for pages that the NIC will map.
+/// This should be a const, but Rust doesn't yet allow constants for the bitflags type
+fn nic_mapping_flags() -> EntryFlags {
+    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
+}
+
 
 
 /// This struct is an E1000 Receive Descriptor as defined by the e1000 spec.
@@ -174,100 +192,8 @@ pub struct IntelE1000Registers {
 }
 
 
-/// A buffer that stores a packet to be transmitted through the NIC
-/// and is guaranteed to be contiguous in physical memory. 
-/// Auto-dereferences into a `MappedPages` object that represents its underlying memory. 
-pub struct TransmitBuffer {
-    mp: MappedPages,
-    phys_addr: PhysicalAddress,
-    length: u16,
-}
-impl TransmitBuffer {
-    /// Creates a new TransmitBuffer with the specified size in bytes.
-    /// The size is a `u16` because that is the maximum size of an NIC transmit buffer. 
-    pub fn new(size_in_bytes: u16) -> Result<TransmitBuffer, &'static str> {
-        let (mp, starting_phys_addr) = create_contiguous_mapping(size_in_bytes as usize)?;
-        Ok(TransmitBuffer {
-            mp: mp,
-            phys_addr: starting_phys_addr,
-            length: size_in_bytes,
-        })
-    }
 
-    pub fn send<N: NetworkInterfaceCard>(&self, nic: &mut N) -> Result<(), &'static str> {
-        nic.send_packet(self)
-    }
-}
-impl Deref for TransmitBuffer {
-    type Target = MappedPages;
-    fn deref(&self) -> &MappedPages {
-        &self.mp
-    }
-}
-impl DerefMut for TransmitBuffer {
-    fn deref_mut(&mut self) -> &mut MappedPages {
-        &mut self.mp
-    }
-}
-
-
-/// A buffer that stores a packet (a piece of an Ethernet frame) that has been received from the NIC
-/// and is guaranteed to be contiguous in physical memory. 
-/// Auto-dereferences into a `MappedPages` object that represents its underlying memory. 
-/// When dropped, its underlying memory is automatically returned to the NIC driver for future reuse.
-pub struct ReceiveBuffer {
-    mp: MappedPages,
-    phys_addr: PhysicalAddress,
-    length: u16,
-}
-impl ReceiveBuffer {
-    pub fn len(&self) -> u16 {
-        self.length
-    }
-}
-impl Deref for ReceiveBuffer {
-    type Target = MappedPages;
-    fn deref(&self) -> &MappedPages {
-        &self.mp
-    }
-}
-impl DerefMut for ReceiveBuffer {
-    fn deref_mut(&mut self) -> &mut MappedPages {
-        &mut self.mp
-    }
-}
-impl Drop for ReceiveBuffer {
-    fn drop(&mut self) {
-        warn!("ReceiveBuffer at paddr {:#X} length {} was dropped, not yet re-using!", self.phys_addr, self.length);
-        // TODO FIXME: return dropped buffers back to the pool
-        // RX_BUFFER_POOL.push(self.mp)
-    }
-}
-
-
-/// An Ethernet Frame that has been received by the NIC
-/// but is no longer owned by the ethernet layer. 
-pub struct ReceivedFrame(pub Vec<ReceiveBuffer>);
-
-
-///trait for network functions
-pub trait NetworkInterfaceCard {
-
-    /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
-    /// Blocks until the packet has been successfully sent by the networking card hardware.
-    fn send_packet(&mut self, transmit_buffer: &TransmitBuffer) -> Result<(), &'static str>;
-
-    /// Handle the receipt of a frame. 
-    /// This should be invoked whenever the NIC has a new received frame that is ready to be handled,
-    /// either in a polling fashion or from a receive interrupt handler.
-    fn handle_receive(&mut self) -> Result<(), &'static str>;
-
-    /// Returns the earliest `ReceivedFrame`, which is essentially a list of `ReceiveBuffer`s 
-    /// that each contain an individual piece of the frame.
-    fn get_received_frame(&mut self) -> Option<ReceivedFrame>;
-}
-
-/// struct to hold information for the network card
+/// A struct representing an e1000 network interface card.
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,
@@ -279,9 +205,9 @@ pub struct E1000Nic {
     eeprom_exists: bool,
     ///interrupt number
     interrupt_num: u8,
-    /// The actual MAC address of this E1000 NIC  
+    /// The actual MAC address burnt into the hardware of this E1000 NIC.
     mac_hardware: [u8; 6],
-    /// The optional spoofed MAC address to use in place of `hardware_mac` when transmitting.  
+    /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive Descriptors
     rx_descs: BoxRefMut<MappedPages, [E1000RxDesc]>, 
@@ -305,31 +231,6 @@ pub struct E1000Nic {
 }
 
 
-
-/// Creates a new memory mapping by allocating frames that are contiguous in physical memory.
-/// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
-/// which is a convenient way to get the physical address without walking the page tables.
-fn create_contiguous_mapping(size_in_bytes: usize) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
-
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-        let mut frame_allocator = FRAME_ALLOCATOR.try()
-            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-            .lock();
-        let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
-            .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
-        let starting_phys_addr = frames.start_address();
-        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-        let mp = active_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
-        Ok((mp, starting_phys_addr))
-    } 
-    else {
-        return Err("create_contiguous_mapping(): Couldn't get kernel's active_table");
-    }
-}
 
 
 impl NetworkInterfaceCard for E1000Nic {
@@ -359,91 +260,29 @@ impl NetworkInterfaceCard for E1000Nic {
         while (self.tx_descs[old_cur as usize].status & TX_DD) == 0 {
             //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
             //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-        }  //bit 0 should be set when done
+        }
+        //bit 0 should be set when done
 
         debug!("Packet is sent!");  
         Ok(())
     }
 
-
-    fn handle_receive(&mut self) -> Result<(), &'static str> {
-        let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut total_packet_length: u16 = 0;
-
-        // The main idea here is to go through all of the receive buffers that the NIC has populated,
-        // and collect all of them into a single ethernet frame, i.e., a `ReceivedFrame`.
-        // We go through each receive buffer and remove it from the list of buffers in use,
-        // but then we need to replace that receive buffer with a new one that can be filled by the NIC
-        // the next time it receives a piece of a frame. 
-        
-        while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
-            // get information about the current receive buffer
-            let length = self.rx_descs[self.rx_cur as usize].length;
-            let status = self.rx_descs[self.rx_cur as usize].status;
-            debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
-
-            // //print rx_buf
-            // let length = self.rx_descs[self.rx_cur as usize].length;
-            // let rx_buf = self.rx_bufs_in_use[self.rx_cur as usize].start_address() as *const u8;
-            // //print rx_buf of length bytes
-            // debug!("rx_buf {}: ", self.rx_cur);
-
-            // for i in 0..length {
-            //     let points_at = unsafe{ *rx_buf.offset(i as isize ) };
-            //     //debug!("{}",points_at);
-            //     debug!("{:x}",points_at);
-            // }  
-
-            total_packet_length += length;
-
-            // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
-            // (because we're saving it for higher layers to use),
-            // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
-            let new_receive_buf = match RX_BUFFER_POOL.pop() {
-                Some(rx_buf) => rx_buf,
-                None => {
-                    // if the pool was empty, then we allocate a new receive buffer
-                    let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize)?;
-                    ReceiveBuffer {
-                        mp: mp,
-                        phys_addr: phys_addr,
-                        length: len,
-                    }
-                }
-            };
-
-            // actually tell the NIC about the new receive buffer
-            self.rx_descs[self.rx_cur as usize].phys_addr = new_receive_buf.phys_addr as u64;
-            self.rx_descs[self.rx_cur as usize].status = 0;
-
-            // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
-            // getting back the receive buffer that is part of the received ethernet frame
-            self.rx_bufs_in_use.push(new_receive_buf);
-            let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(self.rx_cur as usize); 
-            current_rx_buf.length = length; // set the ReceiveBuffer's length to the size of the actual packet received
-            receive_buffers_in_frame.push(current_rx_buf);
-            
-            // move on to the next receive buffer
-            let old_cur = self.rx_cur as u32;
-            self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-            self.regs.rdt.write(old_cur);
-
-            // check if this rx buffer is the last piece of the frame (EOP)
-            if (status & RX_EOP) == RX_EOP {
-                break;
-            } else {
-                warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
-            }
-        }
-
-        self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
-        Ok(())
-    }
-
-
     fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
         self.received_frames.pop_front()
+    }
+
+    fn poll_receive(&mut self) -> Result<(), &'static str> {
+        // check if the NIC has received a new frame that we need to handle
+        if (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+            self.handle_receive()
+        } else {
+            // else, no new frames
+            Ok(())
+        }
+    }
+
+    fn mac_address(&self) -> [u8; 6] {
+        self.mac_spoofed.unwrap_or(self.mac_hardware)
     }
 }
 
@@ -565,7 +404,7 @@ impl E1000Nic {
     pub fn init_mem_pool(&self, num_rx_buffers: usize) -> Result<(), &'static str> {
         let length = E1000_RX_BUFFER_SIZE_IN_BYTES;
         for _i in 0..num_rx_buffers {
-            let (mp, phys_addr) = create_contiguous_mapping(length as usize)?; 
+            let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
             let rx_buf = ReceiveBuffer { mp, phys_addr, length};
             if RX_BUFFER_POOL.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
@@ -575,32 +414,6 @@ impl E1000Nic {
         }
 
         Ok(())
-    }
-
-    // /// write to an NIC register
-    // /// p_address is register offset
-    // fn write_command(&self,p_address:u32, p_value:u32){
-    //     if self.bar_type == 0 
-    //     {
-    //         unsafe { write_volatile((self.mem_base+p_address as usize) as *mut u32, p_value) };
-    //     }
-    // }
-
-    // /// read from an NIC register
-    // /// p_address is register offset
-    // fn read_command(&self, p_address:u32) -> u32 {
-    //     let mut val: u32 = 0;
-    //     if self.bar_type == 0 {
-    //         val = unsafe { read_volatile((self.mem_base+p_address as usize) as *const u32) };
-    //     }
-    //     val
-    // }
-
-    /// Returns the MAC address that this NIC is configured with.
-    /// If spoofed, it will return the spoofed MAC address, 
-    /// otherwise it will return the regular MAC address defined by the NIC hardware.
-    pub fn mac_address(&self) -> [u8; 6] {
-        self.mac_spoofed.unwrap_or(self.mac_hardware)
     }
 
     pub fn spoof_mac(&mut self, spoofed_mac_addr: [u8; 6]) {
@@ -658,7 +471,7 @@ impl E1000Nic {
         let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<E1000RxDesc>();
 
         // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs)?;
+        let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs, nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of receive descriptors
         let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
@@ -668,7 +481,7 @@ impl E1000Nic {
         let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(E1000_NUM_RX_DESC);
         for i in 0 .. E1000_NUM_RX_DESC {
             // create an actual buffer of contiguous memory for receiving ethernet frames, one per rx_desc
-            let (buf_mapped, buf_paddr) = create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize)?;
+            let (buf_mapped, buf_paddr) = create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())?;
             rx_bufs_in_use.push(ReceiveBuffer {
                 mp: buf_mapped,
                 phys_addr: buf_paddr,
@@ -704,7 +517,7 @@ impl E1000Nic {
         let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<E1000TxDesc>();
 
         // Tx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs)?;
+        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of transmit descriptors
         let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
@@ -743,7 +556,7 @@ impl E1000Nic {
         regs.icr.read(); // clear all interrupts
     }      
 
-    pub fn check_state(&self) {
+    pub fn dump_state(&self) {
         debug!("REG_CTRL {:x}",  self.regs.ctrl.read());
         debug!("REG_RCTRL {:x}", self.regs.rctl.read());
         debug!("REG_TCTRL {:x}", self.regs.tctl.read());
@@ -757,23 +570,89 @@ impl E1000Nic {
         debug!("special {:?}",   self.tx_descs[0].special);
     }
 
-    /// Poll for recieved ethernet frames. 
-    /// Can be used as an alternative to interrupts, or as a supplement to interrupts.
-    /// 
-    /// Returns the earliest-received `ReceivedFrame`, which may not necessarily be 
-    /// the same frame that was received during the polling action. 
-    pub fn poll_rx(&mut self) -> Result<ReceivedFrame, &'static str> {
-        // check if the NIC has received a new frame that we need to handle
-        if (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
-            self.handle_receive()?;
-        }
-        self.received_frames.pop_front().ok_or("No pending received frames")
-    }
-
     // reads status and clears interrupt
     fn get_interrupt_status(&self) -> u32 {
         self.regs.icr.read()
     }
+
+    /// Handle the receipt of an Ethernet frame. 
+    /// This should be invoked whenever the NIC has a new received frame that is ready to be handled,
+    /// either in a polling fashion or from a receive interrupt handler.
+    fn handle_receive(&mut self) -> Result<(), &'static str> {
+        let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
+        let mut total_packet_length: u16 = 0;
+
+        // The main idea here is to go through all of the receive buffers that the NIC has populated,
+        // and collect all of them into a single ethernet frame, i.e., a `ReceivedFrame`.
+        // We go through each receive buffer and remove it from the list of buffers in use,
+        // but then we need to replace that receive buffer with a new one that can be filled by the NIC
+        // the next time it receives a piece of a frame. 
+        
+        while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+            // get information about the current receive buffer
+            let length = self.rx_descs[self.rx_cur as usize].length;
+            let status = self.rx_descs[self.rx_cur as usize].status;
+            debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
+
+            // //print rx_buf
+            // let length = self.rx_descs[self.rx_cur as usize].length;
+            // let rx_buf = self.rx_bufs_in_use[self.rx_cur as usize].start_address() as *const u8;
+            // //print rx_buf of length bytes
+            // debug!("rx_buf {}: ", self.rx_cur);
+
+            // for i in 0..length {
+            //     let points_at = unsafe{ *rx_buf.offset(i as isize ) };
+            //     //debug!("{}",points_at);
+            //     debug!("{:x}",points_at);
+            // }  
+
+            total_packet_length += length;
+
+            // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
+            // (because we're saving it for higher layers to use),
+            // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
+            let new_receive_buf = match RX_BUFFER_POOL.pop() {
+                Some(rx_buf) => rx_buf,
+                None => {
+                    // if the pool was empty, then we allocate a new receive buffer
+                    let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
+                    ReceiveBuffer {
+                        mp: mp,
+                        phys_addr: phys_addr,
+                        length: len,
+                    }
+                }
+            };
+
+            // actually tell the NIC about the new receive buffer
+            self.rx_descs[self.rx_cur as usize].phys_addr = new_receive_buf.phys_addr as u64;
+            self.rx_descs[self.rx_cur as usize].status = 0;
+
+            // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
+            // getting back the receive buffer that is part of the received ethernet frame
+            self.rx_bufs_in_use.push(new_receive_buf);
+            let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(self.rx_cur as usize); 
+            current_rx_buf.length = length; // set the ReceiveBuffer's length to the size of the actual packet received
+            receive_buffers_in_frame.push(current_rx_buf);
+            
+            // move on to the next receive buffer
+            let old_cur = self.rx_cur as u32;
+            self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+            self.regs.rdt.write(old_cur);
+
+            // check if this rx buffer is the last piece of the frame (EOP)
+            if (status & RX_EOP) == RX_EOP {
+                break;
+            } else {
+                warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
+            }
+        }
+
+        self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
+        Ok(())
+    }
+
 
     /// The main interrupt handling routine for the e1000 NIC.
     /// This should be invoked from the actual interrupt handler entry point.
@@ -799,12 +678,6 @@ impl E1000Nic {
         Ok(())
     }
 }
-
-/// The single instance of the E1000 NIC.
-/// TODO: in the future, we should support multiple NICs all stored elsewhere,
-/// e.g., on the PCI bus or somewhere else.
-pub static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
-
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     warn!("E1000 handler!");

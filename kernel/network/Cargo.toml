@@ -12,15 +12,17 @@ spin = "0.4.5"
 default-features = false
 version = "0.3.7"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "0.2.1"
-
 [dependencies.irq_safety]
 path = "../../libs/irq_safety"
 
 [dependencies.e1000]
 path = "../e1000"
+
+[dependencies.e1000_smoltcp_device]
+path = "../e1000_smoltcp_device"
+
+[dependencies.network_interface_card]
+path = "../network_interface_card"
 
 [dependencies.tsc]
 path = "../tsc"
@@ -33,6 +35,9 @@ path = "../memory"
 
 [dependencies.acpi]
 path = "../acpi"
+
+[dependencies.task]
+path = "../task"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"

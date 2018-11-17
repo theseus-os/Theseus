@@ -127,6 +127,37 @@ impl MemoryManagementInfo {
 }
 
 
+
+/// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
+/// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
+/// which is a convenient way to get the physical address without walking the page tables.
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
+
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        let mut frame_allocator = FRAME_ALLOCATOR.try()
+            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+            .lock();
+        let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
+            .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
+        let starting_phys_addr = frames.start_address();
+        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        let mp = active_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
+        Ok((mp, starting_phys_addr))
+    } 
+    else {
+        return Err("create_contiguous_mapping(): Couldn't get kernel's active_table");
+    }
+}
+
+
 /// An area of physical memory. 
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]

@@ -56,7 +56,7 @@ extern crate exceptions_full;
 #[cfg(simd_personality)]
 extern crate simd_personality;
 
-#[cfg(any(mirror_log_to_network, test_network))]
+#[cfg(test_network)]
 extern crate network;
 
 
@@ -149,15 +149,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
 
-    #[cfg(mirror_log_to_network)] 
-    {
-        // Setup log mirroring to the network
-        logger::mirror_to_network(network::server::send_log_msg_udp);
-        use network::server::server_init;
-        KernelTaskBuilder::new(server_init, None)
-            .name(String::from("log_to_udp_server"))
-            .spawn()?;
-    }
 
     #[cfg(test_network)]
     {
