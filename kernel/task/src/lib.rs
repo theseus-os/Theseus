@@ -89,8 +89,9 @@ lazy_static! {
 pub fn init() -> Result<(), &'static str> {
     // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
     let root = vfs::get_root();
-    let task_dir = TaskDirectory::new(String::from("tasks"));
-    root.lock().add_fs_node(FSNode::Dir(task_dir))?;
+    let name = String::from("tasks");
+    let task_dir = TaskDirectory::new(name.clone());
+    root.lock().add_fs_node(name, FSNode::Dir(task_dir))?;
     // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
@@ -836,7 +837,7 @@ impl FileDirectory for TaskDirectory {
 
 impl Directory for TaskDirectory {
     /// this is a noop because you can't manually add files to task directory
-    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, name: String,  new_node: FSNode) -> Result<(), &'static str> {
         let self_pointer = match self.get_self_pointer() {
             Some(self_ptr) => self_ptr,
             None => return Err("Couldn't obtain pointer to self")
@@ -870,7 +871,7 @@ impl Directory for TaskDirectory {
             use alloc::string::ToString;
             let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string());
             debug!("maybe it is this task ref lock? {}", task_ref.lock().name);
-            self.add_fs_node(vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
+            self.add_fs_node(child ,vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
             
             return Some(FSNode::Dir(task_dir));
         }
@@ -898,7 +899,8 @@ fn create_mmi(taskref: TaskRef) -> Result<FSNode, &'static str> {
     for vma in vmas.iter() {
         page_table_info.push_str(&format!("{}\n", vma.start_address()));
     }
-    let page_table_file = vfs::VFSFile::new(String::from("memoryManagementInfo"), 0, page_table_info, None);
-    mmi_dir.lock().add_fs_node(vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
+    let name = String::from("memoryManagementInfo");
+    let page_table_file = vfs::VFSFile::new(name.clone(), 0, page_table_info, None);
+    mmi_dir.lock().add_fs_node(name, vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
     return Ok(vfs::FSNode::Dir(mmi_dir));
 }

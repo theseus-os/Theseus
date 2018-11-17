@@ -11,13 +11,15 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::arc::{Arc, Weak};
+use alloc::btree_map::BTreeMap;
+
 
 lazy_static! {
     /// The root directory
     pub static ref ROOT: StrongAnyDirRef = {
         let root_dir = VFSDirectory {
             name: "/root".to_string(),
-            children: Vec::new(), 
+            children: BTreeMap::new(), 
             parent: None, 
         };
         Arc::new(Mutex::new(Box::new(root_dir)))
@@ -48,7 +50,7 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
+    fn add_fs_node(&mut self, name: String, new_node: FSNode) -> Result<(), &'static str>;
     fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode>; 
     fn list_children(&mut self) -> Vec<String>;
 }
@@ -72,8 +74,8 @@ pub enum FSNode{
 pub struct VFSDirectory {
     /// The name of the directory
     name: String,
-    /// A list of StrongDirRefs or pointers to the child directories 
-    children: Vec<FSNode>,
+    /// A list of StrongDirRefs or pointers to the child directories   
+    children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: Option<WeakDirRef<Box<Directory + Send>>>,
 }
@@ -83,7 +85,7 @@ impl VFSDirectory {
     pub fn new_dir(name: String)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
-            children: Vec::new(),
+            children: BTreeMap::new(),
             parent: None,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
@@ -92,7 +94,7 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn add_fs_node(&mut self, new_fs_node: FSNode) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, name: String, new_fs_node: FSNode) -> Result<(), &'static str> {
         let self_pointer = match self.get_self_pointer() {
             Some(self_ptr) => self_ptr,
             None => return Err("Couldn't obtain pointer to self")
@@ -100,48 +102,35 @@ impl Directory for VFSDirectory {
         match new_fs_node {
             FSNode::Dir(dir) => {
                 dir.lock().set_parent(Arc::downgrade(&self_pointer));
-                self.children.push(FSNode::Dir(dir))
+                self.children.insert(name, FSNode::Dir(dir));
                 },
             FSNode::File(file) => {
                 file.lock().set_parent(Arc::downgrade(&self_pointer));
-                self.children.push(FSNode::File(file))
+                self.children.insert(name, FSNode::File(file));
                 },
         }
         Ok(())
     }
 
     fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode> {
-        for child in self.children.iter() {
-            match child {
-                FSNode::File(file) => {
-                    if file.lock().get_name() == child_name && is_file { 
-                        return Some(FSNode::File(Arc::clone(file)));
-                    }
-                }
-                FSNode::Dir(dir) => {
-                    debug!("is it ever reaching here to get child from root? "); // deadlock here
-                    let dir_name = dir.lock().get_name();
-                    debug!("dirname {}", dir_name);
-                    if dir_name == child_name && !is_file { 
-                        debug!("lmao here is the deadlock?");
-                        return Some(FSNode::Dir(Arc::clone(dir)));
-                    }
-                }
+        let option_child = self.children.get(&child_name);
+            match option_child {
+                Some(child) => match child {
+                    FSNode::File(file) => {
+                            return Some(FSNode::File(Arc::clone(file)));
+                        }
+                    FSNode::Dir(dir) => {
+                            return Some(FSNode::Dir(Arc::clone(dir)));
+                        }
+                },
+                None => None
             }
-        }
-        return None;
+
     }
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
-        let mut children_list = Vec::new();
-        for child in self.children.iter() {
-            match child {
-                FSNode::Dir(dir) => children_list.push(format!("{}\n",dir.lock().get_name())),
-                FSNode::File(file) => children_list.push(format!("{}\n", file.lock().get_name()))
-            }
-        }
-        return children_list;
+        return self.children.keys().cloned().collect();
     }
 }
 
