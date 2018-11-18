@@ -12,12 +12,13 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate spin;
 extern crate kernel_config;
+extern crate pci;
 
 
 
 
 
-
+use pci::PCI_BUSES;
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
@@ -30,10 +31,101 @@ use memory::{FRAME_ALLOCATOR,Frame,ActivePageTable, PhysicalAddress, EntryFlags,
 //static CAPA_REGS: Once<BoxRef<MappedPages, CapabilityRegisters>> = Once::new();
 //static OPRA_REGS: Once<BoxRefMut<MappedPages, OperationRegisters>> = Once::new();
 static OPRA_REGS: Once<Mutex<BoxRefMut<MappedPages, OperationRegisters>>> = Once::new();
+static EHCI_ADDRESS_O: Once<PhysicalAddress> = Once::new();
 
-pub const EHCI_ADDRESS: u64 = 0xFEBF1000;
 
 
+/// initialize the EHCI, by mapping the Capability and Operation Registers and setting them
+/// show the current configuration of the EHCI
+pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+
+//    let capa_regs: BoxRef<MappedPages, CapabilityRegisters> = BoxRef::new(Box::new(map_capa_regs(active_table)?))
+//        .try_map(|mp| mp.as_type::<CapabilityRegisters>(0))?;
+    if let Err(e) = read_ehci_address(){
+        info!("{}",e);
+        return Ok(());
+    }
+    if let Ok(capa_regs) = box_capa_regs(active_table) {
+        info!("\nHCIVERSION: {:x}\n", capa_regs.hci_version.read());
+        info!("\nHCSPARAMS: {:x}\n", capa_regs.hcs_params.read());
+        info!("\nHCCPARAMS: {:x}\n", capa_regs.hcc_params.read());
+        info!("\nHCSP-port-route: {:x}\n", capa_regs.hcsp_portroute.read());
+        let op_base = capa_regs.cap_length.read();
+        info!("\nCAPALENGTH: {:x}\n", op_base);
+        info!("\nPORTNUM: {:x}\n", capa_regs.host_ports_num());
+
+        if let Ok(mut opra_register) = mut_box_op_regs(active_table, op_base) {
+            {let opra_regs = & mut opra_register;
+
+                //enable the USB interrupt
+                opra_regs.usb_int(0x3F);
+                opra_regs.set_interrupt_threshold(0x08);
+            }
+
+            if let Err(_e) =  opra_register.set_frame_size(0x10,capa_regs){
+
+                debug!("fail to set USB frame size, now it is in defaul value");
+
+            }
+
+            info!("\nsee the data, USBCMD: {:x}\n", opra_register.usb_cmd.read());
+            info!("\nsee the data, USBSTS: {:x}\n", opra_register.usb_status.read());
+            info!("\nsee the data, USBINTR: {:x}\n", opra_register.interrupt_enable.read());
+            info!("\nsee the data, FRINDEX: {:b}\n", opra_register.frame_index.read());
+            info!("\nsee the data, CTRLDSSEGMENT: {:x}\n", opra_register.ctrlds_segment.read());
+            info!("\nsee the data, PERIODICLISTBASE: {:x}\n", opra_register.perodic_list_base.read());
+            info!("\nsee the data, ASYNLISTBASE: {:x}\n", opra_register.asyn_list_base.read());
+            info!("\nsee the data, CONFIGFLAG: {:x}\n", opra_register.config_flag.read());
+            info!("\nport 1: {:b}", opra_register.portsc.port_1.read());
+            info!("\nport 2: {:b}", opra_register.portsc.port_2.read());
+            info!("\nport 3: {:b}", opra_register.portsc.port_3.read());
+            info!("\nport 4: {:b}", opra_register.portsc.port_4.read());
+            info!("\nport 5: {:b}", opra_register.portsc.port_5.read());
+            info!("\nport 6: {:b}", opra_register.portsc.port_6.read());
+            OPRA_REGS.call_once(|| {
+                Mutex::new(opra_register)
+            });
+
+            Ok(())
+        } else {
+            Err("Fail to read EHCI's operational register")
+        }
+    } else {
+        Err("Fail to read EHCI's capability register")
+    }
+}
+
+
+pub fn read_ehci_address() -> Result<(), &'static str> {
+
+    let mut flag: bool = false;
+    PCI_BUSES.try().map(|pci_buses| {
+
+        for pci_bus in pci_buses{
+            for device in &pci_bus.devices{
+                if device.class == 0x0C && device.subclass == 0x03 && device.prof_if == 0x20{
+                    let base = device.bars[0];
+                    info!("EHCI base addrees: {:x}",base);
+                    EHCI_ADDRESS_O.call_once(||{
+                        base as PhysicalAddress
+                    });
+                    flag = true;
+                    break;
+                }
+            }
+            if flag{
+                break;
+            }
+        }
+    });
+
+    if flag{
+        return Ok(());
+    }else{
+        return Err("Cannot find the EHCI controller on PCI bus, Fail to read the base address");
+    }
+
+}
 ///Struct for defining usb interrupt type
 ///
 pub enum IntType{
@@ -201,62 +293,6 @@ pub fn read_interrupt_enable() -> Option<u32>{
 
 }
 
-/// initialize the EHCI, by mapping the Capability and Operation Registers and setting them
-/// show the current configuration of the EHCI
-pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-
-//    let capa_regs: BoxRef<MappedPages, CapabilityRegisters> = BoxRef::new(Box::new(map_capa_regs(active_table)?))
-//        .try_map(|mp| mp.as_type::<CapabilityRegisters>(0))?;
-    if let Ok(capa_regs) = box_capa_regs(active_table) {
-        info!("\nHCIVERSION: {:x}\n", capa_regs.hci_version.read());
-        info!("\nHCSPARAMS: {:x}\n", capa_regs.hcs_params.read());
-        info!("\nHCCPARAMS: {:x}\n", capa_regs.hcc_params.read());
-        info!("\nHCSP-port-route: {:x}\n", capa_regs.hcsp_portroute.read());
-        let op_base = capa_regs.cap_length.read();
-        info!("\nCAPALENGTH: {:x}\n", op_base);
-        info!("\nPORTNUM: {:x}\n", capa_regs.host_ports_num());
-
-        if let Ok(mut opra_register) = mut_box_op_regs(active_table, op_base) {
-            {let opra_regs = & mut opra_register;
-
-                //enable the USB interrupt
-                opra_regs.usb_int(0x3F);
-                opra_regs.set_interrupt_threshold(0x08);
-            }
-
-            if let Err(_e) =  opra_register.set_frame_size(0x10,capa_regs){
-
-                debug!("fail to set USB frame size, now it is in defaul value");
-
-            }
-
-            info!("\nsee the data, USBCMD: {:x}\n", opra_register.usb_cmd.read());
-            info!("\nsee the data, USBSTS: {:x}\n", opra_register.usb_status.read());
-            info!("\nsee the data, USBINTR: {:x}\n", opra_register.interrupt_enable.read());
-            info!("\nsee the data, FRINDEX: {:b}\n", opra_register.frame_index.read());
-            info!("\nsee the data, CTRLDSSEGMENT: {:x}\n", opra_register.ctrlds_segment.read());
-            info!("\nsee the data, PERIODICLISTBASE: {:x}\n", opra_register.perodic_list_base.read());
-            info!("\nsee the data, ASYNLISTBASE: {:x}\n", opra_register.asyn_list_base.read());
-            info!("\nsee the data, CONFIGFLAG: {:x}\n", opra_register.config_flag.read());
-            info!("\nport 1: {:b}", opra_register.portsc.port_1.read());
-            info!("\nport 2: {:b}", opra_register.portsc.port_2.read());
-            info!("\nport 3: {:b}", opra_register.portsc.port_3.read());
-            info!("\nport 4: {:b}", opra_register.portsc.port_4.read());
-            info!("\nport 5: {:b}", opra_register.portsc.port_5.read());
-            info!("\nport 6: {:b}", opra_register.portsc.port_6.read());
-            OPRA_REGS.call_once(|| {
-                Mutex::new(opra_register)
-            });
-
-            Ok(())
-        } else {
-            Err("Fail to read EHCI's operational register")
-        }
-    } else {
-        Err("Fail to read EHCI's capability register")
-    }
-}
-
 
 /// Box the Operation Registers with 'OperationRegisters' in Virtual Address
  pub fn box_capa_regs(active_table: &mut ActivePageTable)
@@ -293,8 +329,9 @@ pub fn mut_box_capa_regs(active_table: &mut ActivePageTable)
 /// return a mapping of EHCI Capability Registers
 pub fn map_capa_regs(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
 
-
-    let phys_addr = EHCI_ADDRESS as PhysicalAddress;
+    let phys_addr = EHCI_ADDRESS_O.try().map(|add|{
+        *add
+    }).ok_or("fail to read address of EHCI")?;
     let new_page = try!(allocate_pages(1).ok_or("out of virtual address space for EHCI Capability Registers)!"));
     let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("EHCI::init(): couldn't get FRAME_ALLOCATOR")).lock();

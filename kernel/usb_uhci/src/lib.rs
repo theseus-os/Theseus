@@ -32,14 +32,7 @@ use usb_device::{UsbDevice,Controller,HIDType};
 use usb_desc::{UsbDeviceDesc,UsbConfDesc, UsbIntfDesc, UsbEndpDesc};
 use usb_req::UsbDevReq;
 
-//static UHCI_CMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC040));
-//static UHCI_STS_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC042));
-//static UHCI_INT_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC044));
-//static UHCI_FRNUM_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC046));
-//static UHCI_FRBASEADD_PORT:  Mutex<Port<u32>> = Mutex::new(Port::new(0xC048));
-//static UHCI_SOFMD_PORT:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC04C));
-//static REG_PORT1:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC050));
-//static REG_PORT2:  Mutex<Port<u16>> = Mutex::new(Port::new(0xC052));
+
 static UHCI_CMD_PORT:  Once<Mutex<Port<u16>>>= Once::new();
 static UHCI_STS_PORT:  Once<Mutex<Port<u16>>> = Once::new();
 static UHCI_INT_PORT:  Once<Mutex<Port<u16>>> = Once::new();
@@ -72,13 +65,13 @@ static USB_HIGH_SPEED:u8=                  0x02;
 /// Initialize the USB 1.1 host controller
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
-//    if let Err(e) = read_uhci_address(){
-//
-//        info!("{}",e);
-//        return Ok(());
-//    }
+    if let Err(e) = read_uhci_address(){
 
-    let _e = read_uhci_address()?;
+        info!("{}",e);
+        return Ok(());
+    }
+
+//    let _e = read_uhci_address()?;
 
     run(0);
     short_packet_int(1);
