@@ -29,13 +29,10 @@ extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
 extern crate ps2;
-extern crate usb_keyboard;
-extern crate usb_uhci;
 
 
 
 use ps2::handle_mouse_packet;
-use usb_keyboard::USB_KEYBOARD_TD_INDEX;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
 use spin::Once;
 //use port_io::Port;
@@ -346,23 +343,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
-//    debug!("nic handler called");
-
-    let _result = usb_keyboard::data_handler();
-    if let Ok(()) = usb_uhci::int_status_handle(){
-
-        if let Some(td_index) = USB_KEYBOARD_TD_INDEX.try().map(|td_index| {
-
-            let td_index = *td_index;
-            td_index
-        }){
-            usb_uhci::td_clean(td_index);
-            let _a = usb_keyboard::init_receive_data();
-        }
-    }
-
-
-
+    debug!("nic handler called");
     // e1000::e1000_handler();
 	eoi(Some(0x2B));
 }

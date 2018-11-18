@@ -31,6 +31,3 @@ path = "../usb_req"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.usb_keyboard]
-path = "../usb_keyboard"

@@ -6,12 +6,13 @@
 extern crate alloc;
 extern crate volatile;
 extern crate owning_ref;
-
+extern crate memory;
 
 use alloc::boxed::Box;
 use owning_ref::{BoxRef, BoxRefMut};
 use volatile::{Volatile, ReadOnly, WriteOnly};
-
+use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags,
+             MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 // ------------------------------------------------------------------------------------------------
 // USB Request Type
 
@@ -118,6 +119,11 @@ impl UsbDevReq{
     }
 }
 
+/// Box the the frame pointer
+pub fn box_dev_req(active_table: &mut ActivePageTable,page: MappedPages,offset: PhysicalAddress)
+                       -> Result<BoxRefMut<MappedPages, UsbDevReq>, &'static str> {
+    let dev_req: BoxRefMut<MappedPages, UsbDevReq> = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbDevReq>(offset))?;
 
-
-
+    Ok(dev_req)
+}

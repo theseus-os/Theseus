@@ -3,11 +3,16 @@
 
 #![allow(dead_code)]
 
-
+extern crate alloc;
 extern crate volatile;
+extern crate owning_ref;
+extern crate memory;
 
-use volatile::{Volatile};
-
+use alloc::boxed::Box;
+use owning_ref::{BoxRef, BoxRefMut};
+use volatile::{Volatile, ReadOnly, WriteOnly};
+use memory::{Frame,PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags,
+             MappedPages, allocate_pages,allocate_frame,FRAME_ALLOCATOR};
 // ------------------------------------------------------------------------------------------------
 // USB Base Descriptor Types
 
@@ -51,7 +56,26 @@ pub struct UsbDeviceDesc
     pub conf_count: Volatile<u8>,
 }
 
-
+impl UsbDeviceDesc {
+    pub fn default() -> UsbDeviceDesc {
+        UsbDeviceDesc {
+            len: Volatile::new(0),
+            device_type: Volatile::new(0),
+            usb_version: Volatile::new(0),
+            class: Volatile::new(0),
+            sub_class: Volatile::new(0),
+            protocol: Volatile::new(0),
+            max_packet_size: Volatile::new(0),
+            vendor_id: Volatile::new(0),
+            product_id: Volatile::new(0),
+            device_version: Volatile::new(0),
+            vendor_str: Volatile::new(0),
+            product_str: Volatile::new(0),
+            serial_str: Volatile::new(0),
+            conf_count: Volatile::new(0),
+        }
+    }
+}
 
 
 
@@ -71,6 +95,16 @@ pub struct UsbConfDesc
     pub max_power: Volatile<u8>,
 }
 
+/// Box the the frame pointer
+pub fn box_config_desc(active_table: &mut ActivePageTable,page: MappedPages)
+                      -> Result<BoxRefMut<MappedPages, UsbConfDesc>, &'static str>{
+
+
+    let config_desc: BoxRefMut<MappedPages, UsbConfDesc>  = BoxRefMut::new(Box::new(page))
+        .try_map_mut(|mp| mp.as_type_mut::<UsbConfDesc>(0))?;
+
+    Ok(config_desc)
+}
 
 
 // ------------------------------------------------------------------------------------------------
@@ -89,13 +123,13 @@ pub struct UsbStringDesc
 // USB Interface Descriptor
 
 #[repr(C,packed)]
-#[derive(Debug)]
 pub struct UsbIntfDesc
 {
 
     pub len: Volatile<u8>,
-    pub desc_type: Volatile<u8>,
-    pub intf_num: Volatile<u8>,
+    pub config_type: Volatile<u8>,
+    pub intf_type: Volatile<u8>,
+    pub intf_index: Volatile<u8>,
     pub alt_setting: Volatile<u8>,
     pub endp_count: Volatile<u8>,
     pub class: Volatile<u8>,
@@ -104,12 +138,10 @@ pub struct UsbIntfDesc
     pub inf_str: Volatile<u8>,
 }
 
-
 // ------------------------------------------------------------------------------------------------
 // USB Endpoint Descriptor
 
 #[repr(C,packed)]
-#[derive(Debug)]
 pub struct UsbEndpDesc
 {
     pub len: Volatile<u8>,
@@ -118,9 +150,7 @@ pub struct UsbEndpDesc
     pub attributes: Volatile<u8>,
     pub maxpacketsize: Volatile<u16>,
     pub interval: Volatile<u8>,
-    _padding: u16,
 }
-
 
 // ------------------------------------------------------------------------------------------------
 // USB HID Desciptor

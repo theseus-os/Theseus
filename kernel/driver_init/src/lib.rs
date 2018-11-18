@@ -35,35 +35,13 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::M
         &mut PageTable::Active(ref mut active_table) => {
             // first, init the local apic info
             try!(apic::init(active_table));
+            try!(usb_driver::init(active_table));
             
             // then init/parse the ACPI tables to fill in the APIC details, among other things
             // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
             let madt_iter = try!(acpi::init(active_table));
 
             Ok(madt_iter)
-        }
-        _ => {
-            error!("drivers::early_init(): couldn't get kernel's active_table!");
-            Err("Couldn't get kernel's active_table")
-        }
-    }
-}
-
-
-/// This is temporary way for initializing the usb driver
-pub fn usb_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
-    // destructure the kernel's MMI so we can access its page table and vmas
-    let &mut MemoryManagementInfo {
-        page_table: ref mut kernel_page_table,
-        ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-    } = kernel_mmi;
-
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-
-            try!(usb_driver::init(active_table));
-            Ok(())
-
         }
         _ => {
             error!("drivers::early_init(): couldn't get kernel's active_table!");
