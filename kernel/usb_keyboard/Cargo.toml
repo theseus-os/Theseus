@@ -1,14 +1,17 @@
 [package]
-name = "usb_driver"
+name = "usb_keyboard"
 version = "0.1.0"
 authors = ["BowenLiu15 <bl28@rice.edu>"]
 
 [dependencies]
+spin = "0.4.5"
+volatile = "0.2.4"
 
 [dependencies.owning_ref]
 # version = "0.3.3"
 # path = "../../libs/owning-ref-rs"
 git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
 
 [dependencies.usb_device]
 path = "../usb_device"
@@ -26,11 +29,8 @@ path = "../usb_ehci"
 [dependencies.usb_desc]
 path = "../usb_desc"
 
-[dependencies.usb_req]
-path = "../usb_req"
-
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.usb_keyboard]
-path = "../usb_keyboard"
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"

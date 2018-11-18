@@ -69,5 +69,10 @@ path = "../scheduler"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.usb_keyboard]
+path = "../usb_keyboard"
+
+[dependencies.usb_uhci]
+path = "../usb_uhci"
 [lib]
 crate-type = ["rlib"]
