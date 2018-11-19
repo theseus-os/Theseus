@@ -364,15 +364,16 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongAnyDirRef) -> Option<FSNode> {
+    pub fn get(&self, wd: &StrongAnyDirRef) -> Result<FSNode, &'static str> {
         let current_path;
         { current_path = wd.lock().get_path();}
-        debug!("current path {}", current_path.path);
+        
         // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
             Some(dir) => dir, 
-            None => return None
+            None => return Err(&format!("cannot canonicalize path {}", current_path.path))
         };
+
         let mut new_wd = Arc::clone(&wd);
         debug!("components {:?}", shortest_path.components());
         let mut counter: isize = -1;
@@ -382,7 +383,7 @@ impl Path {
             if component == ".." {
                 let dir = match new_wd.lock().get_parent_dir() {
                     Some(dir) => dir, 
-                    None => return None,
+                    None => return Err(&format!("failed to move up in path {}", current_path.path)), 
                 };
                 new_wd = dir;
             }
@@ -399,29 +400,25 @@ impl Path {
                     let children = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
                     for child_name in children.iter() {
                         if child_name == component {
-                            debug!("on this child! {}", child_name); // `tasks` is being locked here
                             match new_wd.lock().get_child(child_name.to_string(), false) {
                                 Some(child) => match child {
-                                    FSNode::File(file) => return Some(FSNode::File(Arc::clone(&file))),
+                                    FSNode::File(file) => return Ok(FSNode::File(Arc::clone(&file))),
                                     FSNode::Dir(dir) => {
-                                        return Some(FSNode::Dir(Arc::clone(&dir)));
+                                        return Ok(FSNode::Dir(Arc::clone(&dir)));
                                     }
                                 },
-                                None => {
-                                    debug!("RETURNING NONE ON 417");
-                                    return None;
-                                    },
+                                None => return Err(&format!("cannot call get_child for {}", child_name)),
                             };                       
                         }
                     }
                 }
                                
-                let dir = match new_wd.lock().get_child(component.to_string(), false) {
+                let dir = match new_wd.lock().get_child(component.clone().to_string(),  false) {
                     Some(child) => match child {
                         FSNode::Dir(dir) => dir,
-                        FSNode::File(file) => return None,
+                        FSNode::File(_file) => return Err(&format!("shouldn't be a file here")),
                     }, 
-                    None => return None,
+                    None => return Err("couldn't get directory"),
                 };
                 new_wd = dir;
             }
@@ -430,7 +427,7 @@ impl Path {
         
     
 
-        return Some(FSNode::Dir(new_wd));
+        return Ok(FSNode::Dir(new_wd));
     }
 }
 
