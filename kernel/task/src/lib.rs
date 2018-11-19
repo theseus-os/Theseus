@@ -680,12 +680,12 @@ pub struct TaskFile<'a> {
 }
 
 impl<'a> TaskFile<'a> {
-    fn new(task: &'a TaskRef) -> TaskFile<'a> {
+    fn new(task: &'a TaskRef, parent_pointer: WeakDirRef) -> TaskFile<'a> {
         let task_id = task.lock().id.clone();
         return TaskFile {
             task: task,
             path: Path::new(format!("/root/task/{}", task_id)), 
-            parent: None
+            parent: Option::some(pparent_pointer)
         };
     }
 }
@@ -765,11 +765,11 @@ pub struct TaskDirectory {
 }
 
 impl TaskDirectory {
-    fn new(name: String)  -> StrongAnyDirRef {
+    fn new(name: String, parent_pointer: WeakDirRef)  -> StrongAnyDirRef {
         let directory = TaskDirectory {
             name: name,
             children: Vec::new(),
-            parent: None,
+            parent: Option::some(parent_pointer),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         dir_ref
@@ -777,7 +777,7 @@ impl TaskDirectory {
 }
 
 impl FileDirectory for TaskDirectory {
-        /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = String::from("tasks");
         if let Some(cur_dir) =  self.get_parent_dir() {

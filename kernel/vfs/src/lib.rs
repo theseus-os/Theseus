@@ -37,7 +37,7 @@ pub type StrongDirRef<D: Directory + Send> = Arc<Mutex<D>>;
 pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
 // type StrongVFSDirectoryRef = StrongDirRef<VFSDirectory>;
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
-pub type WeakDirRef<D: Directory> = Weak<Mutex<D>>;
+pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
 pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 
 // Traits for files, implementors of File must also implement FileDirectory
