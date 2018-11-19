@@ -62,7 +62,7 @@ pub trait FileDirectory {
     fn get_name(&self) -> String;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef>; // DON'T CALL THIS (add_fs_node performs this function)
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>); // DON'T CALL THIS (add_fs_node performs this function)
+    fn set_parent(&mut self, parent_pointer: WeakDirRef); // DON'T CALL THIS (add_fs_node performs this function)
 }
 
 pub enum FSNode{
@@ -77,16 +77,16 @@ pub struct VFSDirectory {
     /// A list of StrongDirRefs or pointers to the child directories   
     children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: Option<WeakDirRef<Box<Directory + Send>>>,
+    parent: Option<WeakDirRef>,
 }
 
 impl VFSDirectory {
     /// Creates a new directory and passes a reference to the new directory created as output
-    pub fn new_dir(name: String)  -> StrongAnyDirRef {
+    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> StrongAnyDirRef {
         let directory = VFSDirectory {
             name: name,
             children: BTreeMap::new(),
-            parent: None,
+            parent: Some(parent_pointer),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         dir_ref
@@ -95,17 +95,11 @@ impl VFSDirectory {
 
 impl Directory for VFSDirectory {
     fn add_fs_node(&mut self, name: String, new_fs_node: FSNode) -> Result<(), &'static str> {
-        let self_pointer = match self.get_self_pointer() {
-            Some(self_ptr) => self_ptr,
-            None => return Err("Couldn't obtain pointer to self")
-        };
         match new_fs_node {
             FSNode::Dir(dir) => {
-                dir.lock().set_parent(Arc::downgrade(&self_pointer));
                 self.children.insert(name, FSNode::Dir(dir));
                 },
             FSNode::File(file) => {
-                file.lock().set_parent(Arc::downgrade(&self_pointer));
                 self.children.insert(name, FSNode::File(file));
                 },
         }
@@ -186,7 +180,7 @@ impl FileDirectory for VFSDirectory {
         }
     }
 
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
         self.parent = Some(parent_pointer);
     }
 }
@@ -199,11 +193,11 @@ pub struct VFSFile {
     /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
     contents: String,
     /// A weak reference to the parent directory
-    parent: Option<WeakDirRef<Box<Directory + Send>>>,
+    parent: Option<WeakDirRef>,
 }
 
 impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: Option<WeakDirRef<Box<Directory + Send>>>) -> VFSFile {
+    pub fn new(name: String, size: usize, contents: String, parent: Option<WeakDirRef>) -> VFSFile {
         VFSFile {
             name: name, 
             size: size, 
@@ -276,7 +270,7 @@ impl FileDirectory for VFSFile {
         }
     }
 
-    fn set_parent(&mut self, parent_pointer: WeakDirRef<Box<Directory + Send>>) {
+    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
         self.parent = Some(parent_pointer);
     }
 }
@@ -413,7 +407,10 @@ impl Path {
                                         return Some(FSNode::Dir(Arc::clone(&dir)));
                                     }
                                 },
-                                None => return None,
+                                None => {
+                                    debug!("RETURNING NONE ON 417");
+                                    return None;
+                                    },
                             };                       
                         }
                     }
