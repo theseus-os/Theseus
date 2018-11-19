@@ -407,7 +407,7 @@ impl Path {
                                         return Ok(FSNode::Dir(Arc::clone(&dir)));
                                     }
                                 },
-                                None => return Err(&format!("cannot call get_child for {}", child_name)),
+                                None => return Err(format!("cannot call get_child for {}", child_name)),
                             };                       
                         }
                     }
@@ -416,7 +416,7 @@ impl Path {
                 let dir = match new_wd.lock().get_child(component.clone().to_string(),  false) {
                     Some(child) => match child {
                         FSNode::Dir(dir) => dir,
-                        FSNode::File(_file) => return Err(&format!("shouldn't be a file here")),
+                        FSNode::File(_file) => return Err("shouldn't be a file here"),
                     }, 
                     None => return Err("couldn't get directory"),
                 };
