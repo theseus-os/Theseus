@@ -150,12 +150,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     driver_init::init(input_event_queue_producer)?;
 
 
-    #[cfg(test_network)]
+    // #[cfg(test_network)]
     {
-        use network::server::server_init;
-        KernelTaskBuilder::new(server_init, None)
-            .name(String::from("test_network_server"))
-            .spawn()?;
+        if let Some(nic) = e1000::get_e1000_nic() {
+            KernelTaskBuilder::new(network::init, nic)
+                .name(String::from("test_network_server"))
+                .spawn()?;
+        }
     }
 
 

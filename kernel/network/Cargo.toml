@@ -13,7 +13,7 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.e1000]
 path = "../e1000"

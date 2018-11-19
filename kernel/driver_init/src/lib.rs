@@ -57,8 +57,8 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     }
 
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
-        debug!("e1000 Device found: {:?}", e1000_pci_dev);
-        try!(e1000::E1000Nic::init(e1000_pci_dev));
+        debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
+        e1000::E1000Nic::init(e1000_pci_dev)?;
     }
     else {
         warn!("No e1000 device found on this system.");

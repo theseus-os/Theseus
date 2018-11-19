@@ -15,7 +15,7 @@ extern crate owning_ref;
 use alloc::boxed::Box;
 use irq_safety::MutexIrqSafe;
 use smoltcp::Error;
-use smoltcp::phy::{Device, DeviceLimits};
+use smoltcp::phy::DeviceLimits;
 use network_interface_card::{NetworkInterfaceCard, ReceivedFrame, TransmitBuffer};
 use owning_ref::{BoxRef, BoxRefMut};
 
@@ -23,7 +23,7 @@ use owning_ref::{BoxRef, BoxRefMut};
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp
 /// to use our existing e1000 ethernet driver.
 /// An instance of this `E1000Device` can be used in smoltcp's `EthernetInterface`.
-pub struct E1000Device<'n, N: NetworkInterfaceCard + 'n> { 
+pub struct E1000Device<'n, N: NetworkInterfaceCard + 'static> { 
     nic_ref: &'n MutexIrqSafe<N>,
 }
 impl<'n, N: NetworkInterfaceCard> E1000Device<'n, N> {
@@ -39,7 +39,8 @@ impl<'n, N: NetworkInterfaceCard> E1000Device<'n, N> {
 /// To connect the e1000 driver to smoltcp, 
 /// we implement transmit and receive callbacks
 /// that allow smoltcp to interact with the e1000 NIC.
-impl<'n, N: NetworkInterfaceCard + 'n> Device for E1000Device<'n, N> {
+impl<'n, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device for E1000Device<'n, N> {
+
     /// The buffer type returned by the receive callback.
     type RxBuffer = RxBuffer;
     /// The buffer type returned by the transmit callback.
@@ -109,21 +110,21 @@ impl<'n, N: NetworkInterfaceCard + 'n> Device for E1000Device<'n, N> {
 /// * it must be representable as a slice of bytes, e.g., it must impl AsRef<[u8]> and AsMut<[u8]>.
 /// * it must actually send the packet when it is dropped.
 /// Internally, we use `BoxRefMut<_, [u8]>` because it implements both AsRef<[u8]> and AsMut<[u8]>.
-pub struct TxBuffer<'n, N: NetworkInterfaceCard + 'n> {
+pub struct TxBuffer<'n, N: NetworkInterfaceCard + 'static> {
     nic_ref: &'n MutexIrqSafe<N>,
     buffer: BoxRefMut<TransmitBuffer, [u8]>,
 }
-impl<'n, N: NetworkInterfaceCard + 'n> AsRef<[u8]> for TxBuffer<'n, N> {
+impl<'n, N: NetworkInterfaceCard + 'static> AsRef<[u8]> for TxBuffer<'n, N> {
     fn as_ref(&self) -> &[u8] {
         self.buffer.as_ref()
     }
 }
-impl<'n, N: NetworkInterfaceCard + 'n> AsMut<[u8]> for TxBuffer<'n, N> {
+impl<'n, N: NetworkInterfaceCard + 'static> AsMut<[u8]> for TxBuffer<'n, N> {
     fn as_mut(&mut self) -> &mut [u8] {
         self.buffer.as_mut()
     }
 }
-impl<'n, N: NetworkInterfaceCard + 'n> Drop for TxBuffer<'n, N> {
+impl<'n, N: NetworkInterfaceCard + 'static> Drop for TxBuffer<'n, N> {
     fn drop(&mut self) {
         let res = self.nic_ref.lock().send_packet(self.buffer.owner());
         if let Err(e) = res {

@@ -30,7 +30,7 @@ default-features = false
 features = [ "log", "alloc" ]
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.memory]
 path = "../memory"

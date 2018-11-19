@@ -71,7 +71,13 @@ pub const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-pub static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+
+/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
+/// if it exists and has been initialized.
+pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
+    E1000_NIC.try()
+}
 
 
 lazy_static! {
@@ -291,7 +297,7 @@ impl NetworkInterfaceCard for E1000Nic {
 /// functions that setup the NIC struct and handle the sending and receiving of packets
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(e1000_pci_dev: &PciDevice) -> Result<(), &'static str> {
+    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         use pic::PIC_MASTER_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -337,9 +343,9 @@ impl E1000Nic {
             regs: mapped_registers,
             received_frames: VecDeque::new(),
         };
-        E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-
-        Ok(())
+        
+        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+        Ok(nic_ref)
     }
     
     ///find out amount of space needed for device's registers
@@ -571,7 +577,7 @@ impl E1000Nic {
     }
 
     // reads status and clears interrupt
-    fn get_interrupt_status(&self) -> u32 {
+    fn clear_interrupt_status(&self) -> u32 {
         self.regs.icr.read()
     }
 
@@ -649,7 +655,9 @@ impl E1000Nic {
             }
         }
 
-        self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
+        if !receive_buffers_in_frame.is_empty() {
+            self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
+        }
         Ok(())
     }
 
@@ -657,8 +665,7 @@ impl E1000Nic {
     /// The main interrupt handling routine for the e1000 NIC.
     /// This should be invoked from the actual interrupt handler entry point.
     fn handle_interrupt(&mut self) -> Result<(), &'static str> {
-        debug!("e1000::handle_interrupt");
-        let status = self.get_interrupt_status();        
+        let status = self.clear_interrupt_status();        
 
         // a link status change
         if (status & INT_LSC) == INT_LSC {

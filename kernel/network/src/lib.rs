@@ -58,8 +58,8 @@ static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 /// Returns a tuple including the following (in order):
 /// * a reference to the newly-spawned network task
 /// * a queue producer that can be used to enqueue messages to be sent out over the network
-pub fn init<N>(nic: &MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProducer<String>), &'static str> 
-    where N: NetworkInterfaceCard + Device
+pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProducer<String>), &'static str> 
+    where N: NetworkInterfaceCard
 {
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
     let skb_size = 8 * 1024; // 8KiB, randomly chosen
@@ -121,8 +121,8 @@ pub fn init<N>(nic: &MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProducer<String
     });
 
     #[cfg(test_network)] {
-        send_msg_udp("FIRST UDP TEST MESSAGE");
-        send_msg_udp("SECOND UDP TEST MESSAGE");
+        send_msg_udp("FIRST UDP TEST MESSAGE")?;
+        send_msg_udp("SECOND UDP TEST MESSAGE")?;
     }
 
     // bind the udp socket to a local port

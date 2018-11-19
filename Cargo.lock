@@ -252,7 +252,7 @@ name = "e1000_smoltcp_device"
 version = "0.1.0"
 dependencies = [
  "e1000 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -461,15 +461,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "irq_safety"
-version = "0.1.1"
-dependencies = [
- "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "stable_deref_trait 1.0.0 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
-]
-
-[[package]]
 name = "itertools"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,7 +662,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "e1000 0.1.0",
  "e1000_smoltcp_device 0.1.0",
- "irq_safety 0.1.1",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "memory 0.1.0",

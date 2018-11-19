@@ -11,7 +11,7 @@ use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages
 
 
 
-pub struct NicDeviceRef<'n, N: NetworkInterfaceCard + 'n> {
+pub struct NicDeviceRef<'n, N: NetworkInterfaceCard + 'static> {
     nic_ref: &'n N,
 }
 
