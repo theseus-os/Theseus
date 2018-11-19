@@ -710,7 +710,7 @@ impl<'a> FileDirectory for TaskFile<'a> {
         }
     }
 
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         unimplemented!();
     }
 
@@ -807,23 +807,23 @@ impl FileDirectory for TaskDirectory {
     /// and then cloning itself via the parent's get_child_dir() method
     /// 
     /// Note that this function cannot be used on the root becuase the root doesn't have a parent directory
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
-            None => return None
+            None => return Err("could not clone parent")
         };
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
-            None => return None
+            None => return Err("could not upgrade parent")
         };
 
         let mut locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
-            Some(child) => match child {
-                FSNode::File(_file) => None,
-                FSNode::Dir(dir) => return Some(dir)
+            Ok(child) => match child {
+                FSNode::File(_file) => return Err("cannot be a file"),
+                FSNode::Dir(dir) => return Ok(dir)
             },
-            None => None,
+            Err(err) => return Err(err),
         }
     }
 
@@ -850,45 +850,47 @@ impl Directory for TaskDirectory {
         Ok(())
     }
     
-    fn get_child(&mut self, child: String, is_file: bool) -> Option<FSNode> {
+    fn get_child(&mut self, child: String, is_file: bool) -> Result<FSNode, &'static str> {
         if is_file {
-            return None;
+            return Err("cannot get a file from the tasks directory");
         } 
         else {
             let id = match child.parse::<usize>() {
                 Ok(id) => id, 
                 Err(_err) => {
-                    error!("could not parse usize");
-                    return None;
+                    return Err("could not parse usize");
                     },
             };
             let task_ref = match TASKLIST.get(&id)  {
                 Some(task_ref) => task_ref,
-                None => return None,
+                None => return Err("could not get taskref from TASKLIST"),
             };
 
             let parent_pointer = match self.get_self_pointer() {
-                Some(ptr) => ptr, 
-                None => return None,
+                Ok(ptr) => ptr, 
+                Err(err) => {
+                        error!("could not get self because: {}", err);
+                        return Err(err)
+                    },
             };
             let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string(), Arc::downgrade(&parent_pointer)); // this is task 0, 1, etc.
             let task_dir_pointer = match task_dir.lock().get_self_pointer() {
-                Some(ptr) => ptr, 
-                None => return None,
+                Ok(ptr) => ptr, 
+                Err(err) => {
+                    error!("could not get self pointer because: {}", err);
+                    return Err(err)
+                    },
             };
             let mmi_info = match create_mmi(task_ref.clone(), Arc::downgrade(&task_dir_pointer)) {
                 Ok(mmi_info) => {
                     mmi_info
                 }, 
-                Err(err) => {
-                    error!("{}", err);
-                    return None;
-                    }
+                Err(err) => return Err(err)
             };
             self.add_fs_node(child ,vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
             debug!("past 1st add fs node");
             task_dir.lock().add_fs_node(String::from("memoryManagementInfo"), mmi_info).ok();
-            return Some(FSNode::Dir(task_dir));
+            return Ok(FSNode::Dir(task_dir));
         }
     }
 
@@ -916,8 +918,11 @@ fn create_mmi(taskref: TaskRef, parent_pointer: WeakDirRef) -> Result<FSNode, &'
     }
     let name = String::from("memoryManagementInfo");
     let mmi_dir_pointer = match mmi_dir.lock().get_self_pointer() {
-        Some(ptr) => ptr, 
-        None => return Err("could not obtain pointer to mmi dir")
+        Ok(ptr) => ptr, 
+        Err(err) => {
+            error!("could not obtain pointer to mmi dir because: {}", err);
+            return Err(err)
+            }
     };
     let page_table_file = vfs::VFSFile::new(name.clone(), 0, page_table_info, Some(Arc::downgrade(&mmi_dir_pointer)));
     mmi_dir.lock().add_fs_node(name, vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;

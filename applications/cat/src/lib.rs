@@ -50,7 +50,7 @@ pub fn main(args: Vec<String>) -> isize {
         
         // navigate to the filepath specified by first argument
         match path.get(&curr_wr) {
-            Some(file_dir_enum) => {
+            Ok(file_dir_enum) => {
                 match file_dir_enum {
                     FSNode::Dir(_) => {
                         println!("why tf would this ever be a dir");
@@ -62,7 +62,7 @@ pub fn main(args: Vec<String>) -> isize {
                 }
 
             },
-            None => {println!("file with this name does not exist");
+            Err(err) => {println!("get call failed in cat because: {}", err);
                         return -1;}
         };
 

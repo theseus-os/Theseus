@@ -55,7 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
         let path = Path::new(matches.free[0].to_string());
         // navigate to the filepath specified by first argument
         match path.get(&curr_wr) {
-            Some(file_dir_enum) => {
+            Ok(file_dir_enum) => {
                 match file_dir_enum {
                     FSNode::Dir(dir) => {
                         debug!("hello?");
@@ -69,7 +69,7 @@ pub fn main(args: Vec<String>) -> isize {
                     }
                 }
             },
-            None => println!("Directory does not exist")
+            Err(err) => {println!("get call in cd failed because: {}", err); return -1;}
         };
     }
     return 0;

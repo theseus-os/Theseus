@@ -51,7 +51,7 @@ pub trait File : FileDirectory {
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
     fn add_fs_node(&mut self, name: String, new_node: FSNode) -> Result<(), &'static str>;
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode>; 
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str>; 
     fn list_children(&mut self) -> Vec<String>;
 }
 
@@ -61,7 +61,7 @@ pub trait FileDirectory {
     fn get_path(&self) -> Path;
     fn get_name(&self) -> String;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef>; // DON'T CALL THIS (add_fs_node performs this function)
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str>; // DON'T CALL THIS (add_fs_node performs this function)
     fn set_parent(&mut self, parent_pointer: WeakDirRef); // DON'T CALL THIS (add_fs_node performs this function)
 }
 
@@ -106,18 +106,18 @@ impl Directory for VFSDirectory {
         Ok(())
     }
 
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Option<FSNode> {
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
         let option_child = self.children.get(&child_name);
             match option_child {
                 Some(child) => match child {
                     FSNode::File(file) => {
-                            return Some(FSNode::File(Arc::clone(file)));
+                            return Ok(FSNode::File(Arc::clone(file)));
                         }
                     FSNode::Dir(dir) => {
-                            return Some(FSNode::Dir(Arc::clone(dir)));
+                            return Ok(FSNode::Dir(Arc::clone(dir)));
                         }
                 },
-                None => None
+                None => Err("could not get child from children map")
             }
 
     }
@@ -154,29 +154,32 @@ impl FileDirectory for VFSDirectory {
         }
     }
 
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         if self.name == ROOT.0 {
             debug!("MATCHED TO ROOT");
-            return Some(get_root());
+            return Ok(get_root());
         }
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
-            None => return None
+            None => return Err("parent does not exist")
         };
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
-            None => return None
+            None => return Err("could not upgrade parent")
         };
 
         let mut locked_parent = parent.lock();
         match locked_parent.get_child(self.name.clone(), false) {
-            Some(child) => {
+            Ok(child) => {
                 match child {
-                    FSNode::Dir(dir) => Some(dir),
-                    FSNode::File(_file) => None,
+                    FSNode::Dir(dir) => Ok(dir),
+                    FSNode::File(_file) => Err("should not be a file"),
                 }
             },
-            None => None,
+            Err(err) => {
+                error!("failed in vfs::get_self_pointer because: {}", err);
+                return Err(err);
+                },
         }
     }
 
@@ -242,31 +245,31 @@ impl FileDirectory for VFSFile {
         }
     }
 
-    fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         if self.name == ROOT.0 {
             debug!("MATCHED TO ROOT");
-            return Some(get_root());
+            return Ok(get_root());
         }
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
-            None => return None
+            None => return Err("could not clone the parent")
         };
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
-            None => return None
+            None => return Err("could not upgrade parent")
         };
         
         debug!("before locking parent");
         let mut locked_parent = parent.lock();
         debug!("after locking parent");
         match locked_parent.get_child(self.name.clone(), false) {
-            Some(child) => {
+            Ok(child) => {
                 match child {
-                    FSNode::Dir(dir) => Some(dir),
-                    FSNode::File(_file) => None,
+                    FSNode::Dir(dir) => Ok(dir),
+                    FSNode::File(_file) => Err("should not be a file"),
                 }
             },
-            None => None,
+            Err(err) => return Err(err),
         }
     }
 
@@ -371,7 +374,10 @@ impl Path {
         // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
             Some(dir) => dir, 
-            None => return Err(&format!("cannot canonicalize path {}", current_path.path))
+            None => {
+                error!("cannot canonicalize path {}", current_path.path); 
+                return Err("couldn't canonicalize path");
+            }
         };
 
         let mut new_wd = Arc::clone(&wd);
@@ -382,8 +388,11 @@ impl Path {
             // Navigate to parent directory
             if component == ".." {
                 let dir = match new_wd.lock().get_parent_dir() {
-                    Some(dir) => dir, 
-                    None => return Err(&format!("failed to move up in path {}", current_path.path)), 
+                    Some(dir) => dir,
+                    None => {
+                        error!("failed to move up in path {}", current_path.path);
+                        return Err("could not move up in path")
+                        }, 
                 };
                 new_wd = dir;
             }
@@ -401,32 +410,29 @@ impl Path {
                     for child_name in children.iter() {
                         if child_name == component {
                             match new_wd.lock().get_child(child_name.to_string(), false) {
-                                Some(child) => match child {
+                                Ok(child) => match child {
                                     FSNode::File(file) => return Ok(FSNode::File(Arc::clone(&file))),
                                     FSNode::Dir(dir) => {
                                         return Ok(FSNode::Dir(Arc::clone(&dir)));
                                     }
                                 },
-                                None => return Err(format!("cannot call get_child for {}", child_name)),
+                                Err(err) => return Err(err),
                             };                       
                         }
                     }
                 }
                                
                 let dir = match new_wd.lock().get_child(component.clone().to_string(),  false) {
-                    Some(child) => match child {
+                    Ok(child) => match child {
                         FSNode::Dir(dir) => dir,
                         FSNode::File(_file) => return Err("shouldn't be a file here"),
                     }, 
-                    None => return Err("couldn't get directory"),
+                    Err(err) => return Err(err),
                 };
                 new_wd = dir;
             }
 
         }
-        
-    
-
         return Ok(FSNode::Dir(new_wd));
     }
 }
