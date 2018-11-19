@@ -869,10 +869,16 @@ impl Directory for TaskDirectory {
                 None => return None,
             };
             use alloc::string::ToString;
-            let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string());
-            debug!("maybe it is this task ref lock? {}", task_ref.lock().name);
+            let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string()); // this is task 0, 1, etc.
+            let mmi_info = match create_mmi(task_ref.clone()) {
+                Ok(mmi_info) => {
+                    mmi_info
+                }, 
+                Err(_err) => return None
+            };
             self.add_fs_node(child ,vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
-            
+            debug!("past 1st add fs node");
+            task_dir.lock().add_fs_node(String::from("memoryManagementInfo"), mmi_info).ok();
             return Some(FSNode::Dir(task_dir));
         }
     }

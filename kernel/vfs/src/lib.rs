@@ -16,18 +16,18 @@ use alloc::btree_map::BTreeMap;
 
 lazy_static! {
     /// The root directory
-    pub static ref ROOT: StrongAnyDirRef = {
+    pub static ref ROOT: (String, StrongAnyDirRef) = {
         let root_dir = VFSDirectory {
             name: "/root".to_string(),
             children: BTreeMap::new(), 
             parent: None, 
         };
-        Arc::new(Mutex::new(Box::new(root_dir)))
+        (String::from("/root"), Arc::new(Mutex::new(Box::new(root_dir))))
     };
 }
 
 pub fn get_root() -> StrongAnyDirRef {
-    Arc::clone(&ROOT)
+    Arc::clone(&ROOT.1)
 }
 
 // pub type StrongFileDirRef = Arc<Mutex<Box<FileDirectory + Send>>>;
@@ -161,8 +161,8 @@ impl FileDirectory for VFSDirectory {
     }
 
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
-        if self.parent.is_none() {
-            debug!("fix this jank ass shit later cuz we cant call on root");
+        if self.name == ROOT.0 {
+            debug!("MATCHED TO ROOT");
             return Some(get_root());
         }
         let weak_parent = match self.parent.clone() {
@@ -249,8 +249,8 @@ impl FileDirectory for VFSFile {
     }
 
     fn get_self_pointer(&self) -> Option<StrongAnyDirRef> {
-        if self.parent.is_none() {
-            debug!("fix this jank ass shit later cuz we cant call on root");
+        if self.name == ROOT.0 {
+            debug!("MATCHED TO ROOT");
             return Some(get_root());
         }
         let weak_parent = match self.parent.clone() {
@@ -261,8 +261,10 @@ impl FileDirectory for VFSFile {
             Some(weak_ref) => weak_ref,
             None => return None
         };
-
+        
+        debug!("before locking parent");
         let mut locked_parent = parent.lock();
+        debug!("after locking parent");
         match locked_parent.get_child(self.name.clone(), false) {
             Some(child) => {
                 match child {
