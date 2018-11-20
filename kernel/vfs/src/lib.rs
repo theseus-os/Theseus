@@ -50,7 +50,7 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_fs_node(&mut self, name: String, new_node: FSNode) -> Result<(), &'static str>;
+    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str>; 
     fn list_children(&mut self) -> Vec<String>;
 }
@@ -94,12 +94,14 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn add_fs_node(&mut self, name: String, new_fs_node: FSNode) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_fs_node: FSNode) -> Result<(), &'static str> {
         match new_fs_node {
             FSNode::Dir(dir) => {
+                let name = dir.lock().get_name().clone();
                 self.children.insert(name, FSNode::Dir(dir));
                 },
             FSNode::File(file) => {
+                let name = file.lock().get_name().clone();
                 self.children.insert(name, FSNode::File(file));
                 },
         }

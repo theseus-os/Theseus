@@ -92,7 +92,7 @@ pub fn init() -> Result<(), &'static str> {
     let root = vfs::get_root();
     let name = String::from("tasks");
     let task_dir = TaskDirectory::new(name.clone(), Arc::downgrade(&root));
-    root.lock().add_fs_node(name, FSNode::Dir(task_dir))?;
+    root.lock().add_fs_node(FSNode::Dir(task_dir))?;
     // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
     Ok(())
 }
@@ -838,7 +838,7 @@ impl FileDirectory for TaskDirectory {
 
 impl Directory for TaskDirectory {
     /// this is a noop because you can't manually add files to task directory
-    fn add_fs_node(&mut self, name: String,  new_node: FSNode) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
         match new_node {
             FSNode::Dir(dir) => {
                 self.children.push(FSNode::Dir(dir))
@@ -865,7 +865,6 @@ impl Directory for TaskDirectory {
                 Some(task_ref) => task_ref,
                 None => return Err("could not get taskref from TASKLIST"),
             };
-
             let parent_pointer = match self.get_self_pointer() {
                 Ok(ptr) => ptr, 
                 Err(err) => {
@@ -874,22 +873,19 @@ impl Directory for TaskDirectory {
                     },
             };
             let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string(), Arc::downgrade(&parent_pointer)); // this is task 0, 1, etc.
-            let task_dir_pointer = match task_dir.lock().get_self_pointer() {
-                Ok(ptr) => ptr, 
-                Err(err) => {
-                    error!("could not get self pointer because: {}", err);
-                    return Err(err)
-                    },
-            };
-            let mmi_info = match create_mmi(task_ref.clone(), Arc::downgrade(&task_dir_pointer)) {
+            debug!("just created new task directory for 0");
+
+            let task_dir_pointer = Arc::clone(&task_dir);
+            self.add_fs_node(vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
+            debug!("WE'RE ABOUT TO CREATE MMI");
+            let mmi_info = match create_mmi(task_ref.clone(), task_dir_pointer) {
                 Ok(mmi_info) => {
                     mmi_info
                 }, 
                 Err(err) => return Err(err)
             };
-            self.add_fs_node(child ,vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
             debug!("past 1st add fs node");
-            task_dir.lock().add_fs_node(String::from("memoryManagementInfo"), mmi_info).ok();
+            // task_dir.lock().add_fs_node(mmi_info).ok();
             return Ok(FSNode::Dir(task_dir));
         }
     }
@@ -905,9 +901,10 @@ impl Directory for TaskDirectory {
 
 }
 
-
-fn create_mmi(taskref: TaskRef, parent_pointer: WeakDirRef) -> Result<FSNode, &'static str> {
-    let mmi_dir: StrongAnyDirRef = vfs::VFSDirectory::new_dir(String::from("mmi"), parent_pointer);
+/// creates the memory management info subdirectory of the task directory
+fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<FSNode, &'static str> {
+    let mmi_dir: StrongAnyDirRef = vfs::VFSDirectory::new_dir(String::from("mmi"), Arc::downgrade(&task_dir_pointer.clone()));
+    task_dir_pointer.lock().add_fs_node(vfs::FSNode::Dir(mmi_dir.clone()))?;
     // obtain information from the MemoryManagementInfo struct of the Task
     let mut page_table_info = String::from("Virtual Addresses:\n");
     let mmi_info = taskref.lock().mmi.clone().unwrap(); // FIX THIS UNWRAP AND DON'T CLONE
@@ -925,6 +922,6 @@ fn create_mmi(taskref: TaskRef, parent_pointer: WeakDirRef) -> Result<FSNode, &'
             }
     };
     let page_table_file = vfs::VFSFile::new(name.clone(), 0, page_table_info, Some(Arc::downgrade(&mmi_dir_pointer)));
-    mmi_dir.lock().add_fs_node(name, vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
+    mmi_dir.lock().add_fs_node(vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
     return Ok(vfs::FSNode::Dir(mmi_dir));
 }
