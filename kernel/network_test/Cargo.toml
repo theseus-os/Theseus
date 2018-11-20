@@ -36,6 +36,9 @@ path = "../memory"
 [dependencies.acpi]
 path = "../acpi"
 
+[dependencies.spawn]
+path = "../spawn"
+
 [dependencies.task]
 path = "../task"
 

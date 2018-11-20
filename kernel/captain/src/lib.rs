@@ -153,7 +153,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     {
         if let Some(nic) = e1000::get_e1000_nic() {
             KernelTaskBuilder::new(network_test::init, nic)
-                .name(String::from("test_network"))
+                .name(String::from("network_test"))
                 .spawn()?;
         }
     }

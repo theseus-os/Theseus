@@ -23,6 +23,7 @@ extern crate acpi;
 // extern crate logger;
 extern crate memory;
 extern crate owning_ref;
+extern crate spawn;
 extern crate task;
 
 
@@ -30,7 +31,7 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::string::ToString;
-use dfqueue::{DFQueue, DFQueueProducer};
+use dfqueue::{DFQueue, DFQueueProducer, DFQueueConsumer};
 use spin::Once;
 // use core::fmt;
 use acpi::get_hpet;
@@ -39,11 +40,11 @@ use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
 use smoltcp::socket::{AsSocket, SocketSet}; 
 use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
 use smoltcp::wire::IpEndpoint;
-use smoltcp::phy::Device;
 use e1000_smoltcp_device::E1000Device;
 use network_interface_card::NetworkInterfaceCard;
 use task::TaskRef;
 use irq_safety::MutexIrqSafe;
+use spawn::KernelTaskBuilder;
 
 
 static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
@@ -58,10 +59,17 @@ static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 /// Returns a tuple including the following (in order):
 /// * a reference to the newly-spawned network task
 /// * a queue producer that can be used to enqueue messages to be sent out over the network
-pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProducer<String>), &'static str> 
+pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
     where N: NetworkInterfaceCard
 {
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
+
+    // initialize the message queue
+    let msg_queue: DFQueue<String> = DFQueue::new();
+    let msg_queue_consumer = msg_queue.into_consumer();
+    let msg_queue_producer = msg_queue_consumer.obtain_producer();
+    MSG_QUEUE.call_once(|| msg_queue_producer.obtain_producer());
+    
     let skb_size = 8 * 1024; // 8KiB, randomly chosen
 
     // For UDP
@@ -106,36 +114,26 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProduce
         local_addr
     );  
 
+    // bind the udp socket to a local port
+    {
+        let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
+        if let Err(_e) = udp_socket.bind(local_port) {
+            error!("network_test::init(): error binding UDP socket: {:?}", _e);
+        }
+    }
 
     let dest_endpoint = IpEndpoint {
         addr: dest_addr,
         port: dest_port,
     };
 
-    // code to initialize the DFQ
-    let udpserver_dfq: DFQueue<String> = DFQueue::new();
-    let udpserver_consumer = udpserver_dfq.into_consumer();
-    let _udpserver_producer = udpserver_consumer.obtain_producer();
-    MSG_QUEUE.call_once(|| {
-       udpserver_consumer.obtain_producer()
-    });
-
     #[cfg(test_network)] {
         send_msg_udp("FIRST UDP TEST MESSAGE")?;
         send_msg_udp("SECOND UDP TEST MESSAGE")?;
     }
 
-    // bind the udp socket to a local port
-    {
-        let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
-        if let Err(_e) = udp_socket.bind(local_port) {
-            error!("server_init(): error binding UDP socket: {:?}", _e);
-        }
-    }
-
-    // Main loop for processing network 
+    // the main loop for processing network transmit/receive operations, should be run as its own Task.
     loop {
-
         {
             let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
 
@@ -148,36 +146,38 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProduce
             }
 
             // Sending packets
-            match udpserver_consumer.peek() {
+            match msg_queue_consumer.peek() {
                 Some(element) => {
-                    debug!("server_init(): about to send UDP packet {:?}", &*element);
-                    debug!("server_init(): can_send: {:?}, can_recv: {:?}", udp_socket.can_send(), udp_socket.can_recv());
+                    debug!("network_test::init(): about to send UDP packet {:?}", &*element);
+                    // debug!("network_test::init(): can_send: {:?}, can_recv: {:?}", udp_socket.can_send(), udp_socket.can_recv());
                     if udp_socket.can_send() {
-                        debug!("server_init(): sending UDP packet...");
+                        debug!("network_test::init(): sending UDP packet...");
                         if let Err(_e) = udp_socket.send_slice(element.as_bytes(), dest_endpoint) {
-                            error!("server_init(): UDP sending error {}", _e);
+                            error!("network_test::init(): UDP sending error {}", _e);
                             continue;
                         }
                         element.mark_completed();
                     } else {
-                        warn!("server_init(): UDP socket wasn't ready to send, skipping....")
+                        warn!("network_test::init(): UDP socket wasn't ready to send, skipping....")
                     }
                 }
                 _ => { }
             }
         }
 
-        // polling (flush?) the ethernet interface
+        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
         let timestamp = millis_since(startup_time);
         let _next_poll_time = match iface.poll(&mut sockets, timestamp){
             Ok(t) => t,
             Err(err) => { 
-                warn!("server_init(): poll error: {}", err);
+                warn!("network_test::init(): poll error: {}", err);
                 continue;
             }
         };  
     }
 }
+
+
 
 /// Function to calculate time since a give time in ms
 fn millis_since(start_time: u64) -> u64 {

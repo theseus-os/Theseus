@@ -680,6 +680,7 @@ dependencies = [
  "network_interface_card 0.1.0",
  "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "smoltcp 0.4.0 (git+https://github.com/kevinaboos/smoltcp)",
+ "spawn 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "tsc 0.1.0",
