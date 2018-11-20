@@ -837,7 +837,7 @@ impl FileDirectory for TaskDirectory {
 }
 
 impl Directory for TaskDirectory {
-    /// this is a noop because you can't manually add files to task directory
+    /// This function adds a newly created fs node (the argument) to the TASKS directory's children vector
     fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
         match new_node {
             FSNode::Dir(dir) => {
@@ -873,19 +873,14 @@ impl Directory for TaskDirectory {
                     },
             };
             let task_dir = VFSDirectory::new_dir(task_ref.lock().id.to_string(), Arc::downgrade(&parent_pointer)); // this is task 0, 1, etc.
-            debug!("just created new task directory for 0");
-
             let task_dir_pointer = Arc::clone(&task_dir);
             self.add_fs_node(vfs::FSNode::Dir(Arc::clone(&task_dir))).ok();
-            debug!("WE'RE ABOUT TO CREATE MMI");
-            let mmi_info = match create_mmi(task_ref.clone(), task_dir_pointer) {
+            match create_mmi(task_ref.clone(), task_dir_pointer) {
                 Ok(mmi_info) => {
                     mmi_info
                 }, 
                 Err(err) => return Err(err)
             };
-            debug!("past 1st add fs node");
-            // task_dir.lock().add_fs_node(mmi_info).ok();
             return Ok(FSNode::Dir(task_dir));
         }
     }
@@ -901,8 +896,9 @@ impl Directory for TaskDirectory {
 
 }
 
-/// creates the memory management info subdirectory of the task directory
-fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<FSNode, &'static str> {
+/// Creates the memory management info subdirectory of a task directory.
+/// This function will attach the mmi directory (and associated subdirectories) to whatever directory task_dir_pointer points to.
+fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<(), &'static str> {
     let mmi_dir: StrongAnyDirRef = vfs::VFSDirectory::new_dir(String::from("mmi"), Arc::downgrade(&task_dir_pointer.clone()));
     task_dir_pointer.lock().add_fs_node(vfs::FSNode::Dir(mmi_dir.clone()))?;
     // obtain information from the MemoryManagementInfo struct of the Task
@@ -921,7 +917,8 @@ fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<FSN
             return Err(err)
             }
     };
+    // create the page table file and add it to the mmi directory
     let page_table_file = vfs::VFSFile::new(name.clone(), 0, page_table_info, Some(Arc::downgrade(&mmi_dir_pointer)));
     mmi_dir.lock().add_fs_node(vfs::FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
-    return Ok(vfs::FSNode::Dir(mmi_dir));
+    return Ok(());
 }

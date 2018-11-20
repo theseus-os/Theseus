@@ -249,21 +249,18 @@ impl FileDirectory for VFSFile {
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         if self.name == ROOT.0 {
-            debug!("MATCHED TO ROOT");
             return Ok(get_root());
         }
         let weak_parent = match self.parent.clone() {
             Some(parent) => parent, 
-            None => return Err("could not clone the parent")
+            None => return Err("parent does not exist")
         };
         let parent = match Weak::upgrade(&weak_parent) {
             Some(weak_ref) => weak_ref,
             None => return Err("could not upgrade parent")
         };
         
-        debug!("before locking parent");
         let mut locked_parent = parent.lock();
-        debug!("after locking parent");
         match locked_parent.get_child(self.name.clone(), false) {
             Ok(child) => {
                 match child {
