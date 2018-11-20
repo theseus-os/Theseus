@@ -109,7 +109,7 @@ dependencies = [
  "logger 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
- "network 0.1.0",
+ "network_test 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
@@ -655,7 +655,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "network"
+name = "network_interface_card"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "network_test"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
@@ -672,17 +683,6 @@ dependencies = [
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "tsc 0.1.0",
-]
-
-[[package]]
-name = "network_interface_card"
-version = "0.1.0"
-dependencies = [
- "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
 ]
 
 [[package]]

@@ -133,7 +133,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(TaskRef, DFQueueProduce
         }
     }
 
-    // Main loop for the server
+    // Main loop for processing network 
     loop {
 
         {

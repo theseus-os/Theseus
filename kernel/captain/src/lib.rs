@@ -52,12 +52,11 @@ extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
+extern crate network_test;
 
 #[cfg(simd_personality)]
 extern crate simd_personality;
 
-#[cfg(test_network)]
-extern crate network;
 
 
 use alloc::arc::Arc;
@@ -150,11 +149,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     driver_init::init(input_event_queue_producer)?;
 
 
-    // #[cfg(test_network)]
+    #[cfg(test_network)]
     {
         if let Some(nic) = e1000::get_e1000_nic() {
-            KernelTaskBuilder::new(network::init, nic)
-                .name(String::from("test_network_server"))
+            KernelTaskBuilder::new(network_test::init, nic)
+                .name(String::from("test_network"))
                 .spawn()?;
         }
     }

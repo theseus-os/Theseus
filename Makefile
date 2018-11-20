@@ -105,9 +105,19 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+
+### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
+check_captain:
+ifneq (1,$(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l))
+	@echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."
+	@echo -e "       Run \"make clean\" and then try rebuilding again.\n"
+	@exit 1
+endif
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
 ### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
-$(iso): build
+$(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -115,9 +125,9 @@ $(iso): build
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
-	
-iso: $(iso)
 
+### Convenience target for building the ISO	using the above target
+iso: $(iso)
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
