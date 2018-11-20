@@ -109,7 +109,6 @@ APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 ### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
 NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
 check_captain:
-	@echo -e "\n\n\nCAPTAINS FOUND: '$(NUM_CAPTAINS)'\n\n\n"
 	@if [ 1  !=  ${NUM_CAPTAINS} ]; then \
 		echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."; \
 		echo -e "       Run \"make clean\" and then try rebuilding again.\n"; \
