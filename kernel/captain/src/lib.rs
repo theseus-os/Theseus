@@ -53,6 +53,7 @@ extern crate frame_buffer;
 extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate network_test;
+extern crate ota_update_client;
 
 #[cfg(simd_personality)]
 extern crate simd_personality;
@@ -154,6 +155,15 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         if let Some(nic) = e1000::get_e1000_nic() {
             KernelTaskBuilder::new(network_test::init, nic)
                 .name(String::from("network_test"))
+                .spawn()?;
+        }
+    }
+
+    #[cfg(test_ota_update_client)]
+    {
+        if let Some(nic) = e1000::get_e1000_nic() {
+            KernelTaskBuilder::new(ota_update_client::init, nic)
+                .name(String::from("ota_update_client"))
                 .spawn()?;
         }
     }

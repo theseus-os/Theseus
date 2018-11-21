@@ -53,12 +53,8 @@ static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 /// Initialize the network server, which spawns a new thread 
 /// to handle transmitting and receiving of packets in a loop.
 /// # Arguments
-/// * `nic`: a reference to an initialized NIC, which must implement
-///   the `NetworkInterfaceCard` trait and smoltcp's `Device` trait.
+/// * `nic`: a reference to an initialized NIC, which must implement the `NetworkInterfaceCard` trait.
 /// 
-/// Returns a tuple including the following (in order):
-/// * a reference to the newly-spawned network task
-/// * a queue producer that can be used to enqueue messages to be sent out over the network
 pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
     where N: NetworkInterfaceCard
 {
@@ -167,7 +163,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
         // poll the smoltcp ethernet interface (i.e., flush tx/rx)
         let timestamp = millis_since(startup_time);
-        let _next_poll_time = match iface.poll(&mut sockets, timestamp){
+        let _next_poll_time = match iface.poll(&mut sockets, timestamp) {
             Ok(t) => t,
             Err(err) => { 
                 warn!("network_test::init(): poll error: {}", err);

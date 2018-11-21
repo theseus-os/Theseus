@@ -19,6 +19,9 @@ use smoltcp::phy::DeviceLimits;
 use network_interface_card::{NetworkInterfaceCard, ReceivedFrame, TransmitBuffer};
 use owning_ref::{BoxRef, BoxRefMut};
 
+/// standard MTU for ethernet cards
+const DEFAULT_MTU: usize = 1500;
+
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp
 /// to use our existing e1000 ethernet driver.
@@ -48,7 +51,7 @@ impl<'n, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device for E1000Device
 
     fn limits(&self) -> DeviceLimits {
         let mut limits = DeviceLimits::default();
-        limits.max_transmission_unit = 1536; // TODO: why 1536?
+        limits.max_transmission_unit = DEFAULT_MTU;
         limits
     }
 

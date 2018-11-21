@@ -110,6 +110,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "network_test 0.1.0",
+ "ota_update_client 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
@@ -698,6 +699,25 @@ dependencies = [
 name = "once"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "ota_update_client"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "dfqueue 0.1.0",
+ "e1000 0.1.0",
+ "e1000_smoltcp_device 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "network_interface_card 0.1.0",
+ "owning_ref 0.3.3 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
+ "smoltcp 0.4.0 (git+https://github.com/kevinaboos/smoltcp)",
+ "spawn 0.1.0",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
 
 [[package]]
 name = "owning_ref"
