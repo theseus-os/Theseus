@@ -3,7 +3,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
-#![feature(unique)]
 #![feature(ptr_internals)]
 
 // #[macro_use] extern crate log;

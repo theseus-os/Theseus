@@ -52,6 +52,8 @@
 #![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
+#[macro_use] pub extern crate alloc;
+
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(simd_personality)] {
@@ -62,7 +64,6 @@ cfg_if! { if #[cfg(simd_personality)] {
 #[cfg(target_feature = "sse2")]
 extern crate compiler_builtins as _compiler_builtins; 
 
-#[macro_use] pub extern crate alloc;
 #[macro_use] pub extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
@@ -71,7 +72,7 @@ extern crate task;
 
 
 use core::ops::DerefMut;
-use alloc::String;
+use alloc::string::String;
 use memory::{get_kernel_mmi_ref, get_module_starting_with};
 use mod_mgmt::{CrateNamespace, get_default_namespace};
 use spawn::KernelTaskBuilder;

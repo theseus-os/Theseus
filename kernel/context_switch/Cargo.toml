@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-cfg-if = "0.1.5"
+cfg-if = "0.1.6"
 
 [dependencies.context_switch_sse]
 path = "../context_switch_sse"

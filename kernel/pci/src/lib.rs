@@ -9,7 +9,7 @@ extern crate spin;
 extern crate port_io;
 
 use core::fmt;
-use alloc::Vec;
+use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
 

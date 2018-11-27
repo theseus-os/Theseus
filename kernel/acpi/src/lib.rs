@@ -2,7 +2,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
-#![feature(iterator_step_by)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
@@ -35,7 +34,7 @@ macro_rules! try_opt {
 
 
 
-use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;

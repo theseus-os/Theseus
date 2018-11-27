@@ -1,4 +1,4 @@
-use alloc::Vec;
+use alloc::vec::Vec;
 use memory::{MappedPages, VirtualMemoryArea, VirtualAddress};
 
 use xmas_elf::ElfFile;

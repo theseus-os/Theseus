@@ -20,7 +20,7 @@ use core::any::{Any, TypeId};
 use core::sync::atomic::{AtomicPtr, Ordering};
 use alloc::boxed::Box;
 use spin::{Once};
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 

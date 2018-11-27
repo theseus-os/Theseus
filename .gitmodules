@@ -12,14 +12,6 @@
 	url = https://github.com/kevinaboos/multiboot2-elf64.git
 	branch = master
 	ignore = dirty
-[submodule "libs/owning-ref-rs"]
-	path = libs/owning-ref-rs
-	url = https://github.com/kevinaboos/owning-ref-rs.git
-	ignore = dirty
-[submodule "libs/stable_deref_trait"]
-	path = libs/stable_deref_trait
-	url = https://github.com/kevinaboos/stable_deref_trait.git
-	ignore = dirty
 [submodule "libs/mpmc"]
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc

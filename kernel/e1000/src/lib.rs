@@ -29,7 +29,7 @@ use core::fmt;
 use core::ops::DerefMut;
 use spin::Once; 
 use alloc::vec::Vec;
-use alloc::vec_deque::VecDeque;
+use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
@@ -241,7 +241,7 @@ pub struct E1000Nic {
 
 impl NetworkInterfaceCard for E1000Nic {
 
-    fn send_packet(&mut self, transmit_buffer: &TransmitBuffer) -> Result<(), &'static str> {
+    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         
         self.tx_descs[self.tx_cur as usize].phys_addr = transmit_buffer.phys_addr as u64;
         self.tx_descs[self.tx_cur as usize].length = transmit_buffer.length;

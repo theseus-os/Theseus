@@ -1,14 +1,10 @@
 #![no_std]
 
-#![feature(stdsimd)]
-
 #[macro_use] extern crate log;
 extern crate pit_clock;
+extern crate packed_simd;
 
-// extern crate simd;
-
-
-use core::simd::f32x4;
+use packed_simd::f32x4;
 
 pub fn test1(_: ()) {
     trace!("at the top of simd_test::test1.");

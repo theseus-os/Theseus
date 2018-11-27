@@ -7,7 +7,8 @@ extern crate task;
 extern crate getopts;
 
 use getopts::Options;
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use task::{TASKLIST, RunState};
 
 #[no_mangle]

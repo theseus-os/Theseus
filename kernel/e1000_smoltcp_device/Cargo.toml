@@ -6,9 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.4.10"
 
 
 [dependencies.log]
@@ -16,18 +14,18 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
-[dependencies.owning_ref]
-# version = "0.3.3"
-# path = "../../libs/owning-ref-rs"
-git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 [dependencies.smoltcp]
-version = "0.4.0"
+version = "0.5.0"
 default-features = false
-features = [ "log", "alloc" ]
+features = [
+    "alloc", "log",
+    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
+    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
+]
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"

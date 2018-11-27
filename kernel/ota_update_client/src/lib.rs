@@ -19,6 +19,7 @@ extern crate owning_ref;
 extern crate spawn;
 extern crate task;
 
+/*
 
 use core::str::{self, FromStr};
 use core::fmt::Write;
@@ -215,3 +216,7 @@ fn millis_since(start_time: u64) -> u64 {
     // Convert to ms
     (end_time - start_time) * hpet_freq / 1_000_000_000_000
 }
+
+
+
+*/

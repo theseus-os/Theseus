@@ -21,7 +21,7 @@ extern crate spin;
 use core::sync::atomic::spin_loop_hint;
 use event_types::Event;
 use dfqueue::DFQueueProducer;
-use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Mutex;

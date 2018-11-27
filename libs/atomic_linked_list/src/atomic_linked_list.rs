@@ -154,7 +154,7 @@ impl<'a, T: 'a> Iterator for AtomicLinkedListIterMut<'a, T> {
 #[test]
 /// To run this test, execute: `cargo test test_ll -- --nocapture`
 fn test_ll() {
-    use alloc::arc::Arc;
+    use alloc::sync::Arc;
     use std::thread;
 
     let list: Arc<AtomicLinkedList<u64>> = Arc::new(AtomicLinkedList::new());

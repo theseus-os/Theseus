@@ -15,7 +15,7 @@ extern crate task;
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
-use alloc::VecDeque;
+use alloc::collections::VecDeque;
 use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::TaskRef;
@@ -218,7 +218,7 @@ impl RunQueue {
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
     // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
-    pub fn iter(&self) -> alloc::vec_deque::Iter<TaskRef> {
+    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<TaskRef> {
         self.queue.iter()
     }
 

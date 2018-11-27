@@ -5,7 +5,7 @@ authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 
 [dependencies.log]
@@ -17,7 +17,7 @@ path = "../../libs/mouse_data"
 
 
 # [dependencies.lazy_static]
-# features = ["spin_no_std"]
+# features = ["spin_no_std", "nightly"]
 # version = "0.2.1"
 
 

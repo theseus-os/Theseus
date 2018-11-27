@@ -16,8 +16,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.27.0-nightly (ac3c2288f 2018-04-18)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-04-19
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.32.0-nightly (f1e2fa8f0 2018-11-20)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-11-21
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	

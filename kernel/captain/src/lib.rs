@@ -17,10 +17,8 @@
 //!
 
 #![no_std]
-
 #![feature(alloc)]
 #![feature(asm)]
-#![feature(used)]
 #![feature(core_intrinsics)]
 
 
@@ -49,10 +47,12 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-#[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate network_test;
+
+#[cfg(test_ota_update_client)]
 extern crate ota_update_client;
 
 #[cfg(simd_personality)]
@@ -60,8 +60,9 @@ extern crate simd_personality;
 
 
 
-use alloc::arc::Arc;
-use alloc::{String, Vec};
+use alloc::sync::Arc;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};

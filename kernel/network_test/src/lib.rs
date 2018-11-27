@@ -9,6 +9,7 @@
 
 #![no_std]
 #![feature(alloc)]
+#![feature(try_from)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
@@ -23,28 +24,26 @@ extern crate acpi;
 // extern crate logger;
 extern crate memory;
 extern crate owning_ref;
-extern crate spawn;
-extern crate task;
 
-
+use core::convert::TryInto;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::string::ToString;
+use alloc::collections::BTreeMap;
 use dfqueue::{DFQueue, DFQueueProducer, DFQueueConsumer};
 use spin::Once;
 // use core::fmt;
 use acpi::get_hpet;
-use smoltcp::wire::{EthernetAddress, IpAddress};
-use smoltcp::iface::{ArpCache, SliceArpCache, EthernetInterface};
-use smoltcp::socket::{AsSocket, SocketSet}; 
-use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketBuffer};
+use smoltcp::time::Instant;
+use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr};
+use smoltcp::iface::{NeighborCache, EthernetInterfaceBuilder};
+use smoltcp::socket::SocketSet;
+use smoltcp::socket::{UdpSocket, UdpSocketBuffer, UdpPacketMetadata};
 use smoltcp::wire::IpEndpoint;
 use e1000_smoltcp_device::E1000Device;
 use network_interface_card::NetworkInterfaceCard;
-use task::TaskRef;
 use irq_safety::MutexIrqSafe;
-use spawn::KernelTaskBuilder;
 
 
 static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
@@ -69,8 +68,8 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     let skb_size = 8 * 1024; // 8KiB, randomly chosen
 
     // For UDP
-    let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
-    let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketBuffer::new(vec![0; skb_size])]);
+    let udp_rx_buffer = UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; skb_size]);
+    let udp_tx_buffer = UdpSocketBuffer::new(vec![UdpPacketMetadata::EMPTY], vec![0; skb_size]);
     let udp_socket = UdpSocket::new(udp_rx_buffer, udp_tx_buffer);
     
     // For TCP - not in use yet
@@ -82,7 +81,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     // let tcp2_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
     // let tcp2_socket = TcpSocket::new(tcp2_rx_buffer, tcp2_tx_buffer);
 
-    let arp_cache = SliceArpCache::new(vec![Default::default(); 8]);
+    let neighbor_cache = NeighborCache::new(BTreeMap::new());
 
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
 
@@ -91,28 +90,27 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     // let tcp2_handle = sockets.add(tcp2_socket);
 
     // create a device that connects the smoltcp data link layer to our e1000 driver
-    let device = E1000Device::new(nic);
+    let device: E1000Device<N> = E1000Device::new(nic);
 
     // setup destination address and port
     let dest_addr = IpAddress::v4(192, 168, 69, 100); // the default gateway (router?)
     let dest_port = 5901;
 
     // setup host ip address (this machine)
-    let local_addr = [IpAddress::v4(192, 168, 69, 1)];
+    let local_addr = IpCidr::new(IpAddress::v4(192, 168, 69, 1), 24);
     let local_port = 6969;
 
     // Initializing the Ethernet interface
     let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
-    let mut iface = EthernetInterface::new(
-        Box::new(device), 
-        Box::new(arp_cache) as Box<ArpCache>,
-        hardware_mac_addr, 
-        local_addr
-    );  
+    let mut iface = EthernetInterfaceBuilder::new(device)
+        .ethernet_addr(hardware_mac_addr)
+        .neighbor_cache(neighbor_cache)
+        .ip_addrs([local_addr])
+        .finalize();
 
     // bind the udp socket to a local port
     {
-        let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
+        let mut udp_socket = sockets.get::<UdpSocket>(udp_handle);
         if let Err(_e) = udp_socket.bind(local_port) {
             error!("network_test::init(): error binding UDP socket: {:?}", _e);
         }
@@ -131,7 +129,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     // the main loop for processing network transmit/receive operations, should be run as its own Task.
     loop {
         {
-            let udp_socket: &mut UdpSocket = sockets.get_mut(udp_handle).as_socket();
+            let mut udp_socket = sockets.get::<UdpSocket>(udp_handle);
 
             // Receiving packets
             match udp_socket.recv() {
@@ -161,9 +159,12 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
         }
 
+        let timestamp: i64 = millis_since(startup_time)?
+            .try_into()
+            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+
         // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp = millis_since(startup_time);
-        let _next_poll_time = match iface.poll(&mut sockets, timestamp) {
+        let _next_poll_time = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
             Ok(t) => t,
             Err(err) => { 
                 warn!("network_test::init(): poll error: {}", err);
@@ -176,11 +177,14 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
 
 /// Function to calculate time since a give time in ms
-fn millis_since(start_time: u64) -> u64 {
-    let end_time: u64 = get_hpet().as_ref().unwrap().get_counter();
-    let hpet_freq: u64 = get_hpet().as_ref().unwrap().counter_period_femtoseconds() as u64;
+fn millis_since(start_time: u64) -> Result<u64, &'static str> {
+    let hpet_guard = get_hpet();
+    let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
+    let end_time: u64 = hpet.get_counter();
+    let hpet_freq: u64 = hpet.counter_period_femtoseconds() as u64;
     // Convert to ms
-    (end_time - start_time) * hpet_freq / 1_000_000_000_000
+    let diff = (end_time - start_time) * hpet_freq / 1_000_000_000_000;
+    Ok(diff)
 }
 
 // /// Function to send debug messages using UDP to configured destination

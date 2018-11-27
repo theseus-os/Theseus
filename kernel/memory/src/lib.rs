@@ -6,7 +6,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(asm)]
-#![feature(unique)]
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
@@ -40,8 +39,9 @@ use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
-use alloc::{Vec, String};
-use alloc::arc::Arc;
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 use qp_trie::{Trie, wrapper::BString};
 
@@ -148,7 +148,6 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
         let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
             .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
         let starting_phys_addr = frames.start_address();
-        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
         let mp = active_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
         Ok((mp, starting_phys_addr))
     } 

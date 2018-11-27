@@ -21,7 +21,7 @@ pub struct NicDeviceRef<'n, N: NetworkInterfaceCard + 'static> {
 pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
     /// Blocks until the packet has been successfully sent by the networking card hardware.
-    fn send_packet(&mut self, transmit_buffer: &TransmitBuffer) -> Result<(), &'static str>;
+    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
 
     /// Returns the earliest `ReceivedFrame`, which is essentially a list of `ReceiveBuffer`s 
     /// that each contain an individual piece of the frame.
@@ -62,7 +62,8 @@ impl TransmitBuffer {
     }
 
     /// Send this `TransmitBuffer` out through the given `NetworkInterfaceCard`. 
-    pub fn send<N: NetworkInterfaceCard>(&self, nic: &mut N) -> Result<(), &'static str> {
+    /// This function consumes this `TransmitBuffer`.
+    pub fn send<N: NetworkInterfaceCard>(self, nic: &mut N) -> Result<(), &'static str> {
         nic.send_packet(self)
     }
 }
