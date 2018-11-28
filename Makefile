@@ -338,7 +338,7 @@ QEMU_FLAGS += -smp 4
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:1f:c6:9c:89:4c -net user,vlan=1 -net dump,file=netdump.pcap
 #QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
 
-# QEMU_FLAGS += -device e1000,netdev=network0,mac=00:1f:c6:9c:89:4c -netdev tap,id=network0,ifname=tap0,script=no,downscript=no  #-netdev user,id=network0
+QEMU_FLAGS += -device e1000,netdev=network0,mac=00:1f:c6:9c:89:4c -netdev tap,id=network0,ifname=tap0,script=no,downscript=no  #-netdev user,id=network0
 #QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
 
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
