@@ -567,11 +567,15 @@ impl Terminal {
                         if let Some(val) = val {
                             self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
                         }
-                    }
+                    },
+
+                    ExitValue::Killed(task::KillReason::Requested) => {
+                        self.print_to_terminal("^C\n".to_string())?;
+                    },
                     // If the user manually aborts the task
                     ExitValue::Killed(kill_reason) => {
                         warn!("task was killed because {:?}", kill_reason);
-                        self.print_to_terminal("^C\n".to_string())?;
+                        self.print_to_terminal(format!("task was killed because {:?}\n", kill_reason))?;
                     }
                 }
                 
@@ -637,6 +641,7 @@ impl Terminal {
                     let prompt_string = self.prompt_string.clone();
                     self.print_to_terminal(prompt_string)?;
                     self.correct_prompt_position = true;
+                    self.left_shift = 0;
                     return Ok(());
                 }
             };
