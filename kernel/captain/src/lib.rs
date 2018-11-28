@@ -49,14 +49,12 @@ extern crate scheduler;
 extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
-extern crate exceptions_full;
+#[cfg(test_network)] extern crate exceptions_full;
 extern crate network_test;
 
-#[cfg(test_ota_update_client)]
-extern crate ota_update_client;
+#[cfg(test_ota_update_client)] extern crate ota_update_client;
 
-#[cfg(simd_personality)]
-extern crate simd_personality;
+#[cfg(simd_personality)] extern crate simd_personality;
 
 
 

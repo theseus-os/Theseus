@@ -128,6 +128,18 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
     // the main loop for processing network transmit/receive operations, should be run as its own Task.
     loop {
+        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
+        let timestamp: i64 = millis_since(startup_time)?
+            .try_into()
+            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
+            Ok(b) => b,
+            Err(err) => {
+                warn!("network_test::init(): poll error: {}", err);
+                false  // continue;
+            }
+        };  
+
         {
             let mut udp_socket = sockets.get::<UdpSocket>(udp_handle);
 
@@ -143,7 +155,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             match msg_queue_consumer.peek() {
                 Some(element) => {
                     debug!("network_test::init(): about to send UDP packet {:?}", &*element);
-                    // debug!("network_test::init(): can_send: {:?}, can_recv: {:?}", udp_socket.can_send(), udp_socket.can_recv());
+                    debug!("network_test::init(): can_send: {:?}, can_recv: {:?}", udp_socket.can_send(), udp_socket.can_recv());
                     if udp_socket.can_send() {
                         debug!("network_test::init(): sending UDP packet...");
                         if let Err(_e) = udp_socket.send_slice(element.as_bytes(), dest_endpoint) {
@@ -158,19 +170,6 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                 _ => { }
             }
         }
-
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let _next_poll_time = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(t) => t,
-            Err(err) => { 
-                warn!("network_test::init(): poll error: {}", err);
-                continue;
-            }
-        };  
     }
 }
 

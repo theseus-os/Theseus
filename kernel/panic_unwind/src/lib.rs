@@ -29,10 +29,11 @@ use core::panic::PanicInfo;
 pub extern "C" fn eh_personality() {}
 
 
+/// The singular entry point for a language-level panic.
 #[cfg(not(test))]
 #[panic_handler]
 #[doc(hidden)]
-extern "C" fn panic_fmt(info: &PanicInfo) -> ! {
+fn panic_entry_point(info: &PanicInfo) -> ! {
 
     // Since a panic could occur before the memory subsystem is initialized,
     // we must check before using alloc types or other functions that depend on the memory system (the heap).
