@@ -641,6 +641,7 @@ impl Terminal {
                     let prompt_string = self.prompt_string.clone();
                     self.print_to_terminal(prompt_string)?;
                     self.correct_prompt_position = true;
+                    self.left_shift = 0;
                     return Ok(());
                 }
             };
