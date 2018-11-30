@@ -70,7 +70,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for E1000De
             nic.get_received_frame()?
         };
 
-        debug!("E1000Device::receive(): got E1000 frame, consists of {} ReceiveBuffers.", received_frame.0.len());
+        // debug!("E1000Device::receive(): got E1000 frame, consists of {} ReceiveBuffers.", received_frame.0.len());
         // TODO FIXME: add support for handling a frame that consists of multiple ReceiveBuffers
         if received_frame.0.len() > 1 {
             error!("E1000Device::receive(): WARNING: E1000 frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
@@ -87,7 +87,6 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for E1000De
 
         // Just create and return a pair of (receive token, transmit token), 
         // the actual rx buffer handling is done in the RxToken::consume() function
-        trace!("E1000Device::receive(): creating RxToken-TxToken pair.");
         Some((
             RxToken(rxbuf_byte_slice),
             TxToken {
@@ -101,7 +100,6 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for E1000De
         // the actual tx buffer creation is done in the TxToken::consume() function.
         // Also, we can't accurately create an actual transmit buffer here
         // because we don't yet know its required length.
-        trace!("E1000Device::transmit(): creating TxToken.");
         Some(TxToken {
             nic_ref: self.nic_ref,
         })
@@ -126,7 +124,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
             return Err(Error::Exhausted)
         }
 
-        debug!("E1000Device::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
+        // debug!("E1000D/evice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
         // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
         let mut txbuf = TransmitBuffer::new(len as u16).map_err(|e| {
             error!("E1000Device::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);

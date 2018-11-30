@@ -47,9 +47,15 @@ use irq_safety::MutexIrqSafe;
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
 
 /// The TCP port on the update server that listens for update requests 
-const DEFAULT_DESTINATION_PORT: u16 = 8098;
+const DEFAULT_DESTINATION_PORT: u16 = 60123;
 
-/// Standard home router address. // TODO FIXME: use DHCP to acquire IP
+/// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
+const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
+
+/// The TCP port on the this machine that can receive replies from the server.
+const DEFAULT_LOCAL_PORT: u16 = 52347;
+
+/// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
 const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
 
 
@@ -82,12 +88,20 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     let dest_port = DEFAULT_DESTINATION_PORT;
 
     // setup local ip address (this machine) // TODO FIXME: obtain an IP via DHCP
-    let local_addr = [IpCidr::new(IpAddress::v4(192, 168, 1, 100), 24)];
-    let local_port = 6969;
+    let local_addr = [IpCidr::new(
+        IpAddress::v4(
+            DEFAULT_LOCAL_IP[0],
+            DEFAULT_LOCAL_IP[1],
+            DEFAULT_LOCAL_IP[2],
+            DEFAULT_LOCAL_IP[3],
+        ),
+        24
+    )];
+    let local_port = DEFAULT_LOCAL_PORT;
 
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     
-    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 64]);
+    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
     let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
     let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
@@ -116,10 +130,73 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         .ip_addrs(local_addr)
         .routes(routes)
         .finalize();
+
     {
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         socket.connect((dest_addr, dest_port), local_port).unwrap();
     }
+
+    let mut loop_ctr = 0;
+    let mut msg_ctr = 0;
+    loop { 
+        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
+        let timestamp: i64 = millis_since(startup_time)?
+            .try_into()
+            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
+            Ok(b) => b,
+            Err(err) => {
+                warn!("ota_update_client: poll error: {}", err);
+                false  // continue;
+            }
+        };  
+
+        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+        if socket.can_send() {
+            if msg_ctr % 2 == 0 {
+                let msg = format!("test message {}", msg_ctr);
+                debug!("ota_update_client: sending msg {:?} ...", msg);
+                write!(socket, "{}", msg).unwrap();
+                debug!("ota_update_client: Sent msg {:?}", msg);
+                msg_ctr += 1;
+            }
+
+            if msg_ctr > 8 {
+                info!("\n\nota_update_client: network test complete!\n\n");
+                return Ok(());
+            }
+        }
+        else {
+            if loop_ctr % 50 == 0 {
+                debug!("ota_update_client: waiting for socket can_send...");
+            }
+        }
+
+
+        if socket.can_recv() {
+            if msg_ctr % 2 == 1 {
+                debug!("ota_update_client: waiting to receive msg {}", msg_ctr);
+                let recv_data = socket.recv(|buf| {
+                    let msg = String::from(str::from_utf8(&buf).unwrap());
+                    (msg.as_bytes().len(), msg)
+                }).unwrap();
+                debug!("ota_update_client: received msg: {}", recv_data);
+                msg_ctr += 1;
+            }
+        }
+        else {
+            if loop_ctr % 50 == 0 {
+                debug!("ota_update_client: waiting for socket can_recv...");
+            }
+        }
+
+        loop_ctr += 1;
+    }
+
+    Ok(())
+
+
+    /*
 
     let mut tcp_active = false;
     let mut initial_val_send = false;
@@ -156,34 +233,33 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             if socket.may_send() {
                 if socket.can_send() && send_items == 0 {
                     debug!("ota_update_client: tcp:6969 send greeting");
-                    //let s: String = number_of_items.to_string();
-                    //write!(socket, "{}",s).unwrap();
-                    //write!(socket, "4").unwrap();
-                    //write!(socket, "GET /a#cpu.o HTTP/1.1\r\nHost: 168.7.138.84\r\n\r\n Connection: keep-alive\r\n\r\n Keep-Alive: 300\r\n").unwrap();
-                    //socket.close();
                     write!(socket, "a#terminal_print.o").unwrap();
                     debug!("ota_update_client: Send 0");
+                    send_items = send_items + 1;
                 }
-                if send_items == 1 {
+                if socket.can_send() && send_items == 1 {
                     write!(socket, "a#test_panic.o").unwrap();
                     debug!("ota_update_client: Send 1");
+                    send_items = send_items + 1;
                 }
-                if send_items == 2 {
+                if socket.can_send() && send_items == 2 {
                     write!(socket, "k#acpi-b3db4f72ccdc307b.o").unwrap();
                     debug!("ota_update_client: Send 2");
+                    send_items = send_items + 1;
                 }
-                if send_items == 3 {
+                if socket.can_send() && send_items == 3 {
                     write!(socket, "k#ap_start-5e82a1be3db78c92.o").unwrap();
                     debug!("ota_update_client: Send 3");
+                    send_items = send_items + 1;
                 }
-                if send_items == 4 {
+                if socket.can_send() && send_items == 4 {
                     write!(socket, "Done.n").unwrap(); //This word is needed to end the sending of modules
-                    debug!("ota_update_client: Send 4");
+                    debug!("ota_update_client: Send 4 -- Done.");
+                    send_items = 100;
                 }
-                send_items = send_items + 1;
             }
 
-            if socket.may_recv() {
+            if socket.can_recv() && send_items == 100 {
                 let data = socket.recv(|data| {
                     let mut data = data.to_owned();
                     if data.len() > 0 {
@@ -220,6 +296,8 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
         }
     }
+
+    */
 }
 
 

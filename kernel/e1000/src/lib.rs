@@ -252,16 +252,16 @@ impl NetworkInterfaceCard for E1000Nic {
         self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
         
 
-        debug!("THD {}", self.regs.tdh.read());
-        debug!("TDT!{}", self.regs.tdt.read());
+        // debug!("THD {}", self.regs.tdh.read());
+        // debug!("TDT!{}", self.regs.tdt.read());
 
         self.regs.tdt.write(self.tx_cur as u32);   
     
-        debug!("THD {}", self.regs.tdh.read());
-        debug!("TDT!{}", self.regs.tdt.read());
-        debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-        debug!("Value of tx descriptor address: {:x}", self.tx_descs[old_cur as usize].phys_addr);
-        debug!("Waiting for packet to send!");
+        // debug!("THD {}", self.regs.tdh.read());
+        // debug!("TDT!{}", self.regs.tdt.read());
+        // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+        // debug!("Value of tx descriptor address: {:x}", self.tx_descs[old_cur as usize].phys_addr);
+        // debug!("Waiting for packet to send!");
         
         while (self.tx_descs[old_cur as usize].status & TX_DD) == 0 {
             //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
@@ -269,7 +269,7 @@ impl NetworkInterfaceCard for E1000Nic {
         }
         //bit 0 should be set when done
 
-        debug!("Packet is sent!");  
+        // debug!("Packet is sent!");  
         Ok(())
     }
 
@@ -687,7 +687,6 @@ impl E1000Nic {
 }
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
-    warn!("E1000 handler!");
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
         let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {
