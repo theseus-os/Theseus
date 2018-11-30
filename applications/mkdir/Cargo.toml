@@ -12,8 +12,8 @@ path = "../terminal_print"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.vfs]
-path = "../../kernel/vfs"
+[dependencies.filesystem]
+path = "../../kernel/filesystem"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

@@ -5,12 +5,12 @@
 
 extern crate task;
 extern crate getopts;
-extern crate vfs;
+extern crate filesystem;
 
 use getopts::Options;
 use alloc::{Vec, String};
 use task::{TASKLIST, RunState};
-use vfs::File;
+use filesystem::File;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

@@ -19,7 +19,7 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
-extern crate vfs;
+extern crate filesystem;
 
 extern crate terminal_print;
 extern crate print;
@@ -36,7 +36,7 @@ use alloc::arc::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use vfs::{StrongDirRef, FileDirectory};
+use filesystem::{StrongDirRef, FileDirectory};
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueue;
 use environment::Environment;
@@ -138,10 +138,10 @@ impl Terminal {
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
         
-        let root = vfs::get_root();
+        let root = filesystem::get_root();
         
         let env = Environment {
-            working_dir: vfs::get_root(), 
+            working_dir: filesystem::get_root(), 
         };
 
         let mut prompt_string = root.lock().get_path_as_string(); // ref numbers are 0-indexed

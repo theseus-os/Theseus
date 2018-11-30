@@ -5,10 +5,10 @@ extern crate task;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-extern crate vfs;
+extern crate filesystem;
 
 use alloc::{Vec, String};
-use vfs::Directory;
+use filesystem::Directory;
 use alloc::arc::Arc;
 
 #[no_mangle]

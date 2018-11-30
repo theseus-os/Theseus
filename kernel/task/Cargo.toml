@@ -46,8 +46,8 @@ path = "../context_switch"
 [dependencies.context_switch_sse]
 path = "../context_switch_sse"
 
-[dependencies.vfs]
-path = "../vfs"
+[dependencies.filesystem]
+path = "../filesystem"
 
 [dependencies.environment]
 path = "../environment"

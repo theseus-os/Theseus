@@ -40,7 +40,7 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
-extern crate vfs;
+extern crate filesystem;
 extern crate context_switch;
 extern crate environment;
 extern crate spin;
@@ -59,7 +59,7 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use vfs::{Directory, FSNode};
+use filesystem::{Directory, FSNode};
 use environment::Environment;
 use spin::Mutex;
 
@@ -90,7 +90,7 @@ lazy_static! {
 /// Initializes the task filesystem by creating a directory called task and by creating a file for each task
 pub fn init() -> Result<(), &'static str> {
     // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
-    let root = vfs::get_root();
+    let root = filesystem::get_root();
     let name = String::from("tasks");
     let task_dir = TaskDirectory::new(name.clone(), Arc::downgrade(&root));
     root.lock().add_fs_node(FSNode::Dir(task_dir))?;
@@ -243,7 +243,7 @@ impl Task {
 
         // TODO - change to option and initialize environment to none
         let env = Environment {
-            working_dir: vfs::get_root(), 
+            working_dir: filesystem::get_root(), 
         };
 
         Task {

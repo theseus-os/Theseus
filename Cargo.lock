@@ -93,6 +93,7 @@ dependencies = [
  "e1000 0.1.0",
  "event_types 0.1.0",
  "exceptions_full 0.1.0",
+ "filesystem 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_3d 0.1.0",
  "input_event_manager 0.1.0",
@@ -111,7 +112,6 @@ dependencies = [
  "syscall 0.1.0",
  "task 0.1.0",
  "tsc 0.1.0",
- "vfs 0.1.0",
  "vga_buffer 0.1.0",
  "window_manager 0.1.0",
 ]
@@ -120,11 +120,11 @@ dependencies = [
 name = "cat"
 version = "0.1.0"
 dependencies = [
+ "filesystem 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "vfs 0.1.0",
 ]
 
 [[package]]
@@ -136,11 +136,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "cd"
 version = "0.1.0"
 dependencies = [
+ "filesystem 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "vfs 0.1.0",
 ]
 
 [[package]]
@@ -267,7 +267,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "environment"
 version = "0.1.0"
 dependencies = [
- "vfs 0.1.0",
+ "filesystem 0.1.0",
 ]
 
 [[package]]
@@ -304,6 +304,16 @@ dependencies = [
  "runqueue 0.1.0",
  "task 0.1.0",
  "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "filesystem"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
 ]
 
@@ -537,10 +547,10 @@ dependencies = [
 name = "ls"
 version = "0.1.0"
 dependencies = [
+ "filesystem 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "vfs 0.1.0",
 ]
 
 [[package]]
@@ -575,10 +585,10 @@ dependencies = [
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
+ "filesystem 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "vfs 0.1.0",
 ]
 
 [[package]]
@@ -772,10 +782,10 @@ dependencies = [
 name = "ps"
 version = "0.1.0"
 dependencies = [
+ "filesystem 0.1.0",
  "getopts 0.2.17 (git+https://github.com/kevinaboos/getopts)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "vfs 0.1.0",
 ]
 
 [[package]]
@@ -1001,6 +1011,7 @@ dependencies = [
  "context_switch 0.1.0",
  "context_switch_sse 0.1.0",
  "environment 0.1.0",
+ "filesystem 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1009,7 +1020,6 @@ dependencies = [
  "panic_info 0.1.0",
  "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
- "vfs 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -1020,6 +1030,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
+ "filesystem 0.1.0",
  "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1032,7 +1043,6 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
  "text_display 0.1.0",
- "vfs 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -1092,16 +1102,6 @@ dependencies = [
 [[package]]
 name = "util"
 version = "0.1.0"
-
-[[package]]
-name = "vfs"
-version = "0.1.0"
-dependencies = [
- "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
-]
 
 [[package]]
 name = "vga_buffer"

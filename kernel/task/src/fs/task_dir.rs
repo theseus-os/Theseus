@@ -4,7 +4,7 @@ use RunState;
 use spin::Mutex;
 use alloc::boxed::Box;
 use TASKLIST;
-use vfs::{Directory, File, FileDirectory, VFSDirectory, VFSFile, WeakDirRef, Path, StrongAnyDirRef, FSNode};
+use filesystem::{Directory, File, FileDirectory, VFSDirectory, VFSFile, WeakDirRef, Path, StrongAnyDirRef, FSNode};
 use alloc::arc::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
@@ -88,7 +88,7 @@ impl<'a> File for TaskFile<'a> {
 }
 
 
-use vfs::StrongFileRef;
+use filesystem::StrongFileRef;
 
 pub struct TaskDirectory {
     name: String,

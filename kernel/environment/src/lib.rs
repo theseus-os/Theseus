@@ -2,11 +2,11 @@
 #![feature(alloc)]
 
 #[macro_use] extern crate alloc;
-extern crate vfs;
+extern crate filesystem;
 
 use alloc::String;
 use alloc::arc::Arc;
-use vfs::{StrongAnyDirRef, FileDirectory, VFSDirectory};
+use filesystem::{StrongAnyDirRef, FileDirectory, VFSDirectory};
 
 /// A structure that contains Environmnt variables for a given task
 pub struct Environment {

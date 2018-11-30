@@ -179,7 +179,7 @@ impl FileDirectory for VFSDirectory {
                 }
             },
             Err(err) => {
-                error!("failed in vfs::get_self_pointer because: {}", err);
+                error!("failed in filesystem::get_self_pointer because: {}", err);
                 return Err(err);
                 },
         }

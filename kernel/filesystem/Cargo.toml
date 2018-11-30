@@ -1,5 +1,5 @@
 [package]
-name = "vfs"
+name = "filesystem"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
 

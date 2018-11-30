@@ -5,5 +5,5 @@ authors = ["christinewang5 <chrissywang54@gmail.com>"]
 
 [dependencies]
 
-[dependencies.vfs]
-path = "../vfs"
+[dependencies.filesystem]
+path = "../filesystem"
