@@ -58,7 +58,10 @@ pub trait Directory : FileDirectory + Send {
 /// Traits that both files and directories share
 pub trait FileDirectory {
     fn get_path_as_string(&self) -> String;
-    fn get_path(&self) -> Path;
+        /// Gets the absolute pathname as a Path struct
+    fn get_path(&self) -> Path {
+        Path::new(self.get_path_as_string())
+    }
     fn get_name(&self) -> String;
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str>; // DON'T CALL THIS (add_fs_node performs this function)
@@ -140,10 +143,7 @@ impl FileDirectory for VFSDirectory {
         }
         return path;
     }
-    /// Gets the absolute pathname as a Path struct
-    fn get_path(&self) -> Path {
-        Path::new(self.get_path_as_string())
-    }
+
     fn get_name(&self) -> String {
         self.name.clone()
     }

@@ -695,9 +695,6 @@ impl<'a> FileDirectory for TaskFile<'a> {
     fn get_path_as_string(&self) -> String {
         return format!("/root/tasks/{}", self.get_name());
     }
-    fn get_path(&self) -> Path {
-        return self.path.clone();
-    }
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
@@ -787,10 +784,7 @@ impl FileDirectory for TaskDirectory {
         }
         return path;
     }
-    /// Gets the absolute pathname as a Path struct
-    fn get_path(&self) -> Path {
-        Path::new(self.get_path_as_string())
-    }
+
     fn get_name(&self) -> String {
         return String::from("tasks");
     }
