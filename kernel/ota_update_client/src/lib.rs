@@ -53,7 +53,7 @@ const DEFAULT_DESTINATION_PORT: u16 = 60123;
 const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
 
 /// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 52347;
+const DEFAULT_LOCAL_PORT: u16 = 53132;
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
 const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
@@ -61,6 +61,20 @@ const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
 
 
 static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
+
+
+
+/// Function to calculate time since a give time in ms
+fn millis_since(start_time: u64) -> Result<u64, &'static str> {
+    let hpet_guard = get_hpet();
+    let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
+    let end_time: u64 = hpet.get_counter();
+    let hpet_freq: u64 = hpet.counter_period_femtoseconds() as u64;
+    // Convert to ms
+    let diff = (end_time - start_time) * hpet_freq / 1_000_000_000_000;
+    Ok(diff)
+}
+
 
 
 /// Initialize the network live update client, 
@@ -136,8 +150,13 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         socket.connect((dest_addr, dest_port), local_port).unwrap();
     }
 
+
+    
+    // /*  SIMPLE TCP TEST START
+
     let mut loop_ctr = 0;
     let mut msg_ctr = 0;
+    let mut done_sending = false;
     loop { 
         // poll the smoltcp ethernet interface (i.e., flush tx/rx)
         let timestamp: i64 = millis_since(startup_time)?
@@ -152,23 +171,25 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         };  
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        if socket.can_send() {
-            if msg_ctr % 2 == 0 {
-                let msg = format!("test message {}", msg_ctr);
-                debug!("ota_update_client: sending msg {:?} ...", msg);
-                write!(socket, "{}", msg).unwrap();
-                debug!("ota_update_client: Sent msg {:?}", msg);
-                msg_ctr += 1;
-            }
+        if !done_sending {
+            if socket.can_send() {
+                if msg_ctr % 2 == 0 {
+                    let msg = format!("test message {}", msg_ctr);
+                    debug!("ota_update_client: sending msg {:?} ...", msg);
+                    write!(socket, "{}", msg).unwrap();
+                    debug!("ota_update_client: Sent msg {:?}", msg);
+                    msg_ctr += 1;
+                }
 
-            if msg_ctr > 8 {
-                info!("\n\nota_update_client: network test complete!\n\n");
-                return Ok(());
+                if msg_ctr > 8 {
+                    info!("\n\nota_update_client: completed sending messages!\n\n");
+                    done_sending = true;
+                }
             }
-        }
-        else {
-            if loop_ctr % 50 == 0 {
-                debug!("ota_update_client: waiting for socket can_send...");
+            else {
+                if loop_ctr % 50000 == 0 {
+                    debug!("ota_update_client: waiting for socket can_send...");
+                }
             }
         }
 
@@ -182,10 +203,15 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                 }).unwrap();
                 debug!("ota_update_client: received msg: {}", recv_data);
                 msg_ctr += 1;
+
+                if recv_data == "Echo msg: test message 8" {
+                    info!("\n\nota_update_client: completed receiving messages!\n\n");
+                    break;
+                }
             }
         }
         else {
-            if loop_ctr % 50 == 0 {
+            if loop_ctr % 50000 == 0 {
                 debug!("ota_update_client: waiting for socket can_recv...");
             }
         }
@@ -193,9 +219,47 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         loop_ctr += 1;
     }
 
+
+    let mut issued_close = false;
+    loop {
+        loop_ctr += 1;
+
+        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
+        let timestamp: i64 = millis_since(startup_time)?
+            .try_into()
+            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
+            Ok(b) => b,
+            Err(err) => {
+                warn!("ota_update_client: poll error: {}", err);
+                false  // continue;
+            }
+        };
+
+
+        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+        if !issued_close {
+            debug!("ota_update_client: socket state is {:?}", socket.state());
+
+            debug!("ota_update_client: closing socket...");
+            socket.close();
+            debug!("ota_update_client: socket state (after close) is now {:?}", socket.state());
+            issued_close = true;
+        }
+
+        if loop_ctr % 50000 == 0 {
+            debug!("ota_update_client: socket state (looping) is now {:?}", socket.state());
+        }
+
+    }
+
     Ok(())
+    
+    // END SIMPLE TCP TEST */
 
-
+    
+    
+    
     /*
 
     let mut tcp_active = false;
@@ -298,16 +362,4 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     }
 
     */
-}
-
-
-/// Function to calculate time since a give time in ms
-fn millis_since(start_time: u64) -> Result<u64, &'static str> {
-    let hpet_guard = get_hpet();
-    let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
-    let end_time: u64 = hpet.get_counter();
-    let hpet_freq: u64 = hpet.counter_period_femtoseconds() as u64;
-    // Convert to ms
-    let diff = (end_time - start_time) * hpet_freq / 1_000_000_000_000;
-    Ok(diff)
 }
