@@ -49,7 +49,7 @@ use atomic_linked_list::atomic_map::*;
 use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use alloc::BTreeSet;
+use alloc::collections::BTreeSet;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicUsize = AtomicUsize::new(0);

@@ -8,10 +8,10 @@ extern crate irq_safety;
 extern crate util;
 
 use alloc::string::String;
-use alloc::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, VecDeque};
 use irq_safety::{RwLockIrqSafe};
 use spin::{Once, RwLock};
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 use util::c_str::{CStr};
 
 

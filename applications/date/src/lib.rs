@@ -8,7 +8,8 @@ extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate rtc;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 
 
 #[no_mangle]

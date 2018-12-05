@@ -5,8 +5,10 @@
 
 use core::ops::{Deref};
 use spin::Mutex;
-use alloc::{Vec, String, BTreeMap, BTreeSet};
-use alloc::arc::{Arc, Weak};
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::{Arc, Weak};
 use memory::{MappedPages, ModuleArea, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};

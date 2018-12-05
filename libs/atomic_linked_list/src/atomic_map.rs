@@ -201,7 +201,7 @@ impl<'a, K: PartialEq + 'a, V: 'a> Iterator for AtomicMapIterMut<'a, K, V> {
 #[test]
 /// To run this test, execute: `cargo test test_map -- --nocapture`
 fn test_map() {
-    use alloc::arc::Arc;
+    use alloc::sync::Arc;
     use std::thread;
 
     let list: AtomicMap<&'static str, u64> = AtomicMap::new();

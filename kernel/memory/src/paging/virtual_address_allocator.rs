@@ -5,7 +5,7 @@
 use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
 use super::{VirtualAddress, Page, PageIter};
 use spin::Mutex;
-use alloc::LinkedList;
+use alloc::collections::LinkedList;
 
 /// A group of contiguous pages, much like a hole in other allocators. 
 struct Chunk {

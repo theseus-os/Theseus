@@ -6,7 +6,7 @@ authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.18"
 
 [dependencies.pmu_x86]
 path = "../../kernel/pmu_x86"
