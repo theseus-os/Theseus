@@ -445,7 +445,6 @@ impl E1000Nic {
 
     /// Start up the network
     fn start_link(regs: &mut IntelE1000Registers) {
-        //for i217 just check that bit1 is set of reg status
         let val = regs.ctrl.read();
         regs.ctrl.write(val | 0x40 | 0x20);
 
@@ -666,20 +665,24 @@ impl E1000Nic {
     /// This should be invoked from the actual interrupt handler entry point.
     fn handle_interrupt(&mut self) -> Result<(), &'static str> {
         let status = self.clear_interrupt_status();        
+        let mut handled = false;
 
         // a link status change
         if (status & INT_LSC) == INT_LSC {
             debug!("e1000::handle_interrupt(): link status changed");
             Self::start_link(&mut self.regs);
+            handled = true;
         }
-        // TODO FIXME: @Ramla: Is it possible for both of these status bits to be set? (don't use `else if`)
+
         // receiver timer interrupt
-        else if (status & INT_RX) == INT_RX {
+        if (status & INT_RX) == INT_RX {
             debug!("e1000::handle_interrupt(): receive interrupt");
             self.handle_receive()?;
+            handled = true;
         }
-        else {
-            error!("e1000::handle_interrupt(): unhandled interrupt!");
+
+        if !handled {
+            error!("e1000::handle_interrupt(): unhandled interrupt!  status: {:#X}", status);
         }
         //regs.icr.read(); //clear interrupt
         Ok(())
