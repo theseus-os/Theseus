@@ -1355,7 +1355,7 @@ impl CrateNamespace {
 
     
     /// Adds the given symbol to this namespace's symbol map.
-    /// If the symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
+    /// If the symbol already exists in the symbol map, this replaces the existing symbol with the new one, warning if they differ in size.
     /// Returns true if the symbol was added, and false if it already existed and thus was not added.
     fn add_symbol(
         existing_symbol_map: &mut SymbolMap,
@@ -1367,13 +1367,14 @@ impl CrateNamespace {
             Entry::Occupied(_old_val) => {
                 if log_replacements {
                     if let Some(old_sec_ref) = _old_val.get().upgrade() {
+                        // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
                         let old_sec = old_sec_ref.lock();
                         let new_sec = new_section_ref.lock();
                         if new_sec.size != old_sec.size {
                             warn!("       add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_sec.size, new_sec.name);
                         } 
                         // else {
-                        //     info!("       add_symbol(): Skipping new symbol already present: old {:?}, new: {:?}", old_sec.name, new_sec.name);
+                        //     info!("       add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_sec.name);
                         // }
                     }
                 }
@@ -1433,11 +1434,15 @@ impl CrateNamespace {
             };
             
             if condition {
+                // trace!("add_symbols_filtered(): adding symbol {:?}", sec_ref);
                 let added = CrateNamespace::add_symbol(&mut existing_map, sec_name, sec_ref, log_replacements);
                 if added {
                     count += 1;
                 }
             }
+            // else {
+            //     trace!("add_symbols_filtered(): skipping symbol {:?}", sec_ref);
+            // }
         }
         
         count
@@ -1500,8 +1505,8 @@ impl CrateNamespace {
         // If not, our second try is to check the backup_namespace
         // to see if that namespace already has the section we want
         if let Some(backup) = backup_namespace {
-            info!("Symbol \"{}\" not initially found, attemping to load it from backup namespace {:?}", 
-                demangled_full_symbol, backup.name);
+            // info!("Symbol \"{}\" not initially found, attemping to load it from backup namespace {:?}", 
+            //     demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
                     // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
@@ -1511,15 +1516,16 @@ impl CrateNamespace {
                     if let Some(parent_crate_ref) = pcref_opt {
                         let parent_crate_name = {
                             let parent_crate = parent_crate_ref.lock_as_ref();
-                            // (1) We could either add just this one missing symbol ...
-                            // self.add_symbols(Some(sec.clone()).iter(), true);
-                            // (2) Or add all symbols from the already-loaded crate in the backup namespace
-                            self.add_symbols(parent_crate.sections.values(), true);
+                            // Here, there is a potential for optimization: add all symbols from the parent_crate into the current namespace.
+                            // While this would save time if future symbols were needed from this crate,
+                            // we *cannot* do this because it violates the expectations of certain namespaces. 
+                            // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
+                            self.add_symbols(Some(sec.clone()).iter(), true);
                             parent_crate.crate_name.clone()
                         };
-                        // info!("Using symbol {:?} (crate {:?}) from backup namespace {:?} in new namespace {:?}",
-                        //     demangled_full_symbol, parent_crate_name, backup.name, self.name);
-                        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref.clone());
+                        info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
+                            demangled_full_symbol, parent_crate_name, backup.name, self.name);
+                        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
                         return weak_sec;
                     }
                     else {
