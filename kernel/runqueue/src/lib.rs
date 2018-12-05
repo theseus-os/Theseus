@@ -122,7 +122,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        debug!("Adding task to runqueue {}, {:?}", self.core, task);
         self.queue.push_back(task);
         
         #[cfg(single_simd_task_optimization)]

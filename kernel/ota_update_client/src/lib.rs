@@ -20,6 +20,7 @@ extern crate memory;
 extern crate owning_ref;
 extern crate spawn;
 extern crate task;
+extern crate httparse;
 
 
 use core::convert::TryInto;
@@ -47,13 +48,14 @@ use irq_safety::MutexIrqSafe;
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
 
 /// The TCP port on the update server that listens for update requests 
-const DEFAULT_DESTINATION_PORT: u16 = 60123;
+// const DEFAULT_DESTINATION_PORT: u16 = 60123;
+const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
 const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
 
 /// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53132;
+const DEFAULT_LOCAL_PORT: u16 = 53145;
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
 const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
@@ -62,6 +64,20 @@ const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
 
 static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 
+
+/// The states that implement the finite state machine for 
+/// sending and receiving the HTTP request and response, respectively.
+#[derive(Debug)]
+enum HttpState {
+    /// The socket is not yet connected.
+    Connecting,
+    /// The socket is connected, but the HTTP request has not yet been sent.
+    Requesting,
+    /// The HTTP request has been sent, but the response has not yet been fully received.
+    ReceivingResponse,
+    /// The response has been received in full, including the entire content.
+    Responded
+}
 
 
 /// Function to calculate time since a give time in ms
@@ -85,6 +101,9 @@ fn millis_since(start_time: u64) -> Result<u64, &'static str> {
 pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
     where N: NetworkInterfaceCard
 {
+    Err("WIP does nothing right now")
+
+    /*
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
 
     // initialize the message queue
@@ -116,7 +135,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     let neighbor_cache = NeighborCache::new(BTreeMap::new());
     
     let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 128]);
+    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
     let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
@@ -145,16 +164,180 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         .routes(routes)
         .finalize();
 
+    let mut loop_ctr = 0;
+
+
+    let mut state = HttpState::Connecting;
+
+    let mut current_http_bytes: Vec<u8> = Vec::new();
+    let mut current_http_response: Option<httparse::Response> = None;
+
+    loop { 
+        loop_ctr += 1;
+
+        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
+        let timestamp: i64 = millis_since(startup_time)?
+            .try_into()
+            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
+            Ok(b) => b,
+            Err(err) => {
+                warn!("ota_update_client: poll error: {}", err);
+                false  // continue;
+            }
+        };  
+
+        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+
+        state = match state {
+            HttpState::Connecting if !socket.is_active() => {
+                debug!("ota_update_client: connecting...");
+                socket.connect((dest_addr, dest_port), local_port).unwrap();
+                debug!("ota_update_client: connected!");
+                HttpState::Requesting
+            }
+
+            HttpState::Requesting if socket.can_send() => {
+                let method = "GET ";
+                let uri = "/a%23hello.o ";
+                let version = "HTTP/1.1\r\n";
+                let host = format_args!("Host: {}:{}\r\n", dest_addr, dest_port); // host
+                let connection = "Connection: close\r\n";
+                let http_request = format!("{}{}{}{}{}\r\n", 
+                    method, 
+                    uri, 
+                    version,
+                    host, 
+                    connection
+                );
+
+                // sanity check the created HTTP request
+                {
+                    let mut headers = [httparse::EMPTY_HEADER; 64];
+                    let mut request = httparse::Request::new(&mut headers);
+                    if let Err(_e) = request.parse(http_request.as_bytes()) {
+                        error!("ota_update_client: created improper HTTP request: {:?}", http_request);
+                        break;
+                    }
+                }
+
+                debug!("ota_update_client: sending request: {:?}", http_request);
+                socket.send_slice(http_request.as_ref()).expect("ota_update_client: cannot send request");
+                HttpState::ReceivingResponse
+            }
+
+            HttpState::ReceivingResponse if socket.can_recv() => {
+                // By default, we stay in the receiving state.
+                // This is changed later if we end up receiving the entire packet.1
+                let mut new_state = HttpState::ReceivingResponse;
+
+                let recv_result = socket.recv(|data| {
+                    debug!("ota_update_client: received data ({} bytes): \n{}",
+                        data.len(),
+                        unsafe {str::from_utf8_unchecked(data)}
+                    );
+
+                    // Eagerly append ALL the received data onto the end of our packet slice. 
+                    // Later, we can remove bytes towards the end if we ended up appending too many bytes,
+                    // e.g., we received more than enough bytes and some of them were for the next packet.
+                    let orig_length = current_http_bytes.len();
+                    current_http_bytes.extend_from_slice(data);
+
+                    let mut headers = [httparse::EMPTY_HEADER; 64];
+                    let mut response = httparse::Response::new(&mut headers);
+                    let res = response.parse(&current_http_bytes);
+                    debug!("ota_update_client: Result {:?} from parsing HTTP Response: {:?}", res, response);
+
+                    // Check to see if we've received the full HTTP response:
+                    // First, by checking whether we have received all of the headers 
+                    // Second, by getting the content length header and seeing if we've received the full content (in num bytes)
+                    match res {
+                        Ok(httparse::Status::Partial) => {
+                            trace!("ota_update_client: received partial HTTP response...");
+                            // pop off all of the bytes from the recv buffer into our packet
+                            (data.len(), ())
+                        }
+                        Ok(httparse::Status::Complete(total_header_len)) => {
+                            trace!("ota_update_client: received all headers in the HTTP response, len {}", total_header_len);
+                            match response.headers.iter()
+                                .filter(|h| h.name == "Content-Length")
+                                .next()
+                                .ok_or("couldn't find \"Content-Length\" header")
+                                .and_then(|header| core::str::from_utf8(header.value)
+                                    .map_err(|_e| "failed to convert content-length value to UTF-8 string")
+                                )
+                                .and_then(|s| s.parse::<usize>()
+                                    .map_err(|_e| "failed to parse content-length header as usize")
+                                )
+                            { 
+                                Ok(content_length) => {
+                                    debug!("ota_update_client: current_http_bytes len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
+                                        current_http_bytes.len(), content_length, total_header_len, loop_ctr
+                                    );
+                                    // the total num of bytes that we want is the length of all the headers + the content
+                                    let expected_length = total_header_len + content_length;
+                                    if current_http_bytes.len() >= expected_length {
+                                        current_http_bytes.truncate(expected_length);
+                                        let bytes_popped = current_http_bytes.len() - orig_length;
+                                        // set state to Responded if we've received all the content
+                                        debug!("ota_update_client: HTTP response fully received. (loop_ctr: {})", loop_ctr);
+                                        new_state = HttpState::Responded;
+                                        (bytes_popped, ())
+                                    } 
+                                    else {
+                                        // here: we haven't gotten all of the content bytes yet, so we pop off all of the bytes received so far
+                                        (data.len(), ())
+                                    }
+                                }
+                                Err(_e) => {
+                                    error!("ota_update_client: {}", _e);
+                                    // upon error, return 0, which instructs the recv() method to pop off 0 bytes from the recv buffer
+                                    (0, ())
+                                }
+                            }
+                        }
+
+                        Err(_e) => {
+                            error!("ota_update_client: Error parsing incoming html: {:?}", _e);
+                            return (0, ());
+                        }
+                    }
+
+                    
+                });
+
+                new_state
+            }
+
+            HttpState::Responded => {
+                break;
+            }
+
+            HttpState::ReceivingResponse if !socket.may_recv() => {
+                warn!("ota_update_client: socket was closed prematurely before full reponse was received! (loop_ctr: {})", loop_ctr);
+                break;
+            }
+
+            _ => { 
+                if loop_ctr % 50000 == 0 {
+                    debug!("ota_update_client: waiting in state {:?} for socket to send/recv ...", state);
+                }
+                state
+            }
+        }
+    }
+
+
+    debug!("ota_update_client: exiting HTTP state loop with state: {:?} (loop_ctr: {})", state, loop_ctr);
+
+    
+    /* SIMPLE TCP TEST START
+
     {
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         socket.connect((dest_addr, dest_port), local_port).unwrap();
     }
 
-
-    
-    // /*  SIMPLE TCP TEST START
-
-    let mut loop_ctr = 0;
     let mut msg_ctr = 0;
     let mut done_sending = false;
     loop { 
@@ -218,6 +401,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
         loop_ctr += 1;
     }
+    END SIMPLE TCP TEST */
 
 
     let mut issued_close = false;
@@ -255,7 +439,6 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
     Ok(())
     
-    // END SIMPLE TCP TEST */
 
     
     
@@ -360,6 +543,8 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
         }
     }
+
+    */
 
     */
 }

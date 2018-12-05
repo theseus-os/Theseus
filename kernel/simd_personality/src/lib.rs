@@ -69,6 +69,7 @@ extern crate memory;
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
+extern crate apic;
 
 
 use core::ops::DerefMut;
@@ -95,6 +96,8 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 
 	let simd_test_module = get_module_starting_with("k_sse#simd_test-").ok_or_else(|| "couldn't get k_sse#simd_test module")?;
 	simd_namespace.load_kernel_crate(simd_test_module, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+
+	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
 	
 	type SimdTestFunc = fn(());
 	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1::")
@@ -108,7 +111,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
 	let task1 = KernelTaskBuilder::new(func1, ())
 		.name(String::from("simd_test_1-sse"))
-		.pin_on_core(2)
+		.pin_on_core(this_core)
 		.simd()
 		.spawn()?;
 	debug!("finished spawning simd_test::test1 task");
@@ -125,7 +128,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
 	let task2 = KernelTaskBuilder::new(func, ())
 		.name(String::from("simd_test_2-sse"))
-		.pin_on_core(2)
+		.pin_on_core(this_core)
 		.simd()
 		.spawn()?;
 	debug!("finished spawning simd_test::test2 task");
@@ -142,7 +145,7 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
 	let task3 = KernelTaskBuilder::new(func, ())
 		.name(String::from("simd_test_short-sse"))
-		.pin_on_core(2)
+		.pin_on_core(this_core)
 		.simd()
 		.spawn()?;
 	debug!("finished spawning simd_test::test_short task");
@@ -154,6 +157,8 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
+	loop { }
+	
 	task1.join()?;
 	task2.join()?;
 	task3.join()?;

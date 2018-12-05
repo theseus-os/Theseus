@@ -25,6 +25,9 @@ path = "../spawn"
 [dependencies.task]
 path = "../task"
 
+[dependencies.apic]
+path = "../apic"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
