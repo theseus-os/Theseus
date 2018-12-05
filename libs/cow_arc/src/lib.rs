@@ -5,7 +5,7 @@ extern crate alloc;
 extern crate spin;
 extern crate owning_ref;
 
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 

@@ -16,9 +16,9 @@ extern crate mod_mgmt;
 extern crate acpi;
 
 use core::ops::DerefMut;
-use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use getopts::Options;
 use memory::{get_module, get_module_starting_with};
 use mod_mgmt::SwapRequest;

@@ -1,0 +1,52 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "ota_update_client"
+description = "Implements network communication with a build server to acquire live updates over the air"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+httparse = { version = "1.3.3", default-features = false }
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.e1000]
+path = "../e1000"
+
+[dependencies.e1000_smoltcp_device]
+path = "../e1000_smoltcp_device"
+
+[dependencies.network_interface_card]
+path = "../network_interface_card"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+
+[dependencies.smoltcp]
+version = "0.5.0"
+default-features = false
+features = [
+    "alloc", "log", "verbose", 
+    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
+    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
+]

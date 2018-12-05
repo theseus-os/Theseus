@@ -16,7 +16,8 @@ extern crate kernel_config;
 extern crate tsc;
 
 
-use alloc::{Vec, String};
+use alloc::string::String;
+use alloc::vec::Vec;
 
 
 

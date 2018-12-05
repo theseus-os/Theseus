@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
@@ -20,8 +20,8 @@ path = "../../libs/atomic_linked_list"
 git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.log]
 default-features = false
@@ -37,7 +37,7 @@ path = "../pit_clock"
 path = "../../libs/port_io"
 
 [dependencies.raw-cpuid]
-version = "5.0.0"
+version = "6.1.0"
 features = [ "use_arch" ]
 
 [dependencies.task]

@@ -6,8 +6,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
-cfg-if = "0.1.5"
+getopts = "0.2.18"
+cfg-if = "0.1.6"
 
 [dependencies.log]
 default-features = false
