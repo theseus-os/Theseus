@@ -18,7 +18,7 @@ use core::ops;
 use core::str::{self, Utf8Error};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use alloc::String;
+use alloc::string::String;
 
 // use error::Error;
 

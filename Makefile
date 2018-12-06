@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -16,8 +16,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.27.0-nightly (ac3c2288f 2018-04-18)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-04-19
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.32.0-nightly (f1e2fa8f0 2018-11-20)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-11-21
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -105,9 +105,20 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+
+### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
+NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
+check_captain:
+	@if [ 1  !=  ${NUM_CAPTAINS} ]; then \
+		echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."; \
+		echo -e "       Run \"make clean\" and then try rebuilding again.\n"; \
+		exit 1; \
+	fi;
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
 ### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
-$(iso): build
+$(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -115,9 +126,9 @@ $(iso): build
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
-	
-iso: $(iso)
 
+### Convenience target for building the ISO	using the above target
+iso: $(iso)
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
@@ -290,35 +301,43 @@ clean:
 
 help: 
 	@echo -e "\nThe following make targets are available:"
-	@echo -e "  run:"
+	@echo -e "   run:"
 	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
-	@echo -e "  debug:"
+	@echo -e "   loadable:"
+	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
+	@echo -e "   debug:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
-	@echo -e "  gdb:"
+	@echo -e "   gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
-	@echo -e "  bochs:"
+	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
-	@echo -e "  boot:"
+	@echo -e "   boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
-	@echo -e "  pxe:"
+	@echo -e "   pxe:"
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
-	@echo -e "  simd_personality:"
+	@echo -e "   simd_personality:"
 	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
 	@echo -e "\t then runs it just like the 'make run' target."
-	@echo -e "  doc:"
+	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
-	@echo -e "  view-doc:"
+	@echo -e "   view-doc:"
 	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
-	@echo -e "\nThe following options are available for QEMU:"
-	@echo -e "  int=yes:"
+	
+	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
+	@echo -e "   net=yes:"
+	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
+	@echo -e "   kvm=yes:"
+	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
+	@echo -e "   host=yes:"
+	@echo -e "\t Use the host CPU model, which is required for using x86 PMU hardware and others. Enables KVM too."
+	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
-	@echo -e "\t Only relevant for QEMU targets like 'run' and 'debug'."
 	@echo ""
 
 
@@ -334,25 +353,36 @@ QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial
 ## multicore 
 QEMU_FLAGS += -smp 4
 
-## basic networking with a standard e1000 ethernet card
-#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
-#QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:1f:c6:9c:89:4c -net user,vlan=1 -net dump,file=netdump.pcap
-#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
-
-QEMU_FLAGS += -device e1000,netdev=network0,mac=00:1f:c6:9c:89:4c -netdev tap,id=network0,ifname=tap0,script=no,downscript=no  #-netdev user,id=network0
-#QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
+MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
+ifeq ($(net),yes)
+	## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
+	
+	## basic userspace QEMU networking with a standard e1000 ethernet NIC
+	#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
+	#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
+
+	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else
+	QEMU_FLAGS += -net none
+endif
+
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
+
 ifeq ($(host),yes)
 	QEMU_FLAGS += -cpu host -enable-kvm
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
+
 ifeq ($(kvm),yes)
 	QEMU_FLAGS += -enable-kvm
 endif

@@ -6,7 +6,7 @@ authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 [dependencies.log]
 default-features = false

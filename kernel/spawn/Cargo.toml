@@ -6,7 +6,8 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-atomic = { version = "0.3.4", features = ["nightly"]}
+atomic = { version = "=0.4.0", features = [ "nightly" ] }
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 
 [dependencies.log]
@@ -14,16 +15,11 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.owning_ref]
-# version = "0.3.3"
-# path = "../../libs/owning-ref-rs"
-git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

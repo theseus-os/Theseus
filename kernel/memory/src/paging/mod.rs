@@ -170,7 +170,8 @@ impl PageIter {
     }
 
     /// Returns the number of pages covered by this iterator. 
-    /// This is instantly fast, because it doesn't need to iterate over each entry, unlike normal iterators.
+    /// Use this instead of the Iterator trait's `count()` method.
+    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
         self.end.number - self.start.number + 1 

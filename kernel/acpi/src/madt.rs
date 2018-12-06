@@ -3,7 +3,7 @@ use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
 use core::ptr::{read_volatile, write_volatile};
 use alloc::boxed::Box;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 use spin::Mutex;
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 

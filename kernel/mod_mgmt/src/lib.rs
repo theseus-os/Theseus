@@ -21,9 +21,10 @@ extern crate qp_trie;
 
 
 use core::ops::DerefMut;
-use alloc::{Vec, BTreeMap, BTreeSet, String};
-use alloc::string::ToString;
-use alloc::arc::{Arc, Weak};
+use alloc::vec::Vec;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 
 use xmas_elf::ElfFile;
