@@ -9,7 +9,6 @@ build = "../../build.rs"
 spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-atomic = { version = "0.4.0", features = ["nightly"] }
 
 
 [dependencies.log]
