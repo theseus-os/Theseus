@@ -55,7 +55,7 @@ const DEFAULT_DESTINATION_PORT: u16 = 8090;
 const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
 
 /// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53145;
+const DEFAULT_LOCAL_PORT: u16 = 53147;
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
 const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
@@ -101,9 +101,6 @@ fn millis_since(start_time: u64) -> Result<u64, &'static str> {
 pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
     where N: NetworkInterfaceCard
 {
-    Err("WIP does nothing right now")
-
-    /*
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
 
     // initialize the message queue
@@ -164,13 +161,10 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         .routes(routes)
         .finalize();
 
+
     let mut loop_ctr = 0;
-
-
     let mut state = HttpState::Connecting;
-
     let mut current_http_bytes: Vec<u8> = Vec::new();
-    let mut current_http_response: Option<httparse::Response> = None;
 
     loop { 
         loop_ctr += 1;
@@ -201,13 +195,12 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                 let method = "GET ";
                 let uri = "/a%23hello.o ";
                 let version = "HTTP/1.1\r\n";
-                let host = format_args!("Host: {}:{}\r\n", dest_addr, dest_port); // host
                 let connection = "Connection: close\r\n";
                 let http_request = format!("{}{}{}{}{}\r\n", 
                     method, 
                     uri, 
                     version,
-                    host, 
+                    format_args!("Host: {}:{}\r\n", dest_addr, dest_port), // host
                     connection
                 );
 
@@ -232,77 +225,87 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                 let mut new_state = HttpState::ReceivingResponse;
 
                 let recv_result = socket.recv(|data| {
-                    debug!("ota_update_client: received data ({} bytes): \n{}",
+                    debug!("ota_update_client: {} bytes on the recv buffer: \n{}",
                         data.len(),
                         unsafe {str::from_utf8_unchecked(data)}
                     );
 
-                    // Eagerly append ALL the received data onto the end of our packet slice. 
+                    // Eagerly append ALL of the received data onto the end of our packet slice, 
+                    // which is necessary to attempt to parse it as an HTTP response.
                     // Later, we can remove bytes towards the end if we ended up appending too many bytes,
                     // e.g., we received more than enough bytes and some of them were for the next packet.
                     let orig_length = current_http_bytes.len();
                     current_http_bytes.extend_from_slice(data);
 
-                    let mut headers = [httparse::EMPTY_HEADER; 64];
-                    let mut response = httparse::Response::new(&mut headers);
-                    let res = response.parse(&current_http_bytes);
-                    debug!("ota_update_client: Result {:?} from parsing HTTP Response: {:?}", res, response);
+                    let bytes_popped_off = {
+                        // Check to see if we've received the full HTTP response:
+                        // First, by checking whether we have received all of the headers (and can properly parse them)
+                        // Second, by getting the content length header and seeing if we've received the full content (in num bytes)
+                        let mut headers = [httparse::EMPTY_HEADER; 64];
+                        let mut response = httparse::Response::new(&mut headers);
+                        let parsed_response = response.parse(&current_http_bytes);
+                        debug!("ota_update_client: Result {:?} from parsing HTTP Response: {:?}", parsed_response, response);
 
-                    // Check to see if we've received the full HTTP response:
-                    // First, by checking whether we have received all of the headers 
-                    // Second, by getting the content length header and seeing if we've received the full content (in num bytes)
-                    match res {
-                        Ok(httparse::Status::Partial) => {
-                            trace!("ota_update_client: received partial HTTP response...");
-                            // pop off all of the bytes from the recv buffer into our packet
-                            (data.len(), ())
-                        }
-                        Ok(httparse::Status::Complete(total_header_len)) => {
-                            trace!("ota_update_client: received all headers in the HTTP response, len {}", total_header_len);
-                            match response.headers.iter()
-                                .filter(|h| h.name == "Content-Length")
-                                .next()
-                                .ok_or("couldn't find \"Content-Length\" header")
-                                .and_then(|header| core::str::from_utf8(header.value)
-                                    .map_err(|_e| "failed to convert content-length value to UTF-8 string")
-                                )
-                                .and_then(|s| s.parse::<usize>()
-                                    .map_err(|_e| "failed to parse content-length header as usize")
-                                )
-                            { 
-                                Ok(content_length) => {
-                                    debug!("ota_update_client: current_http_bytes len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
-                                        current_http_bytes.len(), content_length, total_header_len, loop_ctr
+                        match parsed_response {
+                            Ok(httparse::Status::Partial) => {
+                                trace!("ota_update_client: received partial HTTP response...");
+                                // we haven't received all of the HTTP header bytes yet, 
+                                // so pop off all of the bytes from the recv buffer into our packet
+                                data.len()
+                            }
+
+                            Ok(httparse::Status::Complete(total_header_len)) => {
+                                trace!("ota_update_client: received all headers in the HTTP response, len {}", total_header_len);
+                                let content_length_result = response.headers.iter()
+                                    .filter(|h| h.name == "Content-Length")
+                                    .next()
+                                    .ok_or("couldn't find \"Content-Length\" header")
+                                    .and_then(|header| core::str::from_utf8(header.value)
+                                        .map_err(|_e| "failed to convert content-length value to UTF-8 string")
+                                    )
+                                    .and_then(|s| s.parse::<usize>()
+                                        .map_err(|_e| "failed to parse content-length header as usize")
                                     );
-                                    // the total num of bytes that we want is the length of all the headers + the content
-                                    let expected_length = total_header_len + content_length;
-                                    if current_http_bytes.len() >= expected_length {
-                                        current_http_bytes.truncate(expected_length);
-                                        let bytes_popped = current_http_bytes.len() - orig_length;
-                                        // set state to Responded if we've received all the content
-                                        debug!("ota_update_client: HTTP response fully received. (loop_ctr: {})", loop_ctr);
-                                        new_state = HttpState::Responded;
-                                        (bytes_popped, ())
-                                    } 
-                                    else {
-                                        // here: we haven't gotten all of the content bytes yet, so we pop off all of the bytes received so far
-                                        (data.len(), ())
+
+                                match content_length_result { 
+                                    Ok(content_length) => {
+                                        debug!("ota_update_client: current_http_bytes len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
+                                            current_http_bytes.len(), content_length, total_header_len, loop_ctr
+                                        );
+                                        // the total num of bytes that we want is the length of all the headers + the content
+                                        let expected_length = total_header_len + content_length;
+                                        if current_http_bytes.len() < expected_length {
+                                            // here: we haven't gotten all of the content bytes yet, so we pop off all of the bytes received so far
+                                            data.len()
+                                        } else {
+                                            // here: we *have* received all of the content, so the full response is ready
+                                            debug!("ota_update_client: HTTP response fully received. (loop_ctr: {})", loop_ctr);
+                                            new_state = HttpState::Responded;
+                                            // we pop off the exact number of bytes that make up the rest of the content,
+                                            // leaving the rest on the recv buffer
+                                            expected_length - orig_length
+                                        } 
+                                    }
+                                    Err(_e) => {
+                                        error!("ota_update_client: {}", _e);
+                                        // upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer
+                                        0
                                     }
                                 }
-                                Err(_e) => {
-                                    error!("ota_update_client: {}", _e);
-                                    // upon error, return 0, which instructs the recv() method to pop off 0 bytes from the recv buffer
-                                    (0, ())
-                                }
+                            }
+
+                            Err(_e) => {
+                                error!("ota_update_client: Error parsing incoming html: {:?}", _e);
+                                0
                             }
                         }
+                    };
 
-                        Err(_e) => {
-                            error!("ota_update_client: Error parsing incoming html: {:?}", _e);
-                            return (0, ());
-                        }
-                    }
+                    // Since we eagerly appended all of the received bytes onto this buffer, 
+                    // we need to fix that up based on how many bytes we actually ended up popping off the recv buffer
+                    current_http_bytes.truncate(orig_length + bytes_popped_off);
 
+                    (bytes_popped_off, ())
                     
                 });
 
@@ -310,6 +313,8 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
 
             HttpState::Responded => {
+                debug!("ota_update_client: received full {}-byte HTTP response (loop_ctr: {}): \n{}", 
+                    current_http_bytes.len(), loop_ctr, unsafe { str::from_utf8_unchecked(&current_http_bytes) });
                 break;
             }
 
@@ -543,8 +548,6 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
         }
     }
-
-    */
 
     */
 }

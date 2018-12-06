@@ -155,6 +155,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             KernelTaskBuilder::new(network_test::init, nic)
                 .name(String::from("network_test"))
                 .spawn()?;
+        } else {
+            error!("captain: Couldn't run network_test because no e1000 NIC exists.");
         }
     }
 
@@ -164,6 +166,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             KernelTaskBuilder::new(ota_update_client::init, nic)
                 .name(String::from("ota_update_client"))
                 .spawn()?;
+        } else {
+            error!("captain: Couldn't run ota_update_client test because no e1000 NIC exists.");
         }
     }
 
