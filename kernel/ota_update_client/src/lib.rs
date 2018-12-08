@@ -21,6 +21,8 @@ extern crate owning_ref;
 extern crate spawn;
 extern crate task;
 extern crate httparse;
+extern crate sha3;
+extern crate percent_encoding;
 
 
 use core::convert::TryInto;
@@ -41,6 +43,8 @@ use smoltcp::time::Instant;
 use e1000_smoltcp_device::E1000Device;
 use network_interface_card::NetworkInterfaceCard;
 use irq_safety::MutexIrqSafe;
+use sha3::{Digest, Sha3_512};
+
 
 
 /// The IP address of the update server.
@@ -164,7 +168,9 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
     let mut loop_ctr = 0;
     let mut state = HttpState::Connecting;
-    let mut current_http_bytes: Vec<u8> = Vec::new();
+    let mut current_packet_byte_buffer: Vec<u8> = Vec::new();
+    let mut current_packet_content_length: Option<usize> = None;
+    let mut current_packet_header_length: Option<usize> = None;
 
     loop { 
         loop_ctr += 1;
@@ -179,7 +185,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                 warn!("ota_update_client: poll error: {}", err);
                 false  // continue;
             }
-        };  
+        };
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
 
@@ -234,8 +240,8 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                     // which is necessary to attempt to parse it as an HTTP response.
                     // Later, we can remove bytes towards the end if we ended up appending too many bytes,
                     // e.g., we received more than enough bytes and some of them were for the next packet.
-                    let orig_length = current_http_bytes.len();
-                    current_http_bytes.extend_from_slice(data);
+                    let orig_length = current_packet_byte_buffer.len();
+                    current_packet_byte_buffer.extend_from_slice(data);
 
                     let bytes_popped_off = {
                         // Check to see if we've received the full HTTP response:
@@ -243,7 +249,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                         // Second, by getting the content length header and seeing if we've received the full content (in num bytes)
                         let mut headers = [httparse::EMPTY_HEADER; 64];
                         let mut response = httparse::Response::new(&mut headers);
-                        let parsed_response = response.parse(&current_http_bytes);
+                        let parsed_response = response.parse(&current_packet_byte_buffer);
                         debug!("ota_update_client: Result {:?} from parsing HTTP Response: {:?}", parsed_response, response);
 
                         match parsed_response {
@@ -255,6 +261,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                             }
 
                             Ok(httparse::Status::Complete(total_header_len)) => {
+                                current_packet_header_length = Some(total_header_len);
                                 trace!("ota_update_client: received all headers in the HTTP response, len {}", total_header_len);
                                 let content_length_result = response.headers.iter()
                                     .filter(|h| h.name == "Content-Length")
@@ -269,12 +276,13 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
                                 match content_length_result { 
                                     Ok(content_length) => {
-                                        debug!("ota_update_client: current_http_bytes len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
-                                            current_http_bytes.len(), content_length, total_header_len, loop_ctr
+                                        debug!("ota_update_client: current_packet_byte_buffer len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
+                                            current_packet_byte_buffer.len(), content_length, total_header_len, loop_ctr
                                         );
+                                        current_packet_content_length = Some(content_length);
                                         // the total num of bytes that we want is the length of all the headers + the content
                                         let expected_length = total_header_len + content_length;
-                                        if current_http_bytes.len() < expected_length {
+                                        if current_packet_byte_buffer.len() < expected_length {
                                             // here: we haven't gotten all of the content bytes yet, so we pop off all of the bytes received so far
                                             data.len()
                                         } else {
@@ -303,18 +311,16 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
                     // Since we eagerly appended all of the received bytes onto this buffer, 
                     // we need to fix that up based on how many bytes we actually ended up popping off the recv buffer
-                    current_http_bytes.truncate(orig_length + bytes_popped_off);
+                    current_packet_byte_buffer.truncate(orig_length + bytes_popped_off);
 
                     (bytes_popped_off, ())
-                    
                 });
-
                 new_state
             }
 
             HttpState::Responded => {
                 debug!("ota_update_client: received full {}-byte HTTP response (loop_ctr: {}): \n{}", 
-                    current_http_bytes.len(), loop_ctr, unsafe { str::from_utf8_unchecked(&current_http_bytes) });
+                    current_packet_byte_buffer.len(), loop_ctr, unsafe { str::from_utf8_unchecked(&current_packet_byte_buffer) });
                 break;
             }
 
@@ -334,6 +340,12 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
 
 
     debug!("ota_update_client: exiting HTTP state loop with state: {:?} (loop_ctr: {})", state, loop_ctr);
+
+    // calculate the sha3-512 hash
+    let mut hasher = Sha3_512::new();
+    hasher.input(&current_packet_byte_buffer[current_packet_header_length.unwrap() ..]);
+    let result = hasher.result();
+    info!("ota_update_client: sha3-512 hash of downloaded file: {:x}", result);
 
     
     /* SIMPLE TCP TEST START
