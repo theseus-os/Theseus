@@ -264,7 +264,7 @@ fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<(),
             }
     };
     // create the page table file and add it to the mmi directory
-    let page_table_file = VFSFile::new(name.clone(), 0, page_table_info, Some(Arc::downgrade(&mmi_dir_pointer)));
+    let page_table_file = VFSFile::new(name.clone(), 0, page_table_info, Arc::downgrade(&mmi_dir_pointer));
     mmi_dir.lock().add_fs_node(FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
     return Ok(());
 }

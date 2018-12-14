@@ -2,6 +2,7 @@
 name = "fs_node"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
+description = "defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem"
 
 
 [dependencies]

@@ -24,8 +24,7 @@ lazy_static! {
     pub static ref ROOT: (String, StrongAnyDirRef) = {
         let root_dir = RootDirectory {
             name: "/root".to_string(),
-            children: BTreeMap::new(), 
-            parent: None, 
+            children: BTreeMap::new() 
         };
         (String::from("/root"), Arc::new(Mutex::new(Box::new(root_dir))))
     };
@@ -41,8 +40,6 @@ pub struct RootDirectory {
     name: String,
     /// A list of StrongDirRefs or pointers to the child directories   
     children: BTreeMap<String, FSNode>,
-    /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: Option<WeakDirRef>,
 }
 
 impl Directory for RootDirectory {
@@ -99,42 +96,15 @@ impl FileDirectory for RootDirectory {
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
-        }
+        error!("root directory does not have a parent");
+        return None;
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        if self.name == ROOT.0 {
-            debug!("MATCHED TO ROOT");
-            return Ok(get_root());
-        }
-        let weak_parent = match self.parent.clone() {
-            Some(parent) => parent, 
-            None => return Err("parent does not exist")
-        };
-        let parent = match Weak::upgrade(&weak_parent) {
-            Some(weak_ref) => weak_ref,
-            None => return Err("could not upgrade parent")
-        };
-
-        let mut locked_parent = parent.lock();
-        match locked_parent.get_child(self.name.clone(), false) {
-            Ok(child) => {
-                match child {
-                    FSNode::Dir(dir) => Ok(dir),
-                    FSNode::File(_file) => Err("should not be a file"),
-                }
-            },
-            Err(err) => {
-                error!("failed in get_self_pointer because: {}", err);
-                return Err(err);
-                },
-        }
+        return Ok(get_root());
     }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = Some(parent_pointer);
+        return;
     }
 }

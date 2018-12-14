@@ -28,7 +28,7 @@ pub struct VFSDirectory {
     /// A list of StrongDirRefs or pointers to the child directories   
     children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: Option<WeakDirRef>,
+    parent: WeakDirRef,
 }
 
 impl VFSDirectory {
@@ -37,7 +37,7 @@ impl VFSDirectory {
         let directory = VFSDirectory {
             name: name,
             children: BTreeMap::new(),
-            parent: Some(parent_pointer),
+            parent: parent_pointer,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         dir_ref
@@ -70,7 +70,7 @@ impl Directory for VFSDirectory {
                             return Ok(FSNode::Dir(Arc::clone(dir)));
                         }
                 },
-                None => Err("could not get child from children map")
+                None => Err("file/directory does not exist")
             }
 
     }
@@ -98,18 +98,11 @@ impl FileDirectory for VFSDirectory {
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
-        }
+        return self.parent.upgrade();
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let weak_parent = match self.parent.clone() {
-            Some(parent) => parent, 
-            None => return Err("parent does not exist")
-        };
-        let parent = match Weak::upgrade(&weak_parent) {
+        let parent = match self.parent.upgrade() {
             Some(weak_ref) => weak_ref,
             None => return Err("could not upgrade parent")
         };
@@ -130,7 +123,7 @@ impl FileDirectory for VFSDirectory {
     }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = Some(parent_pointer);
+        self.parent = parent_pointer;
     }
 }
 
@@ -142,11 +135,11 @@ pub struct VFSFile {
     /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
     contents: String,
     /// A weak reference to the parent directory
-    parent: Option<WeakDirRef>,
+    parent: WeakDirRef,
 }
 
 impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: Option<WeakDirRef>) -> VFSFile {
+    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> VFSFile {
         VFSFile {
             name: name, 
             size: size, 
@@ -182,18 +175,11 @@ impl FileDirectory for VFSFile {
     
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
-        }
+        return self.parent.upgrade();
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let weak_parent = match self.parent.clone() {
-            Some(parent) => parent, 
-            None => return Err("parent does not exist")
-        };
-        let parent = match Weak::upgrade(&weak_parent) {
+        let parent = match self.parent.upgrade() {
             Some(weak_ref) => weak_ref,
             None => return Err("could not upgrade parent")
         };
@@ -211,6 +197,6 @@ impl FileDirectory for VFSFile {
     }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = Some(parent_pointer);
+        self.parent = parent_pointer
     }
 }
