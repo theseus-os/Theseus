@@ -52,7 +52,6 @@ extern crate frame_buffer;
 #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
-extern crate filesystem;
 
 #[cfg(simd_personality)]
 extern crate simd_personality;
@@ -129,8 +128,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // create the initial `Task`, i.e., task_zero
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
-    // creates the procfs
-    task::init()?;
+    // creates the taskfs
+    task::fs::task_dir::init()?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);

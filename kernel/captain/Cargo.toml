@@ -90,8 +90,6 @@ path = "../../libs/keycodes_ascii"
 [dependencies.print]
 path = "../print"
 
-[dependencies.filesystem]
-path = "../filesystem"
 
 
 ## This should be dependent upon 'cfg(simd_personality)',

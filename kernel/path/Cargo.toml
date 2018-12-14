@@ -1,7 +1,8 @@
 [package]
-name = "filesystem"
+name = "path"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
+description = "contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct"
 
 
 [dependencies]
@@ -11,6 +12,12 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.0"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
 
 [dependencies.log]
 default-features = false

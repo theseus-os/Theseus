@@ -6,15 +6,16 @@
 extern crate alloc;
 extern crate task;
 extern crate getopts;
-extern crate filesystem;
+extern crate path;
+extern crate fs_node;
 
 use alloc::{Vec, String};
 use alloc::arc::Arc;
 use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
-use filesystem::Path;
-use filesystem::FSNode;
+use path::Path;
+use fs_node::FSNode;
 
 
 #[no_mangle]

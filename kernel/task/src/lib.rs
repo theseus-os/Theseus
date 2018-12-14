@@ -40,10 +40,13 @@ extern crate tss;
 extern crate apic;
 extern crate mod_mgmt;
 extern crate panic_info;
-extern crate filesystem;
 extern crate context_switch;
 extern crate environment;
 extern crate spin;
+extern crate root;
+extern crate vfs_node;
+extern crate fs_node;
+extern crate path;
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
@@ -59,12 +62,9 @@ use apic::get_my_apic_id;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use panic_info::PanicInfo;
-use filesystem::{Directory, FSNode};
 use environment::Environment;
 use spin::Mutex;
-
 pub mod fs; 
-use fs::task_dir::TaskDirectory;
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
@@ -86,17 +86,6 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-
-/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
-pub fn init() -> Result<(), &'static str> {
-    // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
-    let root = filesystem::get_root();
-    let name = String::from("tasks");
-    let task_dir = TaskDirectory::new(name.clone(), Arc::downgrade(&root));
-    root.lock().add_fs_node(FSNode::Dir(task_dir))?;
-    // task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
-    Ok(())
-}
 
 
 /// Get the id of the currently running Task on a specific core
@@ -243,7 +232,7 @@ impl Task {
 
         // TODO - change to option and initialize environment to none
         let env = Environment {
-            working_dir: filesystem::get_root(), 
+            working_dir: root::get_root(), 
         };
 
         Task {
@@ -336,13 +325,7 @@ impl Task {
             None
         }
     }
-/// Initializes the task filesystem by creating a directory called task and by creating a file for each task
-// pub fn init(root_dir: StrongDirRef<TaskDirectory>) -> Result<(), &'static str> {
-//     use alloc::string::ToString;
-//     let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
-//     task_dir.lock().new_file("procfs".to_string(), Arc::downgrade(&task_dir));
-//     Ok(())
-// }
+    
     /// Switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {

@@ -46,11 +46,20 @@ path = "../context_switch"
 [dependencies.context_switch_sse]
 path = "../context_switch_sse"
 
-[dependencies.filesystem]
-path = "../filesystem"
-
 [dependencies.environment]
 path = "../environment"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
 
 [lib]
 crate-type = ["rlib"]

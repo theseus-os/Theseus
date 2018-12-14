@@ -1,14 +1,33 @@
+/// Contains the task implementation of the Directory trait so that each task can be
+/// represented as a separate directory within the *tasks* directory. the *tasks* directory
+/// is at the root of the filesystem (a direct child of the root directory). Each  *task* within
+/// the *tasks* contains information about the task in separate files/subdirectories. 
+/// *task* directories are lazily generated, hence the overriding methods of *get_child()* and *list_children()*
+/// within the task implementation
 use Task;
 use TaskRef;
 use RunState;
 use spin::Mutex;
 use alloc::boxed::Box;
 use TASKLIST;
-use filesystem::{Directory, File, FileDirectory, VFSDirectory, VFSFile, WeakDirRef, Path, StrongAnyDirRef, FSNode};
+use root;
+use fs_node::{Directory, File, FileDirectory, WeakDirRef, StrongAnyDirRef, FSNode};
 use alloc::arc::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
+use vfs_node::{VFSDirectory, VFSFile};
+use path::Path;
 
+
+/// Initializes the task subfilesystem by creating a directory called task and by creating a file for each task
+pub fn init() -> Result<(), &'static str> {
+    // let task_dir = root_dir.lock().new_dir("task".to_string(), Arc::downgrade(&root_dir));
+    let root = root::get_root();
+    let name = String::from("tasks");
+    let task_dir = TaskDirectory::new(name.clone(), Arc::downgrade(&root));
+    root.lock().add_fs_node(FSNode::Dir(task_dir))?;
+    Ok(())
+}
 
 pub struct TaskFile<'a> {
     task: &'a TaskRef,
@@ -86,9 +105,6 @@ impl<'a> File for TaskFile<'a> {
     fn seek(&self) { unimplemented!() }
     fn delete(&self) { unimplemented!() }
 }
-
-
-use filesystem::StrongFileRef;
 
 pub struct TaskDirectory {
     name: String,
