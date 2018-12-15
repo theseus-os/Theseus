@@ -59,18 +59,17 @@ impl Directory for RootDirectory {
 
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
         let option_child = self.children.get(&child_name);
-            match option_child {
-                Some(child) => match child {
-                    FSNode::File(file) => {
-                            return Ok(FSNode::File(Arc::clone(file)));
-                        }
-                    FSNode::Dir(dir) => {
-                            return Ok(FSNode::Dir(Arc::clone(dir)));
-                        }
-                },
-                None => Err("could not get child from children map")
-            }
-
+        match option_child {
+            Some(child) => match child {
+                FSNode::File(file) => {
+                        return Ok(FSNode::File(Arc::clone(file)));
+                    }
+                FSNode::Dir(dir) => {
+                        return Ok(FSNode::Dir(Arc::clone(dir)));
+                    }
+            },
+            None => Err("could not get child from children map")
+        }
     }
 
     /// Returns a string listing all the children in the directory
@@ -82,12 +81,7 @@ impl Directory for RootDirectory {
 impl FileDirectory for RootDirectory {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        let mut path = self.name.clone();
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
-        }
-        return path;
+        return "/root".to_string();
     }
 
     fn get_name(&self) -> String {
@@ -104,6 +98,7 @@ impl FileDirectory for RootDirectory {
     }
 
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
+        // root doesn't have a parent
         return;
     }
 }

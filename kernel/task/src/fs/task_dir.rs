@@ -47,16 +47,6 @@ impl<'a> TaskFile<'a> {
 }
 
 impl<'a> FileDirectory for TaskFile<'a> {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        let mut path = String::from("tasks");
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
-        }
-        return path;
-    }
-
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
@@ -68,11 +58,7 @@ impl<'a> FileDirectory for TaskFile<'a> {
             None => Err("could not upgrade parent")
         }
     }
-
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        unimplemented!();
-    }
-
+    
     /// Sets the parent directory of the Task Directory
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
         self.parent = parent_pointer;
@@ -153,27 +139,6 @@ impl FileDirectory for TaskDirectory {
             None => Err("could not upgrade parent")
         }
     }
-
-    /// This function returns an Arc<Mutex<>> pointer to a directory by navigating up one directory 
-    /// and then cloning itself via the parent's get_child_dir() method
-    /// 
-    /// Note that this function cannot be used on the root becuase the root doesn't have a parent directory
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let parent = match Weak::upgrade(&self.parent) {
-            Some(weak_ref) => weak_ref,
-            None => return Err("could not upgrade parent")
-        };
-
-        let mut locked_parent = parent.lock();
-        match locked_parent.get_child(self.name.clone(), false) {
-            Ok(child) => match child {
-                FSNode::File(_file) => return Err("cannot be a file"),
-                FSNode::Dir(dir) => return Ok(dir)
-            },
-            Err(err) => return Err(err),
-        }
-    }
-
 
     /// Sets the parent directory of the Task Directory
     /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)

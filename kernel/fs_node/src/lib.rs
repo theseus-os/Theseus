@@ -12,7 +12,7 @@
 /// other filesystem functions, and then we simply match on the FSnode to extract the concrete type
 /// to perform the desired function
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate spin;
 
 use alloc::string::String;
@@ -33,10 +33,34 @@ pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 
 /// Traits that both files and directories share
 pub trait FileDirectory {
-    fn get_path_as_string(&self) -> String;
+    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    fn get_path_as_string(&self) -> String {
+        let mut path = String::from("tasks");
+        if let Ok(cur_dir) =  self.get_parent_dir() {
+            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            return path;
+        }
+        return path;
+    }
     fn get_name(&self) -> String;
     fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str>;
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str>; // DON'T CALL THIS (add_fs_node performs this function)
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
+        let parent = match self.get_parent_dir() {
+            Ok(parent) => parent,
+            Err(err) => return Err(err)
+        };
+
+        let mut locked_parent = parent.lock();
+        match locked_parent.get_child(self.get_name(), false) {
+            Ok(child) => {
+                match child {
+                    FSNode::Dir(dir) => Ok(dir),
+                    FSNode::File(_file) => Err("should not be a file"),
+                }
+            },
+            Err(err) => return Err(err)
+        }
+    }
     fn set_parent(&mut self, parent_pointer: WeakDirRef); // DON'T CALL THIS (add_fs_node performs this function)
 }
 

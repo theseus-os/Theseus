@@ -82,17 +82,6 @@ impl Directory for VFSDirectory {
 }
 
 impl FileDirectory for VFSDirectory {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        let mut path = self.name.clone();
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
-        }
-
-        return path;
-    }
-
     fn get_name(&self) -> String {
         self.name.clone()
     }
@@ -102,27 +91,6 @@ impl FileDirectory for VFSDirectory {
         return match self.parent.upgrade() {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")
-        }
-    }
-
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let parent = match self.parent.upgrade() {
-            Some(weak_ref) => weak_ref,
-            None => return Err("could not upgrade parent")
-        };
-
-        let mut locked_parent = parent.lock();
-        match locked_parent.get_child(self.name.clone(), false) {
-            Ok(child) => {
-                match child {
-                    FSNode::Dir(dir) => Ok(dir),
-                    FSNode::File(_file) => Err("should not be a file"),
-                }
-            },
-            Err(err) => {
-                error!("failed in get_self_pointer because: {}", err);
-                return Err(err);
-                },
         }
     }
 
@@ -163,16 +131,6 @@ impl File for VFSFile {
 }
 
 impl FileDirectory for VFSFile {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        let mut path = self.name.clone();
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
-        }
-        return path;
-    }
-
     fn get_name(&self) -> String {
         self.name.clone()
     }
@@ -182,24 +140,6 @@ impl FileDirectory for VFSFile {
         return match self.parent.upgrade() {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")
-        }
-    }
-
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let parent = match self.parent.upgrade() {
-            Some(weak_ref) => weak_ref,
-            None => return Err("could not upgrade parent")
-        };
-        
-        let mut locked_parent = parent.lock();
-        match locked_parent.get_child(self.name.clone(), false) {
-            Ok(child) => {
-                match child {
-                    FSNode::Dir(dir) => Ok(dir),
-                    FSNode::File(_file) => Err("should not be a file"),
-                }
-            },
-            Err(err) => return Err(err),
         }
     }
 
