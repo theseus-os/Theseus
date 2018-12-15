@@ -83,7 +83,7 @@ impl FileDirectory for RootDirectory {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.name.clone();
-        if let Some(cur_dir) =  self.get_parent_dir() {
+        if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
         }
@@ -95,9 +95,8 @@ impl FileDirectory for RootDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        error!("root directory does not have a parent");
-        return None;
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return Err("root does not have a parent");
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {

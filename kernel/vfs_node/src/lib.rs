@@ -85,10 +85,11 @@ impl FileDirectory for VFSDirectory {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.name.clone();
-        if let Some(cur_dir) =  self.get_parent_dir() {
+        if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
         }
+
         return path;
     }
 
@@ -97,8 +98,11 @@ impl FileDirectory for VFSDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        return self.parent.upgrade();
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self.parent.upgrade() {
+            Some(parent) => Ok(parent),
+            None => Err("could not upgrade parent")
+        }
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
@@ -162,7 +166,7 @@ impl FileDirectory for VFSFile {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.name.clone();
-        if let Some(cur_dir) =  self.get_parent_dir() {
+        if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
         }
@@ -174,8 +178,11 @@ impl FileDirectory for VFSFile {
     }
     
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        return self.parent.upgrade();
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self.parent.upgrade() {
+            Some(parent) => Ok(parent),
+            None => Err("could not upgrade parent")
+        }
     }
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {

@@ -35,7 +35,7 @@ pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 pub trait FileDirectory {
     fn get_path_as_string(&self) -> String;
     fn get_name(&self) -> String;
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef>;
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str>;
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str>; // DON'T CALL THIS (add_fs_node performs this function)
     fn set_parent(&mut self, parent_pointer: WeakDirRef); // DON'T CALL THIS (add_fs_node performs this function)
 }

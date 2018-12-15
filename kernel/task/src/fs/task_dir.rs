@@ -32,7 +32,7 @@ pub fn init() -> Result<(), &'static str> {
 pub struct TaskFile<'a> {
     task: &'a TaskRef,
     path: Path, 
-    parent: Option<WeakDirRef>
+    parent: WeakDirRef
 }
 
 impl<'a> TaskFile<'a> {
@@ -41,24 +41,31 @@ impl<'a> TaskFile<'a> {
         return TaskFile {
             task: task,
             path: Path::new(format!("/root/task/{}", task_id)), 
-            parent: Some(parent_pointer)
+            parent: parent_pointer
         };
     }
 }
 
 impl<'a> FileDirectory for TaskFile<'a> {
+    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        return format!("/root/tasks/{}", self.get_name());
+        let mut path = String::from("tasks");
+        if let Ok(cur_dir) =  self.get_parent_dir() {
+            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            return path;
+        }
+        return path;
     }
+
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
 
-        /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self.parent.upgrade() {
+            Some(parent) => Ok(parent),
+            None => Err("could not upgrade parent")
         }
     }
 
@@ -67,10 +74,8 @@ impl<'a> FileDirectory for TaskFile<'a> {
     }
 
     /// Sets the parent directory of the Task Directory
-    /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
-    /// We should consider making this function private
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = Some(parent_pointer);
+        self.parent = parent_pointer;
     }
 }
 
@@ -111,7 +116,7 @@ pub struct TaskDirectory {
     /// A list of StrongDirRefs or pointers to the child directories 
     children: Vec<FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: Option<WeakDirRef>,
+    parent: WeakDirRef,
 }
 
 impl TaskDirectory {
@@ -119,7 +124,7 @@ impl TaskDirectory {
         let directory = TaskDirectory {
             name: name,
             children: Vec::new(),
-            parent: Some(parent_pointer),
+            parent: parent_pointer,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         dir_ref
@@ -130,7 +135,7 @@ impl FileDirectory for TaskDirectory {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = String::from("tasks");
-        if let Some(cur_dir) =  self.get_parent_dir() {
+        if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
         }
@@ -142,10 +147,10 @@ impl FileDirectory for TaskDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<StrongAnyDirRef> {
-        match self.parent {
-            Some(ref dir) => dir.upgrade(),
-            None => None
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self.parent.upgrade() {
+            Some(parent) => Ok(parent),
+            None => Err("could not upgrade parent")
         }
     }
 
@@ -154,11 +159,7 @@ impl FileDirectory for TaskDirectory {
     /// 
     /// Note that this function cannot be used on the root becuase the root doesn't have a parent directory
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let weak_parent = match self.parent.clone() {
-            Some(parent) => parent, 
-            None => return Err("could not clone parent")
-        };
-        let parent = match Weak::upgrade(&weak_parent) {
+        let parent = match Weak::upgrade(&self.parent) {
             Some(weak_ref) => weak_ref,
             None => return Err("could not upgrade parent")
         };
@@ -178,7 +179,7 @@ impl FileDirectory for TaskDirectory {
     /// This function is currently called whenever the VFS root calls add_directory(TaskDirectory)
     /// We should consider making this function private
     fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = Some(parent_pointer);
+        self.parent = parent_pointer;
     }
 }
 

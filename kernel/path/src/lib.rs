@@ -123,10 +123,10 @@ impl Path {
             // Navigate to parent directory
             if component == ".." {
                 let dir = match new_wd.lock().get_parent_dir() {
-                    Some(dir) => dir,
-                    None => {
+                    Ok(dir) => dir,
+                    Err(err) => {
                         error!("failed to move up in path {}", current_path.path);
-                        return Err("could not move up in path")
+                        return Err(err)
                         }, 
                 };
                 new_wd = dir;
