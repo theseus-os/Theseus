@@ -8,7 +8,7 @@ version = "0.1.0"
 # debugit = "0.1.2"
 
 # [dependencies.lazy_static]
-# features = ["spin_no_std"]
+# features = ["spin_no_std", "nightly"]
 # version = "0.2.1"
 
 

@@ -33,7 +33,7 @@ extern crate ps2;
 
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc};
 use spin::Once;
 //use port_io::Port;
 // use drivers::ata_pio;
@@ -202,14 +202,16 @@ pub fn init_handlers_pic() {
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
 
-
-
-
+/// Register an interrupt and supply the interrupt handler 
+pub fn register_interrupt(interrupt_no : u8, func: HandlerFunc) {
+    let mut idt = IDT.lock();
+    idt[interrupt_no as usize].set_handler_fn(func);
+} 
 
 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
-fn eoi(irq: Option<u8>) {
+pub fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
         InterruptChip::APIC |
         InterruptChip::X2APIC => {

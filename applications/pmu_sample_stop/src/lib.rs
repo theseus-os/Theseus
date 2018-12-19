@@ -8,7 +8,8 @@ extern crate alloc;
 extern crate getopts;
 extern crate pmu_x86;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use getopts::Options;
 
 

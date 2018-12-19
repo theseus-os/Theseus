@@ -5,8 +5,10 @@
 //! 
 
 #![no_std]
-#![feature(lang_items)]
 #![feature(alloc)]
+#![feature(alloc_error_handler)]
+#![feature(lang_items)]
+#![feature(panic_info_message)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -17,6 +19,7 @@ extern crate mod_mgmt;
 
 
 use core::fmt;
+use core::panic::PanicInfo;
 
 
 #[cfg(not(test))]
@@ -26,12 +29,12 @@ use core::fmt;
 pub extern "C" fn eh_personality() {}
 
 
+/// The singular entry point for a language-level panic.
 #[cfg(not(test))]
-#[lang = "panic_fmt"]
-#[no_mangle]
+#[panic_handler]
 #[doc(hidden)]
-pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> ! {
-    
+fn panic_entry_point(info: &PanicInfo) -> ! {
+
     // Since a panic could occur before the memory subsystem is initialized,
     // we must check before using alloc types or other functions that depend on the memory system (the heap).
     // We can check that by seeing if the kernel mmi has been initialized.
@@ -40,13 +43,11 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
         #[cfg(loadable)]
         {
-            use core::ops::DerefMut;
-            use mod_mgmt::metadata::CrateType;
-            
-            type PanicWrapperFunc = fn(fmt_args: fmt::Arguments, file: &'static str, line: u32, col: u32) -> Result<(), &'static str>;
-            let section_ref = kernel_mmi_ref.and_then(|kernel_mmi| {
-                mod_mgmt::get_default_namespace().get_symbol_or_load("panic_wrapper::panic_wrapper", CrateType::Kernel.prefix(), None, kernel_mmi.lock().deref_mut(), false).upgrade()
-            }).ok_or("Couldn't get symbol: \"panic_wrapper::panic_wrapper\"");
+            type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
+            let section_ref = mod_mgmt::get_default_namespace()
+                    .get_symbol_starting_with("panic_wrapper::panic_wrapper::")
+                    .upgrade()
+                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
@@ -57,12 +58,12 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
                 };
                 let mapped_pages_locked = mapped_pages.lock();
                 mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
-                    .and_then(|func| func(fmt_args, file, line, col)) // actually call the function
+                    .and_then(|func| func(info)) // actually call the function
             })
         }
         #[cfg(not(loadable))]
         {
-            panic_wrapper::panic_wrapper(fmt_args, file, line, col)
+            panic_wrapper::panic_wrapper(info)
         }
     }
     else {
@@ -71,8 +72,8 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
 
     if let Err(_e) = res {
         // basic early panic printing with no dependencies
-        error!("PANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
-        println_raw!("\nPANIC in {}:{}:{} -- {}", file, line, col, fmt_args);
+        println_raw!("\nPANIC: {}", info);
+        error!("PANIC: {}", info);
     }
 
     // if we failed to handle the panic, there's not really much we can do about it
@@ -105,5 +106,14 @@ pub extern "C" fn panic_fmt(fmt_args: fmt::Arguments, file: &'static str, line: 
 #[doc(hidden)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     error!("\n\nin _Unwind_Resume, unimplemented!");
+    loop {}
+}
+
+
+#[alloc_error_handler]
+fn oom(_layout: core::alloc::Layout) -> ! {
+    // basic early panic printing with no dependencies
+    println_raw!("\nOOM: {:?}", _layout);
+    error!("OOM: {:?}", _layout);
     loop {}
 }

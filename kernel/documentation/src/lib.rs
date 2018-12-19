@@ -41,7 +41,6 @@
 //! * `mod_mgmt`: Module management, including parsing, loading, linking, unloading, and metadata management.
 //! * `mouse`: simple PS2 mouse driver.
 //! * `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
-//! * `panic_info`: Struct definitions containing panic information and such.
 //! * `panic_unwind`: Default entry point for panics and unwinding, as required by the Rust compiler.
 //! * `panic_wrapper`: Wrapper functions for handling and propagating panics.
 //! * `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct ( a wrapper around the String class)

@@ -17,10 +17,8 @@
 //!
 
 #![no_std]
-
 #![feature(alloc)]
 #![feature(asm)]
-#![feature(used)]
 #![feature(core_intrinsics)]
 
 
@@ -49,20 +47,20 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-#[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
-extern crate exceptions_full;
+#[cfg(test_network)] extern crate exceptions_full;
+extern crate network_test;
 
-#[cfg(simd_personality)]
-extern crate simd_personality;
+#[cfg(test_ota_update_client)] extern crate ota_update_client;
 
-// Here, we add pub use statements for any function or data that we want to export from the nano_core
-// and make visible/accessible to other modules that depend on nano_core functions.
-// Or, just make the modules public above. Basically, they need to be exported from the nano_core like a regular library would.
+#[cfg(simd_personality)] extern crate simd_personality;
 
-use alloc::arc::Arc;
-use alloc::{String, Vec};
-use core::fmt;
+
+
+use alloc::sync::Arc;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
@@ -72,9 +70,10 @@ use spawn::KernelTaskBuilder;
 
 
 
+#[cfg(mirror_log_to_vga)]
 /// the callback use in the logger crate for mirroring log functions to the input_event_manager
-pub fn mirror_to_vga_cb(_color: logger::LogColor, prefix: &'static str, args: fmt::Arguments) {
-    println!("{} {}", prefix, args);
+pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: core::fmt::Arguments) {
+    println!("{}{}", prefix, args);
 }
 
 
@@ -93,8 +92,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
-    // at this point, we no longer *need* to use println_raw, because we can see the logs,
-    // either from the serial port on an emulator, or because they're mirrored to the VGA buffer on real hardware.
 
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
@@ -124,7 +121,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
-    
+
     // create the initial `Task`, i.e., task_zero
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
@@ -133,7 +130,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
-
     
     // boot up the other cores (APs)
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
@@ -155,6 +151,26 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     driver_init::init(input_event_queue_producer)?;
 
+
+    #[cfg(test_network)]
+    {
+        if let Some(nic) = e1000::get_e1000_nic() {
+            KernelTaskBuilder::new(network_test::init, nic)
+                .name(String::from("network_test"))
+                .spawn()?;
+        }
+    }
+
+    #[cfg(test_ota_update_client)]
+    {
+        if let Some(nic) = e1000::get_e1000_nic() {
+            KernelTaskBuilder::new(ota_update_client::init, nic)
+                .name(String::from("ota_update_client"))
+                .spawn()?;
+        }
+    }
+
+
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
@@ -172,15 +188,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
         }
     }
-
-    // testing nic
-    // TODO: remove this (@Ramla)
-    if false {
-        use e1000::test_nic_driver::test_nic_driver;
-        KernelTaskBuilder::new(test_nic_driver, None)
-            .name(String::from("test_nic_driver"))
-            .spawn()?;
-    }  
 
     // create and jump to the first userspace thread
     if false {

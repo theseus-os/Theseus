@@ -13,14 +13,17 @@ extern crate itertools;
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate acpi;
 
 use core::ops::DerefMut;
-use alloc::{Vec, String};
 use alloc::slice::SliceConcatExt;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use getopts::Options;
-use memory::{get_module, ModuleArea};
-use mod_mgmt::metadata::StrongCrateRef;
+use memory::{get_module, get_module_starting_with};
+use mod_mgmt::SwapRequest;
+use acpi::get_hpet;
+
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -48,8 +51,8 @@ pub fn main(args: Vec<String>) -> isize {
     let matches = matches.free.join(" ");
     println!("matches: {}", matches);
 
-    let mod_pairs = match parse_module_pairs(&matches) {
-        Ok(pairs) => pairs,
+    let tuples = match parse_input_tuples(&matches) {
+        Ok(t)  => t,
         Err(e) => {
             println!("Error: {}", e);
             print_usage(opts);
@@ -57,9 +60,9 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    println!("mod_pairs: {:?}", mod_pairs);
+    println!("tuples: {:?}", tuples);
 
-    match swap_modules(mod_pairs, verbose) {
+    match swap_modules(tuples, verbose) {
         Ok(_) => 0,
         Err(e) => {
             println!("Error: {}", e);
@@ -69,10 +72,10 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-/// Takes a string of arguments and parses it into a series of pairs, formatted as 
-/// `(OLD,NEW) (OLD,NEW) (OLD,NEW)...`
-fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option<String>)>, String> {
-    let mut v: Vec<(&str, &str, Option<String>)> = Vec::new();
+/// Takes a string of arguments and parses it into a series of tuples, formatted as 
+/// `(OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT])...`
+fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>, String> {
+    let mut v: Vec<(&str, &str, bool)> = Vec::new();
     let mut open_paren_iter = args.match_indices('(');
 
     // looking for open parenthesis
@@ -90,9 +93,15 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option
                 })
             });
         match parsed {
-            Some((o, n, override_name)) => {
-                println!("found triple: {:?}, {:?}, {:?}", o, n, override_name);
-                v.push((o, n, override_name.map(|n| n.to_string())));
+            Some((o, n, reexport)) => {
+                println!("found triple: {:?}, {:?}, {:?}", o, n, reexport);
+                let reexport_bool = match reexport {
+                    Some("true")  => true, 
+                    Some("yes")   => true, 
+                    Some("y")     => true, 
+                    _             => false,
+                };
+                v.push((o, n, reexport_bool));
             }
             _ => return Err("list of module pairs is formatted incorrectly.".to_string()),
         }
@@ -108,29 +117,47 @@ fn parse_module_pairs<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, Option
 
 
 /// Performs the actual swapping of modules.
-fn swap_modules(pairs: Vec<(&str, &str, Option<String>)>, verbose_log: bool) -> Result<(), String> {
-    let swap_pairs = {
-        let mut mods: Vec<(StrongCrateRef, &ModuleArea, Option<String>)> = Vec::with_capacity(pairs.len());
-        for (o, n, override_name) in pairs {
-            println!("   Looking for ({},{})  [override: {:?}]", o, n, override_name);
-            mods.push(
-                (
-                    mod_mgmt::get_default_namespace().get_crate(o).ok_or_else(|| format!("Couldn't find old crate \"{}\".", o))?,
-                    get_module(n).ok_or_else(|| format!("Couldn't find new module file \"{}\".", n))?,
-                    override_name
-                )
-            );
+fn swap_modules(tuples: Vec<(&str, &str, bool)>, verbose_log: bool) -> Result<(), String> {
+    let namespace = mod_mgmt::get_default_namespace();
+
+    let swap_requests = {
+        let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
+        for (o, n, r) in tuples {
+            // 1) check that the old crate exists
+            let old_crate = namespace.get_crate_starting_with(o)
+                .ok_or_else(|| format!("Couldn't find old crate that matched {:?}", o))?;
+
+            // 2) check that the new module file exists
+            let new_crate_module = get_module(n)
+                .ok_or_else(|| format!("Couldn't find new module file {:?}.", n))
+                .or_else(|_| get_module_starting_with(n)
+                    .ok_or_else(|| format!("Couldn't find single fuzzy match for new module file {:?}.", n))
+                )?;
+            mods.push(SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_module, r));
         }
         mods
     };
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    mod_mgmt::get_default_namespace().swap_crates(
-        swap_pairs, 
+    
+    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+    let swap_result = namespace.swap_crates(
+        swap_requests, 
         kernel_mmi.deref_mut(), 
         verbose_log
-    ).map_err(|e| e.to_string())
+    );
+    
+    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+
+    let elapsed_ticks = end - start;
+    println!("Swap operation complete. Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+
+
+    swap_result.map_err(|e| e.to_string())
 }
 
 
@@ -140,7 +167,10 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: swap (OLD1,NEW1[,NEW_NAME1]) [(OLD2,NEW2[,NEW_NAME2])]...
-Swaps the pairwise list of modules, with NEW# replacing OLD# in each pair.
-The OLD value is a crate name (\"my_crate\"), whereas the NEW value is a module file name (\"k#my_crate\").
-A NEW_NAME string is optional, which will override the crate name derived from the NEW module.";
+const USAGE: &'static str = "Usage: swap (OLD1, NEW1 [, true | false]) [(OLD2, NEW2 [, true | false])]...
+Swaps the given list of crate-module tuples, with NEW# replacing OLD# in each tuple.
+The OLD value is a crate name (\"my_crate-<hash>\"), whereas the NEW value is a module file name (\"k#my_crate-<hash>\").
+Both the old crate name and the new module name can be autocompleted, e.g., \"my_cra\" will find \"my_crate-<hash>\" 
+if there is only ONE crate or module file that matched \"my_cra\".
+A third element of each tuple is the optional 'reexport_new_symbols_as_old' boolean, which if true, 
+will reexport new symbols under their old names, if those symbols match (excluding hashes).";
