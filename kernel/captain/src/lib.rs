@@ -160,7 +160,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         }
     }
 
-    #[cfg(test_ota_update_client)]
+    // #[cfg(test_ota_update_client)]
     {
         if let Some(nic) = e1000::get_e1000_nic() {
             KernelTaskBuilder::new(ota_update_client::init, nic)

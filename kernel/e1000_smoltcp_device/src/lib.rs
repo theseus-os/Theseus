@@ -5,6 +5,7 @@
 
 #[macro_use] extern crate log;
 extern crate alloc;
+extern crate spin;
 extern crate smoltcp;
 extern crate e1000;
 extern crate network_interface_card;
@@ -13,15 +14,79 @@ extern crate owning_ref;
 
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
+use spin::{Mutex, Once};
 use irq_safety::MutexIrqSafe;
-use smoltcp::Error;
-use smoltcp::time::Instant;
-use smoltcp::phy::DeviceCapabilities;
+use smoltcp::{
+    Error,
+    time::Instant,
+    phy::DeviceCapabilities,
+    wire::{EthernetAddress, IpAddress, Ipv4Address, IpCidr},
+    iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
+};
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceivedFrame};
 use owning_ref::BoxRef;
 
 /// standard MTU for ethernet cards
 const DEFAULT_MTU: usize = 1500;
+
+
+/// A type alias for a static smoltcp EthernetInterface that works with our E1000 device. 
+pub type E1000EthernetInterface = EthernetInterface<'static, 'static, 'static, E1000Device<e1000::E1000Nic>>;
+
+
+
+/// Returns a reference to the e1000 network interface, which can be used for handling sockets. 
+/// If the interface hasn't yet been created, it will be created on demand using the given local IP and gateway IP.
+/// 
+/// Arguments: 
+/// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
+/// * `static_ip`: the IP that this network interface should locally use. If `None`, one will be assigned via DHCP.
+/// * `gateway_ip`: the IP of this network interface's local gateway (access point, router). If `None`, will be discovered via DHCP.
+/// 
+/// # Note
+/// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
+/// 
+pub fn get_e1000_interface(
+    nic: &'static MutexIrqSafe<e1000::E1000Nic>,
+    static_ip: Option<IpAddress>,
+    gateway_ip: Option<Ipv4Address>,
+) -> Result<&'static Mutex<E1000EthernetInterface>, &'static str> 
+{
+    static E1000_NETWORK_IFACE: Once<Mutex<E1000EthernetInterface>> = Once::new();
+    if let Some(iface) = E1000_NETWORK_IFACE.try() {
+        Ok(iface)
+    } else {
+        // here, we have to create the iface for the first time because it didn't yet exist
+        let mut ip_addrs = Vec::new();
+        ip_addrs.push(IpCidr::new(
+            static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?,
+            24
+        ));
+
+        let mut routes = Routes::new(BTreeMap::new());
+        let _prev_default_gateway = routes.add_default_ipv4_route(
+            gateway_ip.ok_or("gateway_ip is currently required because we do not yet support DHCP")?
+        ).map_err(|_e| {
+            error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
+            "couldn't set default gateway IP address"
+        })?;
+
+        let device = E1000Device::new(nic);
+        let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
+        let iface: E1000EthernetInterface = EthernetInterfaceBuilder::new(device)
+            .ethernet_addr(hardware_mac_addr)
+            .neighbor_cache(NeighborCache::new(BTreeMap::new()))
+            .ip_addrs(Vec::new())
+            .routes(routes)
+            .finalize();
+
+        Ok(
+            E1000_NETWORK_IFACE.call_once(|| Mutex::new(iface))
+        )
+    }
+}
 
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp

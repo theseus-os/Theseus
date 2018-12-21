@@ -44,6 +44,7 @@ use e1000_smoltcp_device::E1000Device;
 use network_interface_card::NetworkInterfaceCard;
 use irq_safety::MutexIrqSafe;
 use sha3::{Digest, Sha3_512};
+use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
 
 
 
@@ -59,14 +60,11 @@ const DEFAULT_DESTINATION_PORT: u16 = 8090;
 const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
 
 /// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53147;
+const DEFAULT_LOCAL_PORT: u16 = 53156;
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
 const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
 
-
-
-static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
 
 
 /// The states that implement the finite state machine for 
@@ -84,7 +82,7 @@ enum HttpState {
 }
 
 
-/// Function to calculate time since a give time in ms
+/// Function to calculate time since a given time in ms
 fn millis_since(start_time: u64) -> Result<u64, &'static str> {
     let hpet_guard = get_hpet();
     let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
@@ -106,12 +104,6 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     where N: NetworkInterfaceCard
 {
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
-
-    // initialize the message queue
-    let msg_queue: DFQueue<String> = DFQueue::new();
-    let msg_queue_consumer = msg_queue.into_consumer();
-    let msg_queue_producer = msg_queue_consumer.obtain_producer();
-    MSG_QUEUE.call_once(|| msg_queue_producer.obtain_producer());
 
     let dest_addr = IpAddress::v4(
         DEFAULT_DESTINATION_IP_ADDR[0],
@@ -198,15 +190,15 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             }
 
             HttpState::Requesting if socket.can_send() => {
-                let method = "GET ";
-                let uri = "/a%23hello.o ";
-                let version = "HTTP/1.1\r\n";
-                let connection = "Connection: close\r\n";
-                let http_request = format!("{}{}{}{}{}\r\n", 
-                    method, 
-                    uri, 
+                let method = "GET";
+                let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
+                let version = "HTTP/1.1";
+                let connection = "Connection: close";
+                let http_request = format!("{} {} {}\r\n{}\r\n{}\r\n\r\n", 
+                    method,
+                    uri,
                     version,
-                    format_args!("Host: {}:{}\r\n", dest_addr, dest_port), // host
+                    format_args!("Host: {}:{}", dest_addr, dest_port), // host
                     connection
                 );
 
@@ -215,7 +207,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
                     let mut headers = [httparse::EMPTY_HEADER; 64];
                     let mut request = httparse::Request::new(&mut headers);
                     if let Err(_e) = request.parse(http_request.as_bytes()) {
-                        error!("ota_update_client: created improper HTTP request: {:?}", http_request);
+                        error!("ota_update_client: created improper HTTP request: {:?}. Error: {:?}", http_request, _e);
                         break;
                     }
                 }

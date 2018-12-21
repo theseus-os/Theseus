@@ -40,8 +40,7 @@ path = "../spawn"
 [dependencies.task]
 path = "../task"
 
-
-[dependencies.percent_encoding]
+[dependencies.percent-encoding]
 path = "../../libs/percent_encoding"
 
 [dependencies.dfqueue]
