@@ -12,6 +12,7 @@ extern crate smoltcp;
 extern crate e1000;
 extern crate e1000_smoltcp_device;
 extern crate network_interface_card;
+extern crate network_manager;
 extern crate spin;
 extern crate dfqueue;
 extern crate irq_safety;
@@ -45,7 +46,7 @@ use network_interface_card::NetworkInterfaceCard;
 use irq_safety::MutexIrqSafe;
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-
+use network_manager::{NetworkInterface, NetworkInterfaceRef};
 
 
 /// The IP address of the update server.
@@ -98,11 +99,10 @@ fn millis_since(start_time: u64) -> Result<u64, &'static str> {
 /// Initialize the network live update client, 
 /// which spawns a new thread to handle live update requests and notifications. 
 /// # Arguments
-/// * `nic`: a reference to an initialized NIC, which must implement the `NetworkInterfaceCard` trait.
+/// * `iface`: a reference to an initialized network interface
 /// 
-pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
-    where N: NetworkInterfaceCard
-{
+pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
+
     let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
 
     let dest_addr = IpAddress::v4(
@@ -113,49 +113,14 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
     );
     let dest_port = DEFAULT_DESTINATION_PORT;
 
-    // setup local ip address (this machine) // TODO FIXME: obtain an IP via DHCP
-    let local_addr = [IpCidr::new(
-        IpAddress::v4(
-            DEFAULT_LOCAL_IP[0],
-            DEFAULT_LOCAL_IP[1],
-            DEFAULT_LOCAL_IP[2],
-            DEFAULT_LOCAL_IP[3],
-        ),
-        24
-    )];
     let local_port = DEFAULT_LOCAL_PORT;
 
-    let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    
     let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
     let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
     let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
 
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
     let tcp_handle = sockets.add(tcp_socket);
-
-    // Setup an interface/device that connects smoltcp to our e1000 driver
-    let device = E1000Device::new(nic);
-    let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
-    // TODO FIXME: get the default gateway IP from DHCP
-    let default_gateway = Ipv4Address::new(
-        DEFAULT_LOCAL_GATEWAY_IP[0],
-        DEFAULT_LOCAL_GATEWAY_IP[1],
-        DEFAULT_LOCAL_GATEWAY_IP[2],
-        DEFAULT_LOCAL_GATEWAY_IP[3],
-    );
-    let mut routes_storage = [None; 1];
-    let mut routes = Routes::new(&mut routes_storage[..]);
-    let _prev_default_gateway = routes.add_default_ipv4_route(default_gateway).map_err(|_e| {
-        error!("ota_update_client: couldn't set default gateway IP address: {:?}", _e);
-        "couldn't set default gateway IP address"
-    })?;
-    let mut iface = EthernetInterfaceBuilder::new(device)
-        .ethernet_addr(hardware_mac_addr)
-        .neighbor_cache(neighbor_cache)
-        .ip_addrs(local_addr)
-        .routes(routes)
-        .finalize();
 
 
     let mut loop_ctr = 0;
@@ -168,16 +133,18 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         loop_ctr += 1;
 
         // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };
+        {
+            let timestamp: i64 = millis_since(startup_time)?
+                .try_into()
+                .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+            let _packets_were_sent_or_received = match iface.lock().flush(&mut sockets, Instant::from_millis(timestamp)) {
+                Ok(b) => b,
+                Err(err) => {
+                    warn!("ota_update_client: poll error: {}", err);
+                    false  // continue;
+                }
+            };
+        }
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
 
@@ -421,7 +388,7 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
         let timestamp: i64 = millis_since(startup_time)?
             .try_into()
             .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
+        let _packets_were_sent_or_received = match iface.lock().flush(&mut sockets, Instant::from_millis(timestamp)) {
             Ok(b) => b,
             Err(err) => {
                 warn!("ota_update_client: poll error: {}", err);

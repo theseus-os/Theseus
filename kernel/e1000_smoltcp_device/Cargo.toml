@@ -34,11 +34,14 @@ git = "https://github.com/kevinaboos/irq_safety"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.network_interface_card]
+path = "../network_interface_card"
+
 [dependencies.e1000]
 path = "../e1000"
 
-[dependencies.network_interface_card]
-path = "../network_interface_card"
+[dependencies.network_manager]
+path = "../network_manager"
 
 [lib]
 crate-type = ["rlib"]

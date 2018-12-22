@@ -11,34 +11,52 @@ extern crate e1000;
 extern crate network_interface_card;
 extern crate irq_safety;
 extern crate owning_ref;
+extern crate network_manager;
 
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 use spin::{Mutex, Once};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{
-    Error,
+    socket::SocketSet,
     time::Instant,
     phy::DeviceCapabilities,
     wire::{EthernetAddress, IpAddress, Ipv4Address, IpCidr},
     iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
 };
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceivedFrame};
+use e1000::E1000Nic;
 use owning_ref::BoxRef;
+use network_manager::NetworkInterface;
 
 /// standard MTU for ethernet cards
 const DEFAULT_MTU: usize = 1500;
 
 
-/// A type alias for a static smoltcp EthernetInterface that works with our E1000 device. 
-pub type E1000EthernetInterface = EthernetInterface<'static, 'static, 'static, E1000Device<e1000::E1000Nic>>;
+// pub type E1000EthernetInterface<N: NetworkInterfaceCard + 'static> = EthernetInterface<'static, 'static, 'static, E1000Device<N>>;
 
 
+pub struct E1000NetworkInterface<N: NetworkInterfaceCard + 'static> {
+    pub iface: EthernetInterface<'static, 'static, 'static, E1000Device<N>>,
+}
+
+impl<N: NetworkInterfaceCard + 'static> NetworkInterface for E1000NetworkInterface<N> { 
+    fn flush(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool> {
+        self.iface.poll(sockets, timestamp)
+    }
+}
+
+
+
+pub fn test_init() {
+    let iface = create_interface(e1000::get_e1000_nic().unwrap(), None, None).unwrap();
+    network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
+}
 
 /// Returns a reference to the e1000 network interface, which can be used for handling sockets. 
-/// If the interface hasn't yet been created, it will be created on demand using the given local IP and gateway IP.
 /// 
 /// Arguments: 
 /// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
@@ -48,45 +66,39 @@ pub type E1000EthernetInterface = EthernetInterface<'static, 'static, 'static, E
 /// # Note
 /// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
 /// 
-pub fn get_e1000_interface(
-    nic: &'static MutexIrqSafe<e1000::E1000Nic>,
+pub fn create_interface<N: NetworkInterfaceCard + 'static>(
+    nic: &'static MutexIrqSafe<N>,
     static_ip: Option<IpAddress>,
     gateway_ip: Option<Ipv4Address>,
-) -> Result<&'static Mutex<E1000EthernetInterface>, &'static str> 
+) -> Result<E1000NetworkInterface<N>, &'static str> 
 {
-    static E1000_NETWORK_IFACE: Once<Mutex<E1000EthernetInterface>> = Once::new();
-    if let Some(iface) = E1000_NETWORK_IFACE.try() {
-        Ok(iface)
-    } else {
-        // here, we have to create the iface for the first time because it didn't yet exist
-        let mut ip_addrs = Vec::new();
-        ip_addrs.push(IpCidr::new(
-            static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?,
-            24
-        ));
+    // here, we have to create the iface for the first time because it didn't yet exist
+    let mut ip_addrs = Vec::new();
+    ip_addrs.push(IpCidr::new(
+        static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?,
+        24
+    ));
 
-        let mut routes = Routes::new(BTreeMap::new());
-        let _prev_default_gateway = routes.add_default_ipv4_route(
-            gateway_ip.ok_or("gateway_ip is currently required because we do not yet support DHCP")?
-        ).map_err(|_e| {
-            error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
-            "couldn't set default gateway IP address"
-        })?;
+    let mut routes = Routes::new(BTreeMap::new());
+    let _prev_default_gateway = routes.add_default_ipv4_route(
+        gateway_ip.ok_or("gateway_ip is currently required because we do not yet support DHCP")?
+    ).map_err(|_e| {
+        error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
+        "couldn't set default gateway IP address"
+    })?;
 
-        let device = E1000Device::new(nic);
-        let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
-        let iface: E1000EthernetInterface = EthernetInterfaceBuilder::new(device)
-            .ethernet_addr(hardware_mac_addr)
-            .neighbor_cache(NeighborCache::new(BTreeMap::new()))
-            .ip_addrs(Vec::new())
-            .routes(routes)
-            .finalize();
+    let device = E1000Device::new(nic);
+    let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
+    let iface = EthernetInterfaceBuilder::new(device)
+        .ethernet_addr(hardware_mac_addr)
+        .neighbor_cache(NeighborCache::new(BTreeMap::new()))
+        .ip_addrs(Vec::new())
+        .routes(routes)
+        .finalize();
 
-        Ok(
-            E1000_NETWORK_IFACE.call_once(|| Mutex::new(iface))
-        )
-    }
+    Ok(E1000NetworkInterface{iface})
 }
+
 
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp
@@ -186,20 +198,20 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         // Because we can dynamically allocate transmit buffers, we just do that here.
         if len > (u16::max_value() as usize) {
             error!("E1000Device::transmit(): requested tx buffer size {} exceeds the max size of u16!", len);
-            return Err(Error::Exhausted)
+            return Err(smoltcp::Error::Exhausted)
         }
 
         // debug!("E1000D/evice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
         // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
         let mut txbuf = TransmitBuffer::new(len as u16).map_err(|e| {
             error!("E1000Device::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);
-            Error::Exhausted
+            smoltcp::Error::Exhausted
         })?;
 
         let closure_retval = {
             let txbuf_byte_slice = txbuf.as_slice_mut::<u8>(0, len).map_err(|e| {
                 error!("E1000Device::transmit(): couldn't convert TransmitBuffer of length {} into byte slice, error {:?}", len, e);
-                Error::Exhausted
+                smoltcp::Error::Exhausted
             })?;
             f(txbuf_byte_slice)?
         };

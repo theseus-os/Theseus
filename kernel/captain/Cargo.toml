@@ -72,8 +72,8 @@ path = "../interrupts"
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.driver_init]
-path = "../driver_init"
+[dependencies.device_manager]
+path = "../device_manager"
 
 [dependencies.e1000]
 path = "../e1000"
@@ -89,6 +89,9 @@ path = "../../libs/keycodes_ascii"
 
 [dependencies.print]
 path = "../print"
+
+[dependencies.network_manager]
+path = "../network_manager"
 
 [dependencies.network_test]
 path = "../network_test"

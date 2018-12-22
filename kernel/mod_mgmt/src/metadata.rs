@@ -186,7 +186,7 @@ impl LoadedCrate {
     /// Returns this crate name as a symbol prefix, including a trailing "`::`".
     /// If there is no hash, then it returns the entire name with a trailing "`::`".
     /// # Example
-    /// * Crate name: "`driver_init-e3769b63863a4030`", return value: "`driver_init::`"
+    /// * Crate name: "`device_manager-e3769b63863a4030`", return value: "`device_manager::`"
     /// * Crate name: "`hello`"` return value: "`hello::`"
     pub fn crate_name_as_prefix(&self) -> String {
         format!("{}::", self.crate_name_without_hash())

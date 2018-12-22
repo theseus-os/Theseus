@@ -18,6 +18,11 @@ version = "0.3.7"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.e1000]
+path = "../e1000"
+
+# [dependencies.e1000_smoltcp_device]
+# path = "../e1000_smoltcp_device"
 
 [dependencies.smoltcp]
 version = "0.5.0"

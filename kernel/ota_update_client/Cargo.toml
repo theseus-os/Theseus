@@ -28,6 +28,9 @@ path = "../e1000_smoltcp_device"
 [dependencies.network_interface_card]
 path = "../network_interface_card"
 
+[dependencies.network_manager]
+path = "../network_manager"
+
 [dependencies.memory]
 path = "../memory"
 
