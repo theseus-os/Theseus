@@ -28,6 +28,7 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(asm, naked_functions)]
+#![feature(panic_info_message)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -37,7 +38,6 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate mod_mgmt;
-extern crate panic_info;
 extern crate context_switch;
 extern crate x86_64;
 
@@ -51,20 +51,48 @@ use spin::Once;
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
-use alloc::String;
+use core::panic::PanicInfo;
+use alloc::string::String;
 use alloc::boxed::Box;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
-use panic_info::PanicInfo;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
+pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
+
+/// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
+#[derive(Debug, Clone)]
+pub struct PanicInfoOwned {
+    pub msg:    String,
+    pub file:   String,
+    pub line:   u32, 
+    pub column: u32,
+}
+impl fmt::Display for PanicInfoOwned {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
+    }
+}
+impl PanicInfoOwned {
+    pub fn from(info: &PanicInfo) -> PanicInfoOwned {
+        let msg = info.message()
+            .map(|m| format!("{}", m))
+            .unwrap_or_else(|| String::new());
+        let (file, line, column) = if let Some(loc) = info.location() {
+            (String::from(loc.file()), loc.line(), loc.column())
+        } else {
+            (String::new(), 0, 0)
+        };
+
+        PanicInfoOwned { msg, file, line, column }
+    }
+}
 
 
 lazy_static! {
@@ -102,7 +130,7 @@ pub enum KillReason {
     /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
     Requested,
     /// A Rust-level panic occurred while running this `Task`
-    Panic(PanicInfo),
+    Panic(PanicInfoOwned),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),

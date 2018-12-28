@@ -10,7 +10,7 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(asm)]
-#![feature(compiler_fence)]
+// #![feature(compiler_fence)]
 #![feature(naked_functions)]
 
 #[macro_use] extern crate log;
@@ -104,7 +104,6 @@ struct UserTaskGsData {
 
 
 
-#[allow(private_no_mangle_fns)]
 #[no_mangle]
 #[naked]
 #[inline(never)]

@@ -15,9 +15,6 @@ version = "0.3.7"
 [dependencies.terminal_print]
 path = "../terminal_print"
 
-[dependencies.panic_info]
-path = "../../kernel/panic_info"
-
 [dependencies.task]
 path = "../../kernel/task"
 

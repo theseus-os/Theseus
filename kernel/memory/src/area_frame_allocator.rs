@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use super::{Frame, FrameAllocator, FrameIter, PhysicalMemoryArea};
-use alloc::Vec;
+use alloc::vec::Vec;
 use kernel_config::memory::PAGE_SIZE;
 
 

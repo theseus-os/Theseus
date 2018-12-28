@@ -9,7 +9,8 @@ extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use getopts::Options;
 
 #[no_mangle]

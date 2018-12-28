@@ -6,10 +6,10 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 [dependencies.volatile]
-version = "0.2.3"
+version = "0.2.5"
 features = ["const_fn"]
 
 [dependencies.serial_port]
