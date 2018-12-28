@@ -93,9 +93,6 @@ path = "../print"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.network_test]
-path = "../network_test"
-
 [dependencies.ota_update_client]
 path = "../ota_update_client"
 

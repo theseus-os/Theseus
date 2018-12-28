@@ -134,7 +134,6 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "network_manager 0.1.0",
- "network_test 0.1.0",
  "ota_update_client 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
@@ -232,12 +231,16 @@ dependencies = [
  "ata_pio 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
+ "e1000_smoltcp_device 0.1.0",
  "event_types 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mouse 0.1.0",
+ "network_manager 0.1.0",
  "pci 0.1.0",
+ "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -728,27 +731,6 @@ dependencies = [
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "network_test"
-version = "0.1.0"
-dependencies = [
- "acpi 0.1.0",
- "dfqueue 0.1.0",
- "e1000 0.1.0",
- "e1000_smoltcp_device 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "logger 0.1.0",
- "memory 0.1.0",
- "network_interface_card 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
- "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "spawn 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "task 0.1.0",
- "tsc 0.1.0",
 ]
 
 [[package]]

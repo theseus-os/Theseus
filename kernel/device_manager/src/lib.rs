@@ -1,6 +1,9 @@
 #![no_std]
+#![feature(alloc)]
 
 #[macro_use] extern crate log;
+extern crate alloc;
+extern crate spin;
 extern crate event_types;
 extern crate ata_pio;
 extern crate e1000;
@@ -11,12 +14,30 @@ extern crate acpi;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
+extern crate network_manager;
+extern crate e1000_smoltcp_device;
+extern crate smoltcp;
 
 
+use alloc::sync::Arc;
+use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::{MemoryManagementInfo, PageTable};
 use pci::get_pci_device_vd;
+use smoltcp::wire::{IpCidr, IpAddress};
+use core::str::FromStr;
+
+
+/// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
+// const DEFAULT_LOCAL_IP: [u8; 4] = [10, 0, 2, 10]; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
+// const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252]; // home router reserved IP
+const DEFAULT_LOCAL_IP: &'static str = "10.42.0.91/24"; // rice net IP
+
+/// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
+// const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
+// const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1]; // the default gateway for our TAP-based bridge
+const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 42, 0, 1]; // rice net gateway ip
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -58,7 +79,11 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
         debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
-        e1000::E1000Nic::init(e1000_pci_dev)?;
+        let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
+        let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
+        let gateway_ip = IpAddress::v4(DEFAULT_GATEWAY_IP[0], DEFAULT_GATEWAY_IP[1], DEFAULT_GATEWAY_IP[2], DEFAULT_GATEWAY_IP[3]);
+        let e1000_iface = e1000_smoltcp_device::E1000NetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
+        network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
     }
     else {
         warn!("No e1000 device found on this system.");

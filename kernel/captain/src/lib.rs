@@ -50,7 +50,6 @@ extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
-extern crate network_test;
 extern crate network_manager;
 
 #[cfg(test_ota_update_client)] extern crate ota_update_client;
@@ -150,18 +149,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     device_manager::init(input_event_queue_producer)?;
 
 
-    // #[cfg(test_network)]
-    // {
-    //     if let Some(nic) = e1000::get_e1000_nic() {
-    //         KernelTaskBuilder::new(network_test::init, nic)
-    //             .name(String::from("network_test"))
-    //             .spawn()?;
-    //     } else {
-    //         error!("captain: Couldn't run network_test because no e1000 NIC exists.");
-    //     }
-    // }
-
-    // #[cfg(test_ota_update_client)]
+    #[cfg(test_ota_update_client)]
     {
         if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
             KernelTaskBuilder::new(ota_update_client::init, iface)

@@ -4,7 +4,7 @@
 #![feature(alloc)]
 
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate spin;
 extern crate smoltcp;
 extern crate e1000;
@@ -16,19 +16,15 @@ extern crate network_manager;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::sync::Arc;
-use spin::{Mutex, Once};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{
     socket::SocketSet,
     time::Instant,
     phy::DeviceCapabilities,
-    wire::{EthernetAddress, IpAddress, Ipv4Address, IpCidr},
+    wire::{EthernetAddress, IpAddress, IpCidr},
     iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
 };
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceivedFrame};
-use e1000::E1000Nic;
 use owning_ref::BoxRef;
 use network_manager::NetworkInterface;
 
@@ -36,69 +32,92 @@ use network_manager::NetworkInterface;
 const DEFAULT_MTU: usize = 1500;
 
 
-// pub type E1000EthernetInterface<N: NetworkInterfaceCard + 'static> = EthernetInterface<'static, 'static, 'static, E1000Device<N>>;
-
-
+/// A struct that implements the `NetworkInterface` trait for an e1000 NIC. 
+/// There should be one instance of this struct per interface, i.e., an Ethernet port on the NIC.
 pub struct E1000NetworkInterface<N: NetworkInterfaceCard + 'static> {
     pub iface: EthernetInterface<'static, 'static, 'static, E1000Device<N>>,
 }
 
 impl<N: NetworkInterfaceCard + 'static> NetworkInterface for E1000NetworkInterface<N> { 
+    fn ethernet_addr(&self) -> EthernetAddress {
+        self.iface.ethernet_addr()
+    }
+
+    fn set_ethernet_addr(&mut self, addr: EthernetAddress) {
+        self.iface.set_ethernet_addr(addr)
+    }
+
     fn flush(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool> {
         self.iface.poll(sockets, timestamp)
     }
+
+    fn ip_addrs(&self) -> &[IpCidr] {
+        self.iface.ip_addrs()
+    }
+
+    fn has_ip_addr(&self, addr: IpAddress) -> bool {
+        self.iface.has_ip_addr(addr)
+    }
+
+    fn routes(&self) -> &Routes<'static> {
+        self.iface.routes()
+    }
+
+    fn routes_mut(&mut self) -> &mut Routes<'static> {
+        self.iface.routes_mut()
+    }
 }
 
+impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
+    /// Creates a new instance of an e1000 network interface, which can be used for handling sockets. 
+    /// 
+    /// Arguments: 
+    /// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
+    /// * `static_ip`: the IP that this network interface should locally use. If `None`, one will be assigned via DHCP.
+    /// * `gateway_ip`: the IP of this network interface's local gateway (access point, router). If `None`, will be discovered via DHCP.
+    /// 
+    /// # Note
+    /// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
+    /// 
+    pub fn new<G: Into<IpAddress>>(
+        nic: &'static MutexIrqSafe<N>,
+        static_ip: Option<IpCidr>,
+        gateway_ip: Option<G>,
+    ) -> Result<E1000NetworkInterface<N>, &'static str> 
+    {
+        // here, we have to create the iface for the first time because it didn't yet exist
+        let static_ip = static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?;
+        let ip_addrs = vec![static_ip];
 
+        let mut routes = Routes::new(BTreeMap::new());
+        let res = match gateway_ip.ok_or("gateway_ip is currently required because we do not yet support DHCP")?.into() {
+            IpAddress::Ipv4(ipv4) => routes.add_default_ipv4_route(ipv4),
+            IpAddress::Ipv6(ipv6) => routes.add_default_ipv6_route(ipv6),
+            _ => {
+                return Err("gateway_ip must be an Ipv4Address or an Ipv6Address");
+            }
+        };
+        res.map_err(|_e| {
+            error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
+            "couldn't set default gateway IP address"
+        })?;
 
-pub fn test_init() {
-    let iface = create_interface(e1000::get_e1000_nic().unwrap(), None, None).unwrap();
-    network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
+        let device = E1000Device::new(nic);
+        let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
+        // When creating an EthernetInterface, only the `ethernet_addr` and `neighbor_cache` are required.
+        let iface = EthernetInterfaceBuilder::new(device)
+            .ethernet_addr(hardware_mac_addr)
+            .neighbor_cache(NeighborCache::new(BTreeMap::new()))
+            .ip_addrs(ip_addrs)
+            .routes(routes)
+            .finalize();
+
+        Ok(
+            E1000NetworkInterface { iface }
+        )
+    }
+
 }
-
-/// Returns a reference to the e1000 network interface, which can be used for handling sockets. 
-/// 
-/// Arguments: 
-/// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
-/// * `static_ip`: the IP that this network interface should locally use. If `None`, one will be assigned via DHCP.
-/// * `gateway_ip`: the IP of this network interface's local gateway (access point, router). If `None`, will be discovered via DHCP.
-/// 
-/// # Note
-/// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
-/// 
-pub fn create_interface<N: NetworkInterfaceCard + 'static>(
-    nic: &'static MutexIrqSafe<N>,
-    static_ip: Option<IpAddress>,
-    gateway_ip: Option<Ipv4Address>,
-) -> Result<E1000NetworkInterface<N>, &'static str> 
-{
-    // here, we have to create the iface for the first time because it didn't yet exist
-    let mut ip_addrs = Vec::new();
-    ip_addrs.push(IpCidr::new(
-        static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?,
-        24
-    ));
-
-    let mut routes = Routes::new(BTreeMap::new());
-    let _prev_default_gateway = routes.add_default_ipv4_route(
-        gateway_ip.ok_or("gateway_ip is currently required because we do not yet support DHCP")?
-    ).map_err(|_e| {
-        error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
-        "couldn't set default gateway IP address"
-    })?;
-
-    let device = E1000Device::new(nic);
-    let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
-    let iface = EthernetInterfaceBuilder::new(device)
-        .ethernet_addr(hardware_mac_addr)
-        .neighbor_cache(NeighborCache::new(BTreeMap::new()))
-        .ip_addrs(Vec::new())
-        .routes(routes)
-        .finalize();
-
-    Ok(E1000NetworkInterface{iface})
-}
-
 
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp

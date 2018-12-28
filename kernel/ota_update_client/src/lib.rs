@@ -28,25 +28,14 @@ extern crate percent_encoding;
 
 use core::convert::TryInto;
 use core::str;
-use core::fmt::Write;
 use alloc::vec::Vec;
-use alloc::borrow::ToOwned;
-use alloc::string::String;
-use alloc::prelude::SliceConcatExt;
-use alloc::collections::BTreeMap;
-use dfqueue::{DFQueue, DFQueueProducer};
-use spin::Once;
 use acpi::get_hpet;
-use smoltcp::wire::{EthernetAddress, Ipv4Address, IpAddress, IpCidr};
-use smoltcp::iface::{NeighborCache, EthernetInterfaceBuilder, Routes};
+use smoltcp::wire::{IpAddress};
 use smoltcp::socket::{SocketSet, TcpSocket, TcpSocketBuffer};
 use smoltcp::time::Instant;
-use e1000_smoltcp_device::E1000Device;
-use network_interface_card::NetworkInterfaceCard;
-use irq_safety::MutexIrqSafe;
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-use network_manager::{NetworkInterface, NetworkInterfaceRef};
+use network_manager::{NetworkInterfaceRef};
 
 
 /// The IP address of the update server.
@@ -57,14 +46,8 @@ const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
 // const DEFAULT_DESTINATION_PORT: u16 = 60123;
 const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
-/// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
-const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
-
 /// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53156;
-
-/// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
-const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
+const DEFAULT_LOCAL_PORT: u16 = 53167;
 
 
 
