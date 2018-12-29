@@ -24,18 +24,26 @@ extern crate task;
 extern crate httparse;
 extern crate sha3;
 extern crate percent_encoding;
+extern crate rand;
 
 
 use core::convert::TryInto;
 use core::str;
 use alloc::vec::Vec;
 use acpi::get_hpet;
-use smoltcp::wire::{IpAddress};
-use smoltcp::socket::{SocketSet, TcpSocket, TcpSocketBuffer};
-use smoltcp::time::Instant;
+use smoltcp::{
+    wire::IpAddress,
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer},
+    time::Instant
+};
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
 use network_manager::{NetworkInterfaceRef};
+use rand::{
+    SeedableRng,
+    RngCore,
+    rngs::SmallRng
+};
 
 
 /// The IP address of the update server.
@@ -43,11 +51,10 @@ use network_manager::{NetworkInterfaceRef};
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
 
 /// The TCP port on the update server that listens for update requests 
-// const DEFAULT_DESTINATION_PORT: u16 = 60123;
 const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
-/// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53167;
+/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
+const STARTING_FREE_PORT: u16 = 49152;
 
 
 
@@ -96,7 +103,8 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     );
     let dest_port = DEFAULT_DESTINATION_PORT;
 
-    let local_port = DEFAULT_LOCAL_PORT;
+    let mut rng = SmallRng::seed_from_u64(startup_time);
+    let local_port = STARTING_FREE_PORT + rng.next_u32() as u16;
 
     let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
     let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
@@ -104,6 +112,15 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
 
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
     let tcp_handle = sockets.add(tcp_socket);
+
+    {
+        info!("ota_update_client: connecting from {}:{} to {}:{}",
+            iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
+            local_port, 
+            dest_addr, 
+            dest_port
+        );
+    }
 
 
     let mut loop_ctr = 0;
