@@ -33,7 +33,7 @@ pub trait NetworkInterface {
     /// Set the Ethernet address of the interface.
     fn set_ethernet_addr(&mut self, addr: EthernetAddress);
 
-    /// Flushes the network interface, which should be called in a periodically repeating fashion,
+    /// Polls (or flushes) the network interface, which should be called in a periodically repeating fashion,
     /// to send queued outgoing packets and check for pending received packets in the given `sockets`. 
     /// 
     /// # Arguments
@@ -42,7 +42,7 @@ pub trait NetworkInterface {
     /// 
     /// This is essentially a thin wrapper around smoltcp's 
     /// [`poll()`](https://docs.rs/smoltcp/0.5.0/smoltcp/iface/struct.EthernetInterface.html#method.poll) method.
-    fn flush(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool>;
+    fn poll(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool>;
 
     /// Get the IP addresses of the interface.
     fn ip_addrs(&self) -> &[IpCidr];

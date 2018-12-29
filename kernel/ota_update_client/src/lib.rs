@@ -30,6 +30,7 @@ extern crate rand;
 use core::convert::TryInto;
 use core::str;
 use alloc::vec::Vec;
+use spin::Once;
 use acpi::get_hpet;
 use smoltcp::{
     wire::IpAddress,
@@ -62,8 +63,6 @@ const STARTING_FREE_PORT: u16 = 49152;
 /// sending and receiving the HTTP request and response, respectively.
 #[derive(Debug)]
 enum HttpState {
-    /// The socket is not yet connected.
-    Connecting,
     /// The socket is connected, but the HTTP request has not yet been sent.
     Requesting,
     /// The HTTP request has been sent, but the response has not yet been fully received.
@@ -73,15 +72,56 @@ enum HttpState {
 }
 
 
+/// A simple macro to get the current HPET clock ticks.
+macro_rules! hpet_ticks {
+    () => {
+        get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter()
+    };
+}
+
+
 /// Function to calculate time since a given time in ms
 fn millis_since(start_time: u64) -> Result<u64, &'static str> {
-    let hpet_guard = get_hpet();
-    let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
-    let end_time: u64 = hpet.get_counter();
-    let hpet_freq: u64 = hpet.counter_period_femtoseconds() as u64;
+    const FEMTOSECONDS_PER_MILLISECOND: u64 = 1_000_000_000_000;
+    static HPET_PERIOD_FEMTOSECONDS: Once<u32> = Once::new();
+
+    let hpet_freq = match HPET_PERIOD_FEMTOSECONDS.try() {
+        Some(period) => period,
+        _ => {
+            let freq = get_hpet().as_ref().ok_or("couldn't get HPET")?.counter_period_femtoseconds();
+            HPET_PERIOD_FEMTOSECONDS.call_once(|| freq)
+        }
+    };
+    let hpet_freq = *hpet_freq as u64;
+
+    let end_time: u64 = hpet_ticks!();
     // Convert to ms
-    let diff = (end_time - start_time) * hpet_freq / 1_000_000_000_000;
+    let diff = (end_time - start_time) * hpet_freq / FEMTOSECONDS_PER_MILLISECOND;
     Ok(diff)
+}
+
+/// A convenience function to poll the given network interface (i.e., flush tx/rx).
+/// Returns true if any packets were sent or received through that interface on the given `sockets`.
+fn poll_iface(iface: &NetworkInterfaceRef, sockets: &mut SocketSet, startup_time: u64) -> Result<bool, &'static str> {
+    let timestamp: i64 = millis_since(startup_time)?
+        .try_into()
+        .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+    let packets_were_sent_or_received = match iface.lock().poll(sockets, Instant::from_millis(timestamp)) {
+        Ok(b) => b,
+        Err(err) => {
+            warn!("ota_update_client: poll error: {}", err);
+            false
+        }
+    };
+    Ok(packets_were_sent_or_received)
+}
+
+
+/// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.
+fn check_http_request(request_bytes: &[u8]) -> bool {
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut request = httparse::Request::new(&mut headers);
+    request.parse(request_bytes).is_ok() && request_bytes.ends_with(b"\r\n\r\n")
 }
 
 
@@ -93,7 +133,7 @@ fn millis_since(start_time: u64) -> Result<u64, &'static str> {
 /// 
 pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
 
-    let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
+    let startup_time = hpet_ticks!();
 
     let dest_addr = IpAddress::v4(
         DEFAULT_DESTINATION_IP_ADDR[0],
@@ -113,6 +153,26 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
     let tcp_handle = sockets.add(tcp_socket);
 
+    let http_request = {
+        let method = "GET";
+        let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
+        let version = "HTTP/1.1";
+        let connection = "Connection: close";
+        format!("{} {} {}\r\n{}\r\n{}\r\n\r\n", 
+            method,
+            uri,
+            version,
+            format_args!("Host: {}:{}", dest_addr, dest_port), // host
+            connection
+        )
+    };
+
+    if !check_http_request(http_request.as_bytes()) {
+        error!("ota_update_client: created improper/incomplete HTTP request: {:?}.", http_request);
+        return Err("ota_update_client: created improper/incomplete HTTP request");
+    }
+
+
     {
         info!("ota_update_client: connecting from {}:{} to {}:{}",
             iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
@@ -123,8 +183,40 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     }
 
 
+    // first, attempt to connect the socket to the remote server
+    let timeout_ms = 3000; // 3 second timeout
+    let start = hpet_ticks!();
+    
+    if sockets.get::<TcpSocket>(tcp_handle).is_active() {
+        warn!("ota_update_client: when connecting socket, it was already active...");
+    } else {
+        debug!("ota_update_client: connecting socket...");
+        sockets.get::<TcpSocket>(tcp_handle).connect((dest_addr, dest_port), local_port).map_err(|_e| {
+            error!("ota_update_client: failed to connect socket, error: {:?}", _e);
+            "ota_update_client: failed to connect socket"
+        })?;
+
+        loop {
+            let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+            
+            // if the socket actually connected, it should be able to send/recv
+            let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+            if socket.may_send() && socket.may_recv() {
+                break;
+            }
+
+            // check to make sure we haven't timed out
+            if millis_since(start)? > timeout_ms {
+                error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_ms);
+                return Err("ota_update_client: failed to connect to socket, timed out.");
+            }
+        }
+    }
+
+    debug!("ota_update_client: socket connected successfully!");
+
     let mut loop_ctr = 0;
-    let mut state = HttpState::Connecting;
+    let mut state = HttpState::Requesting;
     let mut current_packet_byte_buffer: Vec<u8> = Vec::new();
     let mut current_packet_content_length: Option<usize> = None;
     let mut current_packet_header_length: Option<usize> = None;
@@ -132,61 +224,20 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     loop { 
         loop_ctr += 1;
 
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        {
-            let timestamp: i64 = millis_since(startup_time)?
-                .try_into()
-                .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-            let _packets_were_sent_or_received = match iface.lock().flush(&mut sockets, Instant::from_millis(timestamp)) {
-                Ok(b) => b,
-                Err(err) => {
-                    warn!("ota_update_client: poll error: {}", err);
-                    false  // continue;
-                }
-            };
-        }
+        let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
 
         state = match state {
-            HttpState::Connecting if !socket.is_active() => {
-                debug!("ota_update_client: connecting...");
-                socket.connect((dest_addr, dest_port), local_port).unwrap();
-                debug!("ota_update_client: connected!");
-                HttpState::Requesting
-            }
-
             HttpState::Requesting if socket.can_send() => {
-                let method = "GET";
-                let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
-                let version = "HTTP/1.1";
-                let connection = "Connection: close";
-                let http_request = format!("{} {} {}\r\n{}\r\n{}\r\n\r\n", 
-                    method,
-                    uri,
-                    version,
-                    format_args!("Host: {}:{}", dest_addr, dest_port), // host
-                    connection
-                );
-
-                // sanity check the created HTTP request
-                {
-                    let mut headers = [httparse::EMPTY_HEADER; 64];
-                    let mut request = httparse::Request::new(&mut headers);
-                    if let Err(_e) = request.parse(http_request.as_bytes()) {
-                        error!("ota_update_client: created improper HTTP request: {:?}. Error: {:?}", http_request, _e);
-                        break;
-                    }
-                }
-
-                debug!("ota_update_client: sending request: {:?}", http_request);
+                debug!("ota_update_client: sending HTTP request: {:?}", http_request);
                 socket.send_slice(http_request.as_ref()).expect("ota_update_client: cannot send request");
                 HttpState::ReceivingResponse
             }
 
             HttpState::ReceivingResponse if socket.can_recv() => {
                 // By default, we stay in the receiving state.
-                // This is changed later if we end up receiving the entire packet.1
+                // This is changed later if we end up receiving the entire packet.
                 let mut new_state = HttpState::ReceivingResponse;
 
                 let recv_result = socket.recv(|data| {
@@ -300,102 +351,18 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
 
     debug!("ota_update_client: exiting HTTP state loop with state: {:?} (loop_ctr: {})", state, loop_ctr);
 
-    // calculate the sha3-512 hash
+    // calculate the sha3-512 hash of the HTTP response body (excluding headers)
     let mut hasher = Sha3_512::new();
     hasher.input(&current_packet_byte_buffer[current_packet_header_length.unwrap() ..]);
     let result = hasher.result();
     info!("ota_update_client: sha3-512 hash of downloaded file: {:x}", result);
-
-    
-    /* SIMPLE TCP TEST START
-
-    {
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        socket.connect((dest_addr, dest_port), local_port).unwrap();
-    }
-
-    let mut msg_ctr = 0;
-    let mut done_sending = false;
-    loop { 
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };  
-
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        if !done_sending {
-            if socket.can_send() {
-                if msg_ctr % 2 == 0 {
-                    let msg = format!("test message {}", msg_ctr);
-                    debug!("ota_update_client: sending msg {:?} ...", msg);
-                    write!(socket, "{}", msg).unwrap();
-                    debug!("ota_update_client: Sent msg {:?}", msg);
-                    msg_ctr += 1;
-                }
-
-                if msg_ctr > 8 {
-                    info!("\n\nota_update_client: completed sending messages!\n\n");
-                    done_sending = true;
-                }
-            }
-            else {
-                if loop_ctr % 50000 == 0 {
-                    debug!("ota_update_client: waiting for socket can_send...");
-                }
-            }
-        }
-
-
-        if socket.can_recv() {
-            if msg_ctr % 2 == 1 {
-                debug!("ota_update_client: waiting to receive msg {}", msg_ctr);
-                let recv_data = socket.recv(|buf| {
-                    let msg = String::from(str::from_utf8(&buf).unwrap());
-                    (msg.as_bytes().len(), msg)
-                }).unwrap();
-                debug!("ota_update_client: received msg: {}", recv_data);
-                msg_ctr += 1;
-
-                if recv_data == "Echo msg: test message 8" {
-                    info!("\n\nota_update_client: completed receiving messages!\n\n");
-                    break;
-                }
-            }
-        }
-        else {
-            if loop_ctr % 50000 == 0 {
-                debug!("ota_update_client: waiting for socket can_recv...");
-            }
-        }
-
-        loop_ctr += 1;
-    }
-    END SIMPLE TCP TEST */
 
 
     let mut issued_close = false;
     loop {
         loop_ctr += 1;
 
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.lock().flush(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };
-
+        let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         if !issued_close {
@@ -415,110 +382,4 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
 
     Ok(())
     
-
-    
-    
-    
-    /*
-
-    let mut tcp_active = false;
-    let mut initial_val_send = false;
-    let mut number_of_items = 4;
-    let mut send_items = 0;
-    let mut received_items = 0;
-
-    let mut array: Vec<String> = vec![String::new(); 512];
-    let mut break_1 = 0;
-
-    loop {
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };  
-
-        {
-            let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-            if socket.is_active() && !tcp_active {
-                debug!("ota_update_client: connected");
-            } else if !socket.is_active() && tcp_active {
-                debug!("ota_update_client: disconnected");
-                return Err("tcp socket disconnected.");
-            }
-            tcp_active = socket.is_active();
-
-            if socket.may_send() {
-                if socket.can_send() && send_items == 0 {
-                    debug!("ota_update_client: tcp:6969 send greeting");
-                    write!(socket, "a#terminal_print.o").unwrap();
-                    debug!("ota_update_client: Send 0");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 1 {
-                    write!(socket, "a#test_panic.o").unwrap();
-                    debug!("ota_update_client: Send 1");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 2 {
-                    write!(socket, "k#acpi-b3db4f72ccdc307b.o").unwrap();
-                    debug!("ota_update_client: Send 2");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 3 {
-                    write!(socket, "k#ap_start-5e82a1be3db78c92.o").unwrap();
-                    debug!("ota_update_client: Send 3");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 4 {
-                    write!(socket, "Done.n").unwrap(); //This word is needed to end the sending of modules
-                    debug!("ota_update_client: Send 4 -- Done.");
-                    send_items = 100;
-                }
-            }
-
-            if socket.can_recv() && send_items == 100 {
-                let data = socket.recv(|data| {
-                    let mut data = data.to_owned();
-                    if data.len() > 0 {
-                        //debug!("ota_update_client: recv data: {:?}",
-                        //str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-                        data = data.split(|&b| b == b'\n').collect::<Vec<_>>().concat();
-                        //data.reverse();
-                        data.extend(b"\n");
-                        let mut mystring =
-                            str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)");
-                        //debug!("ota_update_client: {}",mystring);
-                        let v: Vec<&str> = mystring.split(':').collect();
-                        //debug!("ota_update_client: {}",v[0]);
-                        if let "Done.." = &*v[0] {
-                            debug!("ota_update_client: Module Receive Completed");
-                            //debug!("ota_update_client: close");
-                            //socket.close();
-                            break_1 = 1;
-                        } else {
-                            debug!("ota_update_client: {}", v[0]);
-                        }
-                        //debug!("ota_update_client: recv data: {:?}",
-                        //str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-                        received_items = received_items + 1;
-                    }
-                    (data.len(), data)
-                })
-                .unwrap();
-            }
-            if break_1 == 1 {
-                debug!("ota_update_client: closing socket after completion.");
-                socket.close();
-                return Err("ota_update_client: closing socket after completion.");
-            }
-        }
-    }
-
-    */
 }

@@ -47,7 +47,7 @@ impl<N: NetworkInterfaceCard + 'static> NetworkInterface for E1000NetworkInterfa
         self.iface.set_ethernet_addr(addr)
     }
 
-    fn flush(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool> {
+    fn poll(&mut self, sockets: &mut SocketSet, timestamp: Instant) -> smoltcp::Result<bool> {
         self.iface.poll(sockets, timestamp)
     }
 
