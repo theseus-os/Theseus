@@ -80,7 +80,7 @@ macro_rules! hpet_ticks {
 }
 
 
-/// Function to calculate time since a given time in ms
+/// Function to calculate the currently elapsed time (in milliseconds) since the given `start_time` (also milliseconds).
 fn millis_since(start_time: u64) -> Result<u64, &'static str> {
     const FEMTOSECONDS_PER_MILLISECOND: u64 = 1_000_000_000_000;
     static HPET_PERIOD_FEMTOSECONDS: Once<u32> = Once::new();
@@ -99,6 +99,7 @@ fn millis_since(start_time: u64) -> Result<u64, &'static str> {
     let diff = (end_time - start_time) * hpet_freq / FEMTOSECONDS_PER_MILLISECOND;
     Ok(diff)
 }
+
 
 /// A convenience function to poll the given network interface (i.e., flush tx/rx).
 /// Returns true if any packets were sent or received through that interface on the given `sockets`.
@@ -200,7 +201,7 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
             let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
             
             // if the socket actually connected, it should be able to send/recv
-            let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+            let socket = sockets.get::<TcpSocket>(tcp_handle);
             if socket.may_send() && socket.may_recv() {
                 break;
             }
