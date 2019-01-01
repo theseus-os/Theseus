@@ -47,7 +47,8 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
+//#[cfg(mirror_log_to_vga)] 
+#[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_test;
@@ -213,7 +214,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_userspace(module, None)?;
     }
 
-    
+
     // create a SIMD personality
     #[cfg(simd_personality)]
     {
@@ -222,6 +223,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }
+
+    KernelTaskBuilder::new(test1 ,1)
+        .name(String::from("test1"))
+        .pin_on_core(2)
+        .spawn()?;
+
+    KernelTaskBuilder::new(test2 ,2)
+        .name(String::from("test2"))
+        .pin_on_core(2)
+        .spawn()?;
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
@@ -233,4 +244,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }
+}
+
+fn test1(a: u32) -> u32 {
+    loop {
+       println!("1"); 
+    }
+    a
+}
+
+fn test2(a: u32) -> u32 {
+    loop {
+       println!("2"); 
+    }
+    a
 }
