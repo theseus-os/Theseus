@@ -66,7 +66,6 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-use spawn::KernelTaskBuilder;
 
 
 
@@ -152,7 +151,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(test_ota_update_client)]
     {
         if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
-            KernelTaskBuilder::new(ota_update_client::init, iface)
+            spawn::KernelTaskBuilder::new(ota_update_client::init, iface)
                 .name(String::from("ota_update_client"))
                 .spawn()?;
         } else {
@@ -211,7 +210,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(simd_personality)]
     {
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
+        spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }

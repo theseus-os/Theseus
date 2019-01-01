@@ -11,12 +11,6 @@ use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages
 
 
 
-pub struct NicDeviceRef<'n, N: NetworkInterfaceCard + 'static> {
-    nic_ref: &'n N,
-}
-
-
-
 /// A trait that defines for a NIC 
 pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
