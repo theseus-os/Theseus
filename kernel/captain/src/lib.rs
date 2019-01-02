@@ -226,19 +226,19 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))
-        .pin_on_core(2)
+        .pin_on_core(1)
         .set_priority(5)
         .spawn()?;
 
     KernelTaskBuilder::new(test2 ,2)
         .name(String::from("test2"))
-        .pin_on_core(2)
+        .pin_on_core(1)
         .set_priority(10)
         .spawn()?;
 
     KernelTaskBuilder::new(test3 ,3)
         .name(String::from("test3"))
-        .pin_on_core(2)
+        .pin_on_core(1)
         .set_priority(-5)
         .spawn()?;
 
@@ -255,21 +255,21 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 }
 
 fn test1(a: u32) -> u32 {
-    for _ in 1..20 {
+    for _ in 1..100 {
        println!("1"); 
     }
     a
 }
 
 fn test2(a: u32) -> u32 {
-    for _ in 1..20 {
+    for _ in 1..100 {
        println!("2"); 
     }
     a
 }
 
 fn test3(a: u32) -> u32 {
-    for _ in 1..20 {
+    for _ in 1..100 {
        println!("3"); 
     }
     a

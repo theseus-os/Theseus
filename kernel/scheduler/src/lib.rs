@@ -55,7 +55,7 @@ pub fn schedule() -> bool {
 
     curr.runtime = curr.runtime + 1;
 
-    if let Some(selected_next_task) = select_next_task_priority(apic_id) {
+    if let Some(selected_next_task) = select_next_task_round_robin(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
     else {
@@ -149,6 +149,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
     
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
+    let mut minimum_run_time = 0;
 
     for (i, taskref) in runqueue_locked.iter().enumerate() {
         let t = taskref.lock();
@@ -180,9 +181,25 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
         }
             
         // found a runnable task!
-        chosen_task_index = Some(i);
+        chosen_task_index = match chosen_task_index{
+        	None => {
+        		minimum_run_time = t.runtime;
+        		Some(i)
+        	},
+        	Some(chosen_task_index) => {
+        		if(t.runtime < minimum_run_time){
+        			minimum_run_time = t.runtime;
+        			Some(i)
+        		}
+        		else{
+        			Some(chosen_task_index) 
+        		}
+ 
+        	}
+        }
+        
         //debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
-        break; 
+        //break; 
     }
 
     // idle task is a backup iff no other task has been chosen
