@@ -36,7 +36,26 @@ pub fn schedule() -> bool {
         }
     };
 
-    if let Some(selected_next_task) = select_next_task_round_robin(apic_id) {
+    
+    
+    // same scoping reasons as above: to release the lock around current_task
+    {
+        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
+                                            .lock_mut().deref_mut() as *mut Task; 
+    }
+
+
+    //if current_task == next_task {
+        // no need to switch if the chosen task is the same as the current task
+    //    return false;
+    //}
+
+    // we want mutable references to mutable tasks
+    let curr = unsafe {&mut *current_task };
+
+    curr.runtime = curr.runtime + 1;
+
+    if let Some(selected_next_task) = select_next_task_priority(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
     else {
@@ -48,22 +67,15 @@ pub fn schedule() -> bool {
         // keep the same current task
         return false;
     }
-    
-    // same scoping reasons as above: to release the lock around current_task
-    {
-        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-                                            .lock_mut().deref_mut() as *mut Task; 
-    }
 
     if current_task == next_task {
         // no need to switch if the chosen task is the same as the current task
         return false;
     }
 
-    // we want mutable references to mutable tasks
-    let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
-
     // trace!("BEFORE TASK_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
+
+    let (next) = unsafe {&mut *next_task};
 
     curr.task_switch(next, apic_id); 
 
@@ -152,6 +164,12 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
             continue;
         }
 
+        //if let Some(priority) = t.priority {
+        //	if priority < -1 {
+        //        continue;
+        //    }
+        //}
+
         // if this task is pinned, it must not be pinned to a different core
         if let Some(pinned) = t.pinned_core {
             if pinned != apic_id {
@@ -163,7 +181,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
             
         // found a runnable task!
         chosen_task_index = Some(i);
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        //debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
         break; 
     }
 

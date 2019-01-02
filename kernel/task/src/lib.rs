@@ -223,12 +223,13 @@ pub struct Task {
     pub simd: bool,
 
     pub priority: Option<i8>,
+    pub runtime: u32,
 }
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}, priority: {:?}}}", 
-               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core, self.priority)
+        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}, priority: {:?}, runtime: {:?}}}", 
+               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core, self.priority, self.runtime)
     }
 }
 
@@ -268,6 +269,7 @@ impl Task {
             simd: false,
 
             priority: Some(0),
+            runtime: 0,
         }
     }
 
