@@ -119,7 +119,7 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
 
 
     // first, attempt to connect the socket to the remote server
-    let timeout_ms = 3000; // 3 second timeout
+    let timeout_millis = 3000; // 3 second timeout
     let start = hpet_ticks!();
     
     if sockets.get::<TcpSocket>(tcp_handle).is_active() {
@@ -141,8 +141,8 @@ pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
             }
 
             // check to make sure we haven't timed out
-            if millis_since(start)? > timeout_ms {
-                error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_ms);
+            if millis_since(start)? > timeout_millis {
+                error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_millis);
                 return Err("ota_update_client: failed to connect to socket, timed out.");
             }
         }

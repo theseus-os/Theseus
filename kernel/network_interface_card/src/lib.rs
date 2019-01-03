@@ -96,7 +96,7 @@ impl DerefMut for ReceiveBuffer {
 }
 impl Drop for ReceiveBuffer {
     fn drop(&mut self) {
-        warn!("ReceiveBuffer at paddr {:#X} length {} was dropped, buffer re-use is not yet implemented!", self.phys_addr, self.length);
+        // warn!("ReceiveBuffer at paddr {:#X} length {} was dropped, buffer re-use is not yet implemented!", self.phys_addr, self.length);
         // TODO FIXME: return dropped buffers back to the pool
         // RX_BUFFER_POOL.push(self.mp)
     }

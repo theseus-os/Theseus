@@ -205,7 +205,17 @@ pub fn send_request(
     loop { 
         _loop_ctr += 1;
 
-        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        let packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+
+        // check for timeout, only if no socket activity occurred
+        if !packet_io_occurred {
+            if let Some(timeout) = timeout_millis {
+                if millis_since(startup_time)? > timeout {
+                    error!("http_client: timed out after {} ms, in state {:?}", timeout, state);
+                    return Err("http_client: timed out");
+                }
+            }
+        }
 
         let mut socket = sockets.get::<TcpSocket>(*handle);
 
@@ -310,20 +320,19 @@ pub fn send_request(
             }
 
             HttpState::Responded => {
-                debug!("http_client: received full {}-byte HTTP response (_loop_ctr: {}): \n{}", 
-                    packet_byte_buffer.len(), _loop_ctr, unsafe { str::from_utf8_unchecked(&packet_byte_buffer) });
+                debug!("http_client: received full {}-byte HTTP response (_loop_ctr: {}).", packet_byte_buffer.len(), _loop_ctr);
                 break;
             }
 
             HttpState::ReceivingResponse if !socket.may_recv() => {
-                warn!("http_client: socket was closed prematurely before full reponse was received! (_loop_ctr: {})", _loop_ctr);
-                break;
+                error!("http_client: socket was closed prematurely before full reponse was received! (_loop_ctr: {})", _loop_ctr);
+                return Err("socket was closed prematurely before full reponse was received!");
             }
 
             _ => { 
-                if _loop_ctr % 50000 == 0 {
-                    debug!("http_client: waiting in state {:?} for socket to send/recv ...", state);
-                }
+                // if _loop_ctr % 50000 == 0 {
+                //     warn!("http_client: waiting in state {:?} for socket to send/recv ...", state);
+                // }
                 state
             }
         }
