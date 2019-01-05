@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 # multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
 multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
 rlibc = "1.0.0"

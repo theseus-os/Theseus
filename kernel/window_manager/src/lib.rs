@@ -18,8 +18,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(const_fn)]
-#![feature(unique)]
-#![feature(unique)]
 #![feature(asm)]
 
 extern crate spin;
@@ -39,11 +37,10 @@ extern crate acpi;
 
 
 use spin::{Once, Mutex};
-use alloc::VecDeque;
-use alloc::btree_map::BTreeMap;
+use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use frame_buffer::text_buffer::{FrameTextBuffer};
 use event_types::Event;
 use alloc::string::{String, ToString};

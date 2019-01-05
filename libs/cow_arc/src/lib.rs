@@ -5,7 +5,7 @@ extern crate alloc;
 extern crate spin;
 extern crate owning_ref;
 
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 
@@ -88,6 +88,12 @@ impl<T> CowArc<T> {
     /// and `false` if it is in the `Exclusive` state.
     pub fn is_shared(&self) -> bool {
         Arc::strong_count(&self.arc.inner_arc) > 1
+    }
+
+    /// Returns true if the two `CowArc`s point to the same value
+    /// (not just values that compare as equal).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.arc, &other.arc)
     }
 
 

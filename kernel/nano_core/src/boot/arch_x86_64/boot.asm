@@ -16,15 +16,8 @@ global start
 section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 start:
-	; The bootloader has loaded us into 32-bit protected mode on a x86
-	; machine. Interrupts are disabled. Paging is disabled. The processor
-	; state is as defined in the multiboot standard. The kernel has full
-	; control of the CPU. The kernel can only make use of hardware features
-	; and any code it provides as part of itself. There's no printf
-	; function, unless the kernel provides its own <stdio.h> header and a
-	; printf implementation. There are no security restrictions, no
-	; safeguards, no debugging mechanisms, only what the kernel provides
-	; itself. It has absolute and complete power over the machine.
+	; The bootloader has loaded us into 32-bit protected mode. 
+	; Interrupts are disabled. Paging is disabled.
 
 	; To set up a stack, we set the esp register to point to the top of our
 	; stack (as it grows downwards on x86 systems). This is necessarily done
@@ -273,6 +266,16 @@ start_high:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
+
+	; clear out the FS/GS base MSRs
+	xor eax, eax          ; set to 0
+	xor edx, edx          ; set to 0
+	mov ecx, 0xc0000100   ; FS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000101   ; GS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
+	wrmsr
 
 
 	; Save the multiboot address

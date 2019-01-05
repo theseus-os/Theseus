@@ -7,11 +7,11 @@ build = "../../build.rs"
 
 [dependencies]
 # typemap = "0.3.3"
-spin = "0.4.5"
+spin = "0.4.10"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

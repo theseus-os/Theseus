@@ -5,7 +5,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.18"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

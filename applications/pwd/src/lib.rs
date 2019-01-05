@@ -6,8 +6,9 @@ extern crate alloc;
 extern crate task;
 extern crate getopts;
 
-use alloc::{Vec, String};
-use alloc::arc::Arc;
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::string::ToString;
 
 #[no_mangle]

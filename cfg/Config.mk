@@ -38,6 +38,8 @@ RUSTFLAGS += --emit=obj
 RUSTFLAGS += -C debuginfo=2
 ## using a large code model 
 RUSTFLAGS += -C code-model=large
+## use static relocation model to avoid GOT-based relocation types and .got/.got.plt sections
+RUSTFLAGS += -C relocation-model=static
 ## promote unused must-use types (like Result) to an error
 RUSTFLAGS += -D unused-must-use
 

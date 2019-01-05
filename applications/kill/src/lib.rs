@@ -8,7 +8,8 @@ extern crate runqueue;
 extern crate getopts;
 
 use getopts::Options;
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use runqueue::RunQueue;
 
 #[no_mangle]

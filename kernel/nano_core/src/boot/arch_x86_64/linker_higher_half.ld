@@ -42,6 +42,12 @@ SECTIONS {
 		*(.rodata .rodata.*)
 	}
 
+	/* .got (Global Offset Table) section and its relocation types are currently unsupported */
+	.got (NOLOAD) :
+	{
+    	KEEP(*(.got .got.*))
+  	}
+	/*
 	.got ALIGN(4K) : AT(ADDR(.got) - KERNEL_OFFSET)
 	{
 		*(.got)
@@ -51,6 +57,7 @@ SECTIONS {
 	{
 		*(.got.plt)
 	}
+	*/
 
 	.data.rel.ro ALIGN(4K) : AT(ADDR(.data.rel.ro) - KERNEL_OFFSET)
 	{

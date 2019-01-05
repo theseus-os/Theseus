@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -16,8 +16,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.27.0-nightly (ac3c2288f 2018-04-18)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-04-19
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.32.0-nightly (f1e2fa8f0 2018-11-20)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-11-21
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -105,9 +105,20 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+
+### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
+NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
+check_captain:
+	@if [ 1  !=  ${NUM_CAPTAINS} ]; then \
+		echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."; \
+		echo -e "       Run \"make clean\" and then try rebuilding again.\n"; \
+		exit 1; \
+	fi;
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
 ### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
-$(iso): build
+$(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -115,28 +126,24 @@ $(iso): build
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
-	
+
+### Convenience target for building the ISO	using the above target
 iso: $(iso)
 
 
-
-## This first calls the cargo target, but then copies all object files into the build dir. 
+## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy the object files from the target/ directory into the object files build directory, and give EVERY file the kernel prefix
-	cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_object_files/Cargo.toml --  \
-		-v --prefix $(KERNEL_PREFIX) ./target/$(TARGET)/$(BUILD_MODE)/deps/  $(OBJECT_FILES_BUILD_DIR)
-## (the old way: just copying all files directly)
-# @for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o ; do \
-# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)-.*/$(KERNEL_PREFIX)\1\.o/p'`   2> /dev/null ; \
-# done
+## Copy the object files from the target/ directory, and the core library, into the main build directory and prepend the kernel prefix
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o; do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
+	done
 
-## Copy the core library's object file
-	@cp -vf $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)core.o
-	
-## Since we gave ALL object files the kernel prefix, we need to rename the application object files with the proper app prefix
+## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix
+## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
+##            if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
-		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
 
@@ -293,35 +300,43 @@ clean:
 
 help: 
 	@echo -e "\nThe following make targets are available:"
-	@echo -e "  run:"
+	@echo -e "   run:"
 	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
-	@echo -e "  debug:"
+	@echo -e "   loadable:"
+	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
+	@echo -e "   debug:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
-	@echo -e "  gdb:"
+	@echo -e "   gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
-	@echo -e "  bochs:"
+	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
-	@echo -e "  boot:"
+	@echo -e "   boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
-	@echo -e "  pxe:"
+	@echo -e "   pxe:"
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
-	@echo -e "  simd_personality:"
+	@echo -e "   simd_personality:"
 	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
 	@echo -e "\t then runs it just like the 'make run' target."
-	@echo -e "  doc:"
+	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
-	@echo -e "  view-doc:"
+	@echo -e "   view-doc:"
 	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
-	@echo -e "\nThe following options are available for QEMU:"
-	@echo -e "  int=yes:"
+	
+	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
+	@echo -e "   net=yes:"
+	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
+	@echo -e "   kvm=yes:"
+	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
+	@echo -e "   host=yes:"
+	@echo -e "\t Use the host CPU model, which is required for using x86 PMU hardware and others. Enables KVM too."
+	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
-	@echo -e "\t Only relevant for QEMU targets like 'run' and 'debug'."
 	@echo ""
 
 
@@ -337,22 +352,36 @@ QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial
 ## multicore 
 QEMU_FLAGS += -smp 4
 
-## basic networking with a standard e1000 ethernet card
-#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
-QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
-#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
+## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
+MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
+ifeq ($(net),yes)
+	## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
+	
+	## basic userspace QEMU networking with a standard e1000 ethernet NIC
+	#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
+	#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
+
+	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else
+	QEMU_FLAGS += -net none
+endif
+
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
+
 ifeq ($(host),yes)
 	QEMU_FLAGS += -cpu host -enable-kvm
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
+
 ifeq ($(kvm),yes)
 	QEMU_FLAGS += -enable-kvm
 endif
@@ -407,13 +436,20 @@ bochs: $(iso)
 
 
 
+IS_WSL = $(shell grep 'Microsoft' /proc/version)
+
+### Checks that the supplied usb device (for usage with the boot/pxe targets).
+### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
 check_usb:
-ifneq (,$(findstring sd, $(usb)))
-ifeq ("$(wildcard /dev/$(usb))", "")
+## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app
+ifeq ($(IS_WSL), ) ## if we're not on WSL...
+ifneq (,$(findstring sd, $(usb))) ## if the specified USB device properly contained "sd"...
+ifeq ("$(wildcard /dev/$(usb))", "") ## if a non-existent "/dev/sd*" drive was specified...
 	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
 	@exit 1
-endif
-else
+endif 
+else 
+## if the specified USB device didn't contain "sd", then it wasn't a proper removable block device.
 	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
@@ -421,15 +457,23 @@ else
 	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
 	@echo ""
 	@exit 1
-endif
+endif  ## end of checking for "sd"
+endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 boot : export THESEUS_CONFIG += mirror_log_to_vga
 boot: check_usb $(iso)
+ifneq ($(IS_WSL), )
+## building on WSL
+	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
+	@echo -e "The ISO file is available at \"$(iso)\"."
+else
+## building on regular linux
 	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
-	@sudo dd bs=4M if=build/theseus-x86_64.iso of=/dev/$(usb)
+	@sudo dd bs=4M if=$(iso) of=/dev/$(usb)
 	@sync
+endif
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
@@ -441,7 +485,6 @@ ifdef $(ip)
 endif
 	@sudo sudo ifconfig $(netdev) 192.168.1.105
 endif
-	
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa

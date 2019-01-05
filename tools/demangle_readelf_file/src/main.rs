@@ -115,7 +115,7 @@ fn main() {
 
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] INPUT_ELF_k", program);
+    let brief = format!("Usage: {} [options] READELF_TEXT", program);
     print!("{}", opts.usage(&brief));
 }
 
@@ -123,25 +123,6 @@ fn print_usage(program: &str, opts: Options) {
 
 
 
-
-
 fn demangle_symbol(mangled: &str) -> String {
-
-    let demangled = rustc_demangle::demangle(mangled);
-    let with_hash    = format!("{}",   demangled);
-    let without_hash = format!("{:#}", demangled);
-
-    let hash_only: Option<String> = with_hash
-        .find::<&str>(without_hash.as_ref())
-        .and_then(|index| {
-            let hash_start = index + 2 + without_hash.len();
-            with_hash.get(hash_start..).map(|s| s.to_string())
-        }); // + 2 to skip the "::" separator
-
-    if let Some(hash_only) = hash_only {
-        format!("{}#{}", without_hash, hash_only)
-    }
-    else {
-        format!("{}", without_hash)
-    }
+    rustc_demangle::demangle(mangled).to_string()
 }
