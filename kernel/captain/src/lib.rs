@@ -255,22 +255,28 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 }
 
 fn test1(a: u32) -> u32 {
-    for _ in 1..100 {
-       println!("1"); 
+    let mut i = 1;
+    loop {
+       debug!("A {}", i);
+       i = i + 1; 
     }
     a
 }
 
 fn test2(a: u32) -> u32 {
-    for _ in 1..100 {
-       println!("2"); 
+    let mut i = 1;
+    loop {
+       debug!("B {}", i);
+       i = i + 1; 
     }
     a
 }
 
 fn test3(a: u32) -> u32 {
-    for _ in 1..100 {
-       println!("3"); 
+    let mut i = 1;
+    loop {
+       debug!("C {}", i);
+       i = i + 1; 
     }
     a
 }
