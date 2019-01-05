@@ -10,7 +10,7 @@ extern crate vfs_node;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 use fs_node::{FSNode, StrongAnyDirRef};
 
 /// A structure that represents a file  

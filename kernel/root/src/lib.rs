@@ -14,8 +14,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
-use alloc::arc::{Arc, Weak};
-use alloc::btree_map::BTreeMap;
+use alloc::sync::{Arc, Weak};
+use alloc::collections::BTreeMap;
 use fs_node::{StrongAnyDirRef, WeakDirRef, Directory, FSNode, FileDirectory};
 
 lazy_static! {

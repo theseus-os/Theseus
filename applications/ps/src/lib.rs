@@ -51,7 +51,7 @@ pub fn main(args: Vec<String>) -> isize {
             RunState::Runnable   => "Runnable",
             RunState::Blocked    => "Blocked",
             RunState::Reaped     => "Reaped",
-            _                    => "Exited",
+            _                    => "useExited",
         };
         let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
         let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));

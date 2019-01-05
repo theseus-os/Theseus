@@ -19,7 +19,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 
 /// An strong reference (Arc) and a Mutex wrapper around the generic Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 

@@ -7,9 +7,10 @@ extern crate task;
 #[macro_use] extern crate log;
 extern crate fs_node;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use fs_node::Directory;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {

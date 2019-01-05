@@ -12,7 +12,7 @@ use alloc::boxed::Box;
 use TASKLIST;
 use root;
 use fs_node::{Directory, File, FileDirectory, WeakDirRef, StrongAnyDirRef, FSNode};
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use vfs_node::{VFSDirectory, VFSFile};

@@ -7,6 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+spin = "0.4.10"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.log]

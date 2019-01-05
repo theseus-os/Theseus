@@ -33,7 +33,7 @@ use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};

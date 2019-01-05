@@ -4,8 +4,8 @@
 #[macro_use] extern crate alloc;
 extern crate fs_node;
 
-use alloc::String;
-use alloc::arc::Arc;
+use alloc::string::String;
+use alloc::sync::Arc;
 use fs_node::{StrongAnyDirRef, FileDirectory};
 
 /// A structure that contains Environmnt variables for a given task

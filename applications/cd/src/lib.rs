@@ -9,8 +9,9 @@ extern crate getopts;
 extern crate path;
 extern crate fs_node;
 
-use alloc::{Vec, String};
-use alloc::arc::Arc;
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;

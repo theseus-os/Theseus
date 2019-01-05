@@ -40,14 +40,11 @@ extern crate tss;
 extern crate mod_mgmt;
 extern crate context_switch;
 extern crate environment;
-extern crate spin;
 extern crate root;
 extern crate vfs_node;
 extern crate fs_node;
 extern crate path;
 extern crate x86_64;
-
-#[cfg(runqueue_state_spill_evaluation)]
 extern crate spin;
 
 #[cfg(runqueue_state_spill_evaluation)]
@@ -67,7 +64,6 @@ use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementIn
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
-use panic_info::PanicInfo;
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};

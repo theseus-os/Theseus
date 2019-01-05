@@ -65,11 +65,6 @@ dependencies = [
 
 [[package]]
 name = "atomic"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "atomic"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
@@ -141,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.27"
+version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -163,8 +158,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "compiler_builtins"
-version = "0.1.2"
-source = "git+https://github.com/rust-lang-nursery/compiler-builtins#10f4f35f9670bb29715a8c1ec01284852d47ed35"
+version = "0.1.4"
+source = "git+https://github.com/rust-lang-nursery/compiler-builtins#0c5dffb5ba791251ae6d2a92d4491d444a5c45b2"
 
 [[package]]
 name = "context_switch"
@@ -231,7 +226,6 @@ version = "0.1.0"
 name = "dfqueue"
 version = "0.1.0"
 dependencies = [
- "atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -672,7 +666,7 @@ dependencies = [
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
- "rustc-demangle 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-demangle 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
@@ -973,7 +967,7 @@ version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "cc 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1034,7 +1028,7 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.11"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -1092,7 +1086,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "compiler_builtins 0.1.2 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
+ "compiler_builtins 0.1.4 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -1216,6 +1210,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "path 0.1.0",
  "root 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
  "vfs_node 0.1.0",
  "x86_64 0.1.2",
@@ -1391,14 +1386,13 @@ version = "0.1.3"
 source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
 
 [metadata]
-"checksum atomic 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6945bb928733f277215e12824ca9e31ce2016b6231dfc4816ed877df189cc17e"
 "checksum atomic 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "777193fba18f25453de6987e78db3c4cdae10768010edfc89e7da23518953136"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
-"checksum cc 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)" = "155ed195f7bd722d1dfeb30365b9d0c1f6a078fa7ca4014497e5935d90993d6f"
+"checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
-"checksum compiler_builtins 0.1.2 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
+"checksum compiler_builtins 0.1.4 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)" = "<none>"
 "checksum goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)" = "c65cd533b33e3d04c6e393225fa8919ddfcf5862ca8919c7f9a167c312ef41c2"
@@ -1419,7 +1413,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)" = "<none>"
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 "checksum rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
-"checksum rustc-demangle 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)" = "01b90379b8664dd83460d59bdc5dd1fd3172b8913788db483ed1325171eab2f7"
+"checksum rustc-demangle 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "adacaae16d02b6ec37fdc7acfcddf365978de76d1983d3ee22afc260e1ca9619"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum scroll 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2f84d114ef17fd144153d608fba7c446b0145d038985e7a8cc5d08bb0ce20383"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"

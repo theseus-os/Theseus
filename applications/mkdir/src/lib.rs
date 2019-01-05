@@ -8,8 +8,9 @@ extern crate getopts;
 extern crate fs_node;
 extern crate vfs_node;
 
-use alloc::{Vec, String};
-use alloc::arc::Arc;
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::string::ToString;
 use fs_node::FSNode;
 use vfs_node::VFSDirectory;
