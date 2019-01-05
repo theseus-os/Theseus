@@ -227,19 +227,19 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))
         .pin_on_core(1)
-        .set_priority(5)
+        .set_priority(30)
         .spawn()?;
 
     KernelTaskBuilder::new(test2 ,2)
         .name(String::from("test2"))
         .pin_on_core(1)
-        .set_priority(10)
+        .set_priority(20)
         .spawn()?;
 
     KernelTaskBuilder::new(test3 ,3)
         .name(String::from("test3"))
         .pin_on_core(1)
-        .set_priority(-5)
+        .set_priority(10)
         .spawn()?;
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");

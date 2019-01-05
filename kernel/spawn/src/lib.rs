@@ -73,7 +73,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
-    set_priority: Option<i8>,
+    set_priority: Option<u8>,
     runtime: u32,
 
     #[cfg(simd_personality)]
@@ -94,7 +94,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
-            set_priority: Some(-1),
+            set_priority: Some(20),
             runtime: 0,
             #[cfg(simd_personality)]
             simd: false,
@@ -114,7 +114,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     }
 
     /// Assign priority to new core.
-    pub fn set_priority(mut self, priority: i8) -> KernelTaskBuilder<F, A, R> {
+    pub fn set_priority(mut self, priority: u8) -> KernelTaskBuilder<F, A, R> {
         self.set_priority = Some(priority);
         self
     }

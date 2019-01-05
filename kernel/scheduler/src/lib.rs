@@ -53,7 +53,9 @@ pub fn schedule() -> bool {
     // we want mutable references to mutable tasks
     let curr = unsafe {&mut *current_task };
 
-    curr.runtime = curr.runtime + 20 - curr.priority;
+    let curr_priority = curr.priority.unwrap() as u32;
+
+    curr.runtime = curr.runtime + 40 - curr_priority;
 
     if let Some(selected_next_task) = select_next_task_priority(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
