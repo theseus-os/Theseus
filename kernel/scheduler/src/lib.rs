@@ -79,6 +79,27 @@ pub fn schedule() -> bool {
 
     let (next) = unsafe {&mut *next_task};
 
+    //We update the minimum run time based on the task we picked
+    {
+        let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
+            Some(rq) => rq.write(),
+            _ => {
+                debug!("BUG: schedule(): couldn't get runqueue for core {}", apic_id); 
+                return false;
+            }
+        };
+        let curr_min_runtime = runqueue_locked.get_min_runtime();
+        if(curr_min_runtime < next.runtime){
+            runqueue_locked.update_min_runtime(next.runtime);
+        }
+        else{
+            next.runtime = curr_min_runtime;
+        }
+
+    }
+
+    next.times_picked = next.times_picked + 1;
+
     curr.task_switch(next, apic_id); 
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);

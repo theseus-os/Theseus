@@ -224,6 +224,9 @@ pub struct Task {
 
     pub priority: Option<u8>,
     pub runtime: u32,
+    //debug
+    pub times_picked: u32,
+
 }
 
 impl fmt::Debug for Task {
@@ -270,6 +273,7 @@ impl Task {
 
             priority: Some(0),
             runtime: 0,
+            times_picked: 0,
         }
     }
 
