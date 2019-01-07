@@ -35,17 +35,17 @@ lazy_static! {
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
-    min_vruntime: u32,
+    minimum_weighted_runtime: u32,
 }
 
 impl RunQueue {
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
+    /// Creates a new `RunQueue` for the given core, which is an `apic_id` and with minimumweighted runtime
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
-            min_vruntime: 0,
+            minimum_weighted_runtime: 0,
         });
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -224,12 +224,15 @@ impl RunQueue {
         self.queue.iter()
     }
 
-    pub fn update_min_runtime(&mut self, runtime: u32) -> () {
-        self.min_vruntime = runtime;
+    /// Update minimum weighted runtime of tasks in this `RunQueue`.
+    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
+    pub fn update_weighted_min_runtime(&mut self, runtime: u32) -> () {
+        self.minimum_weighted_runtime = runtime;
     }
-
-    pub fn get_min_runtime(&self) -> u32 {
-        return self.min_vruntime;
+    /// Returns minimum weighted runtime of tasks in this `RunQueue`.
+    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
+    pub fn get_weighted_min_runtime(&self) -> u32 {
+        return self.minimum_weighted_runtime;
     }
 
 }

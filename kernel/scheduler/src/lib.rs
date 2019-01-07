@@ -55,7 +55,10 @@ pub fn schedule() -> bool {
 
     let curr_priority = curr.priority.unwrap() as u32;
 
-    curr.runtime = curr.runtime + 1000 / (curr_priority + 1);
+    //We update the runtime of the current running task
+    //Ideally this should be curr.weighted_runtime = curr.weighted_runtime + timeslice / (curr_priority);
+    //Since timeslice is constant we replaced it with a constant
+    curr.weighted_runtime = curr.weighted_runtime + 1000 / (curr_priority + 1);
 
     if let Some(selected_next_task) = select_next_task_priority(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
@@ -79,7 +82,10 @@ pub fn schedule() -> bool {
 
     let (next) = unsafe {&mut *next_task};
 
-    //We update the minimum run time based on the task we picked
+    //We update the minimum weighted run time based on the task we picked
+    //If minimum weighted run time of run queue is less than weighted run time of next task we update the minimum weighted run time of run queue
+    //If weighted run time of next task is less than minimum weighted runtime of runqueue then we update the weighted runtime of next task
+    //This is to prevent a task blocked for long period hogging the core 
     {
         let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
             Some(rq) => rq.write(),
@@ -88,16 +94,17 @@ pub fn schedule() -> bool {
                 return false;
             }
         };
-        let curr_min_runtime = runqueue_locked.get_min_runtime();
-        if(curr_min_runtime < next.runtime){
-            runqueue_locked.update_min_runtime(next.runtime);
+        let runqueue_weighted_min_runtime = runqueue_locked.get_weighted_min_runtime();
+        if(runqueue_weighted_min_runtime < next.weighted_runtime){
+            runqueue_locked.update_weighted_min_runtime(next.weighted_runtime);
         }
         else{
-            next.runtime = curr_min_runtime;
+            next.weighted_runtime = runqueue_weighted_min_runtime;
         }
 
     }
 
+    //We update the number of context switches
     next.times_picked = next.times_picked + 1;
 
     curr.task_switch(next, apic_id); 
@@ -110,7 +117,7 @@ pub fn schedule() -> bool {
 
 
 
-/// this defines the scheduler policy.
+/// this defines the round robin scheduler policy.
 /// returns None if there is no schedule-able task
 fn select_next_task_round_robin(apic_id: u8) -> Option<TaskRef>  {
 
@@ -160,7 +167,9 @@ fn select_next_task_round_robin(apic_id: u8) -> Option<TaskRef>  {
         .and_then(|index| runqueue_locked.move_to_end(index))
 }
 
-//This returns the next runnable task which has run the least amount of time
+/// This defines the priority scheduler policy.
+/// Task with the minimum weighted run time is picked
+/// Returns None if there is no schedule-able task
 fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
@@ -173,7 +182,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
     
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
-    let mut minimum_run_time = 0;
+    let mut minimum_weighted_run_time = 0;
 
     for (i, taskref) in runqueue_locked.iter().enumerate() {
         let t = taskref.lock();
@@ -205,14 +214,15 @@ fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
         }
             
         // found a runnable task!
+        // Mark it as the running task if it has he minimum weighted run time
         chosen_task_index = match chosen_task_index{
         	None => {
-        		minimum_run_time = t.runtime;
+        		minimum_weighted_run_time = t.weighted_runtime;
         		Some(i)
         	},
         	Some(chosen_task_index) => {
-        		if(t.runtime < minimum_run_time){
-        			minimum_run_time = t.runtime;
+        		if(t.weighted_runtime < minimum_weighted_run_time){
+        			minimum_weighted_run_time = t.weighted_runtime;
         			Some(i)
         		}
         		else{

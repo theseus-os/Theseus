@@ -74,7 +74,6 @@ pub struct KernelTaskBuilder<F, A, R> {
     name: Option<String>,
     pin_on_core: Option<u8>,
     set_priority: Option<u8>,
-    runtime: u32,
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -95,7 +94,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             name: None,
             pin_on_core: None,
             set_priority: Some(20),
-            runtime: 0,
+
             #[cfg(simd_personality)]
             simd: false,
         }
@@ -119,10 +118,10 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
-    pub fn set_runtime(mut self, runtime: u32) -> KernelTaskBuilder<F, A, R> {
-        self.runtime = runtime;
-        self
-    }
+    //pub fn set_runtime(mut self, runtime: u32) -> KernelTaskBuilder<F, A, R> {
+    //    self.runtime = runtime;
+    //    self
+    //}
 
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
@@ -177,7 +176,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         new_task.kstack = Some(kstack);
         new_task.runstate = RunState::Runnable; // ready to be scheduled in
         new_task.priority = self.set_priority;
-        new_task.runtime = self.runtime;
+        new_task.weighted_runtime = 0;
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
@@ -209,6 +208,7 @@ pub struct ApplicationTaskBuilder {
     name: Option<String>,
     pin_on_core: Option<u8>,
     singleton: bool,
+    set_priority: Option<u8>,
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -224,6 +224,7 @@ impl ApplicationTaskBuilder {
             name: None,
             pin_on_core: None,
             singleton: false,
+            set_priority: Some(20),
 
             #[cfg(simd_personality)]
             simd: false,
@@ -239,6 +240,12 @@ impl ApplicationTaskBuilder {
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder {
         self.pin_on_core = Some(core_apic_id);
+        self
+    }
+
+    /// Assign priority to new core.
+    pub fn set_priority(mut self, priority: u8) -> ApplicationTaskBuilder {
+        self.set_priority = Some(priority);
         self
     }
 
