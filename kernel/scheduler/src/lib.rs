@@ -55,7 +55,7 @@ pub fn schedule() -> bool {
 
     let curr_priority = curr.priority.unwrap() as u32;
 
-    curr.runtime = curr.runtime + 40 - curr_priority;
+    curr.runtime = curr.runtime + 1000 / (curr_priority + 1);
 
     if let Some(selected_next_task) = select_next_task_priority(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
@@ -160,6 +160,7 @@ fn select_next_task_round_robin(apic_id: u8) -> Option<TaskRef>  {
         .and_then(|index| runqueue_locked.move_to_end(index))
 }
 
+//This returns the next runnable task which has run the least amount of time
 fn select_next_task_priority(apic_id: u8) -> Option<TaskRef>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {

@@ -35,6 +35,7 @@ lazy_static! {
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<TaskRef>,
+    min_vruntime: u32,
 }
 
 impl RunQueue {
@@ -44,6 +45,7 @@ impl RunQueue {
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
+            min_vruntime: 0,
         });
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -220,6 +222,14 @@ impl RunQueue {
     // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<TaskRef> {
         self.queue.iter()
+    }
+
+    pub fn update_min_runtime(&mut self, runtime: u32) -> () {
+        self.min_vruntime = runtime;
+    }
+
+    pub fn get_min_runtime(&self) -> u32 {
+        return self.min_vruntime;
     }
 
 }
