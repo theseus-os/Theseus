@@ -9,6 +9,8 @@ use alloc::sync::Arc;
 use fs_node::{StrongAnyDirRef, FileDirectory};
 
 /// A structure that contains Environmnt variables for a given task
+/// For now, the one variable is the current working directory of the task, which is 
+/// stored as a strong pointer to a directory within the filesystem
 pub struct Environment {
     /// The working directory for given tasks
     pub working_dir: StrongAnyDirRef, 
