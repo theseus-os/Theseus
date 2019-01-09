@@ -1,8 +1,8 @@
 [package]
-name = "vfs_node"
+name = "in_memory_node"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
-description = "contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File, respectively. "
+description = "contains the MappedPages-backed implementation of the fs_node traits"
 
 
 [dependencies]
@@ -12,6 +12,8 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.memory]
+path = "../memory"
 
 [dependencies.log]
 default-features = false

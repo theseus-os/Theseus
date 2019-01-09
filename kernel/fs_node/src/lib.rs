@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
+use core::any::Any;
 
 /// An strong reference (Arc) and a Mutex wrapper around the generic Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 
@@ -29,7 +30,7 @@ pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
 
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
 pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
-pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
+pub type StrongFileRef = Arc<Mutex<Box<File<ContentType=Any> + Send>>>;
 
 /// Traits that both files and directories share
 pub trait FileDirectory {
@@ -66,8 +67,9 @@ pub trait FileDirectory {
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
-    fn read(&self) -> String;
-    fn write(&mut self);
+    type ContentType;
+    fn read(&self) -> Self::ContentType;
+    fn write(&mut self, contents: Self::ContentType) -> Result<(), &'static str>;
     fn seek(&self); 
     fn delete(&self);
 }
@@ -80,7 +82,7 @@ pub trait Directory : FileDirectory + Send {
 }
 
 /// Allows us to return a generic type that can be matched by the caller to extract the underlying type
-pub enum FSNode{
+pub enum FSNode {
     File(StrongFileRef),
     Dir(StrongAnyDirRef),
 }

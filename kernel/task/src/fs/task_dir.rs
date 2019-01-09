@@ -66,7 +66,8 @@ impl<'a> FileDirectory for TaskFile<'a> {
 }
 
 impl<'a> File for TaskFile<'a> {
-     fn read(&self) -> String { 
+    type ContentType = String;
+     fn read(&self) -> Self::ContentType { 
         // Print all tasks
         let mut task_string = String::new();
         let name = &self.task.lock().name.clone();
@@ -92,7 +93,7 @@ impl<'a> File for TaskFile<'a> {
         return task_string;
     }
 
-    fn write(&mut self) { unimplemented!() }
+    fn write(&mut self, contents: Self::ContentType) -> Result<(), &'static str> { unimplemented!() }
     fn seek(&self) { unimplemented!() }
     fn delete(&self) { unimplemented!() }
 }
@@ -231,6 +232,6 @@ fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<(),
     };
     // create the page table file and add it to the mmi directory
     let page_table_file = VFSFile::new(name.clone(), 0, page_table_info, Arc::downgrade(&mmi_dir_pointer));
-    mmi_dir.lock().add_fs_node(FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))))?;
+    mmi_dir.lock().add_fs_node(FSNode::File(Arc::new(Mutex::new(Box::new(page_table_file)))));
     return Ok(());
 }

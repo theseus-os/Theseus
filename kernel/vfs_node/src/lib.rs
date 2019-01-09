@@ -122,10 +122,11 @@ impl VFSFile {
 }
 
 impl File for VFSFile {
-    fn read(&self) -> String { 
+    type ContentType = String;
+    fn read(&self) -> Self::ContentType { 
         return self.contents.clone();
      }
-    fn write(&mut self) { unimplemented!(); }
+    fn write(&mut self, contents: Self::ContentType) -> Result<(), &'static str> { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
     fn delete(&self) { unimplemented!(); }
 }
