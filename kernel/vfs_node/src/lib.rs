@@ -122,13 +122,11 @@ impl VFSFile {
 }
 
 impl File for VFSFile {
-    type ContentType = String;
-    fn read(&self) -> Self::ContentType { 
-        return self.contents.clone();
-     }
-    fn write(&mut self, contents: Self::ContentType) -> Result<(), &'static str> { unimplemented!(); }
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
+    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
     fn delete(&self) { unimplemented!(); }
+    fn size(&self) -> usize {unimplemented!()}
 }
 
 impl FileDirectory for VFSFile {

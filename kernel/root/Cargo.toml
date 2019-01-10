@@ -19,5 +19,8 @@ path = "../fs_node"
 default-features = false
 version = "0.3.7"
 
+[dependencies.in_memory_node]
+path = "../in_memory_node"
+
 [lib]
 crate-type = ["rlib"]

@@ -3,7 +3,7 @@
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate log;
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate task;
 extern crate getopts;
 extern crate path;
@@ -55,11 +55,21 @@ pub fn main(args: Vec<String>) -> isize {
             Ok(file_dir_enum) => {
                 match file_dir_enum {
                     FSNode::Dir(_) => {
-                        println!("why tf would this ever be a dir");
                     },
                     FSNode::File(file) => {
-                        debug!("about to read this shit");
-                        println!("{}", file.lock().read());
+                        let file_size = file.lock().size();
+                        let mut string_slice_as_bytes = vec![0; file_size];
+                        
+                        let num_bytes_read = match file.lock().read(&mut string_slice_as_bytes) {
+                            Ok(num) => num,
+                            Err(_) => {return -1},
+                        };
+                        let read_string = match String::from_utf8(string_slice_as_bytes) {
+                            Ok(string_slice) => string_slice,
+                            Err(_) => {return -1}, // consider printing error 
+                        };
+                        println!("{}", read_string);
+                    // println!("{}", file.lock().read());
                     }
                 }
 

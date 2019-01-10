@@ -30,7 +30,7 @@ pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
 
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
 pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
-pub type StrongFileRef = Arc<Mutex<Box<File<ContentType=Any> + Send>>>;
+pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 
 /// Traits that both files and directories share
 pub trait FileDirectory {
@@ -67,11 +67,11 @@ pub trait FileDirectory {
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
-    type ContentType;
-    fn read(&self) -> Self::ContentType;
-    fn write(&mut self, contents: Self::ContentType) -> Result<(), &'static str>;
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str>; 
+    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str>;
     fn seek(&self); 
     fn delete(&self);
+    fn size(&self) -> usize;
 }
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
