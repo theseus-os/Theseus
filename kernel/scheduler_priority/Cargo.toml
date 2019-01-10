@@ -1,7 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "scheduler"
-description = "Provides scheduling functionality for selecting the next task and causing a task switch"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+name = "scheduler_priority"
+description = "Provides Round robin scheduling functionality and picks the next task"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -23,12 +23,6 @@ path = "../task"
 
 [dependencies.runqueue]
 path = "../runqueue"
-
-[dependencies.scheduler_round_robin]
-path = "../scheduler_round_robin"
-
-[dependencies.scheduler_priority]
-path = "../scheduler_priority"
 
 [lib]
 crate-type = ["rlib"]

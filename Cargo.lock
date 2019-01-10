@@ -952,6 +952,32 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
+ "scheduler_priority 0.1.0",
+ "scheduler_round_robin 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scheduler_priority"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scheduler_round_robin"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
