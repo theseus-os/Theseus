@@ -19,7 +19,7 @@ use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
 
 
-pub struct InMemoryFile {
+pub struct MemFile {
     /// The name of the file
     name: String,
     // The size of the file in bytes
@@ -30,9 +30,9 @@ pub struct InMemoryFile {
     parent: WeakDirRef,
 }
 
-impl InMemoryFile {
+impl MemFile {
     /// Combines file creation and file write into one operation
-    pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<InMemoryFile, &'static str> {
+    pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<MemFile, &'static str> {
         // Obtain the active kernel page table
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
         if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
@@ -46,8 +46,8 @@ impl InMemoryFile {
                 let mut dest_slice = mapped_pages.as_slice_mut::<u8>(0, contents.len())?;
                 dest_slice.copy_from_slice(contents); // writes the desired contents into the correct area in the mapped page
             }
-            // create and return the newly create InMemoryFile
-            return Ok(InMemoryFile {
+            // create and return the newly create MemFile
+            return Ok(MemFile {
                 name: name, 
                 size: contents.len(),
                 contents: mapped_pages,
@@ -58,7 +58,7 @@ impl InMemoryFile {
     }
 }
 
-impl File for InMemoryFile {
+impl File for MemFile {
     /// To read the contents of a file, query the size of the file 
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> {
         let num_bytes_read = self.size; // this is the number of bytes of actual information stored in the MappedPage
@@ -95,7 +95,7 @@ impl File for InMemoryFile {
     }
 }
 
-impl FileDirectory for InMemoryFile {
+impl FileDirectory for MemFile {
     fn get_name(&self) -> String {
         self.name.clone()
     }
