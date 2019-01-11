@@ -24,7 +24,10 @@ extern crate rand;
 
 use core::convert::TryInto;
 use core::str;
-use alloc::vec::Vec;
+use alloc::{
+    vec::Vec,
+    string::{String, ToString},
+};
 use spin::Once;
 use acpi::get_hpet;
 use smoltcp::{
@@ -57,15 +60,99 @@ const STARTING_FREE_PORT: u16 = 49152;
 const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
 
 
+/// The path of the update builds file, located at the root of the build server.
+/// This file contains the list of all update build instances available,
+/// listed in reverse chronological order (most recent builds first).
+const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
+
+/// The name (and relative path) of the listing file inside each update build directory,
+/// which contains the names of all crate object files that were built.  
+const LISTING_FILE_NAME: &'static str = "listings.txt";
 
 
-/// Initialize the network live update client, 
-/// which spawns a new thread to handle live update requests and notifications. 
+/// Connects to the update server over the given network interface
+/// and downloads the list of available update builds.
+/// An update build is a compiled instance of Theseus that contains all crates' object files.
+pub fn get_available_update_builds(
+    iface: &NetworkInterfaceRef
+) -> Result<Vec<String>, &'static str> {
+    let updates_file = download_file(iface, UPDATE_BUILDS_PATH)?;
+    let updates_str = str::from_utf8(&updates_file.bytes)
+        .map_err(|_e| "couldn't convert received list of update builds into a UTF8 string")?;
+
+    Ok(
+        updates_str.lines().map(|line| line.to_string()).collect()
+    )
+}
+
+
+
+/// A file that has been downloaded over the network, 
+/// including its name and a byte array containing its contents.
+pub struct DownloadedFile {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+
+/// Connects to the update server over the given network interface
+/// and downloads the compiled crate object files from the specified `update_build`. 
+/// A list of available update builds can be obtained by calling 
+/// `get_available_update_builds()`.
 /// 
 /// # Arguments
-/// * `iface`: a reference to an initialized network interface for sockets to use. 
+/// * `iface`: a reference to an initialized network interface for sockets to use.
+/// * `update_build`: the string name of the update build that the downloaded crates will belong to.
+/// * `existing_crates`: a list of the existing crate names, i.e., the crates to *not* download.
+///    Passing an an empty list of crates will cause all crates in the given `update_build` to be downloaded.
 /// 
-pub fn init(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
+/// Returns the list of crates (as `DownloadedFile`s) in the given `update_build` that differed 
+/// from the given list of `existing_crates`.
+pub fn download_differing_crates(
+    iface: &NetworkInterfaceRef, 
+    update_build: &str,
+    existing_crates: Vec<String>,
+) -> Result<Vec<DownloadedFile>, &'static str> {
+    
+    // first, download the update_build's manifest (listing.txt) file
+    debug!("ota_update_client: downloading the listing for update_build {:?}", update_build);
+    let listing_file = download_file(iface, format!("{}/{}", update_build, LISTING_FILE_NAME))?;
+    
+    // Iterate over the list of crate files in the listing, and build a vector of file paths to download. 
+    // We need to download all crates that differ from the given list of `existing_crates`, 
+    // plus the files containing those crates' sha512 checksums.
+
+
+    Err("unfinished")
+}
+
+
+
+/// A convenience function for downloading just one file. See `download_files()`.
+fn download_file<S: AsRef<str>>(
+    iface: &NetworkInterfaceRef, 
+    absolute_path: S,
+) -> Result<DownloadedFile, &'static str> {
+    
+    download_files(iface, vec![absolute_path])?
+        .into_iter()
+        .next()
+        .ok_or("no file received from the server")
+}
+
+
+/// Connects to the update server over the given network interface
+/// and downloads the given files, each specified with its full absolute path on the update server.
+fn download_files<S: AsRef<str>>(
+    iface: &NetworkInterfaceRef, 
+    absolute_paths: Vec<S>,
+) -> Result<Vec<DownloadedFile>, &'static str> {
+    // TODO: real update sequence: 
+    // (1) establish connection to build server
+    // (2) download the UPDATE MANIFEST, a file that describes which crates should replace which others
+    // (3) compare the crates in the given CrateNamespace with the latest available crates from the manifest
+    // (4) send HTTP requests to download the ones that differ 
+    // (5) swap in the new crates in place of the old crates
 
     let dest_addr = IpAddress::v4(
         DEFAULT_DESTINATION_IP_ADDR[0],

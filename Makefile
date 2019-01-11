@@ -265,6 +265,15 @@ build_simd:
 
 
 
+
+### build_server is a target that builds Theseus into a regular ISO
+### and then sets up an HTTP server that provides module object files 
+### for a running instance of Theseus to download for OTA live updates.
+build_server: iso
+	@sh scripts/build_server.sh  /tmp/theseus_build_server  $(OBJECT_FILES_BUILD_DIR)  $(UPDATE_DIR)
+
+
+
 ## The top-level (root) documentation file
 DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
 
@@ -300,29 +309,44 @@ clean:
 
 help: 
 	@echo -e "\nThe following make targets are available:"
+	@echo -e "   iso:"
+	@echo -e "\t The most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+
 	@echo -e "   run:"
-	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
+	@echo -e "\t The most common target. Builds Theseus (like the 'iso' target) and runs it using QEMU."
+
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
+
 	@echo -e "   debug:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
 	@echo -e "   gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
+
 	@echo -e "   boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+
 	@echo -e "   pxe:"
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
+
 	@echo -e "   simd_personality:"
 	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
 	@echo -e "\t then runs it just like the 'make run' target."
+
+	@echo -e "   build_server:"
+	@echo -e "\t Builds Theseus (as with the 'iso' target) and then runs a build server hosted on this machine"
+	@echo -e "\t that can be used over-the-air live evolution."
+
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "   view-doc:"
