@@ -28,14 +28,14 @@ lazy_static! {
             children: BTreeMap::new() 
         };
 
+        // Creates a file containing the following string so we can test the implementation of MemFile
         let test_string = String::from("TESTINGINMEMORY");
-
         let strongRoot = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
         let mut test_bytes =  test_string.as_bytes().to_vec();
         let file = in_memory_node::InMemoryFile::new(String::from("testfile"), &mut test_bytes ,Arc::downgrade(&Arc::clone(&strongRoot))).unwrap();
         let boxed_file = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
         strongRoot.lock().add_fs_node(FSNode::File(boxed_file)).unwrap();
-        // (String::from("/root"), Arc::new(Mutex::new(Box::new(root_dir))))
+
         (String::from("/root"), strongRoot)
 
     };
