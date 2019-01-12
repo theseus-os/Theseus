@@ -12,7 +12,7 @@ use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use apic::get_lapics;
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

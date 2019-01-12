@@ -18,10 +18,7 @@ extern crate single_simd_task_optimization;
 use alloc::collections::VecDeque;
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
-use task::TaskRef;
-
-use alloc::sync::Arc;
-
+use task::{TaskRef, Task};
 
 
 
@@ -58,9 +55,9 @@ impl PriorityTaskRef {
         priority_taskref
     }
 
-    //pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-    //    MutexIrqSafeGuardRef::new(self.taskref.0.lock())
-    //}
+    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
+       self.taskref.lock()
+    }
 }
 
 /// A list of references to `Task`s (`TaskRef`s) 
@@ -116,11 +113,15 @@ impl RunQueue {
 
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
-    pub fn move_to_end(&mut self, index: usize) -> Option<PriorityTaskRef> {
+    pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
         self.queue.remove(index).map(|taskref| {
             self.queue.push_back(taskref.clone());
             taskref
-        })
+        }).map(|m| m.taskref)
+    }
+
+    pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
+        priority_task_ref.map(|m| m.taskref)
     }
 }
 
@@ -294,8 +295,6 @@ impl RunQueue_trait for RunQueue {
                 rq.write().remove_internal(task)
             })
     }
-
-    
 
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.

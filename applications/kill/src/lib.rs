@@ -10,7 +10,7 @@ extern crate getopts;
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

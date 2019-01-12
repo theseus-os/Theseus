@@ -34,7 +34,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use task::{TaskRef, ExitValue, KillReason};
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;

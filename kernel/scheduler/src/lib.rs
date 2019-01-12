@@ -14,7 +14,7 @@ use core::ops::DerefMut;
 use irq_safety::{disable_interrupts};
 use apic::get_my_apic_id;
 use task::{Task, TaskRef, get_my_current_task};
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
 
 
 
@@ -62,7 +62,7 @@ pub fn schedule() -> bool {
     //Since timeslice is constant we replaced it with a constant
     curr.weighted_runtime = curr.weighted_runtime + 1000 / (curr_priority + 1);
 
-    if let Some(selected_next_task) = scheduler_round_robin::select_next_task(apic_id) {
+    if let Some(selected_next_task) = scheduler_priority::select_next_task(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
     else {

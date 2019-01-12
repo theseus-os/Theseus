@@ -17,7 +17,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use getopts::{Matches, Options};
 use acpi::get_hpet;
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
 use task::{Task, TaskRef};
 
 

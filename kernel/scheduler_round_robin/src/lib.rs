@@ -13,7 +13,8 @@ use core::ops::DerefMut;
 use irq_safety::{disable_interrupts};
 use apic::get_my_apic_id;
 use task::{Task, TaskRef, get_my_current_task};
-use runqueue::RunQueue;
+use runqueue::{RunQueue, RunQueue_trait};
+
 
 
 /// this defines the round robin scheduler policy.

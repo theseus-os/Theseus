@@ -17,6 +17,7 @@ extern crate runqueue;
 use core::panic::PanicInfo;
 use alloc::string::String;
 use task::{KillReason, PanicInfoOwned};
+use runqueue::RunQueue_trait;
 
 
 /// performs the standard panic handling routine, which involves the following:
