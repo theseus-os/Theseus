@@ -70,6 +70,17 @@ const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
 const LISTING_FILE_NAME: &'static str = "listings.txt";
 
 
+
+    // TODO: real update sequence: 
+    // (1) establish connection to build server
+    // (2) download the UPDATE MANIFEST, a file that describes which crates should replace which others
+    // (3) compare the crates in the given CrateNamespace with the latest available crates from the manifest
+    // (4) send HTTP requests to download the ones that differ 
+    // (5) swap in the new crates in place of the old crates
+
+
+
+
 /// Connects to the update server over the given network interface
 /// and downloads the list of available update builds.
 /// An update build is a compiled instance of Theseus that contains all crates' object files.
@@ -123,6 +134,15 @@ pub fn download_differing_crates(
     // plus the files containing those crates' sha512 checksums.
 
 
+
+
+    // calculate the sha3-512 hash of the HTTP response body (excluding headers)
+    let mut hasher = Sha3_512::new();
+    hasher.input(response.content());
+    let result = hasher.result();
+    info!("ota_update_client: sha3-512 hash of downloaded file: {:x}", result);
+
+
     Err("unfinished")
 }
 
@@ -147,12 +167,6 @@ fn download_files<S: AsRef<str>>(
     iface: &NetworkInterfaceRef, 
     absolute_paths: Vec<S>,
 ) -> Result<Vec<DownloadedFile>, &'static str> {
-    // TODO: real update sequence: 
-    // (1) establish connection to build server
-    // (2) download the UPDATE MANIFEST, a file that describes which crates should replace which others
-    // (3) compare the crates in the given CrateNamespace with the latest available crates from the manifest
-    // (4) send HTTP requests to download the ones that differ 
-    // (5) swap in the new crates in place of the old crates
 
     let dest_addr = IpAddress::v4(
         DEFAULT_DESTINATION_IP_ADDR[0],
@@ -174,26 +188,6 @@ fn download_files<S: AsRef<str>>(
 
     let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
     let tcp_handle = sockets.add(tcp_socket);
-
-    let http_request = {
-        let method = "GET";
-        let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
-        let version = "HTTP/1.1";
-        let connection = "Connection: close";
-        format!("{} {} {}\r\n{}\r\n{}\r\n\r\n", 
-            method,
-            uri,
-            version,
-            format_args!("Host: {}:{}", dest_addr, dest_port), // host
-            connection
-        )
-    };
-
-    if !check_http_request(http_request.as_bytes()) {
-        error!("ota_update_client: created improper/incomplete HTTP request: {:?}.", http_request);
-        return Err("ota_update_client: created improper/incomplete HTTP request");
-    }
-
 
     {
         info!("ota_update_client: connecting from {}:{} to {}:{}",
@@ -237,17 +231,36 @@ fn download_files<S: AsRef<str>>(
 
     debug!("ota_update_client: socket connected successfully!");
 
-    // second, send the HTTP request and obtain a response
-    let response = {
-        let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
-        send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
-    };
+    let last_index = absolute_paths.len() - 1;
+    for (i, path) in absolute_paths.iter().enumerate() {
+        let is_last_request = i == last_index;
 
-    // calculate the sha3-512 hash of the HTTP response body (excluding headers)
-    let mut hasher = Sha3_512::new();
-    hasher.input(response.content());
-    let result = hasher.result();
-    info!("ota_update_client: sha3-512 hash of downloaded file: {:x}", result);
+        let http_request = {
+            let method = "GET";
+            let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
+            let version = "HTTP/1.1";
+            let connection = if is_last_request { "Connection: close" } else { "Connection: keep-alive" };
+            format!("{} {} {}\r\n{}\r\n{}\r\n\r\n",
+                method,
+                uri,
+                version,
+                format_args!("Host: {}:{}", dest_addr, dest_port), // host
+                connection
+            )
+        };
+
+        if !check_http_request(http_request.as_bytes()) {
+            error!("ota_update_client: created improper/incomplete HTTP request: {:?}.", http_request);
+            return Err("ota_update_client: created improper/incomplete HTTP request");
+        }
+
+        // send the HTTP request and obtain a response
+        let response = {
+            let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
+            send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
+        };
+
+    }
 
 
     let mut _loop_ctr = 0;

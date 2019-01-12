@@ -11,7 +11,8 @@ use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages
 
 
 
-/// A trait that defines for a NIC 
+/// A trait that defines the necessary minimum functions that all network interface card (NIC) drivers
+/// should implement. 
 pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
     /// Blocks until the packet has been successfully sent by the networking card hardware.
