@@ -18,45 +18,44 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{StrongAnyDirRef, WeakDirRef, Directory, FSNode, File, FileDirectory};
+use fs_node::{StrongAnyDirRef, StrongFileRef, WeakDirRef, Directory, FSNode, File, FileDirectory};
 
 
 /// A struct that represents a node in the VFS 
 pub struct VFSDirectory {
     /// The name of the directory
-    name: String,
+    pub name: String,
     /// A list of StrongDirRefs or pointers to the child directories   
-    children: BTreeMap<String, FSNode>,
+    pub children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: WeakDirRef,
+    pub parent: WeakDirRef,
 }
 
 impl VFSDirectory {
-    /// Creates a new directory and passes a reference to the new directory created as output
-    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> StrongAnyDirRef {
+    /// Creates a new directory and passes a pointer to the new directory created as output
+    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<StrongAnyDirRef, &'static str> {
+        // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
+        let parent_copy = Weak::clone(&parent_pointer);
         let directory = VFSDirectory {
             name: name,
             children: BTreeMap::new(),
             parent: parent_pointer,
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        dir_ref
+        // create a copy of the newly created directory so we can return it
+        let dir_ref_copy = Arc::clone(&dir_ref);
+        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
+        strong_parent.lock().insert_child(FSNode::Dir(dir_ref))?;
+        return Ok(dir_ref_copy)
     }
 }
 
 impl Directory for VFSDirectory {
-    fn add_fs_node(&mut self, new_fs_node: FSNode) -> Result<(), &'static str> {
-        match new_fs_node {
-            FSNode::Dir(dir) => {
-                let name = dir.lock().get_name().clone();
-                self.children.insert(name, FSNode::Dir(dir));
-                },
-            FSNode::File(file) => {
-                let name = file.lock().get_name().clone();
-                self.children.insert(name, FSNode::File(file));
-                },
-        }
-        Ok(())
+    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str> {
+        // gets the name of the child node to be added
+        let name = child.get_name();
+        self.children.insert(name, child);
+        return Ok(())
     }
 
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
@@ -93,10 +92,6 @@ impl FileDirectory for VFSDirectory {
             None => Err("could not upgrade parent")
         }
     }
-
-    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = parent_pointer;
-    }
 }
 
 pub struct VFSFile {
@@ -111,13 +106,21 @@ pub struct VFSFile {
 }
 
 impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> VFSFile {
-        VFSFile {
+    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> Result<StrongFileRef, &'static str>{
+        // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
+        let parent_copy = Weak::clone(&parent);
+        let file = VFSFile {
             name: name, 
             size: size, 
             contents: contents,
             parent: parent
-        }
+        };
+        let file_pointer = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
+        // create a copy of the newly created directory so we can return it
+        let file_pointer_copy = Arc::clone(&file_pointer);
+        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
+        strong_parent.lock().insert_child(FSNode::File(file_pointer))?;
+        return Ok(file_pointer_copy)
     }
 }
 
@@ -140,9 +143,5 @@ impl FileDirectory for VFSFile {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")
         }
-    }
-
-    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = parent_pointer
     }
 }

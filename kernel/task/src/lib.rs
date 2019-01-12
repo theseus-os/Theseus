@@ -46,6 +46,7 @@ extern crate fs_node;
 extern crate path;
 extern crate x86_64;
 extern crate spin;
+extern crate memfs;
 
 #[cfg(runqueue_state_spill_evaluation)]
 use spin::Once;

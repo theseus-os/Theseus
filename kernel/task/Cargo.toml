@@ -52,5 +52,8 @@ path = "../path"
 [dependencies.vfs_node]
 path = "../vfs_node"
 
+[dependencies.memfs]
+path = "../memfs"
+
 [lib]
 crate-type = ["rlib"]

@@ -11,12 +11,17 @@ extern crate fs_node;
 extern crate memory;
 extern crate irq_safety;
 
-use alloc::vec::Vec;
+
+// use alloc::vec::Vec;1
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{StrongAnyDirRef, WeakDirRef, File, FileDirectory};
 use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
+use alloc::sync::{Arc, Weak};
+use spin::Mutex;
+use alloc::boxed::Box;
+use fs_node::FSNode;
 
 
 pub struct MemFile {
@@ -32,7 +37,8 @@ pub struct MemFile {
 
 impl MemFile {
     /// Combines file creation and file write into one operation
-    pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<MemFile, &'static str> {
+    pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<(), &'static str> {
+        let parent_copy = Weak::clone(&parent); // so we can later add a the newly created file to the parent
         // Obtain the active kernel page table
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
         if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
@@ -47,12 +53,16 @@ impl MemFile {
                 dest_slice.copy_from_slice(contents); // writes the desired contents into the correct area in the mapped page
             }
             // create and return the newly create MemFile
-            return Ok(MemFile {
+            let new_file = MemFile {
                 name: name, 
                 size: contents.len(),
                 contents: mapped_pages,
                 parent: parent
-            })
+            };
+            let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
+            let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
+            strong_parent.lock().insert_child(FSNode::File(boxed_file))?;
+            return Ok(())
         }
         return Err("could not get active table");
     }
@@ -106,9 +116,5 @@ impl FileDirectory for MemFile {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")
         }
-    }
-
-    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        self.parent = parent_pointer
     }
 }

@@ -36,7 +36,7 @@ pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 pub trait FileDirectory {
     /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        let mut path = String::from("tasks");
+        let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
             return path;
@@ -62,7 +62,6 @@ pub trait FileDirectory {
             Err(err) => return Err(err)
         }
     }
-    fn set_parent(&mut self, parent_pointer: WeakDirRef); // DON'T CALL THIS (add_fs_node performs this function)
 }
 
 // Traits for files, implementors of File must also implement FileDirectory
@@ -76,13 +75,47 @@ pub trait File : FileDirectory {
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
-    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str>;
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str>; 
+    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str>;
     fn list_children(&mut self) -> Vec<String>;
 }
 
 /// Allows us to return a generic type that can be matched by the caller to extract the underlying type
+#[derive(Clone)]
 pub enum FSNode {
     File(StrongFileRef),
     Dir(StrongAnyDirRef),
 }
+
+// allows us to call methods directly on an enum so we don't have to match on the underlying type
+impl FileDirectory for FSNode {
+    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    fn get_path_as_string(&self) -> String {
+        return match self {
+            FSNode::File(file) => file.lock().get_path_as_string(),
+            FSNode::Dir(dir) => dir.lock().get_path_as_string(),
+        };
+    }
+    fn get_name(&self) -> String {
+        return match self {
+            FSNode::File(file) => file.lock().get_name(),
+            FSNode::Dir(dir) => dir.lock().get_name(),
+        };
+    }
+    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self {
+            FSNode::File(file) => file.lock().get_parent_dir(),
+            FSNode::Dir(dir) => dir.lock().get_parent_dir(),
+        };
+    }
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
+        return match self {
+            FSNode::File(file) => file.lock().get_self_pointer(),
+            FSNode::Dir(dir) => dir.lock().get_self_pointer(),
+        };
+    }
+}
+
+// impl Copy for FSNode {
+
+// }

@@ -1,5 +1,5 @@
 [package]
-name = "in_memory_node"
+name = "memfs"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
 description = "contains the MappedPages-backed implementation of the fs_node traits"

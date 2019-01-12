@@ -26,9 +26,8 @@ pub fn main(args: Vec<String>) -> isize {
                     let locked_task = &taskref.lock();
                     let curr_env = locked_task.env.lock();
                     Arc::clone(&curr_env.working_dir)};
-                let new_dir = VFSDirectory::new_dir(dir_name.to_string(), Arc::downgrade(&curr_dir));
-                match curr_dir.lock().add_fs_node(FSNode::Dir(new_dir)) {
-                    Ok(()) => { },
+                let _new_dir = match VFSDirectory::new_dir(dir_name.to_string(), Arc::downgrade(&curr_dir)) {
+                    Ok(dir) => dir,
                     Err(err) => {println!("{}", err);
                                 return -1;}
                 };

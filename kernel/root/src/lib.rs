@@ -9,7 +9,7 @@
 #[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate fs_node;
-extern crate in_memory_node;
+extern crate memfs;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -32,10 +32,7 @@ lazy_static! {
         let test_string = String::from("TESTINGINMEMORY");
         let strongRoot = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
         let mut test_bytes =  test_string.as_bytes().to_vec();
-        let file = in_memory_node::MemFile::new(String::from("testfile"), &mut test_bytes ,Arc::downgrade(&Arc::clone(&strongRoot))).unwrap();
-        let boxed_file = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
-        strongRoot.lock().add_fs_node(FSNode::File(boxed_file)).unwrap();
-
+        memfs::MemFile::new(String::from("testfile"), &mut test_bytes ,Arc::downgrade(&Arc::clone(&strongRoot))).unwrap();
         (String::from("/root"), strongRoot)
 
     };
@@ -54,18 +51,11 @@ pub struct RootDirectory {
 }
 
 impl Directory for RootDirectory {
-    fn add_fs_node(&mut self, new_fs_node: FSNode) -> Result<(), &'static str> {
-        match new_fs_node {
-            FSNode::Dir(dir) => {
-                let name = dir.lock().get_name().clone();
-                self.children.insert(name, FSNode::Dir(dir));
-                },
-            FSNode::File(file) => {
-                let name = file.lock().get_name().clone();
-                self.children.insert(name, FSNode::File(file));
-                },
-        }
-        Ok(())
+    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str> {
+        // gets the name of the child node to be added
+        let name = child.get_name();
+        self.children.insert(name, child);
+        return Ok(())
     }
 
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
@@ -106,10 +96,5 @@ impl FileDirectory for RootDirectory {
 
     fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
         return Ok(get_root());
-    }
-
-    fn set_parent(&mut self, parent_pointer: WeakDirRef) {
-        // root doesn't have a parent
-        return;
     }
 }
