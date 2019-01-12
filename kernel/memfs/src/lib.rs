@@ -61,7 +61,7 @@ impl MemFile {
             };
             let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
             let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-            strong_parent.lock().insert_child(FSNode::File(boxed_file))?;
+            strong_parent.lock().insert_child(FSNode::File(boxed_file))?; // adds the newly created file to the tree
             return Ok(())
         }
         return Err("could not get active table");
