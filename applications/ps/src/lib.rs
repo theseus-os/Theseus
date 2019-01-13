@@ -34,7 +34,7 @@ pub fn main(args: Vec<String>) -> isize {
         println!("{0:<5}  {1}", "ID", "NAME");
     }
     else {
-        println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6:<18} {7:<18} {8}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "WEIGHTED_RUNTIME", "CONTEXT_SWITCHES", "NAME");
+        println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "NAME");
     }
 
     // Print all tasks
@@ -45,8 +45,8 @@ pub fn main(args: Vec<String>) -> isize {
         let task = taskref.lock();
         let name = &task.name;
         let priority =  &task.priority.map(|priority| format!("{}", priority)).unwrap_or(String::from("-"));
-        let weighted_runtime = &task.weighted_runtime;
-        let context_switches = &task.times_picked;
+        //let weighted_runtime = &task.weighted_runtime;
+        //let context_switches = &task.times_picked;
         let runstate = match &task.runstate {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",
@@ -65,8 +65,8 @@ pub fn main(args: Vec<String>) -> isize {
         }
         else {
             task_string.push_str(
-                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6:<18} {7:<18} {8}\n", 
-                    id, runstate, cpu, pinned, task_type, priority, weighted_runtime, context_switches, name)
+                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6}\n", 
+                    id, runstate, cpu, pinned, task_type, priority, name)
                     //id, runstate, cpu, pinned, task_type, name)
             );
         }

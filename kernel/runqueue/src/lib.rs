@@ -55,8 +55,25 @@ impl PriorityTaskRef {
         priority_taskref
     }
 
+    pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
+        priority_task_ref.map(|m| m.taskref)
+    }
+
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()
+    }
+
+    pub fn get_weight(&self) -> u32{
+        self.weighted_runtime
+    }
+
+    pub fn update_weight(&mut self, weight: u32) -> (){
+        self.weighted_runtime = weight;
+        ()
+    }
+
+    pub fn increase_times_picked(&mut self) -> (){
+        self.times_picked = self.times_picked + 1;
     }
 }
 
@@ -85,10 +102,6 @@ pub trait RunQueue_trait {
     fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str>;
 
     fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str>;
-
-    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
-    fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef>;
 
 }
 
@@ -120,8 +133,31 @@ impl RunQueue {
         }).map(|m| m.taskref)
     }
 
-    pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
-        priority_task_ref.map(|m| m.taskref)
+    pub fn update_and_move_to_end(&mut self, index: usize, weight : u32) -> Option<TaskRef> {
+        self.queue.remove(index).map(|mut taskref| {
+            {
+                taskref.update_weight(weight);
+            }
+            {
+                taskref.increase_times_picked();
+            }
+            self.queue.push_back(taskref.clone());
+            taskref
+        }).map(|m| m.taskref)
+    }
+
+    pub fn remove_from_queue(&mut self, index: usize) -> Option<PriorityTaskRef> {
+        self.queue.remove(index)
+    }
+
+    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
+    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
+        self.queue.iter()
+    }
+
+    pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
+        self.queue.get(index)
     }
 }
 
@@ -297,11 +333,7 @@ impl RunQueue_trait for RunQueue {
     }
 
 
-    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
-    fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
-        self.queue.iter()
-    }
+    
 
     
 

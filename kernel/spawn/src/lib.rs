@@ -176,7 +176,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         new_task.kstack = Some(kstack);
         new_task.runstate = RunState::Runnable; // ready to be scheduled in
         new_task.priority = self.set_priority;
-        new_task.weighted_runtime = 0;
+        //new_task.weighted_runtime = 0;
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);

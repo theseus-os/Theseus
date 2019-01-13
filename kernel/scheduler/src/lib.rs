@@ -38,30 +38,6 @@ pub fn schedule() -> bool {
         }
     };
 
-    
-    
-    // same scoping reasons as above: to release the lock around current_task
-    {
-        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-                                            .lock_mut().deref_mut() as *mut Task; 
-    }
-
-
-    //if current_task == next_task {
-        // no need to switch if the chosen task is the same as the current task
-    //    return false;
-    //}
-
-    // we want mutable references to mutable tasks
-    let curr = unsafe {&mut *current_task };
-
-    let curr_priority = curr.priority.unwrap() as u32;
-
-    //We update the runtime of the current running task
-    //Ideally this should be curr.weighted_runtime = curr.weighted_runtime + timeslice / (curr_priority);
-    //Since timeslice is constant we replaced it with a constant
-    curr.weighted_runtime = curr.weighted_runtime + 1000 / (curr_priority + 1);
-
     if let Some(selected_next_task) = scheduler_priority::select_next_task(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
@@ -74,40 +50,22 @@ pub fn schedule() -> bool {
         // keep the same current task
         return false;
     }
+    
+    // same scoping reasons as above: to release the lock around current_task
+    {
+        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
+                                            .lock_mut().deref_mut() as *mut Task; 
+    }
 
     if current_task == next_task {
         // no need to switch if the chosen task is the same as the current task
         return false;
     }
 
+    // we want mutable references to mutable tasks
+    let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
+
     // trace!("BEFORE TASK_SWITCH CALL (current={}), interrupts are {}", current_taskid, ::interrupts::interrupts_enabled());
-
-    let (next) = unsafe {&mut *next_task};
-
-    //We update the minimum weighted run time based on the task we picked
-    //If minimum weighted run time of run queue is less than weighted run time of next task we update the minimum weighted run time of run queue
-    //If weighted run time of next task is less than minimum weighted runtime of runqueue then we update the weighted runtime of next task
-    //This is to prevent a task blocked for long period hogging the core 
-    {
-        let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-            Some(rq) => rq.write(),
-            _ => {
-                debug!("BUG: schedule(): couldn't get runqueue for core {}", apic_id); 
-                return false;
-            }
-        };
-        let runqueue_weighted_min_runtime = runqueue_locked.get_weighted_min_runtime();
-        if(runqueue_weighted_min_runtime < next.weighted_runtime){
-            runqueue_locked.update_weighted_min_runtime(next.weighted_runtime);
-        }
-        else{
-            next.weighted_runtime = runqueue_weighted_min_runtime;
-        }
-
-    }
-
-    //We update the number of context switches
-    next.times_picked = next.times_picked + 1;
 
     curr.task_switch(next, apic_id); 
 
@@ -116,3 +74,4 @@ pub fn schedule() -> bool {
  
     true
 }
+

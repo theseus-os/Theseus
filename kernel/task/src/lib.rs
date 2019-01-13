@@ -224,17 +224,14 @@ pub struct Task {
 
     /// The priority level of the task. 40 = highest priority, 1 = lowest priority
     pub priority: Option<u8>,
-    /// Weighted runtime of the task. Used as scheduling metric
-    pub weighted_runtime: u32,
-    /// Number of context switches picking the current task
-    pub times_picked: u32,
+
 
 }
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}, priority: {:?}, weighted_runtime: {:?}}}", 
-               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core, self.priority, self.weighted_runtime)
+        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}, priority: {:?}}}", 
+               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core, self.priority)
     }
 }
 
@@ -274,8 +271,6 @@ impl Task {
             simd: false,
 
             priority: Some(0),
-            weighted_runtime: 0,
-            times_picked: 0,
         }
     }
 
