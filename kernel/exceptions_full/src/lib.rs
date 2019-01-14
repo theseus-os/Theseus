@@ -7,7 +7,7 @@
 extern crate x86_64;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_round_robin;
+extern crate runqueue_priority;
 extern crate apic;
 extern crate pmu_x86;
 #[macro_use] extern crate log;
@@ -17,7 +17,7 @@ extern crate pmu_x86;
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
 use runqueue::RunQueueTrait;
-use runqueue_round_robin::RunQueue;
+use runqueue_priority::RunQueue;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 

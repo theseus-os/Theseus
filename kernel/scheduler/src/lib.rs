@@ -38,7 +38,7 @@ pub fn schedule() -> bool {
         }
     };
 
-    if let Some(selected_next_task) = scheduler_round_robin::select_next_task(apic_id) {
+    if let Some(selected_next_task) = scheduler_priority::select_next_task(apic_id) {
         next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
     }
     else {

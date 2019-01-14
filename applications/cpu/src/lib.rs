@@ -7,14 +7,14 @@ extern crate apic;
 extern crate getopts;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_round_robin;
+extern crate runqueue_priority;
 
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use apic::get_lapics;
 use runqueue::RunQueueTrait;
-use runqueue_round_robin::RunQueue;
+use runqueue_priority::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

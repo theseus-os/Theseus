@@ -15,7 +15,7 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_round_robin;
+extern crate runqueue_priority;
 extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
@@ -36,7 +36,7 @@ use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueueTrait;
-use runqueue_round_robin::RunQueue;
+use runqueue_priority::RunQueue;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;

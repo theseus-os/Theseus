@@ -25,8 +25,8 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.runqueue_round_robin]
-path = "../../kernel/runqueue_round_robin"
+[dependencies.runqueue_priority]
+path = "../../kernel/runqueue_priority"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

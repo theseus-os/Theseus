@@ -10,7 +10,7 @@ extern crate log;
 extern crate task;
 extern crate spawn;
 extern crate runqueue;
-extern crate runqueue_round_robin;
+extern crate runqueue_priority;
 extern crate getopts;
 extern crate acpi;
 
@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use getopts::{Matches, Options};
 use acpi::get_hpet;
 use runqueue::RunQueueTrait;
-use runqueue_round_robin::RunQueue;
+use runqueue_priority::RunQueue;
 use task::{Task, TaskRef};
 
 

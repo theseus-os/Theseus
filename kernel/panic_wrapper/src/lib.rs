@@ -12,14 +12,14 @@ extern crate memory;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_round_robin;
+extern crate runqueue_priority;
 
 
 use core::panic::PanicInfo;
 use alloc::string::String;
 use task::{KillReason, PanicInfoOwned};
 use runqueue::RunQueueTrait;
-use runqueue_round_robin::RunQueue;
+use runqueue_priority::RunQueue;
 
 
 /// performs the standard panic handling routine, which involves the following:
