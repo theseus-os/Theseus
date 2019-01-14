@@ -31,19 +31,21 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone)]
-pub struct RoundRobinTaskRef{
+pub struct PriorityTaskRef{
     taskref: TaskRef,
+    weighted_runtime: u32,
     times_picked: u32,
 }
 
-impl RoundRobinTaskRef {
+impl PriorityTaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     /// 
     /// Also establishes the `TaskLocalData` struct that will be used 
     /// to determine the current `Task` on each processor core.
-    pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
-        let round_robin_taskref = RoundRobinTaskRef {
+    pub fn new(taskref: TaskRef) -> PriorityTaskRef {
+        let priority_taskref = PriorityTaskRef {
             taskref: taskref,
+            weighted_runtime: 0,
             times_picked: 0,
         };
         //let tld = TaskLocalData {
@@ -52,15 +54,24 @@ impl RoundRobinTaskRef {
         //};
         //let tld_ptr = Box::into_raw(Box::new(tld));
         //taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
-        round_robin_taskref
+        priority_taskref
     }
 
-    pub fn get_task_ref(round_robin_taskref: Option<RoundRobinTaskRef>) -> Option<TaskRef> {
-        round_robin_taskref.map(|m| m.taskref)
+    pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
+        priority_task_ref.map(|m| m.taskref)
     }
 
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()
+    }
+
+    pub fn get_weight(&self) -> u32{
+        self.weighted_runtime
+    }
+
+    pub fn update_weight(&mut self, weight: u32) -> (){
+        self.weighted_runtime = weight;
+        ()
     }
 
     pub fn increase_times_picked(&mut self) -> (){
@@ -71,11 +82,22 @@ impl RoundRobinTaskRef {
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
-    queue: VecDeque<RoundRobinTaskRef>,
+    queue: VecDeque<PriorityTaskRef>,
+    minimum_weighted_runtime: u32,
 }
 
 impl RunQueue {
-    
+    /// Update minimum weighted runtime of tasks in this `RunQueue`.
+    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
+    pub fn update_weighted_min_runtime(&mut self, runtime: u32) -> () {
+        self.minimum_weighted_runtime = runtime;
+    }
+    /// Returns minimum weighted runtime of tasks in this `RunQueue`.
+    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
+    pub fn get_weighted_min_runtime(&self) -> u32 {
+        return self.minimum_weighted_runtime;
+    }
+
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
@@ -85,14 +107,31 @@ impl RunQueue {
         }).map(|m| m.taskref)
     }
 
-    pub fn remove_from_queue(&mut self, index: usize) -> Option<RoundRobinTaskRef> {
+    pub fn update_and_move_to_end(&mut self, index: usize, weight : u32) -> Option<TaskRef> {
+        self.queue.remove(index).map(|mut taskref| {
+            {
+                taskref.update_weight(weight);
+            }
+            {
+                taskref.increase_times_picked();
+            }
+            self.queue.push_back(taskref.clone());
+            taskref
+        }).map(|m| m.taskref)
+    }
+
+    pub fn remove_from_queue(&mut self, index: usize) -> Option<PriorityTaskRef> {
         self.queue.remove(index)
     }
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
     // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
-    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
+    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
         self.queue.iter()
+    }
+
+    pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
+        self.queue.get(index)
     }
 }
 
@@ -103,6 +142,7 @@ impl RunQueueTrait for RunQueue {
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
+            minimum_weighted_runtime: 0,
         });
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -182,8 +222,8 @@ impl RunQueueTrait for RunQueue {
         }
 
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
-        let round_robin_taskref = RoundRobinTaskRef::new(task);
-        self.queue.push_back(round_robin_taskref);
+        let priority_task_ref = PriorityTaskRef::new(task);
+        self.queue.push_back(priority_task_ref);
         
         #[cfg(single_simd_task_optimization)]
         {   

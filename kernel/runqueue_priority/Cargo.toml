@@ -1,0 +1,39 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "runqueue_priority"
+description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.runqueue]
+path = "../runqueue"
+
+
+## This should be dependent upon 'cfg(single_simd_task_optimization)',
+## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
+## Therefore, it has to be unconditionally included.
+[dependencies.single_simd_task_optimization]
+path = "../single_simd_task_optimization"
+
+
+[lib]
+crate-type = ["rlib"]
