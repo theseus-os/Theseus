@@ -7,13 +7,15 @@ extern crate irq_safety;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
+extern crate runqueue_round_robin;
 
 
 use core::ops::DerefMut;
 use irq_safety::{disable_interrupts};
 use apic::get_my_apic_id;
 use task::{Task, TaskRef, get_my_current_task};
-use runqueue::{RunQueue, RunQueue_trait};
+use runqueue::RunQueueTrait;
+use runqueue_round_robin::RunQueue;
 
 
 

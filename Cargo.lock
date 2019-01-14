@@ -172,6 +172,7 @@ dependencies = [
  "apic 0.1.0",
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -299,6 +300,7 @@ dependencies = [
  "pmu_x86 0.1.0",
  "print 0.1.0",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "task 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
@@ -500,6 +502,7 @@ version = "0.1.0"
 dependencies = [
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -761,6 +764,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "task 0.1.0",
 ]
 
@@ -900,6 +904,7 @@ dependencies = [
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "spawn 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
@@ -927,6 +932,19 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "single_simd_task_optimization 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "runqueue_round_robin"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
  "single_simd_task_optimization 0.1.0",
  "task 0.1.0",
 ]
@@ -966,6 +984,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -978,6 +997,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -1073,6 +1093,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git)",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "scheduler 0.1.0",
  "task 0.1.0",
  "tss 0.1.0",
@@ -1154,6 +1175,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "print 0.1.0",
  "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",

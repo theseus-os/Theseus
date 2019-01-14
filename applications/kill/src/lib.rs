@@ -5,12 +5,14 @@
 
 extern crate task;
 extern crate runqueue;
+extern crate runqueue_round_robin;
 extern crate getopts;
 
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
-use runqueue::{RunQueue, RunQueue_trait};
+use runqueue::RunQueueTrait;
+use runqueue_round_robin::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {

@@ -24,5 +24,8 @@ path = "../task"
 [dependencies.runqueue]
 path = "../runqueue"
 
+[dependencies.runqueue_round_robin]
+path = "../runqueue_round_robin"
+
 [lib]
 crate-type = ["rlib"]

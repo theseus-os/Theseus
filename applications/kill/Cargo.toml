@@ -16,5 +16,8 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
+[dependencies.runqueue_round_robin]
+path = "../../kernel/runqueue_round_robin"
+
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
