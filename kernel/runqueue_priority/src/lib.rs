@@ -45,7 +45,7 @@ impl PriorityTaskRef {
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
-            weighted_runtime: 0,
+            weighted_runtime: 1000,
             times_picked: 0,
         };
         //let tld = TaskLocalData {
@@ -132,6 +132,14 @@ impl RunQueue {
 
     pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
         self.queue.get(index)
+    }
+
+    pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
+        self.queue.get_mut(index)
+    }
+
+    pub fn runqueue_length(&self) -> usize{
+        self.queue.len()
     }
 }
 
