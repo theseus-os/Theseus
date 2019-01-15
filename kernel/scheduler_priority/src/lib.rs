@@ -255,6 +255,7 @@ fn assign_weights(apic_id: u8) -> bool  {
         total_priorities = total_priorities + t.priority.unwrap_or(0) as u32;
         
         
+        
         //debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
         //break; 
     }
@@ -262,6 +263,14 @@ fn assign_weights(apic_id: u8) -> bool  {
         debug!("total priorities(): AP {} priorities {}", apic_id, total_priorities);
     }
     //for (i, taskref) in runqueue_locked.iter().enumerate() {
+
+    let epcoh = if total_priorities < 100 {
+                100
+            }
+            else {
+                total_priorities
+            };
+
     let mut i = 0;
     let mut len = 0;
     {
