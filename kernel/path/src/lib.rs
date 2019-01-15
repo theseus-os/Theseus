@@ -11,7 +11,8 @@ extern crate vfs_node;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use fs_node::{FSNode, StrongAnyDirRef};
+use fs_node::{FSNode, StrongDirRef};
+use alloc::boxed::Box;
 
 /// A structure that represents a file  
 #[derive(Debug, Clone)]
@@ -27,11 +28,16 @@ impl Path {
         }
     }
     
-    /// Returns the components of the path 
+    /// Returns the components of the path
     pub fn components(&self) -> Vec<String> {
         let components = self.path.split("/").map(|s| s.to_string()).filter(|x| x != "").collect();
         return components;
-    } 
+    }  
+    // pub fn components<'a>(&'a self) -> Box<Iterator<Item=String> + 'a> {
+    //     let components = self.path.split("/").map(|x| x.to_string()).filter(|x| x != "");
+    //     return Box::new(components);
+    // } 
+
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
     fn canonicalize(&self, current_path: &Path) -> Path {
@@ -102,7 +108,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongAnyDirRef) -> Result<FSNode, &'static str> {
+    pub fn get(&self, wd: &StrongDirRef) -> Result<FSNode, &'static str> {
         let current_path;
         { current_path = Path::new(wd.lock().get_path_as_string());}
         

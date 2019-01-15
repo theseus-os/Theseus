@@ -18,7 +18,7 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{StrongAnyDirRef, StrongFileRef, WeakDirRef, Directory, FSNode, File, FileDirectory};
+use fs_node::{StrongDirRef, StrongFileRef, WeakDirRef, Directory, FSNode, File, FileDirectory};
 
 
 /// A struct that represents a node in the VFS 
@@ -33,7 +33,7 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<StrongAnyDirRef, &'static str> {
+    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<StrongDirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let parent_copy = Weak::clone(&parent_pointer);
         let directory = VFSDirectory {
@@ -86,7 +86,7 @@ impl FileDirectory for VFSDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
         return match self.parent.upgrade() {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")
@@ -138,7 +138,7 @@ impl FileDirectory for VFSFile {
     }
     
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
         return match self.parent.upgrade() {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")

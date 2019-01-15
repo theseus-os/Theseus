@@ -2,7 +2,7 @@
 #![feature(alloc)]
 
 /// This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
-/// Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
+/// Currently, the read and write operations of the MemFile follows the interface of the std::io read/write operations of the Rust standard library
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -15,7 +15,7 @@ extern crate irq_safety;
 // use alloc::vec::Vec;1
 use core::ops::DerefMut;
 use alloc::string::String;
-use fs_node::{StrongAnyDirRef, WeakDirRef, File, FileDirectory};
+use fs_node::{StrongDirRef, WeakDirRef, File, FileDirectory};
 use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
 use alloc::sync::{Arc, Weak};
@@ -29,7 +29,7 @@ pub struct MemFile {
     name: String,
     // The size of the file in bytes
     size: usize,
-    /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
+    /// The contents or a seqeunce of bytes as a file: this primitive can be changed into a more complex struct as files become more complex
     contents: MappedPages,
     /// A weak reference to the parent directory
     parent: WeakDirRef,
@@ -111,7 +111,7 @@ impl FileDirectory for MemFile {
     }
     
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
         return match self.parent.upgrade() {
             Some(parent) => Ok(parent),
             None => Err("could not upgrade parent")

@@ -25,8 +25,7 @@ use core::any::Any;
 /// An strong reference (Arc) and a Mutex wrapper around the generic Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 
 /// concrete implementations of Directories 
-pub type StrongDirRef<D: Directory + Send> = Arc<Mutex<D>>;
-pub type StrongAnyDirRef = StrongDirRef<Box<Directory + Send>>;
+pub type StrongDirRef = Arc<Mutex<Box<Directory + Send>>>;
 
 /// An weak reference (Weak) and a Mutex wrapper around VFSDirectory
 pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
@@ -34,7 +33,7 @@ pub type StrongFileRef = Arc<Mutex<Box<File + Send>>>;
 
 /// Traits that both files and directories share
 pub trait FileDirectory {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir() {
@@ -43,9 +42,12 @@ pub trait FileDirectory {
         }
         return path;
     }
+    /// Returns the name of the File or Directory
     fn get_name(&self) -> String;
-    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str>;
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
+    /// Returns the parent of the File or Directory in the form of an Arc Mutex
+    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str>;
+    /// Returns a strong reference to itself
+    fn get_self_pointer(&self) -> Result<StrongDirRef, &'static str> {
         let parent = match self.get_parent_dir() {
             Ok(parent) => parent,
             Err(err) => return Err(err)
@@ -84,12 +86,12 @@ pub trait Directory : FileDirectory + Send {
 #[derive(Clone)]
 pub enum FSNode {
     File(StrongFileRef),
-    Dir(StrongAnyDirRef),
+    Dir(StrongDirRef),
 }
 
-// allows us to call methods directly on an enum so we don't have to match on the underlying type
+// Allows us to call methods directly on an enum so we don't have to match on the underlying type
 impl FileDirectory for FSNode {
-    /// Functions as pwd command in bash, recursively gets the absolute pathname as a String
+    /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         return match self {
             FSNode::File(file) => file.lock().get_path_as_string(),
@@ -102,20 +104,16 @@ impl FileDirectory for FSNode {
             FSNode::Dir(dir) => dir.lock().get_name(),
         };
     }
-    fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
         return match self {
             FSNode::File(file) => file.lock().get_parent_dir(),
             FSNode::Dir(dir) => dir.lock().get_parent_dir(),
         };
     }
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
+    fn get_self_pointer(&self) -> Result<StrongDirRef, &'static str> {
         return match self {
             FSNode::File(file) => file.lock().get_self_pointer(),
             FSNode::Dir(dir) => dir.lock().get_self_pointer(),
         };
     }
 }
-
-// impl Copy for FSNode {
-
-// }
