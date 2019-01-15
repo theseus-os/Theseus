@@ -148,16 +148,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     device_manager::init(input_event_queue_producer)?;
 
 
-    #[cfg(test_ota_update_client)]
-    {
-        if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
-            spawn::KernelTaskBuilder::new(ota_update_client::init, iface)
-                .name(String::from("ota_update_client"))
-                .spawn()?;
-        } else {
-            error!("captain: Couldn't run ota_update_client test because no e1000 NIC exists.");
-        }
-    }
+    // #[cfg(test_ota_update_client)]
+    // {
+    //     if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
+    //         spawn::KernelTaskBuilder::new(ota_update_client::init, iface)
+    //             .name(String::from("ota_update_client"))
+    //             .spawn()?;
+    //     } else {
+    //         error!("captain: Couldn't run ota_update_client test because no e1000 NIC exists.");
+    //     }
+    // }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]

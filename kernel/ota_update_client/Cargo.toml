@@ -6,7 +6,6 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 httparse = { version = "1.3.3", default-features = false }
 sha3 = { version = "0.8.1", default-features = false }

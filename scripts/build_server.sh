@@ -49,10 +49,10 @@ cp $MODULES_DIR/*.o $NEW_DIR/
 
 
 ### calculate the checksums for each of the new module files
-mkdir -p $NEW_DIR/checksum
+mkdir -p $NEW_DIR/checksums
 cd $NEW_DIR/
 for f in *.o ; do
-  rhash --sha3-512 $f -o $NEW_DIR/checksum/$(basename $f).sha512
+  rhash --sha3-512 $f -o $NEW_DIR/checksums/$(basename $f).sha512
 done
 
 ### create a simple listing of all module files

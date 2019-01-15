@@ -10,7 +10,6 @@
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate spin;
 extern crate acpi;
 extern crate owning_ref;
 extern crate spawn;
@@ -22,18 +21,16 @@ extern crate rand;
 #[macro_use] extern crate http_client;
 
 
-use core::convert::TryInto;
 use core::str;
 use alloc::{
     vec::Vec,
+    collections::BTreeSet,
     string::{String, ToString},
 };
-use spin::Once;
 use acpi::get_hpet;
 use smoltcp::{
     wire::IpAddress,
-    socket::{SocketSet, TcpSocket, TcpSocketBuffer},
-    time::Instant
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
@@ -43,7 +40,7 @@ use rand::{
     RngCore,
     rngs::SmallRng
 };
-use http_client::{ConnectedTcpSocket, send_request, millis_since, check_http_request, poll_iface};
+use http_client::{HttpResponse, ConnectedTcpSocket, send_request, millis_since, check_http_request, poll_iface};
 
 
 /// The IP address of the update server.
@@ -69,6 +66,12 @@ const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
 /// which contains the names of all crate object files that were built.  
 const LISTING_FILE_NAME: &'static str = "listings.txt";
 
+/// The name of the directory containing the checksums of each crate object file
+/// inside of a given update build.
+const CHECKSUMS_DIR_NAME: &'static str = "checksums";
+
+/// The file extension that is appended onto each crate object file's checksum file.
+const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
 
 
     // TODO: real update sequence: 
@@ -80,6 +83,32 @@ const LISTING_FILE_NAME: &'static str = "listings.txt";
 
 
 
+/// A file that has been downloaded over the network, 
+/// including its name and a byte array containing its contents.
+pub struct DownloadedFile {
+    pub name: String,
+    pub content: HttpResponse,
+}
+
+
+/// An enum used for specifying which crate files to download.
+/// To download all crates, pass an empty `Exclude` set.
+pub enum CrateSet {
+    /// The set of crates to include, i.e., only these crates will be downloaded.
+    Include(BTreeSet<String>),
+    /// The set of crates to exclude, i.e., all crates except for these will be downloaded.
+    Exclude(BTreeSet<String>),
+}
+impl CrateSet {
+    /// Returns true if this `CrateSet` specifies that the given `crate_file_name` is included.
+    pub fn includes(&self, crate_file_name: &str) -> bool {
+        match self {
+            CrateSet::Include(crates_to_include) => crates_to_include.contains(crate_file_name),
+            CrateSet::Exclude(crates_to_exclude) => !crates_to_exclude.contains(crate_file_name),
+        }
+    }
+}
+
 
 /// Connects to the update server over the given network interface
 /// and downloads the list of available update builds.
@@ -88,7 +117,7 @@ pub fn get_available_update_builds(
     iface: &NetworkInterfaceRef
 ) -> Result<Vec<String>, &'static str> {
     let updates_file = download_file(iface, UPDATE_BUILDS_PATH)?;
-    let updates_str = str::from_utf8(&updates_file.bytes)
+    let updates_str = str::from_utf8(updates_file.content.content())
         .map_err(|_e| "couldn't convert received list of update builds into a UTF8 string")?;
 
     Ok(
@@ -97,55 +126,81 @@ pub fn get_available_update_builds(
 }
 
 
-
-/// A file that has been downloaded over the network, 
-/// including its name and a byte array containing its contents.
-pub struct DownloadedFile {
-    pub name: String,
-    pub bytes: Vec<u8>,
-}
-
-
 /// Connects to the update server over the given network interface
-/// and downloads the compiled crate object files from the specified `update_build`. 
+/// and downloads a subset of the compiled crate object files from the specified `update_build`,
+/// based on the provided `crate_set`.
 /// A list of available update builds can be obtained by calling 
 /// `get_available_update_builds()`.
 /// 
 /// # Arguments
 /// * `iface`: a reference to an initialized network interface for sockets to use.
 /// * `update_build`: the string name of the update build that the downloaded crates will belong to.
-/// * `existing_crates`: a list of the existing crate names, i.e., the crates to *not* download.
-///    Passing an an empty list of crates will cause all crates in the given `update_build` to be downloaded.
+/// * `crate_set`: a set of crate name strings that are used as a filter to specify which crates are downloaded.
 /// 
 /// Returns the list of crates (as `DownloadedFile`s) in the given `update_build` that differed 
 /// from the given list of `existing_crates`.
-pub fn download_differing_crates(
+pub fn download_crates(
     iface: &NetworkInterfaceRef, 
     update_build: &str,
-    existing_crates: Vec<String>,
+    crate_set: CrateSet,
 ) -> Result<Vec<DownloadedFile>, &'static str> {
-    
+
     // first, download the update_build's manifest (listing.txt) file
     debug!("ota_update_client: downloading the listing for update_build {:?}", update_build);
-    let listing_file = download_file(iface, format!("{}/{}", update_build, LISTING_FILE_NAME))?;
+    let listing_file = download_file(iface, format!("/{}/{}", update_build, LISTING_FILE_NAME))?;
     
     // Iterate over the list of crate files in the listing, and build a vector of file paths to download. 
     // We need to download all crates that differ from the given list of `existing_crates`, 
     // plus the files containing those crates' sha512 checksums.
+    let files_list = str::from_utf8(listing_file.content.content())
+        .map_err(|_e| "couldn't convert received update listing file into a UTF8 string")?;
 
+    let mut paths_to_download: Vec<String> = Vec::new();
+    for file in files_list.lines()
+        .map(|line| line.trim())
+        .filter(|&line| crate_set.includes(line))
+    {
+        let path = format!("/{}/{}", update_build, file);
+        let path_sha = format!("/{}/{}/{}{}", update_build, CHECKSUMS_DIR_NAME, file, CHECKSUM_FILE_EXTENSION);
+        paths_to_download.push(path);
+        paths_to_download.push(path_sha);
+    }
 
+    let mut crate_object_files = download_files(iface, paths_to_download)?;
 
+    // iterate through each file downloaded, and verify the sha512 hashes
+    for chunk in crate_object_files.chunks(2) {
+        match chunk {
+            [file, hash_file] => {
+                let hash_file_str = str::from_utf8(hash_file.content.content())
+                    .map_err(|_e| "couldn't convert downloaded hash file into a UTF8 string")?;
+                    
+                if let Some(hash_value) = hash_file_str.split_whitespace().next() {
+                    if verify_hash(file.content.content(), hash_value) {
+                        // success! the hash matched, so the file was properly downloaded
+                    } else {
+                        error!("ota_update_client: downloaded file {:?} did not match the expected hash value! Try downloading it again.", file.name);
+                        return Err("ota_update_client: downloaded file did not match the expected hash value");
+                    }
+                } else {
+                    error!("ota_update_client: hash file {:?} had unexpected contents: it should start with a 64-digit hex hash value.", hash_file.name);
+                    return Err("ota_update_client: hash file had unexpected contents");
+                }
+            }
+            _ => {
+                error!("ota_update_client: missing crate object file or hash file for downloaded file pair {:?}, cannot verify file integrity.", 
+                    chunk.iter().next().map(|f| &f.name)
+                );
+                return Err("ota_update_client: missing crate object file or hash file for downloaded file pair");
+            }
+        }
+    }
 
-    // calculate the sha3-512 hash of the HTTP response body (excluding headers)
-    let mut hasher = Sha3_512::new();
-    hasher.input(response.content());
-    let result = hasher.result();
-    info!("ota_update_client: sha3-512 hash of downloaded file: {:x}", result);
+    // now that we've verified all of the hashes, we can just return the crate object files themselves without the hash files
+    crate_object_files.retain(|file| !file.name.ends_with(CHECKSUM_FILE_EXTENSION));
 
-
-    Err("unfinished")
+    Ok(crate_object_files)
 }
-
 
 
 /// A convenience function for downloading just one file. See `download_files()`.
@@ -231,13 +286,14 @@ fn download_files<S: AsRef<str>>(
 
     debug!("ota_update_client: socket connected successfully!");
 
+    let mut downloaded_files: Vec<DownloadedFile> = Vec::with_capacity(absolute_paths.len());
     let last_index = absolute_paths.len() - 1;
     for (i, path) in absolute_paths.iter().enumerate() {
         let is_last_request = i == last_index;
 
         let http_request = {
             let method = "GET";
-            let uri = utf8_percent_encode("/a#hello.o", DEFAULT_ENCODE_SET);
+            let uri = utf8_percent_encode(path.as_ref(), DEFAULT_ENCODE_SET);
             let version = "HTTP/1.1";
             let connection = if is_last_request { "Connection: close" } else { "Connection: keep-alive" };
             format!("{} {} {}\r\n{}\r\n{}\r\n\r\n",
@@ -260,11 +316,17 @@ fn download_files<S: AsRef<str>>(
             send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
         };
 
+        downloaded_files.push(DownloadedFile {
+            name: path.as_ref().into(),
+            content: response,
+        });
     }
 
 
     let mut _loop_ctr = 0;
     let mut issued_close = false;
+    let timeout_millis = 3000; // 3 second timeout
+    let start = hpet_ticks!();
     loop {
         _loop_ctr += 1;
 
@@ -280,12 +342,31 @@ fn download_files<S: AsRef<str>>(
             issued_close = true;
         }
 
+        if socket.state() == TcpState::Closed {
+            break;
+        }
+
         if _loop_ctr % 50000 == 0 {
             debug!("ota_update_client: socket state (looping) is now {:?}", socket.state());
         }
 
+        // check to make sure we haven't timed out
+        if millis_since(start)? > timeout_millis {
+            debug!("ota_update_client: timed out waiting to close socket, closing it manually with an abort.");
+            socket.abort();
+            // Don't break out of the loop here!  we need to let this socket actually send the close msg
+            // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
+            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
+        }
     }
 
-    Ok(())
-    
+    Ok(downloaded_files)
+}
+
+
+/// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.
+/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
+fn verify_hash(content: &[u8], hash: &str) -> bool {
+    let result = Sha3_512::digest(content);
+    hash == format!("{:x}", result)
 }
