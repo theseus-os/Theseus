@@ -115,7 +115,3 @@ impl FileDirectory for FSNode {
         };
     }
 }
-
-// impl Copy for FSNode {
-
-// }

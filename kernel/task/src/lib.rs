@@ -52,6 +52,7 @@ extern crate memfs;
 use spin::Once;
 
 
+
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
@@ -113,6 +114,8 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
+// Variable to initialize the taskfs
+static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
@@ -790,6 +793,12 @@ pub fn create_idle_task(
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
 
+    // one-time initialization of the taskfs
+    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
+        Ok(()) => (),
+        Err(err) => return Err(err)
+    };
+    
     Ok(task_ref)
 }
 
