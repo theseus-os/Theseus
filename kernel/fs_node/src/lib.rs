@@ -44,8 +44,9 @@ pub trait FileDirectory {
     }
     /// Returns the name of the File or Directory
     fn get_name(&self) -> String;
+    /// Returns the strong reference to the parent directory of the File or Directory 
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str>;
-}
+} 
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
