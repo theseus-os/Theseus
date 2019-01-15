@@ -45,7 +45,7 @@ impl PriorityTaskRef {
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
-            weighted_runtime: 100,
+            weighted_runtime: 1,
             times_picked: 0,
         };
         //let tld = TaskLocalData {
