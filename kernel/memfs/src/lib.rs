@@ -38,7 +38,6 @@ pub struct MemFile {
 impl MemFile {
     /// Combines file creation and file write into one operation
     pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<(), &'static str> {
-        let parent_copy = Weak::clone(&parent); // so we can later add a the newly created file to the parent
         // Obtain the active kernel page table
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
         if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
@@ -57,7 +56,7 @@ impl MemFile {
                 name: name, 
                 size: contents.len(),
                 contents: mapped_pages,
-                parent: parent
+                parent: parent.clone()
             };
             let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
             let strong_parent = Weak::upgrade(&parent).ok_or("could not upgrade parent")?;

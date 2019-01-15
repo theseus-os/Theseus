@@ -8,6 +8,7 @@ extern crate task;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
+extern crate root;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -33,9 +34,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
     
-    if matches.free.is_empty() {
-        return 0;
-    }
+
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
@@ -57,7 +56,15 @@ pub fn main(args: Vec<String>) -> isize {
         Arc::clone(&curr_env.working_dir)
     };
 
+    // go to root directory 
+    if matches.free.is_empty() {
+        let root = root::get_root(); 
+        curr_env.lock().set_wd(root);
+        return 0;
+    }
+
     let path = Path::new(matches.free[0].to_string());
+    
     // navigate to the filepath specified by first argument
     match path.get(&curr_wr) {
         Ok(file_dir_enum) => {
