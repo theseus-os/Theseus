@@ -11,7 +11,8 @@ extern crate vfs_node;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use fs_node::{FSNode, StrongAnyDirRef};
+use fs_node::{FSNode, StrongDirRef};
+use alloc::boxed::Box;
 
 /// A structure that represents a file  
 #[derive(Debug, Clone)]
@@ -27,11 +28,15 @@ impl Path {
         }
     }
     
-    /// Returns the components of the path 
-    pub fn components(&self) -> Vec<String> {
-        let components = self.path.split("/").map(|s| s.to_string()).filter(|x| x != "").collect();
-        return components;
-    } 
+    /// Returns the components of the path
+    // pub fn components(&self) -> Vec<String> {
+    //     let components = self.path.split("/").map(|s| s.to_string()).filter(|x| x != "").collect();
+    //     return components;
+    // }  
+    pub fn components<'a>(&'a self) -> Box<Iterator<Item=String> + 'a> {
+        let components = self.path.split("/").map(|x| x.to_string()).filter(|x| x != "");
+        return Box::new(components);
+    }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
     fn canonicalize(&self, current_path: &Path) -> Path {
@@ -39,10 +44,10 @@ impl Path {
         // Push the components of the working directory to the components of the new path
         new_components.extend(current_path.components());
         // Push components of the path to the components of the new path
-        for component in self.components().iter() {
-            if component == &String::from(".") {
+        for component in self.components() {
+            if component == String::from(".") {
                 continue;
-            } else if component == &String::from("..") {
+            } else if component == String::from("..") {
                 new_components.pop();
             } else {
                 new_components.push(component.to_string());
@@ -50,10 +55,10 @@ impl Path {
         }
         // Create the new path from its components 
         let mut new_path = String::new();
-        for component in new_components.iter() {
+        for component in new_components {
             new_path.push_str(&format!("{}/",  component));
         }
-        debug!("canonical {}", new_path.clone());
+        // debug!("canonical {}", new_path.clone());
         return Path::new(new_path);
     }
     
@@ -62,8 +67,8 @@ impl Path {
     pub fn relative(&self, other: &Path) -> Option<Path> {
         let ita = self.components();
         let itb = other.components();
-        let mut ita_iter = ita.iter();
-        let mut itb_iter = itb.iter();
+        let mut ita_iter = ita;
+        let mut itb_iter = itb;
         let mut comps: Vec<String> = Vec::new();
         loop {
             match (ita_iter.next(), itb_iter.next()) {
@@ -76,9 +81,9 @@ impl Path {
                     break;
                 }
                 (None, _) => comps.push("..".to_string()),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => continue,
-                (Some(a), Some(b)) if b == &".".to_string() => comps.push("..".to_string()),
-                (Some(_), Some(b)) if b == &"..".to_string() => return None,
+                (Some(ref a), Some(ref b)) if comps.is_empty() && a == b => continue,
+                (Some(ref a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
+                (Some(_), Some(ref b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
                     comps.push("..".to_string());
                     for _ in itb_iter {
@@ -102,7 +107,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &StrongAnyDirRef) -> Result<FSNode, &'static str> {
+    pub fn get(&self, wd: &StrongDirRef) -> Result<FSNode, &'static str> {
         let current_path;
         { current_path = Path::new(wd.lock().get_path_as_string());}
         
@@ -116,9 +121,9 @@ impl Path {
         };
 
         let mut new_wd = Arc::clone(&wd);
-        debug!("components {:?}", shortest_path.components());
+        // debug!("components {:?}", shortest_path.components());
         let mut counter: isize = -1;
-        for component in shortest_path.components().iter() {
+        for component in shortest_path.components() {
             counter += 1; 
             // Navigate to parent directory
             if component == ".." {
@@ -140,10 +145,16 @@ impl Path {
             else {
                 // this checks the last item in the components to check if it's a file
                 // if no matching file is found, advances to the next match block
-                if counter as usize == shortest_path.components().len() - 1  && shortest_path.components()[0] != ".." { // FIX LATER
+                let first_comp = match shortest_path.components().next() {
+                    Some(comp) => comp, 
+                    None => {
+                        return Err("couldn't get first compoent in path");
+                    }
+                };
+                if counter as usize == shortest_path.components().count() - 1  && first_comp != ".." { // FIX LATER
                     let children = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
                     for child_name in children.iter() {
-                        if child_name == component {
+                        if child_name == &component {
                             match new_wd.lock().get_child(child_name.to_string(), false) {
                                 Ok(child) => match child {
                                     FSNode::File(file) => return Ok(FSNode::File(Arc::clone(&file))),

@@ -5,13 +5,11 @@
 
 extern crate task;
 extern crate getopts;
-extern crate fs_node;
 
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use task::{TASKLIST, RunState};
-use fs_node::File;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -51,7 +49,7 @@ pub fn main(args: Vec<String>) -> isize {
             RunState::Runnable   => "Runnable",
             RunState::Blocked    => "Blocked",
             RunState::Reaped     => "Reaped",
-            _                    => "useExited",
+            _                    => "Exited",
         };
         let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
         let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
