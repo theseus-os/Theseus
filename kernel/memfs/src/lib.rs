@@ -60,7 +60,7 @@ impl MemFile {
                 parent: parent
             };
             let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
-            let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
+            let strong_parent = Weak::upgrade(&parent).ok_or("could not upgrade parent")?;
             strong_parent.lock().insert_child(FSNode::File(boxed_file))?; // adds the newly created file to the tree
             return Ok(())
         }
@@ -112,9 +112,6 @@ impl FileDirectory for MemFile {
     
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
-        return match self.parent.upgrade() {
-            Some(parent) => Ok(parent),
-            None => Err("could not upgrade parent")
-        }
+        self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }

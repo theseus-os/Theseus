@@ -87,10 +87,7 @@ impl FileDirectory for VFSDirectory {
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
-        return match self.parent.upgrade() {
-            Some(parent) => Ok(parent),
-            None => Err("could not upgrade parent")
-        }
+        self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }
 
@@ -139,9 +136,6 @@ impl FileDirectory for VFSFile {
     
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
-        return match self.parent.upgrade() {
-            Some(parent) => Ok(parent),
-            None => Err("could not upgrade parent")
-        }
+        self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }

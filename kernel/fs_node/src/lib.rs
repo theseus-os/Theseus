@@ -105,10 +105,7 @@ impl FileDirectory for FSNode {
         };
     }
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
-        return match self {
-            FSNode::File(file) => file.lock().get_parent_dir(),
-            FSNode::Dir(dir) => dir.lock().get_parent_dir(),
-        };
+        self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
     fn get_self_pointer(&self) -> Result<StrongDirRef, &'static str> {
         return match self {
