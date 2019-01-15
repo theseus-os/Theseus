@@ -1,8 +1,8 @@
 #![no_std]
 #![feature(alloc)]
-/// This crate contains the implementation of the special root directory. The only way that this 
-/// directory implementation differs from VFSDirectory is that there is no parent field (becuase the 
-/// root has no parent directory), and that internal calls to parent will return some type of error value
+//! This crate contains the implementation of the special root directory. The only way that this 
+//! directory implementation differs from VFSDirectory is that there is no parent field (becuase the 
+//! root has no parent directory), and that internal calls to parent will return some type of error value
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;

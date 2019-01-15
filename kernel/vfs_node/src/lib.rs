@@ -1,11 +1,11 @@
 #![no_std]
 #![feature(alloc)]
 
-/// This crate contains a very basic, generic concrete implementation of the Directory
-/// and File traits. 
-/// The VFSDirectory and VFSFile are intended to be used as regular nodes within the filesystem
-/// that require no special functionality as well as for inspiration for creating other concrete implementations
-/// of the Directory and File traits. 
+//! This crate contains a very basic, generic concrete implementation of the Directory
+//! and File traits. 
+//! The VFSDirectory and VFSFile are intended to be used as regular nodes within the filesystem
+//! that require no special functionality as well as for inspiration for creating other concrete implementations
+//!s of the Directory and File traits. 
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;

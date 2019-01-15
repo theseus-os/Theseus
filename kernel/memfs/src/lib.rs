@@ -1,9 +1,9 @@
 #![no_std]
 #![feature(alloc)]
 
-/// This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
-/// This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
-/// Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
+//! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
+//! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
+//! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -70,7 +70,8 @@ impl MemFile {
 }
 
 impl File for MemFile {
-    /// To read the contents of a file, query the size of the file 
+    /// Reads the contents of a file
+    /// Caller should pass in an empty buffer and the read function will query the size of the buffer
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> {
         let num_bytes_read = self.size; // this is the number of bytes of actual information stored in the MappedPage
         // Copies the information from the MappedPage (or at least the section containing the relevant information) to the read-buffer

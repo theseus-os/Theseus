@@ -1,16 +1,16 @@
 #![no_std]
 #![feature(alloc)]
-/// Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic 
-/// that of a standard unix virtual filesystem, where directories follow a hierarchical system
-/// and all directories have a parent directory (except for the special root directory). 
-/// All files must be contained within directories. 
-/// 
-/// Note that both File and Directory extend from FileDirectory, which is a trait that defines
-/// common methods for both Files and Directories to enhance code reuse 
-/// 
-/// Some functions return an enum FSNode; this allows us to seamlessly call functions on the return types of
-/// other filesystem functions, and then we simply match on the FSnode to extract the concrete type
-/// to perform the desired function
+//! Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic 
+//! that of a standard unix virtual filesystem, where directories follow a hierarchical system
+//! and all directories have a parent directory (except for the special root directory). 
+//! All files must be contained within directories. 
+//! 
+//! Note that both File and Directory extend from FileDirectory, which is a trait that defines
+//! common methods for both Files and Directories to enhance code reuse 
+//! 
+//! Some functions return an enum FSNode; this allows us to seamlessly call functions on the return types of
+//! other filesystem functions, and then we simply match on the FSnode to extract the concrete type
+//! to perform the desired function
 
 #[macro_use] extern crate alloc;
 extern crate spin;

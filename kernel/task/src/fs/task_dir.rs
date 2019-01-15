@@ -1,9 +1,9 @@
-/// Contains the task implementation of the Directory trait so that each task can be
-/// represented as a separate directory within the *tasks* directory. the *tasks* directory
-/// is at the root of the filesystem (a direct child of the root directory). Each  *task* within
-/// the *tasks* contains information about the task in separate files/subdirectories. 
-/// *task* directories are lazily generated, hence the overriding methods of *get_child()* and *list_children()*
-/// within the task implementation
+//! Contains the task implementation of the Directory trait so that each task can be
+//! represented as a separate directory within the *tasks* directory. the *tasks* directory
+//! is at the root of the filesystem (a direct child of the root directory). Each  *task* within
+//! the *tasks* contains information about the task in separate files/subdirectories. 
+//! *task* directories are lazily generated, hence the overriding methods of *get_child()* and *list_children()*
+//! within the task implementation
 use Task;
 use TaskRef;
 use RunState;
