@@ -12,7 +12,7 @@ extern crate memory;
 extern crate irq_safety;
 
 
-// use alloc::vec::Vec;1
+// use alloc::vec::Vec;
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{StrongDirRef, WeakDirRef, File, FileDirectory};
@@ -23,7 +23,7 @@ use spin::Mutex;
 use alloc::boxed::Box;
 use fs_node::FSNode;
 
-
+/// The struct that represents a file in memory that is backed by MappedPages
 pub struct MemFile {
     /// The name of the file
     name: String,
