@@ -43,7 +43,7 @@
 //! * `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
 //! * `panic_unwind`: Default entry point for panics and unwinding, as required by the Rust compiler.
 //! * `panic_wrapper`: Wrapper functions for handling and propagating panics.
-//! * `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct ( a wrapper around the String class)
+//! * `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct 
 //! * `pci`: Basic PCI support for Theseus, x86 only.
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.

@@ -131,6 +131,24 @@ impl TaskDirectory {
         }
         Ok(())
     }
+
+    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
+        let parent = match self.get_parent_dir() {
+            Ok(parent) => parent,
+            Err(err) => return Err(err)
+        };
+
+        let mut locked_parent = parent.lock();
+        match locked_parent.get_child(self.get_name(), false) {
+            Ok(child) => {
+                match child {
+                    FSNode::Dir(dir) => Ok(dir),
+                    FSNode::File(_file) => Err("should not be a file"),
+                }
+            },
+            Err(err) => return Err(err)
+        }
+    }
 }
 
 impl FileDirectory for TaskDirectory {
@@ -234,15 +252,9 @@ fn create_mmi(taskref: TaskRef, task_dir_pointer: StrongAnyDirRef) -> Result<(),
         page_table_info.push_str(&format!("{}\n", vma.start_address()));
     }
     let name = String::from("memoryManagementInfo");
-    let mmi_dir_pointer = match mmi_dir.lock().get_self_pointer() {
-        Ok(ptr) => ptr, 
-        Err(err) => {
-            error!("could not obtain pointer to mmi dir because: {}", err);
-            return Err(err)
-            }
-    };
+    let mmi_dir_ptr_copy = Arc::clone(&mmi_dir);
     // create the page table file and add it to the mmi directory
     let mut page_table_info = page_table_info.as_bytes().to_vec();
-    let _page_table_file = MemFile::new(name.clone(), &mut page_table_info, Arc::downgrade(&mmi_dir_pointer));
+    let _page_table_file = MemFile::new(name.clone(), &mut page_table_info, Arc::downgrade(&mmi_dir_ptr_copy));
     return Ok(());
 }

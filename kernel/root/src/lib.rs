@@ -93,8 +93,4 @@ impl FileDirectory for RootDirectory {
     fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str> {
         return Err("root does not have a parent");
     }
-
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        return Ok(get_root());
-    }
 }

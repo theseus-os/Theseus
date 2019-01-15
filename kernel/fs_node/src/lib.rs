@@ -45,23 +45,6 @@ pub trait FileDirectory {
     }
     fn get_name(&self) -> String;
     fn get_parent_dir(&self) -> Result<StrongAnyDirRef, &'static str>;
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        let parent = match self.get_parent_dir() {
-            Ok(parent) => parent,
-            Err(err) => return Err(err)
-        };
-
-        let mut locked_parent = parent.lock();
-        match locked_parent.get_child(self.get_name(), false) {
-            Ok(child) => {
-                match child {
-                    FSNode::Dir(dir) => Ok(dir),
-                    FSNode::File(_file) => Err("should not be a file"),
-                }
-            },
-            Err(err) => return Err(err)
-        }
-    }
 }
 
 // Traits for files, implementors of File must also implement FileDirectory
@@ -106,12 +89,6 @@ impl FileDirectory for FSNode {
         return match self {
             FSNode::File(file) => file.lock().get_parent_dir(),
             FSNode::Dir(dir) => dir.lock().get_parent_dir(),
-        };
-    }
-    fn get_self_pointer(&self) -> Result<StrongAnyDirRef, &'static str> {
-        return match self {
-            FSNode::File(file) => file.lock().get_self_pointer(),
-            FSNode::Dir(dir) => dir.lock().get_self_pointer(),
         };
     }
 }
