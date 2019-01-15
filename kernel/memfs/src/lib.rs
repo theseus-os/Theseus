@@ -40,7 +40,7 @@ impl MemFile {
     /// Combines file creation and file write into one operation
     pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<(), &'static str> {
         // Obtain the active kernel page table
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
         if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
             let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock(); 
             // Allocate and map the least number of pages we need to store the information contained in the buffer
@@ -60,12 +60,28 @@ impl MemFile {
                 parent: parent.clone()
             };
             let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
-            let strong_parent = Weak::upgrade(&parent).ok_or("could not upgrade parent")?;
+            let strong_parent = Weak::upgrade(&parent).ok_or("parent possibly doesn't exist for this MemFile")?;
             strong_parent.lock().insert_child(FSNode::File(boxed_file))?; // adds the newly created file to the tree
             return Ok(())
         }
         return Err("could not get active table");
     }
+
+    /// Converts a MemFile object --> MappedPages object
+    /// Note: This function consumes the MemFile object
+    pub fn into_mapped_pages(self) -> MappedPages {
+        return self.contents;
+    }
+
+    pub fn from_mapped_pages(pages: MappedPages, name: String, size: usize, parent: WeakDirRef) -> MemFile {
+        MemFile {
+            name: name, 
+            size: size, 
+            contents: pages, 
+            parent: parent, 
+        }
+    }
+
 }
 
 impl File for MemFile {

@@ -42,24 +42,33 @@ pub trait FileDirectory {
         }
         return path;
     }
-    /// Returns the name of the File or Directory
+    /// Returns the string name of the node
     fn get_name(&self) -> String;
+    /// Gets a pointer to the parent directory of the current node
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str>;
 }
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {
+    /// Reads the bytes from a file: implementors should pass in an empty buffer that the read function writes the file's data to
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str>; 
+    /// Writes the bytes argument to the contents of the file
     fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str>;
+    /// Finds a string sequence within the file
     fn seek(&self); 
-    fn delete(&self);
+    /// Deletes the file
+    fn delete(self);
+    /// Returns the size of the actual file content (i.e. the bytes that correspond to user-meaningful information) 
     fn size(&self) -> usize;
 }
 
 /// Traits for directories, implementors of Directory must also implement FileDirectory
 pub trait Directory : FileDirectory + Send {
+    /// Gets an individual child node from the current directory based on the name field of that node
     fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str>; 
+    /// Inserts a child into whatever collection the Directory uses to track children nodes
     fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str>;
+    /// Lists the names of the children nodes of the current directory
     fn list_children(&mut self) -> Vec<String>;
 }
 
