@@ -16,7 +16,7 @@ extern crate irq_safety;
 // use alloc::vec::Vec;
 use core::ops::DerefMut;
 use alloc::string::String;
-use fs_node::{StrongDirRef, WeakDirRef, File, FileDirectory};
+use fs_node::{DirRef, WeakDirRef, File, FSCompatible};
 use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
 use alloc::sync::{Arc, Weak};
@@ -115,13 +115,13 @@ impl File for MemFile {
     }
 }
 
-impl FileDirectory for MemFile {
+impl FSCompatible for MemFile {
     fn get_name(&self) -> String {
         self.name.clone()
     }
     
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }

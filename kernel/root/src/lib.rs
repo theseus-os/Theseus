@@ -17,12 +17,12 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{StrongDirRef, WeakDirRef, Directory, FSNode, FileDirectory, File};
+use fs_node::{DirRef, WeakDirRef, Directory, FSNode, FSCompatible, File};
 
 lazy_static! {
     /// The root directory
     /// Returns a tuple for easy access to the name of the root so we don't have to lock it
-    pub static ref ROOT: (String, StrongDirRef) = {
+    pub static ref ROOT: (String, DirRef) = {
         let root_dir = RootDirectory {
             name: "/root".to_string(),
             children: BTreeMap::new() 
@@ -38,7 +38,7 @@ lazy_static! {
     };
 }
 
-pub fn get_root() -> StrongDirRef {
+pub fn get_root() -> DirRef {
     Arc::clone(&ROOT.1)
 }
 
@@ -46,7 +46,7 @@ pub fn get_root() -> StrongDirRef {
 pub struct RootDirectory {
     /// The name of the directory
     name: String,
-    /// A list of StrongDirRefs or pointers to the child directories   
+    /// A list of DirRefs or pointers to the child directories   
     children: BTreeMap<String, FSNode>,
 }
 
@@ -79,7 +79,7 @@ impl Directory for RootDirectory {
     }
 }
 
-impl FileDirectory for RootDirectory {
+impl FSCompatible for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         return "/root".to_string();
@@ -90,7 +90,7 @@ impl FileDirectory for RootDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         return Err("root does not have a parent");
     }
 }

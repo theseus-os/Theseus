@@ -6,14 +6,14 @@ extern crate fs_node;
 
 use alloc::string::String;
 use alloc::sync::Arc;
-use fs_node::{StrongDirRef, FileDirectory};
+use fs_node::{DirRef, FSCompatible};
 
 /// A structure that contains Environmnt variables for a given task
 /// For now, the one variable is the current working directory of the task, which is 
 /// stored as a strong pointer to a directory within the filesystem
 pub struct Environment {
     /// The working directory for given tasks
-    pub working_dir: StrongDirRef, 
+    pub working_dir: DirRef, 
 }
 
 impl Environment {
@@ -24,7 +24,7 @@ impl Environment {
     }
 
     /// Sets working directory
-    pub fn set_wd(&mut self, new_dir: StrongDirRef) {
+    pub fn set_wd(&mut self, new_dir: DirRef) {
         self.working_dir = Arc::clone(&new_dir);
     }
 

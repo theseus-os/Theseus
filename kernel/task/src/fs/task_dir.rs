@@ -11,7 +11,7 @@ use spin::Mutex;
 use alloc::boxed::Box;
 use TASKLIST;
 use root;
-use fs_node::{Directory, File, FileDirectory, WeakDirRef, StrongDirRef, StrongFileRef, FSNode};
+use fs_node::{Directory, File, FSCompatible, WeakDirRef, DirRef, FileRef, FSNode};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
@@ -48,13 +48,13 @@ impl<'a> TaskFile<'a> {
     }
 }
 
-impl<'a> FileDirectory for TaskFile<'a> {
+impl<'a> FSCompatible for TaskFile<'a> {
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }
@@ -95,14 +95,14 @@ impl<'a> File for TaskFile<'a> {
 
 pub struct TaskDirectory {
     name: String,
-    /// A list of StrongDirRefs or pointers to the child directories 
+    /// A list of DirRefs or pointers to the child directories 
     children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: WeakDirRef,
 }
 
 impl TaskDirectory {
-    pub fn new(name: String, parent_pointer: WeakDirRef)  -> Result<StrongDirRef, &'static str> {
+    pub fn new(name: String, parent_pointer: WeakDirRef)  -> Result<DirRef, &'static str> {
         // create a parent copy so that we can add the newly created task directory to the parent's children later
         let parent_copy = Weak::clone(&parent_pointer);
         let directory = TaskDirectory {
@@ -130,7 +130,7 @@ impl TaskDirectory {
         Ok(())
     }
 
-    fn get_self_pointer(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_self_pointer(&self) -> Result<DirRef, &'static str> {
         let parent = match self.get_parent_dir() {
             Ok(parent) => parent,
             Err(err) => return Err(err)
@@ -149,7 +149,7 @@ impl TaskDirectory {
     }
 }
 
-impl FileDirectory for TaskDirectory {
+impl FSCompatible for TaskDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = String::from(TASKS_STR);
@@ -165,7 +165,7 @@ impl FileDirectory for TaskDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }
@@ -236,8 +236,8 @@ impl Directory for TaskDirectory {
 
 /// Creates the memory management info subdirectory of a task directory.
 /// This function will attach the mmi directory (and associated subdirectories) to whatever directory task_dir_pointer points to.
-fn create_mmi_dir(taskref: TaskRef, task_dir_pointer: StrongDirRef) -> Result<(), &'static str> {
-    let mmi_dir: StrongDirRef = VFSDirectory::new_dir(String::from("mmi"), Arc::downgrade(&task_dir_pointer.clone()))?;
+fn create_mmi_dir(taskref: TaskRef, task_dir_pointer: DirRef) -> Result<(), &'static str> {
+    let mmi_dir: DirRef = VFSDirectory::new_dir(String::from("mmi"), Arc::downgrade(&task_dir_pointer.clone()))?;
     // obtain information from the MemoryManagementInfo struct of the Task
     let mut page_table_info = String::from("Virtual Addresses:\n");
     let mmi_info = taskref.lock().mmi.clone().unwrap(); // FIX THIS UNWRAP AND DON'T CLONE

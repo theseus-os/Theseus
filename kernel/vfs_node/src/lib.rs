@@ -18,14 +18,14 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{StrongDirRef, StrongFileRef, WeakDirRef, Directory, FSNode, File, FileDirectory};
+use fs_node::{DirRef, FileRef, WeakDirRef, Directory, FSNode, File, FSCompatible};
 
 
 /// A struct that represents a node in the VFS 
 pub struct VFSDirectory {
     /// The name of the directory
     pub name: String,
-    /// A list of StrongDirRefs or pointers to the child directories   
+    /// A list of DirRefs or pointers to the child directories   
     pub children: BTreeMap<String, FSNode>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     pub parent: WeakDirRef,
@@ -33,7 +33,7 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<StrongDirRef, &'static str> {
+    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let parent_copy = Weak::clone(&parent_pointer);
         let directory = VFSDirectory {
@@ -80,13 +80,13 @@ impl Directory for VFSDirectory {
     }
 }
 
-impl FileDirectory for VFSDirectory {
+impl FSCompatible for VFSDirectory {
     fn get_name(&self) -> String {
         self.name.clone()
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }
@@ -103,7 +103,7 @@ pub struct VFSFile {
 }
 
 impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> Result<StrongFileRef, &'static str>{
+    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> Result<FileRef, &'static str>{
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let parent_copy = Weak::clone(&parent);
         let file = VFSFile {
@@ -129,13 +129,13 @@ impl File for VFSFile {
     fn size(&self) -> usize {unimplemented!()}
 }
 
-impl FileDirectory for VFSFile {
+impl FSCompatible for VFSFile {
     fn get_name(&self) -> String {
         self.name.clone()
     }
     
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str> {
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         self.parent.upgrade().ok_or("couldn't upgrade parent")
     }
 }
