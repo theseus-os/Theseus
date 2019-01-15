@@ -33,8 +33,6 @@ pub fn main(args: Vec<String>) -> isize {
             return -1; 
         }
     };
-    
-
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
