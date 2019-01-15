@@ -46,7 +46,7 @@ pub trait FileDirectory {
     fn get_name(&self) -> String;
     /// Gets a pointer to the parent directory of the current node
     fn get_parent_dir(&self) -> Result<StrongDirRef, &'static str>;
-}
+} 
 
 // Traits for files, implementors of File must also implement FileDirectory
 pub trait File : FileDirectory {

@@ -109,7 +109,7 @@ impl File for MemFile {
     }
 
     fn seek(&self) { unimplemented!(); }
-    fn delete(&self) { unimplemented!(); }
+    fn delete(self) { unimplemented!(); }
     fn size(&self) -> usize {
         return self.size;
     }
