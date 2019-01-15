@@ -125,7 +125,7 @@ impl File for VFSFile {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
     fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
     fn seek(&self) { unimplemented!(); }
-    fn delete(&self) { unimplemented!(); }
+    fn delete(self) { unimplemented!(); }
     fn size(&self) -> usize {unimplemented!()}
 }
 

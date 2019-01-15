@@ -89,7 +89,7 @@ impl<'a> File for TaskFile<'a> {
 
     fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { Err("not permitted to write task contents through the task VFS") } 
     fn seek(&self) { unimplemented!() }
-    fn delete(&self) { unimplemented!() }
+    fn delete(self) { unimplemented!() }
     fn size(&self) -> usize { 0 }
 }
 
