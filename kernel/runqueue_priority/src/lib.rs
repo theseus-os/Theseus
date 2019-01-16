@@ -22,14 +22,16 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 use runqueue::RunQueueTrait;
 
-
-
-lazy_static! {
-    /// There is one runqueue per core, each core only accesses its own private runqueue
-    /// and allows the scheduler to select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
-
+/// A cloneable reference to a `Taskref` that exposes more methods
+/// related to task scheduling
+/// 
+/// The `PriorityTaskRef` type is necessary differnt scheduling algorithms 
+/// require different data associated with the task to be stored alongside,
+/// which makes storing them alongside the task prohibitive
+/// This task holds weighted_runtime which indicates the remaining tokens
+/// for the task and times_picked which indicate the number of context switches
+/// the task has undergone
+/// times_picked is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
     taskref: TaskRef,
@@ -38,75 +40,69 @@ pub struct PriorityTaskRef{
 }
 
 impl PriorityTaskRef {
-    /// Creates a new `TaskRef` that wraps the given `Task`.
-    /// 
-    /// Also establishes the `TaskLocalData` struct that will be used 
-    /// to determine the current `Task` on each processor core.
+    /// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`.
+    /// We just give an initial number of tokens to run the task till 
+    /// next scheduling epoch
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
-            weighted_runtime: 1,
+            weighted_runtime: 10,
             times_picked: 0,
         };
-        //let tld = TaskLocalData {
-        //    current_taskref: taskref.clone(),
-        //    current_task_id: task_id,
-        //};
-        //let tld_ptr = Box::into_raw(Box::new(tld));
-        //taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
         priority_taskref
     }
 
+    /// Get a pointer for the underlying TaskRef
     pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
         priority_task_ref.map(|m| m.taskref)
     }
 
+    /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()
     }
 
+    /// Get the number of remaining tokens
     pub fn get_weight(&self) -> u32{
         self.weighted_runtime
     }
 
+    /// Changes the number of tokens in a given token NAMI
     pub fn update_weight(&mut self, weight: u32) -> (){
         self.weighted_runtime = weight;
         ()
     }
 
+    ///Increment the number of times the task is picked NAMI
     pub fn increase_times_picked(&mut self) -> (){
         self.times_picked = self.times_picked + 1;
     }
 }
 
+
+lazy_static! {
+    /// There is one runqueue per core, each core only accesses its own private runqueue
+    /// and allows the scheduler to select a task from that runqueue to schedule in.
+    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
+}
+
+
+/// A list of references to `Task`s (`PriorityTaskRef`s) 
+/// that is used to store the `Task`s (and associated scheduler related data) 
+/// that are runnable on a given core.
+/// A queue is used for the token based prioirty schedular 
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<PriorityTaskRef>,
-    minimum_weighted_runtime: u32,
 }
 
+/// Scheduler related `RunQueue` functions are listed here
 impl RunQueue {
-    /// Update minimum weighted runtime of tasks in this `RunQueue`.
-    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
-    pub fn update_weighted_min_runtime(&mut self, runtime: u32) -> () {
-        self.minimum_weighted_runtime = runtime;
-    }
-    /// Returns minimum weighted runtime of tasks in this `RunQueue`.
-    /// minimum weighted runtime of a `RunQueue` is the weighted run time of the task last picked
-    pub fn get_weighted_min_runtime(&self) -> u32 {
-        return self.minimum_weighted_runtime;
-    }
 
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
-    /// and returns a cloned reference to that `TaskRef`.
-    pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.queue.remove(index).map(|taskref| {
-            self.queue.push_back(taskref.clone());
-            taskref
-        }).map(|m| m.taskref)
-    }
-
+    /// and returns a cloned reference to that `TaskRef`. This is used when the task is selected by the scheduler
+    /// Hence sheduler related states in the runqueue is updated.  NAMI
     pub fn update_and_move_to_end(&mut self, index: usize, weight : u32) -> Option<TaskRef> {
         self.queue.remove(index).map(|mut taskref| {
             {
@@ -120,37 +116,37 @@ impl RunQueue {
         }).map(|m| m.taskref)
     }
 
-    pub fn remove_from_queue(&mut self, index: usize) -> Option<PriorityTaskRef> {
-        self.queue.remove(index)
-    }
-
-    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+    /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
         self.queue.iter()
     }
 
+    /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
+    /// Index 0 is the front of the `RunQueue`.
     pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
         self.queue.get(index)
     }
 
+    /// Retrieves a mutable `PriorityTaskRef` in this `RunQueue` at the specified `index`.
+    /// Index 0 is the front of the `RunQueue`.
     pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
         self.queue.get_mut(index)
     }
 
+    /// Returns the length of the `RunQueue`
     pub fn runqueue_length(&self) -> usize{
         self.queue.len()
     }
 }
 
+/// Functions required for the `RunQueue` as defined by `RunQueueTrait` is implemented here
 impl RunQueueTrait for RunQueue {
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id` and with minimumweighted runtime
+    /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
-            minimum_weighted_runtime: 0,
         });
 
         #[cfg(runqueue_state_spill_evaluation)] 
