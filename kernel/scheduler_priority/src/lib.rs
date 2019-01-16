@@ -9,23 +9,19 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate apic;
 extern crate task;
 extern crate runqueue;
 extern crate runqueue_priority;
 
 
-use core::ops::DerefMut;
-use irq_safety::{disable_interrupts};
-use apic::get_my_apic_id;
-use task::{Task, TaskRef, get_my_current_task};
+
+use task::TaskRef;
 use runqueue::RunQueueTrait;
 use runqueue_priority::RunQueue;
 
 /// A temporary data structure to hold result of  select_next_task_priority
 /// function.
-struct next_task_result{
+struct NextTaskResult{
     taskref : Option<TaskRef>,
     idle_task : bool,
 }
@@ -39,7 +35,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         //A task has been selected
         Some(task) => {
             //If the selected task is idle task we begin a new scheduling epoch
-            if(task.idle_task == true){
+            if task.idle_task == true {
                 assign_tokens(apic_id);
                 select_next_task_priority(apic_id).and_then(|m| m.taskref)
             }
@@ -60,7 +56,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 /// this defines the priority scheduler policy.
 /// returns None if there is no schedule-able task
 /// Otherwise returns a task with a flag indicating whether its an idle task
-fn select_next_task_priority(apic_id: u8) -> Option<next_task_result>  {
+fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
@@ -118,7 +114,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<next_task_result>  {
     chosen_task_index
         .or(idle_task_index)
         .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
-        .map(|index| next_task_result {
+        .map(|index| NextTaskResult {
             taskref : Some(index),
             idle_task  : idle_task, 
         })
@@ -138,18 +134,16 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
     };
     
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
+
     // We begin with total priorities = 1 to avoid division by zero 
     let mut total_priorities = 1;
 
     // This loop calculates the total priorities of the runqueue
-    for (i, taskref) in runqueue_locked.iter().enumerate() {
+    for (_i, taskref) in runqueue_locked.iter().enumerate() {
         let t = taskref.lock();
 
         // we skip the idle task, it contains zero tokens as it is picked last
         if t.is_an_idle_task {
-            idle_task_index = Some(i);
             continue;
         }
 
@@ -187,30 +181,29 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 total_priorities
             };
 
-    let mut i = 0;
-    let mut len = 0;
+    let mut _i = 0;
+    let len;
     {
         len = runqueue_locked.runqueue_length();
     }
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    while i < len {
-        let mut task_tokens = 1;
+    while _i < len {
+        let task_tokens;
         {
-            let taskref = runqueue_locked.get_priority_task_ref(i).unwrap();
+            let taskref = runqueue_locked.get_priority_task_ref(_i).unwrap();
             let t = taskref.lock();
 
             // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
-                idle_task_index = Some(i);
-                i = i+1;
+                _i = _i+1;
                 continue;
             }
 
             // we give zero tokens to none runnable tasks
             if !t.is_runnable() {
-                i = i+1;
+                _i = _i+1;
                 continue;
             }
 
@@ -226,11 +219,11 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
         
         {
-            let mut mut_task = runqueue_locked.get_priority_task_ref_as_mut(i);
-            mut_task.map(|m| m.update_tokens(task_tokens));
+            let task = runqueue_locked.get_priority_task_ref_as_mut(_i);
+            task.map(|m| m.update_tokens(task_tokens));
         }
         
-        i = i+1;
+        _i = _i+1;
         //debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
         //break; 
     }
