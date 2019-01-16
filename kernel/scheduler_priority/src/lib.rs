@@ -32,14 +32,14 @@ struct NextTaskResult{
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
     let taskref_with_result = select_next_task_priority(apic_id); 
     match taskref_with_result {
-        //A task has been selected
+        // A task has been selected
         Some(task) => {
-            //If the selected task is idle task we begin a new scheduling epoch
+            // If the selected task is idle task we begin a new scheduling epoch
             if task.idle_task == true {
                 assign_tokens(apic_id);
                 select_next_task_priority(apic_id).and_then(|m| m.taskref)
             }
-            //If the selected task is not idle we return the taskref
+            // If the selected task is not idle we return the taskref
             else {
                 task.taskref
             }
@@ -105,7 +105,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         break; 
     }
 
-    //We then reduce the number of tokens of the task by one
+    // We then reduce the number of tokens of the task by one
     let modified_tokens = {
         let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
         chosen_task.map(|m| m.get_tokens()).unwrap_or(1) - 1
@@ -167,8 +167,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
         
         
         
-        //debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
-        //break; 
+        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
+        // break; 
     }
 
     // We keep each epoch for 100 tokens by default
@@ -224,8 +224,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
         
         _i = _i+1;
-        //debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
-        //break; 
+        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
+        // break; 
     }
 
     return true;
