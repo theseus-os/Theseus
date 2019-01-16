@@ -28,15 +28,15 @@ use runqueue::RunQueueTrait;
 /// The `PriorityTaskRef` type is necessary differnt scheduling algorithms 
 /// require different data associated with the task to be stored alongside,
 /// which makes storing them alongside the task prohibitive
-/// This task holds weighted_runtime which indicates the remaining tokens
-/// for the task and times_picked which indicate the number of context switches
+/// This task holds tokens_remaining which indicates the remaining tokens
+/// for the task and context_switches which indicate the number of context switches
 /// the task has undergone
-/// times_picked is not used in scheduling algorithm 
+/// context_switches is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
     taskref: TaskRef,
-    weighted_runtime: u32,
-    times_picked: u32,
+    tokens_remaining: u32,
+    context_switches: u32,
 }
 
 impl PriorityTaskRef {
@@ -46,8 +46,8 @@ impl PriorityTaskRef {
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
-            weighted_runtime: 10,
-            times_picked: 0,
+            tokens_remaining: 10,
+            context_switches: 0,
         };
         priority_taskref
     }
@@ -63,19 +63,19 @@ impl PriorityTaskRef {
     }
 
     /// Get the number of remaining tokens
-    pub fn get_weight(&self) -> u32{
-        self.weighted_runtime
+    pub fn get_tokens(&self) -> u32{
+        self.tokens_remaining
     }
 
-    /// Changes the number of tokens in a given token NAMI
-    pub fn update_weight(&mut self, weight: u32) -> (){
-        self.weighted_runtime = weight;
+    /// Changes the number of tokens in a given task
+    pub fn update_tokens(&mut self, tokens: u32) -> (){
+        self.tokens_remaining = tokens;
         ()
     }
 
-    ///Increment the number of times the task is picked NAMI
-    pub fn increase_times_picked(&mut self) -> (){
-        self.times_picked = self.times_picked + 1;
+    /// Increment the number of times the task is picked
+    pub fn increase_context_switches(&mut self) -> (){
+        self.context_switches = self.context_switches + 1;
     }
 }
 
@@ -103,13 +103,13 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`. This is used when the task is selected by the scheduler
     /// Hence sheduler related states in the runqueue is updated.  NAMI
-    pub fn update_and_move_to_end(&mut self, index: usize, weight : u32) -> Option<TaskRef> {
+    pub fn update_and_move_to_end(&mut self, index: usize, tokens : u32) -> Option<TaskRef> {
         self.queue.remove(index).map(|mut taskref| {
             {
-                taskref.update_weight(weight);
+                taskref.update_tokens(tokens);
             }
             {
-                taskref.increase_times_picked();
+                taskref.increase_context_switches();
             }
             self.queue.push_back(taskref.clone());
             taskref

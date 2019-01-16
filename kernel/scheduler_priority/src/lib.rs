@@ -1,3 +1,9 @@
+//! This crate picks the next task on token based scheduling policy
+//! At the begining of each scheduling epoch a set of tokens is distributed among tasks.
+//! Tasks are executed until all tokens of runnable task are exhausted
+//! Then a new scheduling epoch is initiated 
+
+
 #![no_std]
 #![feature(alloc)]
 
@@ -17,42 +23,44 @@ use task::{Task, TaskRef, get_my_current_task};
 use runqueue::RunQueueTrait;
 use runqueue_priority::RunQueue;
 
+/// A temporary data structure to hold result of  select_next_task_priority
+/// function.
 struct next_task_result{
     taskref : Option<TaskRef>,
     idle_task : bool,
 }
 
 
-
 /// this defines the priority scheduler policy.
 /// returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
-    let taskref_with_result = select_next_task_p2(apic_id); 
+    let taskref_with_result = select_next_task_priority(apic_id); 
     match taskref_with_result {
-        // The division was valid
-        Some(x) => {
-            //debug!("Some coe running: {}", apic_id);
-            
-            if(x.idle_task == true){
-                assign_weights(apic_id);
-                select_next_task_p2(apic_id).and_then(|m| m.taskref)
+        //A task has been selected
+        Some(task) => {
+            //If the selected task is idle task we begin a new scheduling epoch
+            if(task.idle_task == true){
+                assign_tokens(apic_id);
+                select_next_task_priority(apic_id).and_then(|m| m.taskref)
             }
+            //If the selected task is not idle we return the taskref
             else {
-                x.taskref
+                task.taskref
             }
         }
-        // The division was invalid
+
+        // If no task is picked we pick a new scheduling epoch
         None    => {
-            assign_weights(apic_id);
-            select_next_task_p2(apic_id).and_then(|m| m.taskref)
+            assign_tokens(apic_id);
+            select_next_task_priority(apic_id).and_then(|m| m.taskref)
         }
     }
-    //taskref_with_result.and_then(|m| m.taskref)
 }
 
-/// this defines the round robin scheduler policy.
+/// this defines the priority scheduler policy.
 /// returns None if there is no schedule-able task
-fn select_next_task_p2(apic_id: u8) -> Option<next_task_result>  {
+/// Otherwise returns a task with a flag indicating whether its an idle task
+fn select_next_task_priority(apic_id: u8) -> Option<next_task_result>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
@@ -89,7 +97,8 @@ fn select_next_task_p2(apic_id: u8) -> Option<next_task_result>  {
             }
         }
 
-        if taskref.get_weight() == 0{
+        // if the task has no remaining tokens we ignore the task
+        if taskref.get_tokens() == 0{
             continue;
         }
             
@@ -100,19 +109,15 @@ fn select_next_task_p2(apic_id: u8) -> Option<next_task_result>  {
         break; 
     }
 
-    // idle task is a backup iff no other task has been chosen
-    // chosen_task_index
-    //     .or(idle_task_index)
-    //     .and_then(|index| runqueue_locked.move_to_end(index))
-
-    let modified_weight = {
+    //We then reduce the number of tokens of the task by one
+    let modified_tokens = {
         let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
-        chosen_task.map(|m| m.get_weight()).unwrap_or(1) - 1
+        chosen_task.map(|m| m.get_tokens()).unwrap_or(1) - 1
     };
 
     chosen_task_index
         .or(idle_task_index)
-        .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_weight))
+        .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
         .map(|index| next_task_result {
             taskref : Some(index),
             idle_task  : idle_task, 
@@ -120,10 +125,10 @@ fn select_next_task_p2(apic_id: u8) -> Option<next_task_result>  {
 }
 
 
-/// This defines the priority scheduler policy.
-/// Task with the minimum weighted run time is picked
-/// Returns None if there is no schedule-able task
-fn assign_weights(apic_id: u8) -> bool  {
+/// This assigns tokens between tasks
+/// Returns true if successful
+/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks)
+fn assign_tokens(apic_id: u8) -> bool  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
@@ -135,27 +140,23 @@ fn assign_weights(apic_id: u8) -> bool  {
     
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
+    // We begin with total priorities = 1 to avoid division by zero 
     let mut total_priorities = 1;
 
+    // This loop calculates the total priorities of the runqueue
     for (i, taskref) in runqueue_locked.iter().enumerate() {
         let t = taskref.lock();
 
-        // we skip the idle task, and only choose it if no other tasks are runnable
+        // we skip the idle task, it contains zero tokens as it is picked last
         if t.is_an_idle_task {
             idle_task_index = Some(i);
             continue;
         }
 
-        // must be runnable
+        // we assign tokens only to runnable tasks
         if !t.is_runnable() {
             continue;
         }
-
-        //if let Some(priority) = t.priority {
-        //	if priority < -1 {
-        //        continue;
-        //    }
-        //}
 
         // if this task is pinned, it must not be pinned to a different core
         if let Some(pinned) = t.pinned_core {
@@ -167,19 +168,18 @@ fn assign_weights(apic_id: u8) -> bool  {
         }
             
         // found a runnable task!
-        // Mark it as the running task if it has he minimum weighted run time
+        // We add its priority
         total_priorities = total_priorities + t.priority.unwrap_or(0) as u32;
         
         
         
-        //debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        //debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
         //break; 
     }
-    if(apic_id == 1){
-        debug!("total priorities(): AP {} priorities {}", apic_id, total_priorities);
-    }
-    //for (i, taskref) in runqueue_locked.iter().enumerate() {
 
+    // We keep each epoch for 100 tokens by default
+    // However since this granularity could miss low priority tasks when 
+    // many concurrent tasks are running, we increase the epoch in such cases
     let epcoh = if total_priorities < 100 {
                 100
             }
@@ -193,30 +193,26 @@ fn assign_weights(apic_id: u8) -> bool  {
         len = runqueue_locked.runqueue_length();
     }
 
+    // We iterate through each task in runqueue
+    // We dont use iterator as items are modified in the process
     while i < len {
-        let mut task_weight = 1;
+        let mut task_tokens = 1;
         {
             let taskref = runqueue_locked.get_priority_task_ref(i).unwrap();
             let t = taskref.lock();
 
-            // we skip the idle task, and only choose it if no other tasks are runnable
+            // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
                 idle_task_index = Some(i);
                 i = i+1;
                 continue;
             }
 
-            // must be runnable
+            // we give zero tokens to none runnable tasks
             if !t.is_runnable() {
                 i = i+1;
                 continue;
             }
-
-            //if let Some(priority) = t.priority {
-            //	if priority < -1 {
-            //        continue;
-            //    }
-            //}
 
             // if this task is pinned, it must not be pinned to a different core
             if let Some(pinned) = t.pinned_core {
@@ -226,19 +222,16 @@ fn assign_weights(apic_id: u8) -> bool  {
                     return false;
                 }
             }
-            task_weight = 100 * t.priority.unwrap() as u32 / total_priorities;
+            task_tokens = epcoh * t.priority.unwrap() as u32 / total_priorities;
         }
-        // found a runnable task!
-        // Mark it as the running task if it has he minimum weighted run time
         
         {
             let mut mut_task = runqueue_locked.get_priority_task_ref_as_mut(i);
-            mut_task.map(|m| m.update_weight(task_weight));
-            //mut_task.map(|m| m.update_weight(1000));
+            mut_task.map(|m| m.update_tokens(task_tokens));
         }
         
         i = i+1;
-        //debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        //debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
         //break; 
     }
 
