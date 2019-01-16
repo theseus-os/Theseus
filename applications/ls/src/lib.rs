@@ -31,9 +31,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    if matches.free.is_empty() {
-        return 0;
-    }
+    
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
@@ -55,6 +53,17 @@ pub fn main(args: Vec<String>) -> isize {
         let curr_env = locked_task.env.lock();
         Arc::clone(&curr_env.working_dir)
     };
+    
+    if matches.free.is_empty() {
+        let mut child_string = String::new();
+        let mut child_list = curr_wd.lock().list_children(); 
+        child_list.reverse();
+        for child in child_list.iter() {
+            child_string.push_str(&format!("{}\n", child));
+        }
+        println!("{}", child_string);
+        return 0;
+    }
 
     let path = Path::new(matches.free[0].to_string());
 
@@ -65,7 +74,6 @@ pub fn main(args: Vec<String>) -> isize {
                 FSNode::Dir(dir) => {
                     let mut child_string = String::new();
                     let mut child_list = dir.lock().list_children(); 
-                    debug!("hello!? {}", dir.lock().get_name());   
                     child_list.reverse();
                     for child in child_list.iter() {
                         child_string.push_str(&format!("{}\n", child));
