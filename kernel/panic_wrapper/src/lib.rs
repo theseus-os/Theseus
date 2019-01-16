@@ -12,24 +12,15 @@ extern crate memory;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
-
-#[cfg(priority_scheduler)] 
-extern crate runqueue_priority;
-
-#[cfg(not(priority_scheduler))] 
-extern crate runqueue_round_robin;
-
+#[cfg(priority_scheduler)] extern crate runqueue_priority;
+#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 
 use core::panic::PanicInfo;
 use alloc::string::String;
 use task::{KillReason, PanicInfoOwned};
 use runqueue::RunQueueTrait;
-
-#[cfg(priority_scheduler)] 
-use runqueue_priority::RunQueue;
-
-#[cfg(not(priority_scheduler))] 
-use runqueue_round_robin::RunQueue;
+#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
+#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
 
 /// performs the standard panic handling routine, which involves the following:
 /// 

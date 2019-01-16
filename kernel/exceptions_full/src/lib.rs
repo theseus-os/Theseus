@@ -7,13 +7,8 @@
 extern crate x86_64;
 extern crate task;
 extern crate runqueue;
-
-#[cfg(priority_scheduler)] 
-extern crate runqueue_priority;
-
-#[cfg(not(priority_scheduler))] 
-extern crate runqueue_round_robin;
-
+#[cfg(priority_scheduler)] extern crate runqueue_priority;
+#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 extern crate apic;
 extern crate pmu_x86;
 #[macro_use] extern crate log;
@@ -24,11 +19,8 @@ use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode
 use x86_64::registers::msr::*;
 use runqueue::RunQueueTrait;
 
-#[cfg(priority_scheduler)] 
-use runqueue_priority::RunQueue;
-
-#[cfg(not(priority_scheduler))] 
-use runqueue_round_robin::RunQueue;
+#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
+#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 

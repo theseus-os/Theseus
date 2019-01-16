@@ -7,12 +7,8 @@ extern crate irq_safety;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
-
-#[cfg(priority_scheduler)] 
-extern crate scheduler_priority;
-
-#[cfg(not(priority_scheduler))] 
-extern crate scheduler_round_robin;
+#[cfg(priority_scheduler)] extern crate scheduler_priority;
+#[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
 
 
 use core::ops::DerefMut;

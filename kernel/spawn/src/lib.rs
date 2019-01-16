@@ -13,13 +13,8 @@ extern crate memory;
 extern crate kernel_config;
 extern crate task;
 extern crate runqueue;
-
-#[cfg(priority_scheduler)] 
-extern crate runqueue_priority;
-
-#[cfg(not(priority_scheduler))] 
-extern crate runqueue_round_robin;
-
+#[cfg(priority_scheduler)] extern crate runqueue_priority;
+#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
@@ -41,13 +36,8 @@ use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, Memo
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use runqueue::RunQueueTrait;
-
-#[cfg(priority_scheduler)] 
-use runqueue_priority::RunQueue;
-
-#[cfg(not(priority_scheduler))] 
-use runqueue_round_robin::RunQueue;
-
+#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
+#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 
 
