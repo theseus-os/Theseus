@@ -992,6 +992,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scheduler_eval"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "spawn 0.1.0",
+]
+
+[[package]]
 name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
