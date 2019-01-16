@@ -37,7 +37,7 @@ use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use fs_node::{StrongDirRef, FileDirectory};
+use fs_node::{DirRef, FSCompatible};
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueue;
 use environment::Environment;
