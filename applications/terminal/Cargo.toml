@@ -54,6 +54,15 @@ path = "../terminal_print"
 [dependencies.print]
 path = "../../kernel/print"
 
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.environment]
+path = "../../kernel/environment"
+
+[dependencies.root]
+path = "../../kernel/root"
+
 [lib]
 crate-type = ["rlib"]
 

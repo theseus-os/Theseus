@@ -1,0 +1,26 @@
+[package]
+name = "root"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>"]
+description = "a special concrete implementation of the Directory trait; differs from VFSDirectory only in that there is no parent field, and any attempt to access a parent field will return some error value"
+
+[dependencies]
+spin = "0.4.5"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.0"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memfs]
+path = "../memfs"
+
+[lib]
+crate-type = ["rlib"]
