@@ -20,9 +20,12 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
+extern crate fs_node;
+extern crate root;
 
 extern crate terminal_print;
 extern crate print;
+extern crate environment;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -31,12 +34,16 @@ use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
+use fs_node::{DirRef, FsNode};
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueueTrait;
 use runqueue_priority::RunQueue;
+use environment::Environment;
+use spin::Mutex;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -108,6 +115,8 @@ struct Terminal {
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
     print_producer: DFQueueProducer<Event>,
+    /// The terminal's current environment
+    env: Arc<Mutex<Environment>>
 }
 
 
@@ -136,9 +145,15 @@ impl Terminal {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
+        
+        let root = root::get_root();
+        
+        let env = Environment {
+            working_dir: root::get_root(), 
+        };
 
-        let prompt_string = "terminal:~$ ".to_string();
-
+        let mut prompt_string = root.lock().get_path_as_string(); // ref numbers are 0-indexed
+        prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
             window: window_object,
             input_string: String::new(),
@@ -158,6 +173,7 @@ impl Terminal {
             left_shift: 0,
             print_consumer: terminal_print_consumer,
             print_producer: terminal_print_producer,
+            env: Arc::new(Mutex::new(env))
         };
         
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -165,7 +181,7 @@ impl Terminal {
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         let task_ref = KernelTaskBuilder::new(terminal_loop, terminal)
-            .name("terminal loop".to_string())
+            .name("terminal_loop".to_string())
             .spawn()?;
         Ok(task_ref)
     }
@@ -178,7 +194,9 @@ impl Terminal {
 
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
-        let prompt = self.prompt_string.clone();
+        let curr_env = self.env.lock();
+        let mut prompt = curr_env.working_dir.lock().get_path_as_string();
+        prompt = format!("{}: ",prompt);
         self.scrollback_buffer.push_str(&prompt);
     }
 
@@ -924,6 +942,9 @@ impl Terminal {
         let taskref = ApplicationTaskBuilder::new(module)
             .argument(arguments)
             .spawn()?;
+        
+        taskref.set_env(Arc::clone(&self.env)); // Set environment variable of application to the same as terminal task
+
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         return Ok(taskref);
         
@@ -948,7 +969,6 @@ impl Terminal {
                 Err(err) => {error!("could not update display forwards: {}", err); return}
             }
         }
-
     }
 }
 
