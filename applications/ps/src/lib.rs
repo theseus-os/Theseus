@@ -45,8 +45,7 @@ pub fn main(args: Vec<String>) -> isize {
         let task = taskref.lock();
         let name = &task.name;
         let priority =  &task.priority.map(|priority| format!("{}", priority)).unwrap_or(String::from("-"));
-        //let weighted_runtime = &task.weighted_runtime;
-        //let context_switches = &task.times_picked;
+
         let runstate = match &task.runstate {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",

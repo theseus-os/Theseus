@@ -408,7 +408,7 @@ loadable : export THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
-### Currently, loadable module mode requires release build mode
+### Create a make prioirty option to build and run priority scheduler
 priority : export THESEUS_CONFIG += priority_scheduler
 priority : export BUILD_MODE = release
 priority: run
