@@ -24,6 +24,9 @@ path = "../runqueue"
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
 
+[dependencies.runqueue_round_robin]
+path = "../runqueue_round_robin"
+
 [dependencies.apic]
 path = "../apic"
 
