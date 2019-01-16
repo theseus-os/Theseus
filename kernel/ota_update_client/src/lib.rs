@@ -74,14 +74,6 @@ const CHECKSUMS_DIR_NAME: &'static str = "checksums";
 const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
 
 
-    // TODO: real update sequence: 
-    // (1) establish connection to build server
-    // (2) download the UPDATE MANIFEST, a file that describes which crates should replace which others
-    // (3) compare the crates in the given CrateNamespace with the latest available crates from the manifest
-    // (4) send HTTP requests to download the ones that differ 
-    // (5) swap in the new crates in place of the old crates
-
-
 
 /// A file that has been downloaded over the network, 
 /// including its name and a byte array containing its contents.

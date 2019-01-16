@@ -52,7 +52,8 @@ extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
 
-#[cfg(test_ota_update_client)] extern crate ota_update_client;
+#[cfg(test_ota_update)] extern crate ota_update_client;
+#[cfg(test_ota_update)] extern crate test_ota_update;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -134,9 +135,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // //init frame_buffer
     let rs = frame_buffer::init();
     match rs {
-        Ok(_) => { trace!("frame_buffer initialized."); }
+        Ok(_) => {
+            trace!("Frame_buffer initialized successfully.");
+        }
         Err(err) => { 
-            println_raw!("nano_core_start():fail to initialize frame_buffer");
+            println_raw!("captain::init(): failed to initialize frame_buffer");
             return Err(err);
         }
     }
@@ -148,16 +151,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     device_manager::init(input_event_queue_producer)?;
 
 
-    // #[cfg(test_ota_update_client)]
-    // {
-    //     if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
-    //         spawn::KernelTaskBuilder::new(ota_update_client::init, iface)
-    //             .name(String::from("ota_update_client"))
-    //             .spawn()?;
-    //     } else {
-    //         error!("captain: Couldn't run ota_update_client test because no e1000 NIC exists.");
-    //     }
-    // }
+    #[cfg(test_ota_update)]
+    {
+        if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
+            spawn::KernelTaskBuilder::new(test_ota_update::simple_keyboard_swap, iface)
+                .name(String::from("test_ota_update"))
+                .spawn()?;
+        } else {
+            error!("captain: Couldn't test the OTA update functionality because no e1000 NIC exists.");
+        }
+    }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]

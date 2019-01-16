@@ -59,11 +59,12 @@ done
 cd $NEW_DIR/
 ls *.o > $NEW_DIR/listing.txt
 
-### update the root listing to reflect all available update directories.
-### the root listing sorts directories in reverse chronological order (newest at top, oldest at bottom)
+### Update the root listing to reflect all available update directories.
+### The root listing sorts directories in reverse chronological order (newest at top, oldest at bottom),
+### without the trailing slash that usually is appended on directory names.
 rm -rf $HTTP_ROOT/updates.txt
 cd $HTTP_ROOT/
-for d in $(ls -dt */) ; do
+for d in $(ls -dt */ | sed 's/[/]//g') ; do
   echo "$d" >> $HTTP_ROOT/updates.txt
 done
 

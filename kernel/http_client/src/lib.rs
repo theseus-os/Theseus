@@ -264,6 +264,12 @@ pub fn send_request(
                             Ok(httparse::Status::Complete(total_header_len)) => {
                                 packet_header_length = Some(total_header_len);
                                 trace!("http_client: received all headers in the HTTP response, len {}", total_header_len);
+
+                                // Here: when we've received all headers, we may or may not be done receiving the full response.
+                                // If there is a "Content-Length" header present, we can use that to see if all the bytes are received.
+                                // If there is no such header, then there must be a "Connection: close" header, indicating that the response is complete.
+                                // If neither headers exist, then there has been an unexpected problem, and we should return an error.
+
                                 let content_length_result = response.headers.iter()
                                     .filter(|h| h.name == "Content-Length")
                                     .next()
