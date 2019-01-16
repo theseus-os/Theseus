@@ -11,7 +11,7 @@ use spin::Mutex;
 use alloc::boxed::Box;
 use TASKLIST;
 use root;
-use fs_node::{Directory, File, FSCompatible, WeakDirRef, DirRef, FileRef, FSNode};
+use fs_node::{Directory, File, FsNode, WeakDirRef, DirRef, FileRef, FileOrDir};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
@@ -48,7 +48,7 @@ impl<'a> TaskFile<'a> {
     }
 }
 
-impl<'a> FSCompatible for TaskFile<'a> {
+impl<'a> FsNode for TaskFile<'a> {
     fn get_name(&self) -> String {
         return self.task.lock().name.clone();
     }
@@ -96,7 +96,7 @@ impl<'a> File for TaskFile<'a> {
 pub struct TaskDirectory {
     name: String,
     /// A list of DirRefs or pointers to the child directories 
-    children: BTreeMap<String, FSNode>,
+    children: BTreeMap<String, FileOrDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     parent: WeakDirRef,
 }
@@ -113,18 +113,18 @@ impl TaskDirectory {
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
         let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent pointer")?;
-        strong_parent.lock().insert_child(FSNode::Dir(dir_ref))?;
+        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
         return Ok(dir_ref_copy);
     }
 
-    fn add_fs_node(&mut self, new_node: FSNode) -> Result<(), &'static str> {
+    fn add_fs_node(&mut self, new_node: FileOrDir) -> Result<(), &'static str> {
         let name = new_node.get_name();
         match new_node {
-            FSNode::Dir(dir) => {
-                self.children.insert(name, FSNode::Dir(dir));
+            FileOrDir::Dir(dir) => {
+                self.children.insert(name, FileOrDir::Dir(dir));
                 },
-            FSNode::File(file) => {
-                self.children.insert(name, FSNode::File(file));
+            FileOrDir::File(file) => {
+                self.children.insert(name, FileOrDir::File(file));
                 },
         }
         Ok(())
@@ -140,8 +140,8 @@ impl TaskDirectory {
         match locked_parent.get_child(self.get_name(), false) {
             Ok(child) => {
                 match child {
-                    FSNode::Dir(dir) => Ok(dir),
-                    FSNode::File(_file) => Err("should not be a file"),
+                    FileOrDir::Dir(dir) => Ok(dir),
+                    FileOrDir::File(_file) => Err("should not be a file"),
                 }
             },
             Err(err) => return Err(err)
@@ -149,7 +149,7 @@ impl TaskDirectory {
     }
 }
 
-impl FSCompatible for TaskDirectory {
+impl FsNode for TaskDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = String::from(TASKS_STR);
@@ -172,14 +172,14 @@ impl FSCompatible for TaskDirectory {
 
 impl Directory for TaskDirectory {
     /// This function adds a newly created fs node (the argument) to the TASKS directory's children vector    
-    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
         return Ok(())
     }
 
-    fn get_child(&mut self, child: String, is_file: bool) -> Result<FSNode, &'static str> {
+    fn get_child(&mut self, child: String, is_file: bool) -> Result<FileOrDir, &'static str> {
         if is_file {
             return Err("cannot get a file from the tasks directory");
         } 
@@ -212,14 +212,14 @@ impl Directory for TaskDirectory {
             };
             let task_dir = Arc::new(Mutex::new(Box::new(new_dir) as Box<Directory + Send>));
             let task_dir_pointer = Arc::clone(&task_dir);
-            self.add_fs_node(FSNode::Dir(Arc::clone(&task_dir))).ok();
+            self.add_fs_node(FileOrDir::Dir(Arc::clone(&task_dir))).ok();
             match create_mmi_dir(task_ref.clone(), task_dir_pointer) {
                 Ok(mmi_info) => {
                     mmi_info
                 }, 
                 Err(err) => return Err(err)
             };
-            return Ok(FSNode::Dir(task_dir));
+            return Ok(FileOrDir::Dir(task_dir));
         }
     }
 

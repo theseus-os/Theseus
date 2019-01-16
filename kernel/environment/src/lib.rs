@@ -6,7 +6,7 @@ extern crate fs_node;
 
 use alloc::string::String;
 use alloc::sync::Arc;
-use fs_node::{DirRef, FSCompatible};
+use fs_node::{DirRef, FsNode};
 
 /// A structure that contains Environmnt variables for a given task
 /// For now, the one variable is the current working directory of the task, which is 

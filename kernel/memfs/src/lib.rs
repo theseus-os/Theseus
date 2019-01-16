@@ -16,13 +16,13 @@ extern crate irq_safety;
 // use alloc::vec::Vec;
 use core::ops::DerefMut;
 use alloc::string::String;
-use fs_node::{DirRef, WeakDirRef, File, FSCompatible};
+use fs_node::{DirRef, WeakDirRef, File, FsNode};
 use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use alloc::boxed::Box;
-use fs_node::FSNode;
+use fs_node::FileOrDir;
 
 /// The struct that represents a file in memory that is backed by MappedPages
 pub struct MemFile {
@@ -61,7 +61,7 @@ impl MemFile {
             };
             let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
             let strong_parent = Weak::upgrade(&parent).ok_or("parent possibly doesn't exist for this MemFile")?;
-            strong_parent.lock().insert_child(FSNode::File(boxed_file))?; // adds the newly created file to the tree
+            strong_parent.lock().insert_child(FileOrDir::File(boxed_file))?; // adds the newly created file to the tree
             return Ok(())
         }
         return Err("could not get active table");
@@ -115,7 +115,7 @@ impl File for MemFile {
     }
 }
 
-impl FSCompatible for MemFile {
+impl FsNode for MemFile {
     fn get_name(&self) -> String {
         self.name.clone()
     }

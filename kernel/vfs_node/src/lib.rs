@@ -18,7 +18,7 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{DirRef, FileRef, WeakDirRef, Directory, FSNode, File, FSCompatible};
+use fs_node::{DirRef, FileRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
 
 
 /// A struct that represents a node in the VFS 
@@ -26,7 +26,7 @@ pub struct VFSDirectory {
     /// The name of the directory
     pub name: String,
     /// A list of DirRefs or pointers to the child directories   
-    pub children: BTreeMap<String, FSNode>,
+    pub children: BTreeMap<String, FileOrDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     pub parent: WeakDirRef,
 }
@@ -45,28 +45,28 @@ impl VFSDirectory {
         // create a copy of the newly created directory so we can return it
         let dir_ref_copy = Arc::clone(&dir_ref);
         let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-        strong_parent.lock().insert_child(FSNode::Dir(dir_ref))?;
+        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
         return Ok(dir_ref_copy)
     }
 }
 
 impl Directory for VFSDirectory {
-    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
         return Ok(())
     }
 
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str> {
         let option_child = self.children.get(&child_name);
             match option_child {
                 Some(child) => match child {
-                    FSNode::File(file) => {
-                            return Ok(FSNode::File(Arc::clone(file)));
+                    FileOrDir::File(file) => {
+                            return Ok(FileOrDir::File(Arc::clone(file)));
                         }
-                    FSNode::Dir(dir) => {
-                            return Ok(FSNode::Dir(Arc::clone(dir)));
+                    FileOrDir::Dir(dir) => {
+                            return Ok(FileOrDir::Dir(Arc::clone(dir)));
                         }
                 },
                 None => Err("file/directory does not exist")
@@ -80,7 +80,7 @@ impl Directory for VFSDirectory {
     }
 }
 
-impl FSCompatible for VFSDirectory {
+impl FsNode for VFSDirectory {
     fn get_name(&self) -> String {
         self.name.clone()
     }
@@ -116,7 +116,7 @@ impl VFSFile {
         // create a copy of the newly created directory so we can return it
         let file_pointer_copy = Arc::clone(&file_pointer);
         let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-        strong_parent.lock().insert_child(FSNode::File(file_pointer))?;
+        strong_parent.lock().insert_child(FileOrDir::File(file_pointer))?;
         return Ok(file_pointer_copy)
     }
 }
@@ -129,7 +129,7 @@ impl File for VFSFile {
     fn size(&self) -> usize {unimplemented!()}
 }
 
-impl FSCompatible for VFSFile {
+impl FsNode for VFSFile {
     fn get_name(&self) -> String {
         self.name.clone()
     }

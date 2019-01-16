@@ -11,7 +11,7 @@ extern crate vfs_node;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use fs_node::{FSNode, DirRef};
+use fs_node::{FileOrDir, DirRef};
 use alloc::boxed::Box;
 
 /// A structure that represents a file  
@@ -107,7 +107,7 @@ impl Path {
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &DirRef) -> Result<FSNode, &'static str> {
+    pub fn get(&self, wd: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path;
         { current_path = Path::new(wd.lock().get_path_as_string());}
         
@@ -157,9 +157,9 @@ impl Path {
                         if child_name == &component {
                             match new_wd.lock().get_child(child_name.to_string(), false) {
                                 Ok(child) => match child {
-                                    FSNode::File(file) => return Ok(FSNode::File(Arc::clone(&file))),
-                                    FSNode::Dir(dir) => {
-                                        return Ok(FSNode::Dir(Arc::clone(&dir)));
+                                    FileOrDir::File(file) => return Ok(FileOrDir::File(Arc::clone(&file))),
+                                    FileOrDir::Dir(dir) => {
+                                        return Ok(FileOrDir::Dir(Arc::clone(&dir)));
                                     }
                                 },
                                 Err(err) => return Err(err),
@@ -170,8 +170,8 @@ impl Path {
                                
                 let dir = match new_wd.lock().get_child(component.clone().to_string(),  false) {
                     Ok(child) => match child {
-                        FSNode::Dir(dir) => dir,
-                        FSNode::File(_file) => return Err("shouldn't be a file here"),
+                        FileOrDir::Dir(dir) => dir,
+                        FileOrDir::File(_file) => return Err("shouldn't be a file here"),
                     }, 
                     Err(err) => return Err(err),
                 };
@@ -179,7 +179,7 @@ impl Path {
             }
 
         }
-        return Ok(FSNode::Dir(new_wd));
+        return Ok(FileOrDir::Dir(new_wd));
     }
 }
 

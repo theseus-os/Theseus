@@ -17,7 +17,7 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{DirRef, WeakDirRef, Directory, FSNode, FSCompatible, File};
+use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, FsNode, File};
 
 lazy_static! {
     /// The root directory
@@ -47,26 +47,26 @@ pub struct RootDirectory {
     /// The name of the directory
     name: String,
     /// A list of DirRefs or pointers to the child directories   
-    children: BTreeMap<String, FSNode>,
+    children: BTreeMap<String, FileOrDir>,
 }
 
 impl Directory for RootDirectory {
-    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
         return Ok(())
     }
 
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str> {
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str> {
         let option_child = self.children.get(&child_name);
         match option_child {
             Some(child) => match child {
-                FSNode::File(file) => {
-                        return Ok(FSNode::File(Arc::clone(file)));
+                FileOrDir::File(file) => {
+                        return Ok(FileOrDir::File(Arc::clone(file)));
                     }
-                FSNode::Dir(dir) => {
-                        return Ok(FSNode::Dir(Arc::clone(dir)));
+                FileOrDir::Dir(dir) => {
+                        return Ok(FileOrDir::Dir(Arc::clone(dir)));
                     }
             },
             None => Err("could not get child from children map")
@@ -79,7 +79,7 @@ impl Directory for RootDirectory {
     }
 }
 
-impl FSCompatible for RootDirectory {
+impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         return "/root".to_string();

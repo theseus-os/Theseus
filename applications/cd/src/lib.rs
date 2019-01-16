@@ -17,7 +17,7 @@ use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
 use path::Path;
-use fs_node::FSNode;
+use fs_node::FileOrDir;
 
 
 #[no_mangle]
@@ -67,11 +67,11 @@ pub fn main(args: Vec<String>) -> isize {
     match path.get(&curr_wr) {
         Ok(file_dir_enum) => {
             match file_dir_enum {
-                FSNode::Dir(dir) => {
+                FileOrDir::Dir(dir) => {
                     curr_env.lock().set_wd(dir);
                     return 0;
                 },
-                FSNode::File(file) => {
+                FileOrDir::File(file) => {
                     println!("'{}' is not a directory, cannot cd into file", file.lock().get_name());
                     return -1;
                 }

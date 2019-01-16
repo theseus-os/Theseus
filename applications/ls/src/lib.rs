@@ -12,7 +12,7 @@ extern crate path;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
-use fs_node::FSNode;
+use fs_node::FileOrDir;
 use getopts::Options;
 use path::Path;
 use alloc::sync::Arc;
@@ -71,7 +71,7 @@ pub fn main(args: Vec<String>) -> isize {
     match path.get(&curr_wd) {
         Ok(file_dir_enum) => {
             match file_dir_enum {
-                FSNode::Dir(dir) => {
+                FileOrDir::Dir(dir) => {
                     let mut child_string = String::new();
                     let mut child_list = dir.lock().list_children(); 
                     child_list.reverse();
@@ -81,7 +81,7 @@ pub fn main(args: Vec<String>) -> isize {
                     println!("{}", child_string);
                     return 0;
                 },
-                FSNode::File(file) => {
+                FileOrDir::File(file) => {
                     println!("'{}' is not a directory, cannot ls file", file.lock().get_name());
                     return -1;
                 }

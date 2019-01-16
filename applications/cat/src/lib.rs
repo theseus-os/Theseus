@@ -16,7 +16,7 @@ use alloc::string::ToString;
 use getopts::Options;
 use core::ops::Deref;
 use path::Path;
-use fs_node::FSNode;
+use fs_node::FileOrDir;
 
 
 #[no_mangle]
@@ -56,10 +56,10 @@ pub fn main(args: Vec<String>) -> isize {
     match path.get(&curr_wr) {
         Ok(file_dir_enum) => { 
             match file_dir_enum {
-                FSNode::Dir(directory) => {
+                FileOrDir::Dir(directory) => {
                     println!("'{}' is not a file, cannot call cat", directory.lock().get_name());
                 },
-                FSNode::File(file) => {
+                FileOrDir::File(file) => {
                     let file_size = file.lock().size();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     

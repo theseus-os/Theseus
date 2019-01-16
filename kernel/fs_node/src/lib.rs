@@ -5,10 +5,10 @@
 //! and all directories have a parent directory (except for the special root directory). 
 //! All files must be contained within directories. 
 //! 
-//! Note that both File and Directory extend from FSCompatible, which is a trait that defines
+//! Note that both File and Directory extend from FsNode, which is a trait that defines
 //! common methods for both Files and Directories to enhance code reuse 
 //! 
-//! Some functions return an enum FSNode; this allows us to seamlessly call functions on the return types of
+//! Some functions return an enum FileOrDir; this allows us to seamlessly call functions on the return types of
 //! other filesystem functions, and then we simply match on the FSnode to extract the concrete type
 //! to perform the desired function
 
@@ -33,7 +33,7 @@ pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
 pub type FileRef = Arc<Mutex<Box<File + Send>>>;
 
 /// Traits that both files and directories share
-pub trait FSCompatible {
+pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.get_name();
@@ -49,8 +49,8 @@ pub trait FSCompatible {
     fn get_parent_dir(&self) -> Result<DirRef, &'static str>;
 } 
 
-// Traits for files, implementors of File must also implement FSCompatible
-pub trait File : FSCompatible {
+// Traits for files, implementors of File must also implement FsNode
+pub trait File : FsNode {
     /// Reads the bytes from a file: implementors should pass in an empty buffer that the read function writes the file's data to
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str>; 
     /// Writes the bytes argument to the contents of the file
@@ -63,42 +63,42 @@ pub trait File : FSCompatible {
     fn size(&self) -> usize;
 }
 
-/// Traits for directories, implementors of Directory must also implement FSCompatible
-pub trait Directory : FSCompatible + Send {
+/// Traits for directories, implementors of Directory must also implement FsNode
+pub trait Directory : FsNode + Send {
     /// Gets an individual child node from the current directory based on the name field of that node
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FSNode, &'static str>; 
+    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
-    fn insert_child(&mut self, child: FSNode) -> Result<(), &'static str>;
+    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
     /// Lists the names of the children nodes of the current directory
     fn list_children(&mut self) -> Vec<String>;
 }
 
 /// Allows us to return a generic type that can be matched by the caller to extract the underlying type
 #[derive(Clone)]
-pub enum FSNode {
+pub enum FileOrDir {
     File(FileRef),
     Dir(DirRef),
 }
 
 // Allows us to call methods directly on an enum so we don't have to match on the underlying type
-impl FSCompatible for FSNode {
+impl FsNode for FileOrDir {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         return match self {
-            FSNode::File(file) => file.lock().get_path_as_string(),
-            FSNode::Dir(dir) => dir.lock().get_path_as_string(),
+            FileOrDir::File(file) => file.lock().get_path_as_string(),
+            FileOrDir::Dir(dir) => dir.lock().get_path_as_string(),
         };
     }
     fn get_name(&self) -> String {
         return match self {
-            FSNode::File(file) => file.lock().get_name(),
-            FSNode::Dir(dir) => dir.lock().get_name(),
+            FileOrDir::File(file) => file.lock().get_name(),
+            FileOrDir::Dir(dir) => dir.lock().get_name(),
         };
     }
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         return match self {
-            FSNode::File(file) => file.lock().get_parent_dir(),
-            FSNode::Dir(dir) => dir.lock().get_parent_dir(),
+            FileOrDir::File(file) => file.lock().get_parent_dir(),
+            FileOrDir::Dir(dir) => dir.lock().get_parent_dir(),
         };
     }
 }

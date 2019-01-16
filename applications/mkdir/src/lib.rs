@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::string::ToString;
-use fs_node::FSNode;
+use fs_node::FileOrDir;
 use vfs_node::VFSDirectory;
 
 #[no_mangle]
