@@ -163,7 +163,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
             
         // found a runnable task!
         // We add its priority
-        total_priorities = total_priorities + t.priority.unwrap_or(0) as u32;
+        total_priorities = total_priorities + 1 + t.priority.unwrap_or(0) as u32;
         
         
         
@@ -215,7 +215,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
                     return false;
                 }
             }
-            task_tokens = epcoh * t.priority.unwrap() as u32 / total_priorities;
+            task_tokens = epcoh * (t.priority.unwrap() as u32 + 1) / total_priorities;
         }
         
         {

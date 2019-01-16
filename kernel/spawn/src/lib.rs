@@ -243,7 +243,13 @@ impl ApplicationTaskBuilder {
 
     /// Assign priority to new task.
     pub fn set_priority(mut self, priority: u8) -> ApplicationTaskBuilder {
-        self.priority = Some(priority);
+        let clipped_priority = if priority > 40{
+            40
+        }
+        else {
+            priority
+        };
+        self.priority = Some(clipped_priority);
         self
     }
 
