@@ -22,14 +22,17 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 use runqueue::RunQueueTrait;
 
-
-
-lazy_static! {
-    /// There is one runqueue per core, each core only accesses its own private runqueue
-    /// and allows the scheduler to select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
-
+/// A cloneable reference to a `Taskref` that exposes more methods
+/// related to task scheduling
+/// 
+/// The `RoundRobinTaskRef` type is necessary differnt scheduling algorithms 
+/// require different data associated with the task to be stored alongside,
+/// which makes storing them alongside the task prohibitive
+/// Since round robin is the most primitive scheduling policy 
+/// additional scheduling information is needed.
+/// context_switches indicate the number of context switches
+/// the task has undergone
+/// context_switches is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct RoundRobinTaskRef{
     taskref: TaskRef,
@@ -46,34 +49,42 @@ impl RoundRobinTaskRef {
             taskref: taskref,
             times_picked: 0,
         };
-        //let tld = TaskLocalData {
-        //    current_taskref: taskref.clone(),
-        //    current_task_id: task_id,
-        //};
-        //let tld_ptr = Box::into_raw(Box::new(tld));
-        //taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
         round_robin_taskref
     }
 
+    /// Get a pointer for the underlying TaskRef
     pub fn get_task_ref(round_robin_taskref: Option<RoundRobinTaskRef>) -> Option<TaskRef> {
         round_robin_taskref.map(|m| m.taskref)
     }
 
+    /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()
     }
 
+    /// Increment the number of times the task is picked
     pub fn increase_times_picked(&mut self) -> (){
         self.times_picked = self.times_picked + 1;
     }
 }
 
+lazy_static! {
+    /// There is one runqueue per core, each core only accesses its own private runqueue
+    /// and allows the scheduler to select a task from that runqueue to schedule in.
+    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
+}
+
+/// A list of references to `Task`s (`RoundRobinTaskRef`s) 
+/// that is used to store the `Task`s (and associated scheduler related data) 
+/// that are runnable on a given core.
+/// A queue is used for the round robin schedular
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<RoundRobinTaskRef>,
 }
 
+/// Scheduler related `RunQueue` functions are listed here
 impl RunQueue {
     
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
@@ -85,10 +96,6 @@ impl RunQueue {
         }).map(|m| m.taskref)
     }
 
-    pub fn remove_from_queue(&mut self, index: usize) -> Option<RoundRobinTaskRef> {
-        self.queue.remove(index)
-    }
-
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
     // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
@@ -96,7 +103,9 @@ impl RunQueue {
     }
 }
 
+/// Functions required for the `RunQueue` as defined by `RunQueueTrait` is implemented here
 impl RunQueueTrait for RunQueue {
+    
     /// Creates a new `RunQueue` for the given core, which is an `apic_id` and with minimumweighted runtime
     fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
