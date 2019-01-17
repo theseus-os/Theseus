@@ -34,7 +34,7 @@ use ota_update_client::CrateSet;
 pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     let update_builds = ota_update_client::get_available_update_builds(&iface)?;
 
-    warn!("AVAILABLE UPDATE BUILDS:\n{:?}", update_builds);
+    warn!("AVAILABLE UPDATE BUILDS: {:?}", update_builds);
     let keyboard_log_ub = update_builds.iter()
         .find(|&e| e == "keyboard_log")
         .ok_or("build server did not have an update build called \"keyboard_log\"")?;
@@ -47,7 +47,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_include)?;
 
     warn!("DOWNLOADED CRATES:"); 
-    for c in new_crates { 
+    for c in new_crates {
         warn!("\t{:?}: size {}", c.name, c.content.content().len());
     }
     Err("unfinished")

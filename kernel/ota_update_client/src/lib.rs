@@ -29,8 +29,8 @@ use alloc::{
 };
 use acpi::get_hpet;
 use smoltcp::{
-    wire::IpAddress,
-    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
+    wire::{IpAddress, IpEndpoint},
+    socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
@@ -64,7 +64,7 @@ const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
 
 /// The name (and relative path) of the listing file inside each update build directory,
 /// which contains the names of all crate object files that were built.  
-const LISTING_FILE_NAME: &'static str = "listings.txt";
+const LISTING_FILE_NAME: &'static str = "listing.txt";
 
 /// The name of the directory containing the checksums of each crate object file
 /// inside of a given update build.
@@ -245,47 +245,19 @@ fn download_files<S: AsRef<str>>(
         );
     }
 
-
     // first, attempt to connect the socket to the remote server
-    let timeout_millis = 3000; // 3 second timeout
-    let start = hpet_ticks!();
-    
-    if sockets.get::<TcpSocket>(tcp_handle).is_active() {
-        warn!("ota_update_client: when connecting socket, it was already active...");
-    } else {
-        debug!("ota_update_client: connecting socket...");
-        sockets.get::<TcpSocket>(tcp_handle).connect((dest_addr, dest_port), local_port).map_err(|_e| {
-            error!("ota_update_client: failed to connect socket, error: {:?}", _e);
-            "ota_update_client: failed to connect socket"
-        })?;
-
-        loop {
-            let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
-            
-            // if the socket actually connected, it should be able to send/recv
-            let socket = sockets.get::<TcpSocket>(tcp_handle);
-            if socket.may_send() && socket.may_recv() {
-                break;
-            }
-
-            // check to make sure we haven't timed out
-            if millis_since(start)? > timeout_millis {
-                error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_millis);
-                return Err("ota_update_client: failed to connect to socket, timed out.");
-            }
-        }
-    }
-
+    connect(iface, &mut sockets, tcp_handle, (dest_addr, dest_port), local_port, startup_time)?;
     debug!("ota_update_client: socket connected successfully!");
 
     let mut downloaded_files: Vec<DownloadedFile> = Vec::with_capacity(absolute_paths.len());
     let last_index = absolute_paths.len() - 1;
     for (i, path) in absolute_paths.iter().enumerate() {
+        let path = path.as_ref();
         let is_last_request = i == last_index;
 
         let http_request = {
             let method = "GET";
-            let uri = utf8_percent_encode(path.as_ref(), DEFAULT_ENCODE_SET);
+            let uri = utf8_percent_encode(path, DEFAULT_ENCODE_SET);
             let version = "HTTP/1.1";
             let connection = if is_last_request { "Connection: close" } else { "Connection: keep-alive" };
             format!("{} {} {}\r\n{}\r\n{}\r\n\r\n",
@@ -304,12 +276,21 @@ fn download_files<S: AsRef<str>>(
 
         // send the HTTP request and obtain a response
         let response = {
+            if !is_connected(&mut sockets, tcp_handle) {
+                // if the socket isn't connected, try once to reconnect it
+                connect(iface, &mut sockets, tcp_handle, (dest_addr, dest_port), local_port, startup_time)?;
+            }
             let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
             send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
         };
 
+        if response.status_code != 200 {
+            error!("ota_update_client: failed to download {:?}, Error {}: {}", path, response.status_code, response.reason);
+            return Err("failed to download file at the given URI");
+        }
+
         downloaded_files.push(DownloadedFile {
-            name: path.as_ref().into(),
+            name: path.into(),
             content: response,
         });
     }
@@ -353,6 +334,58 @@ fn download_files<S: AsRef<str>>(
     }
 
     Ok(downloaded_files)
+}
+
+
+/// A convenience function that checks whether a socket is connected, 
+/// which is currently true when both `may_send()` and `may_recv()` are true.
+fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
+    let socket = sockets.get::<TcpSocket>(tcp_handle);
+    socket.may_send() && socket.may_recv()
+}
+
+
+/// A convenience function for connecting a socket 
+fn connect<I>(
+    iface: &NetworkInterfaceRef,
+    sockets: &mut SocketSet, 
+    tcp_handle: SocketHandle,
+    remote_endpoint: I,
+    local_port: u16, 
+    startup_time: u64,
+) -> Result<(), &'static str> 
+    where I: Into<IpEndpoint>
+{
+    let timeout_millis = 3000; // 3 second timeout
+    let start = hpet_ticks!();
+    
+    if sockets.get::<TcpSocket>(tcp_handle).is_active() {
+        warn!("ota_update_client: when connecting socket, it was already active...");
+    } else {
+        debug!("ota_update_client: connecting socket...");
+        sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
+            error!("ota_update_client: failed to connect socket, error: {:?}", _e);
+            "ota_update_client: failed to connect socket"
+        })?;
+
+        loop {
+            let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+            
+            // if the socket actually connected, it should be able to send/recv
+            let socket = sockets.get::<TcpSocket>(tcp_handle);
+            if socket.may_send() && socket.may_recv() {
+                break;
+            }
+
+            // check to make sure we haven't timed out
+            if millis_since(start)? > timeout_millis {
+                error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_millis);
+                return Err("ota_update_client: failed to connect to socket, timed out.");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 

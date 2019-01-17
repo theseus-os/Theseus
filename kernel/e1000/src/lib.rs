@@ -676,7 +676,7 @@ impl E1000Nic {
 
         // receiver timer interrupt
         if (status & INT_RX) == INT_RX {
-            debug!("e1000::handle_interrupt(): receive interrupt");
+            // debug!("e1000::handle_interrupt(): receive interrupt");
             self.handle_receive()?;
             handled = true;
         }
