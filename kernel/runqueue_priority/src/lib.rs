@@ -11,7 +11,6 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
-extern crate runqueue;
 
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;

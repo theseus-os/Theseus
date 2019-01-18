@@ -9,14 +9,17 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
-extern crate runqueue_round_robin;
+#[cfg(priority_scheduler)] extern crate runqueue_priority;
+#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
 use irq_safety::{RwLockIrqSafe};
 use task::{TaskRef};
-use runqueue_round_robin::RunQueue;
+#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
+#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
+
 
 /// Runqueue structure holds the list of tasks that are runnable in a given core 
 //pub trait RunQueueTrait {

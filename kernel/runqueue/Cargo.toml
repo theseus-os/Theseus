@@ -27,6 +27,9 @@ path = "../task"
 [dependencies.runqueue_round_robin]
 path = "../runqueue_round_robin"
 
+[dependencies.runqueue_priority]
+path = "../runqueue_priority"
+
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.
