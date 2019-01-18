@@ -36,6 +36,8 @@ pub struct PriorityTaskRef{
     /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
 
+    pub priority: u8,
+
     /// Remaining tokens in this epoch. A will be scheduled in an epoch until tokens run out
     pub tokens_remaining: u32,
 
@@ -50,6 +52,7 @@ impl PriorityTaskRef {
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
+            priority: 20,
             tokens_remaining: 10,
             context_switches: 0,
         };
