@@ -30,29 +30,29 @@ pub fn main(args: Vec<String>) -> (){
         .spawn().expect("failed to initiate task");
 }
 
-fn test1(a: u32) -> u32 {
+fn test1(_a: u32) -> u32 {
     let mut i = 1;
     loop {
        debug!("A {}", i);
        i = i + 1; 
     }
-    a
+    _a
 }
 
-fn test2(a: u32) -> u32 {
+fn test2(_a: u32) -> u32 {
     let mut i = 1;
     loop {
        debug!("B {}", i);
        i = i + 1; 
     }
-    a
+    _a
 }
 
-fn test3(a: u32) -> u32 {
+fn test3(_a: u32) -> u32 {
     let mut i = 1;
     loop {
        debug!("C {}", i);
        i = i + 1; 
     }
-    a
+    _a
 }

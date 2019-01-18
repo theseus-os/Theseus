@@ -17,7 +17,7 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use irq_safety::{RwLockIrqSafe, MutexIrqSafe, MutexIrqSafeGuardRef};
+use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 
