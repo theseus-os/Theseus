@@ -1,4 +1,5 @@
-//! This crate contains the `RunQueue` structure, which is essentially a list of Tasks
+//! This crate contains the `RunQueue` structure, for round robin scheduler. 
+//! `RunQueue` structure is essentially a list of Tasks
 //! that it used for scheduling purposes.
 //! 
 
@@ -82,7 +83,8 @@ pub struct RunQueue {
     queue: VecDeque<RoundRobinTaskRef>,
 }
 
-/// Scheduler related `RunQueue` functions are listed here
+/// `RunQueue` functions are listed here. This is a superset of functions listed in
+/// `RunQueue` crate.
 impl RunQueue {
     
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
@@ -99,11 +101,7 @@ impl RunQueue {
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
         self.queue.iter()
     }
-}
-
-/// Functions required for the `RunQueue` as defined by `RunQueueTrait` is implemented here
-impl RunQueue {
-    
+   
     /// Creates a new `RunQueue` for the given core, which is an `apic_id` and with minimumweighted runtime
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
@@ -141,7 +139,7 @@ impl RunQueue {
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    pub fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
+    fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
         let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
@@ -179,7 +177,7 @@ impl RunQueue {
     }
 
     /// Adds a `TaskRef` to this RunQueue.
-    pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
+    fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
         
@@ -213,7 +211,7 @@ impl RunQueue {
 
 
     /// The internal function that actually removes the task from the runqueue.
-    pub fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| &x.taskref != task);
 

@@ -34,9 +34,6 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.runqueue_priority]
-path = "../../kernel/runqueue_priority"
-
 [dependencies.memory]
 path  = "../../kernel/memory"
 

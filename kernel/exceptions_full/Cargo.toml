@@ -28,12 +28,6 @@ path = "../task"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
-
-[dependencies.runqueue_round_robin]
-path = "../runqueue_round_robin"
-
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 
