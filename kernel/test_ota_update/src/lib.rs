@@ -7,7 +7,7 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate network_manager;
 extern crate mod_mgmt;
 extern crate ota_update_client;
@@ -17,7 +17,6 @@ use alloc::{
     collections::BTreeSet,
 };
 use network_manager::{NetworkInterfaceRef};
-use ota_update_client::CrateSet;
 
 
 
@@ -32,7 +31,7 @@ use ota_update_client::CrateSet;
 
 /// Implements a very simple update scenario that downloads the "keyboard_log" update build and deploys it. 
 pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
-    let update_builds = ota_update_client::get_available_update_builds(&iface)?;
+    let update_builds = ota_update_client::download_available_update_builds(&iface)?;
 
     warn!("AVAILABLE UPDATE BUILDS: {:?}", update_builds);
     let keyboard_log_ub = update_builds.iter()
@@ -42,7 +41,11 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     let crates_to_include = {
         let mut set: BTreeSet<String> = BTreeSet::new();
         set.insert(String::from("k#keyboard-36be916209949cef.o"));
-        CrateSet::Include(set)
+        // set.insert(String::from("k#atomic-905b6e75d16e053c.o"));
+        // set.insert(String::from("k#bit_field-beaefef505b4f61a.o"));
+        set.insert(String::from("k#dbus-495835640c757fc3.o"));
+        set.insert(String::from("k#xmas_elf-3d0cd20d4e1d4ba9.o"));
+        set
     };
     let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_include)?;
 
@@ -52,3 +55,22 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     }
     Err("unfinished")
 }
+
+
+
+
+// fn download_from_listing() {
+//     // Iterate over the list of crate files in the listing, and build a vector of file paths to download. 
+//     // We need to download all crates that differ from the given list of `existing_crates`, 
+//     // plus the files containing those crates' sha512 checksums.
+//     let files_list = str::from_utf8(listing_file.content.content())
+//         .map_err(|_e| "couldn't convert received update listing file into a UTF8 string")?;
+
+//     let mut paths_to_download: Vec<String> = Vec::new();
+//     for file in files_list.lines()
+//         .map(|line| line.trim())
+//         .filter(|&line| crate_set.includes(line))
+//     {
+
+//     }
+// }

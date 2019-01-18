@@ -178,13 +178,15 @@ impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'soc
 }
 
 /// Sends the given HTTP request over the network via the given `socket` on the given `interface`,
-/// waits to receive a full HTTP response from the remote server, 
+/// waits to receive a full HTTP response from the remote endpoint, 
 /// and then returns that full response, or an error if the response wasn't fully received properly.
 /// 
 /// # Arguments
 /// * `request`: the HTTP request to be sent via the connected socket.
 /// * `tcp_socket`: the connected TCP socket that will be used to send the HTTP request and receive the response.
-/// * `timeout_millis`: the timeout in milliseconds that limits how long this function will wait for a response from the remote endpoint.
+/// * `inactivity_timeout_millis`: the timeout in milliseconds that limits how long this function will wait during periods of inactivity. 
+///    This is not a timeout that bounds the total execution time of this function; the timer is reset when a packet is received. 
+///    For example, a value of `5000` means that the function will give up if more than 5 seconds elapses without any packets being received.
 /// 
 pub fn send_request(
     request: HttpRequest, 
@@ -207,20 +209,19 @@ pub fn send_request(
     let mut response_reason:      Option<String> = None;
 
     let startup_time = hpet_ticks!();
+    let mut latest_packet_timestamp = startup_time;
 
     // in the loop below, we do the actual work of sending the request and receiving the response 
     loop { 
         _loop_ctr += 1;
 
-        let packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
 
-        // check for timeout, only if no socket activity occurred
-        if !packet_io_occurred {
-            if let Some(timeout) = timeout_millis {
-                if millis_since(startup_time)? > timeout {
-                    error!("http_client: timed out after {} ms, in state {:?}", timeout, state);
-                    return Err("http_client: timed out");
-                }
+        // check if we have timed out
+        if let Some(t) = timeout_millis {
+            if millis_since(latest_packet_timestamp)? > t {
+                error!("http_client: timed out after {} ms, in state {:?}", t, state);
+                return Err("http_client: timed out");
             }
         }
 
@@ -230,20 +231,20 @@ pub fn send_request(
             HttpState::Requesting if socket.can_send() => {
                 debug!("http_client: sending HTTP request: {:?}", request);
                 socket.send_slice(request.as_ref()).expect("http_client: cannot send request");
+                latest_packet_timestamp = hpet_ticks!();
                 HttpState::ReceivingResponse
             }
 
             HttpState::ReceivingResponse if socket.can_recv() => {
                 // Stay in the receiving state for now; will be changed later if we receive the entire packet.
                 let mut new_state = HttpState::ReceivingResponse;
+                let orig_packet_length = packet_byte_buffer.len();
 
                 let recv_result = socket.recv(|data| {
-
                     // Eagerly append ALL of the received data onto the end of our packet slice, 
                     // which is necessary to attempt to parse it as an HTTP response.
                     // Later, we can remove bytes towards the end if we ended up appending too many bytes,
                     // e.g., we received more than enough bytes and some of them were for the next packet.
-                    let orig_length = packet_byte_buffer.len();
                     packet_byte_buffer.extend_from_slice(data);
 
                     let bytes_popped_off = {
@@ -264,7 +265,6 @@ pub fn send_request(
                                 packet_header_length = Some(total_header_len);
                                 response_status_code = response.code;
                                 response_reason = response.reason.map(|s| String::from(s));
-                                trace!("http_client: received all headers in the HTTP response, len {}", total_header_len);
 
                                 // Here: we've received all headers, but we may not be done receiving the full response.
                                 // If there is a "Content-Length" header present, we can use that to see if all the bytes are received.
@@ -279,9 +279,9 @@ pub fn send_request(
                                         )
                                     {
                                         Ok(content_length) => {
-                                            debug!("http_client: packet_byte_buffer len: {}, content_length: {}, header_len: {} (_loop_ctr: {})", 
-                                                packet_byte_buffer.len(), content_length, total_header_len, _loop_ctr
-                                            );
+                                            // debug!("http_client: packet_byte_buffer len: {}, content_length: {}, header_len: {} (_loop_ctr: {})", 
+                                            //     packet_byte_buffer.len(), content_length, total_header_len, _loop_ctr
+                                            // );
                                             // the total num of bytes that we want is the length of all the headers + the content
                                             let expected_length = total_header_len + content_length;
                                             if packet_byte_buffer.len() < expected_length {
@@ -289,11 +289,10 @@ pub fn send_request(
                                                 data.len()
                                             } else {
                                                 // here: we *have* received all of the content, so the full response is ready
-                                                debug!("http_client: HTTP response fully received. (_loop_ctr: {})", _loop_ctr);
                                                 new_state = HttpState::Responded;
                                                 // we pop off the exact number of bytes that make up the rest of the content,
                                                 // leaving the rest on the recv buffer
-                                                expected_length - orig_length
+                                                expected_length - orig_packet_length
                                             } 
 
                                         }
@@ -327,7 +326,7 @@ pub fn send_request(
 
                     // Since we eagerly appended all of the received bytes onto this buffer, 
                     // we need to fix that up based on how many bytes we actually ended up popping off the recv buffer
-                    packet_byte_buffer.truncate(orig_length + bytes_popped_off);
+                    packet_byte_buffer.truncate(orig_packet_length + bytes_popped_off);
 
                     (bytes_popped_off, ())
                 });
@@ -335,6 +334,11 @@ pub fn send_request(
                 if let Err(_e) = recv_result {
                     error!("http_client: receive error on socket: {:?}", _e);
                     return Err("receive error on socket");
+                }
+
+                // if we just received another packet (the packet buffer changed size), then update the timeout deadline
+                if orig_packet_length != packet_byte_buffer.len() {
+                    latest_packet_timestamp = hpet_ticks!();
                 }
                 
                 new_state
