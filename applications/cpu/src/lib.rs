@@ -7,14 +7,11 @@ extern crate apic;
 extern crate getopts;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_priority;
 
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use apic::get_lapics;
-use runqueue::RunQueueTrait;
-use runqueue_priority::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -42,7 +39,7 @@ pub fn main(args: Vec<String>) -> isize {
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = RunQueue::get_runqueue(apic_id).map(|rq| rq.read()) {
+        if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task_ref in runqueue.iter() {
                 let task = task_ref.lock();

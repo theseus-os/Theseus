@@ -7,8 +7,6 @@
 extern crate x86_64;
 extern crate task;
 extern crate runqueue;
-#[cfg(priority_scheduler)] extern crate runqueue_priority;
-#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 extern crate apic;
 extern crate pmu_x86;
 #[macro_use] extern crate log;
@@ -17,10 +15,7 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use runqueue::RunQueueTrait;
 
-#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
-#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -76,7 +71,7 @@ fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
         match taskref.kill(task::KillReason::Exception(exception_number)) {
             Ok(_) => {
-                if let Err(e) = RunQueue::remove_task_from_all(taskref) {
+                if let Err(e) = runqueue::remove_task_from_all(taskref) {
                     error!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
                 }
             }

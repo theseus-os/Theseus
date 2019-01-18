@@ -12,15 +12,10 @@ extern crate memory;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
-#[cfg(priority_scheduler)] extern crate runqueue_priority;
-#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
 
 use core::panic::PanicInfo;
 use alloc::string::String;
 use task::{KillReason, PanicInfoOwned};
-use runqueue::RunQueueTrait;
-#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
-#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
 
 /// performs the standard panic handling routine, which involves the following:
 /// 
@@ -56,7 +51,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         // kill the offending task (the current task)
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
-        RunQueue::remove_task_from_all(curr_task)?;
+        runqueue::remove_task_from_all(curr_task)?;
         Ok(())
     }
     else {

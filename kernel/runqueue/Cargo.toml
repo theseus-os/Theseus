@@ -24,6 +24,8 @@ path = "../../libs/atomic_linked_list"
 [dependencies.task]
 path = "../task"
 
+[dependencies.runqueue_round_robin]
+path = "../runqueue_round_robin"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

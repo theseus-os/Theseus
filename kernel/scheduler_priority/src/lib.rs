@@ -10,13 +10,11 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate task;
-extern crate runqueue;
 extern crate runqueue_priority;
 
 
 
 use task::TaskRef;
-use runqueue::RunQueueTrait;
 use runqueue_priority::RunQueue;
 
 /// A temporary data structure to hold result of  select_next_task_priority

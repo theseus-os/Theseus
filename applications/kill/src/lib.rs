@@ -5,14 +5,11 @@
 
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_priority;
 extern crate getopts;
 
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
-use runqueue::RunQueueTrait;
-use runqueue_priority::RunQueue;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
@@ -38,7 +35,7 @@ pub fn main(args: Vec<String>) -> isize {
                 if let Some(task_ref) = task::get_task(task_id) {
                     use core::ops::Deref;
                     if task_ref.kill(task::KillReason::Requested)
-                        .and_then(|_| RunQueue::remove_task_from_all(task_ref))
+                        .and_then(|_| runqueue::remove_task_from_all(task_ref))
                         .is_ok() 
                     {
                         println!("Killed task {} \n", task_ref.lock().deref());

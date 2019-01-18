@@ -15,7 +15,6 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate runqueue;
-extern crate runqueue_priority;
 extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
@@ -40,8 +39,6 @@ use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use fs_node::{DirRef, FsNode};
 use task::{TaskRef, ExitValue, KillReason};
-use runqueue::RunQueueTrait;
-use runqueue_priority::RunQueue;
 use environment::Environment;
 use spin::Mutex;
 
@@ -667,7 +664,7 @@ impl Terminal {
             };
             match task_ref_copy.kill(task::KillReason::Requested) {
                 Ok(_) => {
-                    if let Err(e) = RunQueue::remove_task_from_all(&task_ref_copy) {
+                    if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
                         error!("Killed task but could not remove it from runqueue: {}", e);
                     }
                 }

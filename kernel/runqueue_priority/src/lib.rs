@@ -20,7 +20,6 @@ use alloc::collections::VecDeque;
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
-use runqueue::RunQueueTrait;
 
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling
@@ -140,9 +139,9 @@ impl RunQueue {
 }
 
 /// Functions required for the `RunQueue` as defined by `RunQueueTrait` is implemented here
-impl RunQueueTrait for RunQueue {
+impl RunQueue {
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    fn init(which_core: u8) -> Result<(), &'static str> {
+    pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
@@ -165,20 +164,20 @@ impl RunQueueTrait for RunQueue {
     }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-    fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
+    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }
 
 
     /// Returns the "least busy" core, which is currently very simple, based on runqueue size.
-    fn get_least_busy_core() -> Option<u8> {
+    pub fn get_least_busy_core() -> Option<u8> {
         Self::get_least_busy_runqueue().map(|rq| rq.read().core)
     }
 
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
+    pub fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
         let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
@@ -199,7 +198,7 @@ impl RunQueueTrait for RunQueue {
 
     /// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
     /// and adds the given `Task` reference to that core's runqueue.
-    fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
+    pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
             .ok_or("couldn't find any runqueues to add the task to!")?;
@@ -208,7 +207,7 @@ impl RunQueueTrait for RunQueue {
     }
 
     /// Convenience method that adds the given `Task` reference to given core's runqueue.
-    fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+    pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
             .write()
@@ -216,7 +215,7 @@ impl RunQueueTrait for RunQueue {
     }
 
     /// Adds a `TaskRef` to this RunQueue.
-    fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
+    pub fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
         
@@ -244,13 +243,13 @@ impl RunQueueTrait for RunQueue {
 
     /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the RunQueue.
-    fn get(&self, index: usize) -> Option<&TaskRef> {
+    pub fn get(&self, index: usize) -> Option<&TaskRef> {
         self.queue.get(index).map(|m| &m.taskref)
     }
 
 
     /// The internal function that actually removes the task from the runqueue.
-    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
         self.queue.retain(|x| &x.taskref != task);
 
@@ -269,7 +268,7 @@ impl RunQueueTrait for RunQueue {
 
 
     /// Removes a `TaskRef` from this RunQueue.
-    fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         #[cfg(runqueue_state_spill_evaluation)]
         {
             // For the runqueue state spill evaluation, we disable this method because we 
@@ -285,7 +284,7 @@ impl RunQueueTrait for RunQueue {
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
-    fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
         }
@@ -296,7 +295,7 @@ impl RunQueueTrait for RunQueue {
     #[cfg(runqueue_state_spill_evaluation)]
     /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
     /// Note: This method is only used by the state spillful runqueue implementation.
-    fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
+    pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
         // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
         task.lock_mut().on_runqueue = None;
         RUNQUEUES.get(&core)

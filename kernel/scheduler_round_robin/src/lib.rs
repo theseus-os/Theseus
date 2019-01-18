@@ -7,9 +7,7 @@ extern crate task;
 extern crate runqueue;
 extern crate runqueue_round_robin;
 
-
 use task::TaskRef;
-use runqueue::RunQueueTrait;
 use runqueue_round_robin::RunQueue;
 
 
