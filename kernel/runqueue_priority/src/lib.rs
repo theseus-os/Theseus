@@ -33,8 +33,13 @@ use task::{TaskRef, Task};
 /// context_switches is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
+    /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
-    tokens_remaining: u32,
+
+    /// Remaining tokens in this epoch. A will be scheduled in an epoch until tokens run out
+    pub tokens_remaining: u32,
+
+    /// Number of context switches the task has undergone. Not used in scheduling algorithm
     context_switches: u32,
 }
 
@@ -62,18 +67,18 @@ impl PriorityTaskRef {
     }
 
     /// Get the number of remaining tokens
-    pub fn get_tokens(&self) -> u32{
-        self.tokens_remaining
-    }
+    // pub fn get_tokens(&self) -> u32{
+    //     self.tokens_remaining
+    // }
 
     /// Changes the number of tokens in a given task
-    pub fn update_tokens(&mut self, tokens: u32) -> (){
-        self.tokens_remaining = tokens;
-        ()
-    }
+    // pub fn update_tokens(&mut self, tokens: u32) -> (){
+    //     self.tokens_remaining = tokens;
+    //     ()
+    // }
 
     /// Increment the number of times the task is picked
-    pub fn increase_context_switches(&mut self) -> (){
+    pub fn increment_context_switches(&mut self) -> (){
         self.context_switches = self.context_switches + 1;
     }
 }
@@ -106,10 +111,10 @@ impl RunQueue {
     pub fn update_and_move_to_end(&mut self, index: usize, tokens : u32) -> Option<TaskRef> {
         self.queue.remove(index).map(|mut taskref| {
             {
-                taskref.update_tokens(tokens);
+                taskref.tokens_remaining = tokens;
             }
             {
-                taskref.increase_context_switches();
+                taskref.increment_context_switches();
             }
             self.queue.push_back(taskref.clone());
             taskref

@@ -1,7 +1,10 @@
 //! This crate picks the next task on token based scheduling policy
-//! At the begining of each scheduling epoch a set of tokens is distributed among tasks.
-//! Tasks are executed until all tokens of runnable task are exhausted
-//! Then a new scheduling epoch is initiated 
+//! At the begining of each scheduling epoch a set of tokens is distributed among tasks
+//! depending on their priority.
+//! tokens assigned to each task = (prioirty of each task / prioirty of all tasks)*length_of_epoch
+//! Each time a task is picked tokens_assigned to the task is decremented by 1
+//! A task is executed only if it has tokens remaining
+//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated 
 
 
 #![no_std]
@@ -17,8 +20,8 @@ extern crate runqueue_priority;
 use task::TaskRef;
 use runqueue_priority::RunQueue;
 
-/// A temporary data structure to hold result of  select_next_task_priority
-/// function.
+// A data structure to transfer data from select_next_task_priority
+// to select_next_task
 struct NextTaskResult{
     taskref : Option<TaskRef>,
     idle_task : bool,
@@ -92,7 +95,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
 
         // if the task has no remaining tokens we ignore the task
-        if taskref.get_tokens() == 0{
+        if taskref.tokens_remaining == 0{
             continue;
         }
             
@@ -106,7 +109,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     // We then reduce the number of tokens of the task by one
     let modified_tokens = {
         let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
-        chosen_task.map(|m| m.get_tokens()).unwrap_or(1) - 1
+        chosen_task.map(|m| m.tokens_remaining).unwrap_or(1) - 1
     };
 
     chosen_task_index
@@ -127,7 +130,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
-            error!("BUG: select_next_task(): couldn't get runqueue for core {}", apic_id); 
+            error!("BUG: assign_tokens(): couldn't get runqueue for core {}", apic_id); 
             return false;
         }
     };
@@ -173,17 +176,14 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // However since this granularity could miss low priority tasks when 
     // many concurrent tasks are running, we increase the epoch in such cases
     let epcoh = if total_priorities < 100 {
-                100
-            }
-            else {
-                total_priorities
-            };
+        100
+    }
+    else {
+        total_priorities
+    };
 
     let mut _i = 0;
-    let len;
-    {
-        len = runqueue_locked.runqueue_length();
-    }
+    let len = runqueue_locked.runqueue_length();
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
@@ -218,7 +218,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         
         {
             let task = runqueue_locked.get_priority_task_ref_as_mut(_i);
-            task.map(|m| m.update_tokens(task_tokens));
+            task.map(|m| m.tokens_remaining = task_tokens);
         }
         
         _i = _i+1;

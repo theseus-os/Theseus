@@ -34,8 +34,11 @@ use task::{TaskRef, Task};
 /// context_switches is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct RoundRobinTaskRef{
+    /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
-    times_picked: u32,
+
+    /// Number of context switches the task has undergone. Not used in scheduling algorithm
+    context_switches: u32,
 }
 
 impl RoundRobinTaskRef {
@@ -46,7 +49,7 @@ impl RoundRobinTaskRef {
     pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
         let round_robin_taskref = RoundRobinTaskRef {
             taskref: taskref,
-            times_picked: 0,
+            context_switches: 0,
         };
         round_robin_taskref
     }
@@ -62,8 +65,8 @@ impl RoundRobinTaskRef {
     }
 
     /// Increment the number of times the task is picked
-    pub fn increase_times_picked(&mut self) -> (){
-        self.times_picked = self.times_picked + 1;
+    pub fn increment_context_switches(&mut self) -> (){
+        self.context_switches = self.context_switches + 1;
     }
 }
 
