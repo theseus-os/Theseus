@@ -164,6 +164,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
             
         // found a runnable task!
         // We add its priority
+        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, taskref.priority);
         total_priorities = total_priorities + 1 + taskref.priority as u32;
         
         

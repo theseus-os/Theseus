@@ -16,5 +16,8 @@ path = "../../kernel/spawn"
 [dependencies.logger]
 path = "../../kernel/logger"
 
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
 
 

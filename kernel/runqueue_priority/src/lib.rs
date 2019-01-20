@@ -314,4 +314,27 @@ impl RunQueue {
                 rq.write().remove_internal(task)
             })
     }
+
+    /// Removes a `TaskRef` from this RunQueue.
+    pub fn assign_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+        debug!("called_assign_priority_internal called per core");
+        for x in self.queue.iter_mut() {
+            if(&x.taskref == task){
+                debug!("changed priority from {}  to {} ", x.priority, priority);
+                x.priority = priority;
+            }
+        }
+        Ok(())
+    } 
+
+    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
+    pub fn assign_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+        debug!("assign priority wrapper. called once per call");
+        for (_core, rq) in RUNQUEUES.iter() {
+            rq.write().assign_priority_internal(task, priority)?;
+        }
+        Ok(())
+    }
 }

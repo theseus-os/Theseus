@@ -53,5 +53,8 @@ pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str>{
     RunQueue::remove_task_from_all(task)
 }
 
+pub fn assign_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    RunQueue::assign_priority(task, priority)
+}
 
 
