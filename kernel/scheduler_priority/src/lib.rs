@@ -27,6 +27,10 @@ struct NextTaskResult{
     idle_task : bool,
 }
 
+pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    RunQueue::set_priority(task, priority)
+}
+
 
 /// this defines the priority scheduler policy.
 /// returns None if there is no schedule-able task

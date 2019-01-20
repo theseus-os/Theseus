@@ -14,9 +14,10 @@ extern crate runqueue;
 use core::ops::DerefMut;
 use irq_safety::{disable_interrupts};
 use apic::get_my_apic_id;
-use task::{Task, get_my_current_task};
+use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
 #[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
+
 
 
 
@@ -79,3 +80,7 @@ pub fn schedule() -> bool {
     true
 }
 
+#[cfg(priority_scheduler)]
+pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    scheduler_priority::set_priority(task, priority)
+}

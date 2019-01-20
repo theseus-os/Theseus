@@ -4,7 +4,7 @@
 #[macro_use] extern crate log;
 extern crate alloc;
 extern crate spawn;
-extern crate runqueue;
+extern crate scheduler;
 
 use spawn::KernelTaskBuilder;
 use alloc::string::String;
@@ -19,9 +19,9 @@ pub fn main(args: Vec<String>) -> (){
         .set_priority(30)
         .spawn().expect("failed to initiate task");
 
-    runqueue::assign_priority(&taskref1, 30).expect("failed to set priority for task 1");
+    scheduler::set_priority(&taskref1, 30).expect("failed to set priority for task 1");
 
-    debug!("Completed Task 1");
+    debug!("Spawned Task 1");
 
     let taskref2 = KernelTaskBuilder::new(test2 ,2)
         .name(String::from("test2"))
@@ -29,9 +29,9 @@ pub fn main(args: Vec<String>) -> (){
         .set_priority(20)
         .spawn().expect("failed to initiate task");
 
-    runqueue::assign_priority(&taskref2, 20).expect("failed to set priority for task 2");
+    scheduler::set_priority(&taskref2, 20).expect("failed to set priority for task 2");
 
-    debug!("Completed Task 2");
+    debug!("Spawned Task 2");
 
     let taskref3 = KernelTaskBuilder::new(test3 ,3)
         .name(String::from("test3"))
@@ -39,11 +39,11 @@ pub fn main(args: Vec<String>) -> (){
         .set_priority(10)
         .spawn().expect("failed to initiate task");
 
-    runqueue::assign_priority(&taskref3, 10).expect("failed to set priority for task 3");
+    scheduler::set_priority(&taskref3, 10).expect("failed to set priority for task 3");
 
-    debug!("Completed Task 3");
+    debug!("Spawned Task 3");
 
-    debug!("Completed Task all");
+    debug!("Spawned all tasks");
 }
 
 fn test1(_a: u32) -> u32 {
