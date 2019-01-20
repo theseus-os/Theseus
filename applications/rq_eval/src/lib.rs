@@ -13,7 +13,8 @@ extern crate runqueue;
 extern crate getopts;
 extern crate acpi;
 
-use alloc::{Vec, String};
+use alloc::string::String;
+use alloc::vec::Vec;
 use getopts::{Matches, Options};
 use acpi::get_hpet;
 use runqueue::RunQueue;

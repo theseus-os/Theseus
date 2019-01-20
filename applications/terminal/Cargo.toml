@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 
@@ -53,6 +53,15 @@ path = "../terminal_print"
 
 [dependencies.print]
 path = "../../kernel/print"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.environment]
+path = "../../kernel/environment"
+
+[dependencies.root]
+path = "../../kernel/root"
 
 [lib]
 crate-type = ["rlib"]

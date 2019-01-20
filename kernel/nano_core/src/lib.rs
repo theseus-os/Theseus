@@ -17,7 +17,6 @@
 
 #![no_std]
 #![feature(alloc)]
-#![feature(used)]
 
 
 #[cfg(loadable)] 
@@ -45,9 +44,7 @@ extern crate panic_unwind; // the panic/unwind lang items
 #[macro_use] extern crate vga_buffer;
 
 
-// see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
-#[used]
 #[doc(hidden)]
 pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
@@ -175,8 +172,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // That's it, the nano_core is done! That's really all it does! 
     #[cfg(loadable)]
     {
-        use alloc::Vec;
-        use alloc::arc::Arc;
+        use alloc::vec::Vec;
+        use alloc::sync::Arc;
         use irq_safety::MutexIrqSafe;
         use memory::{MappedPages, MemoryManagementInfo};
 

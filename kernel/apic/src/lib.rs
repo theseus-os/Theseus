@@ -23,7 +23,7 @@ use core::ops::DerefMut;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
-use alloc::Vec;
+use alloc::vec::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
 use raw_cpuid::CpuId;

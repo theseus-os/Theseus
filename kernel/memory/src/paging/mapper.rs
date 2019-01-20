@@ -17,7 +17,7 @@ use paging::{PageIter, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
-use alloc::Vec;
+use alloc::vec::Vec;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -271,6 +271,7 @@ const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 
 /// Represents a contiguous range of virtual memory pages that are currently mapped. 
 /// A `MappedPages` object can only have a single range of contiguous pages, not multiple disjoint ranges.
+/// This does not guarantee that its pages are mapped to frames that are contiguous in physical memory.
 /// 
 /// This object also represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be unmapped, and if they were allocated, then also de-allocated. 

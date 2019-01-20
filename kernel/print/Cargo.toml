@@ -6,7 +6,7 @@ description = "offers kernel crates the ability to print to the default terminal
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 
 [dependencies.input_event_manager]

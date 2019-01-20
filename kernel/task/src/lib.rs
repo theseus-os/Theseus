@@ -28,6 +28,7 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(asm, naked_functions)]
+#![feature(panic_info_message)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -37,34 +38,70 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate mod_mgmt;
-extern crate panic_info;
 extern crate context_switch;
+extern crate environment;
+extern crate root;
+extern crate vfs_node;
+extern crate fs_node;
+extern crate path;
 extern crate x86_64;
-
-#[cfg(runqueue_state_spill_evaluation)]
 extern crate spin;
+extern crate memfs;
 
 #[cfg(runqueue_state_spill_evaluation)]
 use spin::Once;
 
 
+
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
-use alloc::String;
+use core::panic::PanicInfo;
+use alloc::string::String;
 use alloc::boxed::Box;
-use alloc::arc::Arc;
+use alloc::sync::Arc;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
-use panic_info::PanicInfo;
+use environment::Environment;
+use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
+pub mod fs; 
+
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfo) + Send>;
+pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
+
+/// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
+#[derive(Debug, Clone)]
+pub struct PanicInfoOwned {
+    pub msg:    String,
+    pub file:   String,
+    pub line:   u32, 
+    pub column: u32,
+}
+impl fmt::Display for PanicInfoOwned {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
+    }
+}
+impl PanicInfoOwned {
+    pub fn from(info: &PanicInfo) -> PanicInfoOwned {
+        let msg = info.message()
+            .map(|m| format!("{}", m))
+            .unwrap_or_else(|| String::new());
+        let (file, line, column) = if let Some(loc) = info.location() {
+            (String::from(loc.file()), loc.line(), loc.column())
+        } else {
+            (String::new(), 0, 0)
+        };
+
+        PanicInfoOwned { msg, file, line, column }
+    }
+}
 
 
 lazy_static! {
@@ -77,6 +114,8 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
+// Variable to initialize the taskfs
+static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
@@ -102,7 +141,7 @@ pub enum KillReason {
     /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
     Requested,
     /// A Rust-level panic occurred while running this `Task`
-    Panic(PanicInfo),
+    Panic(PanicInfoOwned),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),
@@ -187,8 +226,8 @@ pub struct Task {
     pub app_crate: Option<StrongCrateRef>,
     /// The function that will be called when this `Task` panics
     pub panic_handler: Option<PanicHandler>,
-    
-    
+    /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
+    pub env: Arc<Mutex<Environment>>,
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
     /// whether it uses SIMD registers and instructions.
@@ -213,7 +252,12 @@ impl Task {
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
-        
+
+        // TODO - change to option and initialize environment to none
+        let env = Environment {
+            working_dir: root::get_root(), 
+        };
+
         Task {
             id: task_id,
             runstate: RunState::Initing,
@@ -233,10 +277,14 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-
+            env: Arc::new(Mutex::new(env)), 
             #[cfg(simd_personality)]
             simd: false,
         }
+    }
+
+    pub fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
+        self.env = new_env;
     }
 
     /// returns true if this Task is currently running on any cpu.
@@ -653,6 +701,11 @@ impl TaskRef {
         self.0.lock().take_exit_value()
     }
 
+    /// Sets environment
+    pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
+        self.0.lock().set_env(new_env);
+    }
+    
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
     #[deprecated] // TODO FIXME since 2018-09-06
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
@@ -740,6 +793,12 @@ pub fn create_idle_task(
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
 
+    // one-time initialization of the taskfs
+    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
+        Ok(()) => (),
+        Err(err) => return Err(err)
+    };
+    
     Ok(task_ref)
 }
 

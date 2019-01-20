@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 
 [dependencies.log]
@@ -25,16 +25,6 @@ path = "../event_types"
 
 [dependencies.ps2]
 path = "../ps2"
-
-# [dependencies.lazy_static]
-# features = ["spin_no_std"]
-# version = "0.2.1"
-
-# [dependencies.kernel_config]
-# path = "../kernel_config"
-
-# [dependencies.state_store]
-# path = "../state_store"
 
 
 [lib]

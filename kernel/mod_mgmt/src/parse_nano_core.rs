@@ -3,9 +3,9 @@
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
 use core::ops::DerefMut;
-use alloc::{BTreeMap, BTreeSet, String};
-use alloc::arc::Arc;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
 use spin::Mutex;
 use cow_arc::CowArc;
 
