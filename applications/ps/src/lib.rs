@@ -34,7 +34,7 @@ pub fn main(args: Vec<String>) -> isize {
         println!("{0:<5}  {1}", "ID", "NAME");
     }
     else {
-        println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "NAME");
+        println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5} {5}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "NAME");
     }
 
     // Print all tasks
@@ -44,7 +44,6 @@ pub fn main(args: Vec<String>) -> isize {
         num_tasks += 1;
         let task = taskref.lock();
         let name = &task.name;
-        let priority =  &task.priority.map(|priority| format!("{}", priority)).unwrap_or(String::from("-"));
 
         let runstate = match &task.runstate {
             RunState::Initing    => "Initing",
@@ -64,8 +63,8 @@ pub fn main(args: Vec<String>) -> isize {
         }
         else {
             task_string.push_str(
-                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10} {6}\n", 
-                    id, runstate, cpu, pinned, task_type, priority, name)
+                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5} {5}\n", 
+                    id, runstate, cpu, pinned, task_type, name)
                     //id, runstate, cpu, pinned, task_type, name)
             );
         }

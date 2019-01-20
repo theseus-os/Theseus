@@ -36,6 +36,7 @@ pub struct PriorityTaskRef{
     /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
 
+    /// Priority assigned for the task. Max priority = 40, Min priority = 0.
     pub priority: u8,
 
     /// Remaining tokens in this epoch. A will be scheduled in an epoch until tokens run out
@@ -315,7 +316,7 @@ impl RunQueue {
             })
     }
 
-    /// Removes a `TaskRef` from this RunQueue.
+    /// The internal function that sets the priority of a given `Task` in a single `RunQueue`
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("called_assign_priority_internal called per core");
         for x in self.queue.iter_mut() {
@@ -327,9 +328,7 @@ impl RunQueue {
         Ok(())
     } 
 
-    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-    /// 
-    /// This is a brute force approach that iterates over all runqueues. 
+    /// Sets the priority of the given `Task` in all the `RunQueue` structures 
     pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("assign priority wrapper. called once per call");
         for (_core, rq) in RUNQUEUES.iter() {
@@ -338,11 +337,14 @@ impl RunQueue {
         Ok(())
     }
 
+    /// The internal function that outputs the priority of a given task.
+    /// The priority of the first task that matches is shown.
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
         let mut return_priority :Option<u8> = None;
         for x in self.queue.iter() {
             if &x.taskref == task {
+                // A matching task has been found
                 return_priority =  Some(x.priority);
                 break;
             }
@@ -350,15 +352,15 @@ impl RunQueue {
         return_priority
     }
 
-    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-    /// 
-    /// This is a brute force approach that iterates over all runqueues. 
+    /// Output the priority of the given task.
+    /// Outputs None if the task is not found in any of the runqueues.
     pub fn get_priority(task: &TaskRef) -> Option<u8> {
         // debug!("assign priority wrapper. called once per call");
         let mut return_priority :Option<u8> = None;
         for (_core, rq) in RUNQUEUES.iter() {
             return_priority = rq.write().get_priority_internal(task);
             match return_priority {
+                //If a matching task is found the iteration terminates
                 Some(x) => return Some(x),
                 None => continue,
             }

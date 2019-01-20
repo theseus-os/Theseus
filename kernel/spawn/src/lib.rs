@@ -72,7 +72,6 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
-    priority: Option<u8>,
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -92,7 +91,6 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
-            priority: Some(20),
 
             #[cfg(simd_personality)]
             simd: false,
@@ -108,12 +106,6 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> KernelTaskBuilder<F, A, R> {
         self.pin_on_core = Some(core_apic_id);
-        self
-    }
-
-    /// Assign priority to new task.
-    pub fn set_priority(mut self, priority: u8) -> KernelTaskBuilder<F, A, R> {
-        self.priority = Some(priority);
         self
     }
 
@@ -169,7 +161,6 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
         new_task.kstack = Some(kstack);
         new_task.runstate = RunState::Runnable; // ready to be scheduled in
-        new_task.priority = self.priority;
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
@@ -201,7 +192,6 @@ pub struct ApplicationTaskBuilder {
     name: Option<String>,
     pin_on_core: Option<u8>,
     singleton: bool,
-    priority: Option<u8>,
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -217,7 +207,6 @@ impl ApplicationTaskBuilder {
             name: None,
             pin_on_core: None,
             singleton: false,
-            priority: Some(20),
 
             #[cfg(simd_personality)]
             simd: false,
@@ -233,18 +222,6 @@ impl ApplicationTaskBuilder {
     /// Pin the new Task to a specific core.
     pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder {
         self.pin_on_core = Some(core_apic_id);
-        self
-    }
-
-    /// Assign priority to new task.
-    pub fn set_priority(mut self, priority: u8) -> ApplicationTaskBuilder {
-        let clipped_priority = if priority > 40{
-            40
-        }
-        else {
-            priority
-        };
-        self.priority = Some(clipped_priority);
         self
     }
 

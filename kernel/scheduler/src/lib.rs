@@ -80,21 +80,26 @@ pub fn schedule() -> bool {
     true
 }
 
+// Changes the priority of the given task with the given priority level
+// Max priority = 40, Min priority  = 0
 #[cfg(priority_scheduler)]
 pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
     scheduler_priority::set_priority(task, priority)
 }
 
+// Set Priority is ignored when non priority scheduler is in use 
 #[cfg(not(priority_scheduler))]
 pub fn set_priority(_task: &TaskRef, priority: u8) -> Result<(), &'static str> {
     Ok(())
 }
 
+// Shows the priority of a given task
 #[cfg(priority_scheduler)]
 pub fn get_priority(task: &TaskRef) -> Option<u8> {
     scheduler_priority::get_priority(task)
 }
 
+// Get Priority is ignored when non priority scheduler is in use 
 #[cfg(not(priority_scheduler))]
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     None

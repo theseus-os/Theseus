@@ -4,7 +4,8 @@
 //! tokens assigned to each task = (prioirty of each task / prioirty of all tasks)*length_of_epoch
 //! Each time a task is picked tokens_assigned to the task is decremented by 1
 //! A task is executed only if it has tokens remaining
-//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated 
+//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated
+//! In addition this task offers the interfaces to set and get priorities  of each task
 
 
 #![no_std]
@@ -27,10 +28,19 @@ struct NextTaskResult{
     idle_task : bool,
 }
 
+// Changes the priority of the given task with the given priority level
+// Max priority = 40, Min priority  = 0
 pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-    RunQueue::set_priority(task, priority)
+    let clipped_priority = if priority > 40{
+            40
+        }
+        else {
+            priority
+        };
+    RunQueue::set_priority(task, clipped_priority)
 }
 
+// Shows the priority of the given task
 pub fn get_priority(task: &TaskRef) -> Option<u8> {
     RunQueue::get_priority(task)
 }

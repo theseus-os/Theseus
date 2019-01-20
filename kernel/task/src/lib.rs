@@ -233,16 +233,13 @@ pub struct Task {
     /// whether it uses SIMD registers and instructions.
     pub simd: bool,
 
-    /// The priority level of the task. 40 = highest priority, 0 = lowest priority
-    pub priority: Option<u8>,
-
 
 }
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}, priority: {:?}}}", 
-               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core, self.priority)
+        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}}}", 
+               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core)
     }
 }
 
@@ -286,7 +283,6 @@ impl Task {
             #[cfg(simd_personality)]
             simd: false,
 
-            priority: Some(0),
         }
     }
 
@@ -768,7 +764,6 @@ pub fn create_idle_task(
     idle_task.runstate = RunState::Runnable;
     idle_task.running_on_cpu = Some(apic_id); 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    idle_task.priority = Some(0); // Give the lowest priority for this task
     idle_task.mmi = Some(kernel_mmi_ref);
     // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
     idle_task.kstack = Some( 
