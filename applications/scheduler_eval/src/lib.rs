@@ -44,6 +44,19 @@ pub fn main(args: Vec<String>) -> (){
     debug!("Spawned Task 3");
 
     debug!("Spawned all tasks");
+
+    let priority1 = scheduler::get_priority(&taskref1);
+    let priority2 = scheduler::get_priority(&taskref2);
+    let priority3 = scheduler::get_priority(&taskref3);
+    
+    #[cfg(priority_scheduler)]
+    {
+        assert_eq!(priority1,Some(30));
+        assert_eq!(priority2,Some(20));
+        assert_eq!(priority3,Some(10));
+    }
+
+    
 }
 
 fn test1(_a: u32) -> u32 {

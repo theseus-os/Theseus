@@ -317,9 +317,9 @@ impl RunQueue {
 
     /// Removes a `TaskRef` from this RunQueue.
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-        debug!("called_assign_priority_internal called per core");
+        // debug!("called_assign_priority_internal called per core");
         for x in self.queue.iter_mut() {
-            if(&x.taskref == task){
+            if &x.taskref == task{
                 debug!("changed priority from {}  to {} ", x.priority, priority);
                 x.priority = priority;
             }
@@ -331,10 +331,38 @@ impl RunQueue {
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
     pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-        debug!("assign priority wrapper. called once per call");
+        // debug!("assign priority wrapper. called once per call");
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().set_priority_internal(task, priority)?;
         }
         Ok(())
+    }
+
+    fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
+        // debug!("called_assign_priority_internal called per core");
+        let mut return_priority :Option<u8> = None;
+        for x in self.queue.iter() {
+            if &x.taskref == task {
+                return_priority =  Some(x.priority);
+                break;
+            }
+        }
+        return_priority
+    }
+
+    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
+    pub fn get_priority(task: &TaskRef) -> Option<u8> {
+        // debug!("assign priority wrapper. called once per call");
+        let mut return_priority :Option<u8> = None;
+        for (_core, rq) in RUNQUEUES.iter() {
+            return_priority = rq.write().get_priority_internal(task);
+            match return_priority {
+                Some(x) => return Some(x),
+                None => continue,
+            }
+        }
+        return None;
     }
 }

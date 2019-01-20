@@ -31,6 +31,9 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
     RunQueue::set_priority(task, priority)
 }
 
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    RunQueue::get_priority(task)
+}
 
 /// this defines the priority scheduler policy.
 /// returns None if there is no schedule-able task

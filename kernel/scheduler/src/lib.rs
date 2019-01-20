@@ -84,3 +84,18 @@ pub fn schedule() -> bool {
 pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
     scheduler_priority::set_priority(task, priority)
 }
+
+#[cfg(not(priority_scheduler))]
+pub fn set_priority(_task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    Ok(())
+}
+
+#[cfg(priority_scheduler)]
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    scheduler_priority::get_priority(task)
+}
+
+#[cfg(not(priority_scheduler))]
+pub fn get_priority(_task: &TaskRef) -> Option<u8> {
+    None
+}
