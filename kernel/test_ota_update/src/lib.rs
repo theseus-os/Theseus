@@ -43,8 +43,8 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         set.insert(String::from("k#keyboard-36be916209949cef.o"));
         // set.insert(String::from("k#atomic-905b6e75d16e053c.o"));
         // set.insert(String::from("k#bit_field-beaefef505b4f61a.o"));
-        set.insert(String::from("k#dbus-495835640c757fc3.o"));
-        set.insert(String::from("k#xmas_elf-3d0cd20d4e1d4ba9.o"));
+        // set.insert(String::from("k#dbus-495835640c757fc3.o"));
+        // set.insert(String::from("k#xmas_elf-3d0cd20d4e1d4ba9.o"));
         set
     };
     let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_include)?;
@@ -53,6 +53,13 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     for c in new_crates {
         warn!("\t{:?}: size {}", c.name, c.content.content().len());
     }
+
+    let namespace = mod_mgmt::get_default_namespace();
+    let old_kbd_crate_name = namespace.get_crate_starting_with("k#keyboard-").ok_or("couldn't find keyboard crate in default namespace")?;
+
+    // let swap_req = mod_mgmt::SwapRequest::new(old_kbd_crate_name, new_crate_module_area: &'static ModuleArea, reexport_new_symbols_as_old: bool);
+    // namespace.swap_crates(swap_requests: SwapRequestList, kernel_mmi: &mut MemoryManagementInfo, verbose_log: bool)
+
     Err("unfinished")
 }
 
