@@ -38,15 +38,7 @@ pub enum CrateType {
     Userspace,
 }
 impl CrateType {
-    pub fn prefix(&self) -> &'static str {
-        match self {
-            CrateType::Kernel       => "k#",
-            CrateType::Application  => "a#",
-            CrateType::Userspace    => "u#",
-        }
-    }
-
-    fn first_prefix(&self) -> &'static str {
+    fn first_char(&self) -> &'static str {
         match self {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
@@ -54,29 +46,36 @@ impl CrateType {
         }
     }
 
-    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
-    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// Returns a tuple of (CrateType, &str, &str) based on the given `module_name`,
+    /// in which the `CrateType` is based on the first character, 
+    /// the first `&str` is the namespace prefix, e.g., `"sse"` in `"k_sse#..."`,
+    /// and the second `&str` is the rest of the module file name after the prefix delimiter `"#"`.
+    /// 
     /// # Examples 
     /// ```
-    /// let result = CrateType::from_module_name("k#my_crate");
-    /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
+    /// let result = CrateType::from_module_name("k#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "", "my_crate.o") );
+    /// 
+    /// let result = CrateType::from_module_name("ksse#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
         let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
-        let prefix = iter.next().ok_or("couldn't get crate type prefix before delimiter")?;
-        let crate_name = iter.next().ok_or("couldn't get crate name after prefix delimiter")?;
+        let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
+        let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
         if iter.next().is_some() {
-            return Err("too many # delimiters in crate's module name");
+            return Err("found more than one '#' delimiter in module name");
         }
+        let namespace_prefix = prefix.get(1..).unwrap_or("");
         
-        if prefix.starts_with(CrateType::Kernel.first_prefix()) {
-            Ok((CrateType::Kernel, crate_name))
+        if prefix.starts_with(CrateType::Kernel.first_char()) {
+            Ok((CrateType::Kernel, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Application.first_prefix()) {
-            Ok((CrateType::Application, crate_name))
+        else if prefix.starts_with(CrateType::Application.first_char()) {
+            Ok((CrateType::Application, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Userspace.first_prefix()) {
-            Ok((CrateType::Userspace, crate_name))
+        else if prefix.starts_with(CrateType::Userspace.first_char()) {
+            Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
         else {
             Err("module_name didn't start with a known CrateType prefix")
@@ -85,15 +84,15 @@ impl CrateType {
 
 
     pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_prefix())
+        module_name.starts_with(CrateType::Application.first_char())
     }
 
     pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_prefix())
+        module_name.starts_with(CrateType::Kernel.first_char())
     }
 
     pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_prefix())
+        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 

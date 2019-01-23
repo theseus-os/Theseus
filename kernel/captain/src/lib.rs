@@ -218,7 +218,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(simd_personality)]
     {
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
+        KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }

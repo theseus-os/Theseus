@@ -258,8 +258,8 @@ simd_personality: build_simd build
 build_simd : export TARGET := x86_64-theseus-sse
 build_simd : export RUSTFLAGS += -C no-vectorize-loops
 build_simd : export RUSTFLAGS += -C no-vectorize-slp
-build_simd : export KERNEL_PREFIX := k_sse\#
-build_simd : export APP_PREFIX := a_sse\#
+build_simd : export KERNEL_PREFIX := ksimd\#
+build_simd : export APP_PREFIX := asimd\#
 build_simd:
 ## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"

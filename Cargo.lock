@@ -1107,12 +1107,13 @@ dependencies = [
  "apic 0.1.0",
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "compiler_builtins 0.1.4 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
+ "fs_node 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "path 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
- "task 0.1.0",
 ]
 
 [[package]]

@@ -231,7 +231,7 @@ impl Directory for TaskDirectory {
 /// This function will attach the mmi directory (and associated subdirectories) to whatever directory task_dir_pointer points to.
 fn create_mmi_dir(taskref: TaskRef, parent: &DirRef) -> Result<(), &'static str> {
     let name = String::from("mmi");
-    let mmi_dir = VFSDirectory::new(name.clone(), Arc::downgrade(parent))?;
+    let mmi_dir = VFSDirectory::new(name.clone(), parent)?;
     // obtain information from the MemoryManagementInfo struct of the Task
     let mut output = String::new();
     match taskref.lock().mmi {

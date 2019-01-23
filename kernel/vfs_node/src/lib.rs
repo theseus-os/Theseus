@@ -35,20 +35,16 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(name: String, parent_pointer: WeakDirRef)  -> Result<DirRef, &'static str> {
+    pub fn new(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
-        let parent_copy = Weak::clone(&parent_pointer);
         let directory = VFSDirectory {
             name: name,
             children: BTreeMap::new(),
-            parent: parent_pointer,
+            parent: Arc::downgrade(parent),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        // create a copy of the newly created directory so we can return it
-        let dir_ref_copy = Arc::clone(&dir_ref);
-        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
-        return Ok(dir_ref_copy)
+        parent.lock().insert_child(FileOrDir::Dir(dir_ref.clone()))?;
+        Ok(dir_ref)
     }
 }
 

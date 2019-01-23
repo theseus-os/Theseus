@@ -2,6 +2,7 @@
 #![feature(alloc)]
 #![feature(rustc_private)]
 #![feature(transpose_result)]
+#![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -29,9 +30,10 @@ use core::ops::DerefMut;
 use alloc::{
     boxed::Box,
     vec::Vec,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, btree_map, BTreeSet},
     string::{String, ToString},
     sync::{Arc, Weak},
+    slice::SliceConcatExt,
 };
 use spin::{Mutex, Once};
 
@@ -48,7 +50,7 @@ use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashmap_core::HashMap;
 use rustc_demangle::demangle;
-use qp_trie::{Trie, Entry, wrapper::BString};
+use qp_trie::{Trie, wrapper::BString};
 use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
@@ -65,13 +67,15 @@ use self::dependency::*;
 
 
 /// The name of the directory that contains all of the CrateNamespace files.
-const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
-/// The name of the directory in each namespace directory that contains kernel crates.
-const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
-/// The name of the directory in each namespace directory that contains application crates.
-const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "application";
+pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
 /// The name of the default CrateNamespace, also the name of its directory.
-const DEFAULT_NAMESPACE_NAME: &'static str = "default";
+pub const DEFAULT_NAMESPACE_NAME: &'static str = "default";
+/// The name of the directory in each namespace directory that contains kernel crates.
+pub const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
+/// The name of the directory in each namespace directory that contains application crates.
+pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "application";
+/// The name of the directory in each namespace directory that contains userspace files.
+pub const USERSPACE_FILES_DIRECTORY_NAME: &'static str = "userspace";
 
 
 /// The initial `CrateNamespace` that all crates are added to by default,
@@ -111,23 +115,56 @@ pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
 
 
 
-/// Initializes the module management system by parsing the list of bootloader-loaded modules 
-/// into namespace-specific directories. and turning them into creating the default `CrateNamespace`. 
-/// Returns a reference to that default CrateNamespace.
+/// Initializes the module management system based on the bootloader-provided modules, and
+/// creates and returns the default `CrateNamespace`.
 pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static CrateNamespace, &'static str> {
-    let namespaces_dir         = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(),         Arc::downgrade(root::get_root()))?;
-    let default_namespace_dir  = VFSDirectory::new(DEFAULT_NAMESPACE_NAME.to_string(),            Arc::downgrade(&namespaces_dir))?;
-    let default_kernel_dir     = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      Arc::downgrade(&default_namespace_dir))?;
-    let default_app_dir        = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), Arc::downgrade(&default_namespace_dir))?;
+    let (_namespaces_dir, default_dirs) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
+    // create the default CrateNamespace based on the default namespace directory set
+    let default_namespace = CrateNamespace::new(DEFAULT_NAMESPACE_NAME.to_string(), default_dirs);
+    Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| default_namespace))
+}
+
+
+/// Parses the list of bootloader-loaded modules, turning them into crate object files, 
+/// and placing them into namespace-specific directories according to their name prefix, e.g., "k#", "ksse#".
+/// This function does not create any namespaces, it just populates the files and directories
+/// such that namespaces can be created based on those files.
+/// 
+/// Returns a tuple of the top-level root "namespaces" directory that contains the base directories of all other namespaces 
+fn parse_bootloader_modules_into_files(
+    boot_info: &BootInformation, 
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<(DirRef, NamespaceDirectorySet), &'static str> {
+
+    // create the top-leve directory to hold all default namespaces
+    let namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
+
+    // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a set of namespace directories
+    let mut prefix_map: BTreeMap<String, NamespaceDirectorySet> = BTreeMap::new();
 
     let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
-
     if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+
+        // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
+        let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
+            let base_dir   = VFSDirectory::new(prefix.to_string(),                            &namespaces_dir)?;
+            let kernel_dir = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
+            let app_dir    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
+            let user_dir   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
+            Ok(NamespaceDirectorySet {
+                base:   base_dir,
+                kernel: kernel_dir,
+                app:    app_dir,
+                user:   user_dir,
+            })
+        };
+
         for m in boot_info.module_tags() {
             let size_in_bytes = (m.end_address() - m.start_address()) as usize;
             let frames = Frame::range_inclusive_addr(m.start_address() as PhysicalAddress, size_in_bytes);
-            let (crate_type, crate_name) = CrateType::from_module_name(m.name())?;
-            let name = String::from(crate_name);
+            let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+            let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
+            let name = String::from(file_name);
 
             let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
             let mp = active_table.map_allocated_pages_to(
@@ -139,28 +176,33 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 
             // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
 
-            let parent_dir = match crate_type { 
-                CrateType::Kernel => &default_kernel_dir,
-                CrateType::Application => &default_app_dir,
-                CrateType::Userspace => return Err("Userspace crates are currently unsupported")
+            let create_file = |dirs: &NamespaceDirectorySet| {
+                let parent_dir = match crate_type { 
+                    CrateType::Kernel => &dirs.kernel,
+                    CrateType::Application => &dirs.app,
+                    CrateType::Userspace => &dirs.user,
+                };
+                MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
             };
-            MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)?;
-        }
 
-        // create the default CrateNamespace
-        let default_namespace = CrateNamespace::new(
-            DEFAULT_NAMESPACE_NAME.to_string(), 
-            default_namespace_dir,
-            default_kernel_dir,
-            default_app_dir
-        );
-        Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| default_namespace))
+            // get the set of directories corresponding to the given prefix, or create it. 
+            let _new_file = match prefix_map.entry(prefix.to_string()) {
+                btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dirs(prefix)?) )?,
+                btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
+            };
+        }
     }
     else {
-        Err("Couldn't get kernel's ActivePageTable to initialize module management / default CrateNamespace")
+        return Err("Couldn't get kernel's ActivePageTable to parse and map bootloader modules");
     }
-}
 
+    debug!("Created namespace directories: {:?}", prefix_map.keys().map(|s| &**s).collect::<Vec<&str>>().join(", "));
+
+    Ok((
+        namespaces_dir,
+        prefix_map.remove(DEFAULT_NAMESPACE_NAME).ok_or("BUG: no default namespace found")?,
+    ))
+}
 
 
 /// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
@@ -235,6 +277,20 @@ pub type SymbolMap = Trie<BString, WeakSectionRef>;
 pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
 
 
+/// The set of directories that exist in each `CrateNamespace`. 
+#[derive(Clone)]
+pub struct NamespaceDirectorySet {
+    /// The `base` directory is the parent of the other directories.
+    base:   DirRef,
+    /// The directory that contains all kernel crate object files.
+    kernel: DirRef,
+    /// The directory that contains all application crate object files.
+    app:    DirRef,
+    /// The directory that contains all userspace object files.
+    user:   DirRef,
+}
+
+
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
 /// A crate namespace struct is basically a container around many crates 
 /// that have all been loaded and linked against each other, 
@@ -247,16 +303,10 @@ pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
     name: String,
 
-    /// The root directory of this namespace,
-    /// which contains subdirectories of all of the crate object files 
-    /// that are eligible to be loaded into this namespace. 
-    /// In other words, when this namespace is looking for a missing symbol or crate,
-    /// its search space is bounded by the crates contained in this directory.
-    base_directory: DirRef,
-    /// Similar to `base_directory`, but holds all of the kernel crate object files.
-    kernel_directory: DirRef,
-    /// Similar to `base_directory`, but holds all of the application crate object files.
-    application_directory: DirRef,
+    /// The directories owned by this namespace. 
+    /// When this namespace is looking for a missing symbol or crate,
+    /// its search space is bounded by the crates contained in these directory.
+    dirs: NamespaceDirectorySet,
 
     /// The list of all the crates loaded into this namespace,
     /// stored as a map in which the crate's String name
@@ -291,35 +341,76 @@ impl CrateNamespace {
     /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
     /// # Arguments
     /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `base_dir`: the base directory containing other subdirectories of crate object files for this namespace.
-    ///    The `base_dir` should be the parent directory of both the `kernel_dir` and `app_dir`.
-    /// * `kernel_dir`: the subdirectory containing kernel crate object files eligible to be loaded into this namespace.
-    /// * `app_dir`: the subdirectory containing application crate object files eligible to be loaded into this namespace.
-    pub fn new(name: String, base_dir: DirRef, kernel_dir: DirRef, app_dir: DirRef) -> CrateNamespace {
+    /// * `dirs`: the set of directories crate object files for this namespace.
+    pub fn new(name: String, dirs: NamespaceDirectorySet) -> CrateNamespace {
         CrateNamespace {
-            name: String::from(name),
-            base_directory: base_dir,
-            kernel_directory: kernel_dir,
-            application_directory: app_dir,
+            name: name,
+            dirs: dirs,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
         }
     } 
 
-    /// Returns the directory that this `CrateNamespace` is based on.
-    pub fn base_directory(&self) -> &DirRef {
-        &self.base_directory
+    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
+    /// # Arguments
+    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
+    /// * `base_dir`: the base directory for this namespace, which must contain crate file subdirectories. 
+    pub fn with_base_dir(name: String, base_dir: DirRef) -> Result<CrateNamespace, &'static str> {
+        let kernel_dir = match base_dir.lock().get_child(KERNEL_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
+        };
+        let app_dir = match base_dir.lock().get_child(APPLICATION_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace application directory"),
+        };
+        let user_dir = match base_dir.lock().get_child(USERSPACE_FILES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
+        };
+        Ok(CrateNamespace::new(
+            name, 
+            NamespaceDirectorySet {
+                base:   base_dir,
+                kernel: kernel_dir,
+                app:    app_dir, 
+                user:   user_dir,
+            }
+        ))
     }
 
-    /// Returns this `CrateNamespace`'s directory of application crates.
-    pub fn application_directory(&self) -> &DirRef {
-        &self.application_directory
+    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
+    /// # Arguments
+    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
+    /// * `base_dir_path`: the `Path` of the base directory for this namespace, which must contain crate file subdirectories. 
+    pub fn with_base_dir_path(name: String, base_dir_path: Path) -> Result<CrateNamespace, &'static str> {
+        let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
+        let base_dir = match base_dir_path.get(&namespaces_dir) {
+            Ok(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find directory at given path"),
+        };
+        CrateNamespace::with_base_dir(name, base_dir)
+    }
+
+    /// Returns the directory that this `CrateNamespace` is based on.
+    pub fn base_directory(&self) -> &DirRef {
+        &self.dirs.base
     }
 
     /// Returns this `CrateNamespace`'s directory of kernel crates.
     pub fn kernel_directory(&self) -> &DirRef {
-        &self.kernel_directory
+        &self.dirs.kernel
+    }
+
+    /// Returns this `CrateNamespace`'s directory of application crates.
+    pub fn application_directory(&self) -> &DirRef {
+        &self.dirs.app
+    }
+
+    /// Returns this `CrateNamespace`'s directory of userspace files.
+    pub fn userspace_directory(&self) -> &DirRef {
+        &self.dirs.user
     }
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
@@ -381,8 +472,8 @@ impl CrateNamespace {
     ) -> Result<StrongCrateRef, &'static str> {
         
         debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.application_directory)
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory)) // retry with the ".o" extension
+        let crate_file_ref = match crate_file_path.get(&self.application_directory())
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory())) // retry with the ".o" extension
         {
             Ok(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified application crate file path"),
@@ -431,8 +522,8 @@ impl CrateNamespace {
     ) -> Result<usize, &'static str> {
 
         debug!("load_kernel_crate: trying to load kernel crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.kernel_directory)
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.kernel_directory)) // retry with the ".o" extension
+        let crate_file_ref = match crate_file_path.get(&self.kernel_directory())
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.kernel_directory())) // retry with the ".o" extension
         {
             Ok(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified kernel crate file path"),
@@ -475,9 +566,12 @@ impl CrateNamespace {
         // first, validate all of the crate paths by turning them into direct file references
         let mut crate_files: Vec<FileRef> = Vec::new();
         for crate_file_path in crate_file_paths {
-            let crate_file_ref: FileRef = match crate_file_path.get(&self.application_directory) {
+            let crate_file_ref: FileRef = match crate_file_path.get(&self.kernel_directory()) {
                 Ok(FileOrDir::File(f)) => f,
-                _ => return Err("couldn't find specified application crate file path"),
+                _ => {
+                    error!("Couldn't find specified kernel crate file path: {:?}", crate_file_path);
+                    return Err("couldn't find specified kernel crate file path");
+                }
             };
             crate_files.push(crate_file_ref);
         }
@@ -534,9 +628,7 @@ impl CrateNamespace {
 
         CrateNamespace {
             name: self.name.clone(),
-            base_directory: self.base_directory.clone(),
-            kernel_directory: self.kernel_directory.clone(),
-            application_directory: self.application_directory.clone(),
+            dirs: self.dirs.clone(),
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
@@ -588,9 +680,7 @@ impl CrateNamespace {
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
             let nn = CrateNamespace::new(
                 format!("temp_swap--{:?}", swap_requests), 
-                self.base_directory.clone(),
-                self.kernel_directory.clone(),
-                self.application_directory.clone(),
+                self.dirs.clone(),
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
             nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;
@@ -600,9 +690,7 @@ impl CrateNamespace {
         let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
         let cached_crates: CrateNamespace = CrateNamespace::new(
             format!("cached_crates--{:?}", swap_requests), 
-            self.base_directory.clone(),
-            self.kernel_directory.clone(),
-            self.application_directory.clone(),
+            self.dirs.clone(),
         );
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
@@ -1322,7 +1410,6 @@ impl CrateNamespace {
         // Iterate over every non-zero relocation section in the file
         for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela) && sec.size() != 0) {
             use xmas_elf::sections::SectionData::Rela64;
-            use xmas_elf::symbol_table::Entry;
             if verbose_log { 
                 trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
                 sec.get_name(&elf_file), sec.get_type(), sec.info()); 
@@ -1373,7 +1460,7 @@ impl CrateNamespace {
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
 
-                    let source_sec_entry: &Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+                    let source_sec_entry: &xmas_elf::symbol_table::Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                     let source_sec_shndx = source_sec_entry.shndx() as usize; 
                     if verbose_log { 
                         let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
@@ -1496,7 +1583,7 @@ impl CrateNamespace {
         log_replacements: bool,
     ) -> bool {
         match existing_symbol_map.entry(new_section_key.into()) {
-            Entry::Occupied(_old_val) => {
+            qp_trie::Entry::Occupied(_old_val) => {
                 if log_replacements {
                     if let Some(old_sec_ref) = _old_val.get().upgrade() {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
@@ -1512,7 +1599,7 @@ impl CrateNamespace {
                 }
                 false
             }
-            Entry::Vacant(new_entry) => {
+            qp_trie::Entry::Vacant(new_entry) => {
                 new_entry.insert(Arc::downgrade(new_section_ref));
                 true
             }
@@ -1776,7 +1863,7 @@ impl CrateNamespace {
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full name of the crate file. 
     pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = self.kernel_directory.lock().list_children();
+        let children = self.kernel_directory().lock().list_children();
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
@@ -1937,9 +2024,6 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementI
             text_pages,
             rodata_pages,
             data_pages,
-            // text_pages:   text_pages  .map(|tp| Arc::new(Mutex::new(tp))), 
-            // rodata_pages: rodata_pages.map(|rp| Arc::new(Mutex::new(rp))),
-            // data_pages:   data_pages  .map(|dp| Arc::new(Mutex::new(dp))),
         }
     )
 }
