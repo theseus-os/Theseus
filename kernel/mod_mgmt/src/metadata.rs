@@ -9,10 +9,11 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::{Arc, Weak};
-use memory::{MappedPages, ModuleArea, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
+use memory::{MappedPages, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
+use path::Path;
 
 use super::SymbolMap;
 use qp_trie::{Trie, wrapper::BString};
@@ -101,9 +102,8 @@ impl CrateType {
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
-    /// The unique identifier of the object file that this crate was loaded from.
-    /// Currently, this is a reference to the corresponding `ModuleArea`.
-    pub object_file: &'static ModuleArea,
+    /// The absolute path of the object file that this crate was loaded from.
+    pub object_file_abs_path: Path,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -148,7 +148,10 @@ pub struct LoadedCrate {
 use core::fmt;
 impl fmt::Debug for LoadedCrate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", self.crate_name, self.object_file)
+        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", 
+            self.crate_name, 
+            self.object_file_abs_path,
+        )
     }
 }
 
@@ -262,7 +265,7 @@ impl LoadedCrate {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              self.crate_name.clone(),
-            object_file:             self.object_file,
+            object_file_abs_path:    self.object_file_abs_path.clone(),
             sections:                BTreeMap::new(),
             text_pages:              new_text_pages_ref.clone(),
             rodata_pages:            new_rodata_pages_ref.clone(),

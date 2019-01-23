@@ -124,12 +124,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): loaded multiboot2 info."); 
-
+    println_raw!("nano_core_start(): booted via multiboot2."); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    // this consumes boot_info
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(boot_info));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
     // now that we have virtual memory, including a heap, we can create basic things like state_store
@@ -137,10 +135,14 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     trace!("state_store initialized.");
     println_raw!("nano_core_start(): initialized state store.");     
 
+    // initialize the module management subsystem, so we can create the default crate namespace
+    let default_namespace = try_exit!(mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()));
+    println_raw!("nano_core_start(): initialized crate namespace subsystem."); 
+
     // Parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
     // since we need it to load and run applications as crates in the kernel.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-    match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
+    match mod_mgmt::parse_nano_core::parse_nano_core(default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
         Ok(_new_syms) => {
             // debug!("========================== Symbol map after nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
         }

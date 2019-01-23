@@ -17,5 +17,8 @@ version = "1.0"
 default-features = false
 version = "0.3.7"
 
+[dependencies.memory]
+path = "../memory"
+
 [lib]
 crate-type = ["rlib"]

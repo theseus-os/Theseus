@@ -14,13 +14,14 @@
 
 #[macro_use] extern crate alloc;
 extern crate spin;
+extern crate memory;
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
-use core::any::Any;
+use memory::MappedPages;
 
 /// An strong reference (Arc) to a trait object that implements Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 
@@ -38,7 +39,7 @@ pub trait FsNode {
     fn get_path_as_string(&self) -> String {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            path.insert_str(0, &format!("{}/", &cur_dir.lock().get_path_as_string()));
             return path;
         }
         return path;
@@ -51,22 +52,23 @@ pub trait FsNode {
 
 // Traits for files, implementors of File must also implement FsNode
 pub trait File : FsNode {
-    /// Reads the bytes from a file: implementors should pass in an empty buffer that the read function writes the file's data to
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str>; 
+    /// Reads the contents of this file into the given `buffer`
+    /// Caller should pass in an empty buffer and the read function will query the size of the buffer
+    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, &'static str>; 
     /// Writes the bytes argument to the contents of the file
-    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str>;
-    /// Finds a string sequence within the file
-    fn seek(&self); 
+    fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str>;
     /// Deletes the file
-    fn delete(self);
+    fn delete(self) -> Result<(), &'static str>;
     /// Returns the size of the actual file content (i.e. the bytes that correspond to user-meaningful information) 
     fn size(&self) -> usize;
+    /// Returns a view of the file as an immutable memory-mapped region.
+    fn as_mapping(&self) -> Result<&MappedPages, &'static str>;
 }
 
 /// Traits for directories, implementors of Directory must also implement FsNode
 pub trait Directory : FsNode + Send {
     /// Gets an individual child node from the current directory based on the name field of that node
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str>; 
+    fn get_child(&self, child_name: &str) -> Option<FileOrDir>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
     fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
     /// Lists the names of the children nodes of the current directory

@@ -4,12 +4,12 @@
 #![feature(transpose_result)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate spin;
 extern crate irq_safety;
 extern crate xmas_elf;
 extern crate memory;
+extern crate multiboot2;
 extern crate kernel_config;
 extern crate goblin;
 extern crate util;
@@ -18,27 +18,41 @@ extern crate owning_ref;
 extern crate cow_arc;
 extern crate hashmap_core;
 extern crate qp_trie;
+extern crate root;
+extern crate vfs_node;
+extern crate fs_node;
+extern crate path;
+extern crate memfs;
 
 
 use core::ops::DerefMut;
-use alloc::vec::Vec;
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::{String, ToString};
-use alloc::sync::{Arc, Weak};
-use spin::Mutex;
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+    collections::{BTreeMap, BTreeSet},
+    string::{String, ToString},
+    sync::{Arc, Weak},
+};
+use spin::{Mutex, Once};
 
-use xmas_elf::ElfFile;
-use xmas_elf::sections::{SectionData, ShType};
-use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
+use xmas_elf::{
+    ElfFile,
+    sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
+};
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, get_module_starting_with, MemoryManagementInfo, ModuleArea, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashmap_core::HashMap;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, Entry, wrapper::BString};
+use fs_node::{FileOrDir, File, FileRef, DirRef};
+use vfs_node::VFSDirectory;
+use path::Path;
+use memfs::MemFile;
 
 
 pub mod elf_executable;
@@ -50,15 +64,34 @@ use self::metadata::*;
 use self::dependency::*;
 
 
-lazy_static! {
-    /// The initial `CrateNamespace` that all crates are added to by default,
-    /// unless otherwise specified for crate swapping purposes.
-    static ref DEFAULT_CRATE_NAMESPACE: CrateNamespace = CrateNamespace::with_name("default");
+/// The name of the directory that contains all of the CrateNamespace files.
+const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
+/// The name of the directory in each namespace directory that contains kernel crates.
+const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
+/// The name of the directory in each namespace directory that contains application crates.
+const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "application";
+/// The name of the default CrateNamespace, also the name of its directory.
+const DEFAULT_NAMESPACE_NAME: &'static str = "default";
+
+
+/// The initial `CrateNamespace` that all crates are added to by default,
+/// unless otherwise specified for crate swapping purposes.
+static DEFAULT_CRATE_NAMESPACE: Once<CrateNamespace> = Once::new();
+
+/// Returns a reference to the default namespace, which will always exist. 
+/// Returns None if the default namespace hasn't yet been initialized.
+pub fn get_default_namespace() -> Option<&'static CrateNamespace> {
+    DEFAULT_CRATE_NAMESPACE.try()
 }
 
-pub fn get_default_namespace() -> &'static CrateNamespace {
-    &DEFAULT_CRATE_NAMESPACE
+/// Returns the top-level directory that contains all of the namespaces. 
+pub fn get_namespaces_directory() -> Option<DirRef> {
+    match root::get_root().lock().get_child(NAMESPACES_DIRECTORY_NAME) {
+        Some(FileOrDir::Dir(dir)) => Some(dir),
+        _ => None,
+    }
 }
+
 
 /// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
 #[allow(non_snake_case)]
@@ -75,6 +108,60 @@ pub fn RODATA_SECTION_FLAGS() -> EntryFlags {
 pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
     EntryFlags::PRESENT | EntryFlags::NO_EXECUTE | EntryFlags::WRITABLE
 }
+
+
+
+/// Initializes the module management system by parsing the list of bootloader-loaded modules 
+/// into namespace-specific directories. and turning them into creating the default `CrateNamespace`. 
+/// Returns a reference to that default CrateNamespace.
+pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static CrateNamespace, &'static str> {
+    let namespaces_dir         = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(),         Arc::downgrade(root::get_root()))?;
+    let default_namespace_dir  = VFSDirectory::new(DEFAULT_NAMESPACE_NAME.to_string(),            Arc::downgrade(&namespaces_dir))?;
+    let default_kernel_dir     = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      Arc::downgrade(&default_namespace_dir))?;
+    let default_app_dir        = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), Arc::downgrade(&default_namespace_dir))?;
+
+    let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
+
+    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        for m in boot_info.module_tags() {
+            info!("ModuleTag: {:?}", m);
+            let size_in_bytes = (m.end_address() - m.start_address()) as usize;
+            let frames = Frame::range_inclusive_addr(m.start_address() as PhysicalAddress, size_in_bytes);
+            let (crate_type, crate_name) = CrateType::from_module_name(m.name())?;
+            let name = String::from(crate_name);
+
+            let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+            let mp = active_table.map_allocated_pages_to(
+                pages, 
+                frames, 
+                EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
+                fa.lock().deref_mut()
+            )?;
+
+            debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+
+            let parent_dir = match crate_type { 
+                CrateType::Kernel => &default_kernel_dir,
+                CrateType::Application => &default_app_dir,
+                CrateType::Userspace => return Err("Userspace crates are currently unsupported")
+            };
+            MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)?;
+        }
+
+        // create the default CrateNamespace
+        let default_namespace = CrateNamespace::new(
+            DEFAULT_NAMESPACE_NAME.to_string(), 
+            default_namespace_dir,
+            default_kernel_dir,
+            default_app_dir
+        );
+        Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| default_namespace))
+    }
+    else {
+        Err("Couldn't get kernel's ActivePageTable to initialize module management / default CrateNamespace")
+    }
+}
+
 
 
 /// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
@@ -120,8 +207,8 @@ pub struct SwapRequest {
     /// The name of the old crate that will be replaced by the new crate.
     /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
     old_crate_name: String,
-    /// The `ModuleArea` containing the object file for the new crate that will replace the old crate. 
-    new_crate_module_area: &'static ModuleArea,
+    /// The absolute path to the object file for the new crate that will replace the old crate. 
+    new_crate_object_file_abs_path: Path,
     /// Whether to expose the new crate's sections with symbol names that match those from the old crate.
     /// For more details, see the above docs for this struct.
     reexport_new_symbols_as_old: bool,
@@ -132,11 +219,11 @@ impl SwapRequest {
     /// and optionally re-export the new crate's symbols 
     pub fn new(
         old_crate_name: String, 
-        new_crate_module_area: &'static ModuleArea, 
+        new_crate_object_file_abs_path: Path, 
         reexport_new_symbols_as_old: bool,
     ) -> SwapRequest {
         SwapRequest {
-            old_crate_name, new_crate_module_area, reexport_new_symbols_as_old,
+            old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old,
         }
     }
 }
@@ -153,12 +240,26 @@ pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
 /// A crate namespace struct is basically a container around many crates 
 /// that have all been loaded and linked against each other, 
 /// completely separate and in isolation from any other crate namespace 
-/// (although a given crate may be present in multiple namespaces). 
+/// (although a given crate may be present in multiple namespaces).
+/// 
+/// Each `CrateNamespace` can be treated as a separate OS personality, 
+/// but are significantly more efficient than library OS-style personalities. 
 pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
     name: String,
 
-    /// The list of all the crates in this namespace,
+    /// The root directory of this namespace,
+    /// which contains subdirectories of all of the crate object files 
+    /// that are eligible to be loaded into this namespace. 
+    /// In other words, when this namespace is looking for a missing symbol or crate,
+    /// its search space is bounded by the crates contained in this directory.
+    base_directory: DirRef,
+    /// Similar to `base_directory`, but holds all of the kernel crate object files.
+    kernel_directory: DirRef,
+    /// Similar to `base_directory`, but holds all of the application crate object files.
+    application_directory: DirRef,
+
+    /// The list of all the crates loaded into this namespace,
     /// stored as a map in which the crate's String name
     /// is the key that maps to the value, a strong reference to a crate.
     /// It is a strong reference because a crate must not be removed
@@ -188,29 +289,45 @@ pub struct CrateNamespace {
 }
 
 impl CrateNamespace {
-    /// Creates a new `CrateNamespace` that is completely empty. 
-    pub fn new() -> CrateNamespace {
-        CrateNamespace::with_name("")
-    } 
-
-
-    /// Creates a new `CrateNamespace` that is completely empty, and is given the specified `name`.
-    pub fn with_name(name: &str) -> CrateNamespace {
+    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
+    /// # Arguments
+    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
+    /// * `base_dir`: the base directory containing other subdirectories of crate object files for this namespace.
+    ///    The `base_dir` should be the parent directory of both the `kernel_dir` and `app_dir`.
+    /// * `kernel_dir`: the subdirectory containing kernel crate object files eligible to be loaded into this namespace.
+    /// * `app_dir`: the subdirectory containing application crate object files eligible to be loaded into this namespace.
+    pub fn new(name: String, base_dir: DirRef, kernel_dir: DirRef, app_dir: DirRef) -> CrateNamespace {
         CrateNamespace {
             name: String::from(name),
+            base_directory: base_dir,
+            kernel_directory: kernel_dir,
+            application_directory: app_dir,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
         }
     } 
 
+    /// Returns the directory that this `CrateNamespace` is based on.
+    pub fn base_directory(&self) -> &DirRef {
+        &self.base_directory
+    }
+
+    /// Returns this `CrateNamespace`'s directory of application crates.
+    pub fn application_directory(&self) -> &DirRef {
+        &self.application_directory
+    }
+
+    /// Returns this `CrateNamespace`'s directory of kernel crates.
+    pub fn kernel_directory(&self) -> &DirRef {
+        &self.kernel_directory
+    }
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
     /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
     pub fn crate_names(&self) -> Vec<String> {
         self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect()
     }
-
 
     /// Acquires the lock on this `CrateNamespace`'s crate list and looks for the crate 
     /// that matches the given `crate_name`, if it exists in this namespace.
@@ -258,21 +375,21 @@ impl CrateNamespace {
     /// Returns a Result containing the new crate itself.
     pub fn load_application_crate(
         &self, 
-        crate_module: &'static ModuleArea, 
+        crate_file_path: &Path, 
         kernel_mmi: &mut MemoryManagementInfo, 
         load_symbols_as_singleton: bool,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
-        let (crate_type, crate_name) = CrateType::from_module_name(crate_module.name())?;
-        if crate_type != CrateType::Application {
-            error!("load_application_crate() cannot be used for crate \"{}\", only for application crate modules starting with \"{}\"",
-                crate_module.name(), CrateType::Application.prefix());
-            return Err("load_application_crate() can only be used for application crate modules");
-        }
         
-        debug!("load_application_crate: trying to load \"{}\" application module", crate_module.name());
-        let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
+        let crate_file_ref = match crate_file_path.get(&self.application_directory)
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory)) // retry with the ".o" extension
+        {
+            Ok(FileOrDir::File(f)) => f,
+            _ => return Err("couldn't find specified application crate file path"),
+        };
+        let crate_file = crate_file_ref.lock();
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi, verbose_log)?;
         
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
         self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
@@ -290,14 +407,13 @@ impl CrateNamespace {
             info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
         }
         Ok(new_crate_ref)
-
-        // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
     }
 
 
     /// Loads the specified kernel crate into memory, allowing it to be invoked.  
     /// Returns a Result containing the number of symbols that were added to the symbol map
     /// as a result of loading this crate.
+    /// 
     /// # Arguments
     /// * `crate_module`: the crate that should be loaded into this `CrateNamespace`.
     /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
@@ -309,22 +425,21 @@ impl CrateNamespace {
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_kernel_crate(
         &self,
-        crate_module: &'static ModuleArea, 
+        crate_file_path: &Path,
         backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi: &mut MemoryManagementInfo, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
-        let (crate_type, crate_name) = CrateType::from_module_name(crate_module.name())?;
-        if crate_type != CrateType::Kernel {
-            error!("load_kernel_crate() cannot be used for crate \"{}\", only for kernel crate modules starting with \"{}\"",
-                crate_module.name(), CrateType::Kernel.prefix());
-            return Err("load_kernel_crate() can only be used for kernel crate modules");
-        }
-
-        debug!("load_kernel_crate: trying to load \"{}\" kernel crate", crate_name);
-        let temp_module_mapping = map_crate_module(crate_module, kernel_mmi)?;
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&temp_module_mapping, crate_module, crate_module.size(), crate_name, kernel_mmi, verbose_log)?;
+        debug!("load_kernel_crate: trying to load kernel crate {:?}", crate_file_path);
+        let crate_file_ref = match crate_file_path.get(&self.kernel_directory)
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.kernel_directory)) // retry with the ".o" extension
+        {
+            Ok(FileOrDir::File(f)) => f,
+            _ => return Err("couldn't find specified kernel crate file path"),
+        };
+        let crate_file = crate_file_ref.lock();
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi, verbose_log)?;
         self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
@@ -332,7 +447,7 @@ impl CrateNamespace {
             (new_crate.crate_name.clone(), new_syms)
         };
             
-        info!("loaded module {:?} as new crate {:?}, {} new symbols.", crate_module.name(), new_crate_name, new_syms);
+        info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
         Ok(new_syms)
         
@@ -349,43 +464,40 @@ impl CrateNamespace {
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
-    pub fn load_kernel_crates<I>(
+    pub fn load_kernel_crates<'p, I>(
         &self,
-        new_modules: I,
+        crate_file_paths: I,
         backup_namespace: Option<&CrateNamespace>,
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
-        where I: Iterator<Item = &'static ModuleArea> + Clone
+        where I: Iterator<Item = &'p Path>
     {
-        // first we map all of the crates' ModuleAreas
-        let mappings = {
-            let mut mappings: Vec<MappedPages> = Vec::new(); //Vec::with_capacity(len);
-            for crate_module in new_modules.clone() {
-                debug!("mapping crate_module {:?}", crate_module);
-                mappings.push(map_crate_module(crate_module, kernel_mmi)?);
-            }
-            mappings
-        };
+        // first, validate all of the crate paths by turning them into direct file references
+        let mut crate_files: Vec<FileRef> = Vec::new();
+        for crate_file_path in crate_file_paths {
+            let crate_file_ref: FileRef = match crate_file_path.get(&self.application_directory) {
+                Ok(FileOrDir::File(f)) => f,
+                _ => return Err("couldn't find specified application crate file path"),
+            };
+            crate_files.push(crate_file_ref);
+        }
 
-        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(mappings.len()); 
+        // second, lock all of the crates
+        let mut locked_crate_files = Vec::with_capacity(crate_files.len());
+        for crate_file_ref in &crate_files {
+            locked_crate_files.push(crate_file_ref.lock());
+        }
 
-        // then we do all of the section parsing and loading
-        for (i, crate_module) in new_modules.enumerate() {
-            let temp_module_mapping = mappings.get(i).ok_or("BUG: mapped crate module successfully but couldn't retrieve mapping (WTF?)")?;
-            let (new_crate, elf_file) = self.load_crate_sections(
-                temp_module_mapping, 
-                crate_module,
-                crate_module.size(),
-                CrateType::from_module_name(crate_module.name())?.1,
-                kernel_mmi, 
-                verbose_log
-            )?;
-            let _new_syms = self.add_symbols(new_crate.lock_as_ref().sections.values(), verbose_log);
-            partially_loaded_crates.push((new_crate, elf_file));
+        // third, do all of the section parsing and loading
+        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(crate_files.len()); 
+        for locked_crate_file in &locked_crate_files {            
+            let (new_crate_ref, elf_file) = self.load_crate_sections(&locked_crate_file, kernel_mmi, verbose_log)?;
+            let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
+            partially_loaded_crates.push((new_crate_ref, elf_file));
         }
         
-        // then we do all of the relocations 
+        // finally, we do all of the relocations 
         for (new_crate_ref, elf_file) in partially_loaded_crates {
             self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
@@ -394,8 +506,6 @@ impl CrateNamespace {
 
         Ok(())
     }
-
-
 
 
     /// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
@@ -425,6 +535,9 @@ impl CrateNamespace {
 
         CrateNamespace {
             name: self.name.clone(),
+            base_directory: self.base_directory.clone(),
+            kernel_directory: self.kernel_directory.clone(),
+            application_directory: self.application_directory.clone(),
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
@@ -474,14 +587,24 @@ impl CrateNamespace {
         } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
-            let nn = CrateNamespace::with_name(&format!("temp_swap--{:?}", swap_requests));
-            let module_iter = swap_requests.iter().map(|swap_req| swap_req.new_crate_module_area);
-            nn.load_kernel_crates(module_iter, Some(self), kernel_mmi, verbose_log)?;
+            let nn = CrateNamespace::new(
+                format!("temp_swap--{:?}", swap_requests), 
+                self.base_directory.clone(),
+                self.kernel_directory.clone(),
+                self.application_directory.clone(),
+            );
+            let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
+            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;
             (nn, false)
         };
 
         let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
-        let cached_crates: CrateNamespace = CrateNamespace::new();
+        let cached_crates: CrateNamespace = CrateNamespace::new(
+            format!("cached_crates--{:?}", swap_requests), 
+            self.base_directory.clone(),
+            self.kernel_directory.clone(),
+            self.application_directory.clone(),
+        );
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to remove all of the old crates
@@ -489,8 +612,8 @@ impl CrateNamespace {
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
         for req in swap_requests {
-            let SwapRequest { old_crate_name, new_crate_module_area, reexport_new_symbols_as_old } = req;
-            let (_new_crate_type, new_crate_name) = CrateType::from_module_name(new_crate_module_area.name())?;
+            let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+            let new_crate_name = new_crate_object_file_abs_path.file_stem();
             if self.get_crate(new_crate_name).is_some() {
                 error!("swap_crates(): the requested new crate {:?} was already loaded into this namespace!", new_crate_name);
                 return Err("swap_crates(): the requested new crate was already loaded into this namespace!");
@@ -712,11 +835,15 @@ impl CrateNamespace {
 
                     // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
                     // This removed old crate will be useful when a future swap request includes the following:
-                    // (1) the future `new_crate_module_area`        ==  the current `old_crate.object_file`
+                    // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
                     // (2) the future `old_crate_name`               ==  the current `new_crate_name`
                     // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
                     //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                    let future_swap_req = SwapRequest::new(String::from(new_crate_name), old_crate.object_file, !old_crate.reexported_symbols.is_empty());
+                    let future_swap_req = SwapRequest::new(
+                        String::from(new_crate_name), 
+                        old_crate.object_file_abs_path.clone(), 
+                        !old_crate.reexported_symbols.is_empty()
+                    );
                     future_swap_requests.push(future_swap_req);
                     
                     // Remove all of the symbols belonging to the old crate from this namespace.
@@ -768,23 +895,28 @@ impl CrateNamespace {
     /// However, it does add all of the newly-loaded crate sections to the symbol map (yes, even before relocation/linking),
     /// since we can use them to resolve missing symbols for relocations.
     /// 
-    /// Parses each section in the given `ElfFile` and copies the object file contents to each section.
-    /// Returns a tuple of the new `LoadedCrate`, the list of newly `LoadedSection`s, and the crate's ELF file.
-    /// The list of sections is actually a map from its section index (shndx) to the `LoadedSection` itself,
-    /// which is kept separate and has not yet been added to the new `LoadedCrate` beause it needs to be used for relocations.
-    fn load_crate_sections<'e>(
+    /// Parses each section in the given `crate_file` object file and copies its contents to each section.
+    /// Returns a tuple of a reference to the new `LoadedCrate` and the crate's ELF file (to avoid having to re-parse it).
+    /// 
+    /// # Arguments
+    /// * `crate_file`: the object file for the crate that will be loaded into this `CrateNamespace`.
+    /// * `kernel_mmi`: the kernel's MMI struct, for memory mapping use.
+    /// * `verbose_log`: whether to log detailed messages for debugging.
+    fn load_crate_sections<'f>(
         &self,
-        mapped_pages: &'e MappedPages, 
-        object_file: &'static ModuleArea,
-        size_in_bytes: usize, 
-        crate_name: &str, 
+        crate_file: &'f Box<File + Send>,
         kernel_mmi: &mut MemoryManagementInfo,
         _verbose_log: bool
-    ) -> Result<(StrongCrateRef, ElfFile<'e>), &'static str> {
+    ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
         
+        let mapped_pages  = crate_file.as_mapping()?;
+        let size_in_bytes = crate_file.size();
+        let crate_name    = crate_file.get_name();
+        let abs_path      = Path::new(crate_file.get_path_as_string());
+
         // First, check to make sure this crate hasn't already been loaded. 
         // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.
-        if self.crate_tree.lock().contains_key_str(crate_name) {
+        if self.crate_tree.lock().contains_key_str(&crate_name) {
             return Err("the crate has already been loaded, cannot load it again in the same namespace");
         }
 
@@ -848,7 +980,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              String::from(crate_name),
-            object_file:             object_file,
+            object_file_abs_path:    abs_path,
             sections:                BTreeMap::new(),
             text_pages:              text_pages  .as_ref().map(|r| Arc::clone(r)),
             rodata_pages:            rodata_pages.as_ref().map(|r| Arc::clone(r)),
@@ -1279,7 +1411,7 @@ impl CrateNamespace {
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled, CrateType::Kernel.prefix(), backup_namespace, kernel_mmi, verbose_log)
+                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1481,10 +1613,6 @@ impl CrateNamespace {
     /// 
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
-    /// * `kernel_crate_prefix`: the prefix string that goes in front of crate module names, 
-    ///   which is generally "`k#`". 
-    ///   You can specify the default by passing in `CrateType::Kernel.prefix()`, or specify another prefix
-    ///   to help the symbol resolver know in which crate modules to look.
     /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
@@ -1493,7 +1621,6 @@ impl CrateNamespace {
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
-        kernel_crate_prefix: &str,
         backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool
@@ -1546,12 +1673,11 @@ impl CrateNamespace {
             info!("Symbol \"{}\" not initially found, attemping to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             
-            // module names have a prefix like "k#", so we need to prepend that to the crate name
-            let crate_dependency_name = format!("{}{}-", kernel_crate_prefix, crate_dependency_name);
+            let crate_dependency_name = format!("{}-", crate_dependency_name);
  
-            if let Some(dependency_module) = get_module_starting_with(&crate_dependency_name) {
+            if let Some(dependency_crate_file) = self.get_kernel_file_starting_with(&crate_dependency_name) {
                 // try to load the missing symbol's containing crate
-                if let Ok(_num_new_syms) = self.load_kernel_crate(dependency_module, backup_namespace, kernel_mmi, verbose_log) {
+                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file, backup_namespace, kernel_mmi, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
                         return sec;
@@ -1562,12 +1688,12 @@ impl CrateNamespace {
                     }
                 }
                 else {
-                    error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate module {:?}.",
-                        demangled_full_symbol, dependency_module);
+                    error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate file {:?}.",
+                        demangled_full_symbol, dependency_crate_file);
                 }
             }
             else {
-                error!("Symbol \"{}\" not found, and couldn't find its containing crate's module \"{}\".", 
+                error!("Symbol \"{}\" not found, and couldn't find its containing crate's file \"{}\".", 
                     demangled_full_symbol, crate_dependency_name);
             }
         }
@@ -1640,6 +1766,22 @@ impl CrateNamespace {
             Ok(_) => output,
             _ => String::from("(error)"),
         }
+    }
+
+
+    /// Finds the kernel crate object file in this `CrateNamespace`'s directory of kernel crates
+    /// that starts with the given `prefix`, if and only if there is a single match. 
+    /// If multiple crates match the prefix, `None` is returned. 
+    /// 
+    /// Returns the relative `Path` of the matching kernel crate file, 
+    /// relative to this `CrateNamespace`'s kernel crate directory,
+    /// effectively just the full name of the crate file. 
+    pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
+        let children = self.kernel_directory.lock().list_children();
+        let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
+        iter.next()
+            .filter(|_| iter.next().is_none()) // ensure single element
+            .map(|name| Path::new(name))
     }
 
 }
@@ -1801,34 +1943,6 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementI
             // data_pages:   data_pages  .map(|dp| Arc::new(Mutex::new(dp))),
         }
     )
-}
-
-
-/// Maps the given `ModuleArea` for a crate and returns the `MappedPages` that contain it. 
-fn map_crate_module(crate_module: &ModuleArea, mmi: &mut MemoryManagementInfo) -> Result<MappedPages, &'static str> {
-    use kernel_config::memory::address_is_page_aligned;
-    if !address_is_page_aligned(crate_module.start_address()) {
-        error!("map_crate_module(): crate_module {} is not page aligned!", crate_module.name());
-        return Err("map_crate_module(): crate_module is not page aligned");
-    } 
-
-    // first we need to map the module memory region into our address space, 
-    // so we can then parse the module as an ELF file in the kernel.
-    if let PageTable::Active(ref mut active_table) = mmi.page_table {
-        let new_pages = allocate_pages_by_bytes(crate_module.size()).ok_or("couldn't allocate pages for crate module")?;
-        let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
-        active_table.map_allocated_pages_to(
-            new_pages, 
-            Frame::range_inclusive_addr(crate_module.start_address(), 
-            crate_module.size()), 
-            EntryFlags::PRESENT, 
-            frame_allocator.deref_mut()
-        )
-    }
-    else {
-        error!("map_crate_module(): error getting kernel's active page table to temporarily map crate_module {}.", crate_module.name());
-        Err("map_crate_module(): couldn't get kernel's active page table")
-    }
 }
 
 

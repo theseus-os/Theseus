@@ -13,7 +13,6 @@ extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
 extern crate atomic_linked_list; 
-extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate memory;
@@ -21,6 +20,7 @@ extern crate memory;
 extern crate event_types; 
 extern crate frame_buffer;
 extern crate window_manager;
+extern crate path;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -30,8 +30,8 @@ use keycodes_ascii::{Keycode, KeyAction};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::string::{String,ToString};
 use alloc::vec::Vec;
-use mod_mgmt::metadata::CrateType;
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use path::Path;
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
@@ -41,23 +41,20 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
 
     // Spawns the terminal print crate so that we can print to the terminal
-    let app_prefix = CrateType::Application.prefix();
-    let term_print_module = memory::get_module(&format!("{}terminal_print", app_prefix)).ok_or("Error: terminal_print module not found")?;
-    ApplicationTaskBuilder::new(term_print_module)
+    ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
         .name("terminal_print_singleton".to_string())
         .singleton()
         .spawn()?;
 
-    // Initializes the default terminal (will also start the windowing manager)
-    let term_module = memory::get_module(&format!("{}terminal", app_prefix)).ok_or("Error: terminal module not found")?;
-    // spawn the default terminal
-    ApplicationTaskBuilder::new(term_module)
+    // Spawn the default terminal (will also start the windowing manager)
+    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
         .name("default_terminal".to_string())
         .spawn()?;
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
         .spawn()?;
+
     Ok(returned_keyboard_producer)
 }
 
@@ -86,8 +83,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
                     let task_name: String = format!("terminal {}", terminal_id_counter);
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    let term_module = memory::get_module(&format!("{}terminal", CrateType::Application.prefix())).ok_or("Error: terminal module not found")?;
-                    ApplicationTaskBuilder::new(term_module)
+                    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
                         .argument(args)
                         .name(task_name)
                         .spawn()?;

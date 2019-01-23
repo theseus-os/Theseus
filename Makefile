@@ -192,7 +192,9 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d')  >  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
+		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+	echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
 ## This compiles the assembly files in the nano_core
