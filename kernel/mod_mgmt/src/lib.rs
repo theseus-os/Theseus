@@ -124,7 +124,6 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 
     if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
         for m in boot_info.module_tags() {
-            info!("ModuleTag: {:?}", m);
             let size_in_bytes = (m.end_address() - m.start_address()) as usize;
             let frames = Frame::range_inclusive_addr(m.start_address() as PhysicalAddress, size_in_bytes);
             let (crate_type, crate_name) = CrateType::from_module_name(m.name())?;
@@ -138,7 +137,7 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
                 fa.lock().deref_mut()
             )?;
 
-            debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+            // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
 
             let parent_dir = match crate_type { 
                 CrateType::Kernel => &default_kernel_dir,
@@ -911,8 +910,8 @@ impl CrateNamespace {
         
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.size();
-        let crate_name    = crate_file.get_name();
         let abs_path      = Path::new(crate_file.get_path_as_string());
+        let crate_name    = abs_path.file_stem().to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.

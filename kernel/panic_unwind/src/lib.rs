@@ -45,9 +45,8 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         {
             type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
             let section_ref = mod_mgmt::get_default_namespace()
-                    .get_symbol_starting_with("panic_wrapper::panic_wrapper::")
-                    .upgrade()
-                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
+                .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
+                .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
 
             // call the panic_wrapper function, otherwise return an Err into "res"
             let mut space = 0;
