@@ -70,7 +70,7 @@ pub trait Directory : FsNode + Send {
     /// Gets an individual child node from the current directory based on the name field of that node
     fn get_child(&self, child_name: &str) -> Option<FileOrDir>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
+    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str>;
     /// Lists the names of the children nodes of the current directory
     fn list_children(&mut self) -> Vec<String>;
 }

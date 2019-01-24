@@ -43,13 +43,13 @@ impl VFSDirectory {
             parent: Arc::downgrade(parent),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        parent.lock().insert_child(FileOrDir::Dir(dir_ref.clone()))?;
+        parent.lock().insert_child(FileOrDir::Dir(dir_ref.clone()), true)?;
         Ok(dir_ref)
     }
 }
 
 impl Directory for VFSDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
@@ -98,7 +98,7 @@ impl VFSFile {
             parent: Arc::downgrade(parent),
         };
         let file_ref = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
-        parent.lock().insert_child(FileOrDir::File(file_ref.clone()))?;
+        parent.lock().insert_child(FileOrDir::File(file_ref.clone()), true)?;
         Ok(file_ref)
     }
 }

@@ -135,7 +135,7 @@ impl TaskDirectory {
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
         let strong_parent = Arc::clone(parent_dir);
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
+        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref), false)?;
         Ok(dir_ref_copy)
     }
 
@@ -153,13 +153,7 @@ impl TaskDirectory {
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
         let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
-        let parent_dir = match self.get_self_pointer() {
-            Ok(ptr) => ptr, 
-            Err(err) => {
-                error!("could not get self because: {}", err);
-                return Err(err)
-            },
-        };
+        let parent_dir = self.get_self_pointer()?;
 
         // We have to violate orthogonality to avoid a locking issue only present because calling tasks.lock().get_child()
         // locks the highest-level tasks directory, which would then be locked again if we called the regular VFSDirectory::new() method
@@ -171,6 +165,8 @@ impl TaskDirectory {
             parent: Arc::downgrade(&parent_dir),
         };
         let task_dir = Arc::new(Mutex::new(Box::new(new_dir) as Box<Directory + Send>));
+        // FIX: if we uncomment this call, we'll have to make get_child() have a mutable reference to self
+        // self.insert_child(FileOrDir::Dir(Arc::clone(&task_dir))).ok();
         create_mmi_dir(task_ref.clone(), &task_dir)?;
         Ok(FileOrDir::Dir(task_dir))
     }
@@ -197,10 +193,21 @@ impl FsNode for TaskDirectory {
 }
 
 impl Directory for TaskDirectory {
-    /// This function adds a newly created fs node (the argument) to the TASKS directory's children vector    
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+    /// This function adds a newly created fs node (the argument) to the TASKS directory's children map  
+    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
+        if let Some(old_child) = self.children.get(&name) { // the children map contains this key already if this passes
+            if overwrite {
+                match (old_child, &child) {
+                    (FileOrDir::File(_old_file), FileOrDir::Dir(ref _new_file)) => return Err("cannot replace file with directory of same name"),
+                    (FileOrDir::Dir(_old_dir), FileOrDir::File(ref _new_dir)) => return Err("cannot replace directory with file of same name"),
+                    _ => { } // the types check out, so we can overwrite later
+                };
+            } else {
+                return Err("file or directory with the same name already exists");
+            }
+        }
         self.children.insert(name, child);
         Ok(())
     }
