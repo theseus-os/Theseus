@@ -5,7 +5,7 @@
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
 //! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -19,10 +19,10 @@ use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
 use memory::{MappedPages, FRAME_ALLOCATOR};
 use memory::EntryFlags;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use spin::Mutex;
 use alloc::boxed::Box;
-use fs_node::FileOrDir;
+use fs_node::{FileOrDir, FileRef};
 
 /// The struct that represents a file in memory that is backed by MappedPages
 pub struct MemFile {
@@ -31,17 +31,18 @@ pub struct MemFile {
     // The size of the file in bytes
     size: usize,
     /// The contents or a seqeunce of bytes as a file: this primitive can be changed into a more complex struct as files become more complex
-    contents: MappedPages,
+    mp: MappedPages,
     /// A weak reference to the parent directory
     parent: WeakDirRef,
 }
 
 impl MemFile {
-    /// Combines file creation and file write into one operation
-    pub fn new(name: String, contents: &mut [u8], parent: WeakDirRef) -> Result<(), &'static str> {
+    /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
+    pub fn new(name: String, contents: &[u8], parent: &DirRef) -> Result<FileRef, &'static str> {
         // Obtain the active kernel page table
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        if let memory::PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
             let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock(); 
             // Allocate and map the least number of pages we need to store the information contained in the buffer
             let pages = memory::allocate_pages_by_bytes(contents.len()).ok_or("could not allocate pages")?;
@@ -53,66 +54,62 @@ impl MemFile {
                 dest_slice.copy_from_slice(contents); // writes the desired contents into the correct area in the mapped page
             }
             // create and return the newly create MemFile
-            let new_file = MemFile {
-                name: name, 
-                size: contents.len(),
-                contents: mapped_pages,
-                parent: parent.clone()
-            };
-            let boxed_file = Arc::new(Mutex::new(Box::new(new_file) as Box<File + Send>));
-            let strong_parent = Weak::upgrade(&parent).ok_or("parent possibly doesn't exist for this MemFile")?;
-            strong_parent.lock().insert_child(FileOrDir::File(boxed_file))?; // adds the newly created file to the tree
-            return Ok(())
+            Self::from_mapped_pages(mapped_pages, name, contents.len(), parent)
         }
-        return Err("could not get active table");
+        else {
+            Err("could not get active table")
+        }
     }
 
-    /// Converts a MemFile object --> MappedPages object
-    /// Note: This function consumes the MemFile object
-    pub fn into_mapped_pages(self) -> MappedPages {
-        return self.contents;
-    }
-
-    pub fn from_mapped_pages(pages: MappedPages, name: String, size: usize, parent: WeakDirRef) -> MemFile {
-        MemFile {
+    /// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.
+    pub fn from_mapped_pages(mapped_pages: MappedPages, name: String, size: usize, parent: &DirRef) -> Result<FileRef, &'static str> {
+        let memfile = MemFile {
             name: name, 
             size: size, 
-            contents: pages, 
-            parent: parent, 
-        }
+            mp: mapped_pages, 
+            parent: Arc::downgrade(parent), 
+        };
+        let file_ref = Arc::new(Mutex::new(Box::new(memfile) as Box<File + Send>));
+        parent.lock().insert_child(FileOrDir::File(file_ref.clone()))?; // adds the newly created file to the tree
+        Ok(file_ref)
     }
-
 }
 
 impl File for MemFile {
-    /// Reads the contents of a file
-    /// Caller should pass in an empty buffer and the read function will query the size of the buffer
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> {
-        let num_bytes_read = self.size; // this is the number of bytes of actual information stored in the MappedPage
-        // Copies the information from the MappedPage (or at least the section containing the relevant information) to the read-buffer
-        buf.copy_from_slice(self.contents.as_slice_mut(0, num_bytes_read)?); 
-        return Ok(num_bytes_read);
+    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, &'static str> {
+        let offset = 0;
+        // we can only copy up to the end of the given buffer or up to the end of the file
+        let count = core::cmp::min(buffer.len(), self.size);
+        buffer[..count].copy_from_slice(self.mp.as_slice(offset, count)?); 
+        return Ok(count);
     }
 
-    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> {
-        let page_capacity = self.contents.size_in_bytes();
-        if buf.len() <= page_capacity {
+    fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str> {
+        let offset = 0;
+        if buffer.len() <= self.mp.size_in_bytes() {
             { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
                 // Gets a mutuable reference to the byte portion of the newly mapped pages
-                let dest_slice = self.contents.as_slice_mut::<u8>(0, buf.len())?;
-                dest_slice.copy_from_slice(buf); // writes the desired contents into the correct area in the mapped page
+                let dest_slice = self.mp.as_slice_mut::<u8>(offset, buffer.len())?;
+                dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }    
-            return Ok(self.contents.size_in_bytes())
+            return Ok(self.mp.size_in_bytes())
         } else {
             return Err("size of contents to be written exceeds the MappedPages capacity");
         }
     }
 
-    fn seek(&self) { unimplemented!(); }
-    fn delete(self) { unimplemented!(); }
+    fn delete(self) -> Result<(), &'static str> { 
+        Err("unimplemented")
+    }
+
     fn size(&self) -> usize {
         return self.size;
     }
+
+    fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
+        Ok(&self.mp)
+    }
+    
 }
 
 impl FsNode for MemFile {

@@ -255,7 +255,7 @@ impl Task {
 
         // TODO - change to option and initialize environment to none
         let env = Environment {
-            working_dir: root::get_root(), 
+            working_dir: Arc::clone(root::get_root()), 
         };
 
         Task {
