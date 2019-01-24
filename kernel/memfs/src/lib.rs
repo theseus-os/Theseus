@@ -81,7 +81,7 @@ impl File for MemFile {
         // we can only copy up to the end of the given buffer or up to the end of the file
         let count = core::cmp::min(buffer.len(), self.size);
         buffer[..count].copy_from_slice(self.mp.as_slice(offset, count)?); 
-        return Ok(count);
+        Ok(count)
     }
 
     fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str> {
@@ -92,9 +92,9 @@ impl File for MemFile {
                 let dest_slice = self.mp.as_slice_mut::<u8>(offset, buffer.len())?;
                 dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }    
-            return Ok(self.mp.size_in_bytes())
+            Ok(self.mp.size_in_bytes())
         } else {
-            return Err("size of contents to be written exceeds the MappedPages capacity");
+            Err("size of contents to be written exceeds the MappedPages capacity")
         }
     }
 
@@ -103,7 +103,7 @@ impl File for MemFile {
     }
 
     fn size(&self) -> usize {
-        return self.size;
+        self.size
     }
 
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {

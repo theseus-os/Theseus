@@ -30,7 +30,7 @@ pub fn init() -> Result<(), &'static str> {
     // let task_dir = root_dir.lock().new("task".to_string(), Arc::downgrade(&root_dir));
     let root = root::get_root();
     let name = String::from(TASKS_DIRECTORY_NAME);
-    let task_dir = TaskDirectory::new(name, Arc::downgrade(&root))?;
+    let task_dir = TaskDirectory::new(name, &root)?;
     Ok(())
 }
 
@@ -41,17 +41,17 @@ pub struct TaskFile<'a> {
 }
 
 impl<'a> TaskFile<'a> {
-    pub fn new(task: &'a TaskRef, parent_dir: WeakDirRef) -> TaskFile<'a> {
+    pub fn new(task: &'a TaskRef, parent_dir: &DirRef) -> TaskFile<'a> {
         let task_id = task.lock().id.clone();
-        return TaskFile {
+        TaskFile {
             task: task,
             path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)), 
-            parent: parent_dir
-        };
+            parent: Arc::downgrade(parent_dir)
+        }
     }
 
     /// Generates the task info string.
-    /// TODO: calling format!() and .push_str() is redundant and wastes a lot of allocation. Improve this. 
+    /// TODO: calling format!() and .push_str() is redundant and wastes a lot of allocation. Improve this. 1
     fn generate(&self) -> String {
         // Print all tasks
         let mut task_string = String::new();
@@ -80,7 +80,7 @@ impl<'a> TaskFile<'a> {
 
 impl<'a> FsNode for TaskFile<'a> {
     fn get_name(&self) -> String {
-        return self.task.lock().name.clone();
+        self.task.lock().name.clone()
     }
 
     /// Returns a pointer to the parent if it exists
@@ -124,19 +124,19 @@ pub struct TaskDirectory {
 }
 
 impl TaskDirectory {
-    pub fn new(name: String, parent_dir: WeakDirRef)  -> Result<DirRef, &'static str> {
+    pub fn new(name: String, parent_dir: &DirRef)  -> Result<DirRef, &'static str> {
         // create a parent copy so that we can add the newly created task directory to the parent's children later
-        let parent_copy = Weak::clone(&parent_dir);
+        let parent_copy = Arc::downgrade(parent_dir);
         let directory = TaskDirectory {
             name: name,
             children: BTreeMap::new(),
-            parent: parent_dir,
+            parent: Arc::downgrade(parent_dir),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
-        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent pointer")?;
+        let strong_parent = Arc::clone(parent_dir);
         strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
-        return Ok(dir_ref_copy);
+        Ok(dir_ref_copy)
     }
 
 
@@ -182,13 +182,12 @@ impl FsNode for TaskDirectory {
         let mut path = String::from(TASKS_DIRECTORY_NAME);
         if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-            return path;
         }
-        return path;
+        path
     }
 
     fn get_name(&self) -> String {
-        return String::from(TASKS_DIRECTORY_NAME);
+        String::from(TASKS_DIRECTORY_NAME)
     }
 
     /// Returns a pointer to the parent if it exists
@@ -203,7 +202,7 @@ impl Directory for TaskDirectory {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
-        return Ok(())
+        Ok(())
     }
 
     fn get_child(&self, child: &str) -> Option<FileOrDir> {

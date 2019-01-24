@@ -53,7 +53,7 @@ impl Directory for VFSDirectory {
         // gets the name of the child node to be added
         let name = child.get_name();
         self.children.insert(name, child);
-        return Ok(())
+        Ok(())
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
@@ -62,7 +62,7 @@ impl Directory for VFSDirectory {
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
-        return self.children.keys().cloned().collect();
+        self.children.keys().cloned().collect()
     }
 }
 

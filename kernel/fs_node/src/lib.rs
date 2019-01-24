@@ -86,10 +86,10 @@ pub enum FileOrDir {
 impl FsNode for FileOrDir {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        return match self {
+        match self {
             FileOrDir::File(file) => file.lock().get_path_as_string(),
             FileOrDir::Dir(dir) => dir.lock().get_path_as_string(),
-        };
+        }
     }
     fn get_name(&self) -> String {
         return match self {

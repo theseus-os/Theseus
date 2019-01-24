@@ -156,7 +156,7 @@ impl Path {
         // remove the trailing slash after the final path component
         new_path.pop();
         // debug!("relative {}", new_path);
-        return Some(Path::new(new_path));
+        Some(Path::new(new_path))
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
