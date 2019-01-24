@@ -23,7 +23,6 @@ extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate once; // for assert_has_not_been_called!()
-extern crate qp_trie;
 
 mod area_frame_allocator;
 mod paging;
@@ -40,10 +39,8 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use core::ops::DerefMut;
 use alloc::vec::Vec;
-use alloc::string::String;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use qp_trie::{Trie, wrapper::BString};
 
 
 pub type PhysicalAddress = usize;
@@ -73,6 +70,9 @@ pub fn allocate_frame() -> Option<Frame> {
 pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
+
+/// An Arc reference to a `MemoryManagementInfo` struct.
+pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -211,91 +211,6 @@ impl PhysicalMemoryArea {
 // }
 
 
-/// A copy of the set of modules loaded by the bootloader. 
-/// Note that here we use `Once` instead of `lazy_static`, because we need to ensure that 
-/// the enclosed collection (Trie) is NOT allocated until virtual memory and the heap is setup.
-static MODULE_AREAS: Once<Trie<BString, ModuleArea>> = Once::new();
-
-
-/// An area of physical memory that contains a file that the bootloader 
-/// (e.g., GRUB) loaded from the OS image.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ModuleArea {
-    mod_start_paddr: u32,
-    mod_end_paddr: u32,
-    name: String,
-}
-impl fmt::Debug for ModuleArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ModuleArea(\"{}\", {:#X}-{:#X})", 
-                   self.name, self.mod_start_paddr, self.mod_end_paddr) 
-    }
-}
-
-impl ModuleArea {
-    pub fn start_address(&self) -> PhysicalAddress {
-        self.mod_start_paddr as PhysicalAddress
-    }
-
-    pub fn size(&self) -> usize {
-        (self.mod_end_paddr - self.mod_start_paddr) as usize
-    }
-
-    pub fn name<'a>(&'a self) -> &'a String {
-        &self.name
-    }
-}
-
-
-
-/// Returns the `ModuleArea` corresponding to the given `module_name`.
-pub fn get_module(module_name: &str) -> Option<&'static ModuleArea> {
-    MODULE_AREAS.try().and_then(|modules| modules.get_str(module_name))
-}
-
-
-/// Returns an iterator over the `ModuleArea`s with names that start with the given `module_name_prefix` string.
-/// Each item in the returned iterator will be a tuple of type `(BString, &ModuleArea)`,
-/// in which the `BString` is the `ModuleArea`'s name.
-pub fn find_modules_starting_with(module_name_prefix: &str) -> qp_trie::Iter<'static, BString, ModuleArea> { 
-    MODULE_AREAS.try()
-        .map(|modules| modules.iter_prefix_str(module_name_prefix))
-        .unwrap_or_default()
-}
-
-
-/// Returns the `ModuleArea` corresponding to the given module_name_prefix,
-/// *if and only if* the list of `ModuleArea`s only contains a single possible match.
-/// 
-/// # Important Usage Note
-/// To avoid greedily matching more modules than expected, you may wish to end the `module_name_prefix` with `"-"`.
-/// This may provide results more in line with the caller's expectations; see the last example below about a trailing `"-"`. 
-/// This works because the delimiter between a crate name and its trailing hash value is `"-"`.
-/// 
-/// Also, the `module_name_prefix` must include the kernel prefix, e.g., `k#` at the beginning. 
-/// 
-/// # Example
-/// * The module list contains `k#my_crate-843a613894da0c24` and 
-///   `k#my_crate_new-933a635894ce0f12`. 
-///   Calling `get_module_starting_with("k#my_crate::foo")` will return None,
-///   because it will match both `my_crate` and `my_crate_new`. 
-///   To match only `my_crate`, call this function as `get_module_starting_with("k#my_crate-")`
-///   (note the trailing `"-"`).
-pub fn get_module_starting_with(module_name_prefix: &str) -> Option<&'static ModuleArea> { 
-    let mut iter = find_modules_starting_with(module_name_prefix);
-    iter.next()
-        .filter(|_| iter.next().is_none()) // ensure single element
-        .map(|(_key, val)| val)
-}
-
-
-/// Returns an iterator over all of the [`ModuleArea`](struct.ModuleArea.html)s that exist.
-pub fn module_iterator() -> impl Iterator<Item = &'static ModuleArea> {
-    MODULE_AREAS.try()
-        .map(|modules| modules.values())
-        .unwrap_or_default()
-}
-
 
 /// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -415,7 +330,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 /// the original BootInformation will be unmapped and inaccessibl.e
 /// The returned MemoryManagementInfo struct is partially initialized with the kernel's StackAllocator instance, 
 /// and the list of `VirtualMemoryArea`s that represent some of the kernel's mapped sections (for task zero).
-pub fn init(boot_info: BootInformation) 
+pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
     assert_has_not_been_called!("memory::init must be called only once");
@@ -441,14 +356,11 @@ pub fn init(boot_info: BootInformation)
         .ok_or("Couldn't find kernel end address")) as PhysicalAddress;
     let kernel_phys_end: PhysicalAddress = kernel_virt_end - KERNEL_OFFSET;
 
-
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
              kernel_phys_start,
              kernel_phys_end,
              kernel_virt_end);
-
-
-    
+  
     // parse the list of physical memory areas from multiboot
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
     let mut avail_index = 0;
@@ -520,22 +432,6 @@ pub fn init(boot_info: BootInformation)
     debug!("Done with paging::init()!, active_table: {:?}", active_table);
     // print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
 
-    MODULE_AREAS.call_once( || {
-        // parse the list of multiboot modules 
-        let mut modules: Trie<BString, ModuleArea> = Trie::new();
-        for m in boot_info.module_tags() {
-            let mod_area = ModuleArea {
-                mod_start_paddr: m.start_address().clone(), 
-                mod_end_paddr:   m.end_address().clone(), 
-                name:            String::from(m.name()),
-            };
-            // print_early!("ModuleArea: {:?}\n", mod_area);
-            info!("ModuleArea: {:?}", mod_area);
-            modules.insert(mod_area.name.clone().into(), mod_area);
-        }
-        modules
-    });
-    debug!("MODULE_AREAS: {:?}\n", MODULE_AREAS.try());
     
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
@@ -545,7 +441,7 @@ pub fn init(boot_info: BootInformation)
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
-    // return the kernel's (task_zero's) memory info 
+    // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
         page_table: PageTable::Active(active_table),
         vmas: kernel_vmas,

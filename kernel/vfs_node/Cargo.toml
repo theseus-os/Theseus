@@ -9,13 +9,15 @@ description = "contains the structs VFSDirectory and VFSFile, which are the most
 spin = "0.4.5"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-[dependencies.fs_node]
-path = "../fs_node"
-
-
 [dependencies.log]
 default-features = false
 version = "0.3.7"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.memory]
+path = "../memory"
 
 [lib]
 crate-type = ["rlib"]

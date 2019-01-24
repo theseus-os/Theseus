@@ -187,27 +187,27 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     }
 
     // create and jump to the first userspace thread
-    if false {
+    #[cfg(spawn_userspace)] {
         debug!("trying to jump to userspace");
         let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
     }
 
-    if false {
+    #[cfg(spawn_userspace)] {
         debug!("trying to jump to userspace 2nd time");
         let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
         spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
     }
 
     // create and jump to a userspace thread that tests syscalls
-    if false {
+    #[cfg(spawn_userspace)] {
         debug!("trying out a system call module");
         let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
         spawn::spawn_userspace(module, None)?;
     }
 
     // a second duplicate syscall test user task
-    if false {
+    #[cfg(spawn_userspace)] {
         debug!("trying out a receive system call module");
         let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
         spawn::spawn_userspace(module, None)?;
@@ -218,7 +218,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(simd_personality)]
     {
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        KernelTaskBuilder::new(simd_personality::setup_simd_personality, ())
+        KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }

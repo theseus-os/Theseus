@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::string::ToString;
-use fs_node::FileOrDir;
+// use fs_node::FileOrDir;
 use vfs_node::VFSDirectory;
 
 #[no_mangle]
@@ -25,8 +25,9 @@ pub fn main(args: Vec<String>) -> isize {
                 let curr_dir = {
                     let locked_task = &taskref.lock();
                     let curr_env = locked_task.env.lock();
-                    Arc::clone(&curr_env.working_dir)};
-                let _new_dir = match VFSDirectory::new_dir(dir_name.to_string(), Arc::downgrade(&curr_dir)) {
+                    Arc::clone(&curr_env.working_dir)
+                };
+                let _new_dir = match VFSDirectory::new(dir_name.to_string(), &curr_dir) {
                     Ok(dir) => dir,
                     Err(err) => {println!("{}", err);
                                 return -1;}

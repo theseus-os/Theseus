@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 
 extern crate alloc;
 extern crate task;
@@ -15,7 +15,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::string::ToString;
 use getopts::Options;
-use core::ops::Deref;
 use path::Path;
 use fs_node::FileOrDir;
 
@@ -56,8 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     // go to root directory 
     if matches.free.is_empty() {
-        let root = root::get_root(); 
-        curr_env.lock().set_wd(root);
+        curr_env.lock().working_dir = Arc::clone(root::get_root());
         return 0;
     }
 
@@ -68,17 +66,16 @@ pub fn main(args: Vec<String>) -> isize {
         Ok(file_dir_enum) => {
             match file_dir_enum {
                 FileOrDir::Dir(dir) => {
-                    curr_env.lock().set_wd(dir);
-                    return 0;
+                    curr_env.lock().working_dir = dir;
                 },
                 FileOrDir::File(file) => {
-                    println!("'{}' is not a directory, cannot cd into file", file.lock().get_name());
+                    println!("{:?} is not a directory.", file.lock().get_name());
                     return -1;
                 }
             }
         },
         Err(err) => {
-            println!("get call in cd failed because: {}", err); 
+            println!("Path error: {}", err); 
             return -1;
         }
     };
@@ -90,5 +87,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: cd [ARGS]
+const USAGE: &'static str = "Usage: cd [PATH]
 Change directory";
