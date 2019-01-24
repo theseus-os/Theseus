@@ -4,7 +4,7 @@
 extern crate task;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
@@ -31,20 +31,12 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    
-
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
         None => {
             println!("failed to get current task");
             return -1;
         }
-    };
-
-    // grabs the current environment pointer; this is scoped so that we drop the lock on the "cd" task
-    let curr_env = {
-        let locked_task = taskref.lock();
-        Arc::clone(&locked_task.env)
     };
 
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the "cd" task
@@ -79,16 +71,15 @@ pub fn main(args: Vec<String>) -> isize {
                         child_string.push_str(&format!("{}\n", child));
                     }
                     println!("{}", child_string);
-                    return 0;
                 },
                 FileOrDir::File(file) => {
-                    println!("'{}' is not a directory, cannot ls file", file.lock().get_name());
+                    println!("'{}' is not a directory.", file.lock().get_name());
                     return -1;
                 }
             }
         },
         Err(err) => {
-            println!("get call in cd failed because: {}", err); 
+            println!("Path error: {}", err); 
             return -1;
         }
     };

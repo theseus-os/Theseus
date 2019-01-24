@@ -19,6 +19,7 @@ extern crate gdt;
 extern crate owning_ref;
 extern crate apic;
 extern crate context_switch;
+extern crate path;
 
 
 use core::mem;
@@ -30,11 +31,12 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
-use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, ModuleArea, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
+use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use runqueue::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
+use path::Path;
 
 
 /// Initializes tasking for the given AP core, including creating a runqueue for it
@@ -188,7 +190,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 /// A struct that uses the Builder pattern to create and customize new application `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct ApplicationTaskBuilder {
-    module: &'static ModuleArea,
+    path: Path,
     argument: MainFuncArg,
     name: Option<String>,
     pin_on_core: Option<u8>,
@@ -199,11 +201,11 @@ pub struct ApplicationTaskBuilder {
 }
 
 impl ApplicationTaskBuilder {
-    /// Creates a new application `Task` from the given `module`, 
-    /// which must have an entry point called `main`.
-    pub fn new(module: &'static ModuleArea) -> ApplicationTaskBuilder {
+    /// Creates a new application `Task` from the given `path`, which points to 
+    /// an application crate object file that must have an entry point called `main`.
+    pub fn new(path: Path) -> ApplicationTaskBuilder {
         ApplicationTaskBuilder {
-            module: module,
+            path: path,
             argument: Vec::new(), // doesn't allocate yet
             name: None,
             pin_on_core: None,
@@ -259,7 +261,8 @@ impl ApplicationTaskBuilder {
         let app_crate_ref = {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
             let mut kernel_mmi = kernel_mmi_ref.lock();
-            mod_mgmt::get_default_namespace().load_application_crate(self.module, kernel_mmi.deref_mut(), self.singleton, false)?
+            mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?
+                .load_application_crate(&self.path, kernel_mmi.deref_mut(), self.singleton, false)?
         };
 
         // get the LoadedSection for the "main" function in the app_crate
@@ -365,15 +368,15 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
 }
 
 
-
-/// Spawns a new userspace task based on the provided `ModuleArea`, which must be an ELF executable file with a defined entry point.
+#[cfg(spawn_userspace)]
+/// Spawns a new userspace task based on the provided `path`, which must point to an ELF executable file with a defined entry point.
 /// Optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
-pub fn spawn_userspace(module: &ModuleArea, name: Option<String>) -> Result<TaskRef, &'static str> {
+pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'static str> {
 
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     
     let mut new_task = Task::new();
-    new_task.name = String::from(name.unwrap_or(module.name().clone()));
+    new_task.name = String::from(name.unwrap_or(String::from(path.as_ref())));
 
     let mut ustack: Option<Stack> = None;
 

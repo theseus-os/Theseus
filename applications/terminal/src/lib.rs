@@ -20,6 +20,7 @@ extern crate event_types;
 extern crate window_manager;
 extern crate text_display;
 extern crate fs_node;
+extern crate path;
 extern crate root;
 
 extern crate terminal_print;
@@ -37,7 +38,7 @@ use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use fs_node::{DirRef, FsNode};
+use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use runqueue::RunQueue;
 use environment::Environment;
@@ -147,7 +148,7 @@ impl Terminal {
         let root = root::get_root();
         
         let env = Environment {
-            working_dir: root::get_root(), 
+            working_dir: Arc::clone(root::get_root()), 
         };
 
         let mut prompt_string = root.lock().get_path_as_string(); // ref numbers are 0-indexed
@@ -581,13 +582,15 @@ impl Terminal {
                         // we know the return type of this task is `isize`,
                         // so we need to downcast it from Any to isize.
                         let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                        warn!("task returned exit value: {:?}", val);
+                        info!("terminal: task returned exit value: {:?}", val);
                         if let Some(val) = val {
-                            self.print_to_terminal(format!("task returned with exit value {:?}\n", val))?;
+                            if *val < 0 {
+                                self.print_to_terminal(format!("task returned error value {:?}\n", val))?;
+                            }
                         }
                     },
 
-                    ExitValue::Killed(task::KillReason::Requested) => {
+                    ExitValue::Killed(KillReason::Requested) => {
                         self.print_to_terminal("^C\n".to_string())?;
                     },
                     // If the user manually aborts the task
@@ -663,7 +666,7 @@ impl Terminal {
                     return Ok(());
                 }
             };
-            match task_ref_copy.kill(task::KillReason::Requested) {
+            match task_ref_copy.kill(KillReason::Requested) {
                 Ok(_) => {
                     if let Err(e) = RunQueue::remove_task_from_all(&task_ref_copy) {
                         error!("Killed task but could not remove it from runqueue: {}", e);
@@ -927,17 +930,14 @@ impl Terminal {
     fn parse_input(&self, input_string: &str) -> (String, Vec<String>) {
         let mut words: Vec<String> = input_string.split_whitespace().map(|s| s.to_string()).collect();
         // This will never panic because pressing the enter key does not register if she has not entered anything
-        let mut command_string = words.remove(0);
-        // Formats the string into the application module syntax
-		command_string.insert_str(0, mod_mgmt::metadata::CrateType::Application.prefix());
-        return (command_string.to_string(), words);
+        let command_string = words.remove(0);
+        return (command_string, words);
     }
 
 
     /// Execute the command on a new thread 
     fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<TaskRef, &'static str> {
-        let module = memory::get_module(&command_string).ok_or("Error: no module with this name found!")?;
-        let taskref = ApplicationTaskBuilder::new(module)
+        let taskref = ApplicationTaskBuilder::new(Path::new(command_string))
             .argument(arguments)
             .spawn()?;
         

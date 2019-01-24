@@ -6,36 +6,87 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
-extern crate vfs_node;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use alloc::sync::Arc;
+use core::fmt;
+use core::ops::{Deref, DerefMut};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+    sync::Arc,
+};
 use fs_node::{FileOrDir, DirRef};
-use alloc::boxed::Box;
+
+
+pub const PATH_DELIMITER: &str = "/";
+pub const EXTENSION_DELIMITER: &str = ".";
+
 
 /// A structure that represents a file  
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Path {
     path: String
 }
 
+impl Deref for Path {
+    type Target = String;
+
+    fn deref(&self) -> &String {
+        &self.path
+    }
+}
+impl DerefMut for Path {
+    fn deref_mut(&mut self) -> &mut String {
+        &mut self.path
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.path)
+    }
+}
+
 impl Path {
-    /// Creates a new Path struct given its name
+    /// Creates a new `Path` from the given String.
     pub fn new(path: String) -> Self {
-        Path {
-            path: path
-        }
+        Path { path }
     }
     
-    /// Returns the components of the path
-    // pub fn components(&self) -> Vec<String> {
-    //     let components = self.path.split("/").map(|s| s.to_string()).filter(|x| x != "").collect();
-    //     return components;
-    // }  
-    pub fn components<'a>(&'a self) -> Box<Iterator<Item=String> + 'a> {
-        let components = self.path.split("/").map(|x| x.to_string()).filter(|x| x != "");
-        return Box::new(components);
+    /// Returns an iterator over the components of this `Path`,
+    /// split by the path delimiter `"/"`.
+    pub fn components<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.path.split(PATH_DELIMITER)
+            .filter(|&x| x != "")
+    }
+
+    /// Returns just the file name, i.e., the trailling component of the path.
+    /// # Examples
+    /// `"/path/to/me/file.a"` -> "file.a"
+    /// `"me/file.a"` -> "file.a"
+    /// `"file.a"` -> "file.a"
+    pub fn basename<'a>(&'a self) -> &'a str {
+        self.components()
+            .last()
+            .unwrap_or_else(|| &self.path)
+    }
+
+    /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
+    pub fn file_stem<'a>(&'a self) -> &'a str {
+        self.basename()
+            .split(EXTENSION_DELIMITER)
+            .filter(|&x| x != "")
+            .next()
+            .unwrap_or_else(|| &self.path)
+    }
+
+    /// Returns the file extension, if present. 
+    /// If there are multiple extensions as defined by the extension delimiter, `'.'`,
+    /// then the last one will be treated as the extension. 
+    pub fn extension<'a>(&'a self) -> Option<&'a str> {
+        self.basename()
+            .split(EXTENSION_DELIMITER)
+            .filter(|&x| x != "")
+            .last()
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
@@ -50,16 +101,16 @@ impl Path {
             } else if component == String::from("..") {
                 new_components.pop();
             } else {
-                new_components.push(component.to_string());
+                new_components.push(component);
             }
         }
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in new_components {
-            new_path.push_str(&format!("{}/",  component));
+            new_path.push_str(&format!("/{}",  component));
         }
-        // debug!("canonical {}", new_path.clone());
-        return Path::new(new_path);
+        // debug!("canonical {}", new_path);
+        Path::new(new_path)
     }
     
     /// Expresses the current Path, self, relative to another Path, other
@@ -102,14 +153,15 @@ impl Path {
         for component in comps.iter() {
             new_path.push_str(&format!("{}/",  component));
         }
-        debug!("relative {}", new_path.clone());
+        // remove the trailing slash after the final path component
+        new_path.pop();
+        // debug!("relative {}", new_path);
         return Some(Path::new(new_path));
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
-    pub fn get(&self, wd: &DirRef) -> Result<FileOrDir, &'static str> {
-        let current_path;
-        { current_path = Path::new(wd.lock().get_path_as_string());}
+    pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
+        let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         
         // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
@@ -120,66 +172,36 @@ impl Path {
             }
         };
 
-        let mut new_wd = Arc::clone(&wd);
-        // debug!("components {:?}", shortest_path.components());
-        let mut counter: isize = -1;
+
+        let mut curr_dir = Arc::clone(&starting_dir);
+        // debug!("CANONICALIZE: Shortest path: {:?}", shortest_path);
+        // debug!("curr_dir {:?}, relative components {:?}", starting_dir.lock().get_name(), shortest_path.components().collect::<Vec<&str>>());
+        // debug!("CHILDREN in curr_dir: {:?}", curr_dir.lock().list_children());
         for component in shortest_path.components() {
-            counter += 1; 
-            // Navigate to parent directory
-            if component == ".." {
-                let dir = match new_wd.lock().get_parent_dir() {
-                    Ok(dir) => dir,
-                    Err(err) => {
-                        error!("failed to move up in path {}", current_path.path);
-                        return Err(err)
-                        }, 
-                };
-                new_wd = dir;
-            }
-            // Ignore if no directory is specified 
-            else if component == "" {
-                continue;
-            }
-
-            // Navigate to child directory
-            else {
-                // this checks the last item in the components to check if it's a file
-                // if no matching file is found, advances to the next match block
-                let first_comp = match shortest_path.components().next() {
-                    Some(comp) => comp, 
-                    None => {
-                        return Err("couldn't get first compoent in path");
-                    }
-                };
-                if counter as usize == shortest_path.components().count() - 1  && first_comp != ".." { // FIX LATER
-                    let children = new_wd.lock().list_children(); // fixes this so that it uses list_children so we don't preemptively create a bunch of TaskFile objects
-                    for child_name in children.iter() {
-                        if child_name == &component {
-                            match new_wd.lock().get_child(child_name.to_string(), false) {
-                                Ok(child) => match child {
-                                    FileOrDir::File(file) => return Ok(FileOrDir::File(Arc::clone(&file))),
-                                    FileOrDir::Dir(dir) => {
-                                        return Ok(FileOrDir::Dir(Arc::clone(&dir)));
-                                    }
-                                },
-                                Err(err) => return Err(err),
-                            };                       
-                        }
-                    }
+            match component {
+                "." => { 
+                    // stay in the current directory, do nothing. 
                 }
-                               
-                let dir = match new_wd.lock().get_child(component.clone().to_string(),  false) {
-                    Ok(child) => match child {
-                        FileOrDir::Dir(dir) => dir,
-                        FileOrDir::File(_file) => return Err("shouldn't be a file here"),
-                    }, 
-                    Err(err) => return Err(err),
-                };
-                new_wd = dir;
+                ".." => {
+                    // navigate to parent directory
+                    let parent_dir = curr_dir.lock().get_parent_dir().map_err(|_e| {
+                        error!("Path::get(): failed to move up to parent dir, path {}", current_path);
+                        "failed to move up to parent dir"
+                    })?;
+                    curr_dir = parent_dir;
+                }
+                cmpnt => {
+                    // navigate to child directory, or return the child file
+                    let child_dir = match curr_dir.lock().get_child(cmpnt) {
+                        Some(FileOrDir::File(f)) => return Ok(FileOrDir::File(f)),
+                        Some(FileOrDir::Dir(d)) => d,
+                        None => return Err("file or directory not found"),
+                    };
+                    curr_dir = child_dir;
+                }
             }
-
         }
-        return Ok(FileOrDir::Dir(new_wd));
+        Ok(FileOrDir::Dir(curr_dir))
     }
 }
 
