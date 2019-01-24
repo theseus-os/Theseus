@@ -20,7 +20,6 @@ use alloc::slice::SliceConcatExt;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use getopts::Options;
-use memory::{get_module, get_module_starting_with};
 use mod_mgmt::SwapRequest;
 use acpi::get_hpet;
 
@@ -116,24 +115,21 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 }
 
 
-/// Performs the actual swapping of modules.
+/// Performs the actual swapping of crate.
 fn swap_modules(tuples: Vec<(&str, &str, bool)>, verbose_log: bool) -> Result<(), String> {
-    let namespace = mod_mgmt::get_default_namespace();
+    let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
 
     let swap_requests = {
         let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
         for (o, n, r) in tuples {
-            // 1) check that the old crate exists
+            // 1) check that the old crate exists and is loaded into the namespace
             let old_crate = namespace.get_crate_starting_with(o)
-                .ok_or_else(|| format!("Couldn't find old crate that matched {:?}", o))?;
+                .ok_or_else(|| format!("Couldn't find old crate loaded into namespace that matched {:?}", o))?;
 
-            // 2) check that the new module file exists
-            let new_crate_module = get_module(n)
-                .ok_or_else(|| format!("Couldn't find new module file {:?}.", n))
-                .or_else(|_| get_module_starting_with(n)
-                    .ok_or_else(|| format!("Couldn't find single fuzzy match for new module file {:?}.", n))
-                )?;
-            mods.push(SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_module, r));
+            // 2) check that the new crate file exists
+            let new_crate_path = namespace.get_kernel_file_starting_with(n)
+                .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))?;
+            mods.push(SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_path, r));
         }
         mods
     };

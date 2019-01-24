@@ -7,18 +7,20 @@
 //! that require no special functionality as well as for inspiration for creating other concrete implementations
 //!s of the Directory and File traits. 
 
-#[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+// #[macro_use] extern crate log;
+extern crate alloc;
 extern crate spin;
 extern crate fs_node;
+extern crate memory;
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
 use fs_node::{DirRef, FileRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
+use memory::MappedPages;
 
 
 /// A struct that represents a node in the VFS 
@@ -33,20 +35,16 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new_dir(name: String, parent_pointer: WeakDirRef)  -> Result<DirRef, &'static str> {
+    pub fn new(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
-        let parent_copy = Weak::clone(&parent_pointer);
         let directory = VFSDirectory {
             name: name,
             children: BTreeMap::new(),
-            parent: parent_pointer,
+            parent: Arc::downgrade(parent),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        // create a copy of the newly created directory so we can return it
-        let dir_ref_copy = Arc::clone(&dir_ref);
-        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
-        return Ok(dir_ref_copy)
+        parent.lock().insert_child(FileOrDir::Dir(dir_ref.clone()))?;
+        Ok(dir_ref)
     }
 }
 
@@ -58,20 +56,8 @@ impl Directory for VFSDirectory {
         return Ok(())
     }
 
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str> {
-        let option_child = self.children.get(&child_name);
-            match option_child {
-                Some(child) => match child {
-                    FileOrDir::File(file) => {
-                            return Ok(FileOrDir::File(Arc::clone(file)));
-                        }
-                    FileOrDir::Dir(dir) => {
-                            return Ok(FileOrDir::Dir(Arc::clone(dir)));
-                        }
-                },
-                None => Err("file/directory does not exist")
-            }
-
+    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+        self.children.get(child_name).cloned()
     }
 
     /// Returns a string listing all the children in the directory
@@ -103,30 +89,35 @@ pub struct VFSFile {
 }
 
 impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: WeakDirRef) -> Result<FileRef, &'static str>{
+    pub fn new(name: String, size: usize, contents: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
-        let parent_copy = Weak::clone(&parent);
         let file = VFSFile {
             name: name, 
             size: size, 
             contents: contents,
-            parent: parent
+            parent: Arc::downgrade(parent),
         };
-        let file_pointer = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
-        // create a copy of the newly created directory so we can return it
-        let file_pointer_copy = Arc::clone(&file_pointer);
-        let strong_parent = Weak::upgrade(&parent_copy).ok_or("could not upgrade parent")?;
-        strong_parent.lock().insert_child(FileOrDir::File(file_pointer))?;
-        return Ok(file_pointer_copy)
+        let file_ref = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
+        parent.lock().insert_child(FileOrDir::File(file_ref.clone()))?;
+        Ok(file_ref)
     }
 }
 
 impl File for VFSFile {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
-    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
-    fn seek(&self) { unimplemented!(); }
-    fn delete(self) { unimplemented!(); }
-    fn size(&self) -> usize {unimplemented!()}
+    fn read(&mut self, _buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
+    fn write(&mut self, _buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
+    
+    fn delete(self) -> Result<(), &'static str> {
+        Err("unimplemented")
+    }
+    
+    fn size(&self) -> usize {
+        self.size
+    }
+    
+    fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
+        Err("cannot treat a VFSFile as a memory mapped region")
+    }
 }
 
 impl FsNode for VFSFile {

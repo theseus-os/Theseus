@@ -9,10 +9,11 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::{Arc, Weak};
-use memory::{MappedPages, ModuleArea, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
+use memory::{MappedPages, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
+use path::Path;
 
 use super::SymbolMap;
 use qp_trie::{Trie, wrapper::BString};
@@ -37,15 +38,7 @@ pub enum CrateType {
     Userspace,
 }
 impl CrateType {
-    pub fn prefix(&self) -> &'static str {
-        match self {
-            CrateType::Kernel       => "k#",
-            CrateType::Application  => "a#",
-            CrateType::Userspace    => "u#",
-        }
-    }
-
-    fn first_prefix(&self) -> &'static str {
+    fn first_char(&self) -> &'static str {
         match self {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
@@ -53,29 +46,36 @@ impl CrateType {
         }
     }
 
-    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
-    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// Returns a tuple of (CrateType, &str, &str) based on the given `module_name`,
+    /// in which the `CrateType` is based on the first character, 
+    /// the first `&str` is the namespace prefix, e.g., `"sse"` in `"k_sse#..."`,
+    /// and the second `&str` is the rest of the module file name after the prefix delimiter `"#"`.
+    /// 
     /// # Examples 
     /// ```
-    /// let result = CrateType::from_module_name("k#my_crate");
-    /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
+    /// let result = CrateType::from_module_name("k#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "", "my_crate.o") );
+    /// 
+    /// let result = CrateType::from_module_name("ksse#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
         let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
-        let prefix = iter.next().ok_or("couldn't get crate type prefix before delimiter")?;
-        let crate_name = iter.next().ok_or("couldn't get crate name after prefix delimiter")?;
+        let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
+        let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
         if iter.next().is_some() {
-            return Err("too many # delimiters in crate's module name");
+            return Err("found more than one '#' delimiter in module name");
         }
+        let namespace_prefix = prefix.get(1..).unwrap_or("");
         
-        if prefix.starts_with(CrateType::Kernel.first_prefix()) {
-            Ok((CrateType::Kernel, crate_name))
+        if prefix.starts_with(CrateType::Kernel.first_char()) {
+            Ok((CrateType::Kernel, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Application.first_prefix()) {
-            Ok((CrateType::Application, crate_name))
+        else if prefix.starts_with(CrateType::Application.first_char()) {
+            Ok((CrateType::Application, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Userspace.first_prefix()) {
-            Ok((CrateType::Userspace, crate_name))
+        else if prefix.starts_with(CrateType::Userspace.first_char()) {
+            Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
         else {
             Err("module_name didn't start with a known CrateType prefix")
@@ -84,15 +84,15 @@ impl CrateType {
 
 
     pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_prefix())
+        module_name.starts_with(CrateType::Application.first_char())
     }
 
     pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_prefix())
+        module_name.starts_with(CrateType::Kernel.first_char())
     }
 
     pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_prefix())
+        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 
@@ -101,9 +101,8 @@ impl CrateType {
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
-    /// The unique identifier of the object file that this crate was loaded from.
-    /// Currently, this is a reference to the corresponding `ModuleArea`.
-    pub object_file: &'static ModuleArea,
+    /// The absolute path of the object file that this crate was loaded from.
+    pub object_file_abs_path: Path,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -148,7 +147,10 @@ pub struct LoadedCrate {
 use core::fmt;
 impl fmt::Debug for LoadedCrate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", self.crate_name, self.object_file)
+        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", 
+            self.crate_name, 
+            self.object_file_abs_path,
+        )
     }
 }
 
@@ -262,7 +264,7 @@ impl LoadedCrate {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              self.crate_name.clone(),
-            object_file:             self.object_file,
+            object_file_abs_path:    self.object_file_abs_path.clone(),
             sections:                BTreeMap::new(),
             text_pages:              new_text_pages_ref.clone(),
             rodata_pages:            new_rodata_pages_ref.clone(),

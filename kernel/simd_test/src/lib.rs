@@ -15,7 +15,7 @@ pub fn test1(_: ()) {
     let mut loop_ctr = 0;
     loop {
         x = add(x, y);
-        if loop_ctr % 50000 == 0 {
+        if loop_ctr % 5000000 == 0 {
             debug!("SIMD TEST1 (should be 1.111, 11.11, 111.1, 1111): {:?}", x);
         }
         loop_ctr += 1;
@@ -33,7 +33,7 @@ pub fn test2(_: ()) {
     let mut loop_ctr = 0;
     loop {
         x = add(x, y);
-        if loop_ctr % 50000 == 0 {
+        if loop_ctr % 5000000 == 0 {
             trace!("SIMD TEST2 (should be 2.222, 22.22, 222.2, 2222): {:?}", x);
         }
         loop_ctr += 1;
