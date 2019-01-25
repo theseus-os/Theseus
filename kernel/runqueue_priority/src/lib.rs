@@ -116,6 +116,11 @@ impl RunQueue {
         self.queue.iter()
     }
 
+    /// Returns a mutable iterator over all `PriorityTaskRef`s in this `RunQueue`.
+    pub fn iter_mut(&mut self) -> alloc::collections::vec_deque::IterMut<PriorityTaskRef> {
+        self.queue.iter_mut()
+    }
+
     /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the `RunQueue`.
     pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {

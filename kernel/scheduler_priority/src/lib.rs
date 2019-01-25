@@ -193,28 +193,24 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // many concurrent tasks are running, we increase the epoch in such cases
     let epoch :usize = core::cmp::max(total_priorities, 100);
 
-    let mut _i = 0;
-    let len = runqueue_locked.runqueue_length();
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    while _i < len {
+    for (_i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
         let task_tokens;
         {
 
-            let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
+            //let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
 
             let t = priority_taskref.lock();
 
             // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
-                _i = _i+1;
                 continue;
             }
 
             // we give zero tokens to none runnable tasks
             if !t.is_runnable() {
-                _i = _i+1;
                 continue;
             }
 
@@ -231,11 +227,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
         
         {
-            let task = runqueue_locked.get_priority_task_ref_as_mut(_i);
-            task.map(|m| m.tokens_remaining = task_tokens);
+            priority_taskref.tokens_remaining = task_tokens;
         }
-        
-        _i = _i+1;
         // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
         // break; 
     }
