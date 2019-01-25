@@ -232,7 +232,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 }
             }
             // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((priority_taskref.priority as u32).saturating_add(1)) / total_priorities;
+            task_tokens = epoch.saturating_mul((priority_taskref.priority as u32).saturating_add(1)).wrapping_div(total_priorities);
         }
         
         {
