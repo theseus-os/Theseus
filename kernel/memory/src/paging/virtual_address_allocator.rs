@@ -84,9 +84,9 @@ lazy_static!{
 
 
 /// Convenience function for allocating pages by giving the number of bytes
-/// rather than the number of pages. It will still allocated whole pages
+/// rather than the number of pages. It will still allocate whole pages
 /// by rounding up the number of bytes. 
-/// See [allocate_pages]](allocate_pages)
+/// See [`allocate_pages()`](fn.allocate_pages.html)
 pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
