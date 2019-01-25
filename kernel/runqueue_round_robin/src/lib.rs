@@ -63,7 +63,7 @@ impl RoundRobinTaskRef {
 
     /// Increment the number of times the task is picked
     pub fn increment_context_switches(&mut self) -> (){
-        self.context_switches = self.context_switches + 1;
+        self.context_switches = self.context_switches.saturating_add(1);
     }
 }
 

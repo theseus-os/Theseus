@@ -122,7 +122,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let modified_tokens = {
         let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
         match chosen_task.map(|m| m.tokens_remaining){
-            Some(x) => x - 1,
+            Some(x) => x.saturating_sub(1),
             None => 0,
         }
     };
@@ -152,7 +152,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     
 
     // We begin with total priorities = 1 to avoid division by zero 
-    let mut total_priorities = 1;
+    let mut total_priorities :u32 = 1;
 
     // This loop calculates the total priorities of the runqueue
     for (_i, taskref) in runqueue_locked.iter().enumerate() {
@@ -180,7 +180,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         // found a runnable task!
         // We add its priority
         // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, taskref.priority);
-        total_priorities = total_priorities + 1 + taskref.priority as u32;
+        total_priorities = total_priorities.saturating_add(1).saturating_add(taskref.priority as u32);
         
         
         
@@ -191,7 +191,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // We keep each epoch for 100 tokens by default
     // However since this granularity could miss low priority tasks when 
     // many concurrent tasks are running, we increase the epoch in such cases
-    let epoch = core::cmp::max(total_priorities, 100);
+    let epoch :u32 = core::cmp::max(total_priorities, 100);
 
     let mut _i = 0;
     let len = runqueue_locked.runqueue_length();
@@ -229,7 +229,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
                     return false;
                 }
             }
-            task_tokens = epoch * (taskref.priority as u32 + 1) / total_priorities;
+            // task_tokens = epoch * (taskref + 1) / total_priorities;
+            task_tokens = epoch.saturating_mul((taskref.priority as u32).saturating_add(1)) / total_priorities;
         }
         
         {
