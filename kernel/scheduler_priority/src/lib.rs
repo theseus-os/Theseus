@@ -152,7 +152,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     
 
     // We begin with total priorities = 1 to avoid division by zero 
-    let mut total_priorities :u32 = 1;
+    let mut total_priorities :usize = 1;
 
     // This loop calculates the total priorities of the runqueue
     for (_i, priority_taskref) in runqueue_locked.iter().enumerate() {
@@ -180,7 +180,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         // found a runnable task!
         // We add its priority
         // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, priority_taskref.priority);
-        total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as u32);
+        total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as usize);
         
         
         
@@ -191,7 +191,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // We keep each epoch for 100 tokens by default
     // However since this granularity could miss low priority tasks when 
     // many concurrent tasks are running, we increase the epoch in such cases
-    let epoch :u32 = core::cmp::max(total_priorities, 100);
+    let epoch :usize = core::cmp::max(total_priorities, 100);
 
     let mut _i = 0;
     let len = runqueue_locked.runqueue_length();
@@ -202,12 +202,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         let task_tokens;
         {
 
-            let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){
-                Some(x) => x,
-                None => {
-                    continue;
-                },
-            };
+            let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
 
             let t = priority_taskref.lock();
 
@@ -232,7 +227,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 }
             }
             // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((priority_taskref.priority as u32).saturating_add(1)).wrapping_div(total_priorities);
+            task_tokens = epoch.saturating_mul((priority_taskref.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
         }
         
         {

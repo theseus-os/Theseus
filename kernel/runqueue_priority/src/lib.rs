@@ -37,10 +37,10 @@ pub struct PriorityTaskRef{
     pub priority: u8,
 
     /// Remaining tokens in this epoch. A task will be scheduled in an epoch until tokens run out
-    pub tokens_remaining: u32,
+    pub tokens_remaining: usize,
 
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
-    context_switches: u32,
+    context_switches: usize,
 }
 
 impl PriorityTaskRef {
@@ -98,7 +98,7 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
     /// switches is increased by one. This function is used when the task is selected by the scheduler
-    pub fn update_and_move_to_end(&mut self, index: usize, tokens : u32) -> Option<TaskRef> {
+    pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
         self.queue.remove(index).map(|mut taskref| {
             {
                 taskref.tokens_remaining = tokens;
@@ -342,9 +342,8 @@ impl RunQueue {
     /// Outputs None if the task is not found in any of the runqueues.
     pub fn get_priority(task: &TaskRef) -> Option<u8> {
         // debug!("assign priority wrapper. called once per call");
-        let mut return_priority :Option<u8> = None;
         for (_core, rq) in RUNQUEUES.iter() {
-            return_priority = rq.write().get_priority_internal(task);
+            let return_priority = rq.write().get_priority_internal(task);
             match return_priority {
                 //If a matching task is found the iteration terminates
                 Some(x) => return Some(x),
