@@ -1,6 +1,6 @@
 //! This crate contains the `RunQueue` structure, for round robin scheduler. 
 //! `RunQueue` structure is essentially a list of Tasks
-//! that it used for scheduling purposes.
+//! that is used for scheduling purposes.
 //! 
 
 #![no_std]
@@ -24,17 +24,17 @@ use task::{TaskRef, Task};
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling
 /// 
-/// The `RoundRobinTaskRef` type is necessary differnt scheduling algorithms 
-/// require different data associated with the task to be stored alongside,
-/// which makes storing them alongside the task prohibitive
+/// The `RoundRobinTaskRef` type is necessary since differnt scheduling algorithms 
+/// require different data associated with the task to be stored alongside.
+/// This makes storing them alongside the task prohibitive.
 /// Since round robin is the most primitive scheduling policy 
-/// additional scheduling information is needed.
+/// no additional scheduling information is needed.
 /// context_switches indicate the number of context switches
-/// the task has undergone
-/// context_switches is not used in scheduling algorithm 
+/// the task has undergone.
+/// context_switches is not used in scheduling algorithm. 
 #[derive(Debug, Clone)]
 pub struct RoundRobinTaskRef{
-    /// `TaskRef` wrapped by `PriorityTaskRef`
+    /// `TaskRef` wrapped by `RoundRobinTaskRef`
     taskref: TaskRef,
 
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
@@ -42,10 +42,7 @@ pub struct RoundRobinTaskRef{
 }
 
 impl RoundRobinTaskRef {
-    /// Creates a new `TaskRef` that wraps the given `Task`.
-    /// 
-    /// Also establishes the `TaskLocalData` struct that will be used 
-    /// to determine the current `Task` on each processor core.
+    /// Creates a new `RoundRobinTaskRef` that wraps the given `TaskRef`.
     pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
         let round_robin_taskref = RoundRobinTaskRef {
             taskref: taskref,
@@ -76,10 +73,10 @@ lazy_static! {
     static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
-/// A list of references to `Task`s (`RoundRobinTaskRef`s) 
-/// that is used to store the `Task`s (and associated scheduler related data) 
+/// A list of references to `Task`s (`RoundRobinTaskRef`s). 
+/// This is used to store the `Task`s (and associated scheduler related data) 
 /// that are runnable on a given core.
-/// A queue is used for the round robin schedular
+/// A queue is used for the round robin scheduler.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
@@ -100,12 +97,11 @@ impl RunQueue {
     }
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
         self.queue.iter()
     }
    
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id` and with minimumweighted runtime
+    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
@@ -128,7 +124,7 @@ impl RunQueue {
         }
     }
 
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
+    /// Returns the `RunQueue` for the given core, which is an `apic_id`.
     pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }

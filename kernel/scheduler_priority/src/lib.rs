@@ -1,11 +1,11 @@
-//! This crate picks the next task on token based scheduling policy
+//! This crate picks the next task on token based scheduling policy.
 //! At the begining of each scheduling epoch a set of tokens is distributed among tasks
 //! depending on their priority.
-//! tokens assigned to each task = (prioirty of each task / prioirty of all tasks)*length_of_epoch
-//! Each time a task is picked tokens_assigned to the task is decremented by 1
-//! A task is executed only if it has tokens remaining
-//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated
-//! In addition this task offers the interfaces to set and get priorities  of each task
+//! [tokens assigned to each task = (prioirty of each task / prioirty of all tasks) * length of epoch].
+//! Each time a task is picked, the token count of the task is decremented by 1.
+//! A task is executed only if it has tokens remaining.
+//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated.
+//! In addition this crate offers the interfaces to set and get priorities  of each task.
 
 
 #![no_std]
@@ -16,37 +16,32 @@ extern crate alloc;
 extern crate task;
 extern crate runqueue_priority;
 
-
-
 use task::TaskRef;
 use runqueue_priority::RunQueue;
 
-// A data structure to transfer data from select_next_task_priority
-// to select_next_task
+pub const MAX_PRIORITY:u8 = 40;
+
+/// A data structure to transfer data from select_next_task_priority
+/// to select_next_task
 struct NextTaskResult{
     taskref : Option<TaskRef>,
     idle_task : bool,
 }
 
-// Changes the priority of the given task with the given priority level
-// Max priority = 40, Min priority  = 0
+/// Changes the priority of the given task with the given priority level.
+/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-    let clipped_priority = if priority > 40{
-            40
-        }
-        else {
-            priority
-        };
-    RunQueue::set_priority(task, clipped_priority)
+    let priority = core::cmp::min(priority, MAX_PRIORITY);
+    RunQueue::set_priority(task, priority)
 }
 
-// Shows the priority of the given task
+/// Returns the priority of the given task.
 pub fn get_priority(task: &TaskRef) -> Option<u8> {
     RunQueue::get_priority(task)
 }
 
-/// this defines the priority scheduler policy.
-/// returns None if there is no schedule-able task
+/// This defines the priority scheduler policy.
+/// Returns None if there is no schedule-able task.
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
     let taskref_with_result = select_next_task_priority(apic_id); 
     match taskref_with_result {
@@ -72,8 +67,8 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 }
 
 /// this defines the priority scheduler policy.
-/// returns None if there is no schedule-able task
-/// Otherwise returns a task with a flag indicating whether its an idle task
+/// Returns None if there is no schedule-able task.
+/// Otherwise returns a task with a flag indicating whether its an idle task.
 fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
@@ -126,7 +121,10 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     // We then reduce the number of tokens of the task by one
     let modified_tokens = {
         let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
-        chosen_task.map(|m| m.tokens_remaining).unwrap_or(1) - 1
+        match chosen_task.map(|m| m.tokens_remaining){
+            Some(x) => x - 1,
+            None => 0,
+        }
     };
 
     chosen_task_index
@@ -139,9 +137,9 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 }
 
 
-/// This assigns tokens between tasks
-/// Returns true if successful
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks)
+/// This assigns tokens between tasks.
+/// Returns true if successful.
+/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks).
 fn assign_tokens(apic_id: u8) -> bool  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
@@ -193,12 +191,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // We keep each epoch for 100 tokens by default
     // However since this granularity could miss low priority tasks when 
     // many concurrent tasks are running, we increase the epoch in such cases
-    let epcoh = if total_priorities < 100 {
-        100
-    }
-    else {
-        total_priorities
-    };
+    let epoch = core::cmp::max(total_priorities, 100);
 
     let mut _i = 0;
     let len = runqueue_locked.runqueue_length();
@@ -208,7 +201,12 @@ fn assign_tokens(apic_id: u8) -> bool  {
     while _i < len {
         let task_tokens;
         {
-            let taskref = runqueue_locked.get_priority_task_ref(_i).unwrap();
+            let taskref  = runqueue_locked.get_priority_task_ref(_i);
+            if  taskref.is_none() {
+                _i = _i + 1;
+                continue;
+            }
+            let taskref = taskref.unwrap();
             let t = taskref.lock();
 
             // we give zero tokens to the idle tasks
@@ -231,7 +229,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
                     return false;
                 }
             }
-            task_tokens = epcoh * (taskref.priority as u32 + 1) / total_priorities;
+            task_tokens = epoch * (taskref.priority as u32 + 1) / total_priorities;
         }
         
         {

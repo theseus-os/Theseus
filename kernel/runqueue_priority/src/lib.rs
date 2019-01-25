@@ -22,14 +22,11 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 
 /// A cloneable reference to a `Taskref` that exposes more methods
-/// related to task scheduling
+/// related to task scheduling.
 /// 
-/// The `PriorityTaskRef` type is necessary differnt scheduling algorithms 
-/// require different data associated with the task to be stored alongside,
-/// which makes storing them alongside the task prohibitive
-/// This task holds tokens_remaining which indicates the remaining tokens
-/// for the task and context_switches which indicate the number of context switches
-/// the task has undergone
+/// The `PriorityTaskRef` type is necessary since differnt scheduling algorithms 
+/// require different data associated with the task to be stored alongside.
+/// This makes storing them alongside the task prohibitive.
 /// context_switches is not used in scheduling algorithm 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
@@ -39,7 +36,7 @@ pub struct PriorityTaskRef{
     /// Priority assigned for the task. Max priority = 40, Min priority = 0.
     pub priority: u8,
 
-    /// Remaining tokens in this epoch. A will be scheduled in an epoch until tokens run out
+    /// Remaining tokens in this epoch. A task will be scheduled in an epoch until tokens run out
     pub tokens_remaining: u32,
 
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
@@ -70,17 +67,6 @@ impl PriorityTaskRef {
        self.taskref.lock()
     }
 
-    /// Get the number of remaining tokens
-    // pub fn get_tokens(&self) -> u32{
-    //     self.tokens_remaining
-    // }
-
-    /// Changes the number of tokens in a given task
-    // pub fn update_tokens(&mut self, tokens: u32) -> (){
-    //     self.tokens_remaining = tokens;
-    //     ()
-    // }
-
     /// Increment the number of times the task is picked
     pub fn increment_context_switches(&mut self) -> (){
         self.context_switches = self.context_switches + 1;
@@ -98,7 +84,7 @@ lazy_static! {
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 
 /// that are runnable on a given core.
-/// A queue is used for the token based prioirty scheduler 
+/// A queue is used for the token based prioirty scheduler. 
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
@@ -110,8 +96,8 @@ pub struct RunQueue {
 impl RunQueue {
 
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
-    /// and returns a cloned reference to that `TaskRef`. This is used when the task is selected by the scheduler
-    /// and sheduler related states in the task is updated.  NAMI
+    /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
+    /// switches is increased by one. This function is used when the task is selected by the scheduler
     pub fn update_and_move_to_end(&mut self, index: usize, tokens : u32) -> Option<TaskRef> {
         self.queue.remove(index).map(|mut taskref| {
             {
@@ -170,7 +156,7 @@ impl RunQueue {
         }
     }
 
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
+    /// Returns `RunQueue` for the given core, which is an `apic_id`.
     pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }

@@ -1,3 +1,7 @@
+//! This crate picks the next task in round robin fashion.
+//! Each time the task at the front of the queue is picked.
+//! This task is then moved to the back of the queue. 
+
 #![no_std]
 #![feature(alloc)]
 
@@ -12,8 +16,8 @@ use runqueue_round_robin::RunQueue;
 
 
 
-/// this defines the round robin scheduler policy.
-/// returns None if there is no schedule-able task
+/// This defines the round robin scheduler policy.
+/// Returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {

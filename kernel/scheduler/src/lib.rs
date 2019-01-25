@@ -18,9 +18,6 @@ use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
 #[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
 
-
-
-
 /// This function performs a task switch.
 ///
 /// Interrupts will be disabled while this function runs.
@@ -80,27 +77,26 @@ pub fn schedule() -> bool {
     true
 }
 
-// Changes the priority of the given task with the given priority level
-// Max priority = 40, Min priority  = 0
-#[cfg(priority_scheduler)]
+/// Changes the priority of the given task with the given priority level.
+/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
+/// This function returns an error when a scheduler without priority is loaded. 
 pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-    scheduler_priority::set_priority(task, priority)
+    #[cfg(priority_scheduler)] {
+        scheduler_priority::set_priority(task, priority)
+    }
+    #[cfg(not(priority_scheduler))] {
+        Err("no scheduler that uses task priority is currently loaded")
+    }
 }
 
-// Set Priority is ignored when non priority scheduler is in use 
-#[cfg(not(priority_scheduler))]
-pub fn set_priority(_task: &TaskRef, priority: u8) -> Result<(), &'static str> {
-    Ok(())
-}
-
-// Shows the priority of a given task
-#[cfg(priority_scheduler)]
+/// Returns the priority of a given task.
+/// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(task: &TaskRef) -> Option<u8> {
-    scheduler_priority::get_priority(task)
-}
-
-// Get Priority is ignored when non priority scheduler is in use 
-#[cfg(not(priority_scheduler))]
-pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    None
+    #[cfg(priority_scheduler)] {
+        scheduler_priority::get_priority(task)
+    }
+    #[cfg(not(priority_scheduler))] {
+        //Err("no scheduler that uses task priority is currently loaded")
+        None
+    }
 }

@@ -18,7 +18,9 @@ pub fn main(args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    scheduler::set_priority(&taskref1, 30).expect("failed to set priority for task 1");
+    if let Err(e) = scheduler::set_priority(&taskref1, 30) {
+        error!("scheduler_eval(): Could not set priority to taskref1: {}", e);
+    }
 
     debug!("Spawned Task 1");
 
@@ -27,7 +29,9 @@ pub fn main(args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    scheduler::set_priority(&taskref2, 20).expect("failed to set priority for task 2");
+    if let Err(e) = scheduler::set_priority(&taskref2, 20) {
+        error!("scheduler_eval(): Could not set priority to taskref2: {}", e);
+    }
 
     debug!("Spawned Task 2");
 
@@ -36,7 +40,9 @@ pub fn main(args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    scheduler::set_priority(&taskref3, 10).expect("failed to set priority for task 3");
+    if let Err(e) = scheduler::set_priority(&taskref3, 10) {
+        error!("scheduler_eval(): Could not set priority to taskref3: {}", e);
+    }
 
     debug!("Spawned Task 3");
 

@@ -1,6 +1,6 @@
 //! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain
 //! list of tasks with additional scheduling information depending on the scheduler.
-//! All crates except the scheduler should refer this crate to access functions on`RunQueue`.
+//! All crates except the scheduler should refer to this crate to access functions on `RunQueue`.
 //! 
 
 #![no_std]
@@ -27,7 +27,7 @@ pub fn init(which_core: u8) -> Result<(), &'static str>{
     RunQueue::init(which_core)
 }
 
-/// Creates a new `RunQueue` for the given core, which is an `apic_id`.
+/// Returns the `RunQueue` of the given core, which is an `apic_id`.
 pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>>{
     RunQueue::get_runqueue(which_core)
 }
