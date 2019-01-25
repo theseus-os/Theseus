@@ -43,8 +43,8 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
-    let taskref_with_result = select_next_task_priority(apic_id); 
-    match taskref_with_result {
+    let priority_taskref_with_result = select_next_task_priority(apic_id); 
+    match priority_taskref_with_result {
         // A task has been selected
         Some(task) => {
             // If the selected task is idle task we begin a new scheduling epoch
@@ -83,8 +83,8 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let mut chosen_task_index: Option<usize> = None;
     let mut idle_task = true;
 
-    for (i, taskref) in runqueue_locked.iter().enumerate() {
-        let t = taskref.lock();
+    for (i, priority_taskref) in runqueue_locked.iter().enumerate() {
+        let t = priority_taskref.lock();
 
         // we skip the idle task, and only choose it if no other tasks are runnable
         if t.is_an_idle_task {
@@ -107,7 +107,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
 
         // if the task has no remaining tokens we ignore the task
-        if taskref.tokens_remaining == 0{
+        if priority_taskref.tokens_remaining == 0{
             continue;
         }
             
@@ -155,8 +155,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
     let mut total_priorities :u32 = 1;
 
     // This loop calculates the total priorities of the runqueue
-    for (_i, taskref) in runqueue_locked.iter().enumerate() {
-        let t = taskref.lock();
+    for (_i, priority_taskref) in runqueue_locked.iter().enumerate() {
+        let t = priority_taskref.lock();
 
         // we skip the idle task, it contains zero tokens as it is picked last
         if t.is_an_idle_task {
@@ -179,8 +179,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
             
         // found a runnable task!
         // We add its priority
-        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, taskref.priority);
-        total_priorities = total_priorities.saturating_add(1).saturating_add(taskref.priority as u32);
+        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, priority_taskref.priority);
+        total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as u32);
         
         
         
@@ -201,13 +201,15 @@ fn assign_tokens(apic_id: u8) -> bool  {
     while _i < len {
         let task_tokens;
         {
-            let taskref  = runqueue_locked.get_priority_task_ref(_i);
-            if  taskref.is_none() {
-                _i = _i + 1;
-                continue;
-            }
-            let taskref = taskref.unwrap();
-            let t = taskref.lock();
+
+            let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){
+                Some(x) => x,
+                None => {
+                    continue;
+                },
+            };
+
+            let t = priority_taskref.lock();
 
             // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
@@ -230,7 +232,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 }
             }
             // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((taskref.priority as u32).saturating_add(1)) / total_priorities;
+            task_tokens = epoch.saturating_mul((priority_taskref.priority as u32).saturating_add(1)) / total_priorities;
         }
         
         {
