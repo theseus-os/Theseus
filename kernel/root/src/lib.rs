@@ -31,6 +31,14 @@ lazy_static! {
         };
 
         let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
+        
+        // let test_string = String::from("Testing write function");
+        // let mut test_bytes =  test_string.as_bytes().to_vec();
+        // let memFile = memfs::MemFile::new(String::from("testfile"), &strong_root).unwrap();
+        // memFile.lock().write(&test_bytes).ok();
+        
+        
+
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 
     };

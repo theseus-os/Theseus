@@ -248,6 +248,9 @@ fn create_mmi_dir(taskref: TaskRef, parent: &DirRef) -> Result<(), &'static str>
         _ => output.push_str("MMI was None."),
     }
     // create the actual MMI file and add it to the mmi directory
-    let _page_table_file = MemFile::new(name, output.as_bytes(), &mmi_dir);
+    let page_table_file = MemFile::new(name, &mmi_dir)?;
+    page_table_file.lock().write(output.as_bytes())?;
+    // debug!("exited mmi dir")
+    // let _size = page_table_file.lock().write();
     Ok(())
 }

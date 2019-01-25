@@ -5,7 +5,7 @@
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
 //! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -38,27 +38,10 @@ pub struct MemFile {
 
 impl MemFile {
     /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
-    pub fn new(name: String, contents: &[u8], parent: &DirRef) -> Result<FileRef, &'static str> {
-        // Obtain the active kernel page table
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        if let memory::PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock(); 
-            // Allocate and map the least number of pages we need to store the information contained in the buffer
-            let pages = memory::allocate_pages_by_bytes(contents.len()).ok_or("could not allocate pages")?;
-            let mut mapped_pages = active_table.map_allocated_pages(pages,  EntryFlags::WRITABLE, allocator.deref_mut())?;            
-
-            { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
-                // Gets a mutuable reference to the byte portion of the newly mapped pages
-                let mut dest_slice = mapped_pages.as_slice_mut::<u8>(0, contents.len())?;
-                dest_slice.copy_from_slice(contents); // writes the desired contents into the correct area in the mapped page
-            }
-            // create and return the newly create MemFile
-            Self::from_mapped_pages(mapped_pages, name, contents.len(), parent)
-        }
-        else {
-            Err("could not get active table")
-        }
+    pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
+        // let new_file = Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)?;
+        // Ok(new_file) // 0 because we're creating an empty file
+        Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)
     }
 
     /// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.
@@ -85,6 +68,7 @@ impl File for MemFile {
     }
 
     fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str> {
+        // FIX ME: The write function overwrites the file's contents rather than appending to it
         let offset = 0;
         if buffer.len() <= self.mp.size_in_bytes() {
             { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
@@ -93,8 +77,28 @@ impl File for MemFile {
                 dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }    
             Ok(self.mp.size_in_bytes())
-        } else {
-            Err("size of contents to be written exceeds the MappedPages capacity")
+        } else { // we'll allocate a new set of mapped pages
+            // Obtain the active kernel page table
+            let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+            debug!("INSIDE WRITE FUNCTION");
+            if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
+                debug!("GOT THE ALLOCATOR"); 
+                // Allocate and map the least number of pages we need to store the information contained in the buffer
+                let pages = memory::allocate_pages_by_bytes(buffer.len()).ok_or("could not allocate pages")?;
+                debug!("ALLOCATED THE PAGES");
+                let mut mapped_pages = active_table.map_allocated_pages(pages,  EntryFlags::WRITABLE, allocator.deref_mut())?;            
+                debug!("got the mapped pages");
+                { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
+                    // Gets a mutuable reference to the byte portion of the newly mapped pages
+                    let mut dest_slice = mapped_pages.as_slice_mut::<u8>(0, buffer.len())?;
+                    dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
+                }
+                // self.mp = mapped_pages;
+                debug!("about to return from function?");
+                return Ok(buffer.len());
+            }
+            return Err("could not get active table");
         }
     }
 
