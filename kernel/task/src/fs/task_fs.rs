@@ -71,25 +71,15 @@ impl TaskFs {
 
 
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
+        debug!("ID error is {:?}", child);
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
+        // debug!("ID IS {}", child);
         let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer()?;
-
-        // We have to violate orthogonality to avoid a locking issue only present because calling tasks.lock().get_child()
-        // locks the highest-level tasks directory, which would then be locked again if we called the regular VFSDirectory::new() method
-        // We'll manually create the VFSDirectory instead and add it right here
         let name = task_ref.lock().id.to_string(); 
-        // let new_dir = VFSDirectory {
-        //     name: name.clone(),
-        //     children: BTreeMap::new(),
-        //     parent: Arc::downgrade(&parent_dir),
-        // };
-        let task_dir = TaskDirectory::new(name, &parent_dir, task_ref.clone())?;
-        
+        // lazily compute a new TaskDirectory everytime the caller wants to get a TaskDirectory
+        let task_dir = TaskDirectory::new(name, &parent_dir, task_ref.clone())?;        
         let boxed_task_dir = Arc::new(Mutex::new(Box::new(task_dir) as Box<Directory + Send>));
-        // FIX: if we uncomment this call, we'll have to make get_child() have a mutable reference to self
-        // self.insert_child(FileOrDir::Dir(Arc::clone(&task_fs))).ok();
-        // create_mmi_dir(task_ref.clone(), &task_fs)?;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
 }
@@ -153,25 +143,4 @@ impl Directory for TaskFs {
         tasks_string
     }
 
-}
-
-/// Creates the memory management info subdirectory of a task directory.
-/// This function will attach the mmi directory (and associated subdirectories) to whatever directory task_fs_pointer points to.
-fn create_mmi_dir(taskref: TaskRef, parent: &DirRef) -> Result<(), &'static str> {
-    let name = String::from("mmi");
-    let mmi_dir = VFSDirectory::new(name.clone(), parent)?;
-    // obtain information from the MemoryManagementInfo struct of the Task
-    let mut output = String::new();
-    match taskref.lock().mmi {
-        Some(ref mmi) => {
-            output.push_str(&format!("Page table:\n{:?}\n", mmi.lock().page_table));
-            output.push_str(&format!("Virtual memory areas:\n{:?}", mmi.lock().vmas));
-        }
-        _ => output.push_str("MMI was None."),
-    }
-    // create the actual MMI file and add it to the mmi directory
-    let page_table_file = MemFile::new(name, &mmi_dir)?;
-    debug!("{}", output);
-    let _bytes_written = page_table_file.lock().write(output.as_bytes())?;
-    Ok(())
 }

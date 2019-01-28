@@ -20,126 +20,53 @@ use memfs::MemFile;
 use path::Path;
 use alloc::collections::BTreeMap;
 use memory::MappedPages;
-use super::mmi_node::MmiDir;
-
-
-
 
 
 /// A struct that represents a node in the VFS 
-pub struct TaskDirectory {
-    /// The name of the directory
-    pub name: String,
-    // The absolute path of the TaskDirectory
+pub struct MmiDir {
+    // The absolute path of the MmiDir
     path: Path,
     taskref: TaskRef,
-    parent: DirRef, // we can store the parent because TaskFs is a persistent directory
 }
 
-impl TaskDirectory {
+impl MmiDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDirectory, &'static str> {
+    pub fn new(taskref: TaskRef)  -> MmiDir {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let task_id = taskref.lock().id.clone();
-        let directory = TaskDirectory {
-            name: name,
-            path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)),
+        MmiDir {
+            path: Path::new(format!("/root/{}/{}/mmi", TASKS_DIRECTORY_NAME, task_id)),
             taskref: taskref,
-            parent: Arc::clone(parent),
-        };
-        Ok(directory)
+        }
     }
 }
 
-impl Directory for TaskDirectory {
+impl Directory for MmiDir {
     fn insert_child(&mut self, _child: FileOrDir, _overwrite: bool) -> Result<(), &'static str> {
         Err("cannot insert child into virtual task directory")
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
-        if child_name == "taskInfo" {
-            let task_file = TaskFile::new(self.taskref.clone());
+        if child_name == "MmiInfo" {
+            let task_file = MmiFile::new(self.taskref.clone());
             return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
 
         }
-
-        if child_name == "mmi" {
-            let mmi_dir = MmiDir::new(self.taskref.clone());
-            return Some(FileOrDir::Dir(Arc::new(Mutex::new(Box::new(mmi_dir) as Box<Directory + Send>))));
-            
-        }
         None
+        // create a new mmi dir here
     }
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut children = Vec::new();
-        children.push("mmi".to_string());
-        children.push("taskInfo".to_string());
+        children.push("MmiInfo".to_string());
         children
     }
 }
 
-impl FsNode for TaskDirectory {
+impl FsNode for MmiDir {
     fn get_name(&self) -> String {
-        self.name.clone()
-    }
-
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        Ok(Arc::clone(&self.parent))
-    }
-}
-
-
-
-/// Note that this TaskFile will reside within the TaskDirectory, so it will have no concept
-/// of a persistent parent directory
-pub struct TaskFile {
-    taskref: TaskRef,
-    path: Path, 
-}
-
-impl TaskFile {
-    pub fn new(task: TaskRef) -> TaskFile {
-        let task_id = task.lock().id.clone();
-        TaskFile {
-            taskref: task,
-            path: Path::new(format!("/root/{}/{}/task_info", TASKS_DIRECTORY_NAME, task_id)), 
-        }
-    }
-
-    /// Generates the task info string.
-    /// TODO: calling format!() and .push_str() is redundant and wastes a lot of allocation. Improve this. 1
-    fn generate(&self) -> String {
-        // Print all tasks
-        let mut task_string = String::new();
-        let name = &self.taskref.lock().name.clone();
-        let runstate = match &self.taskref.lock().runstate {
-            RunState::Initing    => "Initing",
-            RunState::Runnable   => "Runnable",
-            RunState::Blocked    => "Blocked",
-            RunState::Reaped     => "Reaped",
-            _                    => "Exited",
-        };
-        let cpu = self.taskref.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.taskref.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if self.taskref.lock().is_an_idle_task {"I"}
-        else if self.taskref.lock().is_application() {"A"}
-        else {" "} ;  
-
-        task_string.push_str(
-            &format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-                "name", name, "task id",  self.taskref.lock().id, "runstate", runstate, "cpu",cpu, "pinned", pinned, "task type", task_type)
-        );
-        
-        task_string
-    }
-}
-
-impl FsNode for TaskFile {
-    fn get_name(&self) -> String {
-        self.taskref.lock().name.clone()
+        "mmi".to_string()
     }
 
     /// Returns a pointer to the parent if it exists
@@ -154,7 +81,58 @@ impl FsNode for TaskFile {
     }
 }
 
-impl File for TaskFile {
+
+
+/// Note that this MmiFile will reside within the MmiDir, so it will have no concept
+/// of a persistent parent directory
+pub struct MmiFile {
+    taskref: TaskRef,
+    path: Path, 
+}
+
+impl MmiFile {
+    pub fn new(task: TaskRef) -> MmiFile {
+        let task_id = task.lock().id.clone();
+        MmiFile {
+            taskref: task,
+            path: Path::new(format!("/root/{}/{}/mmi/MmiInfo", TASKS_DIRECTORY_NAME, task_id)), 
+        }
+    }
+
+    /// Generates the mmi info string.
+    /// TODO: calling format!() and .push_str() is redundant and wastes a lot of allocation. Improve this. 1
+    fn generate(&self) -> String {
+        let mut output = String::new();
+        match self.taskref.lock().mmi {
+            Some(ref mmi) => {
+                output.push_str(&format!("Page table:\n{:?}\n", mmi.lock().page_table));
+                output.push_str(&format!("Virtual memory areas:\n{:?}", mmi.lock().vmas));
+            }
+            _ => output.push_str("MMI was None."),
+        }
+        output
+    }
+}
+
+impl FsNode for MmiFile {
+    fn get_name(&self) -> String {
+        // self.taskref.lock().name.clone()
+        "MmiInfo".to_string()
+    }
+
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
+        // parse from root 
+        let path = Path::new(format!("/root/{}/{}/mmi", TASKS_DIRECTORY_NAME, self.taskref.lock().id.clone()));
+        let dir = match Path::get_from_root(path)? {
+            FileOrDir::File(f) => return Err("parent cannot be a file"),
+            FileOrDir::Dir(d) => d,
+        };
+        Ok(dir)
+    }
+}
+
+impl File for MmiFile {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
