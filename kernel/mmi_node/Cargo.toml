@@ -1,0 +1,23 @@
+[package]
+    name = "mmi_node"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>, Christine Wang <chrissywang54@gmail.com"]
+description = "contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File, respectively. "
+
+
+[dependencies]
+spin = "0.4.5"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.memory]
+path = "../memory"
+
+[lib]
+crate-type = ["rlib"]

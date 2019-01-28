@@ -794,7 +794,7 @@ pub fn create_idle_task(
     }
 
     // one-time initialization of the taskfs
-    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
+    match INIT_TASKFS.call_once(|| fs::task_fs::init()) {
         Ok(()) => (),
         Err(err) => return Err(err)
     };

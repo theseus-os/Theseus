@@ -6,6 +6,7 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
+extern crate root;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -15,7 +16,6 @@ use alloc::{
     sync::Arc,
 };
 use fs_node::{FileOrDir, DirRef};
-
 
 pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
@@ -202,6 +202,36 @@ impl Path {
             }
         }
         Ok(FileOrDir::Dir(curr_dir))
+    }
+
+
+    pub fn get_helper(parent_dir: DirRef, path_components: Vec<&str>) -> Result<FileOrDir, &'static str> {
+        if path_components.len() > 1 {
+            let curr_node_name = path_components.get(0).ok_or("could not get path name")?; // mutates the path_components vector
+            let child_dir = match parent_dir.lock().get_child(curr_node_name) {
+                Some(FileOrDir::File(f)) => return Err("intermediate path component should not be a file"),
+                Some(FileOrDir::Dir(d)) => d,
+                None => return Err("directory not found"),
+            };
+            return Self::get_helper(child_dir, path_components.clone());
+        } else { // we've reached the end of the path
+            let curr_node_name = path_components.get(0).ok_or("could not get path name")?;
+            match parent_dir.lock().get_child(curr_node_name) {
+                Some(FileOrDir::File(f)) => Ok(FileOrDir::File(f)),
+                Some(FileOrDir::Dir(d)) => Ok(FileOrDir::Dir(d)),
+                None => return Err("file or directory not found"),
+            }
+        }
+    }
+
+    pub fn get_from_root(path: Path) -> Result<FileOrDir, &'static str> {
+        let mut components = Vec::new();
+        components.extend(path.components());
+        if components.remove(0) != "root" {
+            return Err("path does not start from root");
+        }
+        
+        Self::get_helper(Arc::clone(root::get_root()), components)
     }
 }
 

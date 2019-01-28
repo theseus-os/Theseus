@@ -7,6 +7,7 @@
 use Task;
 use TaskRef;
 use RunState;
+use super::task_fs::TASKS_DIRECTORY_NAME;
 use spin::Mutex;
 use alloc::boxed::Box;
 use TASKLIST;
@@ -15,38 +16,89 @@ use fs_node::{Directory, File, FsNode, WeakDirRef, DirRef, FileRef, FileOrDir};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
-use vfs_node::{VFSDirectory, VFSFile};
 use memfs::MemFile;
 use path::Path;
 use alloc::collections::BTreeMap;
 use memory::MappedPages;
 
-/// The name of the VFS directory that exposes task info in the root. 
-pub const TASKS_DIRECTORY_NAME: &str = "tasks";
 
 
-/// Initializes the task subfilesystem by creating a directory called task and by creating a file for each task
-pub fn init() -> Result<(), &'static str> {
-    // let task_dir = root_dir.lock().new("task".to_string(), Arc::downgrade(&root_dir));
-    let root = root::get_root();
-    let name = String::from(TASKS_DIRECTORY_NAME);
-    let task_dir = TaskDirectory::new(name, &root)?;
-    Ok(())
+
+/// A struct that represents a node in the VFS 
+pub struct TaskDirectory {
+    /// The name of the directory
+    pub name: String,
+    // The absolute path of the TaskDirectory
+    path: Path,
+    taskref: TaskRef,
+    parent: DirRef, // we can store the parent because TaskFs is a persistent directory
 }
 
-pub struct TaskFile<'a> {
-    task: &'a TaskRef,
+impl TaskDirectory {
+    /// Creates a new directory and passes a pointer to the new directory created as output
+    pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDirectory, &'static str> {
+        // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
+        let task_id = taskref.lock().id.clone();
+        let directory = TaskDirectory {
+            name: name,
+            path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)),
+            taskref: taskref,
+            parent: Arc::clone(parent),
+        };
+        Ok(directory)
+    }
+}
+
+impl Directory for TaskDirectory {
+    fn insert_child(&mut self, _child: FileOrDir, _overwrite: bool) -> Result<(), &'static str> {
+        Err("cannot insert child into virtual task directory")
+    }
+
+    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+        if child_name == "taskInfo" {
+            let task_file = TaskFile::new(self.taskref.clone());
+            return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
+
+        }
+        None
+        // create a new mmi dir here
+    }
+
+    /// Returns a string listing all the children in the directory
+    fn list_children(&mut self) -> Vec<String> {
+        let mut children = Vec::new();
+        children.push("mmi".to_string());
+        children.push("taskInfo".to_string());
+        children
+    }
+}
+
+impl FsNode for TaskDirectory {
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    /// Returns a pointer to the parent if it exists
+    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
+        Ok(Arc::clone(&self.parent))
+    }
+}
+
+
+
+/// Note that this TaskFile will reside within the TaskDirectory, so it will have no concept
+/// of a persistent parent directory
+pub struct TaskFile {
+    taskref: TaskRef,
     path: Path, 
-    parent: WeakDirRef
 }
 
-impl<'a> TaskFile<'a> {
-    pub fn new(task: &'a TaskRef, parent_dir: &DirRef) -> TaskFile<'a> {
+impl TaskFile {
+    pub fn new(task: TaskRef) -> TaskFile {
         let task_id = task.lock().id.clone();
         TaskFile {
-            task: task,
-            path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)), 
-            parent: Arc::downgrade(parent_dir)
+            taskref: task,
+            path: Path::new(format!("/root/{}/{}/task_info", TASKS_DIRECTORY_NAME, task_id)), 
         }
     }
 
@@ -55,41 +107,47 @@ impl<'a> TaskFile<'a> {
     fn generate(&self) -> String {
         // Print all tasks
         let mut task_string = String::new();
-        let name = &self.task.lock().name.clone();
-        let runstate = match &self.task.lock().runstate {
+        let name = &self.taskref.lock().name.clone();
+        let runstate = match &self.taskref.lock().runstate {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",
             RunState::Blocked    => "Blocked",
             RunState::Reaped     => "Reaped",
             _                    => "Exited",
         };
-        let cpu = self.task.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.task.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if self.task.lock().is_an_idle_task {"I"}
-        else if self.task.lock().is_application() {"A"}
+        let cpu = self.taskref.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
+        let pinned = &self.taskref.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let task_type = if self.taskref.lock().is_an_idle_task {"I"}
+        else if self.taskref.lock().is_application() {"A"}
         else {" "} ;  
 
         task_string.push_str(
             &format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-                "name", name, "task id",  self.task.lock().id, "runstate", runstate, "cpu",cpu, "pinned", pinned, "task type", task_type)
+                "name", name, "task id",  self.taskref.lock().id, "runstate", runstate, "cpu",cpu, "pinned", pinned, "task type", task_type)
         );
         
         task_string
     }
 }
 
-impl<'a> FsNode for TaskFile<'a> {
+impl FsNode for TaskFile {
     fn get_name(&self) -> String {
-        self.task.lock().name.clone()
+        self.taskref.lock().name.clone()
     }
 
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
+        // parse from root 
+        let path = Path::new(format!("/root/{}/{}/task_info", TASKS_DIRECTORY_NAME, self.taskref.lock().id.clone()));
+        let dir = match Path::get_from_root(path)? {
+            FileOrDir::File(f) => return Err("parent cannot be a file"),
+            FileOrDir::Dir(d) => d,
+        };
+        Ok(dir)
     }
 }
 
-impl<'a> File for TaskFile<'a> {
+impl File for TaskFile {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
@@ -115,141 +173,3 @@ impl<'a> File for TaskFile<'a> {
     }
 }
 
-pub struct TaskDirectory {
-    name: String,
-    /// A list of DirRefs or pointers to the child directories 
-    children: BTreeMap<String, FileOrDir>,
-    /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
-    parent: WeakDirRef,
-}
-
-impl TaskDirectory {
-    pub fn new(name: String, parent_dir: &DirRef)  -> Result<DirRef, &'static str> {
-        // create a parent copy so that we can add the newly created task directory to the parent's children later
-        let parent_copy = Arc::downgrade(parent_dir);
-        let directory = TaskDirectory {
-            name: name,
-            children: BTreeMap::new(),
-            parent: Arc::downgrade(parent_dir),
-        };
-        let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
-        let strong_parent = Arc::clone(parent_dir);
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref), false)?;
-        Ok(dir_ref_copy)
-    }
-
-
-    fn get_self_pointer(&self) -> Result<DirRef, &'static str> {
-        let parent = self.get_parent_dir()?;
-        let parent_locked = parent.lock();
-        match parent_locked.get_child(&self.get_name()) {
-            Some(FileOrDir::Dir(dir)) => Ok(dir),
-            _ => Err("BUG: a TaskFile's parent directory didn't contain the TaskFile itself")
-        }
-    }
-
-
-    fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
-        let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
-        let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
-        let parent_dir = self.get_self_pointer()?;
-
-        // We have to violate orthogonality to avoid a locking issue only present because calling tasks.lock().get_child()
-        // locks the highest-level tasks directory, which would then be locked again if we called the regular VFSDirectory::new() method
-        // We'll manually create the VFSDirectory instead and add it right here
-        let name = task_ref.lock().id.to_string(); 
-        let new_dir = VFSDirectory {
-            name: name.clone(),
-            children: BTreeMap::new(),
-            parent: Arc::downgrade(&parent_dir),
-        };
-        let task_dir = Arc::new(Mutex::new(Box::new(new_dir) as Box<Directory + Send>));
-        // FIX: if we uncomment this call, we'll have to make get_child() have a mutable reference to self
-        // self.insert_child(FileOrDir::Dir(Arc::clone(&task_dir))).ok();
-        create_mmi_dir(task_ref.clone(), &task_dir)?;
-        Ok(FileOrDir::Dir(task_dir))
-    }
-}
-
-impl FsNode for TaskDirectory {
-    /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        let mut path = String::from(TASKS_DIRECTORY_NAME);
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
-        }
-        path
-    }
-
-    fn get_name(&self) -> String {
-        String::from(TASKS_DIRECTORY_NAME)
-    }
-
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
-    }
-}
-
-impl Directory for TaskDirectory {
-    /// This function adds a newly created fs node (the argument) to the TASKS directory's children map  
-    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str> {
-        // gets the name of the child node to be added
-        let name = child.get_name();
-        if let Some(old_child) = self.children.get(&name) { // the children map contains this key already if this passes
-            if overwrite {
-                match (old_child, &child) {
-                    (FileOrDir::File(_old_file), FileOrDir::Dir(ref _new_file)) => return Err("cannot replace file with directory of same name"),
-                    (FileOrDir::Dir(_old_dir), FileOrDir::File(ref _new_dir)) => return Err("cannot replace directory with file of same name"),
-                    _ => { } // the types check out, so we can overwrite later
-                };
-            } else {
-                return Err("file or directory with the same name already exists");
-            }
-        }
-        self.children.insert(name, child);
-        Ok(())
-    }
-
-    fn get_child(&self, child: &str) -> Option<FileOrDir> {
-        match self.get_child_internal(child) {
-            Ok(d) => Some(d),
-            Err(e) => {
-                error!("TaskDirectory::get_child() error: {:?}", e);
-                None
-            }
-        }
-    }
-
-    /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
-        let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.iter() {
-            tasks_string.push(format!("{}", id));
-        }
-        tasks_string
-    }
-
-}
-
-/// Creates the memory management info subdirectory of a task directory.
-/// This function will attach the mmi directory (and associated subdirectories) to whatever directory task_dir_pointer points to.
-fn create_mmi_dir(taskref: TaskRef, parent: &DirRef) -> Result<(), &'static str> {
-    let name = String::from("mmi");
-    let mmi_dir = VFSDirectory::new(name.clone(), parent)?;
-    // obtain information from the MemoryManagementInfo struct of the Task
-    let mut output = String::new();
-    match taskref.lock().mmi {
-        Some(ref mmi) => {
-            output.push_str(&format!("Page table:\n{:?}\n", mmi.lock().page_table));
-            output.push_str(&format!("Virtual memory areas:\n{:?}", mmi.lock().vmas));
-        }
-        _ => output.push_str("MMI was None."),
-    }
-    // create the actual MMI file and add it to the mmi directory
-    let page_table_file = MemFile::new(name, &mmi_dir)?;
-    debug!("{}", output);
-    let _bytes_written = page_table_file.lock().write(output.as_bytes())?;
-    Ok(())
-}
