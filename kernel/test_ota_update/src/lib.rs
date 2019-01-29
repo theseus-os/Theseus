@@ -7,7 +7,7 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate memory;
 extern crate network_manager;
 extern crate mod_mgmt;
@@ -24,7 +24,7 @@ use alloc::{
 use network_manager::{NetworkInterfaceRef};
 use vfs_node::VFSDirectory;
 use memfs::MemFile;
-use mod_mgmt::{SwapRequest, SwapRequestList};
+use mod_mgmt::{SwapRequest, SwapRequestList, metadata::CrateType};
 use path::Path;
 
 
@@ -65,18 +65,24 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     let mut swap_requests = SwapRequestList::with_capacity(new_crates.len());
 
     warn!("DOWNLOADED CRATES:"); 
-    for c in new_crates {
-        let content = c.content.as_result_err_str()?;
-        debug!("Saving downloaded crate to file: {:?}, size {}", c.name, content.len());
-        let cfile = MemFile::new(c.name.clone(), content, &update_build_dir)?;
-        let cname_no_hash = c.name.split("-").next().ok_or("downloaded crate name couldn't be split at the '-' hash delimiter")?;
-        let old_crate_name = namespace.get_crate_starting_with(cname_no_hash)
+    for df in new_crates.into_iter() {
+        let content = df.content.as_result_err_str()?;
+        debug!("Saving downloaded crate to file: {:?}, size {}", df.name, content.len());
+        // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
+        // We need to get just the basename of the file, then remove the crate type prefix ("k#"), and then strip the trailing hash after the "-". 
+        let df_path = Path::new(df.name);
+        let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
+        let cname_no_hash = objfilename.split("-").next().ok_or("downloaded crate name couldn't be split at the '-' hash delimiter")?;
+        debug!("\tobjfilename: {:?}, cname_no_hash: {:?}, crate type: {:?}, _prefix: {:?}", objfilename, cname_no_hash, _crate_type, _prefix);
+        let cfile = MemFile::new(String::from(objfilename), content, &update_build_dir)?;
+        let old_crate_name = namespace.get_crate_starting_with(&format!("{}-", cname_no_hash))
             .map(|(name, _old_crate_ref)| name)
             .ok_or("couldn't find matching old crate in namespace")?;
         let swap_req = SwapRequest::new(old_crate_name, Path::new(cfile.lock().get_path_as_string()), true);
         swap_requests.push(swap_req);
     }
 
+    debug!("SWAP_REQUESTS: {:?}", swap_requests);
     namespace.swap_crates(swap_requests, kernel_mmi_ref.lock().deref_mut(), false)?;
 
     Err("unfinished")

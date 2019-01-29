@@ -630,7 +630,7 @@ impl E1000Nic {
                 }
             };
 
-            // actually tell the NIC about the new receive buffer
+            // actually tell the NIC about the new receive buffer, and that it's ready for use now
             self.rx_descs[self.rx_cur as usize].phys_addr = new_receive_buf.phys_addr as u64;
             self.rx_descs[self.rx_cur as usize].status = 0;
 
@@ -641,10 +641,8 @@ impl E1000Nic {
             current_rx_buf.length = length; // set the ReceiveBuffer's length to the size of the actual packet received
             receive_buffers_in_frame.push(current_rx_buf);
             
-            // move on to the next receive buffer
-            let old_cur = self.rx_cur as u32;
+            // move on to the next receive buffer to see if it's ready for us to take
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-            self.regs.rdt.write(old_cur);
 
             // check if this rx buffer is the last piece of the frame (EOP)
             if (status & RX_EOP) == RX_EOP {

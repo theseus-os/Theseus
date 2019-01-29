@@ -377,7 +377,7 @@ fn connect<I>(
         return Err("ota_update_client: when connecting socket, it was already open...");
     }
 
-    let timeout_millis = 3000; // 3 second timeout
+    let timeout_millis = 103000; // 3 second timeout
     let start = hpet_ticks!();
     let remote_endpoint = remote_endpoint.into();
     

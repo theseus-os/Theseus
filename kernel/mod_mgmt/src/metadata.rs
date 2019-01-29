@@ -31,7 +31,7 @@ pub type WeakCrateRef = CowWeak<LoadedCrate>; // Weak<Mutex<LoadedCrate>>;
 
 const CRATE_PREFIX_DELIMITER: &'static str = "#";
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum CrateType {
     Kernel,
     Application,

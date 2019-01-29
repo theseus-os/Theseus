@@ -91,6 +91,7 @@ pub fn poll_iface(iface: &NetworkInterfaceRef, sockets: &mut SocketSet, startup_
     let timestamp: i64 = millis_since(startup_time)?
         .try_into()
         .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
+    // debug!("calling iface.poll() with timestamp: {:?}", timestamp);
     let packets_were_sent_or_received = match iface.lock().poll(sockets, Instant::from_millis(timestamp)) {
         Ok(b) => b,
         Err(err) => {
