@@ -8,15 +8,24 @@
 
 #[macro_use] extern crate log;
 extern crate alloc;
+extern crate memory;
 extern crate network_manager;
 extern crate mod_mgmt;
 extern crate ota_update_client;
+extern crate vfs_node;
+extern crate path;
+extern crate memfs;
 
+use core::ops::DerefMut;
 use alloc::{
     string::String,
     collections::BTreeSet,
 };
 use network_manager::{NetworkInterfaceRef};
+use vfs_node::VFSDirectory;
+use memfs::MemFile;
+use mod_mgmt::{SwapRequest, SwapRequestList};
+use path::Path;
 
 
 
@@ -31,8 +40,11 @@ use network_manager::{NetworkInterfaceRef};
 
 /// Implements a very simple update scenario that downloads the "keyboard_log" update build and deploys it. 
 pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
-    let update_builds = ota_update_client::download_available_update_builds(&iface)?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI")?;
+    let namespace = mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?;
+    let namespaces_dir = mod_mgmt::get_namespaces_directory().ok_or("couldn't get directory of namespaces")?;
 
+    let update_builds = ota_update_client::download_available_update_builds(&iface)?;
     warn!("AVAILABLE UPDATE BUILDS: {:?}", update_builds);
     let keyboard_log_ub = update_builds.iter()
         .find(|&e| e == "keyboard_log")
@@ -40,25 +52,32 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
 
     let crates_to_include = {
         let mut set: BTreeSet<String> = BTreeSet::new();
-        set.insert(String::from("k#keyboard-36be916209949cef.o"));
-        // set.insert(String::from("k#atomic-905b6e75d16e053c.o"));
-        // set.insert(String::from("k#bit_field-beaefef505b4f61a.o"));
-        // set.insert(String::from("k#dbus-495835640c757fc3.o"));
-        // set.insert(String::from("k#xmas_elf-3d0cd20d4e1d4ba9.o"));
+        set.insert(String::from("k#keyboard-36be916209949cef.o")); // hardcoded right now based on what the build server offers
         set
     };
     let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_include)?;
+    if new_crates.is_empty() {
+        return Err("failed to download any crate files");
+    }
+
+    // save the newly-downloaded crates to the fs, and create swap requests based on them
+    let update_build_dir = VFSDirectory::new(keyboard_log_ub.clone(), &namespaces_dir)?;
+    let mut swap_requests = SwapRequestList::with_capacity(new_crates.len());
 
     warn!("DOWNLOADED CRATES:"); 
     for c in new_crates {
-        warn!("\t{:?}: size {}", c.name, c.content.content().len());
+        let content = c.content.as_result_err_str()?;
+        debug!("Saving downloaded crate to file: {:?}, size {}", c.name, content.len());
+        let cfile = MemFile::new(c.name.clone(), content, &update_build_dir)?;
+        let cname_no_hash = c.name.split("-").next().ok_or("downloaded crate name couldn't be split at the '-' hash delimiter")?;
+        let old_crate_name = namespace.get_crate_starting_with(cname_no_hash)
+            .map(|(name, _old_crate_ref)| name)
+            .ok_or("couldn't find matching old crate in namespace")?;
+        let swap_req = SwapRequest::new(old_crate_name, Path::new(cfile.lock().get_path_as_string()), true);
+        swap_requests.push(swap_req);
     }
 
-    let namespace = mod_mgmt::get_default_namespace();
-    let old_kbd_crate_name = namespace.get_crate_starting_with("k#keyboard-").ok_or("couldn't find keyboard crate in default namespace")?;
-
-    // let swap_req = mod_mgmt::SwapRequest::new(old_kbd_crate_name, new_crate_module_area: &'static ModuleArea, reexport_new_symbols_as_old: bool);
-    // namespace.swap_crates(swap_requests: SwapRequestList, kernel_mmi: &mut MemoryManagementInfo, verbose_log: bool)
+    namespace.swap_crates(swap_requests, kernel_mmi_ref.lock().deref_mut(), false)?;
 
     Err("unfinished")
 }

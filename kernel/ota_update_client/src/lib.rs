@@ -14,7 +14,6 @@ extern crate acpi;
 extern crate owning_ref;
 extern crate spawn;
 extern crate task;
-extern crate httparse;
 extern crate sha3;
 extern crate percent_encoding;
 extern crate rand;
@@ -109,12 +108,11 @@ pub fn download_available_update_builds(
     iface: &NetworkInterfaceRef
 ) -> Result<Vec<String>, &'static str> {
     // Download the update build file, convert it to a string, and then split it by line
-    download_file(iface, UPDATE_BUILDS_PATH)
-        .and_then(|updates_file| {
-            str::from_utf8(updates_file.content.content())
-                .map_err(|_e| "couldn't convert received list of update builds into a UTF8 string")
-                .map(|updates_str| updates_str.lines().map(|line| String::from(line)).collect())
-        })
+    let updates_file = download_file(iface, UPDATE_BUILDS_PATH)?;
+    let content = updates_file.content.as_result_err_str()?;
+    str::from_utf8(content)
+        .map_err(|_e| "couldn't convert received list of update builds into a UTF8 string")
+        .map(|updates_str| updates_str.lines().map(|line| String::from(line)).collect())
 }
 
 
@@ -125,12 +123,11 @@ pub fn download_listing(
     update_build: &str,
 ) -> Result<BTreeSet<String>, &'static str> {
     // Download the listing file, convert it to a string, and then split it by line
-    download_file(iface, format!("/{}/{}", update_build, LISTING_FILE_NAME))
-        .and_then(|listing_file| {
-            str::from_utf8(listing_file.content.content())
-                .map_err(|_e| "couldn't convert received update listing file into a UTF8 string")
-                .map(|files| files.lines().map(|s| String::from(s)).collect())
-        })
+    let listing_file = download_file(iface, format!("/{}/{}", update_build, LISTING_FILE_NAME))?;
+    let content = listing_file.content.as_result_err_str()?;
+    str::from_utf8(content)
+        .map_err(|_e| "couldn't convert received update listing file into a UTF8 string")
+        .map(|files| files.lines().map(|s| String::from(s)).collect())
 }
 
 
@@ -169,11 +166,13 @@ pub fn download_crates(
     for chunk in crate_object_files.chunks(2) {
         match chunk {
             [file, hash_file] => {
-                let hash_file_str = str::from_utf8(hash_file.content.content())
-                    .map_err(|_e| "couldn't convert downloaded hash file into a UTF8 string")?;
+                let hash_file_str = hash_file.content.as_result_err_str()
+                    .and_then(|content| str::from_utf8(content)
+                        .map_err(|_e| "couldn't convert downloaded hash file into a UTF8 string")
+                    )?;
                     
                 if let Some(hash_value) = hash_file_str.split_whitespace().next() {
-                    if verify_hash(file.content.content(), hash_value) {
+                    if verify_hash(file.content.as_result_err_str()?, hash_value) {
                         // success! the hash matched, so the file was properly downloaded
                     } else {
                         error!("ota_update_client: downloaded file {:?} did not match the expected hash value! Try downloading it again.", file.name);

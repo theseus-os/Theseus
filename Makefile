@@ -192,7 +192,9 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d')  >  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
+		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+	echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
 ## This compiles the assembly files in the nano_core
@@ -256,8 +258,8 @@ simd_personality: build_simd build
 build_simd : export TARGET := x86_64-theseus-sse
 build_simd : export RUSTFLAGS += -C no-vectorize-loops
 build_simd : export RUSTFLAGS += -C no-vectorize-slp
-build_simd : export KERNEL_PREFIX := k_sse\#
-build_simd : export APP_PREFIX := a_sse\#
+build_simd : export KERNEL_PREFIX := ksimd\#
+build_simd : export APP_PREFIX := asimd\#
 build_simd:
 ## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"

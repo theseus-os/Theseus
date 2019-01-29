@@ -15,11 +15,23 @@ version = "0.3.7"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.network_manager]
 path = "../network_manager"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.memfs]
+path = "../memfs"
 
 [dependencies.ota_update_client]
 path = "../ota_update_client"

@@ -133,8 +133,27 @@ impl HttpResponse {
         &self.packet[0 .. self.header_length]
     }
 
-    pub fn content(&self) -> &[u8] {
+    fn content(&self) -> &[u8] {
         &self.packet[self.header_length ..]
+    }
+
+    /// Returns the content of this `HttpResponse` as a `Result`, 
+    /// in which `Ok(content)` is returned if the status code is 200 (Ok),
+    /// and `Err((status_code, reason))` is returned otherwise.
+    pub fn as_result(&self) -> Result<&[u8], (u16, &str)> {
+        if self.status_code == 200 {
+            Ok(self.content())
+        } else {
+            Err((self.status_code, &self.reason))
+        }
+    }
+
+    /// A convenience function that just returns a standard Err `&str`.
+    pub fn as_result_err_str(&self) -> Result<&[u8], &'static str> {
+        self.as_result().map_err(|_e| {
+            error!("HttpResponse: error code {}, reason {:?}", _e.0, _e.1);
+            "HttpResponse had an error status code (not Ok 200)"
+        })
     }
 }
 
