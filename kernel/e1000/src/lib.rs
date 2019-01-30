@@ -593,7 +593,7 @@ impl E1000Nic {
         // but then we need to replace that receive buffer with a new one that can be filled by the NIC
         // the next time it receives a piece of a frame. 
         
-        while (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+        while self.rx_descs[self.rx_cur as usize].status & RX_DD == RX_DD {
             // get information about the current receive buffer
             let length = self.rx_descs[self.rx_cur as usize].length;
             let status = self.rx_descs[self.rx_cur as usize].status;
@@ -646,15 +646,14 @@ impl E1000Nic {
 
             // check if this rx buffer is the last piece of the frame (EOP)
             if (status & RX_EOP) == RX_EOP {
-                break;
+                // if so, then package it up as a received frame
+                self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
+                receive_buffers_in_frame = Vec::new();
             } else {
                 warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
             }
         }
 
-        if !receive_buffers_in_frame.is_empty() {
-            self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
-        }
         Ok(())
     }
 

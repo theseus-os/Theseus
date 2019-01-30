@@ -28,7 +28,7 @@ version = "0.5.0"
 default-features = false
 features = [
     "alloc", 
-    # "log", "verbose", 
+    "log", "verbose", 
     "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]

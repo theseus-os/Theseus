@@ -156,6 +156,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
             spawn::KernelTaskBuilder::new(test_ota_update::simple_keyboard_swap, iface)
                 .name(String::from("test_ota_update"))
+                .pin_on_core(bsp_apic_id)
                 .spawn()?;
         } else {
             error!("captain: Couldn't test the OTA update functionality because no e1000 NIC exists.");

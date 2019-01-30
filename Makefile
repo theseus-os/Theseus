@@ -240,7 +240,7 @@ userspace:
 ## The "normal" target must come last ('build_simd', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality : export TARGET := x86_64-theseus
 simd_personality : export BUILD_MODE = release
-simd_personality : override THESEUS_CONFIG += simd_personality
+simd_personality : export override THESEUS_CONFIG += simd_personality
 simd_personality: build_simd build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -256,8 +256,8 @@ simd_personality: build_simd build
 ### build_simd is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
 ### It is the latter half of the simd_personality target.
 build_simd : export TARGET := x86_64-theseus-sse
-build_simd : override RUSTFLAGS += -C no-vectorize-loops
-build_simd : override RUSTFLAGS += -C no-vectorize-slp
+build_simd : export override RUSTFLAGS += -C no-vectorize-loops
+build_simd : export override RUSTFLAGS += -C no-vectorize-slp
 build_simd : export KERNEL_PREFIX := ksimd\#
 build_simd : export APP_PREFIX := asimd\#
 build_simd:
@@ -431,7 +431,7 @@ odebug:
 
 
 ### Currently, loadable module mode requires release build mode
-loadable : override THESEUS_CONFIG += "loadable"
+loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
@@ -456,7 +456,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-bochs : override THESEUS_CONFIG += apic_timer_fixed
+bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -489,7 +489,7 @@ endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : override THESEUS_CONFIG += mirror_log_to_vga
+boot : export override THESEUS_CONFIG += mirror_log_to_vga
 boot: check_usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
@@ -504,7 +504,7 @@ endif
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : override THESEUS_CONFIG += mirror_log_to_vga
+pxe : export override THESEUS_CONFIG += mirror_log_to_vga
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)

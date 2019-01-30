@@ -377,7 +377,7 @@ fn connect<I>(
         return Err("ota_update_client: when connecting socket, it was already open...");
     }
 
-    let timeout_millis = 103000; // 3 second timeout
+    let timeout_millis = 10000; // 10 second timeout
     let start = hpet_ticks!();
     let remote_endpoint = remote_endpoint.into();
     
@@ -386,6 +386,8 @@ fn connect<I>(
         local_port, 
         remote_endpoint,
     );
+
+    let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
 
     sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
         error!("ota_update_client: failed to connect socket, error: {:?}", _e);
@@ -408,7 +410,7 @@ fn connect<I>(
         }
     }
 
-    debug!("ota_update_client: connected!");
+    debug!("ota_update_client: connected!  (took {} ms)", millis_since(start)?);
     Ok(())
 }
 
