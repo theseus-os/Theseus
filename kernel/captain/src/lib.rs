@@ -47,7 +47,7 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-//#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_test;
@@ -213,6 +213,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         spawn::spawn_userspace(module, None)?;
     }
 
+    
     // create a SIMD personality
     #[cfg(simd_personality)]
     {

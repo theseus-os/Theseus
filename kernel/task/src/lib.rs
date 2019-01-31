@@ -232,8 +232,6 @@ pub struct Task {
     /// Whether this Task is SIMD enabled, i.e.,
     /// whether it uses SIMD registers and instructions.
     pub simd: bool,
-
-
 }
 
 impl fmt::Debug for Task {
@@ -282,7 +280,6 @@ impl Task {
             env: Arc::new(Mutex::new(env)), 
             #[cfg(simd_personality)]
             simd: false,
-
         }
     }
 
