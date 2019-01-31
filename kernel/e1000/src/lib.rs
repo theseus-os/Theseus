@@ -83,7 +83,7 @@ pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the E1000 NIC
     /// and temporarily given to higher layers in the networking stack.
-    static ref RX_BUFFER_POOL: Queue<ReceiveBuffer> = Queue::with_capacity(2000);
+    static ref RX_BUFFER_POOL: Queue<ReceiveBuffer> = Queue::with_capacity(1000);
 }
 
 
@@ -98,44 +98,65 @@ fn nic_mapping_flags() -> EntryFlags {
 
 /// This struct is an E1000 Receive Descriptor as defined by the e1000 spec.
 /// There is one instance of this struct per receive buffer.
-#[repr(C,packed)]
-#[derive(Default)]
+#[repr(C, packed)]
 pub struct E1000RxDesc {
     /// The starting physical address of the receive buffer
-    phys_addr: u64,
+    phys_addr:   Volatile<u64>,
     /// Length of the receive buffer in bytes
-    length: u16,
-    checksum: u16,
-    status: u8,
-    errors: u8,
-    special: u16,
+    length:      ReadOnly<u16>,
+    checksum:    ReadOnly<u16>,
+    status:      Volatile<u8>,
+    errors:      ReadOnly<u8>,
+    special:     ReadOnly<u16>,
 }
+impl E1000RxDesc {
+    /// Initializes a receive descriptor by clearing its status 
+    /// and setting the descriptor's physical address.
+    fn init(&mut self, rx_buf_paddr: u64) {
+        self.phys_addr.write(rx_buf_paddr);
+        self.status.write(0);
+    }
+}
+
 impl fmt::Debug for E1000RxDesc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{phys_addr: {:#X}, length: {:#X}, checksum: {:#X}, status: {:#X}, errors: {:#X}, special: {:#X}}}",
-            self.phys_addr, self.length, self.checksum, self.status, self.errors, self.special)
+            self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.special.read())
     }
 }
+
 
 /// This struct is an E1000 Transmit Descriptor as defined by the e1000 spec.
 /// There is one instance of this struct per buffer to be transmitted.
 #[repr(C, packed)]
-#[derive(Default)]
 pub struct E1000TxDesc {
     /// The starting physical address of the transmit buffer
-    phys_addr: u64,
+    phys_addr:   Volatile<u64>,
     /// Length of the transmit buffer in bytes
-    length: u16,
-    cso: u8,
-    cmd: u8,
-    status: u8,
-    css: u8,
-    special : u16,
+    length:      Volatile<u16>,
+    cso:         Volatile<u8>,
+    cmd:         Volatile<u8>,
+    status:      Volatile<u8>,
+    css:         Volatile<u8>,
+    special:     Volatile<u16>,
 }
+impl E1000TxDesc {
+    /// Initializes a transmit descriptor by clearing all of its values.
+    fn init(&mut self) {
+        self.phys_addr.write(0);
+        self.length.write(0);
+        self.cso.write(0);
+        self.cmd.write(0);
+        self.status.write(0);
+        self.css.write(0);
+        self.special.write(0);
+    }
+}
+
 impl fmt::Debug for E1000TxDesc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{phys_addr: {:#X}, length: {:#X}, cso: {:#X}, cmd: {:#X}, status: {:#X}, css: {:#X}, special: {:#X}}}",
-            self.phys_addr, self.length, self.cso, self.cmd, self.status, self.css, self.special)
+            self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.special.read())
     }
 }
 
@@ -243,10 +264,10 @@ impl NetworkInterfaceCard for E1000Nic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         
-        self.tx_descs[self.tx_cur as usize].phys_addr = transmit_buffer.phys_addr as u64;
-        self.tx_descs[self.tx_cur as usize].length = transmit_buffer.length;
-        self.tx_descs[self.tx_cur as usize].cmd = (regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8;
-        self.tx_descs[self.tx_cur as usize].status = 0;
+        self.tx_descs[self.tx_cur as usize].phys_addr.write(transmit_buffer.phys_addr as u64);
+        self.tx_descs[self.tx_cur as usize].length.write(transmit_buffer.length);
+        self.tx_descs[self.tx_cur as usize].cmd.write((regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8);
+        self.tx_descs[self.tx_cur as usize].status.write(0);
 
         let old_cur: u8 = self.tx_cur as u8;
         self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
@@ -263,13 +284,13 @@ impl NetworkInterfaceCard for E1000Nic {
         // debug!("Value of tx descriptor address: {:x}", self.tx_descs[old_cur as usize].phys_addr);
         // debug!("Waiting for packet to send!");
         
-        while (self.tx_descs[old_cur as usize].status & TX_DD) == 0 {
+        while (self.tx_descs[old_cur as usize].status.read() & TX_DD) == 0 {
             //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
             //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
         }
         //bit 0 should be set when done
 
-        // debug!("Packet is sent!");  
+        debug!("Sent tx buffer [{}]: length: {}", old_cur, transmit_buffer.length);  
         Ok(())
     }
 
@@ -279,7 +300,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
         // check if the NIC has received a new frame that we need to handle
-        if (self.rx_descs[self.rx_cur as usize].status & RX_DD) != 0 {
+        if (self.rx_descs[self.rx_cur as usize].status.read() & RX_DD) != 0 {
             self.handle_receive()
         } else {
             // else, no new frames
@@ -407,14 +428,14 @@ impl E1000Nic {
     }
 
 
-    pub fn init_mem_pool(&self, num_rx_buffers: usize) -> Result<(), &'static str> {
+    fn init_rx_buf_pool(num_rx_buffers: usize) -> Result<(), &'static str> {
         let length = E1000_RX_BUFFER_SIZE_IN_BYTES;
         for _i in 0..num_rx_buffers {
             let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
             let rx_buf = ReceiveBuffer { mp, phys_addr, length};
             if RX_BUFFER_POOL.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("e1000::init_mem_pool(): rx buffer pool is full, cannot add rx buffer number {}!", _i);
+                error!("e1000::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer number {}!", _i);
                 return Err("e1000 rx buffer pool is full");
             };
         }
@@ -473,6 +494,8 @@ impl E1000Nic {
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
     fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [E1000RxDesc]>, Vec<ReceiveBuffer>), &'static str> {
+        Self::init_rx_buf_pool(1000 - E1000_NUM_RX_DESC)?;
+
         let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<E1000RxDesc>();
 
         // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -480,11 +503,11 @@ impl E1000Nic {
 
         // cast our physically-contiguous MappedPages into a slice of receive descriptors
         let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut(0, E1000_NUM_RX_DESC))?;
+            .try_map_mut(|mp| mp.as_slice_mut::<E1000RxDesc>(0, E1000_NUM_RX_DESC))?;
 
         // now that we've created the rx descriptors, we can fill them in with initial values
         let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(E1000_NUM_RX_DESC);
-        for i in 0 .. E1000_NUM_RX_DESC {
+        for rd in rx_descs.iter_mut() {
             // create an actual buffer of contiguous memory for receiving ethernet frames, one per rx_desc
             let (buf_mapped, buf_paddr) = create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())?;
             rx_bufs_in_use.push(ReceiveBuffer {
@@ -493,10 +516,7 @@ impl E1000Nic {
                 length: E1000_RX_BUFFER_SIZE_IN_BYTES,
             });
 
-            let mut desc = E1000RxDesc::default();
-            desc.phys_addr = buf_paddr as u64;
-            debug!("e1000::rx_init(): receive buffer [{}] phys_addr: {:#X}", i, desc.phys_addr);
-            rx_descs[i] = desc; 
+            rd.init(buf_paddr as u64);
         }
         
         debug!("e1000::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
@@ -509,9 +529,15 @@ impl E1000Nic {
         // write the length (in total bytes) of the rx descs array
         regs.rdlen.write(size_in_bytes_of_all_rx_descs as u32);
         
-        // write the head index (the first receive descriptor) and the tail index (the index after the last tail descriptor)
+        // Write the head index (the first receive descriptor) and the tail index.
         regs.rdh.write(0);
-        regs.rdt.write(E1000_NUM_RX_DESC as u32);
+        // Note that the e1000 SDM states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
+        // so if you have 8 rx descs, you will set it to 8. 
+        // However, this causes problems during the first burst of ethernet packets when you first enable interrupts, 
+        // because the `rx_cur` counter won't be able to catch up with the head index properly. 
+        // Thus, we set it to one less than that in order to prevent such bugs. 
+        // This doesn't prevent all of the rx buffers from being used, they will still all be used fully.
+        regs.rdt.write((E1000_NUM_RX_DESC - 1) as u32); 
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
         Ok((rx_descs, rx_bufs_in_use))
@@ -526,11 +552,11 @@ impl E1000Nic {
 
         // cast our physically-contiguous MappedPages into a slice of transmit descriptors
         let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut(0, E1000_NUM_TX_DESC))?;
+            .try_map_mut(|mp| mp.as_slice_mut::<E1000TxDesc>(0, E1000_NUM_TX_DESC))?;
 
         // now that we've created the tx descriptors, we can fill them in with initial values
-        for i in 0 .. E1000_NUM_TX_DESC {
-            tx_descs[i] = E1000TxDesc::default();
+        for td in tx_descs.iter_mut() {
+            td.init();
         }
 
         debug!("e1000::tx_init(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
@@ -561,20 +587,6 @@ impl E1000Nic {
         regs.icr.read(); // clear all interrupts
     }      
 
-    pub fn dump_state(&self) {
-        debug!("REG_CTRL {:x}",  self.regs.ctrl.read());
-        debug!("REG_RCTRL {:x}", self.regs.rctl.read());
-        debug!("REG_TCTRL {:x}", self.regs.tctl.read());
-
-        debug!("phys_addr {:x}", self.tx_descs[0].phys_addr);
-        debug!("length {:?}",    self.tx_descs[0].length);
-        debug!("cso {:?}",       self.tx_descs[0].cso);
-        debug!("cmd {:?}",       self.tx_descs[0].cmd);
-        debug!("status {:?}",    self.tx_descs[0].status);
-        debug!("css {:?}",       self.tx_descs[0].css);
-        debug!("special {:?}",   self.tx_descs[0].special);
-    }
-
     // reads status and clears interrupt
     fn clear_interrupt_status(&self) -> u32 {
         self.regs.icr.read()
@@ -593,10 +605,23 @@ impl E1000Nic {
         // but then we need to replace that receive buffer with a new one that can be filled by the NIC
         // the next time it receives a piece of a frame. 
         
-        while self.rx_descs[self.rx_cur as usize].status & RX_DD == RX_DD {
+        debug!("handle_receive(): rx_cur {}, head: {}, tail: {}\n\t[{:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}]", 
+            self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read(),
+            self.rx_descs[0].status.read(), 
+            self.rx_descs[1].status.read(), 
+            self.rx_descs[2].status.read(), 
+            self.rx_descs[3].status.read(), 
+            self.rx_descs[4].status.read(), 
+            self.rx_descs[5].status.read(), 
+            self.rx_descs[6].status.read(), 
+            self.rx_descs[7].status.read(), 
+        );
+
+
+        while (self.rx_descs[self.rx_cur as usize].status.read() & RX_DD) == RX_DD {
             // get information about the current receive buffer
-            let length = self.rx_descs[self.rx_cur as usize].length;
-            let status = self.rx_descs[self.rx_cur as usize].status;
+            let length = self.rx_descs[self.rx_cur as usize].length.read();
+            let status = self.rx_descs[self.rx_cur as usize].status.read();
             debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
 
             // //print rx_buf
@@ -619,6 +644,7 @@ impl E1000Nic {
             let new_receive_buf = match RX_BUFFER_POOL.pop() {
                 Some(rx_buf) => rx_buf,
                 None => {
+                    warn!("e1000 RX BUF POOL WAS EMPTY.... reallocating!");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
                     let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
@@ -631,8 +657,8 @@ impl E1000Nic {
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            self.rx_descs[self.rx_cur as usize].phys_addr = new_receive_buf.phys_addr as u64;
-            self.rx_descs[self.rx_cur as usize].status = 0;
+            self.rx_descs[self.rx_cur as usize].phys_addr.write(new_receive_buf.phys_addr as u64);
+            self.rx_descs[self.rx_cur as usize].status.write(0);
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
@@ -642,7 +668,10 @@ impl E1000Nic {
             receive_buffers_in_frame.push(current_rx_buf);
             
             // move on to the next receive buffer to see if it's ready for us to take
+            let old_cur = self.rx_cur as u32;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
+            debug!("writing rx buffer tail: old_cur {} -> rx_cur {}  (head: {}, tail: {})", old_cur, self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read());
+            self.regs.rdt.write(old_cur);
 
             // check if this rx buffer is the last piece of the frame (EOP)
             if (status & RX_EOP) == RX_EOP {
@@ -673,7 +702,7 @@ impl E1000Nic {
 
         // receiver timer interrupt
         if (status & INT_RX) == INT_RX {
-            // debug!("e1000::handle_interrupt(): receive interrupt");
+            debug!("e1000::handle_interrupt(): receive interrupt");
             self.handle_receive()?;
             handled = true;
         }
