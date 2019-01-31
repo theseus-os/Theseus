@@ -7,7 +7,6 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate smoltcp;
-extern crate e1000;
 extern crate network_interface_card;
 extern crate irq_safety;
 extern crate owning_ref;
@@ -220,7 +219,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
             return Err(smoltcp::Error::Exhausted)
         }
 
-        // debug!("E1000D/evice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
+        // debug!("E1000Device::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
         // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
         let mut txbuf = TransmitBuffer::new(len as u16).map_err(|e| {
             error!("E1000Device::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);

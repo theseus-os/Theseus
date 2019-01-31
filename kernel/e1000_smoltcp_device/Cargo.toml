@@ -38,9 +38,6 @@ path = "../memory"
 [dependencies.network_interface_card]
 path = "../network_interface_card"
 
-[dependencies.e1000]
-path = "../e1000"
-
 [dependencies.network_manager]
 path = "../network_manager"
 

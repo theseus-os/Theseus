@@ -39,7 +39,6 @@ use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
-use mpmc::*;
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 
 
@@ -79,11 +78,12 @@ pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
     E1000_NIC.try()
 }
 
-
+/// How many ReceiveBuffers are preallocated for this driver to use. 
+const RX_BUFFER_POOL_SIZE: usize = 256; 
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the E1000 NIC
     /// and temporarily given to higher layers in the networking stack.
-    static ref RX_BUFFER_POOL: Queue<ReceiveBuffer> = Queue::with_capacity(1000);
+    static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
 }
 
 
@@ -290,7 +290,10 @@ impl NetworkInterfaceCard for E1000Nic {
         }
         //bit 0 should be set when done
 
-        // debug!("Sent tx buffer [{}]: length: {}", old_cur, transmit_buffer.length);  
+        // debug!("Sent tx buffer [{}]: length: {}, paddr: {:#X}, vaddr: {:#X}", 
+        //     old_cur, transmit_buffer.length, transmit_buffer.phys_addr, transmit_buffer.mp.start_address()
+        // );  
+
         Ok(())
     }
 
@@ -432,10 +435,10 @@ impl E1000Nic {
         let length = E1000_RX_BUFFER_SIZE_IN_BYTES;
         for _i in 0..num_rx_buffers {
             let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
-            let rx_buf = ReceiveBuffer { mp, phys_addr, length};
+            let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_BUFFER_POOL);
             if RX_BUFFER_POOL.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("e1000::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer number {}!", _i);
+                error!("e1000::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
                 return Err("e1000 rx buffer pool is full");
             };
         }
@@ -494,7 +497,7 @@ impl E1000Nic {
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
     fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [E1000RxDesc]>, Vec<ReceiveBuffer>), &'static str> {
-        Self::init_rx_buf_pool(1000 - E1000_NUM_RX_DESC)?;
+        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE)?;
 
         let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<E1000RxDesc>();
 
@@ -508,15 +511,18 @@ impl E1000Nic {
         // now that we've created the rx descriptors, we can fill them in with initial values
         let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(E1000_NUM_RX_DESC);
         for rd in rx_descs.iter_mut() {
-            // create an actual buffer of contiguous memory for receiving ethernet frames, one per rx_desc
-            let (buf_mapped, buf_paddr) = create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())?;
-            rx_bufs_in_use.push(ReceiveBuffer {
-                mp: buf_mapped,
-                phys_addr: buf_paddr,
-                length: E1000_RX_BUFFER_SIZE_IN_BYTES,
-            });
-
-            rd.init(buf_paddr as u64);
+            // obtain or create a receive buffer for each rx_desc
+            let rx_buf = RX_BUFFER_POOL.pop()
+                .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
+                .or_else(|_e| {
+                    create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())
+                        .map(|(buf_mapped, buf_paddr)| 
+                            ReceiveBuffer::new(buf_mapped, buf_paddr, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)
+                        )
+                })?;
+            let paddr = rx_buf.phys_addr;
+            rx_bufs_in_use.push(rx_buf);
+            rd.init(paddr as u64);
         }
         
         debug!("e1000::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
@@ -624,7 +630,7 @@ impl E1000Nic {
             // get information about the current receive buffer
             let length = self.rx_descs[self.rx_cur as usize].length.read();
             let status = self.rx_descs[self.rx_cur as usize].status.read();
-            // debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
+            debug!("e1000: received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
 
             // //print rx_buf
             // let length = self.rx_descs[self.rx_cur as usize].length;
@@ -646,15 +652,11 @@ impl E1000Nic {
             let new_receive_buf = match RX_BUFFER_POOL.pop() {
                 Some(rx_buf) => rx_buf,
                 None => {
-                    warn!("e1000 RX BUF POOL WAS EMPTY.... reallocating!");
+                    warn!("e1000 RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
                     let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
-                    ReceiveBuffer {
-                        mp: mp,
-                        phys_addr: phys_addr,
-                        length: len,
-                    }
+                    ReceiveBuffer::new(mp, phys_addr, len, &RX_BUFFER_POOL)
                 }
             };
 
@@ -678,8 +680,8 @@ impl E1000Nic {
             // check if this rx buffer is the last piece of the frame (EOP)
             if (status & RX_EOP) == RX_EOP {
                 // if so, then package it up as a received frame
-                self.received_frames.push_back(ReceivedFrame(receive_buffers_in_frame));
-                receive_buffers_in_frame = Vec::new();
+                let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
+                self.received_frames.push_back(ReceivedFrame(buffers));
             } else {
                 warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
             }
