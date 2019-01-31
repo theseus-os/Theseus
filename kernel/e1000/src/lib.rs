@@ -290,7 +290,7 @@ impl NetworkInterfaceCard for E1000Nic {
         }
         //bit 0 should be set when done
 
-        debug!("Sent tx buffer [{}]: length: {}", old_cur, transmit_buffer.length);  
+        // debug!("Sent tx buffer [{}]: length: {}", old_cur, transmit_buffer.length);  
         Ok(())
     }
 
@@ -529,8 +529,9 @@ impl E1000Nic {
         // write the length (in total bytes) of the rx descs array
         regs.rdlen.write(size_in_bytes_of_all_rx_descs as u32);
         
-        // Write the head index (the first receive descriptor) and the tail index.
+        // Write the head index (the first receive descriptor)
         regs.rdh.write(0);
+        // Write the tail index.
         // Note that the e1000 SDM states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
         // so if you have 8 rx descs, you will set it to 8. 
         // However, this causes problems during the first burst of ethernet packets when you first enable interrupts, 
@@ -538,6 +539,7 @@ impl E1000Nic {
         // Thus, we set it to one less than that in order to prevent such bugs. 
         // This doesn't prevent all of the rx buffers from being used, they will still all be used fully.
         regs.rdt.write((E1000_NUM_RX_DESC - 1) as u32); 
+        // TODO: document these various e1000 flags and why we're setting them
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
         Ok((rx_descs, rx_bufs_in_use))
@@ -605,24 +607,24 @@ impl E1000Nic {
         // but then we need to replace that receive buffer with a new one that can be filled by the NIC
         // the next time it receives a piece of a frame. 
         
-        debug!("handle_receive(): rx_cur {}, head: {}, tail: {}\n\t[{:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}]", 
-            self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read(),
-            self.rx_descs[0].status.read(), 
-            self.rx_descs[1].status.read(), 
-            self.rx_descs[2].status.read(), 
-            self.rx_descs[3].status.read(), 
-            self.rx_descs[4].status.read(), 
-            self.rx_descs[5].status.read(), 
-            self.rx_descs[6].status.read(), 
-            self.rx_descs[7].status.read(), 
-        );
+        // debug!("handle_receive(): rx_cur {}, head: {}, tail: {}\n\t[{:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}]", 
+        //     self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read(),
+        //     self.rx_descs[0].status.read(), 
+        //     self.rx_descs[1].status.read(), 
+        //     self.rx_descs[2].status.read(), 
+        //     self.rx_descs[3].status.read(), 
+        //     self.rx_descs[4].status.read(), 
+        //     self.rx_descs[5].status.read(), 
+        //     self.rx_descs[6].status.read(), 
+        //     self.rx_descs[7].status.read(), 
+        // );
 
 
         while (self.rx_descs[self.rx_cur as usize].status.read() & RX_DD) == RX_DD {
             // get information about the current receive buffer
             let length = self.rx_descs[self.rx_cur as usize].length.read();
             let status = self.rx_descs[self.rx_cur as usize].status.read();
-            debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
+            // debug!("Received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
 
             // //print rx_buf
             // let length = self.rx_descs[self.rx_cur as usize].length;
@@ -670,7 +672,7 @@ impl E1000Nic {
             // move on to the next receive buffer to see if it's ready for us to take
             let old_cur = self.rx_cur as u32;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-            debug!("writing rx buffer tail: old_cur {} -> rx_cur {}  (head: {}, tail: {})", old_cur, self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read());
+            // debug!("writing rx buffer tail: old_cur {} -> rx_cur {}  (head: {}, tail: {})", old_cur, self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read());
             self.regs.rdt.write(old_cur);
 
             // check if this rx buffer is the last piece of the frame (EOP)
@@ -702,7 +704,7 @@ impl E1000Nic {
 
         // receiver timer interrupt
         if (status & INT_RX) == INT_RX {
-            debug!("e1000::handle_interrupt(): receive interrupt");
+            // debug!("e1000::handle_interrupt(): receive interrupt");
             self.handle_receive()?;
             handled = true;
         }
