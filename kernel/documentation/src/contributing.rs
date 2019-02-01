@@ -73,5 +73,5 @@
 //! At the very least, you'll need to change the `name` entry under the `[package]` heading at the top of the `Cargo.toml` file, and you'll need to change the dependencies for your new crate.     
 //!
 //! If your new crate needs to be initialized, you can invoke it from the [`captain::init()`](../captain/fn.init.html) function, 
-//! although there may be more appropriate places to do so, such as the [`driver_init::init()`](../driver_init/fn.init.html) function for drivers.
+//! although there may be more appropriate places to do so, such as the [`device_manager::init()`](../device_manager/fn.init.html) function for drivers.
 //! 

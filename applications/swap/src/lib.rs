@@ -124,6 +124,7 @@ fn swap_modules(tuples: Vec<(&str, &str, bool)>, verbose_log: bool) -> Result<()
         for (o, n, r) in tuples {
             // 1) check that the old crate exists and is loaded into the namespace
             let old_crate = namespace.get_crate_starting_with(o)
+                .map(|(_name, crate_ref)| crate_ref)
                 .ok_or_else(|| format!("Couldn't find old crate loaded into namespace that matched {:?}", o))?;
 
             // 2) check that the new crate file exists
