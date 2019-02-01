@@ -83,8 +83,6 @@ pub struct RunQueue {
     queue: VecDeque<RoundRobinTaskRef>,
 }
 
-/// `RunQueue` functions are listed here. This is a superset of functions listed in
-/// `RunQueue` crate.
 impl RunQueue {
     
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,

@@ -91,8 +91,6 @@ pub struct RunQueue {
     queue: VecDeque<PriorityTaskRef>,
 }
 
-/// `RunQueue` functions are listed here. This is a superset of functions listed in
-/// `RunQueue` crate.
 impl RunQueue {
 
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,

@@ -409,7 +409,7 @@ loadable : export BUILD_MODE = release
 loadable: run
 
 ### Create a make prioirty option to build and run priority scheduler
-priority : export THESEUS_CONFIG += priority_scheduler
+priority : export override THESEUS_CONFIG += priority_scheduler
 priority : export BUILD_MODE = release
 priority: run
 

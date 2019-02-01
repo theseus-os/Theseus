@@ -1,7 +1,7 @@
 [package]
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 name = "scheduler_priority"
-description = "Provides Round robin scheduling functionality and picks the next task"
+description = "Provides priority scheduling functionality and picks the next task"
 version = "0.1.0"
 build = "../../build.rs"
 
