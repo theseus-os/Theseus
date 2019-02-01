@@ -9,37 +9,36 @@
 #[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate fs_node;
-extern crate memfs;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
-use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, FsNode, File};
+use fs_node::{DirRef, Directory, FileOrDir, FsNode};
+
+
+pub const ROOT_DIRECTORY_NAME: &'static str = "/root";
 
 lazy_static! {
     /// The root directory
     /// Returns a tuple for easy access to the name of the root so we don't have to lock it
     pub static ref ROOT: (String, DirRef) = {
         let root_dir = RootDirectory {
-            name: "/root".to_string(),
+            name: ROOT_DIRECTORY_NAME.to_string(),
             children: BTreeMap::new() 
         };
 
-        // Creates a file containing the following string so we can test the implementation of MemFile
-        let test_string = String::from("TESTINGINMEMORY");
-        let strongRoot = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
-        let mut test_bytes =  test_string.as_bytes().to_vec();
-        memfs::MemFile::new(String::from("testfile"), &mut test_bytes ,Arc::downgrade(&Arc::clone(&strongRoot))).unwrap();
-        (String::from("/root"), strongRoot)
+        let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
+        (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 
     };
 }
 
-pub fn get_root() -> DirRef {
-    Arc::clone(&ROOT.1)
+/// Returns a reference to the root directory.
+pub fn get_root() -> &'static DirRef {
+    &ROOT.1
 }
 
 /// A struct that represents a node in the VFS 
@@ -58,31 +57,20 @@ impl Directory for RootDirectory {
         return Ok(())
     }
 
-    fn get_child(&mut self, child_name: String, is_file: bool) -> Result<FileOrDir, &'static str> {
-        let option_child = self.children.get(&child_name);
-        match option_child {
-            Some(child) => match child {
-                FileOrDir::File(file) => {
-                        return Ok(FileOrDir::File(Arc::clone(file)));
-                    }
-                FileOrDir::Dir(dir) => {
-                        return Ok(FileOrDir::Dir(Arc::clone(dir)));
-                    }
-            },
-            None => Err("could not get child from children map")
-        }
+    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+        self.children.get(child_name).cloned()
     }
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
-        return self.children.keys().cloned().collect();
+        self.children.keys().cloned().collect()
     }
 }
 
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        return "/root".to_string();
+        ROOT_DIRECTORY_NAME.to_string()
     }
 
     fn get_name(&self) -> String {

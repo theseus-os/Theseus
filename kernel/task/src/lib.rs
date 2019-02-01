@@ -59,7 +59,7 @@ use core::any::Any;
 use core::panic::PanicInfo;
 use alloc::string::String;
 use alloc::boxed::Box;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
@@ -255,7 +255,7 @@ impl Task {
 
         // TODO - change to option and initialize environment to none
         let env = Environment {
-            working_dir: root::get_root(), 
+            working_dir: Arc::clone(root::get_root()), 
         };
 
         Task {

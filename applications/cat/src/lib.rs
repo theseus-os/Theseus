@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
 extern crate task;
@@ -9,12 +9,13 @@ extern crate getopts;
 extern crate path;
 extern crate fs_node;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::string::ToString;
+use core::str;
+use alloc::{
+    vec::Vec,
+    string::{String, ToString},
+    sync::Arc,
+};
 use getopts::Options;
-use core::ops::Deref;
 use path::Path;
 use fs_node::FileOrDir;
 
@@ -57,19 +58,27 @@ pub fn main(args: Vec<String>) -> isize {
         Ok(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {
-                    println!("'{}' is not a file, cannot call cat", directory.lock().get_name());
-                },
+                    println!("{:?} is a directory, cannot 'cat' non-files.", directory.lock().get_name());
+                    return -1;
+                }
                 FileOrDir::File(file) => {
-                    let file_size = file.lock().size();
+                    let mut file_locked = file.lock();
+                    let file_size = file_locked.size();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
-                    let num_bytes_read = match file.lock().read(&mut string_slice_as_bytes) {
+                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes) {
                         Ok(num) => num,
-                        Err(_) => {return -1},
+                        Err(e) => {
+                            println!("Failed to read {:?}, error {:?}", file_locked.get_name(), e);
+                            return -1;
+                        }
                     };
-                    let read_string = match String::from_utf8(string_slice_as_bytes) {
+                    let read_string = match str::from_utf8(&string_slice_as_bytes) {
                         Ok(string_slice) => string_slice,
-                        Err(_) => {return -1}, // consider printing error 
+                        Err(utf8_err) => {
+                            println!("File {:?} was not a printable UTF-8 text file: {}", file_locked.get_name(), utf8_err);
+                            return -1;
+                        }
                     };
                     println!("{}", read_string);
                 }

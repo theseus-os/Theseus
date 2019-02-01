@@ -2,7 +2,6 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
-use core::ops::DerefMut;
 use alloc::string::{String, ToString};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
@@ -15,16 +14,18 @@ use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use rustc_demangle::demangle;
 
-use memory::{FRAME_ALLOCATOR, ModuleArea, get_module, MemoryManagementInfo, Frame, PageTable, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-use metadata::{CrateType, LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
+use memory::{VirtualAddress, MappedPages};
+use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 use qp_trie::Trie;
+use fs_node::{File, FileOrDir};
+use path::Path;
+use super::CrateNamespace;
 
 
-/// Decides which parsing technique to use, either the symbol file or the actual binary file.
-/// `parse_nano_core_binary()` is VERY SLOW in debug mode for large binaries, so we use the more efficient symbol file parser instead.
-/// Note that this must match the setup of the kernel/Makefile as well as the cfg/grub.cfg entry
-const PARSE_NANO_CORE_SYMBOL_FILE: bool = true;
-
+/// The file name (without extension) that we expect to see in the namespace's kernel crate directory.
+/// The trailing period '.' is there to avoid matching the "nano_core-<hash>.o" object file. 
+const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
+const NANO_CORE_CRATE_NAME: &str = "nano_core";
 
 
 /// Just like Rust's `try!()` macro, but packages up the given error message in a tuple
@@ -51,78 +52,54 @@ macro_rules! try_break {
 }
 
 
-/// Parses the nano_core module that represents the already loaded (and currently running) nano_core code.
+/// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
 pub fn parse_nano_core(
-    kernel_mmi:   &mut MemoryManagementInfo, 
+    namespace:    &CrateNamespace,
     text_pages:   MappedPages, 
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
-    verbose_log: bool
+    verbose_log:  bool
 ) -> Result<usize, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
 
     let text_pages   = Arc::new(Mutex::new(text_pages));
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
     let data_pages   = Arc::new(Mutex::new(data_pages));
 
-    let crate_name = String::from("nano_core");
-    debug!("parse_nano_core: trying to load and parse the nano_core file");
-    let module = try_mp!(
-        get_module(&format!("{}nano_core", CrateType::Kernel.prefix())).ok_or("Couldn't find nano_core module"), 
+    let nano_core_file_path = try_mp!(
+        namespace.get_kernel_file_starting_with(NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
         text_pages, rodata_pages, data_pages
     );
-    use kernel_config::memory::address_is_page_aligned;
-    if !address_is_page_aligned(module.start_address()) {
-        error!("module {} is not page aligned!", module.name());
-        return Err(("nano_core module was not page aligned", [text_pages, rodata_pages, data_pages]));
-    } 
 
-    // below, we map the nano_core module file just so we can parse it. We don't need to actually load it since we're already running it.
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-        let (size, flags) = if PARSE_NANO_CORE_SYMBOL_FILE {
-            (
-                // + 1 to add space for appending a null character to the end of the symbol file string
-                module.size() + 1, 
-                // WRITABLE because we need to write that null character
-                EntryFlags::PRESENT | EntryFlags::WRITABLE
-            )
-        }
-        else {
-            (module.size(), EntryFlags::PRESENT)
-        };
+    let nano_core_file_ref = match nano_core_file_path.get(&namespace.kernel_directory()) {
+        Ok(FileOrDir::File(f)) => f,
+        _ => return Err(("BUG: no nano_core file at expected path", [text_pages, rodata_pages, data_pages])),
+    };
+    let nano_core_file = &**nano_core_file_ref.lock();
 
-        let temp_module_mapping = {
-            let new_pages = try_mp!(allocate_pages_by_bytes(size).ok_or("couldn't allocate pages for nano_core module"), text_pages, rodata_pages, data_pages);
-            let mut frame_allocator = try_mp!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR"), text_pages, rodata_pages, data_pages).lock();
-            try_mp!(active_table.map_allocated_pages_to(
-                new_pages, Frame::range_inclusive_addr(module.start_address(), size), 
-                flags, frame_allocator.deref_mut()
-            ), text_pages, rodata_pages, data_pages)
-        };
+    debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
+    // We don't need to actually load the nano_core as a new crate, since we're already running it.
+    // We just need to parse it to discover the symbols. 
+    let new_crate_ref = match nano_core_file_path.extension() {
+        Some("sym") => parse_nano_core_symbol_file(nano_core_file, text_pages, rodata_pages, data_pages)?,
+        Some("bin") => parse_nano_core_binary(nano_core_file, text_pages, rodata_pages, data_pages)?,
+        _ => return Err((
+            "nano_core object file had unexpected file extension. Expected \".bin\" or \".sym\"",
+            [text_pages, rodata_pages, data_pages]
+        )),          
+    };
 
-        let new_crate_ref = if PARSE_NANO_CORE_SYMBOL_FILE {
-            parse_nano_core_symbol_file(temp_module_mapping, module, text_pages, rodata_pages, data_pages, size)?
-        } else {
-            parse_nano_core_binary(temp_module_mapping, module, text_pages, rodata_pages, data_pages, size)?
-        };
+    let crate_name = String::from(NANO_CORE_CRATE_NAME);
 
-        let default_namespace = super::get_default_namespace();
-        trace!("parse_nano_core(): adding symbols to namespace...");
-        let new_syms = default_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
-        trace!("parse_nano_core(): finished adding symbols.");
-        default_namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
-        info!("parsed nano_core crate, {} new symbols.", new_syms);
-        Ok(new_syms)
-
-        // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-    }
-    else {
-        error!("parse_nano_core(): error getting kernel's active page table to map module.");
-        Err(("couldn't get kernel's active page table", [text_pages, rodata_pages, data_pages]))
-    }
+    trace!("parse_nano_core(): adding symbols to namespace...");
+    let new_syms = namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
+    trace!("parse_nano_core(): finished adding symbols.");
+    namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
+    info!("parsed nano_core crate, {} new symbols.", new_syms);
+    Ok(new_syms)
 }
 
 
@@ -131,15 +108,18 @@ pub fn parse_nano_core(
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core module file itself.
-fn parse_nano_core_symbol_file(
-    mut mapped_pages: MappedPages,
-    nano_core_object_file: &'static ModuleArea,
+fn parse_nano_core_symbol_file<F: File + ?Sized>(
+    nano_core_object_file: &F,
     text_pages:   Arc<Mutex<MappedPages>>,
     rodata_pages: Arc<Mutex<MappedPages>>,
     data_pages:   Arc<Mutex<MappedPages>>,
-    size: usize
 ) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
-    let crate_name = String::from("nano_core");
+    
+    let crate_name = String::from(NANO_CORE_CRATE_NAME);
+    let size = nano_core_object_file.size();
+    let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
+    let abs_path = Path::new(nano_core_object_file.get_path_as_string());
+
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
@@ -147,15 +127,9 @@ fn parse_nano_core_symbol_file(
     let mut section_counter = 0;
     let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
 
-    // ensure that there's a null byte at the end
-    {
-        let null_byte: &mut u8 = try_mp!(mapped_pages.as_type_mut(size - 1), text_pages, rodata_pages, data_pages);
-        *null_byte = 0u8;
-    }
-
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name,
-        object_file:             nano_core_object_file,
+        object_file_abs_path:    abs_path,
         sections:                BTreeMap::new(),
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
@@ -169,10 +143,10 @@ fn parse_nano_core_symbol_file(
     // scoped to drop the borrow on mapped_pages through `bytes`
     {
         use util::c_str::CStr;
-        let bytes = try_mp!(mapped_pages.as_slice_mut(0, size), text_pages, rodata_pages, data_pages);
+        let bytes = try_mp!(mapped_pages.as_slice(0, size), text_pages, rodata_pages, data_pages);
         let symbol_cstr = try_mp!(CStr::from_bytes_with_nul(bytes).map_err(|e| {
-            error!("parse_nano_core_symbol_file(): error casting memory to CStr: {:?}", e);
-            "FromBytesWithNulError occurred when casting nano_core symbol memory to CStr"
+            error!("parse_nano_core_symbol_file(): error casting nano_core symbol file to CStr: {:?}", e);
+            "FromBytesWithNulError occurred when casting nano_core symbol file to CStr"
         }), text_pages, rodata_pages, data_pages);
         let symbol_str = try_mp!(symbol_cstr.to_str().map_err(|e| {
             error!("parse_nano_core_symbol_file(): error with CStr::to_str(): {:?}", e);
@@ -417,15 +391,18 @@ fn parse_nano_core_symbol_file(
 /// Thus, we simply search for its global symbols, and add them to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
-fn parse_nano_core_binary(
-    mapped_pages: MappedPages, 
-    nano_core_object_file: &'static ModuleArea,
+fn parse_nano_core_binary<F: File + ?Sized>(
+    nano_core_object_file: &F,
     text_pages:   Arc<Mutex<MappedPages>>, 
     rodata_pages: Arc<Mutex<MappedPages>>, 
     data_pages:   Arc<Mutex<MappedPages>>, 
-    size_in_bytes: usize
 ) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
-    let crate_name = String::from("nano_core");
+
+    let crate_name = String::from(NANO_CORE_CRATE_NAME);
+    let size_in_bytes = nano_core_object_file.size();
+    let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
+    let abs_path = Path::new(nano_core_object_file.get_path_as_string());
+
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
 
@@ -519,7 +496,7 @@ fn parse_nano_core_binary(
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name, 
-        object_file:             nano_core_object_file,
+        object_file_abs_path:    abs_path,
         sections:                BTreeMap::new(),
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
