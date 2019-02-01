@@ -44,14 +44,14 @@ path = "../task"
 [dependencies.memory]
 path  = "../memory"
 
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
 [dependencies.text_display]
 path = "../text_display"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.path]
+path = "../path"
 
 
 [lib]

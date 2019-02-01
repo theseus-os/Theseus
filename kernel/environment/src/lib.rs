@@ -1,12 +1,11 @@
 #![no_std]
 #![feature(alloc)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate fs_node;
 
 use alloc::string::String;
-use alloc::sync::Arc;
-use fs_node::{DirRef, FsNode};
+use fs_node::DirRef;
 
 /// A structure that contains Environmnt variables for a given task
 /// For now, the one variable is the current working directory of the task, which is 
@@ -22,10 +21,4 @@ impl Environment {
         let wd = self.working_dir.lock();
         wd.get_path_as_string()
     }
-
-    /// Sets working directory
-    pub fn set_wd(&mut self, new_dir: DirRef) {
-        self.working_dir = Arc::clone(&new_dir);
-    }
-
 }

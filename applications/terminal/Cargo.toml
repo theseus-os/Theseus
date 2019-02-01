@@ -63,6 +63,9 @@ path = "../../kernel/environment"
 [dependencies.root]
 path = "../../kernel/root"
 
+[dependencies.path]
+path = "../../kernel/path"
+
 [lib]
 crate-type = ["rlib"]
 

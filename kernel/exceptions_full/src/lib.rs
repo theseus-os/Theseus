@@ -71,12 +71,17 @@ fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
         match taskref.kill(task::KillReason::Exception(exception_number)) {
             Ok(_) => {
+                println_both!("Killed task {:?} due to exception {}.", taskref, exception_number);
                 if let Err(e) = runqueue::remove_task_from_all(taskref) {
-                    error!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
+                    println_both!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
                 }
             }
-            Err(e) => error!("kill_and_halt(): error killing current task {:?}: {}", taskref, e),
+            Err(e) => {
+                println_both!("kill_and_halt(): error killing current task {:?}: {}", taskref, e);
+            }
         }
+    } else {
+        println_both!("kill_and_halt(): couldn't get the current task after exception.");
     }
 
     loop { }
