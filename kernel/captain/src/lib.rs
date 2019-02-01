@@ -42,7 +42,7 @@ extern crate task;
 extern crate syscall;
 extern crate interrupts;
 extern crate acpi;
-extern crate driver_init;
+extern crate device_manager;
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
@@ -50,9 +50,10 @@ extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
-extern crate network_test;
+extern crate network_manager;
 
-#[cfg(test_ota_update_client)] extern crate ota_update_client;
+#[cfg(test_ota_update)] extern crate ota_update_client;
+#[cfg(test_ota_update)] extern crate test_ota_update;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -66,7 +67,6 @@ use core::sync::atomic::spin_loop_hint;
 use memory::{MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-use spawn::KernelTaskBuilder;
 
 
 
@@ -99,7 +99,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    let madt_iter = driver_init::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    let madt_iter = device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack, syscall_stack) = { 
@@ -135,9 +135,11 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // //init frame_buffer
     let rs = frame_buffer::init();
     match rs {
-        Ok(_) => { trace!("frame_buffer initialized."); }
+        Ok(_) => {
+            trace!("Frame_buffer initialized successfully.");
+        }
         Err(err) => { 
-            println_raw!("nano_core_start():fail to initialize frame_buffer");
+            println_raw!("captain::init(): failed to initialize frame_buffer");
             return Err(err);
         }
     }
@@ -146,24 +148,18 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers
-    driver_init::init(input_event_queue_producer)?;
+    device_manager::init(input_event_queue_producer)?;
 
 
-    #[cfg(test_network)]
+    #[cfg(test_ota_update)]
     {
-        if let Some(nic) = e1000::get_e1000_nic() {
-            KernelTaskBuilder::new(network_test::init, nic)
-                .name(String::from("network_test"))
+        if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
+            spawn::KernelTaskBuilder::new(test_ota_update::simple_keyboard_swap, iface)
+                .name(String::from("test_ota_update"))
+                .pin_on_core(bsp_apic_id)
                 .spawn()?;
-        }
-    }
-
-    #[cfg(test_ota_update_client)]
-    {
-        if let Some(nic) = e1000::get_e1000_nic() {
-            KernelTaskBuilder::new(ota_update_client::init, nic)
-                .name(String::from("ota_update_client"))
-                .spawn()?;
+        } else {
+            error!("captain: Couldn't test the OTA update functionality because no e1000 NIC exists.");
         }
     }
 

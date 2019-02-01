@@ -430,8 +430,9 @@ impl CrateNamespace {
         self.crate_tree.lock().get_str(crate_name).map(|r| CowArc::clone_shallow(r))
     }
 
-    /// Returns a reference to the `LoadedCrate` that corresponds to the given crate_name_prefix,
-    /// *if and only if* the list of `LoadedCrate`s only contains a single possible match.
+    /// Finds the `LoadedCrate` that corresponds to the given crate_name_prefix,
+    /// *if and only if* the list of `LoadedCrate`s only contains a single possible match,
+    /// and returns a tuple of the crate's name and a reference to the crate.
     /// 
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with "`-`".
@@ -445,12 +446,12 @@ impl CrateNamespace {
     ///   because it will match both `my_crate` and `my_crate_new`. 
     ///   To match only `my_crate`, call this function as `get_crate_starting_with("my_crate-")`
     ///   (note the trailing "`-`").
-    pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<StrongCrateRef> { 
+    pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<(String, StrongCrateRef)> { 
         let crates = self.crate_tree.lock();
         let mut iter = crates.iter_prefix_str(crate_name_prefix);
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .map(|(_key, val)| val.clone())
+            .map(|(key, val)| (key.clone().into(), val.clone()))
     }
 
 
