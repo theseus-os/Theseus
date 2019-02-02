@@ -243,15 +243,15 @@ fn scan_pci() -> Vec<PciBus> {
                     header_type:      pci_read_8( bus, slot, f, PCI_HEADER_TYPE),
                     bist:             pci_read_8( bus, slot, f, PCI_BIST),
                     bars:             [ 
-                                        pci_read_32(bus, slot, f, PCI_BAR0),
-                                        pci_read_32(bus, slot, f, PCI_BAR1), 
-                                        pci_read_32(bus, slot, f, PCI_BAR2), 
-                                        pci_read_32(bus, slot, f, PCI_BAR3), 
-                                        pci_read_32(bus, slot, f, PCI_BAR4), 
-                                        pci_read_32(bus, slot, f, PCI_BAR5), 
-                                        ],
-                    int_pin:            pci_read_8(bus, slot, f, PCI_INTERRUPT_PIN),
-                    int_line:           pci_read_8(bus, slot, f, PCI_INTERRUPT_LINE),
+                                          pci_read_32(bus, slot, f, PCI_BAR0),
+                                          pci_read_32(bus, slot, f, PCI_BAR1), 
+                                          pci_read_32(bus, slot, f, PCI_BAR2), 
+                                          pci_read_32(bus, slot, f, PCI_BAR3), 
+                                          pci_read_32(bus, slot, f, PCI_BAR4), 
+                                          pci_read_32(bus, slot, f, PCI_BAR5), 
+                                      ],
+                    int_pin:          pci_read_8(bus, slot, f, PCI_INTERRUPT_PIN),
+                    int_line:         pci_read_8(bus, slot, f, PCI_INTERRUPT_LINE),
                 };
 
 

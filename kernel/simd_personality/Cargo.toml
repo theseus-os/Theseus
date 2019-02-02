@@ -22,14 +22,17 @@ path = "../memory"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.apic]
 path = "../apic"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.path]
+path = "../path"
 
 [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins"
