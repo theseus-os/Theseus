@@ -45,7 +45,7 @@ impl<'a> TaskFile<'a> {
         let task_id = task.lock().id.clone();
         return TaskFile {
             task: task,
-            path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)), 
+            path: Path::new(format!("{}{}/{}", root::ROOT_DIRECTORY_NAME, TASKS_DIRECTORY_NAME, task_id)), 
             parent: parent_dir
         };
     }
@@ -181,7 +181,7 @@ impl FsNode for TaskDirectory {
     fn get_path_as_string(&self) -> String {
         let mut path = String::from(TASKS_DIRECTORY_NAME);
         if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            path.insert_str(0, &format!("{}",&cur_dir.lock().get_path_as_string()));
             return path;
         }
         return path;

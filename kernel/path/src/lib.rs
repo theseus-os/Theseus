@@ -107,8 +107,15 @@ impl Path {
         }
         // Create the new path from its components 
         let mut new_path = String::new();
+        let mut first_cmpnt = true; 
         for component in new_components {
-            new_path.push_str(&format!("/{}",  component));
+            if first_cmpnt {
+                new_path.push_str(&format!("{}",  component));
+                first_cmpnt = false;
+            } 
+            else {
+                new_path.push_str(&format!("/{}",  component));
+            }
         }
         // debug!("canonical {}", new_path);
         Path::new(new_path)
@@ -150,9 +157,7 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-            if component != "root" {
-                new_path.push_str(&format!("{}/",  component));
-            }
+            new_path.push_str(&format!("{}/",  component));
         }
         // Remove the trailing slash after the final path component
         new_path.pop();
@@ -227,7 +232,7 @@ pub enum PathComponent {
 impl PathComponent {
     pub fn as_string(self) -> String {
         match self {
-            PathComponent::RootDir => String::from("/root"),
+            PathComponent::RootDir => String::from(root::ROOT_DIRECTORY_NAME),
             PathComponent::CurrentDir => String::from("."),
             PathComponent::ParentDir => String::from(".."),
         }

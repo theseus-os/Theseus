@@ -38,9 +38,16 @@ pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
         let mut path = self.get_name();
-        if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/", &cur_dir.lock().get_path_as_string()));
-            return path;
+        if let Ok(cur_dir) =  self.get_parent_dir()  {
+            let parent_path = &cur_dir.lock().get_path_as_string();
+            // Exclude first "/" if parent_path is currently root
+            if parent_path == "/" {
+                path.insert_str(0, &format!("{}", parent_path));
+                return path;
+            } else {
+                path.insert_str(0, &format!("{}/", parent_path));
+                return path;
+            }
         }
         return path;
     }

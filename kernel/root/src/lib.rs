@@ -19,7 +19,7 @@ use alloc::collections::BTreeMap;
 use fs_node::{DirRef, Directory, FileOrDir, FsNode};
 
 
-pub const ROOT_DIRECTORY_NAME: &'static str = "/root";
+pub const ROOT_DIRECTORY_NAME: &'static str = "/";
 
 lazy_static! {
     /// The root directory
