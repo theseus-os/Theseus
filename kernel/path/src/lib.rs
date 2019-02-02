@@ -167,7 +167,7 @@ impl Path {
     
     /// Returns a boolean indicating whether path contains root
     fn has_root(&self) -> bool {
-        self.path.starts_with(root::ROOT_DIRECTORY_NAME)
+        self.path.starts_with("/")
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 

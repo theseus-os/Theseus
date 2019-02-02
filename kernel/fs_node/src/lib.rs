@@ -40,14 +40,13 @@ pub trait FsNode {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir()  {
             let parent_path = &cur_dir.lock().get_path_as_string();
-            // Exclude first "/" if parent_path is currently root
+            // Check if the parent path is root 
             if parent_path == "/" {
                 path.insert_str(0, &format!("{}", parent_path));
                 return path;
-            } else {
-                path.insert_str(0, &format!("{}/", parent_path));
-                return path;
             }
+            path.insert_str(0, &format!("{}/", parent_path));
+            return path;
         }
         return path;
     }
