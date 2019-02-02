@@ -17,7 +17,7 @@ extern crate util;
 extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
-extern crate hashmap_core;
+extern crate hashbrown;
 extern crate qp_trie;
 extern crate root;
 extern crate vfs_node;
@@ -48,7 +48,7 @@ use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAdd
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
-use hashmap_core::HashMap;
+use hashbrown::HashMap;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
 use fs_node::{FileOrDir, File, FileRef, DirRef};
