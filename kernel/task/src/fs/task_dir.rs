@@ -152,7 +152,7 @@ impl TaskDirectory {
 
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
-        let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
+        let task_ref = ::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = match self.get_self_pointer() {
             Ok(ptr) => ptr, 
             Err(err) => {
@@ -171,7 +171,7 @@ impl TaskDirectory {
             parent: Arc::downgrade(&parent_dir),
         };
         let task_dir = Arc::new(Mutex::new(Box::new(new_dir) as Box<Directory + Send>));
-        create_mmi_dir(task_ref.clone(), &task_dir)?;
+        create_mmi_dir(task_ref, &task_dir)?;
         Ok(FileOrDir::Dir(task_dir))
     }
 }
@@ -219,7 +219,7 @@ impl Directory for TaskDirectory {
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.iter() {
+        for (id, _taskref) in TASKLIST.lock().iter() {
             tasks_string.push(format!("{}", id));
         }
         tasks_string
