@@ -19,6 +19,9 @@ path = "../fs_node"
 [dependencies.vfs_node]
 path = "../vfs_node"
 
+[dependencies.root]
+path = "../root"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"

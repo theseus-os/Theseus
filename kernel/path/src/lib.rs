@@ -6,6 +6,7 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
+extern crate root;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -116,10 +117,8 @@ impl Path {
     /// Expresses the current Path, self, relative to another Path, other
     /// https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
     pub fn relative(&self, other: &Path) -> Option<Path> {
-        let ita = self.components();
-        let itb = other.components();
-        let mut ita_iter = ita;
-        let mut itb_iter = itb;
+        let mut ita_iter = self.components();
+        let mut itb_iter = other.components();
         let mut comps: Vec<String> = Vec::new();
         loop {
             match (ita_iter.next(), itb_iter.next()) {
@@ -133,7 +132,7 @@ impl Path {
                 }
                 (None, _) => comps.push("..".to_string()),
                 (Some(ref a), Some(ref b)) if comps.is_empty() && a == b => continue,
-                (Some(ref a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
+                (Some(ref _a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
                 (Some(_), Some(ref b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
                     comps.push("..".to_string());
@@ -151,19 +150,26 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-            new_path.push_str(&format!("{}/",  component));
+            if component != "root" {
+                new_path.push_str(&format!("{}/",  component));
+            }
         }
-        // remove the trailing slash after the final path component
+        // Remove the trailing slash after the final path component
         new_path.pop();
         // debug!("relative {}", new_path);
         return Some(Path::new(new_path));
+    }
+    
+    /// Returns a boolean indicating whether path contains root
+    fn has_root(&self) -> bool {
+        self.path.starts_with(root::ROOT_DIRECTORY_NAME)
     }
 
     /// Gets the reference to the directory specified by the path given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         
-        // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
+        // Get the shortest path from self to working directory 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
             Some(dir) => dir, 
             None => {
@@ -172,8 +178,15 @@ impl Path {
             }
         };
 
+        let mut curr_dir = {
+            if self.has_root() {
+                Arc::clone(root::get_root())
+            }
+            else {
+                Arc::clone(&starting_dir)
+            }
+        };
 
-        let mut curr_dir = Arc::clone(&starting_dir);
         // debug!("CANONICALIZE: Shortest path: {:?}", shortest_path);
         // debug!("curr_dir {:?}, relative components {:?}", starting_dir.lock().get_name(), shortest_path.components().collect::<Vec<&str>>());
         // debug!("CHILDREN in curr_dir: {:?}", curr_dir.lock().list_children());
