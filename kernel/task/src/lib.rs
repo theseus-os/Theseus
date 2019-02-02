@@ -60,6 +60,7 @@ use core::panic::PanicInfo;
 use alloc::string::String;
 use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
+use alloc::collections::BTreeMap;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
@@ -111,17 +112,34 @@ lazy_static! {
 
 lazy_static! {
     /// The list of all Tasks in the system.
-    pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
+    pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
 // Variable to initialize the taskfs
 static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
-pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
-    TASKLIST.get(&task_id)
+pub fn get_task(task_id: usize) -> Option<TaskRef> {
+    match TASKLIST.lock().get(&task_id) {
+        Some(tref) => {Some(tref.clone())}
+        None => {None}
+    }
 }
 
+/// removes Task TaskRef from the `TASKLIST` using `task_id`.
+/// It disconnects the link `Task` -> `TaskRef` so that `Task` can be dropped.
+fn remove_task(task: &mut Task) -> Result<(), &'static str> {
+    if let Some(taskref) = TASKLIST.lock().remove(&task.id) {
+        unsafe {
+            // just to need to consume and drop
+            Box::from_raw(task.task_local_data_ptr as *mut TaskLocalData);
+            task.task_local_data_ptr = 0;
+        }
+        return Ok(());
+    }
+
+    Err("couldn't remove the specified task from TASKLIST")
+}
 
 /// Sets the panic handler function for the current `Task`
 pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
@@ -349,6 +367,10 @@ impl Task {
 
         let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
         if let RunState::Exited(exit_value) = exited {
+            match remove_task(self) {
+                Ok(_) => {}
+                Err(e) => { warn!("{}", e); }
+            }
             Some(exit_value)
         } 
         else {
@@ -786,7 +808,7 @@ pub fn create_idle_task(
     }
 
     // insert the new task into the task list
-    let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
+    let old_task = TASKLIST.lock().insert(idle_task_id, task_ref.clone());
     if old_task.is_some() {
         error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
             idle_task_id, apic_id);
