@@ -31,8 +31,6 @@ exclude = [
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 ### use our own no_std-compatible qp trie
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
-### the new nightly alloc crate needs this: <https://github.com/Amanieu/hashmap_core/pull/8>
-hashmap_core = { git = "https://github.com/pepyakin/hashmap_core", branch = "add-alloc-layout-extra" }
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
