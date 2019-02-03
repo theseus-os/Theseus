@@ -20,6 +20,7 @@ use alloc::collections::VecDeque;
 use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
+use core::ops::{Deref, DerefMut};
 
 pub const MAX_PRIORITY: u8 = 40;
 pub const DEFAULT_PRIORITY: u8 = 20;
@@ -90,32 +91,33 @@ pub struct RunQueue {
     queue: VecDeque<PriorityTaskRef>,
 }
 
+impl Deref for RunQueue {
+    type Target = VecDeque<PriorityTaskRef>;
+    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
+        &self.queue
+    }
+}
+
+impl DerefMut for RunQueue {
+    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
+        &mut self.queue
+    }
+}
+
 impl RunQueue {
 
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
     /// switches is increased by one. This function is used when the task is selected by the scheduler
     pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
-        // self.queue.remove(index).map(|mut taskref| {
-        //     {
-        //         taskref.tokens_remaining = tokens;
-        //     }
-        //     {
-        //         taskref.increment_context_switches();
-        //     }
-        //     self.queue.push_back(taskref.clone());
-        //     taskref
-        // }).map(|m| m.taskref)
-
-        if let Some(mut priority_task_ref) = self.queue.remove(index) {
-            // do your token & context switch increment and push back, etc
+        if let Some(mut priority_task_ref) = self.deref_mut().remove(index) {
             {
                 priority_task_ref.tokens_remaining = tokens;
             }
             {
                 priority_task_ref.increment_context_switches();
             }
-            self.queue.push_back(priority_task_ref.clone());
+            self.deref_mut().push_back(priority_task_ref.clone());
             Some(priority_task_ref.taskref)
         } 
         else {
@@ -125,29 +127,24 @@ impl RunQueue {
 
     /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
     pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
-        self.queue.iter()
-    }
-
-    /// Returns a mutable iterator over all `PriorityTaskRef`s in this `RunQueue`.
-    pub fn iter_mut(&mut self) -> alloc::collections::vec_deque::IterMut<PriorityTaskRef> {
-        self.queue.iter_mut()
+       self.deref().iter()
     }
 
     /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the `RunQueue`.
     pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
-        self.queue.get(index)
+        self.deref().get(index)
     }
 
     /// Retrieves a mutable `PriorityTaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the `RunQueue`.
     pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
-        self.queue.get_mut(index)
+        self.deref_mut().get_mut(index)
     }
 
     /// Returns the length of the `RunQueue`
     pub fn runqueue_length(&self) -> usize{
-        self.queue.len()
+        self.deref().len()
     }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
@@ -236,7 +233,7 @@ impl RunQueue {
 
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
-        self.queue.push_back(priority_task_ref);
+        self.deref_mut().push_back(priority_task_ref);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -254,14 +251,14 @@ impl RunQueue {
     /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the RunQueue.
     pub fn get(&self, index: usize) -> Option<&TaskRef> {
-        self.queue.get(index).map(|m| &m.taskref)
+        self.deref().get(index).map(|m| &m.taskref)
     }
 
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
-        self.queue.retain(|x| &x.taskref != task);
+        self.deref_mut().retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
@@ -322,7 +319,7 @@ impl RunQueue {
     /// The internal function that sets the priority of a given `Task` in a single `RunQueue`
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("called_assign_priority_internal called per core");
-        for x in self.queue.iter_mut() {
+        for x in self.deref_mut().iter_mut() {
             if &x.taskref == task{
                 debug!("changed priority from {}  to {} ", x.priority, priority);
                 x.priority = priority;
@@ -345,7 +342,7 @@ impl RunQueue {
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
         let mut return_priority :Option<u8> = None;
-        for x in self.queue.iter() {
+        for x in self.deref().iter() {
             if &x.taskref == task {
                 // A matching task has been found
                 return_priority =  Some(x.priority);
