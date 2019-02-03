@@ -61,11 +61,6 @@ impl PriorityTaskRef {
         priority_taskref
     }
 
-    /// Get a pointer for the underlying TaskRef
-    pub fn get_task_ref(priority_task_ref: Option<PriorityTaskRef>) -> Option<TaskRef> {
-        priority_task_ref.map(|m| m.taskref)
-    }
-
     /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()

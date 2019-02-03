@@ -51,11 +51,6 @@ impl RoundRobinTaskRef {
         round_robin_taskref
     }
 
-    /// Get a pointer for the underlying TaskRef
-    pub fn get_task_ref(round_robin_taskref: Option<RoundRobinTaskRef>) -> Option<TaskRef> {
-        round_robin_taskref.map(|m| m.taskref)
-    }
-
     /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
        self.taskref.lock()
