@@ -96,16 +96,31 @@ impl RunQueue {
     /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
     /// switches is increased by one. This function is used when the task is selected by the scheduler
     pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
-        self.queue.remove(index).map(|mut taskref| {
+        // self.queue.remove(index).map(|mut taskref| {
+        //     {
+        //         taskref.tokens_remaining = tokens;
+        //     }
+        //     {
+        //         taskref.increment_context_switches();
+        //     }
+        //     self.queue.push_back(taskref.clone());
+        //     taskref
+        // }).map(|m| m.taskref)
+
+        if let Some(mut priority_task_ref) = self.queue.remove(index) {
+            // do your token & context switch increment and push back, etc
             {
-                taskref.tokens_remaining = tokens;
+                priority_task_ref.tokens_remaining = tokens;
             }
             {
-                taskref.increment_context_switches();
+                priority_task_ref.increment_context_switches();
             }
-            self.queue.push_back(taskref.clone());
-            taskref
-        }).map(|m| m.taskref)
+            self.queue.push_back(priority_task_ref.clone());
+            Some(priority_task_ref.taskref)
+        } 
+        else {
+            None 
+        }
     }
 
     /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
