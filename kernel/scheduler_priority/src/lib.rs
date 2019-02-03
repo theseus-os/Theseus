@@ -17,8 +17,8 @@ extern crate task;
 extern crate runqueue_priority;
 
 use task::TaskRef;
-use runqueue_priority::RunQueue;
-use runqueue_priority::MAX_PRIORITY;
+use core::ops::{Deref, DerefMut};
+use runqueue_priority::{RunQueue, MAX_PRIORITY};
 
 
 /// A data structure to transfer data from select_next_task_priority
@@ -120,7 +120,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 
     // We then reduce the number of tokens of the task by one
     let modified_tokens = {
-        let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get_priority_task_ref(index));
+        let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.deref().get(index));
         match chosen_task.map(|m| m.tokens_remaining){
             Some(x) => x.saturating_sub(1),
             None => 0,

@@ -48,6 +48,19 @@ pub struct PriorityTaskRef{
     context_switches: usize,
 }
 
+impl Deref for PriorityTaskRef {
+    type Target = TaskRef;
+    fn deref(&self) -> &TaskRef {
+        &self.taskref
+    }
+}
+
+impl DerefMut for PriorityTaskRef {
+    fn deref_mut(&mut self) -> &mut TaskRef {
+        &mut self.taskref
+    }
+}
+
 impl PriorityTaskRef {
     /// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`.
     /// We just give an initial number of tokens to run the task till 
@@ -125,27 +138,27 @@ impl RunQueue {
         }
     }
 
-    /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
-    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
-       self.deref().iter()
-    }
+    // /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
+    // pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
+    //    self.deref().iter()
+    // }
 
-    /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
-    /// Index 0 is the front of the `RunQueue`.
-    pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
-        self.deref().get(index)
-    }
+    // /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
+    // /// Index 0 is the front of the `RunQueue`.
+    // pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
+    //     self.deref().get(index)
+    // }
 
-    /// Retrieves a mutable `PriorityTaskRef` in this `RunQueue` at the specified `index`.
-    /// Index 0 is the front of the `RunQueue`.
-    pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
-        self.deref_mut().get_mut(index)
-    }
+    // /// Retrieves a mutable `PriorityTaskRef` in this `RunQueue` at the specified `index`.
+    // /// Index 0 is the front of the `RunQueue`.
+    // pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
+    //     self.deref_mut().get_mut(index)
+    // }
 
-    /// Returns the length of the `RunQueue`
-    pub fn runqueue_length(&self) -> usize{
-        self.deref().len()
-    }
+    // /// Returns the length of the `RunQueue`
+    // pub fn runqueue_length(&self) -> usize{
+    //     self.deref().len()
+    // }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8) -> Result<(), &'static str> {
@@ -250,9 +263,9 @@ impl RunQueue {
 
     /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
     /// Index 0 is the front of the RunQueue.
-    pub fn get(&self, index: usize) -> Option<&TaskRef> {
-        self.deref().get(index).map(|m| &m.taskref)
-    }
+    // pub fn get(&self, index: usize) -> Option<&TaskRef> {
+    //     self.deref().get(index).map(|m| &m.taskref)
+    // }
 
 
     /// The internal function that actually removes the task from the runqueue.
