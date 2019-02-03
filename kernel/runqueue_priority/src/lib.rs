@@ -21,6 +21,10 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 
+pub const MAX_PRIORITY: u8 = 40;
+pub const DEFAULT_PRIORITY: u8 = 20;
+pub const INITIAL_TOKENS: usize = 10;
+
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling.
 /// 
@@ -50,8 +54,8 @@ impl PriorityTaskRef {
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
-            priority: 20,
-            tokens_remaining: 10,
+            priority: DEFAULT_PRIORITY,
+            tokens_remaining: INITIAL_TOKENS,
             context_switches: 0,
         };
         priority_taskref

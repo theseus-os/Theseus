@@ -18,8 +18,8 @@ extern crate runqueue_priority;
 
 use task::TaskRef;
 use runqueue_priority::RunQueue;
+use runqueue_priority::MAX_PRIORITY;
 
-pub const MAX_PRIORITY:u8 = 40;
 
 /// A data structure to transfer data from select_next_task_priority
 /// to select_next_task
