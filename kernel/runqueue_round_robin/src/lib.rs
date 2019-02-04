@@ -112,8 +112,8 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.deref_mut().remove(index).map(|taskref| {
-            self.deref_mut().push_back(taskref.clone());
+        self.remove(index).map(|taskref| {
+            self.push_back(taskref.clone());
             taskref
         }).map(|m| m.taskref)
     }
@@ -209,7 +209,7 @@ impl RunQueue {
 
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let round_robin_taskref = RoundRobinTaskRef::new(task);
-        self.deref_mut().push_back(round_robin_taskref);
+        self.push_back(round_robin_taskref);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -227,7 +227,7 @@ impl RunQueue {
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
-        self.deref_mut().retain(|x| &x.taskref != task);
+        self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
