@@ -33,7 +33,7 @@ use core::ops::{Deref, DerefMut};
 /// context_switches indicate the number of context switches
 /// the task has undergone.
 /// context_switches is not used in scheduling algorithm.
-/// `RoundRobinTaskRef` implements `Deref` and `DerefMut` traits, which deferences to `TaskRef`.  
+/// `RoundRobinTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.  
 #[derive(Debug, Clone)]
 pub struct RoundRobinTaskRef{
     /// `TaskRef` wrapped by `RoundRobinTaskRef`
