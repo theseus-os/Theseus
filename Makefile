@@ -388,10 +388,10 @@ ifeq ($(net),yes)
 	## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 
 	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
-	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+	# QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
 
 	## user-based networking setup with standard e1000 ethernet NIC (DOESN'T WORK)
-	# QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev user,id=network0
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev user,id=network0
 
 	## Dump network activity to a pcap file
 	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap

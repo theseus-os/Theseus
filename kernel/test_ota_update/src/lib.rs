@@ -75,7 +75,10 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         let cname_no_hash = objfilename.split("-").next().ok_or("downloaded crate name couldn't be split at the '-' hash delimiter")?;
         debug!("\tobjfilename: {:?}, cname_no_hash: {:?}, crate type: {:?}, _prefix: {:?}", objfilename, cname_no_hash, _crate_type, _prefix);
         let cfile = MemFile::new(String::from(objfilename), content, &update_build_dir)?;
-        let old_crate_name = namespace.get_crate_starting_with(&format!("{}-", cname_no_hash))
+        debug!("\tcreated new file at path: {}", cfile.lock().get_path_as_string());
+        let search_str = format!("{}-", cname_no_hash);
+        debug!("\tsearch_str: {}", search_str);
+        let old_crate_name = namespace.get_crate_starting_with(&search_str)
             .map(|(name, _old_crate_ref)| name)
             .ok_or("couldn't find matching old crate in namespace")?;
         let swap_req = SwapRequest::new(old_crate_name, Path::new(cfile.lock().get_path_as_string()), true);

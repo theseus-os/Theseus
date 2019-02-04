@@ -680,7 +680,7 @@ impl CrateNamespace {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
             let nn = CrateNamespace::new(
-                format!("temp_swap--{:?}", swap_requests), 
+                String::from("temp_swap"), //format!("temp_swap--{:?}", swap_requests), 
                 self.dirs.clone(),
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
