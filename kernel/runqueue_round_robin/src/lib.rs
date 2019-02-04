@@ -20,6 +20,7 @@ use alloc::collections::VecDeque;
 use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
+use core::ops::{Deref, DerefMut};
 
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling
@@ -31,7 +32,8 @@ use task::{TaskRef, Task};
 /// no additional scheduling information is needed.
 /// context_switches indicate the number of context switches
 /// the task has undergone.
-/// context_switches is not used in scheduling algorithm. 
+/// context_switches is not used in scheduling algorithm.
+/// `RoundRobinTaskRef` implements `Deref` and `DerefMut` traits, which deferences to `TaskRef`.  
 #[derive(Debug, Clone)]
 pub struct RoundRobinTaskRef{
     /// `TaskRef` wrapped by `RoundRobinTaskRef`
@@ -39,6 +41,19 @@ pub struct RoundRobinTaskRef{
 
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
     context_switches: u32,
+}
+
+impl Deref for RoundRobinTaskRef {
+    type Target = TaskRef;
+    fn deref(&self) -> &TaskRef {
+        &self.taskref
+    }
+}
+
+impl DerefMut for RoundRobinTaskRef {
+    fn deref_mut(&mut self) -> &mut TaskRef {
+        &mut self.taskref
+    }
 }
 
 impl RoundRobinTaskRef {
@@ -72,10 +87,24 @@ lazy_static! {
 /// This is used to store the `Task`s (and associated scheduler related data) 
 /// that are runnable on a given core.
 /// A queue is used for the round robin scheduler.
+/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
     queue: VecDeque<RoundRobinTaskRef>,
+}
+
+impl Deref for RunQueue {
+    type Target = VecDeque<RoundRobinTaskRef>;
+    fn deref(&self) -> &VecDeque<RoundRobinTaskRef> {
+        &self.queue
+    }
+}
+
+impl DerefMut for RunQueue {
+    fn deref_mut(&mut self) -> &mut VecDeque<RoundRobinTaskRef> {
+        &mut self.queue
+    }
 }
 
 impl RunQueue {
@@ -83,16 +112,16 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.queue.remove(index).map(|taskref| {
-            self.queue.push_back(taskref.clone());
+        self.deref_mut().remove(index).map(|taskref| {
+            self.deref_mut().push_back(taskref.clone());
             taskref
         }).map(|m| m.taskref)
     }
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
-        self.queue.iter()
-    }
+    // pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
+    //     self.queue.iter()
+    // }
    
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
@@ -180,7 +209,7 @@ impl RunQueue {
 
         debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let round_robin_taskref = RoundRobinTaskRef::new(task);
-        self.queue.push_back(round_robin_taskref);
+        self.deref_mut().push_back(round_robin_taskref);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -195,17 +224,10 @@ impl RunQueue {
     }
 
 
-    /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
-    /// Index 0 is the front of the RunQueue.
-    pub fn get(&self, index: usize) -> Option<&TaskRef> {
-        self.queue.get(index).map(|m| &m.taskref)
-    }
-
-
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         // debug!("Removing task from runqueue {}, {:?}", self.core, task);
-        self.queue.retain(|x| &x.taskref != task);
+        self.deref_mut().retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
         {   

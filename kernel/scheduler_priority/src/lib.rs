@@ -17,7 +17,7 @@ extern crate task;
 extern crate runqueue_priority;
 
 use task::TaskRef;
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use runqueue_priority::{RunQueue, MAX_PRIORITY};
 
 

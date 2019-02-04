@@ -32,7 +32,8 @@ pub const INITIAL_TOKENS: usize = 10;
 /// The `PriorityTaskRef` type is necessary since differnt scheduling algorithms 
 /// require different data associated with the task to be stored alongside.
 /// This makes storing them alongside the task prohibitive.
-/// context_switches is not used in scheduling algorithm 
+/// context_switches is not used in scheduling algorithm
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which deferences to `TaskRef`. 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
     /// `TaskRef` wrapped by `PriorityTaskRef`
@@ -97,7 +98,8 @@ lazy_static! {
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 
 /// that are runnable on a given core.
-/// A queue is used for the token based prioirty scheduler. 
+/// A queue is used for the token based prioirty scheduler.
+/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
@@ -137,28 +139,6 @@ impl RunQueue {
             None 
         }
     }
-
-    // /// Returns an iterator over all `PriorityTaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> alloc::collections::vec_deque::Iter<PriorityTaskRef> {
-    //    self.deref().iter()
-    // }
-
-    // /// Retrieves the `PriorityTaskRef` in this `RunQueue` at the specified `index`.
-    // /// Index 0 is the front of the `RunQueue`.
-    // pub fn get_priority_task_ref(&self, index: usize) -> Option<&PriorityTaskRef> {
-    //     self.deref().get(index)
-    // }
-
-    // /// Retrieves a mutable `PriorityTaskRef` in this `RunQueue` at the specified `index`.
-    // /// Index 0 is the front of the `RunQueue`.
-    // pub fn get_priority_task_ref_as_mut(&mut self, index: usize) -> Option<&mut PriorityTaskRef> {
-    //     self.deref_mut().get_mut(index)
-    // }
-
-    // /// Returns the length of the `RunQueue`
-    // pub fn runqueue_length(&self) -> usize{
-    //     self.deref().len()
-    // }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8) -> Result<(), &'static str> {
@@ -259,14 +239,6 @@ impl RunQueue {
 
         Ok(())
     }
-
-
-    /// Retrieves the `TaskRef` in this `RunQueue` at the specified `index`.
-    /// Index 0 is the front of the RunQueue.
-    // pub fn get(&self, index: usize) -> Option<&TaskRef> {
-    //     self.deref().get(index).map(|m| &m.taskref)
-    // }
-
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
