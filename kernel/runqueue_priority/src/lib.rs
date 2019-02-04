@@ -33,7 +33,7 @@ pub const INITIAL_TOKENS: usize = 10;
 /// require different data associated with the task to be stored alongside.
 /// This makes storing them alongside the task prohibitive.
 /// context_switches is not used in scheduling algorithm
-/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which deferences to `TaskRef`. 
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`. 
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef{
     /// `TaskRef` wrapped by `PriorityTaskRef`
