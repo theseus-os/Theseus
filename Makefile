@@ -134,8 +134,9 @@ iso: $(iso)
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy the object files from the target/ directory, and the core library, into the main build directory and prepend the kernel prefix
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o; do \
+## Copy all object files into the main build directory and prepend the kernel prefix
+## Al object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 

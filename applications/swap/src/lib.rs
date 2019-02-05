@@ -14,6 +14,8 @@ extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate acpi;
+extern crate path;
+extern crate fs_node;
 
 use core::ops::DerefMut;
 use alloc::slice::SliceConcatExt;
@@ -22,6 +24,8 @@ use alloc::vec::Vec;
 use getopts::Options;
 use mod_mgmt::SwapRequest;
 use acpi::get_hpet;
+use path::Path;
+use fs_node::{FileOrDir, DirRef};
 
 
 #[no_mangle]
@@ -29,7 +33,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
-
+    opts.optopt("k", "kernel-crates", "specify the absolute path of the directory where new kernel crates will be loaded from", "PATH");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -45,6 +49,19 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
+    let kernel_crates_dir = if let Some(path) = matches.opt_str("k") {
+        let path = Path::new(path);
+        match Path::get_absolute(&path) {
+            Ok(FileOrDir::Dir(dir)) => Some(dir),
+            _ => {
+                println!("Error: could not find specified kernel crate directory: {}.", path);
+                return -1;
+            }
+        }
+    } else {
+        None
+    };
+
     let verbose = matches.opt_present("v");
 
     let matches = matches.free.join(" ");
@@ -58,10 +75,10 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-
     println!("tuples: {:?}", tuples);
 
-    match swap_modules(tuples, verbose) {
+
+    match swap_modules(tuples, kernel_crates_dir, verbose) {
         Ok(_) => 0,
         Err(e) => {
             println!("Error: {}", e);
@@ -116,7 +133,7 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 
 
 /// Performs the actual swapping of crate.
-fn swap_modules(tuples: Vec<(&str, &str, bool)>, verbose_log: bool) -> Result<(), String> {
+fn swap_modules(tuples: Vec<(&str, &str, bool)>, kernel_crates_dir: Option<DirRef>, verbose_log: bool) -> Result<(), String> {
     let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
 
     let swap_requests = {
@@ -142,6 +159,7 @@ fn swap_modules(tuples: Vec<(&str, &str, bool)>, verbose_log: bool) -> Result<()
 
     let swap_result = namespace.swap_crates(
         swap_requests, 
+        kernel_crates_dir,
         kernel_mmi.deref_mut(), 
         verbose_log
     );

@@ -41,7 +41,7 @@ use path::Path;
 /// Implements a very simple update scenario that downloads the "keyboard_log" update build and deploys it. 
 pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static str> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI")?;
-    let namespace = mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?;
+    let default_namespace = mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?;
     let namespaces_dir = mod_mgmt::get_namespaces_directory().ok_or("couldn't get directory of namespaces")?;
 
     let update_builds = ota_update_client::download_available_update_builds(&iface)?;
@@ -52,7 +52,9 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
 
     let crates_to_include = {
         let mut set: BTreeSet<String> = BTreeSet::new();
-        set.insert(String::from("k#keyboard-36be916209949cef.o")); // hardcoded right now based on what the build server offers
+        // this list is hardcoded right now based on what the build server offers
+        set.insert(String::from("k#keyboard-36be916209949cef.o")); 
+        set.insert(String::from("k#alloc-f655a0dd1878a29d.o"));
         set
     };
     let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_include)?;
@@ -78,7 +80,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         debug!("\tcreated new file at path: {}", cfile.lock().get_path_as_string());
         let search_str = format!("{}-", cname_no_hash);
         debug!("\tsearch_str: {}", search_str);
-        let old_crate_name = namespace.get_crate_starting_with(&search_str)
+        let old_crate_name = default_namespace.get_crate_starting_with(&search_str)
             .map(|(name, _old_crate_ref)| name)
             .ok_or("couldn't find matching old crate in namespace")?;
         let swap_req = SwapRequest::new(old_crate_name, Path::new(cfile.lock().get_path_as_string()), true);
@@ -86,7 +88,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     }
 
     debug!("SWAP_REQUESTS: {:?}", swap_requests);
-    namespace.swap_crates(swap_requests, kernel_mmi_ref.lock().deref_mut(), false)?;
+    default_namespace.swap_crates(swap_requests, Some(update_build_dir.clone()), kernel_mmi_ref.lock().deref_mut(), false)?;
 
     Err("unfinished")
 }

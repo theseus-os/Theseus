@@ -280,7 +280,8 @@ pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
 /// The set of directories that exist in each `CrateNamespace`. 
 #[derive(Clone)]
 pub struct NamespaceDirectorySet {
-    /// The `base` directory is the parent of the other directories.
+    /// The `base` directory is the parent of the other directories,
+    /// and is generally found within the top-level namespaces directory.
     base:   DirRef,
     /// The directory that contains all kernel crate object files.
     kernel: DirRef,
@@ -288,6 +289,31 @@ pub struct NamespaceDirectorySet {
     app:    DirRef,
     /// The directory that contains all userspace object files.
     user:   DirRef,
+}
+impl NamespaceDirectorySet {
+    pub fn new(base: DirRef, kernel: DirRef, app: DirRef, user: DirRef) -> NamespaceDirectorySet {
+        NamespaceDirectorySet { base, kernel, app, user }
+    }
+
+    /// Returns a reference to the base directory.
+    pub fn base_dir(&self) -> &DirRef {
+        &self.base
+    }
+
+    /// Returns a reference to the directory of kernel crates.
+    pub fn kernel_dir(&self) -> &DirRef {
+        &self.kernel
+    }
+
+    /// Returns a reference to the directory of application crates.
+    pub fn app_dir(&self) -> &DirRef {
+        &self.app
+    }
+
+    /// Returns a reference to the directory of userspace programs.
+    pub fn user_dir(&self) -> &DirRef {
+        &self.user
+    }
 }
 
 
@@ -657,6 +683,9 @@ impl CrateNamespace {
     ///   as a single "atomic" procedure, which prevents weird linking/relocation errors, 
     ///   such as a new crate linking against an old crate that already exists in this namespace
     ///   instead of linking against the new one that we want to replace that old crate with. 
+    /// * `new_kernel_crates_dir`: 
+    /// 
+    ///   If `None`, the 
     /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
@@ -667,6 +696,7 @@ impl CrateNamespace {
     pub fn swap_crates(
         &self,
         swap_requests: SwapRequestList,
+        kernel_crates_dir: Option<DirRef>,
         kernel_mmi: &mut MemoryManagementInfo,
         verbose_log: bool,
     ) -> Result<(), &'static str> {
@@ -674,14 +704,20 @@ impl CrateNamespace {
         // First, before we perform any expensive crate loading, let's try an optimization
         // based on cached crates that were unloaded during a previous swap operation. 
         let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-            // info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+            info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
             (cached_crates, true)
         } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
+            // Also, use the optionally-provided directory of kernel crates instead of the current namespace's kernel dir.
             let nn = CrateNamespace::new(
-                String::from("temp_swap"), //format!("temp_swap--{:?}", swap_requests), 
-                self.dirs.clone(),
+                String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
+                NamespaceDirectorySet::new(
+                    self.dirs.base_dir().clone(), 
+                    kernel_crates_dir.unwrap_or_else(|| self.dirs.kernel_dir().clone()),
+                    self.dirs.app_dir().clone(),
+                    self.dirs.user_dir().clone(),
+                ),
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
             nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;

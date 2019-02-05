@@ -22,3 +22,9 @@ path = "../../kernel/memory"
 
 [dependencies.acpi]
 path = "../../kernel/acpi"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.path]
+path = "../../kernel/path"
