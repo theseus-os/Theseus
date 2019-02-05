@@ -14,13 +14,17 @@ extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate acpi;
+extern crate task;
 extern crate path;
 extern crate fs_node;
 
 use core::ops::DerefMut;
-use alloc::slice::SliceConcatExt;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+    sync::Arc,
+    slice::SliceConcatExt,
+};
 use getopts::Options;
 use mod_mgmt::SwapRequest;
 use acpi::get_hpet;
@@ -48,6 +52,19 @@ pub fn main(args: Vec<String>) -> isize {
         print_usage(opts);
         return 0;
     }
+
+    let taskref = match task::get_my_current_task() {
+        Some(t) => t,
+        None => {
+            println!("failed to get current task");
+            return -1;
+        }
+    };
+    let curr_dir = {
+        let locked_task = taskref.lock();
+        let curr_env = locked_task.env.lock();
+        Arc::clone(&curr_env.working_dir)
+    };
 
     let kernel_crates_dir = if let Some(path) = matches.opt_str("k") {
         let path = Path::new(path);
@@ -78,7 +95,7 @@ pub fn main(args: Vec<String>) -> isize {
     println!("tuples: {:?}", tuples);
 
 
-    match swap_modules(tuples, kernel_crates_dir, verbose) {
+    match swap_modules(tuples, &curr_dir, kernel_crates_dir, verbose) {
         Ok(_) => 0,
         Err(e) => {
             println!("Error: {}", e);
@@ -133,7 +150,12 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 
 
 /// Performs the actual swapping of crate.
-fn swap_modules(tuples: Vec<(&str, &str, bool)>, kernel_crates_dir: Option<DirRef>, verbose_log: bool) -> Result<(), String> {
+fn swap_modules(
+    tuples: Vec<(&str, &str, bool)>, 
+    curr_dir: &DirRef, 
+    kernel_crates_dir: Option<DirRef>, 
+    verbose_log: bool
+) -> Result<(), String> {
     let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
 
     let swap_requests = {
@@ -144,9 +166,11 @@ fn swap_modules(tuples: Vec<(&str, &str, bool)>, kernel_crates_dir: Option<DirRe
                 .map(|(_name, crate_ref)| crate_ref)
                 .ok_or_else(|| format!("Couldn't find old crate loaded into namespace that matched {:?}", o))?;
 
-            // 2) check that the new crate file exists
-            let new_crate_path = namespace.get_kernel_file_starting_with(n)
-                .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))?;
+            // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
+            let new_crate_path = match Path::new(String::from(n)).get(curr_dir) {
+                Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_path_as_string())),
+                _ => namespace.get_kernel_file_starting_with(n).ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n)),
+            }?;
             mods.push(SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_path, r));
         }
         mods

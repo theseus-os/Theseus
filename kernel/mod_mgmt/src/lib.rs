@@ -1827,9 +1827,9 @@ impl CrateNamespace {
             
             let crate_dependency_name = format!("{}-", crate_dependency_name);
  
-            if let Some(dependency_crate_file) = self.get_kernel_file_starting_with(&crate_dependency_name) {
+            if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name) {
                 // try to load the missing symbol's containing crate
-                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file, backup_namespace, kernel_mmi, verbose_log) {
+                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
                         return sec;
@@ -1841,7 +1841,7 @@ impl CrateNamespace {
                 }
                 else {
                     error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate file {:?}.",
-                        demangled_full_symbol, dependency_crate_file);
+                        demangled_full_symbol, dependency_crate_file_path);
                 }
             }
             else {

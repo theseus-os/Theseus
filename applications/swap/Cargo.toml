@@ -20,6 +20,9 @@ path = "../../kernel/mod_mgmt"
 [dependencies.memory]
 path = "../../kernel/memory"
 
+[dependencies.task]
+path = "../../kernel/task"
+
 [dependencies.acpi]
 path = "../../kernel/acpi"
 
