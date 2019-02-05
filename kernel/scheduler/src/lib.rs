@@ -22,13 +22,9 @@ use runqueue::RunQueue;
 pub fn schedule() -> bool {
     disable_interrupts();
 
-    schedule_with_curr_task(get_my_current_task().expect("schedule(): get_my_current_task() failed").clone())
-}
+    // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
+    // trace!("schedule [0]: current_taskid={}", current_taskid);
 
-fn consume<T> (_: T) {}
-
-/// This function performs a task switch with a specified task
-pub fn schedule_with_curr_task(taskref: TaskRef) -> bool {
     let current_task: *mut Task;
     let next_task: *mut Task; 
 
@@ -55,9 +51,9 @@ pub fn schedule_with_curr_task(taskref: TaskRef) -> bool {
     
     // same scoping reasons as above: to release the lock around current_task
     {
-        current_task = taskref.lock_mut().deref_mut() as *mut Task;
+        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
+                                            .lock_mut().deref_mut() as *mut Task; 
     }
-    consume(taskref);   // TODO: better way to consume?
 
     if current_task == next_task {
         // no need to switch if the chosen task is the same as the current task
