@@ -692,9 +692,8 @@ impl CrateNamespace {
     ///   as a single "atomic" procedure, which prevents weird linking/relocation errors, 
     ///   such as a new crate linking against an old crate that already exists in this namespace
     ///   instead of linking against the new one that we want to replace that old crate with. 
-    /// * `new_kernel_crates_dir`: 
-    /// 
-    ///   If `None`, the 
+    /// * `new_kernel_crates_dir`: the directory of object files from which missing kernel crates should be loaded.
+    ///   If `None`, this `CrateNamespace`'s kernel directory will be used to look for missing kernel crates.
     /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
@@ -792,7 +791,7 @@ impl CrateNamespace {
                     let old_sec_ref = this_symbol_map.get(old_sec_name)
                         .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
                         .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
-                    debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
+                    // debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
                     let mut old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
@@ -820,7 +819,7 @@ impl CrateNamespace {
                             error!("swap_crates(): couldn't find section in the new crate that corresponds to a fuzzy match of the old section {:?}", old_sec.name);
                             "couldn't find section in the new crate that corresponds to a fuzzy match of the old section"
                         })?;
-                        debug!("swap_crates(): found fuzzy match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
+                        // debug!("swap_crates(): found fuzzy match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                             let reexported_name = BString::from(old_sec.name.as_str());
@@ -862,7 +861,7 @@ impl CrateNamespace {
                             new_sec_ref.get_or_insert(nsr)
                         };
                         let mut new_source_sec = new_source_sec_ref.lock();
-                        debug!("swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
+                        // debug!("swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
