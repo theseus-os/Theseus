@@ -40,7 +40,7 @@ pub fn main(args: Vec<String>) -> isize {
     // Print all tasks
     let mut num_tasks = 0;
     let mut task_string = String::new();
-    for (id, taskref) in TASKLIST.iter() {
+    for (id, taskref) in TASKLIST.lock().iter() {
         num_tasks += 1;
         let task = taskref.lock();
         let name = &task.name;
