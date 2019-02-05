@@ -1341,10 +1341,13 @@ name = "swap"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
+ "fs_node 0.1.0",
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "task 0.1.0",
  "terminal_print 0.1.0",
 ]
 
