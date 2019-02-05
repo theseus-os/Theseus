@@ -135,8 +135,8 @@ fn remove_task(task: &mut Task) -> Result<(), &'static str> {
         unsafe {
             // just to need to consume and drop
             Box::from_raw(task.task_local_data_ptr as *mut TaskLocalData);
-            task.task_local_data_ptr = 0;
         }
+        task.task_local_data_ptr = 0;
         return Ok(());
     }
 

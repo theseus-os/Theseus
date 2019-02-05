@@ -941,9 +941,6 @@ impl Terminal {
             .argument(arguments)
             .spawn()?;
         
-        warn!("TERMINAL STOPS FOR DEBUGGING!");
-        loop{}
-
         taskref.set_env(Arc::clone(&self.env)); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C

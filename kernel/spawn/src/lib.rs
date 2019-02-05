@@ -562,7 +562,7 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().").clone();
     let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
@@ -596,7 +596,6 @@ fn task_wrapper<F, A, R>() -> !
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    let curr_task_ref = curr_task_ref.clone();
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // (1) Put the task into a non-runnable mode (exited), and set its exit value
@@ -623,14 +622,12 @@ fn task_wrapper<F, A, R>() -> !
             error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
         }
 
+        // (3) Yield the CPU
+        scheduler::schedule_with_curr_task(curr_task_ref);
+
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
 
-    warn!("DON'T CALL SCHEDULE() FOR DEBUGGING!");
-    loop{}
-
-    // (3) Yield the CPU
-    scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
     error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
