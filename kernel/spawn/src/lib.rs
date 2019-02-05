@@ -596,6 +596,7 @@ fn task_wrapper<F, A, R>() -> !
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
+    let curr_task_ref = curr_task_ref.clone();
     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // (1) Put the task into a non-runnable mode (exited), and set its exit value
