@@ -167,7 +167,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
-        let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
+        let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if old_task.is_some() {
             error!("BUG: KernelTaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
@@ -562,7 +562,7 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().").clone();
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
     let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
@@ -622,12 +622,11 @@ fn task_wrapper<F, A, R>() -> !
             error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
         }
 
-        // (3) Yield the CPU
-        scheduler::schedule_with_curr_task(curr_task_ref);
-
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
 
+    // (3) Yield the CPU
+    scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
     error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
