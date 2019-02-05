@@ -152,7 +152,7 @@ impl TaskDirectory {
 
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
-        let task_ref = ::get_task(id).ok_or("could not get taskref from TASKLIST")?;
+        let task_ref = super::super::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = match self.get_self_pointer() {
             Ok(ptr) => ptr, 
             Err(err) => {

@@ -120,15 +120,17 @@ static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<TaskRef> {
-    match TASKLIST.lock().get(&task_id) {
-        Some(tref) => {Some(tref.clone())}
-        None => {None}
-    }
+    TASKLIST.lock().get(&task_id).cloned()
 }
 
 /// removes Task TaskRef from the `TASKLIST` using `task_id`.
 /// It disconnects the link `Task` -> `TaskRef` so that `Task` can be dropped.
 fn remove_task(task: &mut Task) -> Result<(), &'static str> {
+    match task.runstate {   // sanity check
+        RunState::Exited(_) => {}
+        _ => { return Err("the task in not in the Exited state"); }
+    }
+
     if let Some(taskref) = TASKLIST.lock().remove(&task.id) {
         unsafe {
             // just to need to consume and drop
@@ -367,10 +369,6 @@ impl Task {
 
         let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
         if let RunState::Exited(exit_value) = exited {
-            match remove_task(self) {
-                Ok(_) => {}
-                Err(e) => { warn!("{}", e); }
-            }
             Some(exit_value)
         } 
         else {
@@ -640,6 +638,7 @@ impl TaskRef {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
+            remove_task(&mut task)?;    // removes from TASKLIST
         }
 
         #[cfg(runqueue_state_spill_evaluation)] 
