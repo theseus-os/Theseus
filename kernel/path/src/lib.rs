@@ -165,12 +165,14 @@ impl Path {
         return Some(Path::new(new_path));
     }
     
-    /// Returns a boolean indicating whether path contains root
-    fn has_root(&self) -> bool {
-        self.path.starts_with("/")
+    /// Returns a boolean indicating whether this Path is absolute,
+    /// i.e., whether it starts with the root directory.
+    pub fn is_absolute(&self) -> bool {
+        self.path.starts_with(PATH_DELIMITER)
     }
 
-    /// Gets the reference to the directory specified by the path given the current working directory 
+    /// Returns the file or directory specified by the given path, 
+    /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         
@@ -184,7 +186,7 @@ impl Path {
         };
 
         let mut curr_dir = {
-            if self.has_root() {
+            if self.is_absolute() {
                 Arc::clone(root::get_root())
             }
             else {
@@ -220,6 +222,16 @@ impl Path {
             }
         }
         Ok(FileOrDir::Dir(curr_dir))
+    }
+
+
+    /// Returns the file or directory specified by the given absolute path
+    pub fn get_absolute(path: &Path) -> Result<FileOrDir, &'static str> {
+        if path.is_absolute() {
+            path.get(root::get_root())
+        } else {
+            Err("given path was not absolute")
+        }
     }
 }
 
