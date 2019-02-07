@@ -1,70 +1,140 @@
 use bit_field::BitField;
+use volatile::{Volatile, ReadOnly, WriteOnly};
 
-/// Legacy Descriptors
-/// struct to represent receive descriptors
+/// Legacy Receive Descriptor
 #[repr(C,packed)]
-pub struct e1000_rx_desc {
-        pub addr: u64,      
-        pub length: u16,
-        pub checksum: u16,
-        pub status: u8,
-        pub errors: u8,
-        pub special: u16,
+pub struct E1000RxDesc {
+    pub phys_addr: Volatile<u64>,      
+    pub length: Volatile<u16>,
+    pub checksum: Volatile<u16>,
+    pub status: Volatile<u8>,
+    pub errors: Volatile<u8>,
+    pub special: Volatile<u16>,
 }
 use core::fmt;
-impl fmt::Debug for e1000_rx_desc {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
-                        self.addr, self.length, self.checksum, self.status, self.errors, self.special)
-        }
+impl fmt::Debug for E1000RxDesc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
+                    self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.special.read())
+    }
 }
 
-/// struct to represent transmission descriptors
+/// Legacy Transmit Descriptor
+/// TODO: Replace with advanced receive descriptor
 #[repr(C,packed)]
-pub struct e1000_tx_desc {
-        pub addr: u64,
-        pub length: u16,
-        pub cso: u8,
-        pub cmd: u8,
-        pub status: u8,
-        pub css: u8,
-        pub special : u16,
-}
-impl fmt::Debug for e1000_tx_desc {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}",
-                        self.addr, self.length, self.cso, self.cmd, self.status, self.css, self.special)
-        }
+pub struct E1000TxDesc {
+    pub phys_addr: Volatile<u64>,
+    pub length: Volatile<u16>,
+    pub cso: Volatile<u8>,
+    pub cmd: Volatile<u8>,
+    pub status: Volatile<u8>,
+    pub css: Volatile<u8>,
+    pub special : Volatile<u16>,
 }
 
-/// Advanced Descriptors. Section 7.1.6 of 82599 datasheet
-/// Advanced Receive Descriptor
+impl E1000TxDesc {
+    /// Initializes a transmit descriptor by clearing all of its values.
+    pub fn init(&mut self) {
+        self.phys_addr.write(0);
+        self.length.write(0);
+        self.cso.write(0);
+        self.cmd.write(0);
+        self.status.write(0);
+        self.css.write(0);
+        self.special.write(0);
+    }
+}
 
-#[repr(packed)]
-#[derive(Default, Debug, Copy, Clone)]
+impl fmt::Debug for E1000TxDesc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}",
+                    self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.special.read())
+    }
+}
+
+/// Advanced Receive Descriptor ( Section 7.1.6 of 82599 datasheet)
+/// It has 2 modes: Read and WriteBack. There is one receive descriptor per receive buffer that can be converted between these 2 forms.
+/// Read contains the addresses that the driver writes. 
+#[repr(C, packed)]
 pub struct AdvancedReceiveDescriptorR {
-    upper:  u64,
-    lower:  u64,
+    /// the packet buffer address
+    upper:  Volatile<u64>,
+    /// the header buffer address
+    lower:  Volatile<u64>,
 }
 
 impl AdvancedReceiveDescriptorR {
+    /// initialize the Receive descriptor in Read mode by setting the packet and header physical address.
+    pub fn init (&mut self, packet_buffer_addres: u64, header_buffer_address: u64) {
+        self.upper.write(packet_buffer_addres);
+        self.lower.write(header_buffer_address);
+    }
+
     pub fn set_packet_buffer_address(&mut self, val: u64){
-        self.upper = val;
+        self.upper.write(val);
     }
 
     pub fn set_header_buffer_address(&mut self, val: u64){
-        self.lower = val;
+        self.lower.write(val);
     }
 
     pub fn get_packet_buffer_address(&self) -> u64{
-        self.upper 
+        self.upper.read() 
     }
 
     pub fn get_header_buffer_address(&self) -> u64{
-        self.lower 
+        self.lower.read() 
+    }
+
+    /*** functions for Write Back format ***/
+
+    pub fn get_rss_hash(&self) -> u64{
+        self.upper.read().get_bits(32..63) 
+    }
+
+    pub fn get_sph(&self) -> bool{
+        self.upper.read().get_bit(31) 
+    }
+    
+    pub fn get_hdr_len(&self) -> u64{
+        self.upper.read().get_bits(21..30) 
+    }
+
+    pub fn get_rsccnt(&self) -> u64{
+        self.upper.read().get_bits(17..20) 
+    }
+
+    pub fn get_packet_type(&self) -> u64{
+        self.upper.read().get_bits(4..16) 
+    }
+
+    pub fn get_rss_type(&self) -> u64{
+        self.upper.read().get_bits(0..3) 
+    }
+
+    pub fn get_vlan_tag(&self) -> u64{
+        self.lower.read().get_bits(48..63) 
+    }
+
+    pub fn get_pkt_len(&self) -> u64{
+        self.lower.read().get_bits(32..47) 
+    }
+
+    pub fn get_ext_error(&self) -> u64{
+        self.lower.read().get_bits(20..31) 
+    }
+
+    pub fn get_ext_status(&self) -> u64{
+        self.lower.read().get_bits(0..19) 
     }
 }
 
+impl fmt::Debug for AdvancedReceiveDescriptorR {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{Packet buffer address: {:#X}, Packet header address: {:#X}}}",
+            self.upper.read(), self.lower.read())
+    }
+}
 
 impl From<AdvancedReceiveDescriptorWB> for AdvancedReceiveDescriptorR {
 
@@ -77,53 +147,62 @@ impl From<AdvancedReceiveDescriptorWB> for AdvancedReceiveDescriptorR {
 
 }
 
-#[repr(packed)]
-#[derive(Default, Debug)]
+/// Advanced Receive Descriptor ( Section 7.1.6 of 82599 datasheet)
+/// It has 2 modes: Read and WriteBack. There is one receive descriptor per receive buffer that can be converted between these 2 forms.
+/// WriteBack contains the status bits that the hardware writes to it on receiving a packet,
+#[repr(C, packed)]
 pub struct AdvancedReceiveDescriptorWB {
-    upper:  u64,
-    lower:  u64,
+    upper:  Volatile<u64>,
+    lower:  Volatile<u64>,
 }
 
 impl AdvancedReceiveDescriptorWB {
 
     pub fn get_rss_hash(&self) -> u64{
-        self.upper.get_bits(32..63) 
+        self.upper.read().get_bits(32..63) 
     }
 
     pub fn get_sph(&self) -> bool{
-        self.upper.get_bit(31) 
+        self.upper.read().get_bit(31) 
     }
     
     pub fn get_hdr_len(&self) -> u64{
-        self.upper.get_bits(21..30) 
+        self.upper.read().get_bits(21..30) 
     }
 
     pub fn get_rsccnt(&self) -> u64{
-        self.upper.get_bits(17..20) 
+        self.upper.read().get_bits(17..20) 
     }
 
     pub fn get_packet_type(&self) -> u64{
-        self.upper.get_bits(4..16) 
+        self.upper.read().get_bits(4..16) 
     }
 
     pub fn get_rss_type(&self) -> u64{
-        self.upper.get_bits(0..3) 
+        self.upper.read().get_bits(0..3) 
     }
 
     pub fn get_vlan_tag(&self) -> u64{
-        self.lower.get_bits(48..63) 
+        self.lower.read().get_bits(48..63) 
     }
 
     pub fn get_pkt_len(&self) -> u64{
-        self.lower.get_bits(32..47) 
+        self.lower.read().get_bits(32..47) 
     }
 
     pub fn get_ext_error(&self) -> u64{
-        self.lower.get_bits(20..31) 
+        self.lower.read().get_bits(20..31) 
     }
 
     pub fn get_ext_status(&self) -> u64{
-        self.lower.get_bits(0..19) 
+        self.lower.read().get_bits(0..19) 
+    }
+}
+
+impl fmt::Debug for AdvancedReceiveDescriptorWB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{rss_hash: {:#X}, sph: {}, hdr_len: {:#X}, rsccnt: {:#X}, packet_type: {:#X}, rss_type: {:#X}, vlan_tag: {:#X}, pkt_len: {:#X}, ext_error: {:#X}, ext_status: {:#X}}}",
+            self.get_rss_hash(), self.get_sph(), self.get_hdr_len(), self.get_rsccnt(), self.get_packet_type(), self.get_rss_type(), self.get_vlan_tag(), self.get_pkt_len(), self.get_ext_error(), self.get_ext_status())
     }
 }
 

@@ -20,7 +20,6 @@
 #![feature(asm)]
 #![feature(core_intrinsics)]
 
-
 extern crate alloc;
 #[macro_use] extern crate log;
 

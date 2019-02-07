@@ -10,6 +10,8 @@ volatile = "0.2.4"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 bit_field = "0.7.0"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
 
 [dependencies.log]
 default-features = false
@@ -45,6 +47,12 @@ path = "../pit_clock"
 
 [dependencies.interrupts]
 path = "../interrupts"
+
+[dependencies.network_interface_card]
+path = "../network_interface_card"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

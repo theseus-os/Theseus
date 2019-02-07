@@ -17,7 +17,6 @@ extern crate network_manager;
 extern crate e1000_smoltcp_device;
 extern crate smoltcp;
 
-
 use alloc::sync::Arc;
 use spin::Mutex;
 use dfqueue::DFQueueProducer;
@@ -37,7 +36,6 @@ const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-
 const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 // const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1]; // the default gateway for our TAP-based bridge
 // const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 42, 0, 1]; // rice net gateway ip
-
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
@@ -60,8 +58,12 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
-    }
+    } */
 
+    if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
+        debug!("82599 Device found: {:?}", pci_dev_82599);
+        let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;
+    }
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
         debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
         let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
@@ -71,7 +73,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
     }
     else {
-        warn!("No e1000 device found on this system.");
+        warn!("No 82599 device found on this system.");
     }
     
 

@@ -105,7 +105,9 @@ pub const CMD_IDE:                  u32 = (1 << 7);    // Interrupt Delay Enable
  
  
 /// TCTL commands
- 
+pub const TX_Q_ENABLE:              bool = true;
+pub const TE:                       u32  = 1; //Transmit Enable
+
 pub const TCTL_EN:                  u32 = (1 << 1);    // Transmit Enable
 pub const TCTL_PSP:                 u32 = (1 << 3);    // Pad Short Packets
 pub const TCTL_CT_SHIFT:            u32 = 4;          // Collision Threshold
@@ -117,3 +119,178 @@ pub const TSTA_DD:                  u32 = (1 << 0);    // Descriptor Done
 pub const TSTA_EC:                  u32 = (1 << 1);    // Excess Collisions
 pub const TSTA_LC:                  u32 = (1 << 2);    // Late Collision
 pub const LSTA_TU:                  u32 = (1 << 3);    // Transmit Underrun
+
+
+
+#[repr(C)]
+pub struct IntelIxgbeRegisters {
+    pub ctrl:                       Volatile<u32>,          // 0x0
+    _padding0:                      [u8; 4],                // 0x4 - 0x7
+    
+    pub status:                     ReadOnly<u32>,          // 0x8
+    _padding1:                      [u8; 2036],             // 0xC - 0x7FF
+
+    pub eicr:                       Volatile<u32>,          // 0x800
+    _padding2:                      [u8; 4],                // 0x804 - 0x807
+
+    pub eics:                       WriteOnly<u32>,         // 0x808 // set bits in eicr register 
+    _padding3:                      [u8; 4],                // 0x80C - 0x80F
+
+    pub eiac:                       Volatile<u32>,          // 0x810; // enables auto-clear
+    _padding4:                      [u8; 12],               // 0x814 - 0x81F 
+    
+    pub eitr:                       RegisterArray24,        // 0x820 - 0x87F; // first 24 Interrupt throttle registers
+
+    pub eims:                       Volatile<u32>,          // 0x880; // enables interrupt in eicr register
+    _padding5:                      [u8; 4],                // 0x884 - 0x887
+
+    pub eimc:                       WriteOnly<u32>,         // 0x888; // clears bit in eims reg, disabling that interrupt
+    _padding6:                      [u8; 4],                // 0x88C - 0x88F     
+
+    pub eiam:                       Volatile<u32>,          // 0x890; // enables auto set and clear
+    _padding7:                      [u8; 4],                // 0x894 - 0x897
+
+    pub gpie:                       Volatile<u32>,          // 0x898; // enable clear on read
+    _padding8:                      [u8; 100],              // 0x89C - 0x8FF
+
+    pub ivar:                       RegisterArray64,        // 0x900 - 0x9FF  // maps interrupt causes from Rx and Tx queues to eicr entries (0x900 + 4*n, n = 0..63)
+    _padding9:                      [u8; 1536],             // 0xA00 - 0xFFF
+
+    pub rx_regs1:                   RegisterArrayRx,        // 0x1000 - 0x1FFF, for 64 queues
+    _padding10:                     [u8; 3840],             // 0x2000 - 0x2EFF
+
+    pub rdrxctl:                    Volatile<u32>,          // 0x2F00;
+    _padding11:                     [u8; 252],              // 0x2F04 - 0x2FFF
+
+    pub rxctrl:                     Volatile<u32>,          // 0x3000;
+    _padding12:                     [u8; 508],              // 0x3004 - 0x31FF
+
+    pub fcttv:                      RegisterArray4,         // 0x3200 - 0x320F, +4*n with n=0..3
+    _padding13:                     [u8; 16],               // 0x3210 - 0x321F
+
+    pub fcrtl:                      RegisterArray8,         // 0x3220 - 0x323F, +4*n with n=0..7
+    _padding14:                     [u8; 32],               // 0x3240 - 0x325F 
+
+    pub fcrth:                      RegisterArray8,         // 0x3260 - 0x327F, +4*n with n=0..7
+    _padding15:                     [u8; 32],               // 0x3280 - 0x329F
+
+    pub fcrtv:                      Volatile<u32>,          // 0x32A0;
+    _padding16:                     [u8; 2652],             // 0x32A4 - 0x3CFF
+
+    pub fccfg:                      Volatile<u32>,          // 0x3D00;
+    _padding17:                     [u8; 1340],             // 0x3D04 - 0x423F
+
+    pub hlreg0:                     Volatile<u32>,          // 0x4240;
+    _padding18:                     [u8; 92],               // 0x4244 - 0x429F
+
+    pub autoc:                      Volatile<u32>,          // 0x42A0;
+
+    pub links:                      Volatile<u32>,          // 0x42A4;
+
+    pub autoc2:                     Volatile<u32>,          // 0x42A8;
+    _padding19:                     [u8; 1620],             // 0x42AC - 0x48FF
+
+    pub rttdcs:                     Volatile<u32>,          // 0x4900;
+    _padding20:                     [u8; 380],              // 0x4904 - 0x4A7F
+
+    pub dmatxctl:                   Volatile<u32>,          // 0x4A80;
+    _padding21:                     [u8; 4],                // 0x4A84 - 0x4A87
+    
+    pub dtxtcpflgl:                 Volatile<u32>,          // 0x4A88;
+    
+    pub dtxtcpflgh:                 Volatile<u32>,          // 0x4A8C;
+    _padding22:                     [u8; 1520],             // 0x4A90 - 0x507F
+
+    pub fctrl:                      Volatile<u32>,          // 0x5080;
+    _padding23:                     [u8; 164],              // 0x5084 - 0x5127
+
+    pub etqf:                       RegisterArray8,         // 0x5128 - 0x5147;
+    _padding24:                     [u8; 3768],             // 0x5148 - 0x5FFF
+
+    pub tx_regs:                    RegisterArrayTx,        // 0x6000 - 0x7FFF, end at 0x40 * 128, 128 queues
+    _padding25:                     [u8; 8704],             // 0x8000 - 0xA1FF
+
+    pub ral:                        Volatile<u32>,          // 0xA200;
+    
+    pub rah:                        Volatile<u32>,          // 0xA204;
+    _padding26:                     [u8; 11768],            // 0xA208 - 0xCFFF
+
+    pub rx_regs2:                   RegisterArrayRx,        // 0xD000 - 0xDFFF, for 64 queues
+    _padding27:                     [u8; 3072],             // 0xE000 - 0xEBFF
+
+    pub etqs:                       RegisterArray8,         // 0xEC00 - 0xEC1F;
+    _padding28:                     [u8; 96],               // 0xEC20 - 0xEC7F
+
+    pub mrqc:                       Volatile<u32>,          // 0xEC80;
+    _padding29:                     [u8; 5008],             // 0xEC84 - 0x10013
+
+    pub eerd:                       Volatile<u32>,          // 0x10014;
+    _padding30:                     [u8; 65512],            // 0x10018 - 0x1FFFF
+} //128 KB
+
+#[repr(C)]
+pub struct RegisterArray4 {
+    pub reg:                            [Volatile<u32>;4],
+}
+
+#[repr(C)]
+pub struct RegisterArray8 {
+    pub reg:                            [Volatile<u32>;8],
+}
+
+#[repr(C)]
+pub struct RegisterArray64 {
+    pub reg:                            [Volatile<u32>;64],
+}
+
+#[repr(C)]
+pub struct RegisterArray24 {
+    pub reg:                           [Volatile<u32>;24],
+}
+
+#[repr(C)]
+pub struct RegisterArray104 {
+    pub reg:                           [Volatile<u32>;104],
+}
+
+//size 0x40
+#[repr(C)]
+pub struct RegistersTx {
+    pub tdbal:                          Volatile<u32>,          // 0x6000
+    pub tdbah:                          Volatile<u32>,          // 0x6004
+    pub tdlen:                          Volatile<u32>,          // 0x6008
+    pub dca_txctrl:                     Volatile<u32>,          // 0x600C
+    pub tdh:                            Volatile<u32>,          // 0x6010
+    _padding0:                      [u8; 4],                // 0x6014 - 0x6017
+    pub tdt:                            Volatile<u32>,          // 0x6018
+    _padding1:                      [u8; 12],               // 0x601C - 0x6027
+    pub txdctl:                         Volatile<u32>,          // 0x6028
+    _padding2:                      [u8; 12],               // 0x602C - 0x6037
+    pub tdwbal:                         Volatile<u32>,          // 0x6038
+    pub tdwbah:                         Volatile<u32>,          // 0x603C
+}
+
+#[repr(C)]
+pub struct RegisterArrayTx {
+    pub tx_queue:                          [RegistersTx; 128],
+}
+
+//size 0x40
+#[repr(C)]
+pub struct RegistersRx {
+    pub rdbal:                          Volatile<u32>,          // 0x1000;
+    pub rdbah:                          Volatile<u32>,          // 0x1004;
+    pub rdlen:                          Volatile<u32>,          // 0x1008;
+    _padding0:                      [u8;4],                 // 0x100C - 0x100F
+    pub rdh:                            Volatile<u32>,          // 0x1010;
+    pub srrctl:                         Volatile<u32>,          // 0x1014; //specify descriptor type
+    pub rdt:                            Volatile<u32>,          // 0x1018;
+    _padding1:                      [u8;12],                // 0x101C - 0x1027
+    pub rxdctl:                         Volatile<u32>,          // 0x1028;
+    _padding2:                      [u8;20],                // 0x102C - 0x103F                                            
+}
+
+#[repr(C)]
+pub struct RegisterArrayRx {
+    pub rx_queue:                          [RegistersRx; 64],
+}
