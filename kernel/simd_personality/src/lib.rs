@@ -68,34 +68,48 @@ extern crate compiler_builtins as _compiler_builtins;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate spawn;
-extern crate task;
 extern crate apic;
+extern crate fs_node;
+extern crate path;
 
 
 use core::ops::DerefMut;
 use alloc::string::String;
-use memory::{get_kernel_mmi_ref, get_module_starting_with};
-use mod_mgmt::{CrateNamespace, get_default_namespace};
+use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
+use fs_node::FileOrDir; 
+use path::Path;
+
+/// By default, the simd namespace base directory will be in ".../namespaces/simd/"
+const DEFAULT_SIMD_NAMESPACE_BASE_DIR: &str = "simd";
 
 
-const SSE_KERNEL_PREFIX: &'static str = "k_sse#";
+/// Initializes the simd personality, with an optional `Path` argument that can be used 
+/// to point the new SIMD `CrateNamespace` to the directory containing the crate object files it should use.
+pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'static str> {
+	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
+	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
 
-
-pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
-	let kernel_mmi_ref = get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
-
-	let backup_namespace = get_default_namespace();
-	let simd_namespace = CrateNamespace::with_name("simd");
+	// The `mod_mgmt::init()` function should have initialized the following directories, 
+	// assuming 'simd' was the prefix used to build the SIMD versions of each crate:
+	//     .../namespaces/simd/
+	//     .../namespaces/simd/kernel
+	//     .../namespaces/simd/application
+	//     .../namespaces/simd/userspace
+	let path = namespace_path.unwrap_or_else(|| Path::new(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR)));
+	let simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR), path)?;
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
-	let compiler_builtins_simd = get_module_starting_with("k_sse#compiler_builtins-").ok_or_else(|| "couldn't get k_sse#compiler_builtins module")?;
-	let core_lib_simd = get_module_starting_with("k_sse#core-").ok_or_else(|| "couldn't get k_sse#core module")?;
-	let new_modules = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_kernel_crates(new_modules.into_iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
+		.ok_or_else(|| "couldn't get compiler_builtins object file in simd_personality")?;
+	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
+		.ok_or_else(|| "couldn't get core object file in simd_personality")?;
+	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
+	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 
-	let simd_test_module = get_module_starting_with("k_sse#simd_test-").ok_or_else(|| "couldn't get k_sse#simd_test module")?;
-	simd_namespace.load_kernel_crate(simd_test_module, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
+		.ok_or_else(|| "couldn't get simd_test object file in simd_personality")?;
+	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 
 	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
 	

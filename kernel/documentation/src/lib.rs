@@ -28,10 +28,11 @@
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
-//! * `driver_init`: Code for handling the sequence required to initialize each driver.
+//! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
+//! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 
 //! * `ioapic`: IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus.
@@ -42,10 +43,12 @@
 //! * `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
 //! * `panic_unwind`: Default entry point for panics and unwinding, as required by the Rust compiler.
 //! * `panic_wrapper`: Wrapper functions for handling and propagating panics.
+//! * `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct 
 //! * `pci`: Basic PCI support for Theseus, x86 only.
 //! * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 //! * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
 //! * `ps2`: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).
+//! * `root`: special implementation of the root directory; initializes the root of the filesystem
 //! * `rtc`: simple driver for handling the Real Time Clock chip.
 //! * `scheduler`: The scheduler and runqueue management.
 //! * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
@@ -55,6 +58,7 @@
 //! * `text_display` : Defines a trait for anything that can display text to the screen
 //! * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
+//! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //!
 

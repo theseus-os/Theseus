@@ -7,16 +7,17 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
+# multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
+multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 rustc-demangle = "0.1.9"
-hashmap_core = "0.1.9"
 qp-trie = "0.7.3"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -42,6 +43,21 @@ version = "0.3.7"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.memfs]
+path = "../memfs"
 
 [lib]
 crate-type = ["rlib"]

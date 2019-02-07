@@ -1,0 +1,9 @@
+[package]
+name = "environment"
+version = "0.1.0"
+authors = ["christinewang5 <chrissywang54@gmail.com>"]
+
+[dependencies]
+
+[dependencies.fs_node]
+path = "../fs_node"

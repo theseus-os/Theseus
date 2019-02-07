@@ -1,0 +1,16 @@
+[package]
+name = "pwd"
+version = "0.1.0"
+authors = ["Christine Wang <chrissywang54@gmail.com>"]
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"

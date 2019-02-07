@@ -7,8 +7,8 @@ build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+spin = "0.4.10"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
 
 [dependencies.log]
 default-features = false
@@ -36,6 +36,24 @@ path = "../mod_mgmt"
 [dependencies.context_switch]
 path = "../context_switch"
 
+
+[dependencies.environment]
+path = "../environment"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
+
+[dependencies.memfs]
+path = "../memfs"
 
 [lib]
 crate-type = ["rlib"]

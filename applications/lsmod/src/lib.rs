@@ -34,18 +34,28 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
+    let namespace = match mod_mgmt::get_default_namespace() {
+        Some(n) => n,
+        _ => {
+            println!("Error: unable to get default CrateNamespace"); 
+            return -1;
+        }
+    };
     let mut out = String::new();
 
     if matches.opt_present("a") {
-        for m in memory::module_iterator() {
-            out.push_str(&format!("{}, {:#X} -- {:#X} ({:#X} bytes)\n", 
-                m.name(), m.start_address(), m.start_address() + m.size(), m.size())
-            );
+        out.push_str("==== Kernel Crate Files ====\n");
+        for f in namespace.kernel_directory().lock().list_children() {
+            out.push_str(&format!("{}\n", f)); 
+        }
+        out.push_str("\n==== Application Crate Files ====\n");
+        for f in namespace.application_directory().lock().list_children() {
+            out.push_str(&format!("{}\n", f)); 
         }
     }
     else {
-        for n in mod_mgmt::get_default_namespace().crate_names() {
-            out.push_str(&format!("{}\n", n));
+        for n in namespace.crate_names() {
+            out.push_str(&format!("{}\t\t{:?}\n", n, namespace.get_crate(&n).map(|c| c.lock_as_ref().object_file_abs_path.clone())));
         }
     }
     println!("{}", out);

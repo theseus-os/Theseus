@@ -296,6 +296,17 @@ pub struct MappedPages {
 }
 
 impl MappedPages {
+    /// Returns an empty MappedPages object that performs no allocation or mapping actions. 
+    /// Can be used as a placeholder, but will not permit any real usage. 
+    pub fn empty() -> MappedPages {
+        MappedPages {
+            page_table_p4: get_current_p4(),
+            pages: PageIter::empty(),
+            allocated: None,
+            flags: Default::default(),
+        }
+    }
+
 	/// Returns the start address of the first page. 
     #[deprecated]
 	pub fn start_address(&self) -> VirtualAddress {
@@ -506,6 +517,8 @@ impl MappedPages {
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
+        if self.size_in_pages() == 0 { return Ok(()); }
+
         if new_flags == self.flags {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
@@ -549,6 +562,8 @@ impl MappedPages {
     fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
+        if self.size_in_pages() == 0 { return Ok(()); }
+
         let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
         let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
             Vec::with_capacity(self.size_in_pages())
@@ -829,6 +844,8 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
+        if self.size_in_pages() == 0 { return; }
+        
         // skip logging temp page unmapping, since it's the most common
         if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
             trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
@@ -839,9 +856,9 @@ impl Drop for MappedPages {
         
         let mut mapper = Mapper::new();
         if mapper.target_p4 != self.page_table_p4 {
-            error!("BUG: MappedPages::drop(): current P4 {:?} must equal original P4 {:?}, \
+            error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
                 cannot unmap MappedPages from a different page table than they were originally mapped to!",
-                get_current_p4(), self.page_table_p4
+                self, get_current_p4(), self.page_table_p4
             );
             return;
         }   
