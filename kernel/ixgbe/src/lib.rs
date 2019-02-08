@@ -51,7 +51,7 @@ use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer
 use owning_ref::BoxRefMut;
 
 //parameter that determine size of tx and rx descriptor queues
-const IXGBE_NUM_RX_DESC:        usize = 8;
+const IXGBE_NUM_RX_DESC:        usize = 1024;
 const IXGBE_NUM_TX_DESC:        usize = 8;
 
 // const SIZE_RX_DESC:       usize = 16;
@@ -61,7 +61,7 @@ const IXGBE_RX_BUFFER_SIZE_IN_BYTES:     u16 = 8192;
 const IXGBE_RX_HEADER_SIZE_IN_BYTES:     usize = 0;
 const IXGBE_TX_BUFFER_SIZE_IN_BYTES:     usize = 256;
 
-const IXGBE_NUM_RX_QUEUES:       usize = 1;
+const IXGBE_NUM_RX_QUEUES:       usize = 2;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -223,6 +223,8 @@ impl IxgbeNic{
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
 
+        Self::set_rss(&mut mapped_registers);
+
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
             io_base: io_base,
@@ -281,7 +283,7 @@ impl IxgbeNic{
 
         // set up virtual pages and physical frames to be mapped
         let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = Frame::range_inclusive_addr(mem_base, mem_size_in_bytes);
+        let frames_nic = Frame::range_inclusive_addr(mem_base, (mem_size_in_bytes - PAGE_SIZE + 1));
         let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
 
         debug!("Ixgbe: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
@@ -839,13 +841,12 @@ pub fn rx_poll_mq(_: Option<u64>) -> Result<(), &'static str> {
     loop {
         let mut nic = IXGBE_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
 
-        // for queue in 0..IXGBE_NUM_RX_QUEUES{
-        //     let mut a = AdvancedReceiveDescriptorWB:: from(nic.rx_descs[queue][nic.rx_cur[queue] as usize]);
-        //     if (a.get_ext_status()&0x1) != 0 {    
-        //             debug!("Packet received in QUEUE{}!", queue);
-        //             let _ = nic.handle_receive(queue);                    
-        //     }       
-        // }        
+        for queue in 0..IXGBE_NUM_RX_QUEUES {
+            if ((nic.rx_descs[queue][nic.rx_cur[queue] as usize]).get_ext_status()&0x1) != 0 {    
+                    debug!("Packet received in QUEUE{}!", queue);
+                    let _ = nic.handle_receive(queue);                    
+            }       
+        }        
                 
     }
     
