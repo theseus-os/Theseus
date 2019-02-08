@@ -4,7 +4,6 @@
 #![no_std]
 #![feature(asm, naked_functions)]
 
-
 /// The registers saved before a context switch and restored after a context switch.
 #[repr(C, packed)]
 pub struct ContextRegular {
@@ -74,6 +73,30 @@ macro_rules! switch_stacks {
     );
 }
 
+#[macro_export]
+macro_rules! switch_stacks_ignore_prev {
+    () => (
+        asm!("
+            # switch the stack pointers
+            mov rsp, rsi
+            "
+            : : : "memory" : "intel", "volatile"
+        );
+    );
+}
+
+#[macro_export]
+macro_rules! drop_rdi {
+    ($T:ty) => (
+        let tld: $T;
+        asm!("
+            mov $0, rdi;"
+            : "=r"(tld) :
+            : "memory" : "intel", "volatile"
+        );
+    );
+}
+
 
 /// An assembly macro for saving regular x86_64 registers.
 /// by pushing them onto the stack.
@@ -115,4 +138,17 @@ pub unsafe fn context_switch_regular() {
     save_registers_regular!();
     switch_stacks!();
     restore_registers_regular!();
+}
+
+
+#[naked]
+#[inline(never)]
+pub unsafe fn context_switch_regular_with_dead_prev<T>() {
+    // Since this is a naked function that expects its arguments in two registers,
+    // you CANNOT place any log statements or other instructions here,
+    // or at any point before, in between, or after the following macros.
+
+    switch_stacks_ignore_prev!();
+    restore_registers_regular!();
+    drop_rdi!(T);
 }

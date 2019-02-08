@@ -42,6 +42,19 @@ cfg_if! {
             restore_registers_regular!();
         }
 
+        #[naked]
+        #[inline(never)]
+        pub unsafe fn context_switch_regular_to_sse_with_dead_prev<T>() {
+            // Since this is a naked function that expects its arguments in two registers,
+            // you CANNOT place any log statements or other instructions here,
+            // or at any point before, in between, or after the following macros.
+
+            switch_stacks_ignore_prev!();
+            restore_registers_sse!();
+            restore_registers_regular!();
+            drop_rdi!(T);
+        }
+
 
         /// Switches context from an SSE Task to a regular Task.
         /// 
@@ -65,6 +78,18 @@ cfg_if! {
             switch_stacks!();
             restore_registers_regular!();
         }
+
+        #[naked]
+        #[inline(never)]
+        pub unsafe fn context_switch_sse_to_regular_with_dead_prev<T>() {
+            // Since this is a naked function that expects its arguments in two registers,
+            // you CANNOT place any log statements or other instructions here,
+            // or at any point before, in between, or after the following macros.
+
+            switch_stacks_ignore_prev!();
+            restore_registers_regular!();
+            drop_rdi!(T);
+        }
     }
 
     else if #[cfg(target_feature = "sse2")] {
@@ -73,6 +98,7 @@ cfg_if! {
 
         pub use context_switch_sse::ContextSSE as Context;
         pub use context_switch_sse::context_switch_sse as context_switch;
+        pub use context_switch_sse::context_switch_sse_with_dead_prev as context_switch_with_dead_prev;
     }
     
     else {
@@ -81,6 +107,7 @@ cfg_if! {
 
         pub use context_switch_regular::ContextRegular as Context;
         pub use context_switch_regular::context_switch_regular as context_switch;
+        pub use context_switch_regular::context_switch_regular_with_dead_prev as context_switch_with_dead_prev;
     }
 }
 

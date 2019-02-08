@@ -52,7 +52,7 @@ pub fn schedule() -> bool {
     // same scoping reasons as above: to release the lock around current_task
     {
         current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-                                            .lock_mut().deref_mut() as *mut Task; 
+                                            .lock_mut().deref_mut() as *mut Task;
     }
 
     if current_task == next_task {
@@ -65,7 +65,7 @@ pub fn schedule() -> bool {
 
     // trace!("BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}", apic_id, curr, next, irq_safety::interrupts_enabled());
 
-    curr.task_switch(next, apic_id); 
+    curr.task_switch(next, apic_id);
 
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());

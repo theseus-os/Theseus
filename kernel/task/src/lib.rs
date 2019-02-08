@@ -60,6 +60,7 @@ use core::panic::PanicInfo;
 use alloc::string::String;
 use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
+use alloc::collections::BTreeMap;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
@@ -111,17 +112,29 @@ lazy_static! {
 
 lazy_static! {
     /// The list of all Tasks in the system.
-    pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
+    pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
 // Variable to initialize the taskfs
 static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
-pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
-    TASKLIST.get(&task_id)
+pub fn get_task(task_id: usize) -> Option<TaskRef> {
+    TASKLIST.lock().get(&task_id).cloned()
 }
 
+/// removes Task TaskRef from the `TASKLIST` using `task_id`.
+/// It disconnects the link `Task` -> `TaskRef` so that `Task` can be dropped.
+fn remove_task(task: &mut Task) -> Result<(), &'static str> {
+    match task.runstate {   // sanity check
+        RunState::Exited(_) => {}
+        _ => { return Err("the task in not in the Exited state"); }
+    }
+
+    TASKLIST.lock().remove(&task.id).expect("couldn't remove the specified task from TASKLIST");
+
+    Ok(())
+}
 
 /// Sets the panic handler function for the current `Task`
 pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
@@ -472,18 +485,35 @@ impl Task {
         my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
         
+        // When a task exits, `schedule()` is called with IRQ disabled.
+        // So, we don't need to add the `RunState::Reaped` arm?
+        let is_prev_exited = match self.runstate {
+            RunState::Exited(_) | RunState::Reaped => {true}
+            _ => {false}
+        };
 
         /// A private macro that actually calls the given context switch routine
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
         macro_rules! call_context_switch {
-            ($func:expr) => (
-                asm!("
-                    mov rdi, $0; \
-                    mov rsi, $1;" 
-                    : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                    : "memory" : "intel", "volatile"
-                );
-                $func();
+            ($func:path, $func_dead_prev:expr) => (
+                if is_prev_exited { // when the prev task is exited.
+                    // rdi is used for TLD
+                    asm!("
+                        mov rdi, $0; \
+                        mov rsi, $1;"
+                        : : "r"(Box::from_raw(self.task_local_data_ptr as *mut TaskLocalData)), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    $func_dead_prev();
+                } else {
+                    asm!("
+                        mov rdi, $0; \
+                        mov rsi, $1;"
+                        : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
+                        : "memory" : "intel", "volatile"
+                    );
+                    $func();
+                }
             );
         }
 
@@ -497,28 +527,32 @@ impl Task {
                 (false, false) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
-                        call_context_switch!(context_switch::context_switch_regular);
+                        call_context_switch!(context_switch::context_switch_regular,
+                                             context_switch::context_switch_regular_with_dead_prev::<Box<TaskLocalData>>);
                     }
                 }
 
                 (false, true)  => {
                     // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
                     unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_sse);
+                        call_context_switch!(context_switch::context_switch_regular_to_sse,
+                                             context_switch::context_switch_regular_to_sse_with_dead_prev::<Box<TaskLocalData>>);
                     }
                 }
                 
                 (true, false)  => {
                     // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_regular);
+                        call_context_switch!(context_switch::context_switch_sse_to_regular,
+                                             context_switch::context_switch_sse_to_regular_with_dead_prev::<Box<TaskLocalData>>);
                     }
                 }
 
                 (true, true)   => {
                     // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
                     unsafe {
-                        call_context_switch!(context_switch::context_switch_sse);
+                        call_context_switch!(context_switch::context_switch_sse,
+                                             context_switch::context_switch_sse_with_dead_prev::<Box<TaskLocalData>>);
                     }
                 }
             }
@@ -526,7 +560,8 @@ impl Task {
         #[cfg(not(simd_personality))]
         {
             unsafe {
-                call_context_switch!(context_switch::context_switch);
+                call_context_switch!(context_switch::context_switch,
+                                     context_switch::context_switch_with_dead_prev::<Box<TaskLocalData>>);
             }
         }
     }
@@ -618,6 +653,7 @@ impl TaskRef {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
+            remove_task(&mut task)?;    // removes from TASKLIST
         }
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -786,7 +822,7 @@ pub fn create_idle_task(
     }
 
     // insert the new task into the task list
-    let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
+    let old_task = TASKLIST.lock().insert(idle_task_id, task_ref.clone());
     if old_task.is_some() {
         error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
             idle_task_id, apic_id);

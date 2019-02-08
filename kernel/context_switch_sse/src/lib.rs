@@ -146,3 +146,16 @@ pub unsafe fn context_switch_sse() {
     restore_registers_sse!();
     restore_registers_regular!();
 }
+
+#[naked]
+#[inline(never)]
+pub unsafe fn context_switch_sse_with_dead_prev<T>() {
+    // Since this is a naked function that expects its arguments in two registers,
+    // you CANNOT place any log statements or other instructions here,
+    // or at any point before, in between, or after the following macros.
+
+    switch_stacks_ignore_prev!();
+    restore_registers_sse!();
+    restore_registers_regular!();
+    drop_rdi!(T);
+}
