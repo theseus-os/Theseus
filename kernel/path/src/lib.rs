@@ -162,12 +162,14 @@ impl Path {
         Some(Path::new(new_path))
     }
     
-    /// Returns a boolean indicating whether path contains root
-    fn has_root(&self) -> bool {
-        self.path.starts_with("/")
+    /// Returns a boolean indicating whether this Path is absolute,
+    /// i.e., whether it starts with the root directory.
+    pub fn is_absolute(&self) -> bool {
+        self.path.starts_with(PATH_DELIMITER)
     }
 
-    /// Gets the reference to the directory specified by the path given the current working directory 
+    /// Returns the file or directory specified by the given path, 
+    /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         
@@ -181,7 +183,7 @@ impl Path {
         };
 
         let mut curr_dir = {
-            if self.has_root() {
+            if self.is_absolute() {
                 Arc::clone(root::get_root())
             }
             else {
@@ -217,36 +219,13 @@ impl Path {
     }
 
 
-    pub fn get_helper(parent_dir: DirRef, mut path_components: Vec<&str>) -> Result<FileOrDir, &'static str> {
-        if path_components.len() > 1 {
-            let child_dir;
-            {
-            let curr_node_name = path_components.get(0).ok_or("could not get path name")?; 
-            child_dir = match parent_dir.lock().get_child(curr_node_name) {
-                Some(FileOrDir::File(f)) => return Err("intermediate path component should not be a file"),
-                Some(FileOrDir::Dir(d)) => d,
-                None => return Err("directory not found"),
-            };
-            }
-            let _cpmnt = path_components.remove(0); // we don't care about the element we just removed
-            return Self::get_helper(child_dir, path_components);
-        } else { // we've reached the end of the path
-            let curr_node_name = path_components.get(0).ok_or("could not get path name")?;
-            match parent_dir.lock().get_child(curr_node_name) {
-                Some(FileOrDir::File(f)) => Ok(FileOrDir::File(f)),
-                Some(FileOrDir::Dir(d)) => Ok(FileOrDir::Dir(d)),
-                None => return Err("file or directory not found"),
-            }
+    /// Returns the file or directory specified by the given absolute path
+    pub fn get_absolute(path: &Path) -> Result<FileOrDir, &'static str> {
+        if path.is_absolute() {
+            path.get(root::get_root())
+        } else {
+            Err("given path was not absolute")
         }
-    }
-
-    pub fn get_from_root(path: Path) -> Result<FileOrDir, &'static str> {
-        let mut components = Vec::new();
-        if !path.has_root() {
-            return Err("Path does not start from root");
-        }
-        components.extend(path.components());
-        Self::get_helper(Arc::clone(root::get_root()), components)
     }
 }
 

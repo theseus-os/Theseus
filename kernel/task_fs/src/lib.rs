@@ -279,7 +279,7 @@ impl FsNode for TaskFile {
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
         let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
-        let dir = match Path::get_from_root(path)? {
+        let dir = match Path::get_absolute(&path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
         };
@@ -370,7 +370,7 @@ impl FsNode for MmiDir {
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
         let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
-        let dir = match Path::get_from_root(path)? {
+        let dir = match Path::get_absolute(&path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
         };
@@ -421,7 +421,7 @@ impl FsNode for MmiFile {
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
         let path = Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
-        let dir = match Path::get_from_root(path)? {
+        let dir = match Path::get_absolute(&path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
         };
