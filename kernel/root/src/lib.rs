@@ -19,7 +19,7 @@ use alloc::collections::BTreeMap;
 use fs_node::{DirRef, Directory, FileOrDir, FsNode};
 
 
-pub const ROOT_DIRECTORY_NAME: &'static str = "/root";
+pub const ROOT_DIRECTORY_NAME: &'static str = "";
 
 lazy_static! {
     /// The root directory
@@ -31,14 +31,7 @@ lazy_static! {
         };
 
         let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
-        
-        // let test_string = String::from("Testing write function");
-        // let mut test_bytes =  test_string.as_bytes().to_vec();
-        // let memFile = memfs::MemFile::new(String::from("testfile"), &strong_root).unwrap();
-        // memFile.lock().write(&test_bytes).ok();
-        
-        
-
+    
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 
     };
@@ -89,11 +82,11 @@ impl Directory for RootDirectory {
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        ROOT_DIRECTORY_NAME.to_string()
+        format!("{}/", ROOT_DIRECTORY_NAME.to_string()).to_string()
     }
 
     fn get_name(&self) -> String {
-        self.name.clone()
+        ROOT_DIRECTORY_NAME.to_string()
     }
 
     /// Returns a pointer to the parent if it exists

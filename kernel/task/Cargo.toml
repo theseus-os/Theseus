@@ -36,24 +36,11 @@ path = "../mod_mgmt"
 [dependencies.context_switch]
 path = "../context_switch"
 
-
 [dependencies.environment]
 path = "../environment"
 
 [dependencies.root]
 path = "../root"
-
-[dependencies.fs_node]
-path = "../fs_node"
-
-[dependencies.path]
-path = "../path"
-
-[dependencies.vfs_node]
-path = "../vfs_node"
-
-[dependencies.memfs]
-path = "../memfs"
 
 
 [lib]
