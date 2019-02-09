@@ -91,6 +91,9 @@ impl Path {
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
     fn canonicalize(&self, current_path: &Path) -> Path {
+        debug!("SELF PATH BEFORE CANONICALIZATION: {}", self.path);
+        debug!("ARG PATH BEFORE CANONICALIZATION: {}", current_path.path);
+
         let mut new_components = Vec::new();
         // Push the components of the working directory to the components of the new path
         new_components.extend(current_path.components());
@@ -116,6 +119,7 @@ impl Path {
                 new_path.push_str(&format!("/{}",  component));
             }
         }
+        debug!("NEW PATH IS {}", new_path);
         Path::new(new_path)
     }
     
@@ -155,7 +159,7 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-            new_path.push_str(&format!("{}/",  component));
+                new_path.push_str(&format!("{}/",  component));
         }
         // Remove the trailing slash after the final path component
         new_path.pop();
@@ -171,17 +175,8 @@ impl Path {
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
+        let shortest_path = Path::new(self.path.clone());
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
-        
-        // Get the shortest path from self to working directory 
-        let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
-            Some(dir) => dir, 
-            None => {
-                error!("cannot canonicalize path {}", current_path.path); 
-                return Err("couldn't canonicalize path");
-            }
-        };
-
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())

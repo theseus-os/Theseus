@@ -20,6 +20,7 @@ use fs_node::{DirRef, Directory, FileOrDir, FsNode};
 
 
 pub const ROOT_DIRECTORY_NAME: &'static str = "";
+pub const ROOT_PARENT_GET_ERROR: &'static str = "root does not have a parent";
 
 lazy_static! {
     /// The root directory
@@ -89,8 +90,8 @@ impl FsNode for RootDirectory {
         ROOT_DIRECTORY_NAME.to_string()
     }
 
-    /// Returns a pointer to the parent if it exists
+    /// we just return the root itself because it is the top of the filesystem
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        return Err("root does not have a parent");
+        return Ok(get_root().clone());
     }
 }
