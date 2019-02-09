@@ -48,6 +48,8 @@ use path::Path;
 
 /// The name of the VFS directory that exposes task info in the root. 
 pub const TASKS_DIRECTORY_NAME: &str = "tasks";
+/// The absolute path of the tasks directory, which is currently below the root
+pub const TASKS_DIRECTORY_PATH: &str = "/tasks"; 
 
 
 /// Initializes the task subfilesystem by creating a directory called task and by creating a file for each task
@@ -174,7 +176,7 @@ impl TaskDir {
         let task_id = taskref.lock().id.clone();
         let directory = TaskDir {
             name: name,
-            path: Path::new(format!("{}/{}", TASKS_DIRECTORY_NAME, task_id)),
+            path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
             taskref: taskref,
             parent: Arc::clone(parent),
         };
@@ -236,7 +238,7 @@ impl TaskFile {
         let task_id = task.lock().id.clone();
         TaskFile {
             taskref: task,
-            path: Path::new(format!("/{}/{}/task_info", TASKS_DIRECTORY_NAME, task_id)), 
+            path: Path::new(format!("{}/{}/task_info", TASKS_DIRECTORY_PATH, task_id)), 
         }
     }
 
@@ -276,7 +278,7 @@ impl FsNode for TaskFile {
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
-        let path = Path::new(format!("/{}/{}", TASKS_DIRECTORY_NAME, self.taskref.lock().id.clone()));
+        let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
         let dir = match Path::get_from_root(path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
@@ -330,7 +332,7 @@ impl MmiDir {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let task_id = taskref.lock().id.clone();
         MmiDir {
-            path: Path::new(format!("//{}/{}/mmi", TASKS_DIRECTORY_NAME, task_id)),
+            path: Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, task_id)),
             taskref: taskref,
         }
     }
@@ -367,7 +369,7 @@ impl FsNode for MmiDir {
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
-        let path = Path::new(format!("/{}/{}", TASKS_DIRECTORY_NAME, self.taskref.lock().id.clone()));
+        let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
         let dir = match Path::get_from_root(path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
@@ -390,7 +392,7 @@ impl MmiFile {
         let task_id = task.lock().id.clone();
         MmiFile {
             taskref: task,
-            path: Path::new(format!("/{}/{}/mmi/MmiInfo", TASKS_DIRECTORY_NAME, task_id)), 
+            path: Path::new(format!("{}/{}/mmi/MmiInfo", TASKS_DIRECTORY_PATH, task_id)), 
         }
     }
 
@@ -418,7 +420,7 @@ impl FsNode for MmiFile {
     /// Returns a pointer to the parent if it exists
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
         // parse from root 
-        let path = Path::new(format!("/{}/{}/mmi", TASKS_DIRECTORY_NAME, self.taskref.lock().id.clone()));
+        let path = Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, self.taskref.lock().id.clone()));
         let dir = match Path::get_from_root(path)? {
             FileOrDir::File(f) => return Err("parent cannot be a file"),
             FileOrDir::Dir(d) => d,
