@@ -25,7 +25,7 @@ pub fn main(args: Vec<String>) -> isize {
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
-            println!("{} \n", _f);
+            println!("{}", _f);
             return -1; 
         }
     };
@@ -48,7 +48,7 @@ pub fn main(args: Vec<String>) -> isize {
                 }
             }, 
             _ => { 
-                println!("Invalid argument {}, not a valid task ID (usize)\n", task_id_str); 
+                println!("Invalid argument {}, not a valid task ID (usize)", task_id_str); 
                 return -1;
             },
         };   
@@ -63,7 +63,7 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
             .and_then(|_| RunQueue::remove_task_from_all(&task_ref))
             .is_ok() 
         {
-            println!("Killed task {}\n", &*task_ref.lock());
+            println!("Killed task {}", &*task_ref.lock());
             if reap {
                 match task_ref.take_exit_value() {
                     Some(exit_val) => { 
@@ -95,19 +95,19 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
             }
             else {
                 // failed to kill the task, no reap request, so return failure.
-                Err(format!("Failed to kill task {}, it was already exited.\n", task_id))
+                Err(format!("Failed to kill task {}, it was already exited.", task_id))
             }
         }
     }
     else {
-        Err(format!("Task ID {} does not exist\n", task_id))
+        Err(format!("Task ID {} does not exist", task_id))
     }
 }
 
 
 fn print_usage(opts: Options) -> isize {
     let brief = format!("Usage: kill [OPTS] TASK_ID");
-    println!("{} \n", opts.usage(&brief));
+    println!("{}", opts.usage(&brief));
     0
 }
 
