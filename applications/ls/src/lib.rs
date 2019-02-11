@@ -12,7 +12,7 @@ extern crate path;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
-use fs_node::FileOrDir;
+use fs_node::{FileOrDir, DirRef};
 use getopts::Options;
 use path::Path;
 use alloc::sync::Arc;
@@ -46,14 +46,9 @@ pub fn main(args: Vec<String>) -> isize {
         Arc::clone(&curr_env.working_dir)
     };
     
+    // print children of working directory if no child is specified
     if matches.free.is_empty() {
-        let mut child_string = String::new();
-        let mut child_list = curr_wd.lock().list_children(); 
-        child_list.reverse();
-        for child in child_list.iter() {
-            child_string.push_str(&format!("{}\n", child));
-        }
-        println!("{}", child_string);
+        print_children(&curr_wd);
         return 0;
     }
 
@@ -64,13 +59,8 @@ pub fn main(args: Vec<String>) -> isize {
         Ok(file_dir_enum) => {
             match file_dir_enum {
                 FileOrDir::Dir(dir) => {
-                    let mut child_string = String::new();
-                    let mut child_list = dir.lock().list_children(); 
-                    child_list.reverse();
-                    for child in child_list.iter() {
-                        child_string.push_str(&format!("{}\n", child));
-                    }
-                    println!("{}", child_string);
+                    print_children(&dir);
+                    return 0;
                 },
                 FileOrDir::File(file) => {
                     println!("'{}' is not a directory.", file.lock().get_name());
@@ -83,8 +73,16 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    
-    return 0;
+}
+
+fn print_children(dir: &DirRef) {
+    let mut child_string = String::new();
+    let mut child_list = dir.lock().list_children(); 
+    child_list.reverse();
+    for child in child_list.iter() {
+        child_string.push_str(&format!("{}\n", child));
+    }
+    println!("{}", child_string);
 }
 
 fn print_usage(opts: Options) {
