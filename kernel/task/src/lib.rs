@@ -855,11 +855,11 @@ pub fn create_idle_task(
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
 
-    // // one-time initialization of the taskfs
-    // match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
-    //     Ok(()) => (),
-    //     Err(err) => return Err(err)
-    // };
+    // one-time initialization of the taskfs
+    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
+        Ok(()) => (),
+        Err(err) => return Err(err)
+    };
     
     Ok(task_ref)
 }

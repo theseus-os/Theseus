@@ -219,7 +219,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             .spawn()?;
     }
 
-
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
