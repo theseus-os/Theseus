@@ -123,25 +123,6 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
     TASKLIST.lock().get(&task_id).cloned()
 }
 
-/// removes Task TaskRef from the `TASKLIST` using `task_id`.
-/// It disconnects the link `Task` -> `TaskRef` so that `Task` can be dropped.
-fn remove_task(task: &mut Task) -> Result<(), &'static str> {
-    match task.runstate {   // sanity check
-        RunState::Exited(_) => {}
-        _ => { return Err("the task in not in the Exited state"); }
-    }
-
-    if let Some(taskref) = TASKLIST.lock().remove(&task.id) {
-        unsafe {
-            // just to need to consume and drop
-            Box::from_raw(task.task_local_data_ptr as *mut TaskLocalData);
-        }
-        task.task_local_data_ptr = 0;
-        return Ok(());
-    }
-
-    Err("couldn't remove the specified task from TASKLIST")
-}
 
 /// Sets the panic handler function for the current `Task`
 pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
@@ -168,8 +149,8 @@ pub enum KillReason {
 }
 
 
-#[derive(Debug)]
 /// The list of ways that a Task can exit, including possible return values and conditions.
+#[derive(Debug)]
 pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
@@ -224,8 +205,8 @@ pub struct Task {
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// the virtual address of the `TaskLocalData` struct that points back to this `Task` struct.
-    pub task_local_data_ptr: VirtualAddress,
+    /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
+    task_local_data_ptr: VirtualAddress,
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
     pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
@@ -322,6 +303,15 @@ impl Task {
         }
     }
 
+    /// Returns true if this `Task` has been exited, i.e.,
+    /// if its RunState is either `Exited` or `Reaped`.
+    pub fn has_exited(&self) -> bool {
+        match self.runstate {
+            RunState::Exited(_) | RunState::Reaped => true,
+            _ => false,
+        }
+    }
+
     /// Returns true if this is an application `Task`.
     pub fn is_application(&self) -> bool {
         self.app_crate.is_some()
@@ -368,10 +358,12 @@ impl Task {
         }
 
         let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
+        TASKLIST.lock().remove(&self.id);
         if let RunState::Exited(exit_value) = exited {
             Some(exit_value)
         } 
         else {
+            error!("BUG: Task::take_exit_value(): task {} runstate was Exited but couldn't get exit value.", self);
             None
         }
     }
@@ -383,6 +375,16 @@ impl Task {
     fn set_as_current_task(&self) {
         unsafe {
             wrmsr(IA32_FS_BASE, self.task_local_data_ptr as u64);
+        }
+    }
+
+    /// Removes and drops this `Task`'s `TaskLocalData` cyclical task reference,
+    /// which should only be done once the Task will never ever be used again. 
+    fn drop_task_local_data(&mut self) {
+        // sanity check to ensure we haven't dropped this Task's TaskLocalData twice.
+        if self.task_local_data_ptr != 0 {
+            let _ = unsafe { Box::from_raw(self.task_local_data_ptr as *mut TaskLocalData) };
+            self.task_local_data_ptr = 0;
         }
     }
 
@@ -488,6 +490,11 @@ impl Task {
         // update the current task to `next`
         next.set_as_current_task();
 
+        // if the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData
+        if self.has_exited() {
+            self.drop_task_local_data();
+        }
+
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
@@ -508,9 +515,16 @@ impl Task {
         }
 
         // Now it's time to perform the actual context switch.
+        // If `simd_personality` is NOT enabled, then we proceed as normal 
+        // using the singular context_switch routine that matches the actual build target. 
+        #[cfg(not(simd_personality))]
+        {
+            unsafe {
+                call_context_switch!(context_switch::context_switch);
+            }
+        }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-        // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
         #[cfg(simd_personality)]
         {
             match (self.simd, next.simd) {
@@ -543,12 +557,13 @@ impl Task {
                 }
             }
         }
-        #[cfg(not(simd_personality))]
-        {
-            unsafe {
-                call_context_switch!(context_switch::context_switch);
-            }
-        }
+    }
+}
+
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        warn!("\nDROPPING TASK {}\n", self);
     }
 }
 
@@ -615,15 +630,14 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if let RunState::Exited(_) = self.0.lock().runstate {
+            if self.0.lock().has_exited() {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            let t = self.0.lock();
-            if !t.is_running() {
+            if !self.0.lock().is_running() {
                 return Ok(());
             }
         }
@@ -631,6 +645,7 @@ impl TaskRef {
 
 
     /// The internal routine that actually exits or kills a Task.
+    /// It also performs select cleanup routines, e.g., removing the task from the task list.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
             let mut task = self.0.lock();
@@ -638,7 +653,12 @@ impl TaskRef {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
-            remove_task(&mut task)?;    // removes from TASKLIST
+
+            // Corner case: if the task isn't running (as with killed tasks), 
+            // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
+            if !task.is_running() {
+                task.drop_task_local_data();
+            }
         }
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -814,11 +834,11 @@ pub fn create_idle_task(
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
 
-    // one-time initialization of the taskfs
-    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
-        Ok(()) => (),
-        Err(err) => return Err(err)
-    };
+    // // one-time initialization of the taskfs
+    // match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
+    //     Ok(()) => (),
+    //     Err(err) => return Err(err)
+    // };
     
     Ok(task_ref)
 }
@@ -834,6 +854,11 @@ pub fn create_idle_task(
 struct TaskLocalData {
     current_taskref: TaskRef,
     current_task_id: usize,
+}
+impl Drop for TaskLocalData {
+    fn drop(&mut self) {
+        warn!("DROPPING TaskLocalData for task {}: {:?}", self.current_task_id, self.current_taskref);
+    }
 }
 
 
@@ -861,7 +886,7 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
     // };
 }
 
-/// Returns a reference to the current task id by using the `TaskLocalData` pointer
+/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
 /// stored in the FS base MSR register.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)

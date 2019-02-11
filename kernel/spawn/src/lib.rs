@@ -541,28 +541,13 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
 
 
-/// Remove a task from the list.
-///
-/// ## Parameters
-/// - `id`: the TaskId to be removed.
-///
-/// ## Returns
-/// An Option with a reference counter for the removed Task.
-pub fn remove_task(_id: usize) -> Option<TaskRef> {
-    unimplemented!();
-// assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
-    // TASKLIST.remove(id)
-}
-
-
-
 /// The entry point for all new `Task`s that run in kernelspace. This does not return!
 fn task_wrapper<F, A, R>() -> !
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().").clone();
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task()."); //.clone();
     let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
@@ -610,7 +595,7 @@ fn task_wrapper<F, A, R>() -> !
         
         // (1) Put the task into a non-runnable mode (exited), and set its exit value
         if curr_task_ref.exit(Box::new(exit_value)).is_err() {
-            warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+            warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
         }
 
         // (2) Remove it from its runqueue
@@ -623,7 +608,7 @@ fn task_wrapper<F, A, R>() -> !
         }
 
         // (3) Yield the CPU
-        scheduler::schedule_with_curr_task(curr_task_ref);
+        scheduler::schedule();
 
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }

@@ -22,7 +22,7 @@
 #![feature(core_intrinsics)]
 
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 
@@ -219,6 +219,12 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
             .spawn()?;
     }
 
+    for i in 1..10 {
+        spawn::KernelTaskBuilder::new(orphan_task, i)
+            .name(format!("test_orphan{}", i))
+            .spawn()?;
+    }
+
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
     // NOTE: do not put any code below this point, as it should never run
@@ -228,5 +234,17 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     loop { 
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
+    }
+}
+
+
+fn orphan_task(arg: usize) -> () {
+    info!("in orphan_task{}", arg);
+    let mut ctr: usize = 0;
+    loop {
+        ctr += 1;
+        if ctr % 100000000 ==0 { 
+            info!("      orphan_task{}, ctr: {}", arg, ctr);
+        }
     }
 }

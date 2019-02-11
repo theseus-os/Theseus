@@ -16,19 +16,13 @@ use task::{Task, TaskRef, get_my_current_task};
 use runqueue::RunQueue;
 
 
-/// This function performs a task switch.
+/// Yields the current CPU by selecting a new `Task` to run 
+/// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
     disable_interrupts();
 
-    schedule_with_curr_task(get_my_current_task().expect("schedule(): get_my_current_task() failed").clone())
-}
-
-fn consume<T> (_: T) {}
-
-/// This function performs a task switch with a specified task
-pub fn schedule_with_curr_task(taskref: TaskRef) -> bool {
     let current_task: *mut Task;
     let next_task: *mut Task; 
 
@@ -54,17 +48,18 @@ pub fn schedule_with_curr_task(taskref: TaskRef) -> bool {
     }
     
     // same scoping reasons as above: to release the lock around current_task
-    {
+    {   
+        let taskref = get_my_current_task().expect("schedule(): get_my_current_task() failed").clone();
         current_task = taskref.lock_mut().deref_mut() as *mut Task;
     }
-    consume(taskref);   // TODO: better way to consume?
 
     if current_task == next_task {
         // no need to switch if the chosen task is the same as the current task
         return false;
     }
 
-    // we want mutable references to mutable tasks
+    // we want mutable task references without the locks, and we use unsafe code to obtain those references
+    // because the scope-based lock guard won't drop properly after the actual task_switch occurs.
     let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
 
     // trace!("BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}", apic_id, curr, next, irq_safety::interrupts_enabled());
