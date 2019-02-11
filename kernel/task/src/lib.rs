@@ -109,8 +109,6 @@ lazy_static! {
     pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
 }
 
-// // Variable to initialize the taskfs
-// static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
@@ -787,12 +785,6 @@ pub fn create_idle_task(
             idle_task_id, apic_id);
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
-
-    // // one-time initialization of the taskfs
-    // match INIT_TASKFS.call_once(|| fs::task_fs::init()) {
-    //     Ok(()) => (),
-    //     Err(err) => return Err(err)
-    // };
     
     Ok(task_ref)
 }

@@ -20,7 +20,6 @@ use fs_node::{DirRef, Directory, FileOrDir, FsNode};
 
 
 pub const ROOT_DIRECTORY_NAME: &'static str = "";
-pub const ROOT_PARENT_GET_ERROR: &'static str = "root does not have a parent";
 
 lazy_static! {
     /// The root directory
