@@ -659,8 +659,7 @@ impl Terminal {
                     self.input_string.clear();
                     self.buffer_string.clear();
                     self.print_to_terminal("^C\n".to_string())?;
-                    let prompt_string = self.prompt_string.clone();
-                    self.print_to_terminal(prompt_string)?;
+                    self.redisplay_prompt();
                     self.correct_prompt_position = true;
                     self.left_shift = 0;
                     return Ok(());
@@ -717,13 +716,15 @@ impl Terminal {
                         self.current_task_ref = Some(new_task_ref);
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     } Err("Error: no module with this name found!") => {
-                        self.print_to_terminal(format!("\n{}: command not found\n{}",input_string, prompt_string))?;
+                        self.print_to_terminal(format!("\n{}: command not found\n",input_string))?;
+                        self.redisplay_prompt();
                         self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(());
                     } Err(&_) => {
-                        self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
+                        self.print_to_terminal("\nrunning command on new thread failed\n".to_string())?;
+                        self.redisplay_prompt();
                         self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
