@@ -9,38 +9,37 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
-extern crate e1000;
-extern crate e1000_smoltcp_device;
-extern crate network_interface_card;
-extern crate spin;
-extern crate dfqueue;
-extern crate irq_safety;
+extern crate network_manager;
 extern crate acpi;
-extern crate memory;
 extern crate owning_ref;
 extern crate spawn;
 extern crate task;
-extern crate httparse;
+extern crate sha3;
+extern crate percent_encoding;
+extern crate rand;
+#[macro_use] extern crate http_client;
 
 
-use core::convert::TryInto;
 use core::str;
-use core::fmt::Write;
-use alloc::vec::Vec;
-use alloc::borrow::ToOwned;
-use alloc::string::String;
-use alloc::prelude::SliceConcatExt;
-use alloc::collections::BTreeMap;
-use dfqueue::{DFQueue, DFQueueProducer};
-use spin::Once;
+use alloc::{
+    vec::Vec,
+    collections::BTreeSet,
+    string::{String, ToString},
+};
 use acpi::get_hpet;
-use smoltcp::wire::{EthernetAddress, Ipv4Address, IpAddress, IpCidr};
-use smoltcp::iface::{NeighborCache, EthernetInterfaceBuilder, Routes};
-use smoltcp::socket::{SocketSet, TcpSocket, TcpSocketBuffer};
-use smoltcp::time::Instant;
-use e1000_smoltcp_device::E1000Device;
-use network_interface_card::NetworkInterfaceCard;
-use irq_safety::MutexIrqSafe;
+use smoltcp::{
+    wire::{IpAddress, Ipv4Address, IpEndpoint},
+    socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},
+};
+use sha3::{Digest, Sha3_512};
+use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
+use network_manager::{NetworkInterfaceRef};
+use rand::{
+    SeedableRng,
+    RngCore,
+    rngs::SmallRng
+};
+use http_client::{HttpResponse, ConnectedTcpSocket, send_request, millis_since, check_http_request, poll_iface};
 
 
 /// The IP address of the update server.
@@ -48,378 +47,275 @@ use irq_safety::MutexIrqSafe;
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
 
 /// The TCP port on the update server that listens for update requests 
-// const DEFAULT_DESTINATION_PORT: u16 = 60123;
 const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
-/// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
-const DEFAULT_LOCAL_IP: [u8; 4] = [192, 168, 1, 252];
+/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
+const STARTING_FREE_PORT: u16 = 49152;
 
-/// The TCP port on the this machine that can receive replies from the server.
-const DEFAULT_LOCAL_PORT: u16 = 53145;
-
-/// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
-const DEFAULT_LOCAL_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1];
+/// The time limit in milliseconds to wait for a response to an HTTP request.
+const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
 
 
+/// The path of the update builds file, located at the root of the build server.
+/// This file contains the list of all update build instances available,
+/// listed in reverse chronological order (most recent builds first).
+const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
 
-static MSG_QUEUE: Once<DFQueueProducer<String>> = Once::new();
+/// The name (and relative path) of the listing file inside each update build directory,
+/// which contains the names of all crate object files that were built.  
+const LISTING_FILE_NAME: &'static str = "listing.txt";
+
+/// The name of the directory containing the checksums of each crate object file
+/// inside of a given update build.
+const CHECKSUMS_DIR_NAME: &'static str = "checksums";
+
+/// The file extension that is appended onto each crate object file's checksum file.
+const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
 
 
-/// The states that implement the finite state machine for 
-/// sending and receiving the HTTP request and response, respectively.
-#[derive(Debug)]
-enum HttpState {
-    /// The socket is not yet connected.
-    Connecting,
-    /// The socket is connected, but the HTTP request has not yet been sent.
-    Requesting,
-    /// The HTTP request has been sent, but the response has not yet been fully received.
-    ReceivingResponse,
-    /// The response has been received in full, including the entire content.
-    Responded
+
+/// A file that has been downloaded over the network, 
+/// including its name and a byte array containing its contents.
+pub struct DownloadedFile {
+    pub name: String,
+    pub content: HttpResponse,
 }
 
 
-/// Function to calculate time since a give time in ms
-fn millis_since(start_time: u64) -> Result<u64, &'static str> {
-    let hpet_guard = get_hpet();
-    let hpet = hpet_guard.as_ref().ok_or("couldn't get HPET")?;
-    let end_time: u64 = hpet.get_counter();
-    let hpet_freq: u64 = hpet.counter_period_femtoseconds() as u64;
-    // Convert to ms
-    let diff = (end_time - start_time) * hpet_freq / 1_000_000_000_000;
-    Ok(diff)
+/// An enum used for specifying which crate files to download from an update build's listing.
+/// To download all crates, pass an empty `Exclude` set.
+pub enum CrateSet {
+    /// The set of crates to include, i.e., only these crates will be downloaded.
+    Include(BTreeSet<String>),
+    /// The set of crates to exclude, i.e., all crates except for these will be downloaded.
+    Exclude(BTreeSet<String>),
+}
+impl CrateSet {
+    /// Returns true if this `CrateSet` specifies that the given `crate_file_name` is included.
+    pub fn includes(&self, crate_file_name: &str) -> bool {
+        match self {
+            CrateSet::Include(crates_to_include) => crates_to_include.contains(crate_file_name),
+            CrateSet::Exclude(crates_to_exclude) => !crates_to_exclude.contains(crate_file_name),
+        }
+    }
 }
 
 
+/// Connects to the update server over the given network interface
+/// and downloads the list of available update builds.
+/// An update build is a compiled instance of Theseus that contains all crates' object files.
+pub fn download_available_update_builds(
+    iface: &NetworkInterfaceRef
+) -> Result<Vec<String>, &'static str> {
+    // Download the update build file, convert it to a string, and then split it by line
+    let updates_file = download_file(iface, UPDATE_BUILDS_PATH)?;
+    let content = updates_file.content.as_result_err_str()?;
+    str::from_utf8(content)
+        .map_err(|_e| "couldn't convert received list of update builds into a UTF8 string")
+        .map(|updates_str| updates_str.lines().map(|line| String::from(line)).collect())
+}
 
-/// Initialize the network live update client, 
-/// which spawns a new thread to handle live update requests and notifications. 
-/// # Arguments
-/// * `nic`: a reference to an initialized NIC, which must implement the `NetworkInterfaceCard` trait.
+
+/// Connects to the update server over the given network interface
+/// and downloads the list of crates present in the given update build.
+pub fn download_listing(
+    iface: &NetworkInterfaceRef,
+    update_build: &str,
+) -> Result<BTreeSet<String>, &'static str> {
+    // Download the listing file, convert it to a string, and then split it by line
+    let listing_file = download_file(iface, format!("/{}/{}", update_build, LISTING_FILE_NAME))?;
+    let content = listing_file.content.as_result_err_str()?;
+    str::from_utf8(content)
+        .map_err(|_e| "couldn't convert received update listing file into a UTF8 string")
+        .map(|files| files.lines().map(|s| String::from(s)).collect())
+}
+
+
+/// Connects to the update server over the given network interface
+/// and downloads the object files for the specified `crates`.
 /// 
-pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str> 
-    where N: NetworkInterfaceCard
-{
-    Err("WIP does nothing right now")
+/// It also downloads the checksum file for each crate object file 
+/// in order to verify that each object file was completely downloaded correctly.
+/// 
+/// A list of available update builds can be obtained by calling `download_available_update_builds()`.
+/// 
+/// # Arguments
+/// * `iface`: a reference to an initialized network interface for sockets to use.
+/// * `update_build`: the string name of the update build that the downloaded crates will belong to.
+/// * `crates`: a set of crate names, e.g., "k#my_crate-3d0cd20d4e1d4ba9.o",
+///    that will be downloaded from the given `update_build` on the server. 
+/// 
+/// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.
+pub fn download_crates(
+    iface: &NetworkInterfaceRef, 
+    update_build: &str,
+    crates: BTreeSet<String>,
+) -> Result<Vec<DownloadedFile>, &'static str> {
 
-    /*
-    let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter();
+    let mut paths_to_download: Vec<String> = Vec::new();
+    for file_name in crates.iter() {
+        let path = format!("/{}/{}", update_build, file_name);
+        let path_sha = format!("/{}/{}/{}{}", update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        paths_to_download.push(path);
+        paths_to_download.push(path_sha);
+    }
 
-    // initialize the message queue
-    let msg_queue: DFQueue<String> = DFQueue::new();
-    let msg_queue_consumer = msg_queue.into_consumer();
-    let msg_queue_producer = msg_queue_consumer.obtain_producer();
-    MSG_QUEUE.call_once(|| msg_queue_producer.obtain_producer());
+    let mut crate_object_files = download_files(iface, paths_to_download)?;
 
-    let dest_addr = IpAddress::v4(
-        DEFAULT_DESTINATION_IP_ADDR[0],
-        DEFAULT_DESTINATION_IP_ADDR[1],
-        DEFAULT_DESTINATION_IP_ADDR[2],
-        DEFAULT_DESTINATION_IP_ADDR[3],
-    );
-    let dest_port = DEFAULT_DESTINATION_PORT;
-
-    // setup local ip address (this machine) // TODO FIXME: obtain an IP via DHCP
-    let local_addr = [IpCidr::new(
-        IpAddress::v4(
-            DEFAULT_LOCAL_IP[0],
-            DEFAULT_LOCAL_IP[1],
-            DEFAULT_LOCAL_IP[2],
-            DEFAULT_LOCAL_IP[3],
-        ),
-        24
-    )];
-    let local_port = DEFAULT_LOCAL_PORT;
-
-    let neighbor_cache = NeighborCache::new(BTreeMap::new());
-    
-    let tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    let tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    let tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-
-    let mut sockets = SocketSet::new(Vec::with_capacity(1)); // just 1 socket right now
-    let tcp_handle = sockets.add(tcp_socket);
-
-    // Setup an interface/device that connects smoltcp to our e1000 driver
-    let device = E1000Device::new(nic);
-    let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
-    // TODO FIXME: get the default gateway IP from DHCP
-    let default_gateway = Ipv4Address::new(
-        DEFAULT_LOCAL_GATEWAY_IP[0],
-        DEFAULT_LOCAL_GATEWAY_IP[1],
-        DEFAULT_LOCAL_GATEWAY_IP[2],
-        DEFAULT_LOCAL_GATEWAY_IP[3],
-    );
-    let mut routes_storage = [None; 1];
-    let mut routes = Routes::new(&mut routes_storage[..]);
-    let _prev_default_gateway = routes.add_default_ipv4_route(default_gateway).map_err(|_e| {
-        error!("ota_update_client: couldn't set default gateway IP address: {:?}", _e);
-        "couldn't set default gateway IP address"
-    })?;
-    let mut iface = EthernetInterfaceBuilder::new(device)
-        .ethernet_addr(hardware_mac_addr)
-        .neighbor_cache(neighbor_cache)
-        .ip_addrs(local_addr)
-        .routes(routes)
-        .finalize();
-
-    let mut loop_ctr = 0;
-
-
-    let mut state = HttpState::Connecting;
-
-    let mut current_http_bytes: Vec<u8> = Vec::new();
-    let mut current_http_response: Option<httparse::Response> = None;
-
-    loop { 
-        loop_ctr += 1;
-
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };  
-
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-
-        state = match state {
-            HttpState::Connecting if !socket.is_active() => {
-                debug!("ota_update_client: connecting...");
-                socket.connect((dest_addr, dest_port), local_port).unwrap();
-                debug!("ota_update_client: connected!");
-                HttpState::Requesting
-            }
-
-            HttpState::Requesting if socket.can_send() => {
-                let method = "GET ";
-                let uri = "/a%23hello.o ";
-                let version = "HTTP/1.1\r\n";
-                let host = format_args!("Host: {}:{}\r\n", dest_addr, dest_port); // host
-                let connection = "Connection: close\r\n";
-                let http_request = format!("{}{}{}{}{}\r\n", 
-                    method, 
-                    uri, 
-                    version,
-                    host, 
-                    connection
-                );
-
-                // sanity check the created HTTP request
-                {
-                    let mut headers = [httparse::EMPTY_HEADER; 64];
-                    let mut request = httparse::Request::new(&mut headers);
-                    if let Err(_e) = request.parse(http_request.as_bytes()) {
-                        error!("ota_update_client: created improper HTTP request: {:?}", http_request);
-                        break;
-                    }
-                }
-
-                debug!("ota_update_client: sending request: {:?}", http_request);
-                socket.send_slice(http_request.as_ref()).expect("ota_update_client: cannot send request");
-                HttpState::ReceivingResponse
-            }
-
-            HttpState::ReceivingResponse if socket.can_recv() => {
-                // By default, we stay in the receiving state.
-                // This is changed later if we end up receiving the entire packet.1
-                let mut new_state = HttpState::ReceivingResponse;
-
-                let recv_result = socket.recv(|data| {
-                    debug!("ota_update_client: received data ({} bytes): \n{}",
-                        data.len(),
-                        unsafe {str::from_utf8_unchecked(data)}
-                    );
-
-                    // Eagerly append ALL the received data onto the end of our packet slice. 
-                    // Later, we can remove bytes towards the end if we ended up appending too many bytes,
-                    // e.g., we received more than enough bytes and some of them were for the next packet.
-                    let orig_length = current_http_bytes.len();
-                    current_http_bytes.extend_from_slice(data);
-
-                    let mut headers = [httparse::EMPTY_HEADER; 64];
-                    let mut response = httparse::Response::new(&mut headers);
-                    let res = response.parse(&current_http_bytes);
-                    debug!("ota_update_client: Result {:?} from parsing HTTP Response: {:?}", res, response);
-
-                    // Check to see if we've received the full HTTP response:
-                    // First, by checking whether we have received all of the headers 
-                    // Second, by getting the content length header and seeing if we've received the full content (in num bytes)
-                    match res {
-                        Ok(httparse::Status::Partial) => {
-                            trace!("ota_update_client: received partial HTTP response...");
-                            // pop off all of the bytes from the recv buffer into our packet
-                            (data.len(), ())
-                        }
-                        Ok(httparse::Status::Complete(total_header_len)) => {
-                            trace!("ota_update_client: received all headers in the HTTP response, len {}", total_header_len);
-                            match response.headers.iter()
-                                .filter(|h| h.name == "Content-Length")
-                                .next()
-                                .ok_or("couldn't find \"Content-Length\" header")
-                                .and_then(|header| core::str::from_utf8(header.value)
-                                    .map_err(|_e| "failed to convert content-length value to UTF-8 string")
-                                )
-                                .and_then(|s| s.parse::<usize>()
-                                    .map_err(|_e| "failed to parse content-length header as usize")
-                                )
-                            { 
-                                Ok(content_length) => {
-                                    debug!("ota_update_client: current_http_bytes len: {}, content_length: {}, header_len: {} (loop_ctr: {})", 
-                                        current_http_bytes.len(), content_length, total_header_len, loop_ctr
-                                    );
-                                    // the total num of bytes that we want is the length of all the headers + the content
-                                    let expected_length = total_header_len + content_length;
-                                    if current_http_bytes.len() >= expected_length {
-                                        current_http_bytes.truncate(expected_length);
-                                        let bytes_popped = current_http_bytes.len() - orig_length;
-                                        // set state to Responded if we've received all the content
-                                        debug!("ota_update_client: HTTP response fully received. (loop_ctr: {})", loop_ctr);
-                                        new_state = HttpState::Responded;
-                                        (bytes_popped, ())
-                                    } 
-                                    else {
-                                        // here: we haven't gotten all of the content bytes yet, so we pop off all of the bytes received so far
-                                        (data.len(), ())
-                                    }
-                                }
-                                Err(_e) => {
-                                    error!("ota_update_client: {}", _e);
-                                    // upon error, return 0, which instructs the recv() method to pop off 0 bytes from the recv buffer
-                                    (0, ())
-                                }
-                            }
-                        }
-
-                        Err(_e) => {
-                            error!("ota_update_client: Error parsing incoming html: {:?}", _e);
-                            return (0, ());
-                        }
-                    }
-
+    // iterate through each file downloaded, and verify the sha512 hashes
+    for chunk in crate_object_files.chunks(2) {
+        match chunk {
+            [file, hash_file] => {
+                let hash_file_str = hash_file.content.as_result_err_str()
+                    .and_then(|content| str::from_utf8(content)
+                        .map_err(|_e| "couldn't convert downloaded hash file into a UTF8 string")
+                    )?;
                     
-                });
-
-                new_state
-            }
-
-            HttpState::Responded => {
-                break;
-            }
-
-            HttpState::ReceivingResponse if !socket.may_recv() => {
-                warn!("ota_update_client: socket was closed prematurely before full reponse was received! (loop_ctr: {})", loop_ctr);
-                break;
-            }
-
-            _ => { 
-                if loop_ctr % 50000 == 0 {
-                    debug!("ota_update_client: waiting in state {:?} for socket to send/recv ...", state);
+                if let Some(hash_value) = hash_file_str.split_whitespace().next() {
+                    if verify_hash(file.content.as_result_err_str()?, hash_value) {
+                        // success! the hash matched, so the file was properly downloaded
+                    } else {
+                        error!("ota_update_client: downloaded file {:?} did not match the expected hash value! Try downloading it again.", file.name);
+                        return Err("ota_update_client: downloaded file did not match the expected hash value");
+                    }
+                } else {
+                    error!("ota_update_client: hash file {:?} had unexpected contents: it should start with a 64-digit hex hash value.", hash_file.name);
+                    return Err("ota_update_client: hash file had unexpected contents");
                 }
-                state
+            }
+            _ => {
+                error!("ota_update_client: missing crate object file or hash file for downloaded file pair {:?}, cannot verify file integrity.", 
+                    chunk.iter().next().map(|f| &f.name)
+                );
+                return Err("ota_update_client: missing crate object file or hash file for downloaded file pair");
             }
         }
     }
 
+    // All hashes are verified, just return the crate object files themselves without the hash files
+    crate_object_files.retain(|file| !file.name.ends_with(CHECKSUM_FILE_EXTENSION));
 
-    debug!("ota_update_client: exiting HTTP state loop with state: {:?} (loop_ctr: {})", state, loop_ctr);
+    Ok(crate_object_files)
+}
 
+
+/// A convenience function for downloading just one file. See `download_files()`.
+fn download_file<S: AsRef<str>>(
+    iface: &NetworkInterfaceRef, 
+    absolute_path: S,
+) -> Result<DownloadedFile, &'static str> {
     
-    /* SIMPLE TCP TEST START
+    download_files(iface, vec![absolute_path])?
+        .into_iter()
+        .next()
+        .ok_or("no file received from the server")
+}
 
-    {
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        socket.connect((dest_addr, dest_port), local_port).unwrap();
+
+/// Connects to the update server over the given network interface
+/// and downloads the given files, each specified with its full absolute path on the update server.
+/// 
+/// Returns an error if any of the given `absolute_paths` didn't exist, 
+/// or if there was any other error on the remote server.
+fn download_files<S: AsRef<str>>(
+    iface: &NetworkInterfaceRef, 
+    absolute_paths: Vec<S>,
+) -> Result<Vec<DownloadedFile>, &'static str> {
+    if absolute_paths.is_empty() { 
+        return Err("no download paths given");
     }
 
-    let mut msg_ctr = 0;
-    let mut done_sending = false;
-    loop { 
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };  
+    let startup_time = hpet_ticks!();
+    let mut rng = SmallRng::seed_from_u64(startup_time);
+    let rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
 
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        if !done_sending {
-            if socket.can_send() {
-                if msg_ctr % 2 == 0 {
-                    let msg = format!("test message {}", msg_ctr);
-                    debug!("ota_update_client: sending msg {:?} ...", msg);
-                    write!(socket, "{}", msg).unwrap();
-                    debug!("ota_update_client: Sent msg {:?}", msg);
-                    msg_ctr += 1;
-                }
+    let dest_addr: IpAddress = Ipv4Address::from_bytes(&DEFAULT_DESTINATION_IP_ADDR).into();
+    let dest_port = DEFAULT_DESTINATION_PORT;
+    
+    // the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one
+    let mut local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
+    let mut tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
+    let mut tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
+    let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
+    let mut sockets = SocketSet::new(Vec::with_capacity(1));
+    let mut tcp_handle = sockets.add(tcp_socket);
 
-                if msg_ctr > 8 {
-                    info!("\n\nota_update_client: completed sending messages!\n\n");
-                    done_sending = true;
-                }
-            }
-            else {
-                if loop_ctr % 50000 == 0 {
-                    debug!("ota_update_client: waiting for socket can_send...");
-                }
-            }
+    // first, attempt to connect the socket to the remote server
+    connect(iface, &mut sockets, tcp_handle, (dest_addr, dest_port), local_port, startup_time)?;
+    debug!("ota_update_client: socket connected successfully!");
+
+    // iterate over the provided list of file paths, and retrieve each one via HTTP
+    let mut downloaded_files: Vec<DownloadedFile> = Vec::with_capacity(absolute_paths.len());
+    let last_index = absolute_paths.len() - 1;
+    for (i, path) in absolute_paths.iter().enumerate() {
+        let path = path.as_ref();
+        let is_last_request = i == last_index;
+
+        let http_request = {
+            let method = "GET";
+            let uri = utf8_percent_encode(path, DEFAULT_ENCODE_SET);
+            let version = "HTTP/1.1";
+            let connection = if is_last_request { "Connection: close" } else { "Connection: keep-alive" };
+            format!("{} {} {}\r\n{}\r\n{}\r\n\r\n",
+                method,
+                uri,
+                version,
+                format_args!("Host: {}:{}", dest_addr, dest_port), // host
+                connection
+            )
+        };
+        if !check_http_request(http_request.as_bytes()) {
+            error!("ota_update_client: created improper/incomplete HTTP request: {:?}.", http_request);
+            return Err("ota_update_client: created improper/incomplete HTTP request");
         }
 
-
-        if socket.can_recv() {
-            if msg_ctr % 2 == 1 {
-                debug!("ota_update_client: waiting to receive msg {}", msg_ctr);
-                let recv_data = socket.recv(|buf| {
-                    let msg = String::from(str::from_utf8(&buf).unwrap());
-                    (msg.as_bytes().len(), msg)
-                }).unwrap();
-                debug!("ota_update_client: received msg: {}", recv_data);
-                msg_ctr += 1;
-
-                if recv_data == "Echo msg: test message 8" {
-                    info!("\n\nota_update_client: completed receiving messages!\n\n");
-                    break;
-                }
+        // Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
+        if !is_connected(&mut sockets, tcp_handle) {
+            debug!("ota_update_client: remote endpoint closed socket after response, opening a new socket.");
+            // first, close the existing socket
+            {
+                let mut socket = sockets.get::<TcpSocket>(tcp_handle);
+                socket.close(); 
+                socket.abort(); 
             }
-        }
-        else {
-            if loop_ctr % 50000 == 0 {
-                debug!("ota_update_client: waiting for socket can_recv...");
-            }
+            let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+            
+            // second, create an entirely new socket and connect it
+            local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
+            tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
+            tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
+            tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
+            sockets = SocketSet::new(Vec::with_capacity(1));
+            tcp_handle = sockets.add(tcp_socket);
+            connect(iface, &mut sockets, tcp_handle, (dest_addr, dest_port), local_port, startup_time)?;
         }
 
-        loop_ctr += 1;
-    }
-    END SIMPLE TCP TEST */
-
-
-    let mut issued_close = false;
-    loop {
-        loop_ctr += 1;
-
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
+        // send the HTTP request and obtain a response
+        let response = {
+            let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
+            send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
         };
 
+        if response.status_code != 200 {
+            error!("ota_update_client: failed to download {:?}, Error {}: {}", path, response.status_code, response.reason);
+            break;
+        }
+
+        downloaded_files.push(DownloadedFile {
+            name: path.into(),
+            content: response,
+        });
+    }
+
+
+    let mut _loop_ctr = 0;
+    let mut issued_close = false;
+    let timeout_millis = 3000; // 3 second timeout
+    let start = hpet_ticks!();
+    loop {
+        _loop_ctr += 1;
+
+        let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         if !issued_close {
@@ -431,120 +327,97 @@ pub fn init<N>(nic: &'static MutexIrqSafe<N>) -> Result<(), &'static str>
             issued_close = true;
         }
 
-        if loop_ctr % 50000 == 0 {
+        if socket.state() == TcpState::Closed {
+            break;
+        }
+
+        if _loop_ctr % 50000 == 0 {
             debug!("ota_update_client: socket state (looping) is now {:?}", socket.state());
         }
 
-    }
-
-    Ok(())
-    
-
-    
-    
-    
-    /*
-
-    let mut tcp_active = false;
-    let mut initial_val_send = false;
-    let mut number_of_items = 4;
-    let mut send_items = 0;
-    let mut received_items = 0;
-
-    let mut array: Vec<String> = vec![String::new(); 512];
-    let mut break_1 = 0;
-
-    loop {
-        // poll the smoltcp ethernet interface (i.e., flush tx/rx)
-        let timestamp: i64 = millis_since(startup_time)?
-            .try_into()
-            .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-        let _packets_were_sent_or_received = match iface.poll(&mut sockets, Instant::from_millis(timestamp)) {
-            Ok(b) => b,
-            Err(err) => {
-                warn!("ota_update_client: poll error: {}", err);
-                false  // continue;
-            }
-        };  
-
-        {
-            let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-            if socket.is_active() && !tcp_active {
-                debug!("ota_update_client: connected");
-            } else if !socket.is_active() && tcp_active {
-                debug!("ota_update_client: disconnected");
-                return Err("tcp socket disconnected.");
-            }
-            tcp_active = socket.is_active();
-
-            if socket.may_send() {
-                if socket.can_send() && send_items == 0 {
-                    debug!("ota_update_client: tcp:6969 send greeting");
-                    write!(socket, "a#terminal_print.o").unwrap();
-                    debug!("ota_update_client: Send 0");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 1 {
-                    write!(socket, "a#test_panic.o").unwrap();
-                    debug!("ota_update_client: Send 1");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 2 {
-                    write!(socket, "k#acpi-b3db4f72ccdc307b.o").unwrap();
-                    debug!("ota_update_client: Send 2");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 3 {
-                    write!(socket, "k#ap_start-5e82a1be3db78c92.o").unwrap();
-                    debug!("ota_update_client: Send 3");
-                    send_items = send_items + 1;
-                }
-                if socket.can_send() && send_items == 4 {
-                    write!(socket, "Done.n").unwrap(); //This word is needed to end the sending of modules
-                    debug!("ota_update_client: Send 4 -- Done.");
-                    send_items = 100;
-                }
-            }
-
-            if socket.can_recv() && send_items == 100 {
-                let data = socket.recv(|data| {
-                    let mut data = data.to_owned();
-                    if data.len() > 0 {
-                        //debug!("ota_update_client: recv data: {:?}",
-                        //str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-                        data = data.split(|&b| b == b'\n').collect::<Vec<_>>().concat();
-                        //data.reverse();
-                        data.extend(b"\n");
-                        let mut mystring =
-                            str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)");
-                        //debug!("ota_update_client: {}",mystring);
-                        let v: Vec<&str> = mystring.split(':').collect();
-                        //debug!("ota_update_client: {}",v[0]);
-                        if let "Done.." = &*v[0] {
-                            debug!("ota_update_client: Module Receive Completed");
-                            //debug!("ota_update_client: close");
-                            //socket.close();
-                            break_1 = 1;
-                        } else {
-                            debug!("ota_update_client: {}", v[0]);
-                        }
-                        //debug!("ota_update_client: recv data: {:?}",
-                        //str::from_utf8(data.as_ref()).unwrap_or("(invalid utf8)"));
-                        received_items = received_items + 1;
-                    }
-                    (data.len(), data)
-                })
-                .unwrap();
-            }
-            if break_1 == 1 {
-                debug!("ota_update_client: closing socket after completion.");
-                socket.close();
-                return Err("ota_update_client: closing socket after completion.");
-            }
+        // check to make sure we haven't timed out
+        if millis_since(start)? > timeout_millis {
+            debug!("ota_update_client: timed out waiting to close socket, closing it manually with an abort.");
+            socket.abort();
+            // Don't break out of the loop here!  we need to let this socket actually send the close msg
+            // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
+            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
         }
     }
 
-    */
+    if downloaded_files.len() != absolute_paths.len() {
+        return Err("failed to download all specified files");
+    }
 
-    */
+    Ok(downloaded_files)
+}
+
+
+/// A convenience function that checks whether a socket is connected, 
+/// which is currently true when both `may_send()` and `may_recv()` are true.
+fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
+    let socket = sockets.get::<TcpSocket>(tcp_handle);
+    socket.may_send() && socket.may_recv()
+}
+
+
+/// A convenience function for connecting a socket.
+/// If the given socket is already open, it is forcibly closed immediately and reconnected.
+fn connect<I>(
+    iface: &NetworkInterfaceRef,
+    sockets: &mut SocketSet, 
+    tcp_handle: SocketHandle,
+    remote_endpoint: I,
+    local_port: u16, 
+    startup_time: u64,
+) -> Result<(), &'static str> 
+    where I: Into<IpEndpoint>
+{
+    if sockets.get::<TcpSocket>(tcp_handle).is_open() {
+        return Err("ota_update_client: when connecting socket, it was already open...");
+    }
+
+    let timeout_millis = 3000; // 3 second timeout
+    let start = hpet_ticks!();
+    let remote_endpoint = remote_endpoint.into();
+    
+    debug!("ota_update_client: connecting from {}:{} to {} ...",
+        iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
+        local_port, 
+        remote_endpoint,
+    );
+
+    let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+
+    sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
+        error!("ota_update_client: failed to connect socket, error: {:?}", _e);
+        "ota_update_client: failed to connect socket"
+    })?;
+
+    loop {
+        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        
+        // if the socket actually connected, it should be able to send/recv
+        let socket = sockets.get::<TcpSocket>(tcp_handle);
+        if socket.may_send() && socket.may_recv() {
+            break;
+        }
+
+        // check to make sure we haven't timed out
+        if millis_since(start)? > timeout_millis {
+            error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_millis);
+            return Err("ota_update_client: failed to connect to socket, timed out.");
+        }
+    }
+
+    debug!("ota_update_client: connected!  (took {} ms)", millis_since(start)?);
+    Ok(())
+}
+
+
+/// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.
+/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
+fn verify_hash(content: &[u8], hash: &str) -> bool {
+    let result = Sha3_512::digest(content);
+    hash == format!("{:x}", result)
 }

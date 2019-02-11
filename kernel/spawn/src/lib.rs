@@ -370,8 +370,9 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
 
 #[cfg(spawn_userspace)]
 /// Spawns a new userspace task based on the provided `path`, which must point to an ELF executable file with a defined entry point.
-/// Optionally, provide a `name` for the new Task. If none is provided, the name from the given `ModuleArea` is used.
+/// Optionally, provide a `name` for the new Task. If none is provided, the name is based on the given `Path`.
 pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'static str> {
+    return Err("this function has not yet been adapted to use the fs-based crate namespace system");
 
     debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
     

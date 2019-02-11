@@ -134,8 +134,9 @@ iso: $(iso)
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy the object files from the target/ directory, and the core library, into the main build directory and prepend the kernel prefix
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o; do \
+## Copy all object files into the main build directory and prepend the kernel prefix
+## Al object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 
@@ -240,7 +241,7 @@ userspace:
 ## The "normal" target must come last ('build_simd', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality : export TARGET := x86_64-theseus
 simd_personality : export BUILD_MODE = release
-simd_personality : export THESEUS_CONFIG += simd_personality
+simd_personality : export override THESEUS_CONFIG += simd_personality
 simd_personality: build_simd build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -256,14 +257,23 @@ simd_personality: build_simd build
 ### build_simd is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
 ### It is the latter half of the simd_personality target.
 build_simd : export TARGET := x86_64-theseus-sse
-build_simd : export RUSTFLAGS += -C no-vectorize-loops
-build_simd : export RUSTFLAGS += -C no-vectorize-slp
+build_simd : export override RUSTFLAGS += -C no-vectorize-loops
+build_simd : export override RUSTFLAGS += -C no-vectorize-slp
 build_simd : export KERNEL_PREFIX := ksimd\#
 build_simd : export APP_PREFIX := asimd\#
 build_simd:
 ## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
 	@$(MAKE) build
+
+
+
+
+### build_server is a target that builds Theseus into a regular ISO
+### and then sets up an HTTP server that provides module object files 
+### for a running instance of Theseus to download for OTA live updates.
+build_server: iso
+	@sh scripts/build_server.sh  /tmp/theseus_build_server  $(OBJECT_FILES_BUILD_DIR)  $(UPDATE_DIR)
 
 
 
@@ -302,36 +312,53 @@ clean:
 
 help: 
 	@echo -e "\nThe following make targets are available:"
+	@echo -e "   iso:"
+	@echo -e "\t The most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+
 	@echo -e "   run:"
-	@echo -e "\t The most common target. Builds and runs Theseus using the QEMU emulator."
+	@echo -e "\t The most common target. Builds Theseus (like the 'iso' target) and runs it using QEMU."
+
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
+
 	@echo -e "   debug:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
 	@echo -e "   gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
 	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
+
 	@echo -e "   boot:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
 	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
+
 	@echo -e "   pxe:"
 	@echo -e "\t Builds Theseus as a bootable .iso and copies it to the tftpboot folder for network booting over PXE."
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
+
 	@echo -e "   simd_personality:"
 	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
 	@echo -e "\t then runs it just like the 'make run' target."
+
+	@echo -e "   build_server:"
+	@echo -e "\t Builds Theseus (as with the 'iso' target) and then runs a build server hosted on this machine"
+	@echo -e "\t that can be used over-the-air live evolution."
+
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
 	@echo -e "   view-doc:"
 	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
 	
 	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
-	@echo -e "   net=yes:"
+	@echo -e "   net=user:"
+	@echo -e "\t Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
+	@echo -e "   net=tap:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
 	@echo -e "   kvm=yes:"
 	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
@@ -360,20 +387,26 @@ MAC_ADDR ?= 52:54:00:d1:55:01
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
-ifeq ($(net),yes)
-	## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
-	
-	## basic userspace QEMU networking with a standard e1000 ethernet NIC
-	#QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
-	#QEMU_FLAGS += -net nic,vlan=1,model=e1000 -net user,vlan=1 -net dump,file=netdump.pcap
-
+## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
+ifeq ($(net),user)
+	## user-based networking setup with standard e1000 ethernet NIC
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev user,id=network0
+	## Dump network activity to a pcap file
+	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else ifeq ($(net),tap)
 	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
 	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+	## Dump network activity to a pcap file
 	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else ifeq ($(net),none)
+	QEMU_FLAGS += -net none
+else ifneq (,$(net)) 
+$(error Error: unsupported option "net=$(net)")
 else
 	QEMU_FLAGS += -net none
 endif
 
+## Dump interrupts to the serial port log
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif
@@ -406,7 +439,7 @@ odebug:
 
 
 ### Currently, loadable module mode requires release build mode
-loadable : export THESEUS_CONFIG += loadable
+loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
@@ -431,7 +464,7 @@ gdb:
 
 
 ### builds and runs Theseus in Bochs
-bochs : export THESEUS_CONFIG += apic_timer_fixed
+bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
@@ -464,7 +497,7 @@ endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export THESEUS_CONFIG += mirror_log_to_vga
+boot : export override THESEUS_CONFIG += mirror_log_to_vga
 boot: check_usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
@@ -479,7 +512,7 @@ endif
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
-pxe : export THESEUS_CONFIG += mirror_log_to_vga
+pxe : export override THESEUS_CONFIG += mirror_log_to_vga
 pxe: $(iso)
 ifdef $(netdev)
 ifdef $(ip)

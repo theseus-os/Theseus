@@ -297,7 +297,7 @@ pub struct MappedPages {
 
 impl MappedPages {
     /// Returns an empty MappedPages object that performs no allocation or mapping actions. 
-    /// Can be used as a placeholder, but will not 
+    /// Can be used as a placeholder, but will not permit any real usage. 
     pub fn empty() -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
