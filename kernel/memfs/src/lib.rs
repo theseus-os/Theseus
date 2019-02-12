@@ -58,7 +58,7 @@ impl MemFile {
 }
 
 impl File for MemFile {
-    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, &'static str> {
+    fn read(&self, buffer: &mut [u8]) -> Result<usize, &'static str> {
         let offset = 0;
         // we can only copy up to the end of the given buffer or up to the end of the file
         let count = core::cmp::min(buffer.len(), self.size);

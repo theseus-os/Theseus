@@ -104,7 +104,7 @@ impl VFSFile {
 }
 
 impl File for VFSFile {
-    fn read(&mut self, _buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
+    fn read(&self, _buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
     fn write(&mut self, _buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
     
     fn delete(self) -> Result<(), &'static str> {

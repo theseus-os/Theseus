@@ -289,7 +289,7 @@ impl FsNode for TaskFile {
 }
 
 impl File for TaskFile {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { 
+    fn read(&self, buf: &mut [u8]) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
         // copy as many bytes as we can 
@@ -431,7 +431,7 @@ impl FsNode for MmiFile {
 }
 
 impl File for MmiFile {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, &'static str> { 
+    fn read(&self, buf: &mut [u8]) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
         // copy as many bytes as we can 

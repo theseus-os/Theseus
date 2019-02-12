@@ -60,7 +60,7 @@ pub trait FsNode {
 pub trait File : FsNode {
     /// Reads the contents of this file into the given `buffer`
     /// Caller should pass in an empty buffer and the read function will query the size of the buffer
-    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, &'static str>; 
+    fn read(&self, buffer: &mut [u8]) -> Result<usize, &'static str>; 
     /// Writes the bytes argument to the contents of the file
     fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str>;
     /// Deletes the file
