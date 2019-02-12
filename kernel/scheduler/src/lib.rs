@@ -18,14 +18,12 @@ use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
 #[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
 
-/// This function performs a task switch.
+/// Yields the current CPU by selecting a new `Task` to run 
+/// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
     disable_interrupts();
-
-    // let current_taskid: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("schedule [0]: current_taskid={}", current_taskid);
 
     let current_task: *mut Task;
     let next_task: *mut Task; 
@@ -56,7 +54,7 @@ pub fn schedule() -> bool {
     // same scoping reasons as above: to release the lock around current_task
     {
         current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-                                            .lock_mut().deref_mut() as *mut Task; 
+            .lock_mut().deref_mut() as *mut Task; 
     }
 
     if current_task == next_task {
@@ -64,7 +62,8 @@ pub fn schedule() -> bool {
         return false;
     }
 
-    // we want mutable references to mutable tasks
+    // we want mutable task references without the locks, and we use unsafe code to obtain those references
+    // because the scope-based lock guard won't drop properly after the actual task_switch occurs.
     let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
 
     // trace!("BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}", apic_id, curr, next, irq_safety::interrupts_enabled());

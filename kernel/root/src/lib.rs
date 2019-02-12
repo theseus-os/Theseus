@@ -19,7 +19,7 @@ use alloc::collections::BTreeMap;
 use fs_node::{DirRef, Directory, FileOrDir, FsNode};
 
 
-pub const ROOT_DIRECTORY_NAME: &'static str = "/root";
+pub const ROOT_DIRECTORY_NAME: &'static str = "";
 
 lazy_static! {
     /// The root directory
@@ -70,11 +70,11 @@ impl Directory for RootDirectory {
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_path_as_string(&self) -> String {
-        ROOT_DIRECTORY_NAME.to_string()
+        format!("{}/", ROOT_DIRECTORY_NAME.to_string()).to_string()
     }
 
     fn get_name(&self) -> String {
-        self.name.clone()
+        ROOT_DIRECTORY_NAME.to_string()
     }
 
     /// Returns a pointer to the parent if it exists
