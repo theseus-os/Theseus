@@ -45,7 +45,7 @@ impl<'a> TaskFile<'a> {
         let task_id = task.lock().id.clone();
         return TaskFile {
             task: task,
-            path: Path::new(format!("/root/{}/{}", TASKS_DIRECTORY_NAME, task_id)), 
+            path: Path::new(format!("{}/{}/{}", root::ROOT_DIRECTORY_NAME, TASKS_DIRECTORY_NAME, task_id)), 
             parent: parent_dir
         };
     }
@@ -152,7 +152,7 @@ impl TaskDirectory {
 
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
-        let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
+        let task_ref = super::super::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = match self.get_self_pointer() {
             Ok(ptr) => ptr, 
             Err(err) => {
@@ -171,7 +171,7 @@ impl TaskDirectory {
             parent: Arc::downgrade(&parent_dir),
         };
         let task_dir = Arc::new(Mutex::new(Box::new(new_dir) as Box<Directory + Send>));
-        create_mmi_dir(task_ref.clone(), &task_dir)?;
+        create_mmi_dir(task_ref, &task_dir)?;
         Ok(FileOrDir::Dir(task_dir))
     }
 }
@@ -181,8 +181,15 @@ impl FsNode for TaskDirectory {
     fn get_path_as_string(&self) -> String {
         let mut path = String::from(TASKS_DIRECTORY_NAME);
         if let Ok(cur_dir) =  self.get_parent_dir() {
-            path.insert_str(0, &format!("{}/",&cur_dir.lock().get_path_as_string()));
+            let parent_path = &cur_dir.lock().get_path_as_string();
+            // Check if the parent path is root
+            if parent_path == "/" {
+                path.insert_str(0, &format!("{}", parent_path));
+                return path;
+            }
+            path.insert_str(0, &format!("{}/", parent_path));
             return path;
+            
         }
         return path;
     }
@@ -219,7 +226,7 @@ impl Directory for TaskDirectory {
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.iter() {
+        for (id, _taskref) in TASKLIST.lock().iter() {
             tasks_string.push(format!("{}", id));
         }
         tasks_string

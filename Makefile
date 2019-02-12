@@ -134,8 +134,9 @@ iso: $(iso)
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy the object files from the target/ directory, and the core library, into the main build directory and prepend the kernel prefix
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/core-*.o; do \
+## Copy all object files into the main build directory and prepend the kernel prefix
+## Al object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 
@@ -355,7 +356,9 @@ help:
 	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
 	
 	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
-	@echo -e "   net=yes:"
+	@echo -e "   net=user:"
+	@echo -e "\t Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
+	@echo -e "   net=tap:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
 	@echo -e "   kvm=yes:"
 	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
@@ -384,21 +387,26 @@ MAC_ADDR ?= 52:54:00:d1:55:01
 ## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
 QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
-ifeq ($(net),yes)
-	## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
-
-	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
-	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
-
-	## user-based networking setup with standard e1000 ethernet NIC (DOESN'T WORK)
-	# QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev user,id=network0
-
+## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
+ifeq ($(net),user)
+	## user-based networking setup with standard e1000 ethernet NIC
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev user,id=network0
 	## Dump network activity to a pcap file
 	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else ifeq ($(net),tap)
+	## TAP-based networking setup with a standard e1000 ethernet NIC frontent (in the guest) and the TAP backend (in the host)
+	QEMU_FLAGS += -device e1000,netdev=network0,mac=$(MAC_ADDR) -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+	## Dump network activity to a pcap file
+	QEMU_FLAGS += -object filter-dump,id=f1,netdev=network0,file=netdump.pcap
+else ifeq ($(net),none)
+	QEMU_FLAGS += -net none
+else ifneq (,$(net)) 
+$(error Error: unsupported option "net=$(net)")
 else
 	QEMU_FLAGS += -net none
 endif
 
+## Dump interrupts to the serial port log
 ifeq ($(int),yes)
 	QEMU_FLAGS += -d int
 endif

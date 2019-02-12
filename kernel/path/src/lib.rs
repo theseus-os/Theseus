@@ -6,6 +6,7 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
+extern crate root;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -106,8 +107,15 @@ impl Path {
         }
         // Create the new path from its components 
         let mut new_path = String::new();
+        let mut first_cmpnt = true; 
         for component in new_components {
-            new_path.push_str(&format!("/{}",  component));
+            if first_cmpnt {
+                new_path.push_str(&format!("{}",  component));
+                first_cmpnt = false;
+            } 
+            else {
+                new_path.push_str(&format!("/{}",  component));
+            }
         }
         // debug!("canonical {}", new_path);
         Path::new(new_path)
@@ -116,10 +124,8 @@ impl Path {
     /// Expresses the current Path, self, relative to another Path, other
     /// https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
     pub fn relative(&self, other: &Path) -> Option<Path> {
-        let ita = self.components();
-        let itb = other.components();
-        let mut ita_iter = ita;
-        let mut itb_iter = itb;
+        let mut ita_iter = self.components();
+        let mut itb_iter = other.components();
         let mut comps: Vec<String> = Vec::new();
         loop {
             match (ita_iter.next(), itb_iter.next()) {
@@ -133,7 +139,7 @@ impl Path {
                 }
                 (None, _) => comps.push("..".to_string()),
                 (Some(ref a), Some(ref b)) if comps.is_empty() && a == b => continue,
-                (Some(ref a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
+                (Some(ref _a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
                 (Some(_), Some(ref b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
                     comps.push("..".to_string());
@@ -153,17 +159,24 @@ impl Path {
         for component in comps.iter() {
             new_path.push_str(&format!("{}/",  component));
         }
-        // remove the trailing slash after the final path component
+        // Remove the trailing slash after the final path component
         new_path.pop();
         // debug!("relative {}", new_path);
         return Some(Path::new(new_path));
     }
+    
+    /// Returns a boolean indicating whether this Path is absolute,
+    /// i.e., whether it starts with the root directory.
+    pub fn is_absolute(&self) -> bool {
+        self.path.starts_with(PATH_DELIMITER)
+    }
 
-    /// Gets the reference to the directory specified by the path given the current working directory 
+    /// Returns the file or directory specified by the given path, 
+    /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         
-        // Get the shortest path from self to working directory by first finding the canonical path of self then the relative path of that path to the 
+        // Get the shortest path from self to working directory 
         let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
             Some(dir) => dir, 
             None => {
@@ -172,8 +185,15 @@ impl Path {
             }
         };
 
+        let mut curr_dir = {
+            if self.is_absolute() {
+                Arc::clone(root::get_root())
+            }
+            else {
+                Arc::clone(&starting_dir)
+            }
+        };
 
-        let mut curr_dir = Arc::clone(&starting_dir);
         // debug!("CANONICALIZE: Shortest path: {:?}", shortest_path);
         // debug!("curr_dir {:?}, relative components {:?}", starting_dir.lock().get_name(), shortest_path.components().collect::<Vec<&str>>());
         // debug!("CHILDREN in curr_dir: {:?}", curr_dir.lock().list_children());
@@ -203,6 +223,16 @@ impl Path {
         }
         Ok(FileOrDir::Dir(curr_dir))
     }
+
+
+    /// Returns the file or directory specified by the given absolute path
+    pub fn get_absolute(path: &Path) -> Result<FileOrDir, &'static str> {
+        if path.is_absolute() {
+            path.get(root::get_root())
+        } else {
+            Err("given path was not absolute")
+        }
+    }
 }
 
 pub enum PathComponent {
@@ -214,7 +244,7 @@ pub enum PathComponent {
 impl PathComponent {
     pub fn as_string(self) -> String {
         match self {
-            PathComponent::RootDir => String::from("/root"),
+            PathComponent::RootDir => String::from(root::ROOT_DIRECTORY_NAME),
             PathComponent::CurrentDir => String::from("."),
             PathComponent::ParentDir => String::from(".."),
         }

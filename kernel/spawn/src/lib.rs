@@ -167,7 +167,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
-        let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
+        let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if old_task.is_some() {
             error!("BUG: KernelTaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
@@ -541,21 +541,6 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
 
 
-/// Remove a task from the list.
-///
-/// ## Parameters
-/// - `id`: the TaskId to be removed.
-///
-/// ## Returns
-/// An Option with a reference counter for the removed Task.
-pub fn remove_task(_id: usize) -> Option<TaskRef> {
-    unimplemented!();
-// assert!(get_task(id).unwrap().runstate == Runstate::Exited, "A task must be exited before it can be removed from the TASKLIST!");
-    // TASKLIST.remove(id)
-}
-
-
-
 /// The entry point for all new `Task`s that run in kernelspace. This does not return!
 fn task_wrapper<F, A, R>() -> !
     where A: Send + 'static, 
@@ -610,7 +595,7 @@ fn task_wrapper<F, A, R>() -> !
         
         // (1) Put the task into a non-runnable mode (exited), and set its exit value
         if curr_task_ref.exit(Box::new(exit_value)).is_err() {
-            warn!("task_wrapper \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+            warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
         }
 
         // (2) Remove it from its runqueue
@@ -622,11 +607,12 @@ fn task_wrapper<F, A, R>() -> !
             error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
         }
 
+        // (3) Yield the CPU
+        scheduler::schedule();
+
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
 
-    // (3) Yield the CPU
-    scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
     error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");

@@ -55,7 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
     else {
         for n in namespace.crate_names() {
-            out.push_str(&format!("{}\n", n));
+            out.push_str(&format!("{}\t\t{:?}\n", n, namespace.get_crate(&n).map(|c| c.lock_as_ref().object_file_abs_path.clone())));
         }
     }
     println!("{}", out);
