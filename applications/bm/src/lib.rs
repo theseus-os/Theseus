@@ -25,8 +25,13 @@ use fs_node::{DirRef, FileOrDir, FileRef};
 // const ITERATIONS: usize = 1_000_000;
 // const TRIES: usize = 10;
 const THRESHOLD_ERROR_RATIO: u64 = 1;
-const DIVISOR_FEMTO_TO_MICRO: u64 = 1_000_000_000;
-const DIVISOR_FEMTO_TO_NANO: u64 = 1_000_000;
+const MICRO_TO_FEMTO: u64 = 1_000_000_000;
+const NANO_TO_FEMTO: u64 = 1_000_000;
+const SEC_TO_NANO: u64 = 1_000_000_000;
+const SEC_TO_MICRO: u64 = 1_000_000;
+const MB_IN_KB: usize = 1024;
+const MB: u64 = 1024 * 1024;
+const KB: u64 = 1024;
 
 // for testing..
 const ITERATIONS: usize = 1_000;
@@ -93,13 +98,12 @@ fn getpid() -> usize {
 
 fn hpet_2_us(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	hpet * hpet_period as u64 / DIVISOR_FEMTO_TO_MICRO
+	hpet * hpet_period as u64 / MICRO_TO_FEMTO
 }
 
 fn hpet_2_ns(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	let rtn = hpet * hpet_period as u64 / DIVISOR_FEMTO_TO_NANO;
-	rtn
+	rtn = hpet * hpet_period as u64 / NANO_TO_FEMTO
 }
 
 fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
@@ -394,20 +398,21 @@ fn do_fs_create_del() {
 	printlninfo!("Cannot test without MemFile::Delete()...");
 }
 
-fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
 	let mut dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
-	let mut unread_size = match get_file(filename) {
+	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
 		_ => {
 			return Err("Cannot get the size");
 		}
 	} as i64;
+	let mut unread_size = size;
 
-	if unread_size % READ_BUF_SIZE as i64 != 0 {
+	if size % READ_BUF_SIZE as i64 != 0 {
 		return Err("File size is not alligned");
 	}
 
@@ -418,11 +423,15 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
             FileOrDir::File(fileref) => { 
             	let mut file = fileref.lock();	// so far, open()
 
+            	unread_size = size;
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
                 	let nr_read = file.read(&mut buf).expect("Cannot read");
 					unread_size -= nr_read as i64;
+
+					// LMbench based on C does the magic to cast a type from char to int
+					// But, we dont' have the luxury with type-safe Rust, so we do...
 					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 
@@ -437,24 +446,30 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let delta_hpet = end_hpet - start_hpet - overhead_ct;
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("read_with_open_inner ({}/{}): : {} total_time -> {} {} (ignore: {})", 
-		th, nr, delta_time, delta_time_avg, T_UNIT, dummy_sum);
 
-	Ok(delta_time_avg)
+	let to_sec: u64 = if cfg!(bm_in_us) {1_000} else {1_000_000};
+	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
+	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
+
+	printlninfo!("read_with_open_inner ({}/{}): : {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})", 
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+
+	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
 
-fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
 	let mut dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
-	let mut unread_size = match get_file(filename) {
+	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
 		_ => {
 			return Err("Cannot get the size");
 		}
 	} as i64;
+	let mut unread_size = size;
 
 	if unread_size % READ_BUF_SIZE as i64 != 0 {
 		return Err("File size is not alligned");
@@ -467,11 +482,15 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 
 			start_hpet = get_hpet().as_ref().unwrap().get_counter();
 			for _ in 0..ITERATIONS 	{
+				unread_size = size;
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
                 	let nr_read = file.read(&mut buf).expect("Cannot read");
 					unread_size -= nr_read as i64;
+
+					// LMbench based on C does the magic to cast a type from char to int
+					// But, we dont' have the luxury with type-safe Rust, so we do...
 					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 			}	// for
@@ -486,48 +505,63 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let delta_hpet = end_hpet - start_hpet - overhead_ct;
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("read_only_inner ({}/{}): : {} total_time -> {} {} (ignore: {})", 
-		th, nr, delta_time, delta_time_avg, T_UNIT, dummy_sum);
 
-	Ok(delta_time_avg)
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
+	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
+
+	printlninfo!("read_only_inner ({}/{}): : {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})", 
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+
+	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
 
 fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 	let mut tries: u64 = 0;
+	let mut tries_mb: u64 = 0;
+	let mut tries_kb: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 
 	let filename = format!("tmp_{}k.txt", fsize_kb);
-	mk_tmp_file(&filename, fsize_kb*1024).expect("Cannot create a file");
+	mk_tmp_file(&filename, fsize_kb * 1024).expect("Cannot create a file");
 
 	for i in 0..TRIES {
-		let lat = if with_open {
+		let (lat, tput_mb, tput_kb) = if with_open {
 			do_fs_read_with_open_inner(&filename, overhead_ct, i+1, TRIES).expect("Error in read_open inner()")
 		} else {
 			do_fs_read_only_inner(&filename, overhead_ct, i+1, TRIES).expect("Error in read_only inner()")
 		};
 
 		tries += lat;
+		tries_mb += tput_mb;
+		tries_kb += tput_kb;
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
 
 	let lat = tries / TRIES as u64;
+	let tput_mb = tries_mb / TRIES as u64;
+	let tput_kb = tries_kb / TRIES as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
 	if 	max - lat > err || lat - min > err {
 		printlnwarn!("test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
 
-	printlninfo!("{} for {} KB: {} {}", if with_open {"READ WITH OPEN"} else {"READ ONLY"}, fsize_kb, lat, T_UNIT);
+	printlninfo!("{} for {} KB: {} {} {} MB/sec {} KB/sec", 
+		if with_open {"READ WITH OPEN"} else {"READ ONLY"}, 
+		fsize_kb, lat, T_UNIT, tput_mb, tput_kb);
 }
 
 fn do_fs_read(with_open: bool) {
+	let f_size = 1024;
+	printlninfo!("File size     : {} KB", f_size);
+	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
+	printlninfo!("========================================");
+
 	let overhead_ct = timing_overhead();
 
-	// min: 64K
-	for i in [64, 128, 256, 512, 1024].iter() {
-        do_fs_read_with_size(overhead_ct, *i, with_open);
-    }
+	do_fs_read_with_size(overhead_ct, f_size, with_open);
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
