@@ -239,8 +239,3 @@ impl PathComponent {
         }
     }
 }
-
-struct Symlink {
-    file_or_dir: FileOrDir, 
-    relative_path: Path
-}
