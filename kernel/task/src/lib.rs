@@ -53,9 +53,13 @@ use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use core::panic::PanicInfo;
-use alloc::string::String;
-use alloc::boxed::Box;
-use alloc::sync::{Arc, Weak};
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::String,
+    sync::Arc,
+    vec::Vec,
+};
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
@@ -106,13 +110,13 @@ lazy_static! {
 
 lazy_static! {
     /// The list of all Tasks in the system.
-    pub static ref TASKLIST: AtomicMap<usize, TaskRef> = AtomicMap::new();
+    pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
-pub fn get_task(task_id: usize) -> Option<&'static TaskRef> {
-    TASKLIST.get(&task_id)
+pub fn get_task(task_id: usize) -> Option<TaskRef> {
+    TASKLIST.lock().get(&task_id).cloned()
 }
 
 
@@ -141,8 +145,8 @@ pub enum KillReason {
 }
 
 
-#[derive(Debug)]
 /// The list of ways that a Task can exit, including possible return values and conditions.
+#[derive(Debug)]
 pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
@@ -197,8 +201,10 @@ pub struct Task {
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// the virtual address of the `TaskLocalData` struct that points back to this `Task` struct.
-    pub task_local_data_ptr: VirtualAddress,
+    /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
+    task_local_data_ptr: VirtualAddress,
+    /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
+    drop_after_task_switch: Option<Box<Any + Send>>,
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
     pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
@@ -261,6 +267,7 @@ impl Task {
             
             saved_sp: 0,
             task_local_data_ptr: 0,
+            drop_after_task_switch: None,
             name: format!("task{}", task_id),
             kstack: None,
             ustack: None,
@@ -291,6 +298,15 @@ impl Task {
     pub fn is_runnable(&self) -> bool {
         match self.runstate {
             RunState::Runnable => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if this `Task` has been exited, i.e.,
+    /// if its RunState is either `Exited` or `Reaped`.
+    pub fn has_exited(&self) -> bool {
+        match self.runstate {
+            RunState::Exited(_) | RunState::Reaped => true,
             _ => false,
         }
     }
@@ -341,10 +357,12 @@ impl Task {
         }
 
         let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
+        TASKLIST.lock().remove(&self.id);
         if let RunState::Exited(exit_value) = exited {
             Some(exit_value)
         } 
         else {
+            error!("BUG: Task::take_exit_value(): task {} runstate was Exited but couldn't get exit value.", self);
             None
         }
     }
@@ -356,6 +374,20 @@ impl Task {
     fn set_as_current_task(&self) {
         unsafe {
             wrmsr(IA32_FS_BASE, self.task_local_data_ptr as u64);
+        }
+    }
+
+    /// Removes this `Task`'s `TaskLocalData` cyclical task reference so that it can be dropped.
+    /// This should only be called once, after the Task will never ever be used again. 
+    fn take_task_local_data(&mut self) -> Option<Box<TaskLocalData>> {
+        // sanity check to ensure we haven't dropped this Task's TaskLocalData twice.
+        if self.task_local_data_ptr != 0 {
+            let tld = unsafe { Box::from_raw(self.task_local_data_ptr as *mut TaskLocalData) };
+            self.task_local_data_ptr = 0;
+            Some(tld)
+        }
+        else {
+            None
         }
     }
 
@@ -461,6 +493,13 @@ impl Task {
         // update the current task to `next`
         next.set_as_current_task();
 
+        // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
+        // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
+        if self.has_exited() {
+            // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
+            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<Any + Send>);
+        }
+
         // release this core's task switch lock
         my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
@@ -481,9 +520,16 @@ impl Task {
         }
 
         // Now it's time to perform the actual context switch.
+        // If `simd_personality` is NOT enabled, then we proceed as normal 
+        // using the singular context_switch routine that matches the actual build target. 
+        #[cfg(not(simd_personality))]
+        {
+            unsafe {
+                call_context_switch!(context_switch::context_switch);
+            }
+        }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-        // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
         #[cfg(simd_personality)]
         {
             match (self.simd, next.simd) {
@@ -516,12 +562,21 @@ impl Task {
                 }
             }
         }
-        #[cfg(not(simd_personality))]
-        {
-            unsafe {
-                call_context_switch!(context_switch::context_switch);
-            }
-        }
+        
+        // Here, `self` (curr) is now `next` because the stacks have been switched, 
+        // and `next` has become some other random task based on a previous task switch operation.
+        // Do not make any assumptions about what `next` is now, since it's unknown. 
+
+        // Now, as a final action, we drop any data that the original previous task 
+        // prepared for droppage before the context switch occurred.
+        let _prev_task_data_to_drop = self.drop_after_task_switch.take();
+        
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        trace!("Task::drop(): {}", self);
     }
 }
 
@@ -588,15 +643,14 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if let RunState::Exited(_) = self.0.lock().runstate {
+            if self.0.lock().has_exited() {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            let t = self.0.lock();
-            if !t.is_running() {
+            if !self.0.lock().is_running() {
                 return Ok(());
             }
         }
@@ -604,6 +658,7 @@ impl TaskRef {
 
 
     /// The internal routine that actually exits or kills a Task.
+    /// It also performs select cleanup routines, e.g., removing the task from the task list.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
             let mut task = self.0.lock();
@@ -611,6 +666,13 @@ impl TaskRef {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
+
+            // Corner case: if the task isn't running (as with killed tasks), 
+            // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
+            if !task.is_running() {
+                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                let _tld = task.take_task_local_data();
+            }
         }
 
         #[cfg(runqueue_state_spill_evaluation)] 
@@ -779,7 +841,7 @@ pub fn create_idle_task(
     }
 
     // insert the new task into the task list
-    let old_task = TASKLIST.insert(idle_task_id, task_ref.clone());
+    let old_task = TASKLIST.lock().insert(idle_task_id, task_ref.clone());
     if old_task.is_some() {
         error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
             idle_task_id, apic_id);
@@ -801,7 +863,6 @@ struct TaskLocalData {
     current_taskref: TaskRef,
     current_task_id: usize,
 }
-
 
 /// Returns a reference to the current task's `TaskLocalData` 
 /// by using the `TaskLocalData` pointer stored in the FS base MSR register.
@@ -827,7 +888,7 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
     // };
 }
 
-/// Returns a reference to the current task id by using the `TaskLocalData` pointer
+/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
 /// stored in the FS base MSR register.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)

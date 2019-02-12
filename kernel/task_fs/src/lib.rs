@@ -99,7 +99,7 @@ impl TaskFs {
 
     fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
-        let task_ref = TASKLIST.get(&id).ok_or("could not get taskref from TASKLIST")?;
+        let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer()?;
         let name = task_ref.lock().id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
@@ -148,7 +148,7 @@ impl Directory for TaskFs {
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
         let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.iter() {
+        for (id, _taskref) in TASKLIST.lock().iter() {
             tasks_string.push(format!("{}", id));
         }
         tasks_string

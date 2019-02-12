@@ -539,6 +539,7 @@ version = "0.1.0"
 name = "kill"
 version = "0.1.0"
 dependencies = [
+ "debugit 0.1.0",
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "runqueue 0.1.0",
  "task 0.1.0",

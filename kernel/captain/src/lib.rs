@@ -22,7 +22,7 @@
 #![feature(core_intrinsics)]
 
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 
