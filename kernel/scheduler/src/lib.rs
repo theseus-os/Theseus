@@ -48,9 +48,9 @@ pub fn schedule() -> bool {
     }
     
     // same scoping reasons as above: to release the lock around current_task
-    {   
-        let taskref = get_my_current_task().expect("schedule(): get_my_current_task() failed").clone();
-        current_task = taskref.lock_mut().deref_mut() as *mut Task;
+    {
+        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
+            .lock_mut().deref_mut() as *mut Task; 
     }
 
     if current_task == next_task {
