@@ -194,7 +194,7 @@ impl RunQueue {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
             .write()
-            .add_task(task.clone())
+            .add_task(task)
     }
 
     /// Adds a `TaskRef` to this RunQueue.
