@@ -7,6 +7,9 @@ build = "../../build.rs"
 [dependencies]
 getopts = "0.2.18"
 
+[dependencies.debugit]
+path = "../../libs/debugit"
+
 [dependencies.terminal_print]
 path = "../terminal_print"
 
