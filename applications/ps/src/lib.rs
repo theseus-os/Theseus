@@ -40,7 +40,7 @@ pub fn main(args: Vec<String>) -> isize {
     // Print all tasks
     let mut num_tasks = 0;
     let mut task_string = String::new();
-    for (id, taskref) in TASKLIST.iter() {
+    for (id, taskref) in TASKLIST.lock().iter() {
         num_tasks += 1;
         let task = taskref.lock();
         let name = &task.name;
@@ -48,8 +48,8 @@ pub fn main(args: Vec<String>) -> isize {
             RunState::Initing    => "Initing",
             RunState::Runnable   => "Runnable",
             RunState::Blocked    => "Blocked",
+            RunState::Exited(_)  => "Exited",
             RunState::Reaped     => "Reaped",
-            _                    => "Exited",
         };
         let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
         let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
