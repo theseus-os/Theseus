@@ -59,35 +59,37 @@ pub fn main(args: Vec<String>) -> (){
         assert_eq!(priority3,Some(10));
     }
 
-    
+    taskref1.join().expect("Task 1 join failed");
+    taskref2.join().expect("Task 2 join failed");
+    taskref3.join().expect("Task 3 join failed");
 }
 
 fn test1(_a: u32) -> u32 {
-    let mut i = 1;
-    loop{
-    //for i in 0..10 {
+    //let mut i = 1;
+    //loop{
+    for i in 0..100000 {
        debug!("A {}", i);
-       i = i + 1; 
+       //i = i + 1; 
     }
     _a
 }
 
 fn test2(_a: u32) -> u32 {
-    let mut i = 1;
-    loop{
-    //for i in 0..10 {
+    //let mut i = 1;
+    //loop{
+    for i in 0..100000 {
        debug!("B {}", i);
-       i = i + 1; 
+       //i = i + 1; 
     }
     _a
 }
 
 fn test3(_a: u32) -> u32 {
-    let mut i = 1;
-    loop{
-    //for i in 1..10 {
+    //let mut i = 1;
+    //loop{
+    for i in 0..100000 {
        debug!("C {}", i);
-       i = i + 1; 
+       //i = i + 1; 
     }
     _a
 }
