@@ -82,7 +82,7 @@ impl TaskFs {
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
         let strong_parent = Arc::clone(parent_dir);
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref), false)?;
+        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
         Ok(dir_ref_copy)
     }
 
@@ -131,7 +131,7 @@ impl FsNode for TaskFs {
 
 impl Directory for TaskFs {
     /// This function adds a newly created fs node (the argument) to the TASKS directory's children map  
-    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot add children to read-only TaskFs")
     }
 
@@ -186,7 +186,7 @@ impl TaskDir {
 }
 
 impl Directory for TaskDir {
-    fn insert_child(&mut self, _child: FileOrDir, _overwrite: bool) -> Result<(), &'static str> {
+    fn insert_child(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot insert child into virtual task directory")
     }
 
@@ -340,7 +340,7 @@ impl MmiDir {
 }
 
 impl Directory for MmiDir {
-    fn insert_child(&mut self, _child: FileOrDir, _overwrite: bool) -> Result<(), &'static str> {
+    fn insert_child(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot insert child into virtual task directory")
     }
 

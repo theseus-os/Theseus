@@ -46,6 +46,13 @@ impl fmt::Display for Path {
     }
 }
 
+impl From<String> for Path {
+    #[inline]
+    fn from(path: String) -> Self {
+        Path {path: path}
+    }
+}
+
 impl Path {
     /// Creates a new `Path` from the given String.
     pub fn new(path: String) -> Self {
@@ -91,9 +98,6 @@ impl Path {
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
     fn canonicalize(&self, current_path: &Path) -> Path {
-        debug!("SELF PATH BEFORE CANONICALIZATION: {}", self.path);
-        debug!("ARG PATH BEFORE CANONICALIZATION: {}", current_path.path);
-
         let mut new_components = Vec::new();
         // Push the components of the working directory to the components of the new path
         new_components.extend(current_path.components());
@@ -175,7 +179,6 @@ impl Path {
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
-        let shortest_path = Path::new(self.path.clone());
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
         let mut curr_dir = {
             if self.is_absolute() {
@@ -186,7 +189,7 @@ impl Path {
             }
         };
 
-        for component in shortest_path.components() {
+        for component in self.components() {
             match component {
                 "." => { 
                     // stay in the current directory, do nothing. 

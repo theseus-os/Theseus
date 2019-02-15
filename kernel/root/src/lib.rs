@@ -51,22 +51,11 @@ pub struct RootDirectory {
 }
 
 impl Directory for RootDirectory {
-    fn insert_child(&mut self, child: FileOrDir, overwrite: bool) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
-        if let Some(old_child) = self.children.get(&name) { // the children map contains this key already if this passes
-            if overwrite {
-                match (old_child, &child) {
-                    (FileOrDir::File(_old_file), FileOrDir::Dir(ref _new_file)) => return Err("cannot replace file with directory of same name"),
-                    (FileOrDir::Dir(_old_dir), FileOrDir::File(ref _new_dir)) => return Err("cannot replace directory with file of same name"),
-                    _ => { } // the types check out, so we can overwrite later
-                };
-            } else {
-                return Err("file or directory with the same name already exists");
-            }
-        }
-        self.children.insert(name, child);
-        Ok(())
+        // inserts new child, if that child already exists the old value is returned
+        Ok(self.children.insert(name, child.clone()))
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
