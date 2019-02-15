@@ -85,7 +85,7 @@ impl File for MemFile {
                 let pages = memory::allocate_pages_by_bytes(buffer.len()).ok_or("could not allocate pages")?;
                 let mut mapped_pages = active_table.map_allocated_pages(pages,  EntryFlags::WRITABLE, allocator.lock().deref_mut())?;            
                 { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
-                    // Gets a mutuable reference to the byte portion of the newly mapped pages
+                    // Gets a mutable reference to the byte portion of the newly mapped pages
                     let mut dest_slice = mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 }
