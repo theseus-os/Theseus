@@ -59,7 +59,9 @@ impl MemFile {
 
 impl File for MemFile {
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
-        let offset = 0;
+        if offset > self.size {
+            return Err("read offset exceeds file size");
+        }
         // we can only copy up to the end of the given buffer or up to the end of the file
         let count = core::cmp::min(buffer.len(), self.size);
         buffer[..count].copy_from_slice(self.mp.as_slice(offset, count)?); 
@@ -67,6 +69,9 @@ impl File for MemFile {
     }
 
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
+        if offset > self.size {
+            return Err("write offset exceeds file size");
+        }
         if buffer.len() + offset <= self.mp.size_in_bytes() {
             { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
                 // Gets a mutuable reference to the byte portion of the newly mapped pages
