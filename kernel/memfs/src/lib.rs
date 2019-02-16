@@ -58,7 +58,7 @@ impl MemFile {
 }
 
 impl File for MemFile {
-    fn read(&self, buffer: &mut [u8]) -> Result<usize, &'static str> {
+    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         let offset = 0;
         // we can only copy up to the end of the given buffer or up to the end of the file
         let count = core::cmp::min(buffer.len(), self.size);
@@ -66,14 +66,17 @@ impl File for MemFile {
         Ok(count)
     }
 
-    fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str> {
-        // FIX ME: The write function overwrites the file's contents rather than appending to it
-        let offset = 0;
-        if buffer.len() <= self.mp.size_in_bytes() {
+    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
+        if buffer.len() + offset <= self.mp.size_in_bytes() {
             { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
                 // Gets a mutuable reference to the byte portion of the newly mapped pages
                 let dest_slice = self.mp.as_slice_mut::<u8>(offset, buffer.len())?;
                 dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
+                // if the buffer written into the mapped pages exceeds the current size, we set the new size equal to 
+                // this value
+                if (buffer.len() + offset) > self.size { 
+                    self.size = buffer.len() + offset; 
+                }
             }    
             Ok(self.mp.size_in_bytes())
         } else { // we'll allocate a new set of mapped pages
@@ -82,9 +85,19 @@ impl File for MemFile {
             if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                 let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
                 // Allocate and map the least number of pages we need to store the information contained in the buffer
-                let pages = memory::allocate_pages_by_bytes(buffer.len()).ok_or("could not allocate pages")?;
+                // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
+                // need (because it entered this conditional statement)
+                let pages = memory::allocate_pages_by_bytes(buffer.len() + offset).ok_or("could not allocate pages")?;
                 let mut mapped_pages = active_table.map_allocated_pages(pages,  EntryFlags::WRITABLE, allocator.lock().deref_mut())?;            
-                { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
+                { // scoped so that the mutable borrow on mapped_pages ends as soon as possible
+                    // first need to copy over the bytes from the previous mapped pages
+                    // this copies bytes up to the write offset 
+                    let existing_bytes = self.mp.as_slice(0, offset)?;
+                    let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, offset)?;
+                    copy_slice.copy_from_slice(existing_bytes);
+                }
+                {
+                    // now write the new content into the mapped pages
                     // Gets a mutable reference to the byte portion of the newly mapped pages
                     let mut dest_slice = mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page

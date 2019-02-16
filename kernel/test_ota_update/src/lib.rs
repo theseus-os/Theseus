@@ -78,7 +78,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         let df_path = Path::new(df.name);
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
         let cfile = MemFile::new(String::from(objfilename), &update_build_dir)?;
-        cfile.lock().write(content)?;
+        cfile.lock().write(content,0)?;
         debug!("    created new file at path: {}", cfile.lock().get_path_as_string());
     }
 

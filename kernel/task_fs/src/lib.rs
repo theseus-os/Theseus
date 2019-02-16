@@ -289,7 +289,7 @@ impl FsNode for TaskFile {
 }
 
 impl File for TaskFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, &'static str> { 
+    fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
         // copy as many bytes as we can 
@@ -297,7 +297,7 @@ impl File for TaskFile {
         Ok(count)
     }
 
-    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { 
+    fn write(&mut self, buf: &[u8], offset: usize) -> Result<usize, &'static str> { 
         Err("not permitted to write task contents through the task VFS") 
     } 
 
@@ -431,7 +431,7 @@ impl FsNode for MmiFile {
 }
 
 impl File for MmiFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, &'static str> { 
+    fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { 
         let output = self.generate();
         let count = core::cmp::min(buf.len(), output.len());
         // copy as many bytes as we can 
@@ -439,7 +439,7 @@ impl File for MmiFile {
         Ok(count)
     }
 
-    fn write(&mut self, buf: &[u8]) -> Result<usize, &'static str> { 
+    fn write(&mut self, buf: &[u8], offset: usize) -> Result<usize, &'static str> { 
         Err("not permitted to write task contents through the task VFS") 
     } 
 
