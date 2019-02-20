@@ -76,12 +76,21 @@ pub const CTRL_RST:                 u32 = (1<<26);
 
 /// RCTL commands
 pub const BSIZEPACKET_8K:           u32 = 8;
+pub const BSIZEHEADER_256B:         u32 = 4;
 pub const DESCTYPE_LEG:             u32 = 0;
 pub const DESCTYPE_ADV_1BUFFER:     u32 = 1;
+pub const DESCTYPE_ADV_HS:          u32 = 2;
 pub const RX_Q_ENABLE:              bool = true;
 
-pub const RSS_ONLY:                 u32 = 1;
-pub const RSS_UDPIPV4:              u32 = 0x40; // bit 22
+// RSS commands
+pub const RXCSUM_PCSD:              u32 = 1 << 13; 
+pub const MRQC_MRQE_RSS:            u32 = 1; // set bits 0..3 in MRQC
+pub const MRQC_TCPIPV4:             u32 = 1 << 16; 
+pub const MRQC_IPV4:                u32 = 1 << 17; 
+pub const MRQC_IPV6:                u32 = 1 << 20;
+pub const MRQC_TCPIPV6:             u32 = 1 << 21;  
+pub const MRQC_UDPIPV4:             u32 = 1 << 22; 
+pub const MRQC_UDPIPV6:             u32 = 1 << 23;  
  
 /// Buffer Sizes
 pub const RCTL_BSIZE_256:           u32 = (3 << 16);
@@ -199,7 +208,10 @@ pub struct IntelIxgbeRegisters {
     pub dtxtcpflgl:                 Volatile<u32>,          // 0x4A88;
     
     pub dtxtcpflgh:                 Volatile<u32>,          // 0x4A8C;
-    _padding22:                     [u8; 1520],             // 0x4A90 - 0x507F
+    _padding22:                     [u8; 1392],             // 0x4A90 - 0x4FFF
+
+    pub rxcsum:                     Volatile<u32>,          // 0x5000
+    _paddin22a:                     [u8; 124],              // 0x5004 - 0x507F
 
     pub fctrl:                      Volatile<u32>,          // 0x5080;
     _padding23:                     [u8; 164],              // 0x5084 - 0x5127
@@ -216,7 +228,12 @@ pub struct IntelIxgbeRegisters {
     _padding26:                     [u8; 11768],            // 0xA208 - 0xCFFF
 
     pub rx_regs2:                   RegisterArrayRx,        // 0xD000 - 0xDFFF, for 64 queues
-    _padding27:                     [u8; 3072],             // 0xE000 - 0xEBFF
+    _padding27:                     [u8; 2816],             // 0xE000 - 0xEAFF
+
+    pub reta:                       RegisterArray32,        // 0xEB00 - 0xEB7F
+
+    pub rssrk:                      RegisterArray10,        // 0xEB80 - 0xEBA7
+    _padding27a:                    [u8; 88],               // 0xEBA8 - 0xEBFF
 
     pub etqs:                       RegisterArray8,         // 0xEC00 - 0xEC1F;
     _padding28:                     [u8; 96],               // 0xEC20 - 0xEC7F
@@ -236,6 +253,16 @@ pub struct RegisterArray4 {
 #[repr(C)]
 pub struct RegisterArray8 {
     pub reg:                            [Volatile<u32>;8],
+}
+
+#[repr(C)]
+pub struct RegisterArray10 {
+    pub reg:                            [Volatile<u32>;10],
+}
+
+#[repr(C)]
+pub struct RegisterArray32 {
+    pub reg:                            [Volatile<u32>;32],
 }
 
 #[repr(C)]

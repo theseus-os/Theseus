@@ -24,6 +24,7 @@ extern crate volatile;
 extern crate mpmc;
 extern crate network_interface_card;
 extern crate owning_ref;
+extern crate rand;
 
 pub mod test_ixgbe_driver;
 pub mod descriptors;
@@ -54,14 +55,11 @@ use owning_ref::BoxRefMut;
 const IXGBE_NUM_RX_DESC:        usize = 1024;
 const IXGBE_NUM_TX_DESC:        usize = 8;
 
-// const SIZE_RX_DESC:       usize = 16;
-// const SIZE_TX_DESC:       usize = 16;
-
 const IXGBE_RX_BUFFER_SIZE_IN_BYTES:     u16 = 8192;
-const IXGBE_RX_HEADER_SIZE_IN_BYTES:     usize = 0;
+const IXGBE_RX_HEADER_SIZE_IN_BYTES:     u16 = 256;
 const IXGBE_TX_BUFFER_SIZE_IN_BYTES:     usize = 256;
 
-const IXGBE_NUM_RX_QUEUES:       usize = 2;
+const IXGBE_NUM_RX_QUEUES:       usize = 16;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -86,10 +84,20 @@ pub fn get_ixgbe_nic() -> Option<&'static MutexIrqSafe<IxgbeNic>> {
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
 const RX_BUFFER_POOL_SIZE: usize = 256; 
+
+/// How many receive headers are preallocated for this driver to use. 
+const RX_HEADER_POOL_SIZE: usize = 256; 
+
 lazy_static! {
-    /// The pool of pre-allocated receive buffers that are used by the E1000 NIC
+    /// The pool of pre-allocated receive buffers that are used by the IXGBE NIC
     /// and temporarily given to higher layers in the networking stack.
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
+}
+
+lazy_static! {
+    /// The pool of pre-allocated receive buffers that are used by the ixgbe nic to store the packet headers
+    /// and temporarily given to higher layers in the networking stack.
+    static ref RX_HEADER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_HEADER_POOL_SIZE);
 }
 
 /// The mapping flags used for pages that the NIC will map.
@@ -128,6 +136,10 @@ pub struct IxgbeNic {
     /// For example, `rx_bufs_in_use[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).
     /// should have one list for each rx queue
     rx_bufs_in_use: Vec<Vec<ReceiveBuffer>>, 
+    /// The list of rx buffers, in which the index in the vector corresponds to the index in `rx_descs`.
+    /// For example, `rx_bufs_in_use[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).
+    /// should have one list for each rx queue
+    rx_headers_in_use: Vec<Vec<ReceiveBuffer>>, 
     /// memory-mapped control registers
     regs: BoxRefMut<MappedPages, IntelIxgbeRegisters>,
     /// The queue of received Ethernet frames, ready for consumption by a higher layer.
@@ -220,10 +232,10 @@ impl IxgbeNic{
         // register_interrupt(interrupt_num + PIC_MASTER_OFFSET, ixgbe_handler);
         // redirect_interrupt(interrupt_num, 119);
 
-        let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
+        let (rx_descs, rx_buffers, rx_headers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
 
-        Self::set_rss(&mut mapped_registers);
+        Self::setup_mrq(&mut mapped_registers);
 
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
@@ -238,6 +250,7 @@ impl IxgbeNic{
             rx_cur: [0; IXGBE_NUM_RX_QUEUES],
             tx_cur: 0,
             rx_bufs_in_use: rx_buffers,
+            rx_headers_in_use: rx_headers,
             regs: mapped_registers,
             received_frames: VecDeque::new(),
         };
@@ -313,8 +326,23 @@ impl IxgbeNic{
             let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_BUFFER_POOL);
             if RX_BUFFER_POOL.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("e1000::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
-                return Err("e1000 rx buffer pool is full");
+                error!("ixgbe::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
+                return Err("ixgbe rx buffer pool is full");
+            };
+        }
+
+        Ok(())
+    }
+
+    fn init_rx_header_pool(num_rx_headers: usize) -> Result<(), &'static str> {
+        let length = IXGBE_RX_HEADER_SIZE_IN_BYTES;
+        for _i in 0..num_rx_headers {
+            let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
+            let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_HEADER_POOL);
+            if RX_HEADER_POOL.push(rx_buf).is_err() {
+                // if the queue is full, it returns an Err containing the object trying to be pushed
+                error!("ixgbe::init_rx_header_pool(): rx header pool is full, cannot add rx buffer {}!", _i);
+                return Err("ixgbe rx header pool is full");
             };
         }
 
@@ -405,13 +433,15 @@ impl IxgbeNic{
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them for all rx queues in use.
-    pub fn rx_init(regs: &mut IntelIxgbeRegisters) -> Result<(Vec<BoxRefMut<MappedPages, [AdvancedReceiveDescriptorR]>>, Vec<Vec<ReceiveBuffer>>), &'static str>  {
+    pub fn rx_init(regs: &mut IntelIxgbeRegisters) -> Result<(Vec<BoxRefMut<MappedPages, [AdvancedReceiveDescriptorR]>>, Vec<Vec<ReceiveBuffer>>, Vec<Vec<ReceiveBuffer>>), &'static str>  {
         Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE)?;
+        Self::init_rx_header_pool(RX_HEADER_POOL_SIZE)?;
 
         let size_in_bytes_of_all_rx_descs_per_queue = IXGBE_NUM_RX_DESC * core::mem::size_of::<AdvancedReceiveDescriptorR>();
 
         let mut rx_descs_all_queues = Vec::new();
         let mut rx_bufs_in_use_all_queues = Vec::new();
+        let mut rx_headers_in_use_all_queues = Vec::new();
         
         for queue in 0..IXGBE_NUM_RX_QUEUES {
             // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -423,6 +453,7 @@ impl IxgbeNic{
 
             // now that we've created the rx descriptors, we can fill them in with initial values
             let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(IXGBE_NUM_RX_DESC);
+            let mut rx_headers_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(IXGBE_NUM_RX_DESC);
             for rd in rx_descs.iter_mut()
             {
                 // obtain or create a receive buffer for each rx_desc
@@ -434,9 +465,22 @@ impl IxgbeNic{
                                 ReceiveBuffer::new(buf_mapped, buf_paddr, IXGBE_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)
                             )
                     })?;
-                let paddr = rx_buf.phys_addr;
+                let paddr_buf = rx_buf.phys_addr;
                 rx_bufs_in_use.push(rx_buf); 
-                rd.init(paddr as u64, 0); // TODO: Currently setting header address to be 0 because using descriptors with out splitting. Need to check if it's supported because manual says it's not (Section 7.1.6.1)
+
+                // obtain or create a receive header for each rx_desc
+                let rx_header = RX_HEADER_POOL.pop()
+                    .ok_or("Couldn't obtain a rx header from the pool")
+                    .or_else(|_e| {
+                        create_contiguous_mapping(IXGBE_RX_HEADER_SIZE_IN_BYTES as usize, nic_mapping_flags())
+                            .map(|(buf_mapped, buf_paddr)| 
+                                ReceiveBuffer::new(buf_mapped, buf_paddr, IXGBE_RX_HEADER_SIZE_IN_BYTES, &RX_HEADER_POOL)
+                            )
+                    })?;
+                let paddr_header = rx_header.phys_addr;
+                rx_headers_in_use.push(rx_header);
+
+                rd.init(paddr_buf as u64, paddr_header as u64); // TODO: Currently setting header address to be 0 because using descriptors with out splitting. Need to check if it's supported because manual says it's not (Section 7.1.6.1)
             }
 
             debug!("ixgbe::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
@@ -467,8 +511,9 @@ impl IxgbeNic{
 
             //set the size of the packet buffers and the descriptor format used
             let mut val = rx_queue_regs.rx_queue[queue_num].srrctl.read();
-            val.set_bits(0..4,BSIZEPACKET_8K);
-            val.set_bits(25..27,DESCTYPE_ADV_1BUFFER);
+            val.set_bits(0..4, BSIZEPACKET_8K);
+            val.set_bits(8..13, BSIZEHEADER_256B);
+            val.set_bits(25..27, DESCTYPE_ADV_HS);
             rx_queue_regs.rx_queue[queue_num].srrctl.write(val);
 
             //enable the rx queue
@@ -491,6 +536,7 @@ impl IxgbeNic{
 
             rx_descs_all_queues.push(rx_descs);
             rx_bufs_in_use_all_queues.push(rx_bufs_in_use);
+            rx_headers_in_use_all_queues.push(rx_headers_in_use);
         
         }
         
@@ -498,7 +544,7 @@ impl IxgbeNic{
         let val = regs.rxctrl.read();
         regs.rxctrl.write(val |1); //TODO: remove magic number
 
-        Ok((rx_descs_all_queues, rx_bufs_in_use_all_queues))
+        Ok((rx_descs_all_queues, rx_bufs_in_use_all_queues, rx_headers_in_use_all_queues))
     }
 
     //TODO: Remove magic numbers
@@ -514,12 +560,62 @@ impl IxgbeNic{
 
     //     Ok(())
     // }
+
+    /// enable multiple receive queues
+    /// Part of queue initialization is done in the rx_init function per queue
+    pub fn setup_mrq(regs: &mut IntelIxgbeRegisters) {
+        //enable RSS writeback in the header field of the receive descriptor
+        regs.rxcsum.write(RXCSUM_PCSD);
+        
+        //enable RSS and set fields that will be used by hash function
+        regs.mrqc.write(MRQC_MRQE_RSS | MRQC_UDPIPV4 ); //MRQC_IPV4 | MRQC_IPV6 | MRQC_TCPIPV4 | MRQC_TCPIPV6 | MRQC_UDPIPV4 | MRQC_UDPIPV6);
+
+        //set the random keys for the hash function
+        //TODO: using multiples of 33 for no good reason. Need to find a RNG with no_std.
+        for i in 0..10 {
+            regs.rssrk.reg[i].write(i as u32 * 33);
+        }
+
+        // Initialize the RSS redirection table
+        // Right now I'm making it so that that only 0-3 are given as the output index
+        for i in 0..(32 / 4) {
+            let mut val = regs.reta.reg[i*4].read();
+            val.set_bits(0..4, 0);
+            val.set_bits(8..12, 1);
+            val.set_bits(16..20, 2);
+            val.set_bits(24..28, 3);
+            regs.reta.reg[i*4].write(val);
+
+            let mut val = regs.reta.reg[i*4 + 1].read();
+            val.set_bits(0..4, 4);
+            val.set_bits(8..12, 5);
+            val.set_bits(16..20, 6);
+            val.set_bits(24..28, 7);
+            regs.reta.reg[i*4 + 1].write(val);
+
+            let mut val = regs.reta.reg[i*4 + 2].read();
+            val.set_bits(0..4, 8);
+            val.set_bits(8..12, 9);
+            val.set_bits(16..20, 10);
+            val.set_bits(24..28, 11);
+            regs.reta.reg[i*4 + 2].write(val);
+
+            let mut val = regs.reta.reg[i*4 + 3].read();
+            val.set_bits(0..4, 12);
+            val.set_bits(8..12, 13);
+            val.set_bits(16..20, 14);
+            val.set_bits(24..28, 15);
+            regs.reta.reg[i*4 + 3].write(val);
+        }
+
+
+    }
     
     /// enable receive side scaling to allow packets to be received on multiple queues
     pub fn set_rss(regs: &mut IntelIxgbeRegisters) {
         let mut val = regs.mrqc.read();
-        val.set_bits(0..3,RSS_ONLY);
-        val.set_bits(16..31, RSS_UDPIPV4);
+        val.set_bits(0..3, MRQC_MRQE_RSS);
+        val.set_bits(16..31, MRQC_UDPIPV4);
         regs.mrqc.write(val);
     }
 
@@ -657,7 +753,10 @@ impl IxgbeNic{
             // get information about the current receive buffer
             let length = rx_descs[rx_cur].get_pkt_len();
             let status = rx_descs[rx_cur].get_ext_status();
-            debug!("ixgbe: received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur[queue_num], length, status);
+            let rss_type = rx_descs[rx_cur].get_rss_type();
+            let rss_hash = rx_descs[rx_cur].get_rss_hash();
+            let packet_type = rx_descs[rx_cur].get_packet_type();
+            debug!("ixgbe: received rx buffer [{}]: length: {}, status: {:#X}, rss type: {:#X}, rss hash: {:#X}, packet_type: {:#X}", self.rx_cur[queue_num], length, status, rss_type, rss_hash, packet_type);
 
             total_packet_length += length as u16;
 

@@ -54,6 +54,11 @@ path = "../network_interface_card"
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 
+[dependencies.rand]
+version = "0.6"
+default-features = false 
+features = [ "alloc" ]
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 
