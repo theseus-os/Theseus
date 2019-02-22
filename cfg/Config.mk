@@ -43,3 +43,9 @@ RUSTFLAGS += -C relocation-model=static
 ## promote unused must-use types (like Result) to an error
 RUSTFLAGS += -D unused-must-use
 
+## As of Dec 31, 2018, this is needed to make loadable mode work, because otherwise, 
+## some core generic function implementations won't exist in the object files.
+## Details here: https://github.com/rust-lang/rust/pull/57268
+## Relevant rusct commit: https://github.com/jethrogb/rust/commit/71990226564e9fe327bc9ea969f9d25e8c6b58ed#diff-8ad3595966bf31a87e30e1c585628363R8
+RUSTFLAGS += -Z merge-functions=disabled
+
