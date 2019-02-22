@@ -24,7 +24,6 @@
 //!
 
 #![no_std]
-#![feature(integer_atomics)]
 #![feature(asm)]
 #![feature(alloc)]
 
