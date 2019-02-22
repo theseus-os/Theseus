@@ -374,6 +374,7 @@ pub fn init(boot_info: &BootInformation)
             continue;
         }
         let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
+        let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
 
         available[avail_index] = PhysicalMemoryArea {
             base_addr: start_paddr,

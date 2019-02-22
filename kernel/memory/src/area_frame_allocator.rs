@@ -59,9 +59,12 @@ pub struct AreaFrameAllocator {
 }
 
 impl AreaFrameAllocator {
-    pub fn new(available: [PhysicalMemoryArea; 32], avail_len: usize, occupied: [PhysicalMemoryArea; 32], occ_len: usize) 
-               -> Result<AreaFrameAllocator, &'static str> {
-
+    pub fn new(
+        available: [PhysicalMemoryArea; 32], 
+        avail_len: usize, 
+        occupied: [PhysicalMemoryArea; 32], 
+        occ_len: usize
+    ) -> Result<AreaFrameAllocator, &'static str> {
         let mut allocator = AreaFrameAllocator {
             next_free_frame: Frame::containing_address(0),
             current_area: None,
@@ -140,7 +143,7 @@ impl AreaFrameAllocator {
     /// Determines whether or not the current `next_free_frame` is within any occupied memory area,
     /// and advances it to the start of the next free region after the occupied area.
     fn skip_occupied_frames(&mut self) {
-        let orig_frame: usize = self.next_free_frame.number;
+        let mut rerun = false;
         match self.occupied {
             VectorArray::Array((len, ref arr)) => {
                 for area in arr.iter().take(len) {
@@ -148,8 +151,9 @@ impl AreaFrameAllocator {
                     let end = Frame::containing_address(area.base_addr + area.size_in_bytes);
                     if self.next_free_frame >= start && self.next_free_frame <= end {
                         self.next_free_frame = end + 1; 
-                        trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
-                        return;
+                        trace!("AreaFrameAllocator: skipping occupied area to next frame {:?}", self.next_free_frame);
+                        rerun = true;
+                        break;
                     }
                 }
             }
@@ -159,12 +163,19 @@ impl AreaFrameAllocator {
                     let end = Frame::containing_address(area.base_addr + area.size_in_bytes);
                     if self.next_free_frame >= start && self.next_free_frame <= end {
                         self.next_free_frame = end + 1; 
-                        trace!("AreaFrameAllocator: skipping frame {:?} to next frame {:?}", orig_frame, self.next_free_frame);
-                        return;
+                        trace!("AreaFrameAllocator: skipping occupied area to next frame {:?}", self.next_free_frame);
+                        rerun = true;
+                        break;
                     }
                 }
             }
         };
+        
+        // If we actually skipped an occupied area, then we need to rerun this again,
+        // to ensure that we didn't skip into another occupied area.
+        if rerun {
+            self.skip_occupied_frames();
+        }
     }
 }
 
