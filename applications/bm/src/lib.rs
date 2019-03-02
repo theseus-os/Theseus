@@ -103,7 +103,7 @@ fn hpet_2_us(hpet: u64) -> u64 {
 
 fn hpet_2_ns(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	rtn = hpet * hpet_period as u64 / NANO_TO_FEMTO
+	hpet * hpet_period as u64 / NANO_TO_FEMTO
 }
 
 fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
