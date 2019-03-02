@@ -29,7 +29,7 @@ const MICRO_TO_FEMTO: u64 = 1_000_000_000;
 const NANO_TO_FEMTO: u64 = 1_000_000;
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
-const MB_IN_KB: usize = 1024;
+// const MB_IN_KB: usize = 1024;
 const MB: u64 = 1024 * 1024;
 const KB: u64 = 1024;
 
@@ -412,7 +412,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	} as i64;
 	let mut unread_size = size;
 
-	if size % READ_BUF_SIZE as i64 != 0 {
+	if unread_size % READ_BUF_SIZE as i64 != 0 {
 		return Err("File size is not alligned");
 	}
 
