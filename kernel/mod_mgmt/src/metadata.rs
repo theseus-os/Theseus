@@ -628,9 +628,3 @@ impl fmt::Debug for LoadedSection {
         write!(f, "LoadedSection(name: {:?}, vaddr: {:#X})", self.name, self.virt_addr)
     }
 }
-
-impl Drop for LoadedSection {
-    fn drop(&mut self) {
-        trace!("### Dropped LoadedSection {:?} {:?}", self.typ, self.name);
-    }
-}
