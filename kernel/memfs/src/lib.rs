@@ -40,7 +40,8 @@ pub struct MemFile {
 impl MemFile {
     /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
     pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
-        let new_file = Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)?;
+        let empty_pages = MappedPages::empty();        
+        let new_file = Self::from_mapped_pages(empty_pages, name, 0, parent)?;
         Ok(new_file) // 0 because we're creating an empty file
     }
 
@@ -70,11 +71,8 @@ impl File for MemFile {
     }
 
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
-        if offset > self.size {
-            return Err("write offset exceeds file size");
-        }
-
-        if !self.mp.flags().is_writable() {
+        // The pages are already allocated and are not writeable
+        if !self.mp.flags().is_writable() && self.mp.size_in_bytes() != 0 {
             return Err("MemFile::write(): existing MappedPages were not writable");
         }
 
@@ -91,7 +89,14 @@ impl File for MemFile {
             }    
             Ok(self.mp.size_in_bytes())
         } else { // we'll allocate a new set of mapped pages
-            let prev_flags = self.mp.flags();
+            // If the mapped pages are empty (i.e. haven't been allocated), we make them writable
+            // Otherwise, use the existing entry flags
+            let prev_flags;
+            if self.mp.size_in_bytes() == 0 {
+                prev_flags = EntryFlags::WRITABLE;
+            } else {
+                prev_flags = self.mp.flags();
+            }
             // Obtain the active kernel page table
             let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
             if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
@@ -103,8 +108,8 @@ impl File for MemFile {
                 let mut mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
                 { // scoped so that the mutable borrow on mapped_pages ends as soon as possible
                     // first need to copy over the bytes from the previous mapped pages
-                    // this copies bytes up to the write offset 
-                    let existing_bytes = self.mp.as_slice(0, offset)?;
+                    // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
+                    let existing_bytes = self.mp.as_slice(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
                     let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, offset)?;
                     copy_slice.copy_from_slice(existing_bytes);
                 } 

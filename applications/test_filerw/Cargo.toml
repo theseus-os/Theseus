@@ -1,0 +1,25 @@
+[package]
+name = "test_filerw"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.memfs]
+path = "../../kernel/memfs"
+
+[dependencies.root]
+path = "../../kernel/root"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"
