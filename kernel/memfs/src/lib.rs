@@ -17,8 +17,7 @@ extern crate irq_safety;
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, FRAME_ALLOCATOR};
-use memory::EntryFlags;
+use memory::{MappedPages, FRAME_ALLOCATOR, EntryFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
 use alloc::boxed::Box;
@@ -60,6 +59,8 @@ impl MemFile {
 }
 
 impl File for MemFile {
+    // read will throw an error if you pass in a mutable buffer that tries to read past 
+    // the end of the file
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         if offset > self.size {
             return Err("read offset exceeds file size");
@@ -87,7 +88,7 @@ impl File for MemFile {
                     self.size = buffer.len() + offset; 
                 }
             }    
-            Ok(self.mp.size_in_bytes())
+            Ok(buffer.len())
         } else { // we'll allocate a new set of mapped pages
             // If the mapped pages are empty (i.e. haven't been allocated), we make them writable
             // Otherwise, use the existing entry flags
@@ -110,7 +111,7 @@ impl File for MemFile {
                     // first need to copy over the bytes from the previous mapped pages
                     // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
                     let existing_bytes = self.mp.as_slice(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
-                    let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, offset)?;
+                    let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
                     copy_slice.copy_from_slice(existing_bytes);
                 } 
                 {

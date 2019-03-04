@@ -21,5 +21,7 @@ path = "../../kernel/memfs"
 [dependencies.root]
 path = "../../kernel/root"
 
+[dependencies.memory]
+path = "../../kernel/memory"
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
