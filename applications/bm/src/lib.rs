@@ -39,6 +39,8 @@ const TRIES: usize = 10;
 
 // don't change it. 
 const READ_BUF_SIZE: usize = 64*1024;
+const WRITE_BUF_SIZE: usize = 128*1024;
+const WRITE_BUF: [u8; WRITE_BUF_SIZE] = [65; WRITE_BUF_SIZE];
 
 #[cfg(bm_in_us)]
 const T_UNIT: &str = "micro sec";
@@ -186,7 +188,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
 
-	printlninfo!("null_test_inner ({}/{}): {} total_time -> {} {} (ignore: {})", 
+	printlninfo!("null_test_inner ({}/{}): {} total_time -> {} {} (ignore: {})",
 		th, nr, delta_time, delta_time_avg, T_UNIT, mypid);
 
 	delta_time_avg
@@ -249,7 +251,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
     let delta_hpet = end_hpet - start_hpet - overhead_ct;
     let delta_time = hpet_2_time("", delta_hpet);
     let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("spawn_test_inner ({}/{}): : {} total_time -> {} {}", 
+	printlninfo!("spawn_test_inner ({}/{}): {} total_time -> {} {}",
 		th, nr, delta_time, delta_time_avg, T_UNIT);
 
 	Ok(delta_time_avg)
@@ -303,20 +305,79 @@ fn get_cwd() -> Option<DirRef> {
 fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 	if let Some(fileref) = get_file(filename) {
 		if fileref.lock().size() == sz {
-			printlninfo!("{} exits", filename);
 			return Ok(());
 		}
 	}
 
-	let mut output = String::new();
-	for i in 0..sz-1 {
-		output.push((i as u8 % 10 + 48) as char);
+    MemFile::new(filename.to_string(), &WRITE_BUF[0..sz], &get_cwd().unwrap()).expect("File cannot be created.");
+
+	Ok(())
+}
+
+fn del_or_err(filename: &str) -> Result<(), &'static str> {
+	if let Some(_fileref) = get_file(filename) {
+		return Err("Need to delete a file, but delete() is not implemented yet :(");
 	}
-	output.push('!'); // my magic char for the last byte
 
-    MemFile::new(filename.to_string(), output.as_bytes(), &get_cwd().unwrap()).expect("File cannot be created.");
+	Ok(())
+}
 
-	printlninfo!("{} is created.", filename);
+fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static str> {
+	let mut filenames = vec!["".to_string(); ITERATIONS];
+	let pid = getpid();
+	let start_hpet_create: u64;
+	let end_hpet_create: u64;
+	// let start_hpet_del: u64;
+	// let end_hpet_del: u64;
+
+
+	// populate filenames
+	for i in 0..ITERATIONS {
+		filenames[i] = format!("tmp_{}_{}_{}.txt", pid, fsize_b, i);
+	}
+
+	// check if we have enough data to write. We use just const data to avoid unnecessary overhead
+	if fsize_b > WRITE_BUF_SIZE {
+		// don't put this into mk_tmp_file() or the loop below
+		// mk_tmp_file() and the loop below must be minimal for create/del benchmark
+		return Err("Cannot test because the file size is too big");
+	}
+
+	// delete existing files. To make sure that the file creation below succeeds.
+	for filename in &filenames {
+		del_or_err(filename).expect("Cannot continue the test. We need 'delete()'.");
+	}
+
+	// don't put this into the loop to be timed
+	let cwd = match get_cwd() {
+		Some(dirref) => {dirref}
+		_ => {return Err("Cannot get CWD");}
+	};
+
+	// create
+	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	for filename in &filenames {
+		// checking if filename exists is done above
+		// here, we only create files
+		MemFile::new(filename.to_string(), &WRITE_BUF[0..fsize_b], &cwd).expect("File cannot be created.");
+	}
+	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+
+	// delete --- complete this once delete() is implemented
+	/*start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+	for filename in filenames {
+		if let Some(fileref) = get_file_in(filename, &cwd) {
+			// fileref.lock().delete();
+		}
+	}
+	end_hpet_del = get_hpet().as_ref().unwrap().get_counter();*/
+
+	let delta_hpet_create = end_hpet_create - start_hpet_create - overhead_ct;
+	let delta_time_create = hpet_2_time("", delta_hpet_create);
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let files_per_time = (ITERATIONS * ITERATIONS) as u64 * to_sec / delta_time_create;
+
+	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
 	Ok(())
 }
 
@@ -380,6 +441,20 @@ fn get_file(filename: &str) -> Option<FileRef> {
 	}
 }
 
+// the function is not used now. but it can be used in the future, e.g., remove
+/*fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
+	let path = Path::new(filename.to_string());
+	match path.get(dirref) {
+		Ok(file_dir_enum) => {
+			match file_dir_enum {
+                FileOrDir::File(fileref) => { Some(fileref) }
+                _ => {None}
+            }
+		}
+		_ => { None }
+	}
+}*/
+
 fn test_file(filename: &str) {
 	if let Some(fileref) = get_file(filename) {
 		test_file_inner(fileref);
@@ -395,7 +470,16 @@ fn do_fs() {
 }
 
 fn do_fs_create_del() {
-	printlninfo!("Cannot test without MemFile::Delete()...");
+	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
+	let	fsizes_b = [1024_usize, 4096, 10*1024];
+
+	let overhead_ct = timing_overhead();
+
+	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
+	printlninfo!("SIZE(KB)    Iteration    created(files/s)");
+	for fsize_b in fsizes_b.iter() {
+		do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+	}
 }
 
 fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
@@ -451,7 +535,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
 	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
 
-	printlninfo!("read_with_open_inner ({}/{}): : {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})", 
+	printlninfo!("read_with_open_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
 		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
 
 	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
@@ -510,7 +594,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
 	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
 
-	printlninfo!("read_only_inner ({}/{}): : {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})", 
+	printlninfo!("read_only_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
 		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
 
 	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
@@ -522,9 +606,16 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 	let mut tries_kb: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
+	let fsize_b = fsize_kb * KB as usize;
 
 	let filename = format!("tmp_{}k.txt", fsize_kb);
-	mk_tmp_file(&filename, fsize_kb * 1024).expect("Cannot create a file");
+	if fsize_b > WRITE_BUF_SIZE {
+		// don't put this into mk_tmp_file()
+		// mk_tmp_file() must be minimal for create/del benchmark
+		printlnwarn!("Cannot test because the file size is too big");
+		return;
+	}
+	mk_tmp_file(&filename, fsize_b).expect("Cannot create a file");
 
 	for i in 0..TRIES {
 		let (lat, tput_mb, tput_kb) = if with_open {
@@ -554,14 +645,14 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 }
 
 fn do_fs_read(with_open: bool) {
-	let f_size = 1024;
-	printlninfo!("File size     : {} KB", f_size);
+	let fsize_kb = 1024;
+	printlninfo!("File size     : {} KB", fsize_kb);
 	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
 	printlninfo!("========================================");
 
 	let overhead_ct = timing_overhead();
 
-	do_fs_read_with_size(overhead_ct, f_size, with_open);
+	do_fs_read_with_size(overhead_ct, fsize_kb, with_open);
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
