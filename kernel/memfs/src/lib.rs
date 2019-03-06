@@ -68,8 +68,6 @@ impl File for MemFile {
         let count = core::cmp::min(buffer.len() + offset, self.size);
         let bytes_read = count - offset;
         // The subslice buffer and the source slice are guranteed to be the same size
-        // let dest_slice = &buffer[..bytes_read];
-        let mp_slice: & [u8] = self.mp.as_slice(offset,count - offset)?;
         buffer[..bytes_read].copy_from_slice(self.mp.as_slice(offset, bytes_read)?); 
         Ok(bytes_read) 
     }
