@@ -123,7 +123,6 @@ impl Path {
                 new_path.push_str(&format!("/{}",  component));
             }
         }
-        debug!("NEW PATH IS {}", new_path);
         Path::new(new_path)
     }
     

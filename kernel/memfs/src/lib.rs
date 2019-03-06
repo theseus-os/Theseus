@@ -68,7 +68,7 @@ impl File for MemFile {
         // we can only copy up to the end of the given buffer or up to the end of the file
         let count = core::cmp::min(buffer.len(), self.size);
         buffer[..count].copy_from_slice(self.mp.as_slice(offset, count)?); 
-        Ok(count)
+        Ok(count - offset) // Returns the number of bytes that were read
     }
 
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {

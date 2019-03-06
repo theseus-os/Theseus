@@ -53,7 +53,7 @@ impl Directory for VFSDirectory {
          // gets the name of the child node to be added
         let name = child.get_name();
         // inserts new child, if that child already exists the old value is returned
-        Ok(self.children.insert(name, child.clone()))
+        Ok(self.children.insert(name, child))
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {

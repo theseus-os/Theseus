@@ -30,7 +30,6 @@ fn test_filerw() -> Result<(), &'static str> {
     let file_size = testfile.lock().size();
     let mut string_slice_as_bytes = vec![0; file_size];
     testfile.lock().read(&mut string_slice_as_bytes, 0)?;
-    debug!("first test file string is: {}", str::from_utf8(&mut string_slice_as_bytes).unwrap());
     println!("first test file string is {}", str::from_utf8(&mut string_slice_as_bytes).unwrap());
     println!("size of test file should be 15, actual is {}", testfile.lock().size());
     println!("first test successful: wrote to empty file");
@@ -39,7 +38,6 @@ fn test_filerw() -> Result<(), &'static str> {
     testfile.lock().write("OVERWRITE".as_bytes(), 5)?;
     let mut string_slice_as_bytes2 = vec![0; file_size];
     testfile.lock().read(&mut string_slice_as_bytes2, 0)?;
-    debug!("second test file string is: {}", str::from_utf8(&mut string_slice_as_bytes2).unwrap());
     println!("second test file string is: {}", str::from_utf8(&mut string_slice_as_bytes2).unwrap());
     println!("size of testfile should be 15, actual is {}", testfile.lock().size());
     println!("second test successful: overwrote file contents at an offset");
@@ -48,7 +46,6 @@ fn test_filerw() -> Result<(), &'static str> {
     testfile.lock().write("OVERWRITE ALL CONTENTS".as_bytes(), 0)?;
     let mut full_overwrite_bytes = vec![0; file_size];
     testfile.lock().read(&mut full_overwrite_bytes, 0)?;
-    debug!("third test file string is: {}", str::from_utf8(&mut full_overwrite_bytes).unwrap());
     println!("third test file string is: {}", str::from_utf8(&mut full_overwrite_bytes).unwrap());
     println!("size of testfilel should be {}, actual is {}", 22, testfile.lock().size());
     println!("third test successful: fully overwrote existing file content");
@@ -57,7 +54,6 @@ fn test_filerw() -> Result<(), &'static str> {
     testfile.lock().write("hello way down here".as_bytes(), 4094)?;
     let mut reallocate2 = vec![0; "hello way down here".as_bytes().len()];
     testfile.lock().read(&mut reallocate2, 4094)?;
-    debug!("fourth read is: {}", str::from_utf8(&mut reallocate2).unwrap());
     println!("fourth read is: {}", str::from_utf8(&mut reallocate2).unwrap());
     println!("size of testfile should be {}, actual is {}", 4094 + 19, testfile.lock().size());
     println!("fourth test successful: expanded file to two mapped pages via reallocation");
@@ -67,7 +63,6 @@ fn test_filerw() -> Result<(), &'static str> {
     testfile.lock().write("reallocated to four mapped pages".as_bytes(), 4096 * 4 + 5)?;
     let mut reallocate4 = vec![0; "reallocated to four mapped pages".as_bytes().len()];
     testfile.lock().read(&mut reallocate4, 4096 * 4 + 5)?;
-    debug!("fifth  read is: {}", str::from_utf8(&mut reallocate4).unwrap());
     println!("fifth read is: {}", str::from_utf8(&mut reallocate4).unwrap());
     println!("size of testfile should be {}, actual is {}", 4096 * 4 + 5 + 32, testfile.lock().size());
     println!("fifth test successful: expanded file to four mapped pages via reallocation");

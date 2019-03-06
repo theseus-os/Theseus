@@ -55,7 +55,7 @@ impl Directory for RootDirectory {
         // gets the name of the child node to be added
         let name = child.get_name();
         // inserts new child, if that child already exists the old value is returned
-        Ok(self.children.insert(name, child.clone()))
+        Ok(self.children.insert(name, child))
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
@@ -80,6 +80,6 @@ impl FsNode for RootDirectory {
 
     /// we just return the root itself because it is the top of the filesystem
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        return Ok(get_root().clone());
+        Ok(get_root().clone())
     }
 }
