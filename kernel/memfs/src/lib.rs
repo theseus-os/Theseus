@@ -59,16 +59,19 @@ impl MemFile {
 }
 
 impl File for MemFile {
-    // read will throw an error if you pass in a mutable buffer that tries to read past 
-    // the end of the file
+    // read will throw an error if the read offset extends past the end of the file
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         if offset > self.size {
             return Err("read offset exceeds file size");
         }
         // we can only copy up to the end of the given buffer or up to the end of the file
-        let count = core::cmp::min(buffer.len(), self.size);
-        buffer[..count].copy_from_slice(self.mp.as_slice(offset, count)?); 
-        Ok(count - offset) // Returns the number of bytes that were read
+        let count = core::cmp::min(buffer.len() + offset, self.size);
+        let bytes_read = count - offset;
+        // The subslice buffer and the source slice are guranteed to be the same size
+        // let dest_slice = &buffer[..bytes_read];
+        let mp_slice: & [u8] = self.mp.as_slice(offset,count - offset)?;
+        buffer[..bytes_read].copy_from_slice(self.mp.as_slice(offset, bytes_read)?); 
+        Ok(bytes_read) 
     }
 
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
@@ -81,9 +84,11 @@ impl File for MemFile {
             { // scoped this so that the mutable borrow on mapped_pages ends as soon as possible
                 // Gets a mutuable reference to the byte portion of the newly mapped pages
                 let dest_slice = self.mp.as_slice_mut::<u8>(offset, buffer.len())?;
+                // The destination slice is guranteed to be the same length as the source slice by the virtue
+                // of entering this conditional
                 dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 // if the buffer written into the mapped pages exceeds the current size, we set the new size equal to 
-                // this value
+                // this value, otherwise, the size remains the same
                 if (buffer.len() + offset) > self.size { 
                     self.size = buffer.len() + offset; 
                 }
@@ -112,12 +117,16 @@ impl File for MemFile {
                     // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
                     let existing_bytes = self.mp.as_slice(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
                     let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
+                    // Destination slice is guaranteed to be the same length as the source slice because they both index
+                    // with the same beginning and end parameters
                     copy_slice.copy_from_slice(existing_bytes);
                 } 
                 {
                     // now write the new content into the mapped pages
                     // Gets a mutable reference to the byte portion of the newly mapped pages
                     let mut dest_slice = mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
+                    // Destination slice is guaranteed to be the same length as the source slice because
+                    // we allocated enough MappedPages capacity to store the entire write buffer
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 }
                 self.mp = mapped_pages;

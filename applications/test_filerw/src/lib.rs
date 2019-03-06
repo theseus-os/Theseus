@@ -29,9 +29,16 @@ fn test_filerw() -> Result<(), &'static str> {
     testfile.lock().write("test from hello".as_bytes(),0)?;
     let file_size = testfile.lock().size();
     let mut string_slice_as_bytes = vec![0; file_size];
-    testfile.lock().read(&mut string_slice_as_bytes, 0)?;
+    testfile.lock().read(&mut string_slice_as_bytes, 5)?;
     println!("first test file string is {}", str::from_utf8(&mut string_slice_as_bytes).unwrap());
     println!("size of test file should be 15, actual is {}", testfile.lock().size());
+
+
+    // tests that the read function works when we pass an oversized buffer with an offset that exceeds the end of the file
+    let mut oversize_buffer = vec![0; 4 * file_size];
+    let test1_bytesread = testfile.lock().read(&mut oversize_buffer, 5)?;
+    println!("first test (part 2) should have read 10 bytes, actually read {} bytes", test1_bytesread);
+    println!("first test read output should be 'from hello', actually is '{}'", str::from_utf8(&mut oversize_buffer).unwrap());
     println!("first test successful: wrote to empty file");
 
     // test that we can overwrite overlapping existing content
