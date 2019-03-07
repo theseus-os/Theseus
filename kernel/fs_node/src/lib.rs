@@ -58,14 +58,14 @@ pub trait FsNode {
 
 // Traits for files, implementors of File must also implement FsNode
 pub trait File : FsNode {
-    /// Reads the contents of this file into the given `buffer`
-    /// Caller should pass in an empty buffer and the read function will query the size of the buffer
+    /// Reads the contents of this file starting at the given `offset` and copies them into the given `buffer`.
+    /// The length of the given `buffer` determines the maximum number of bytes to be read.
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str>; 
-    /// Writes the bytes argument to the contents of the file
+    /// Writes the given `buffer` to this file starting at the given `offset`.
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str>;
     /// Deletes the file
     fn delete(self) -> Result<(), &'static str>;
-    /// Returns the size of the actual file content (i.e. the bytes that correspond to user-meaningful information) 
+    /// Returns the size in bytes of the file.
     fn size(&self) -> usize;
     /// Returns a view of the file as an immutable memory-mapped region.
     fn as_mapping(&self) -> Result<&MappedPages, &'static str>;
