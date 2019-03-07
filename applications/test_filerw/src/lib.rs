@@ -90,7 +90,7 @@ fn test_filerw() -> Result<(), &'static str> {
 
 
     // tests that the read function works when we pass an oversized buffer with an offset that exceeds the end of the file
-    let testfile2 = MemFile::new("testfile".to_string(), &parent)?;
+    let testfile2 = MemFile::new("testfile2".to_string(), &parent)?;
     testfile2.lock().write("test from hello".as_bytes(),0)?;
     let mut oversize_buffer = vec![0; 4 * file_size];
     let test1_bytesread = testfile2.lock().read(&mut oversize_buffer, 0)?;

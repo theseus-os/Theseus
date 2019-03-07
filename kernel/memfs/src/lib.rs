@@ -114,13 +114,19 @@ impl File for MemFile {
                 // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
                 // need (because it entered this conditional statement)
                 let pages = memory::allocate_pages_by_bytes(buffer.len() + offset).ok_or("could not allocate pages")?;
-                let mut mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
+                let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
                 { // scoped so that this mutable borrow on mapped_pages ends before the next borrow
                     // first need to copy over the bytes from the previous mapped pages
                     // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
-                    
-                    let existing_bytes = self.mp.as_slice(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
-                    let mut copy_slice = mapped_pages.as_slice_mut::<u8>(0, core::cmp::min(offset, self.mp.size_in_bytes()))?;
+                    let copy_limit;
+                    // The write does not overlap with existing content, so we copy all existing content
+                    if offset > self.size { 
+                        copy_limit = self.size;
+                    } else { // Otherwise, we only copy up to where the overlap begins
+                        copy_limit = offset;
+                    }
+                    let existing_bytes = self.mp.as_slice(0, copy_limit)?;
+                    let mut copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
                     // Destination slice is guaranteed to be the same length as the source slice because they both index
                     // with the same beginning and end parameters
                     copy_slice.copy_from_slice(existing_bytes);
@@ -128,12 +134,12 @@ impl File for MemFile {
                 {
                     // now write the new content into the mapped pages
                     // Gets a mutable reference to the byte portion of the newly mapped pages
-                    let mut dest_slice = mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
+                    let mut dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
                     // Destination slice is guaranteed to be the same length as the source slice because
                     // we allocated enough MappedPages capacity to store the entire write buffer
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 }
-                self.mp = mapped_pages;
+                self.mp = new_mapped_pages;
                 self.size = end;
                 return Ok(buffer.len());
             }
