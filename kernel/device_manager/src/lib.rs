@@ -64,6 +64,9 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         debug!("82599 Device found: {:?}", pci_dev_82599);
         let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;
     }
+    else {
+        warn!("No 82599 device found on this system.");
+    }
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
         debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
         let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
@@ -71,9 +74,6 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
         let e1000_iface = e1000_smoltcp_device::E1000NetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
         network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
-    }
-    else {
-        warn!("No 82599 device found on this system.");
     }
     
 

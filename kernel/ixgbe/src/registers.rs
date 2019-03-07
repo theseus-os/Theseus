@@ -21,12 +21,6 @@ pub const REG_AUTOC:                u32 = 0x42A0;
 pub const REG_AUTOC2:               u32 = 0x42A8;
 pub const REG_LINKS:                u32 = 0x42A4;
 
-pub const AUTOC_FLU:                u32 = 1;
-pub const AUTOC_LMS:                u32 = 6<<13; //KX/KX4//KR
-pub const AUTOC_10G_PMA_PMD_PAR:    u32 = 1<<7;
-pub const AUTOC2_10G_PMA_PMD_PAR:   u32 = 0<<8|0<<7; 
-pub const AUTOC_RESTART_AN:         u32 = 1<<12;
-
 pub const REG_EERD:                 u32 = 0x10014;
 
 pub const REG_HLREG0:               u32 = 0x4240;
@@ -70,9 +64,33 @@ pub const REG_ETQS:                 u32 = 0xEC00;
 
 /******************/
 
+// Link set up commands
+pub const AUTOC_LMS_CLEAR:          u32 = 0x0000_E000; // set bits 13..15 to 0, also used to set 1 GB etehrnet
+pub const AUTOC_LMS_1_GB:           u32 = 0x0000_E000;
+pub const AUTOC_LMS_10_GBE_P:       u32 = 1 << 13;
+pub const AUTOC_LMS_10_GBE_S:       u32 = 3 << 13;
+
+pub const AUTOC_FLU:                u32 = 1;
+pub const AUTOC_LMS:                u32 = 6<<13; //KX/KX4//KR
+pub const AUTOC_RESTART_AN:         u32 = 1<<12;
+pub const AUTOC_1G_PMA_PMD:         u32 = 0x0000_0200; //clear bit 9
+pub const AUTOC_10G_PMA_PMD_P:      u32 = 1 << 7; 
+
+pub const AUTOC2_10G_PMA_PMD_S_CLEAR:  u32 = 0x0003_0000; //clear bits 16 and 17 
+pub const AUTOC2_10G_PMA_PMD_S_SFI: u32 = 1 << 17;
+
 ///CTRL commands
 pub const CTRL_LRST:                u32 = (1<<3); 
 pub const CTRL_RST:                 u32 = (1<<26);
+
+///semaphore commands
+pub const SWSM_SMBI:                u32 = 1 << 0;
+pub const SWSM_SWESMBI:             u32 = 1 << 1;
+pub const SW_FW_SYNC_SMBITS_MASK:   u32 = 0x3FF;
+pub const SW_FW_SYNC_SMBITS_SW:     u32 = 0x1F;
+pub const SW_FW_SYNC_SMBITS_FW:     u32 = 0x3E0;
+pub const SW_FW_SYNC_SW_MAC:        u32 = 1 << 3;
+pub const SW_FW_SYNC_FW_MAC:        u32 = 1 << 8;
 
 /// RCTL commands
 pub const BSIZEPACKET_8K:           u32 = 8;
@@ -242,7 +260,13 @@ pub struct IntelIxgbeRegisters {
     _padding29:                     [u8; 5008],             // 0xEC84 - 0x10013
 
     pub eerd:                       Volatile<u32>,          // 0x10014;
-    _padding30:                     [u8; 65512],            // 0x10018 - 0x1FFFF
+    _padding30:                     [u8; 296],              // 0x10018 - 0x1013F
+
+    pub swsm:                       Volatile<u32>,          // 0x10140
+    _padding31:                     [u8; 28],               // 0x10144 - 0x1015F
+
+    pub sw_fw_sync:                 Volatile<u32>,          // 0x10160 
+    _padding32:                     [u8; 65180],            // 0x10164 - 0x1FFFF
 } //128 KB
 
 #[repr(C)]

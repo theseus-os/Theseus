@@ -1,0 +1,14 @@
+[package]
+name = "test_ixgbe"
+version = "0.1.0"
+description = "An application that tests the ixgbe driver"
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+
+[dependencies]
+getopts = { git = "https://github.com/kevinaboos/getopts" }
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.ixgbe]
+path = "../../kernel/ixgbe"

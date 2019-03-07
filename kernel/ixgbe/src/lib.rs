@@ -48,8 +48,12 @@ use x86_64::structures::idt::{ExceptionStackFrame};
 use apic::get_my_apic_id;
 use pic::PIC_MASTER_OFFSET;
 use acpi::madt::redirect_interrupt;
+use acpi::get_hpet;
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use owning_ref::BoxRefMut;
+
+const IXGBE_10GB_LINK:          bool = true;
+const IXGBE_1GB_LINK:           bool = !(IXGBE_10GB_LINK);
 
 //parameter that determine size of tx and rx descriptor queues
 const IXGBE_NUM_RX_DESC:        usize = 1024;
@@ -221,7 +225,7 @@ impl IxgbeNic{
 
         let mut mapped_registers = Self::mem_map(ixgbe_pci_dev, mem_base)?;
 
-        Self::start_link(&mut mapped_registers);
+        Self::start_link(&mut mapped_registers)?;
 
         let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers);
 
@@ -370,9 +374,103 @@ impl IxgbeNic{
         mac_addr
     }   
 
+    /// acquires semaphore to synchronize between software and firmware (section 10.5.4)
+    /// used for autoc and autoc2 registers
+    fn acquire_semaphore(regs: &mut IntelIxgbeRegisters) -> Result<bool, &'static str> {
+
+        // check that some other sofware is not using the semaphore
+        // 1. poll SWSM.SMBI bit until reads as 0 or 10ms timer expires
+        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let period_fs: u64 = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds() as u64;
+        let fs_per_ms: u64 = 1_000_000_000_000;
+        let mut timer_expired_smbi = false;
+        let mut smbi_bit = 1;
+        while smbi_bit != 0 {
+            smbi_bit = regs.swsm.read() & SWSM_SMBI;
+            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+            if (end-start) * period_fs / fs_per_ms == 10 {
+                timer_expired_smbi = true;
+                break;
+            }
+        } 
+        // now, hardware will auto write 1 to the SMBI bit
+
+        // check that firmware is not using the semaphore
+        // 1. write to SWESMBI bit
+        let set_swesmbi = regs.swsm.read() | SWSM_SWESMBI; // set bit 1 to 1
+        regs.swsm.write(set_swesmbi);
+
+        // 2. poll SWSM.SWESMBI bit until reads as 1 or 3s timer expires
+        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let mut swesmbi_bit = 0;
+        let mut timer_expired_swesmbi = false;
+        while swesmbi_bit == 0 {
+            swesmbi_bit = (regs.swsm.read() & SWSM_SWESMBI) >> 1;
+            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+            if (end-start) * period_fs / fs_per_ms == 3000 {
+                timer_expired_swesmbi = true;
+                break;
+            }
+        } 
+
+        // software takes control of the requested resource
+        // 1. read firmware and software bits of sw_fw_sync register 
+        let mut sw_fw_sync_smbits = regs.sw_fw_sync.read() & SW_FW_SYNC_SMBITS_MASK;
+        let sw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_SW_MAC) >> 3;
+        let fw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_FW_MAC) >> 8;
+
+        // clear sw sempahore bits if sw malfunction
+        if timer_expired_smbi {
+            sw_fw_sync_smbits &= !(SW_FW_SYNC_SMBITS_SW);
+        }
+
+        // clear fw semaphore bits if fw malfunction
+        if timer_expired_swesmbi {
+            sw_fw_sync_smbits &= !(SW_FW_SYNC_SMBITS_FW);
+        }
+
+        regs.sw_fw_sync.write(sw_fw_sync_smbits);
+
+        // check if semaphore bits for the resource are cleared
+        // then resources are available
+        if (sw_mac == 0) && (fw_mac == 0) {
+            //claim the sw resource by setting the bit
+            let sw_fw_sync = regs.sw_fw_sync.read() & SW_FW_SYNC_SW_MAC;
+            regs.sw_fw_sync.write(sw_fw_sync);
+
+            //clear bits in the swsm register
+            let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+            regs.swsm.write(swsm);
+
+            return Ok(true);
+        }
+
+        //resource is not available
+        else {
+            //clear bits in the swsm register
+            let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+            regs.swsm.write(swsm);
+
+            Ok(false)
+        }
+    }
+
+    fn release_semaphore(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str> {
+        // clear bit of released resource
+        let sw_fw_sync = regs.sw_fw_sync.read() & !(SW_FW_SYNC_SW_MAC);
+        regs.sw_fw_sync.write(sw_fw_sync);
+
+        // release semaphore
+        let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+
+        Ok(())
+    }
+
     /// software reset of NIC to get it running
     /// TODO: Replace all magic numbers
-    fn start_link (regs: &mut IntelIxgbeRegisters) {
+    fn start_link (mut regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs.eimc.write(0x7FFFFFFF);
 
@@ -413,22 +511,44 @@ impl IxgbeNic{
         //setup PHY and the link
         debug!("AUTOC: {:#X}", regs.autoc.read()); 
 
-        let mut val = regs.autoc.read();
-        val = val & !(0x0000_E000) & !(0x0000_0200);
-        regs.autoc.write(val|AUTOC_10G_PMA_PMD_PAR|AUTOC_FLU);
+        while(Self::acquire_semaphore(&mut regs)?) {
+            //wait 10 ms
+            let _ =pit_clock::pit_wait(10000);
+        }
 
-        let mut val = regs.autoc2.read();
-        val = val & !(0x0003_0000);
-        regs.autoc2.write(val|1<<17);
+        debug!("IXGBE: Semaphore acquired!");
+
+        if IXGBE_10GB_LINK {
+            let mut val = regs.autoc.read();
+            val = (val & !(AUTOC_LMS_CLEAR)) | AUTOC_LMS_10_GBE_S | AUTOC_FLU;           
+            // regs.autoc.write(val);
+            regs.autoc.write(0xc09c_6004);
+
+            let mut val = regs.autoc2.read();
+            val = (val & !(AUTOC2_10G_PMA_PMD_S_CLEAR)) | AUTOC2_10G_PMA_PMD_S_SFI;
+            // regs.autoc2.write(val);
+            regs.autoc2.write(0xa0000);
+        }
+
+        if IXGBE_1GB_LINK {
+            let mut val = regs.autoc.read();
+            // val = val & !(0x0000_E000) & !(0x0000_0200); //used for 1GBE
+            val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
+            regs.autoc.write(val);
+        }
 
         let val = regs.autoc.read();
         regs.autoc.write(val|AUTOC_RESTART_AN); 
 
+        Self::release_semaphore(&mut regs)?;        
 
         debug!("STATUS: {:#X}", regs.status.read()); 
         debug!("CTRL: {:#X}", regs.ctrl.read());
         debug!("LINKS: {:#X}", regs.links.read()); //b7 and b30 should be 1 for link up 
         debug!("AUTOC: {:#X}", regs.autoc.read()); 
+        debug!("AUTOC2: {:#X}", regs.autoc2.read()); 
+
+        Ok(())
     }
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
