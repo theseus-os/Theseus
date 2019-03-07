@@ -43,10 +43,10 @@ fn test_filerw() -> Result<(), &'static str> {
 
     // test that we can simply overwrite all file contents
     testfile.lock().write("OVERWRITE ALL CONTENTS".as_bytes(), 0)?;
-    let mut full_overwrite_bytes = vec![0; file_size];
+    let mut full_overwrite_bytes = vec![0; "OVERWRITE ALL CONTENTS".as_bytes().len()];
     testfile.lock().read(&mut full_overwrite_bytes, 0)?;
     println!("third test file string is: {}", str::from_utf8(&mut full_overwrite_bytes).unwrap());
-    println!("size of testfilel should be {}, actual is {}", 22, testfile.lock().size());
+    println!("size of testfile should be {}, actual is {}", 22, testfile.lock().size());
     println!("third test successful: fully overwrote existing file content");
 
     // testing reallocation when file contents exceeds existing MappedPages capacity
