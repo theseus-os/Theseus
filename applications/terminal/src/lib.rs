@@ -214,11 +214,17 @@ impl Terminal {
     }
 
     /// Removes a character from the stdin buffer; will remove the character specified by the left shift field
-    fn pop_from_stdin(&mut self) {
+    /// Pop_left is true if the caller wants to remove the character to the left of the cursor
+    /// otherwise, removes the character at the current cursor position
+    fn pop_from_stdin(&mut self, pop_left: bool) {
+        let mut dir = 0;
+        if pop_left {
+            dir = 1;
+        }
         let buffer_len = self.stdin_buffer.len();
-        self.stdin_buffer.remove(buffer_len - self.left_shift - 1);
+        self.stdin_buffer.remove(buffer_len - self.left_shift - dir);
         let buffer_len = self.scrollback_buffer.len();
-        self.scrollback_buffer.remove(buffer_len - self.left_shift -1);
+        self.scrollback_buffer.remove(buffer_len - self.left_shift - dir);
     }
 
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
@@ -419,7 +425,7 @@ impl Terminal {
             new_start_idx = match index {
                 Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
                 None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
-            }; 
+            }; // we're moving the cursor one position to the right relative to the end of the input string
         } else {
             return;
         }
@@ -689,6 +695,26 @@ impl Terminal {
                 }
                 let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
                 self.input_string.remove(remove_idx);
+                self.pop_from_stdin(true);
+                return Ok(());
+            }
+        }
+
+        if keyevent.keycode == Keycode::Delete {
+            // if there's no characters to the right of the cursor, does nothing
+            if self.input_string.len() == 0 || self.left_shift == 0 { 
+                return Ok(());
+            } else {
+                // Subtraction by accounts for 0-indexing
+                if let Some(text_display) = self.window.get_displayable(display_name){
+                    text_display.disable_cursor();
+                }
+                let remove_idx: usize =  self.input_string.len() - self.left_shift;
+                // we're moving the cursor one position to the right relative to the end of the input string
+                self.input_string.remove(remove_idx);
+                self.pop_from_stdin(false);
+                self.left_shift -= 1; 
+                return Ok(());
             }
         }
 
@@ -731,7 +757,7 @@ impl Terminal {
                         return Ok(())
                     }
                 }
-            };
+            }
             // Clears the buffer for another command once current command is finished executing
             self.input_string.clear();
             self.left_shift = 0;
@@ -805,7 +831,7 @@ impl Terminal {
             self.left_shift = 0;
             let previous_input = self.input_string.clone();
             for _i in 0..previous_input.len() {
-                self.pop_from_stdin();
+                self.pop_from_stdin(true);
             }
             if self.history_index == 0 && self.input_string.len() != 0 {
                 self.command_history.push(previous_input);
@@ -827,7 +853,7 @@ impl Terminal {
             self.left_shift = 0;
             let previous_input = self.input_string.clone();
             for _i in 0..previous_input.len() {
-                self.pop_from_stdin();
+                self.pop_from_stdin(true);
             }
             self.history_index -=1;
             if self.history_index == 0 {return Ok(())}
@@ -866,8 +892,7 @@ impl Terminal {
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
-        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
-            && keyevent.keycode != Keycode::Backspace && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
                 if self.left_shift == 0 {
                     if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
                         match keyevent.keycode.to_ascii(keyevent.modifiers) {
@@ -914,14 +939,7 @@ impl Terminal {
         
         // Pushes regular keypresses (ie ascii characters and non-meta characters) into the standard-in buffer
         match keyevent.keycode.to_ascii(keyevent.modifiers) {
-            Some(c) => { 
-                // If the keypress is Enter
-                if c == '\u{8}' {
-                    self.pop_from_stdin();
-                } else {
-                    self.push_to_stdin(c.to_string());
-                }
-            }
+            Some(c) => self.push_to_stdin(c.to_string()),
             _ => { } 
         }
         Ok(())

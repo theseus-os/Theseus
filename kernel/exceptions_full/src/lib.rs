@@ -2,7 +2,6 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
-#![feature(integer_atomics)]
 
 extern crate x86_64;
 extern crate task;

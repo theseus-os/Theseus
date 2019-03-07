@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(rustc_private)]
-#![feature(transpose_result)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
