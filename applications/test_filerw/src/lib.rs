@@ -33,14 +33,6 @@ fn test_filerw() -> Result<(), &'static str> {
     println!("first test file string is {}", str::from_utf8(&mut string_slice_as_bytes).unwrap());
     println!("size of test file should be 15, actual is {}", testfile.lock().size());
 
-
-    // tests that the read function works when we pass an oversized buffer with an offset that exceeds the end of the file
-    let mut oversize_buffer = vec![0; 4 * file_size];
-    let test1_bytesread = testfile.lock().read(&mut oversize_buffer, 5)?;
-    println!("first test (part 2) should have read 10 bytes, actually read {} bytes", test1_bytesread);
-    println!("first test read output should be 'from hello', actually is '{}'", str::from_utf8(&mut oversize_buffer).unwrap());
-    println!("first test successful: wrote to empty file");
-
     // test that we can overwrite overlapping existing content
     testfile.lock().write("OVERWRITE".as_bytes(), 5)?;
     let mut string_slice_as_bytes2 = vec![0; file_size];
@@ -94,6 +86,22 @@ fn test_filerw() -> Result<(), &'static str> {
         Ok(_) => println!("should not have been able to write"),
         Err(err) => println!("sixth test successful\nsuccessfully failed to write to nonwritable mapped pages")
     }
+
+
+
+    // tests that the read function works when we pass an oversized buffer with an offset that exceeds the end of the file
+    let testfile2 = MemFile::new("testfile".to_string(), &parent)?;
+    testfile2.lock().write("test from hello".as_bytes(),0)?;
+    let mut oversize_buffer = vec![0; 4 * file_size];
+    let test1_bytesread = testfile2.lock().read(&mut oversize_buffer, 0)?;
+    println!("seventh test (part 1) should have read 15 bytes, actually read {} bytes", test1_bytesread);
+    println!("seventh test read output (part 1) should be 'test from hello', actually is {} ", str::from_utf8(&mut oversize_buffer).unwrap());
+    let mut oversize_buffer2 = vec![0; 4* file_size];
+    let test2_bytesread = testfile2.lock().read(&mut oversize_buffer2, 5)?;
+    println!("seventh test (part 2) should have read 10 bytes, actually read {} bytes", test2_bytesread);
+    println!("seventh test read output (part 1) should be 'from hello', actually is {} ", str::from_utf8(&mut oversize_buffer2).unwrap());    
+    println!("seventh test successful: read with oversized buffers works");
+
 
     Ok(())
 }
