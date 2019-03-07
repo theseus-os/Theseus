@@ -17,7 +17,7 @@ extern crate irq_safety;
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, FRAME_ALLOCATOR, EntryFlags};
+use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PageTable, FRAME_ALLOCATOR, EntryFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
 use alloc::boxed::Box;
@@ -99,10 +99,11 @@ impl File for MemFile {
                 self.mp.flags()
             };
             
-            let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-            if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+            let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+			let mut kernel_mmi = kernel_mmi_ref.lock();
+            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
                 let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
-                let pages = memory::allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
+                let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
                 let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
                 
                 // first, we need to copy over the bytes from the previous mapped pages
