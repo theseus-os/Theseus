@@ -25,23 +25,22 @@ use fs_node::{FileOrDir, FileRef};
 
 /// The struct that represents a file in memory that is backed by MappedPages
 pub struct MemFile {
-    /// The name of the file
+    /// The name of the file.
     name: String,
-    // The size of the file in bytes (this is the actual length of meaningful content in the file rather than the size of this file's 
-    // mapped pages collection)
+    /// The size in bytes of the file.
+    /// Note that this is not the same as the capacity of its underlying MappedPages object. 
     size: usize,
-    /// The contents or a seqeunce of bytes as a file: this primitive can be changed into a more complex struct as files become more complex
+    /// The underlying contents of this file in memory.
     mp: MappedPages,
-    /// A weak reference to the parent directory
+    /// The parent directory that contains this file.
     parent: WeakDirRef,
 }
 
 impl MemFile {
     /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
     pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
-        let empty_pages = MappedPages::empty();        
-        let new_file = Self::from_mapped_pages(empty_pages, name, 0, parent)?;
-        Ok(new_file) // 0 because we're creating an empty file
+        let new_file = Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)?;
+        Ok(new_file)
     }
 
     /// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.
@@ -63,60 +62,51 @@ impl File for MemFile {
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         if offset > self.size {
             return Err("read offset exceeds file size");
-        } else {
-            let read_bytes;
-            if buffer.len() + offset > self.size {
-                // The amount of bytes we can read is limited by the end of the file;
-                read_bytes = self.size - offset;
-            } else {
-                // Otherwise, we read the entire buffer because the end of the buffer doesn't extend
-                // past the end of the file
-                read_bytes = buffer.len();
-            }
-            buffer[..read_bytes].copy_from_slice(self.mp.as_slice(offset, read_bytes)?); 
-            Ok(read_bytes) 
         }
+        // read from the offset until the end of the file, but not more than the buffer length
+        let read_bytes = core::cmp::min(self.size - offset, buffer.len());
+        buffer[..read_bytes].copy_from_slice(self.mp.as_slice(offset, read_bytes)?); 
+        Ok(read_bytes) 
     }
 
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
-        // The pages are already allocated and are not writeable
+        // error out if the underlying mapped pages are already allocated and not writeable
         if !self.mp.flags().is_writable() && self.mp.size_in_bytes() != 0 {
             return Err("MemFile::write(): existing MappedPages were not writable");
         }
         
         let end = buffer.len() + offset;
-        if end <= self.mp.size_in_bytes() { // We don't perform any realloaction
-            // Gets a mutuable reference to the byte portion of the newly mapped pages
+        // check to see if we can fit the write buffer into the existing mapped pages region
+        if end <= self.mp.size_in_bytes() {
             let dest_slice = self.mp.as_slice_mut::<u8>(offset, buffer.len())?;
-            // The destination slice is guranteed to be the same length as the source slice by the virtue
-            // of entering this conditional
-            dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
+            // actually perform the write operation
+            dest_slice.copy_from_slice(buffer);
             // if the buffer written into the mapped pages exceeds the current size, we set the new size equal to 
             // this value, otherwise, the size remains the same
             if end > self.size { 
                 self.size = end; 
             }
-            Ok(buffer.len())
-        } else { // we'll allocate a new set of mapped pages
-            // If the mapped pages are empty (i.e. haven't been allocated), we make them writable
-            // Otherwise, use the existing entry flags
-            let prev_flags;
-            if self.mp.size_in_bytes() == 0 {
-                prev_flags = EntryFlags::WRITABLE;
-            } else {
-                prev_flags = self.mp.flags();
-            }
-            // Obtain the active kernel page table
+            Ok(buffer.len()) // we wrote all of the requested bytes successfully
+        } 
+        // if not, we need to reallocate a new mapped pages 
+        else {
+            // If the mapped pages are empty (this is the first allocation), we make them writable
+            let prev_flags = if self.mp.size_in_bytes() == 0 {
+                EntryFlags::WRITABLE
+            } 
+            // Otherwise, use the existing mapped pages flags
+            else {
+                self.mp.flags()
+            };
+            
             let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
             if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                 let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
-                // Allocate and map the least number of pages we need to store the information contained in the buffer
-                // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
-                // need (because it entered this conditional statement)
-                let pages = memory::allocate_pages_by_bytes(buffer.len() + offset).ok_or("could not allocate pages")?;
+                let pages = memory::allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
                 let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
-                { // scoped so that this mutable borrow on mapped_pages ends before the next borrow
-                    // first need to copy over the bytes from the previous mapped pages
+                
+                // first, we need to copy over the bytes from the previous mapped pages
+                {
                     // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
                     let copy_limit;
                     // The write does not overlap with existing content, so we copy all existing content
@@ -127,23 +117,21 @@ impl File for MemFile {
                     }
                     let existing_bytes = self.mp.as_slice(0, copy_limit)?;
                     let mut copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
-                    // Destination slice is guaranteed to be the same length as the source slice because they both index
-                    // with the same beginning and end parameters
                     copy_slice.copy_from_slice(existing_bytes);
                 } 
+                
+                // second, we write the new content into the reallocated mapped pages
                 {
-                    // now write the new content into the mapped pages
-                    // Gets a mutable reference to the byte portion of the newly mapped pages
                     let mut dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
-                    // Destination slice is guaranteed to be the same length as the source slice because
-                    // we allocated enough MappedPages capacity to store the entire write buffer
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 }
                 self.mp = new_mapped_pages;
                 self.size = end;
-                return Ok(buffer.len());
+                Ok(buffer.len())
             }
-            return Err("could not get active table");
+            else {
+                Err("could not get active table")
+            }
         }
     }
 
