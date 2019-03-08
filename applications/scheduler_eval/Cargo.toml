@@ -19,5 +19,7 @@ path = "../../kernel/logger"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
+[dependencies.task]
+path = "../../kernel/task"
 
 

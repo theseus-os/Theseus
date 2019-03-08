@@ -5,6 +5,7 @@
 extern crate alloc;
 extern crate spawn;
 extern crate scheduler;
+extern crate task;
 
 use spawn::KernelTaskBuilder;
 use alloc::string::String;
@@ -68,7 +69,12 @@ fn test1(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..100000 {
-       debug!("A {}", i);
+       let task_id = match task::get_my_current_task_id() {
+            Some(task_id) => {task_id},
+            None => 0
+       };
+       debug!("Task_ID : {} , Instance : {}", task_id, i);
+       scheduler::schedule();
        //i = i + 1; 
     }
     _a
@@ -78,7 +84,12 @@ fn test2(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..100000 {
-       debug!("B {}", i);
+       let task_id = match task::get_my_current_task_id() {
+            Some(task_id) => {task_id},
+            None => 0
+       };
+       debug!("Task_ID : {} , Instance : {}", task_id, i);
+       scheduler::schedule();
        //i = i + 1; 
     }
     _a
@@ -88,7 +99,12 @@ fn test3(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..100000 {
-       debug!("C {}", i);
+       let task_id = match task::get_my_current_task_id() {
+            Some(task_id) => {task_id},
+            None => 0
+       };
+       debug!("Task_ID : {} , Instance : {}", task_id, i);
+       scheduler::schedule();
        //i = i + 1; 
     }
     _a
