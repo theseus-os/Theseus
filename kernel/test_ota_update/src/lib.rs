@@ -77,7 +77,8 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         // We need to get just the basename of the file, then remove the crate type prefix ("k#"), and then strip the trailing hash after the "-". 
         let df_path = Path::new(df.name);
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
-        let cfile = MemFile::new(String::from(objfilename), content, &update_build_dir)?;
+        let cfile = MemFile::new(String::from(objfilename), &update_build_dir)?;
+        cfile.lock().write(content,0)?;
         debug!("    created new file at path: {}", cfile.lock().get_path_as_string());
     }
 
