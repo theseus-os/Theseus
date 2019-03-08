@@ -41,12 +41,8 @@ extern crate mod_mgmt;
 extern crate context_switch;
 extern crate environment;
 extern crate root;
-extern crate vfs_node;
-extern crate fs_node;
-extern crate path;
 extern crate x86_64;
 extern crate spin;
-extern crate memfs;
 
 #[cfg(runqueue_state_spill_evaluation)]
 use spin::Once;
@@ -74,7 +70,6 @@ use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
-pub mod fs; 
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
@@ -118,8 +113,6 @@ lazy_static! {
     pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
-// Variable to initialize the taskfs
-static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<TaskRef> {
@@ -854,12 +847,6 @@ pub fn create_idle_task(
             idle_task_id, apic_id);
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
-
-    // one-time initialization of the taskfs
-    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
-        Ok(()) => (),
-        Err(err) => return Err(err)
-    };
     
     Ok(task_ref)
 }

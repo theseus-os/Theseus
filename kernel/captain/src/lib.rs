@@ -150,6 +150,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     device_manager::init(input_event_queue_producer)?;
 
+    task_fs::init()?;
+
 
     #[cfg(test_ota_update)]
     {

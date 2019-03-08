@@ -17,7 +17,6 @@ use alloc::{
 };
 use fs_node::{FileOrDir, DirRef};
 
-
 pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
 
@@ -44,6 +43,13 @@ impl DerefMut for Path {
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "{}", self.path)
+    }
+}
+
+impl From<String> for Path {
+    #[inline]
+    fn from(path: String) -> Self {
+        Path {path: path}
     }
 }
 
@@ -117,7 +123,6 @@ impl Path {
                 new_path.push_str(&format!("/{}",  component));
             }
         }
-        // debug!("canonical {}", new_path);
         Path::new(new_path)
     }
     
@@ -157,12 +162,11 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-            new_path.push_str(&format!("{}/",  component));
+                new_path.push_str(&format!("{}/",  component));
         }
         // Remove the trailing slash after the final path component
         new_path.pop();
-        // debug!("relative {}", new_path);
-        return Some(Path::new(new_path));
+        Some(Path::new(new_path))
     }
     
     /// Returns a boolean indicating whether this Path is absolute,
@@ -175,16 +179,6 @@ impl Path {
     /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
         let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
-        
-        // Get the shortest path from self to working directory 
-        let shortest_path = match self.canonicalize(&current_path).relative(&current_path) {
-            Some(dir) => dir, 
-            None => {
-                error!("cannot canonicalize path {}", current_path.path); 
-                return Err("couldn't canonicalize path");
-            }
-        };
-
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())
@@ -194,10 +188,7 @@ impl Path {
             }
         };
 
-        // debug!("CANONICALIZE: Shortest path: {:?}", shortest_path);
-        // debug!("curr_dir {:?}, relative components {:?}", starting_dir.lock().get_name(), shortest_path.components().collect::<Vec<&str>>());
-        // debug!("CHILDREN in curr_dir: {:?}", curr_dir.lock().list_children());
-        for component in shortest_path.components() {
+        for component in self.components() {
             match component {
                 "." => { 
                     // stay in the current directory, do nothing. 
