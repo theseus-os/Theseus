@@ -68,7 +68,7 @@ pub fn main(args: Vec<String>) -> (){
 fn test1(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
-    for i in 0..100000 {
+    for i in 0..1000 {
        let task_id = match task::get_my_current_task_id() {
             Some(task_id) => {task_id},
             None => 0
@@ -83,7 +83,7 @@ fn test1(_a: u32) -> u32 {
 fn test2(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
-    for i in 0..100000 {
+    for i in 0..1000 {
        let task_id = match task::get_my_current_task_id() {
             Some(task_id) => {task_id},
             None => 0
@@ -98,7 +98,7 @@ fn test2(_a: u32) -> u32 {
 fn test3(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
-    for i in 0..100000 {
+    for i in 0..1000 {
        let task_id = match task::get_my_current_task_id() {
             Some(task_id) => {task_id},
             None => 0
