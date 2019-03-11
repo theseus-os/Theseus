@@ -352,33 +352,4 @@ impl RunQueue {
         return None;
     }
 
-    /// The internal function that outputs the context switches of a given task.
-    /// The context switch of the first task that matches is shown.
-    fn get_context_switches_internal(&self, task: &TaskRef) -> Option<usize> {
-        // debug!("called_assign_priority_internal called per core");
-        let mut return_context_switches :Option<usize> = None;
-        for x in self.iter() {
-            if &x.taskref == task {
-                // A matching task has been found
-                return_context_switches =  Some(x.context_switches);
-                break;
-            }
-        }
-        return_context_switches
-    }
-
-    /// Output the context switches of a given task
-    /// Outputs None if the task is not found in any of the runqueues.
-    pub fn get_context_switches(task: &TaskRef) -> Option<usize> {
-        // debug!("assign priority wrapper. called once per call");
-        for (_core, rq) in RUNQUEUES.iter() {
-            let context_switches = rq.write().get_context_switches_internal(task);
-            match context_switches {
-                //If a matching task is found the iteration terminates
-                Some(x) => return Some(x),
-                None => continue,
-            }
-        }
-        return None;
-    }
 }

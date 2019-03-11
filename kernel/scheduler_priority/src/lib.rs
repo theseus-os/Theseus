@@ -39,11 +39,6 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
     RunQueue::get_priority(task)
 }
 
-/// Returns the context_switches of the given task.
-pub fn get_context_switches(task: &TaskRef) -> Option<usize> {
-    RunQueue::get_context_switches(task)
-}
-
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {

@@ -36,7 +36,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
     else {
         #[cfg(priority_scheduler)] {
-            println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6:<11}  {7}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "CTX_SWTCH", "NAME");
+            println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "NAME");
         }
         #[cfg(not(priority_scheduler))] {
             println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "NAME");
@@ -62,14 +62,7 @@ pub fn main(args: Vec<String>) -> isize {
         let task_type = if task.is_an_idle_task {"I"}
             else if task.is_application() {"A"}
             else {" "} ;     
-        let priority = match scheduler::get_priority(&taskref){
-            Some(priority) => {priority},
-            None => 0
-        };
-        let context_switches = match scheduler::get_context_switches(&taskref){
-            Some(context_switches) => {context_switches},
-            None => 0
-        };
+        let priority = scheduler::get_priority(&taskref).map(|priority| format!("{}", priority)).unwrap_or(String::from("-"));
         if matches.opt_present("b") {
             task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
@@ -77,8 +70,8 @@ pub fn main(args: Vec<String>) -> isize {
 
             #[cfg(priority_scheduler)] {
                 task_string.push_str(
-                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6:<11}  {7}\n", 
-                    id, runstate, cpu, pinned, task_type, priority, context_switches, name)
+                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
+                    id, runstate, cpu, pinned, task_type, priority, name)
                 );
             }
             #[cfg(not(priority_scheduler))] {

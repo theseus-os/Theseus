@@ -100,14 +100,4 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
     }
 }
 
-/// Returns the context switches of a given task.
-/// This function returns None when a scheduler without priority is loaded.
-pub fn get_context_switches(task: &TaskRef) -> Option<usize> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::get_context_switches(task)
-    }
-    #[cfg(not(priority_scheduler))] {
-        //Err("no scheduler that uses task priority is currently loaded")
-        None
-    }
-}
+
