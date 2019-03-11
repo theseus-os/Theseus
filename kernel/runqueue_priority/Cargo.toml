@@ -1,7 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "runqueue"
-description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
+authors = ["Namitha Liyanage <Namithaliyanage@gmail.com>"]
+name = "runqueue_priority"
+description = "Functions and types for handling runqueues when priority scheduler is in use, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -23,12 +23,6 @@ path = "../../libs/atomic_linked_list"
 
 [dependencies.task]
 path = "../task"
-
-[dependencies.runqueue_round_robin]
-path = "../runqueue_round_robin"
-
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

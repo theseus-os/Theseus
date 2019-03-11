@@ -40,7 +40,6 @@ use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
-use runqueue::RunQueue;
 use environment::Environment;
 use spin::Mutex;
 
@@ -673,7 +672,7 @@ impl Terminal {
             };
             match task_ref_copy.kill(KillReason::Requested) {
                 Ok(_) => {
-                    if let Err(e) = RunQueue::remove_task_from_all(&task_ref_copy) {
+                    if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
                         error!("Killed task but could not remove it from runqueue: {}", e);
                     }
                 }

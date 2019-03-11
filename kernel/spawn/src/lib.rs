@@ -34,7 +34,6 @@ use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_en
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
-use runqueue::RunQueue;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
 
@@ -47,10 +46,10 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 {
     TASK_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
 
-    RunQueue::init(apic_id)?;
+    runqueue::init(apic_id)?;
     
     let task_ref = task::create_idle_task(apic_id, stack_bottom, stack_top, kernel_mmi_ref)?;
-    RunQueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
+    runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(task_ref)
 }
 
@@ -94,7 +93,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
-            
+
             #[cfg(simd_personality)]
             simd: false,
         }
@@ -175,10 +174,10 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         }
         
         if let Some(core) = self.pin_on_core {
-            RunQueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
         }
         else {
-            RunQueue::add_task_to_any_runqueue(task_ref.clone())?;
+            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
         Ok(task_ref)
@@ -534,7 +533,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
         return Err("TASKLIST already contained a task with the new task's ID");
     }
     
-    RunQueue::add_task_to_any_runqueue(task_ref.clone())?;
+    runqueue::add_task_to_any_runqueue(task_ref.clone())?;
 
     Ok(task_ref)
 }
@@ -600,7 +599,7 @@ fn task_wrapper<F, A, R>() -> !
 
         // (2) Remove it from its runqueue
         if let Err(e) = apic::get_my_apic_id()
-            .and_then(|id| RunQueue::get_runqueue(id))
+            .and_then(|id| runqueue::get_runqueue(id))
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
         {
