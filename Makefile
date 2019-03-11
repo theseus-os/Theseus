@@ -443,6 +443,11 @@ loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
+### Create a make prioirty option to build and run priority scheduler
+priority : export override THESEUS_CONFIG += priority_scheduler
+priority : export BUILD_MODE = release
+priority: run
+
 
 ### builds and runs Theseus in QEMU
 run: $(iso) 

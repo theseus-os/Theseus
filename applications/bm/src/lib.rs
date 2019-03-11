@@ -532,7 +532,7 @@ fn do_fs_read(with_open: bool) {
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::RunQueue::get_runqueue(core).map(|rq| rq.read()) {
+	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.iter().count()) }
 		_ => { None }
 	}
