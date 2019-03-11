@@ -13,5 +13,8 @@ path = "../terminal_print"
 [dependencies.task]
 path = "../../kernel/task"
 
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

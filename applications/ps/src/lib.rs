@@ -5,6 +5,7 @@
 
 extern crate task;
 extern crate getopts;
+extern crate scheduler;
 
 use getopts::Options;
 use alloc::vec::Vec;
@@ -34,7 +35,12 @@ pub fn main(args: Vec<String>) -> isize {
         println!("{0:<5}  {1}", "ID", "NAME");
     }
     else {
-        println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "NAME");
+        #[cfg(priority_scheduler)] {
+            println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6:<11}  {7}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "CTX_SWTCH", "NAME");
+        }
+        #[cfg(not(priority_scheduler))] {
+            println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "NAME");
+        }
     }
 
     // Print all tasks
@@ -56,15 +62,31 @@ pub fn main(args: Vec<String>) -> isize {
         let task_type = if task.is_an_idle_task {"I"}
             else if task.is_application() {"A"}
             else {" "} ;     
-
+        let priority = match scheduler::get_priority(&taskref){
+            Some(priority) => {priority},
+            None => 0
+        };
+        let context_switches = match scheduler::get_context_switches(&taskref){
+            Some(context_switches) => {context_switches},
+            None => 0
+        };
         if matches.opt_present("b") {
             task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
         else {
-            task_string.push_str(
-                &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
+
+            #[cfg(priority_scheduler)] {
+                task_string.push_str(
+                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6:<11}  {7}\n", 
+                    id, runstate, cpu, pinned, task_type, priority, context_switches, name)
+                );
+            }
+            #[cfg(not(priority_scheduler))] {
+                task_string.push_str(
+                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
                     id, runstate, cpu, pinned, task_type, name)
-            );
+                );
+            }
         }
     }
     print!("{}", task_string);
