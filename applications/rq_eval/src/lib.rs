@@ -17,7 +17,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use getopts::{Matches, Options};
 use acpi::get_hpet;
-use runqueue::RunQueue;
 use task::{Task, TaskRef};
 
 
@@ -121,7 +120,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     
     for _i in 0..iterations {
-        RunQueue::add_task_to_any_runqueue(taskref.clone())?;
+        runqueue::add_task_to_any_runqueue(taskref.clone())?;
 
         #[cfg(runqueue_state_spill_evaluation)] 
         {   
@@ -134,7 +133,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         }
         #[cfg(not(runqueue_state_spill_evaluation))]
         {
-            RunQueue::remove_task_from_all(&taskref)?;
+            runqueue::remove_task_from_all(&taskref)?;
         }
     }
 

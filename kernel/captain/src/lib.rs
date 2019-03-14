@@ -22,7 +22,7 @@
 #![feature(core_intrinsics)]
 
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 
@@ -149,6 +149,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     // initialize the rest of our drivers
     device_manager::init(input_event_queue_producer)?;
+
+    task_fs::init()?;
 
 
     #[cfg(test_ota_update)]
