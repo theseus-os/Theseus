@@ -59,10 +59,10 @@
 cfg_if! { if #[cfg(simd_personality)] {
 
 
-// This crate is required for the SIMD environment,
-// so we can resolve symbols that the core lib requires. 
-#[cfg(target_feature = "sse2")]
-extern crate compiler_builtins as _compiler_builtins; 
+// // This crate is required for the SIMD environment,
+// // so we can resolve symbols that the core lib requires. 
+// #[cfg(target_feature = "sse2")]
+// extern crate compiler_builtins as _compiler_builtins; 
 
 #[macro_use] pub extern crate log;
 extern crate memory;

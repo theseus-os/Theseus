@@ -34,9 +34,9 @@ path = "../fs_node"
 [dependencies.path]
 path = "../path"
 
-[target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
-git = "https://github.com/rust-lang-nursery/compiler-builtins"
-features = [ "no-lang-items" ]
+# [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
+# git = "https://github.com/rust-lang-nursery/compiler-builtins"
+# features = [ "no-lang-items" ]
 
 [lib]
 crate-type = ["rlib"]
