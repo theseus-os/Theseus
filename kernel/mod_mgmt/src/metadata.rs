@@ -567,20 +567,29 @@ impl LoadedSection {
         self.typ == SectionType::Bss
     }
 
-    /// Returns the substring of this section's name that excludes the trailing hash,
+    /// Returns the substring of this section's name that excludes the trailing hash. 
+    /// 
+    /// See the identical associated function [`section_name_without_hash()`](#method.section_name_without_hash) for more. 
+    pub fn name_without_hash(&self) -> &str {
+        Self::section_name_without_hash(&self.name)
+    }
+
+
+    /// Returns the substring of the given section's name that excludes the trailing hash,
     /// but includes the hash delimiter "`::h`". 
-    /// If there is no hash, then it returns the entire name. 
+    /// If there is no hash, then it returns the full section name unchanged.
     /// 
     /// # Examples
     /// name: "`keyboard_new::init::h832430094f98e56b`", return value: "`keyboard_new::init::h`"
     /// name: "`start_me`", return value: "`start_me`"
-    pub fn name_without_hash(&self) -> &str {
+    pub fn section_name_without_hash(sec_name: &str) -> &str {
         // the hash identifier (delimiter) is "::h"
         const HASH_DELIMITER: &'static str = "::h";
-        self.name.rfind("::h")
-            .and_then(|end| self.name.get(0 .. (end + HASH_DELIMITER.len())))
-            .unwrap_or_else(|| &self.name)
+        sec_name.rfind("::h")
+            .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
+            .unwrap_or_else(|| &sec_name)
     }
+
 
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.

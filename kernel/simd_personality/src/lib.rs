@@ -97,19 +97,24 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	//     .../namespaces/simd/application
 	//     .../namespaces/simd/userspace
 	let path = namespace_path.unwrap_or_else(|| Path::new(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR)));
-	let simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR), path)?;
+	let mut simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR), path)?;
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
-		.ok_or_else(|| "couldn't get compiler_builtins object file in simd_personality")?;
+		.ok_or_else(|| "couldn't find a single 'compiler_builtins' object file in simd_personality")?;
 	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
-		.ok_or_else(|| "couldn't get core object file in simd_personality")?;
+		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
 	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
 	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
 
+
+	// load the actual crate that we want to run in the simd namespace, "simd_test"
 	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
-		.ok_or_else(|| "couldn't get simd_test object file in simd_personality")?;
+		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
+	simd_namespace.enable_fuzzy_symbol_matching();
 	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	simd_namespace.disable_fuzzy_symbol_matching();
+
 
 	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
 	
