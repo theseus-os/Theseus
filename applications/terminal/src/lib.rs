@@ -150,7 +150,7 @@ impl Terminal {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        let mut prompt_string = root.lock().get_path_as_string(); // ref numbers are 0-indexed
+        let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
             window: window_object,
@@ -193,7 +193,7 @@ impl Terminal {
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
         let curr_env = self.env.lock();
-        let mut prompt = curr_env.working_dir.lock().get_path_as_string();
+        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
         prompt = format!("{}: ",prompt);
         self.scrollback_buffer.push_str(&prompt);
     }

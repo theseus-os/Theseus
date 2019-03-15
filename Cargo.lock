@@ -1031,6 +1031,7 @@ name = "ps"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "scheduler 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -1249,6 +1250,7 @@ dependencies = [
  "logger 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]
