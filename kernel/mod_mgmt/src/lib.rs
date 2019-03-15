@@ -261,9 +261,12 @@ impl SwapRequest {
         old_crate_name: String, 
         new_crate_object_file_abs_path: Path, 
         reexport_new_symbols_as_old: bool,
-    ) -> SwapRequest {
-        SwapRequest {
-            old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old,
+    ) -> Result<SwapRequest, &'static str> {
+        if new_crate_object_file_abs_path.is_absolute() {
+            Ok( SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } )
+        }
+        else {
+            Err("new_crate_object_file_abs_path was not an absolute Path")
         }
     }
 }
@@ -718,10 +721,20 @@ impl CrateNamespace {
     /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
-    /// # Note
+    /// # Warning: Correctness not guaranteed
     /// This function currently makes no attempt to guarantee correct operation after a crate is swapped. 
     /// For example, if the new crate changes a function or data structure, there is no guarantee that 
-    /// other crates will be swapped alongside that one -- that responsibility is currently left to the caller.
+    /// other crates will be swapped alongside that one. 
+    /// It will most likely error out, but this responsibility is currently left to the caller.
+    /// 
+    /// # Enabling swapping optimizations
+    /// When one or more crates is swapped out, they are not fully unloaded, but rather saved in a cache
+    /// in order to accelerate future swapping commands. 
+    /// You must use full absolute `Path`s in the given list of `swap_requests` to ensure that the 
+    /// optimizer can find the correct previously-swapped out crate cache.
+    /// This is because in order for the cached crates to be found, 
+    /// the swap request list must be the exact inverse of a prior swap request list. 
+    /// 
     pub fn swap_crates(
         &self,
         swap_requests: SwapRequestList,
@@ -730,10 +743,12 @@ impl CrateNamespace {
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
+        debug!("SWAP REQUESTS: {:?}", swap_requests);
+
         // First, before we perform any expensive crate loading, let's try an optimization
         // based on cached crates that were unloaded during a previous swap operation. 
         let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-            info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+            warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
             (cached_crates, true)
         } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
@@ -992,7 +1007,7 @@ impl CrateNamespace {
                         String::from(new_crate_name), 
                         old_crate.object_file_abs_path.clone(), 
                         !old_crate.reexported_symbols.is_empty()
-                    );
+                    )?;
                     future_swap_requests.push(future_swap_req);
                     
                     // Remove all of the symbols belonging to the old crate from this namespace.
@@ -1047,8 +1062,8 @@ impl CrateNamespace {
         });
 
 
-        // debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-        //     future_swap_requests, cached_crates.crate_names());
+        debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+            future_swap_requests, cached_crates.crate_names());
         self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
@@ -1078,7 +1093,7 @@ impl CrateNamespace {
         
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.size();
-        let abs_path      = Path::new(crate_file.get_path_as_string());
+        let abs_path      = Path::new(crate_file.get_absolute_path());
         let crate_name    = abs_path.file_stem().to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 

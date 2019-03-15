@@ -36,10 +36,10 @@ pub type FileRef = Arc<Mutex<Box<File + Send>>>;
 /// Traits that both files and directories share
 pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir()  {
-            let parent_path = &cur_dir.lock().get_path_as_string();
+            let parent_path = &cur_dir.lock().get_absolute_path();
             // Check if the parent path is root 
             if parent_path == "/" {
                 path.insert_str(0, &format!("{}", parent_path));
@@ -91,10 +91,10 @@ pub enum FileOrDir {
 // Allows us to call methods directly on an enum so we don't have to match on the underlying type
 impl FsNode for FileOrDir {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         match self {
-            FileOrDir::File(file) => file.lock().get_path_as_string(),
-            FileOrDir::Dir(dir) => dir.lock().get_path_as_string(),
+            FileOrDir::File(file) => file.lock().get_absolute_path(),
+            FileOrDir::Dir(dir) => dir.lock().get_absolute_path(),
         }
     }
     fn get_name(&self) -> String {

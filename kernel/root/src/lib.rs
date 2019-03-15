@@ -70,7 +70,7 @@ impl Directory for RootDirectory {
 
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         format!("{}/", ROOT_DIRECTORY_NAME.to_string()).to_string()
     }
 
