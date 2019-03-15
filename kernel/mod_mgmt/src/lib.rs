@@ -360,6 +360,18 @@ pub struct CrateNamespace {
     /// 
     /// This is soft state that can be removed at any time with no effect on correctness.
     unloaded_crate_cache: Mutex<HashMap<SwapRequestList, CrateNamespace>>,
+
+    /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
+    /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
+    /// on any other `my_crate::foo::*` regardless of hash value. 
+    /// Fuzzy matching should only be successful if there is just a single matching symbol; 
+    /// if there are multiple matches (e.g., `my_crate::foo::h456` and `my_crate::foo::h789` both exist),
+    /// then the dependency should fail to be resolved.
+    /// 
+    /// This is a potentially dangerous setting because it overrides the compiler-chosen dependency links.
+    /// Thus, it is false by default, and should only be enabled with expert knowledge, 
+    /// ideally only temporarily in order to manually load a given crate.
+    fuzzy_symbol_matching: bool,
 }
 
 impl CrateNamespace {
@@ -374,6 +386,7 @@ impl CrateNamespace {
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
+            fuzzy_symbol_matching: false,
         }
     } 
 
@@ -436,6 +449,14 @@ impl CrateNamespace {
     /// Returns this `CrateNamespace`'s directory of userspace files.
     pub fn userspace_directory(&self) -> &DirRef {
         &self.dirs.user
+    }
+
+    pub fn enable_fuzzy_symbol_matching(&mut self) {
+        self.fuzzy_symbol_matching = true;
+    }
+
+    pub fn disable_fuzzy_symbol_matching(&mut self) {
+        self.fuzzy_symbol_matching = false;
     }
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
@@ -667,6 +688,7 @@ impl CrateNamespace {
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
+            fuzzy_symbol_matching: self.fuzzy_symbol_matching,
         }
     }
 
@@ -1748,18 +1770,23 @@ impl CrateNamespace {
 
 
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string,
-    /// similar to the simpler function `get_symbol()`.
+    /// similar to the simpler function `get_symbol()`, but takes the additional step of trying to 
+    /// automatically find and/or load the crate containing that symbol 
+    /// (and does so recursively for any of its crate dependencies).
     /// 
-    /// If the symbol cannot be found in this namespace, it does the following:    
-    /// (1) First, try to find the missing symbol in the `backup_namespace`. 
-    ///     If we find it there, then add that shared crate into this namespace,
-    ///     and add all of that shared crate's symbols into this crate as well. 
+    /// (1) First, it looks up the symbol in this namespace's symbol map, and returns it if present. 
     /// 
-    /// (2) Second, if the missing symbol isn't in the backup namespace either, 
+    /// (2) Second, if the symbol is missing from this namespace, it looks in the `backup_namespace`. 
+    ///     If we find it there, then add that shared crate into this namespace.
+    /// 
+    /// (3) Third, if the missing symbol isn't in the backup namespace either, 
     ///     try to load its containing crate from the module file. 
     ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
-    ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it
+    ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
+    /// 
+    /// (4) Fourth, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
+    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
     /// 
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
@@ -1780,10 +1807,10 @@ impl CrateNamespace {
             return sec;
         }
 
-        // If not, our second try is to check the backup_namespace
+        // If not, our second option is to check the backup_namespace
         // to see if that namespace already has the section we want
         if let Some(backup) = backup_namespace {
-            // info!("Symbol \"{}\" not initially found, attemping to load it from backup namespace {:?}", 
+            // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
@@ -1795,7 +1822,7 @@ impl CrateNamespace {
                         let parent_crate_name = {
                             let parent_crate = parent_crate_ref.lock_as_ref();
                             // Here, there is a potential for optimization: add all symbols from the parent_crate into the current namespace.
-                            // While this would save time if future symbols were needed from this crate,
+                            // While this would save lookup/loading time if future symbols were needed from this crate,
                             // we *cannot* do this because it violates the expectations of certain namespaces. 
                             // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
                             self.add_symbols(Some(sec.clone()).iter(), true);
@@ -1820,7 +1847,7 @@ impl CrateNamespace {
         // such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
-            info!("Symbol \"{}\" not initially found, attemping to load its containing crate {:?}", 
+            info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             
             let crate_dependency_name = format!("{}-", crate_dependency_name);
@@ -1843,13 +1870,51 @@ impl CrateNamespace {
                 }
             }
             else {
-                error!("Symbol \"{}\" not found, and couldn't find its containing crate's file \"{}\".", 
-                    demangled_full_symbol, crate_dependency_name);
+                if !self.fuzzy_symbol_matching {
+                    error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
+                        demangled_full_symbol, crate_dependency_name);
+                }
             }
         }
 
-        error!("Symbol \"{}\" not found. Try loading the crate manually first.", demangled_full_symbol);    
-    
+        // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
+        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
+        if self.fuzzy_symbol_matching {
+            if let Some(backup) = backup_namespace {
+                let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
+                
+                if fuzzy_matches.len() == 1 {
+                    let (_sec_name, weak_sec) = &fuzzy_matches[0];
+                    if let Some(sec) = weak_sec.upgrade() {
+                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
+                        // to this namespace so it can't be dropped while this namespace is still relying on it.  
+                        let pcref_opt = { sec.lock().parent_crate.upgrade() };
+                        if let Some(parent_crate_ref) = pcref_opt {
+                            let parent_crate_name = {
+                                let parent_crate = parent_crate_ref.lock_as_ref();
+                                self.add_symbols(Some(sec.clone()).iter(), true);
+                                parent_crate.crate_name.clone()
+                            };
+                            warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
+                                demangled_full_symbol, _sec_name, parent_crate_name, backup.name, self.name);
+                            self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+                            return weak_sec.clone();
+                        }
+                        else {
+                            error!("get_symbol_or_load(): found fuzzy-matched symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
+                                demangled_full_symbol);
+                            return Weak::default();
+                        }
+                    }
+                }
+                else {
+                    warn!("Cannot resolve dependency because there are multiple ({}) fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
+                        fuzzy_matches.len(), demangled_full_symbol, backup.name, fuzzy_matches.into_iter().map(|tup| tup.0).collect::<String>());
+                }
+            }
+        }
+
+        error!("Symbol \"{}\" not found. Try loading the crate manually first.", demangled_full_symbol);
         Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
     }
 
@@ -1919,9 +1984,9 @@ impl CrateNamespace {
     }
 
 
-    /// Finds the kernel crate object file in this `CrateNamespace`'s directory of kernel crates
-    /// that starts with the given `prefix`, if and only if there is a single match. 
-    /// If multiple crates match the prefix, `None` is returned. 
+    /// Same as `get_kernel_files_starting_with()`, 
+    /// but returns `Some(Path)` only if there is a single match.
+    /// If there are multiple matches, `None` is returned.
     /// 
     /// Returns the relative `Path` of the matching kernel crate file, 
     /// relative to this `CrateNamespace`'s kernel crate directory,
@@ -1932,6 +1997,19 @@ impl CrateNamespace {
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
             .map(|name| Path::new(name))
+    }
+
+
+    /// Finds the kernel crate object files in this `CrateNamespace`'s directory of kernel crates
+    /// that start with the given `prefix`.
+    /// 
+    /// Returns the relative `Path`s of the matching kernel crate files, 
+    /// relative to this `CrateNamespace`'s kernel crate directory,
+    /// effectively just the full names of the crate files. 
+    pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
+        let mut children = self.kernel_directory().lock().list_children();
+        children.retain(|child_name| child_name.starts_with(prefix)); // remove non-matches
+        children.into_iter().map(|name| Path::new(name)).collect()
     }
 
 }

@@ -47,5 +47,7 @@ RUSTFLAGS += -D unused-must-use
 ## some core generic function implementations won't exist in the object files.
 ## Details here: https://github.com/rust-lang/rust/pull/57268
 ## Relevant rusct commit: https://github.com/jethrogb/rust/commit/71990226564e9fe327bc9ea969f9d25e8c6b58ed#diff-8ad3595966bf31a87e30e1c585628363R8
+## Either "trampolines" or "disabled" works here, not sure how they're different
 RUSTFLAGS += -Z merge-functions=disabled
+# RUSTFLAGS += -Z merge-functions=trampolines
 
