@@ -345,3 +345,19 @@ pub struct RegistersRx {
 pub struct RegisterArrayRx {
     pub rx_queue:                          [RegistersRx; 64],
 }
+
+//TODO: It should be set from PCI space
+pub const IXGBE_MSIX_VECTORS:     usize = 64;
+
+#[repr(C)]
+pub struct MsixVectorTable {
+    pub msi_vector:     [MsixVectorEntry; IXGBE_MSIX_VECTORS],
+}
+
+#[repr(C)]
+pub struct MsixVectorEntry {
+    pub msg_lower_addr:         Volatile<u32>,
+    pub msg_upper_addr:         Volatile<u32>,
+    pub msg_data:               Volatile<u32>,
+    pub vector_control:         Volatile<u32>,
+}

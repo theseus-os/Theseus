@@ -294,7 +294,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
 
 /// 0x2C
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x2C");
+    // debug!("In handler 0x2C");
     let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60

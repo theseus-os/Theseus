@@ -164,24 +164,32 @@ pub fn pci_config_space(dev_pci: &PciDevice, capability_pci: u16) -> Option<u16>
         while cap_addr != 0 {
             cap_id = cap_header & 0xFF;
 
+            // if cap_id == MSIX_CAPABILITY {
+            //         let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
+
+            //         debug!("MSIX control: {:#X}", msix_control);
+
+            //         let msix_table = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 4);
+
+            //         debug!("MSIX table: {:#X}", msix_table);
+
+            //         let msix_pba = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + 8);
+
+            //         debug!("MSIX PBA: {:#X}", msix_pba);
+
+            //         // pci_unset_msix_enable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+            //         // pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next, msix_control&0x7FFF_FFFF);
+
+            //         // let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
+
+            //         // debug!("MSIX control_updated: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
+            // }
+            
             if cap_id == capability_pci {
                     debug!("Found capability: {:#X} at {:#X}", capability_pci, cap_addr);// (msi_control>>16) & 0xFFFF);
                     return Some(cap_addr);
             }
-
-            // if node_id == MSIX_CAPABILITY {
-            //         let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
-
-            //         debug!("MSIX control: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
-
-            //         // pci_unset_msix_enable_bit(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
-
-            //         pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next, msix_control&0x7FFF_FFFF);
-
-            //         let msix_control = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, node_next);
-
-            //         debug!("MSIX control_updated: {:#X}", msix_control);// (msi_control>>16) & 0xFFFF);
-            // }
 
             //find address of next capability
             cap_addr = (cap_header >> 8) & 0xFF;            
@@ -210,6 +218,7 @@ pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
 
     //write to MSI Addr... Intel Arch SDM, vol3, 10.11, TODO: need to add dest id as an argument
     pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20 | 119<<12);
+    // pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20);
 
     //write to MSI data, TODO: should add this as a function arg, vector num
     pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+12, 0x30);
@@ -229,6 +238,24 @@ pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
     debug!("MSI CTRL: {:#X}", ctrl>>16 & 0xFFFF);
     debug!("MSI ADDR: {:#X}", addr);
     debug!("MSI DATA: {:#X}", data);
+
+    Ok(())  
+
+}
+
+pub fn pci_enable_msix(dev_pci: &PciDevice) -> Result<(), &'static str> {
+
+    let cap_addr = try!(pci_config_space(dev_pci, MSIX_CAPABILITY).ok_or("Device not MSI capable"));
+
+    let message_control_offset = 2;
+    let ctrl = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + message_control_offset);
+
+    //write to bit 15 of Message Control, (82599 data sheet, section 9.3.8.1)
+    let msix_enable = 1 << 15; 
+    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + message_control_offset, (ctrl|msix_enable) as u32);
+
+    let ctrl = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
+    debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
     Ok(())  
 

@@ -38,7 +38,7 @@ use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
 use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, MemoryManagementInfo, PhysicalAddress, Frame, PageTable, EntryFlags, FrameAllocator, allocate_pages, MappedPages,FrameIter,PhysicalMemoryArea, allocate_pages_by_bytes, create_contiguous_mapping};
-use pci::{get_pci_device_vd,PciDevice,pci_read_32, pci_read_8, pci_read_16, pci_write, pci_set_command_bus_master_bit,pci_set_interrupt_disable_bit, pci_enable_msi, PCI_BAR0, PCI_INTERRUPT_PIN};
+use pci::{get_pci_device_vd,PciDevice,pci_read_32, pci_read_8, pci_read_16, pci_write, pci_set_command_bus_master_bit,pci_set_interrupt_disable_bit, pci_enable_msi, PCI_BAR0, PCI_INTERRUPT_PIN, pci_enable_msix, pci_config_space, MSIX_CAPABILITY};
 use kernel_config::memory::PAGE_SIZE;
 use descriptors::*;
 use registers::*;
@@ -63,7 +63,7 @@ const IXGBE_RX_BUFFER_SIZE_IN_BYTES:     u16 = 8192;
 const IXGBE_RX_HEADER_SIZE_IN_BYTES:     u16 = 256;
 const IXGBE_TX_BUFFER_SIZE_IN_BYTES:     usize = 256;
 
-const IXGBE_NUM_RX_QUEUES:       usize = 16;
+const IXGBE_NUM_RX_QUEUES:       usize = 1;
 
 /// to hold memory mappings
 static NIC_PAGES: Once<MappedPages> = Once::new();
@@ -153,6 +153,8 @@ pub struct IxgbeNic {
     /// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers
     /// TODO: Currently not using this for the IXGBE driver because no network stack. Will directly pass receive buffers to application.
     received_frames: VecDeque<ReceivedFrame>,
+    /// memory-mapped msi-x vector table
+    msix_vector_table: BoxRefMut<MappedPages, MsixVectorTable>,
 }
 
 impl NetworkInterfaceCard for IxgbeNic {
@@ -233,13 +235,18 @@ impl IxgbeNic{
         // pci_enable_msi(ixgbe_pci_dev)?;
         // pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
         // Self::enable_interrupts(&mut mapped_registers);
-        // register_interrupt(interrupt_num + PIC_MASTER_OFFSET, ixgbe_handler);
-        // redirect_interrupt(interrupt_num, 119);
+        register_interrupt(interrupt_num + PIC_MASTER_OFFSET, ixgbe_handler);
+        redirect_interrupt(interrupt_num, 119); // Don't need this, interrupts are re-directed from the pci capability space
+
+        let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
+        pci_enable_msix(ixgbe_pci_dev)?;
+        pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
+        Self::enable_msix_interrupts(&mut mapped_registers, &mut vector_table);
 
         let (rx_descs, rx_buffers, rx_headers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
 
-        Self::setup_mrq(&mut mapped_registers);
+        // Self::setup_mrq(&mut mapped_registers);
 
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
@@ -257,6 +264,7 @@ impl IxgbeNic{
             rx_headers_in_use: rx_headers,
             regs: mapped_registers,
             received_frames: VecDeque::new(),
+            msix_vector_table: vector_table
         };
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
@@ -321,6 +329,47 @@ impl IxgbeNic{
         debug!("Ixgbe status register: {:#X}", regs.status.read());
         Ok(regs)
 
+    }
+
+    pub fn mem_map_msix(dev: &PciDevice) -> Result<BoxRefMut<MappedPages, MsixVectorTable>, &'static str> {
+        let cap_addr = try!(pci_config_space(dev, MSIX_CAPABILITY).ok_or("Device not MSI capable"));
+
+        let vector_table_offset = 4;
+        let table_offset = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr + vector_table_offset);
+        let bar = table_offset & 0x7;
+        let offset = table_offset >> 3;
+
+        let mem_base = dev.bars[bar as usize] + offset;
+        let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * IXGBE_MSIX_VECTORS;
+
+        debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
+
+        // inform the frame allocator that the physical frames where the PCI config space for the nic exists
+        // is now off-limits and should not be touched
+        {
+            let nic_area = PhysicalMemoryArea::new(mem_base as usize, mem_size_in_bytes as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
+            FRAME_ALLOCATOR.try().ok_or("ixgbe: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
+        }
+
+        // set up virtual pages and physical frames to be mapped
+        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map_msix(): couldn't allocated virtual page!")?;
+        let frames_nic = Frame::range_inclusive_addr(mem_base as usize, mem_size_in_bytes);
+        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+
+        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("ixgbe:mem_map_msix KERNEL_MMI was not yet initialized!")?;
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+
+        let vector_table = if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            let mut fa = FRAME_ALLOCATOR.try().ok_or("ixgbe::mem_map_msix(): couldn't get FRAME_ALLOCATOR")?.lock();
+            let nic_mapped_page = active_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+            
+            BoxRefMut::new(Box::new(nic_mapped_page))
+                .try_map_mut(|mp| mp.as_type_mut::<MsixVectorTable>(0))?
+        } else {
+            return Err("ixgbe:mem_map_msix Couldn't get kernel's active_table");
+        };
+
+        Ok(vector_table)
     }
 
     fn init_rx_buf_pool(num_rx_buffers: usize) -> Result<(), &'static str> {
@@ -828,6 +877,49 @@ impl IxgbeNic{
         debug!("EICR: {:#X}", val);
     }
 
+    /// enable interrupts for msi-x mode
+    /// TODO: change all magic numbers and update for Tx
+    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable) {
+        //set IVAR reg for 16 queue
+        // each IVAR registeres controls 2 RX and 2 TX queues
+        let no_queues = 16;
+        let queues_per_ivar_reg = 2;
+        for queue in 0..no_queues/queues_per_ivar_reg {
+            let int_enable = 0x80808080 | (queue*2) | ((queue*2 + 1) << 15);
+            regs.ivar.reg[queue].write(int_enable as u32); 
+            debug!("IVAR: {:#X}", regs.ivar.reg[queue].read());
+        }
+        
+        //enable clear on read of EICR and MSI-X mode
+        let val = regs.gpie.read();
+        regs.gpie.write(val | 1<<6 | 1<<4 | 1<<31); 
+        debug!("GPIE: {:#X}", regs.gpie.read());
+
+        //set eims to enable required interrupt
+        regs.eims.write(0xFFFF); // Rx 0
+        debug!("EIMS: {:#X}", regs.eims.read());
+
+        //self.write_command(REG_EITR, 0x8000_00C8); // Rx0
+        // debug!("EITR: {:#X}", regs.eitr.reg[queue_num].read());
+
+        //clears eicr by writing 1 to clear old interrupt causes?
+        let val = regs.eicr.read();
+        debug!("EICR: {:#X}", val);
+
+        //allocate an interrupt to msix vector
+        // vector_table.msi_vector[0].vector_control.write(0);
+        // vector_table.msi_vector[0].msg_lower_addr.write(0xFEE << 20 | 119 << 12); 
+        // vector_table.msi_vector[0].msg_data.write(0x30);
+
+        for i in 0..64{
+            //allocate an interrupt to msix vector
+            vector_table.msi_vector[i].vector_control.write(0);
+            vector_table.msi_vector[i].msg_lower_addr.write(0xFEE << 20 | 0 << 12); 
+            vector_table.msi_vector[i].msg_data.write(0x30);
+            debug!("Vector control bit: {}", vector_table.msi_vector[i].vector_control.read());
+        }
+    }
+
     // reads status and clears interrupt
     fn clear_interrupt_status(&self) -> u32 {
         self.regs.eicr.read()
@@ -924,7 +1016,8 @@ impl IxgbeNic{
     /// TODO: need to update, just a dummy handler
     fn handle_interrupt(&self) -> Result<(), &'static str> {
         let status = self.clear_interrupt_status();
-
+        let me = try!(get_my_apic_id().ok_or("handle_bsp_entry(): Couldn't get_my_apic_id"));
+        debug!("ixgbe int on apic :{}", me);
         if (status & 0x01) == 0x01 { //Rx0
             debug!("Interrupt:packet received, status {:#X}", status);
         }
