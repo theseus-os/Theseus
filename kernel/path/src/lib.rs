@@ -178,7 +178,7 @@ impl Path {
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
-        let current_path = { Path::new(starting_dir.lock().get_path_as_string()) };
+        let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())

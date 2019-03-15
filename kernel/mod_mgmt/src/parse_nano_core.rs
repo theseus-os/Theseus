@@ -118,7 +118,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size = nano_core_object_file.size();
     let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
-    let abs_path = Path::new(nano_core_object_file.get_path_as_string());
+    let abs_path = Path::new(nano_core_object_file.get_absolute_path());
 
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -401,7 +401,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size_in_bytes = nano_core_object_file.size();
     let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
-    let abs_path = Path::new(nano_core_object_file.get_path_as_string());
+    let abs_path = Path::new(nano_core_object_file.get_absolute_path());
 
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
