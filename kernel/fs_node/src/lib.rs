@@ -36,10 +36,10 @@ pub type FileRef = Arc<Mutex<Box<File + Send>>>;
 /// Traits that both files and directories share
 pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir()  {
-            let parent_path = &cur_dir.lock().get_path_as_string();
+            let parent_path = &cur_dir.lock().get_absolute_path();
             // Check if the parent path is root 
             if parent_path == "/" {
                 path.insert_str(0, &format!("{}", parent_path));
@@ -58,14 +58,14 @@ pub trait FsNode {
 
 // Traits for files, implementors of File must also implement FsNode
 pub trait File : FsNode {
-    /// Reads the contents of this file into the given `buffer`
-    /// Caller should pass in an empty buffer and the read function will query the size of the buffer
-    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, &'static str>; 
-    /// Writes the bytes argument to the contents of the file
-    fn write(&mut self, buffer: &[u8]) -> Result<usize, &'static str>;
+    /// Reads the contents of this file starting at the given `offset` and copies them into the given `buffer`.
+    /// The length of the given `buffer` determines the maximum number of bytes to be read.
+    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str>; 
+    /// Writes the given `buffer` to this file starting at the given `offset`.
+    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str>;
     /// Deletes the file
     fn delete(self) -> Result<(), &'static str>;
-    /// Returns the size of the actual file content (i.e. the bytes that correspond to user-meaningful information) 
+    /// Returns the size in bytes of the file.
     fn size(&self) -> usize;
     /// Returns a view of the file as an immutable memory-mapped region.
     fn as_mapping(&self) -> Result<&MappedPages, &'static str>;
@@ -76,7 +76,7 @@ pub trait Directory : FsNode + Send {
     /// Gets an individual child node from the current directory based on the name field of that node
     fn get_child(&self, child_name: &str) -> Option<FileOrDir>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
+    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
     /// Lists the names of the children nodes of the current directory
     fn list_children(&mut self) -> Vec<String>;
 }
@@ -91,11 +91,11 @@ pub enum FileOrDir {
 // Allows us to call methods directly on an enum so we don't have to match on the underlying type
 impl FsNode for FileOrDir {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
-        return match self {
-            FileOrDir::File(file) => file.lock().get_path_as_string(),
-            FileOrDir::Dir(dir) => dir.lock().get_path_as_string(),
-        };
+    fn get_absolute_path(&self) -> String {
+        match self {
+            FileOrDir::File(file) => file.lock().get_absolute_path(),
+            FileOrDir::Dir(dir) => dir.lock().get_absolute_path(),
+        }
     }
     fn get_name(&self) -> String {
         return match self {

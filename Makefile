@@ -16,8 +16,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.32.0-nightly (f1e2fa8f0 2018-11-20)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-11-21
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.34.0-nightly (633d75ac1 2019-02-21)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-02-22
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -42,7 +42,7 @@ endif ## BYPASS_RUSTC_CHECK
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.12
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.13
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -442,6 +442,11 @@ odebug:
 loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
+
+### Create a make prioirty option to build and run priority scheduler
+priority : export override THESEUS_CONFIG += priority_scheduler
+priority : export BUILD_MODE = release
+priority: run
 
 
 ### builds and runs Theseus in QEMU

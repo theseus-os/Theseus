@@ -18,7 +18,6 @@ extern crate panic_wrapper;
 extern crate mod_mgmt;
 
 
-use core::fmt;
 use core::panic::PanicInfo;
 
 
@@ -110,6 +109,7 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 
 
 #[alloc_error_handler]
+#[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {
     // basic early panic printing with no dependencies
     println_raw!("\nOOM: {:?}", _layout);

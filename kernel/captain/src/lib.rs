@@ -150,6 +150,8 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // initialize the rest of our drivers
     device_manager::init(input_event_queue_producer)?;
 
+    task_fs::init()?;
+
 
     #[cfg(test_ota_update)]
     {
@@ -214,7 +216,7 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(simd_personality)]
     {
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
+        spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }

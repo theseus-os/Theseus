@@ -2,7 +2,6 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
-#![feature(integer_atomics)]
 
 extern crate x86_64;
 extern crate task;
@@ -15,7 +14,7 @@ extern crate pmu_x86;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use runqueue::RunQueue;
+
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -72,7 +71,7 @@ fn kill_and_halt(exception_number: u8) -> ! {
         match taskref.kill(task::KillReason::Exception(exception_number)) {
             Ok(_) => {
                 println_both!("Killed task {:?} due to exception {}.", taskref, exception_number);
-                if let Err(e) = RunQueue::remove_task_from_all(taskref) {
+                if let Err(e) = runqueue::remove_task_from_all(taskref) {
                     println_both!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
                 }
             }

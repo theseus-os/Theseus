@@ -28,7 +28,7 @@ impl Chunk {
 
 
 /// Represents an allocated range of virtual addresses, specified in pages. 
-/// These pages are not mapped to any physical memory frames, you must do that separately.
+/// These pages are not initially mapped to any physical memory frames, you must do that separately.
 /// This object represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be de-allocated. 
 /// See `MappedPages` struct for a similar object that unmaps pages when dropped.
@@ -102,7 +102,7 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 	if num_pages == 0 {
-		error!("allocate_pages(): requested an allocation of 0 pages... stupid!");
+		warn!("allocate_pages(): requested an allocation of 0 pages... stupid!");
 		return None;
 	}
 
@@ -110,33 +110,32 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 	let mut new_start_page: Option<Page> = None;
 
 	let mut locked_list = FREE_PAGE_LIST.lock();
-	{
-		for mut c in locked_list.iter_mut() {
-			// skip already-allocated chunks and chunks that are too small
-			if c.allocated || c.size_in_pages < num_pages {
-				continue;
-			}
-
-			// here: we have found a suitable chunk
-			let start_page = c.start_page;
-			let remaining_size = c.size_in_pages - num_pages;
-			if remaining_size == 0 {
-				// if the chunk is exactly the right size, just update it in-place as 'allocated'
-				c.allocated = true;
-				return Some(c.as_allocated_pages())
-			}
-
-			// here: we have the chunk and we need to split it up into two chunks
-			assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
-			
-			// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
-			c.size_in_pages = remaining_size;
-			c.start_page += num_pages;
-
-			// second, create a new chunk that has the pages we've peeled off the original chunk being split
-			// (or rather, we create the chunk below outside of the iterator loop, so just tell it where to start here)
-			new_start_page = Some(start_page);
+	for mut c in locked_list.iter_mut() {
+		// skip already-allocated chunks and chunks that are too small
+		if c.allocated || c.size_in_pages < num_pages {
+			continue;
 		}
+
+		// here: we have found a suitable chunk
+		let start_page = c.start_page;
+		let remaining_size = c.size_in_pages - num_pages;
+		if remaining_size == 0 {
+			// if the chunk is exactly the right size, just update it in-place as 'allocated'
+			c.allocated = true;
+			return Some(c.as_allocated_pages())
+		}
+
+		// here: we have the chunk and we need to split it up into two chunks
+		assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
+		
+		// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
+		c.size_in_pages = remaining_size;
+		c.start_page += num_pages;
+
+		// second, create a new chunk that has the pages we've peeled off the original chunk being split
+		// (or rather, we create the chunk below outside of the iterator loop, so here we just tell it where to start)
+		new_start_page = Some(start_page);
+		break;
 	}
 
 	if let Some(p) = new_start_page {

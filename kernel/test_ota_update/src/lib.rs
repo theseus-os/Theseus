@@ -77,8 +77,9 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         // We need to get just the basename of the file, then remove the crate type prefix ("k#"), and then strip the trailing hash after the "-". 
         let df_path = Path::new(df.name);
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
-        let cfile = MemFile::new(String::from(objfilename), content, &update_build_dir)?;
-        debug!("    created new file at path: {}", cfile.lock().get_path_as_string());
+        let cfile = MemFile::new(String::from(objfilename), &update_build_dir)?;
+        cfile.lock().write(content,0)?;
+        debug!("    created new file at path: {}", cfile.lock().get_absolute_path());
     }
 
     // now create the list of swap requests detailing which newly-downloaded crates we want to swap in
@@ -93,9 +94,9 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
             .ok_or("couldn't find matching old crate in namespace")?;
         let swap_req = SwapRequest::new(
             old_crate_name, 
-            Path::new(format!("{}/{}", update_build_dir.lock().get_path_as_string(), objfilename)), 
+            Path::new(format!("{}/{}", update_build_dir.lock().get_absolute_path(), objfilename)), 
             true
-        );
+        )?;
         swap_requests.push(swap_req);
     }
 

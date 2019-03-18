@@ -31,6 +31,7 @@ lazy_static! {
         };
 
         let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
+    
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 
     };
@@ -50,11 +51,11 @@ pub struct RootDirectory {
 }
 
 impl Directory for RootDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
-        self.children.insert(name, child);
-        return Ok(())
+        // inserts new child, if that child already exists the old value is returned
+        Ok(self.children.insert(name, child))
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
@@ -69,7 +70,7 @@ impl Directory for RootDirectory {
 
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         format!("{}/", ROOT_DIRECTORY_NAME.to_string()).to_string()
     }
 
@@ -77,8 +78,8 @@ impl FsNode for RootDirectory {
         ROOT_DIRECTORY_NAME.to_string()
     }
 
-    /// Returns a pointer to the parent if it exists
+    /// we just return the root itself because it is the top of the filesystem
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        return Err("root does not have a parent");
+        Ok(get_root().clone())
     }
 }
