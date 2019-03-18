@@ -49,23 +49,23 @@ const T_UNIT: &str = "micro sec";
 const T_UNIT: &str = "nano sec";
 
 /*macro_rules! printlninfo {
-    ($fmt:expr) => (warn!(concat!("BM-INFO: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-INFO: ", $fmt), $($arg)*));
+	($fmt:expr) => (warn!(concat!("BM-INFO: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-INFO: ", $fmt), $($arg)*));
 }
 
 macro_rules! printlnwarn {
-    ($fmt:expr) => (warn!(concat!("BM-WARN: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-WARN: ", $fmt), $($arg)*));
+	($fmt:expr) => (warn!(concat!("BM-WARN: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }*/
 
 macro_rules! printlninfo {
-    ($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
+	($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
 }
 
 macro_rules! printlnwarn {
-    ($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
+	($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }
 
 macro_rules! CPU_ID {
@@ -74,7 +74,7 @@ macro_rules! CPU_ID {
 
 fn get_prog_name() -> String {
 	let taskref = match task::get_my_current_task() {
-        Some(t) => t,
+	   Some(t) => t,
         None => {
             printlninfo!("failed to get current task");
             return "Unknown".to_string();
@@ -302,14 +302,20 @@ fn get_cwd() -> Option<DirRef> {
     None
 }
 
+// Don't call this function inside of a measuring loop.
 fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
+	if sz > WRITE_BUF_SIZE {
+		return Err("Cannot test because the file size is too big");
+	}
+
 	if let Some(fileref) = get_file(filename) {
 		if fileref.lock().size() == sz {
 			return Ok(());
 		}
 	}
 
-	MemFile::new(filename.to_string(), &WRITE_BUF[0..sz], &get_cwd().unwrap()).expect("File cannot be created.");
+	let file = MemFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
+	file.lock().write(&WRITE_BUF[0..sz], 0)?;
 
 	Ok(())
 }
@@ -330,6 +336,8 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	// let start_hpet_del: u64;
 	// let end_hpet_del: u64;
 
+	// don't put these (populating files, checks, etc) into the loop to be timed
+	// The loop must be doing minimal operations to exclude unnecessary overhead
 	// populate filenames
 	for i in 0..ITERATIONS {
 		filenames[i] = format!("tmp_{}_{}_{}.txt", pid, fsize_b, i);
@@ -337,8 +345,6 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 
 	// check if we have enough data to write. We use just const data to avoid unnecessary overhead
 	if fsize_b > WRITE_BUF_SIZE {
-		// don't put this into mk_tmp_file() or the loop below
-		// mk_tmp_file() and the loop below must be minimal for create/del benchmark
 		return Err("Cannot test because the file size is too big");
 	}
 
@@ -347,18 +353,23 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 		del_or_err(filename).expect("Cannot continue the test. We need 'delete()'.");
 	}
 
-	// don't put this into the loop to be timed
 	let cwd = match get_cwd() {
 		Some(dirref) => {dirref}
 		_ => {return Err("Cannot get CWD");}
 	};
 
-	// create
+	let wbuf = &WRITE_BUF[0..fsize_b];
+
+	// Measuring loop - create
 	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
 	for filename in &filenames {
 		// checking if filename exists is done above
 		// here, we only create files
-		MemFile::new(filename.to_string(), &WRITE_BUF[0..fsize_b], &cwd).expect("File cannot be created.");
+
+		// We can create a file from mapped pages using 'from_mapped_pages(),'
+		// but we first create a file and then write to resemble LMBench.
+		let file = MemFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		file.lock().write(wbuf, 0)?;
 	}
 	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
 
@@ -382,7 +393,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 
 fn cat(fileref: &FileRef, sz: usize, msg: &str) {
 	printlninfo!("{}", msg);
-	let mut file = fileref.lock();
+	let file = fileref.lock();
 	let mut buf = vec![0 as u8; sz];
 
 	match file.read(&mut buf,0) {
@@ -414,6 +425,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 
 fn test_file_inner(fileref: FileRef) {
 	let sz = {fileref.lock().size()};
+	printlninfo!("File size: {}", sz);
 
 	cat(&fileref, sz, 	"== Do CAT-NORMAL ==");
 	cat(&fileref, sz*2,	"== Do CAT-MORE   ==");
@@ -460,7 +472,7 @@ fn test_file(filename: &str) {
 	}
 }
 
-fn do_fs() {
+fn do_fs_cap_check() {
 	let filename = format!("tmp{}.txt", getpid());
 	if mk_tmp_file(&filename, 4).is_ok() {
 		printlninfo!("Testing with the file...");
@@ -470,7 +482,8 @@ fn do_fs() {
 
 fn do_fs_create_del() {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
-	let	fsizes_b = [1024_usize, 4096, 10*1024];
+	// let	fsizes_b = [1024_usize, 4096, 10*1024];
+	let	fsizes_b = [1024_usize];
 
 	let overhead_ct = timing_overhead();
 
@@ -608,12 +621,8 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 	let fsize_b = fsize_kb * KB as usize;
 
 	let filename = format!("tmp_{}k.txt", fsize_kb);
-	if fsize_b > WRITE_BUF_SIZE {
-		// don't put this into mk_tmp_file()
-		// mk_tmp_file() must be minimal for create/del benchmark
-		printlnwarn!("Cannot test because the file size is too big");
-		return;
-	}
+
+	// we can use `mk_tmp_file()` because it is outside of the loop
 	mk_tmp_file(&filename, fsize_b).expect("Cannot create a file");
 
 	for i in 0..TRIES {
@@ -691,43 +700,43 @@ fn print_header() {
 pub fn main(args: Vec<String>) -> isize {
 	let prog = get_prog_name();
 
-    if args.len() != 1 {
-    	print_usage(&prog);
-    	return 0;
-    }
+	if args.len() != 1 {
+		print_usage(&prog);
+		return 0;
+	}
 
-    if !check_myrq() {
-    	printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
-    	return 0;
-    }
+	if !check_myrq() {
+		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
+		return 0;
+	}
 
 	print_header();
-    
-    match args[0].as_str() {
-    	"null" => {
-    		do_null();
-    	}
-    	"spawn" => {
-    		do_spawn();
-    	}
-    	"fs_read_with_open" | "fs1" => {
-    		do_fs_read(true /*with_open*/);
-    	}
-    	"fs_read_only" | "fs2" => {
-    		do_fs_read(false /*with_open*/);
-    	}
-    	"fs_create" | "fs3" => {
-    		do_fs_create_del();
-    	}
-    	"fs" => {	// test code for checking FS' ability
-    		do_fs();
-    	}
-    	_arg => {
-    		printlninfo!("Unknown command: {}", args[0]);
-    		print_usage(&prog);
-    		return 0;
-    	}
-    }
-    
-    0
+
+	match args[0].as_str() {
+		"null" => {
+			do_null();
+		}
+		"spawn" => {
+			do_spawn();
+		}
+		"fs_read_with_open" | "fs1" => {
+			do_fs_read(true /*with_open*/);
+		}
+		"fs_read_only" | "fs2" => {
+			do_fs_read(false /*with_open*/);
+		}
+		"fs_create" | "fs3" => {
+			do_fs_create_del();
+		}
+		"fs" => {	// test code for checking FS' ability
+			do_fs_cap_check();
+		}
+		_arg => {
+			printlninfo!("Unknown command: {}", args[0]);
+			print_usage(&prog);
+			return 0;
+		}
+	}
+
+	0
 }
