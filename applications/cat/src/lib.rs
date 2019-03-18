@@ -66,7 +66,7 @@ pub fn main(args: Vec<String>) -> isize {
                     let file_size = file_locked.size();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
-                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes) {
+                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes,0) {
                         Ok(num) => num,
                         Err(e) => {
                             println!("Failed to read {:?}, error {:?}", file_locked.get_name(), e);

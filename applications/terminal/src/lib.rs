@@ -40,7 +40,6 @@ use window_manager::displayable::text_display::TextDisplay;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
-use runqueue::RunQueue;
 use environment::Environment;
 use spin::Mutex;
 
@@ -151,7 +150,7 @@ impl Terminal {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        let mut prompt_string = root.lock().get_path_as_string(); // ref numbers are 0-indexed
+        let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
             window: window_object,
@@ -194,7 +193,7 @@ impl Terminal {
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
         let curr_env = self.env.lock();
-        let mut prompt = curr_env.working_dir.lock().get_path_as_string();
+        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
         prompt = format!("{}: ",prompt);
         self.scrollback_buffer.push_str(&prompt);
     }
@@ -665,8 +664,7 @@ impl Terminal {
                     self.input_string.clear();
                     self.buffer_string.clear();
                     self.print_to_terminal("^C\n".to_string())?;
-                    let prompt_string = self.prompt_string.clone();
-                    self.print_to_terminal(prompt_string)?;
+                    self.redisplay_prompt();
                     self.correct_prompt_position = true;
                     self.left_shift = 0;
                     return Ok(());
@@ -674,7 +672,7 @@ impl Terminal {
             };
             match task_ref_copy.kill(KillReason::Requested) {
                 Ok(_) => {
-                    if let Err(e) = RunQueue::remove_task_from_all(&task_ref_copy) {
+                    if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
                         error!("Killed task but could not remove it from runqueue: {}", e);
                     }
                 }
@@ -743,13 +741,15 @@ impl Terminal {
                         self.current_task_ref = Some(new_task_ref);
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     } Err("Error: no module with this name found!") => {
-                        self.print_to_terminal(format!("\n{}: command not found\n{}",input_string, prompt_string))?;
+                        self.print_to_terminal(format!("\n{}: command not found\n",input_string))?;
+                        self.redisplay_prompt();
                         self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(());
                     } Err(&_) => {
-                        self.print_to_terminal(format!("\nrunning command on new thread failed\n\n{}", prompt_string))?;
+                        self.print_to_terminal("\nrunning command on new thread failed\n".to_string())?;
+                        self.redisplay_prompt();
                         self.input_string.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;

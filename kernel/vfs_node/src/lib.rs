@@ -49,11 +49,11 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
-        // gets the name of the child node to be added
+    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+         // gets the name of the child node to be added
         let name = child.get_name();
-        self.children.insert(name, child);
-        return Ok(())
+        // inserts new child, if that child already exists the old value is returned
+        Ok(self.children.insert(name, child))
     }
 
     fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
@@ -62,7 +62,7 @@ impl Directory for VFSDirectory {
 
     /// Returns a string listing all the children in the directory
     fn list_children(&mut self) -> Vec<String> {
-        return self.children.keys().cloned().collect();
+        self.children.keys().cloned().collect()
     }
 }
 
@@ -104,8 +104,8 @@ impl VFSFile {
 }
 
 impl File for VFSFile {
-    fn read(&mut self, _buf: &mut [u8]) -> Result<usize, &'static str> { unimplemented!()    }
-    fn write(&mut self, _buf: &[u8]) -> Result<usize, &'static str> { unimplemented!(); }
+    fn read(&self, _buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { unimplemented!()    }
+    fn write(&mut self, _buf: &[u8], offset: usize) -> Result<usize, &'static str> { unimplemented!(); }
     
     fn delete(self) -> Result<(), &'static str> {
         Err("unimplemented")

@@ -309,7 +309,7 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 		}
 	}
 
-    MemFile::new(filename.to_string(), &WRITE_BUF[0..sz], &get_cwd().unwrap()).expect("File cannot be created.");
+	MemFile::new(filename.to_string(), &WRITE_BUF[0..sz], &get_cwd().unwrap()).expect("File cannot be created.");
 
 	Ok(())
 }
@@ -329,7 +329,6 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let end_hpet_create: u64;
 	// let start_hpet_del: u64;
 	// let end_hpet_del: u64;
-
 
 	// populate filenames
 	for i in 0..ITERATIONS {
@@ -386,7 +385,7 @@ fn cat(fileref: &FileRef, sz: usize, msg: &str) {
 	let mut file = fileref.lock();
 	let mut buf = vec![0 as u8; sz];
 
-	match file.read(&mut buf) {
+	match file.read(&mut buf,0) {
 		Ok(nr_read) => {
 			printlninfo!("tries to read {} bytes, and {} bytes are read", sz, nr_read);
 			printlninfo!("read: '{}'", str::from_utf8(&buf).unwrap());
@@ -404,7 +403,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 	}
 
 	let mut file = fileref.lock();
-	match file.write(&buf) {
+	match file.write(&buf,0) {
 		Ok(nr_write) => {
 			printlninfo!("tries to write {} bytes, and {} bytes are written", sz, nr_write);
 			printlninfo!("written: '{}'", str::from_utf8(&buf).unwrap());
@@ -511,7 +510,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf).expect("Cannot read");
+                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
 					unread_size -= nr_read as i64;
 
 					// LMbench based on C does the magic to cast a type from char to int
@@ -570,7 +569,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf).expect("Cannot read");
+                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
 					unread_size -= nr_read as i64;
 
 					// LMbench based on C does the magic to cast a type from char to int
@@ -656,7 +655,7 @@ fn do_fs_read(with_open: bool) {
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::RunQueue::get_runqueue(core).map(|rq| rq.read()) {
+	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.iter().count()) }
 		_ => { None }
 	}
