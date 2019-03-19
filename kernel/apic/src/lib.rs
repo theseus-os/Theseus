@@ -348,6 +348,8 @@ impl LocalApic {
             regs.lvt_lint1.write(APIC_DISABLE);
             regs.task_priority.write(0);
 
+            // debug!("Enabled apic for :{}" , self.apic_id);
+
             // set bit 8 to allow receiving interrupts (still need to "sti")
             regs.spurious_interrupt_vector.write(APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE);   
             Ok(())         

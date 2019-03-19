@@ -159,7 +159,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0x16, bsp_id, PIC_MASTER_OFFSET + 0x16);
                     ioapic_ref.set_irq(0x17, bsp_id, PIC_MASTER_OFFSET + 0x17);
 
-                    // ioapic_ref.set_irq(0x1, 0xFF, PIC_MASTER_OFFSET + 0x1); 
+                    ioapic_ref.set_irq(0x1F, 0xFF, PIC_MASTER_OFFSET + 0x1F); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                 }
                 

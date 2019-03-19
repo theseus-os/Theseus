@@ -51,6 +51,10 @@ use acpi::madt::redirect_interrupt;
 use acpi::get_hpet;
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use owning_ref::BoxRefMut;
+use server_info::SOCKET_1_LAPICS;
+
+/// max 64
+const NUM_MSI_VEC_ENABLED:      usize = 1;
 
 const IXGBE_10GB_LINK:          bool = true;
 const IXGBE_1GB_LINK:           bool = !(IXGBE_10GB_LINK);
@@ -906,17 +910,42 @@ impl IxgbeNic{
         let val = regs.eicr.read();
         debug!("EICR: {:#X}", val);
 
-        //allocate an interrupt to msix vector
-        // vector_table.msi_vector[0].vector_control.write(0);
-        // vector_table.msi_vector[0].msg_lower_addr.write(0xFEE << 20 | 119 << 12); 
-        // vector_table.msi_vector[0].msg_data.write(0x30);
+        for i in 0..NUM_MSI_VEC_ENABLED {
+            //find interrupt number for this msi vector
+            interrupt_nums[i] = get_unused_interrupt().ok_or("Ixgbe: No available interrupt!")?;
+        }
+        // Register interrupts
+        // TODO: find a cleaner way
+        register_interrupt(0x3F, ixgbe_handler_0);
+        // register_interrupt(interrupt_nums[0] as u8, ixgbe_handler_0);
+        // register_interrupt(interrupt_nums[1] as u8, ixgbe_handler_1);
+        // register_interrupt(interrupt_nums[2] as u8, ixgbe_handler_2);
+        // register_interrupt(interrupt_nums[3] as u8, ixgbe_handler_3);
+        // register_interrupt(interrupt_nums[4] as u8, ixgbe_handler_4);
+        // register_interrupt(interrupt_nums[5] as u8, ixgbe_handler_5);
+        // register_interrupt(interrupt_nums[6] as u8, ixgbe_handler_6);
+        // register_interrupt(interrupt_nums[7] as u8, ixgbe_handler_7);
+        // register_interrupt(interrupt_nums[8] as u8, ixgbe_handler_8);
+        // register_interrupt(interrupt_nums[9] as u8, ixgbe_handler_9);
+        // register_interrupt(interrupt_nums[10] as u8, ixgbe_handler_10);
+        // register_interrupt(interrupt_nums[11] as u8, ixgbe_handler_11);
+        // register_interrupt(interrupt_nums[12] as u8, ixgbe_handler_12);
+        // register_interrupt(interrupt_nums[13] as u8, ixgbe_handler_13);
+        // register_interrupt(interrupt_nums[14] as u8, ixgbe_handler_14);
+        // register_interrupt(interrupt_nums[15] as u8, ixgbe_handler_15);
 
-        for i in 0..64{
+        // Initialze 16 msi vectors
+        for i in 0..NUM_MSI_VEC_ENABLED{
+            // find core to redirect interrupt to
+            let core_id = SOCKET_1_LAPICS[i] as u32;
             //allocate an interrupt to msix vector
             vector_table.msi_vector[i].vector_control.write(0);
-            vector_table.msi_vector[i].msg_lower_addr.write(0xFEE << 20 | 0 << 12); 
-            vector_table.msi_vector[i].msg_data.write(0x30);
-            debug!("Vector control bit: {}", vector_table.msi_vector[i].vector_control.read());
+            let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
+            // debug!("MSI lower addr {}", lower_addr);
+            vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !0xFF0) | 0xFEE << 20 | 0xFF << 12); 
+            // redirect_interrupt(interrupt_nums[i] - PIC_MASTER_OFFSET, 118); // Don't need this, interrupts are re-directed from the pci capability space
+            vector_table.msi_vector[i].msg_data.write(0x3F as u32);
+            // debug!("Created MSI vector: control: {}, core: {}, int: {}", vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);
         }
     }
 
