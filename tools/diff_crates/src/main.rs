@@ -5,12 +5,12 @@ extern crate getopts;
 extern crate walkdir;
 extern crate qp_trie;
 extern crate multimap;
+extern crate spin;
+extern crate serde_json;
 
 use getopts::Options;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::io::Write;
-use std::process;
+use std::path::PathBuf;
 use std::env;
 use multimap::MultiMap;
 use std::string::ToString;
@@ -19,6 +19,20 @@ use qp_trie::{
     wrapper::BString,
 };
 use walkdir::WalkDir;
+use spin::Once;
+
+
+static VERBOSE: Once<bool> = Once::new();
+
+
+macro_rules! pr {
+    ($fmt:expr) => {
+        if VERBOSE.try() == Some(&true) { println!(concat!($fmt, "\n")); }
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        if VERBOSE.try() == Some(&true) { println!(concat!($fmt, "\n"), $($arg)*); }
+    };
+}
 
 
 fn main() -> Result<(), String> {
@@ -26,12 +40,17 @@ fn main() -> Result<(), String> {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
+    opts.optflag("v", "verbose", "print verbose logs to stdout");
 
     let matches = opts.parse(&args[1..]).map_err(|e| e.to_string())?;
 
     if matches.opt_present("h") {
         usage("cargo run -- ", opts);
         return Ok(());
+    }
+
+    if matches.opt_present("v") {
+        VERBOSE.call_once(|| true);
     }
 
     // Require two directories as input 
@@ -64,19 +83,22 @@ fn main() -> Result<(), String> {
 
 
     if false {
-        println!("---------------------------- OLD DIR ----------------------------------");
+        pr!("---------------------------- OLD DIR ----------------------------------");
         for (filename, p) in old_dir_contents.iter() {
-            println!("{:>50}     {}", filename.as_str(), p.display());
+            pr!("{:>50}     {}", filename.as_str(), p.display());
         }
-        println!("---------------------------- NEW DIR ----------------------------------");
+        pr!("---------------------------- NEW DIR ----------------------------------");
         for (filename, p) in new_dir_contents.iter() {
-            println!("{:>50}     {}", filename.as_str(), p.display());
+            pr!("{:>50}     {}", filename.as_str(), p.display());
         }
     }
     
 
     let replacements = compare_dirs(old_dir_contents, new_dir_contents).map_err(|e| e.to_string())?;
-    println!("\nREPLACEMENTS:\n{:?}", replacements);
+    pr!("\nREPLACEMENTS:\n{:?}", replacements);
+    let serialized = serde_json::to_string_pretty(&replacements).map_err(|e| format!("Couldn't serialize multimap of replacements: {:?}", e))?;
+    println!("{}", serialized);
+    
     Ok(())
 }
 
@@ -87,19 +109,19 @@ fn main() -> Result<(), String> {
 /// If the old crate is `None` and the new crate is `Some`, then the new crate is a new addition that does not replace any old crate.
 /// If the old crate is `Some` and the new crate is `None`, then the old crate is merely being removed without being replaced.
 /// If both the old crate and new crate are `Some`, then the new crate is replacing the old crate.
-fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie<BString, PathBuf>) -> std::io::Result<MultiMap<Option<String>, Option<String>>> {
-    let mut replacements: MultiMap<Option<String>, Option<String>> = MultiMap::new();
+fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie<BString, PathBuf>) -> Result<MultiMap<String, String>, String> {
+    let mut replacements: MultiMap<String, String> = MultiMap::new();
 
     // First, we go through the new directory and see which files have changed since the old directory
     for (new_filename, new_path) in new_dir_contents.iter() {
 
         // if the old dir contains an identical file as the new dir, then we diff their actual contents
         if let Some(old_path) = old_dir_contents.get(new_filename) {
-            let old_file = fs::read(old_path)?;
-            let new_file = fs::read(new_path)?;
+            let old_file = fs::read(old_path).map_err(|e| e.to_string())?;
+            let new_file = fs::read(new_path).map_err(|e| e.to_string())?;
             if old_file != new_file {
-                println!("{0} -> {0}", new_filename.as_str());
-                replacements.insert(Some(new_filename.clone().into()), Some(new_filename.clone().into()));
+                pr!("{0} -> {0}", new_filename.as_str());
+                replacements.insert(new_filename.clone().into(), new_filename.clone().into());
             }
         }
         // otherwise we try to search the old dir to see if there's a single matching crate that has a different hash
@@ -108,20 +130,21 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
             match &matching_old_crates[..] {
                 [] => {
                     // if empty, there were no matches, so the crate is brand new and should be added but not replace anything. 
-                    println!("+ {}", new_filename.as_str());
-                    replacements.insert(None, Some(new_filename.clone().into()));
+                    pr!("+ {}", new_filename.as_str());
+                    replacements.insert(String::new(), new_filename.clone().into());
                 }
                 [(old_filename, _old_path)] => {
                     // If there was one match, it means we updated from an old crate to a new crate of the same name, but the hash changed.
                     // This is the most common scenario.
-                    println!("{} -> {}", old_filename.as_str(), new_filename.as_str());
-                    replacements.insert(Some(old_filename.clone().into()), Some(new_filename.clone().into()));
+                    pr!("{} -> {}", old_filename.as_str(), new_filename.as_str());
+                    replacements.insert(old_filename.clone().into(), new_filename.clone().into());
                 }
                 other => {
-                    eprintln!("Unsupported: there were multiple old crates that matched the new crate {}:", new_filename.as_str());
+                    let mut err_str = format!("Unsupported: multiple old crates matched the new crate {}:\n", new_filename.as_str());
                     for (k, _v) in other {
-                        eprintln!("\t{}", k.as_str());
+                        err_str = format!("{}\t{}\n", err_str, k.as_str());
                     }
+                    return Err(err_str)
                 }
             }
 
@@ -132,8 +155,8 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
     // Second, we got through the old directory to make sure we didn't miss any files that were present in the old directory but not in the new
     for (old_filename, _old_path) in old_dir_contents.iter() {
         if new_dir_contents.iter_prefix_str(crate_name_without_hash(old_filename.as_str())).next().is_none() {
-            println!("- {}", old_filename.as_str());
-            replacements.insert(Some(old_filename.clone().into()), None);
+            pr!("- {}", old_filename.as_str());
+            replacements.insert(old_filename.clone().into(), String::new());
         }
     }
 
@@ -148,33 +171,8 @@ fn crate_name_without_hash<'s>(name: &'s str) -> &'s str {
 }
 
 
-
-
 fn usage(program: &str, opts: Options) {
     let mut brief = format!("Usage: {} [options] OLD_DIR NEW_DIR\n", program);
     brief.push_str("Outputs the list of differing files in a format that shows how to change OLD_DIR into NEW_DIR\n");
     println!("{}", opts.usage(&brief));
-}
-
-
-#[test]
-fn test() {
-    use multimap::MultiMap;
-
-    let mut map: MultiMap<usize, usize> = MultiMap::new();
-    map.insert(1,42);
-    map.insert(1,1337);
-    map.insert(3,2332);
-    map.insert(4,1991);
-
-    for (k, values) in map.iter_all() {
-        for v in values {
-            println!("{}, {}", k, v);
-        }
-    }
-
-    for iter in map.iter_all() {
-        println!("iter: {:?}", iter);
-        // println!("key: {:?}, val: {:?}", key, value);
-    }
 }
