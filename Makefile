@@ -268,8 +268,6 @@ build_simd:
 
 
 
-DIFF_FILE := $(BUILD_DIR)/diff.txt
-
 preserve_old_modules:
 	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
 
@@ -355,8 +353,15 @@ help:
 
 	@echo -e "   build_server:"
 	@echo -e "\t Builds Theseus (as with the 'iso' target) and then runs a build server hosted on this machine"
-	@echo -e "\t that can be used over-the-air live evolution."
+	@echo -e "\t that can be used for over-the-air live evolution."
 	@echo -e "\t You can specify the name of the directory of newly-built modules by setting the 'UPDATE_DIR' environment variable."
+	@echo -e "\t This target should be invoked as an incremental build after a prior build has already completed."
+	@echo -e "\t For example, first checkout version 1 (e.g., a specific git commit), build it as normal,"
+	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
+	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
+	
+
+	
 
 
 	@echo -e "   doc:"
