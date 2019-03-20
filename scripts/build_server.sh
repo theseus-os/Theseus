@@ -80,8 +80,8 @@ for d in $(ls -dt */ | sed 's/[/]//g') ; do
 done
 
 
-### It's okay to invoke the http server without checking to see if it's already running, because if it is, 
-### then invoking it again will just error out silently and let the existing instance keep running.
+### Start up the actual HTTP server (after killing off any existing identical web server)
+WEBSERVER_CMD="python -m SimpleHTTPServer 8090"
+pkill -f "$WEBSERVER_CMD" || true
 echo "Starting simple HTTP server at root dir $HTTP_ROOT with new dir $NEW_DIR_NAME"
-killall -q SimpleHTTPServer || true
-cd $HTTP_ROOT && python -m SimpleHTTPServer 8090  > /dev/null  2>&1  &
+cd $HTTP_ROOT && $($WEBSERVER_CMD) > /dev/null  2>&1  &
