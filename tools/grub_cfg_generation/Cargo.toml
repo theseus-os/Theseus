@@ -1,7 +1,11 @@
 [package]
-name = "grub-cfg-generation"
+name = "grub_cfg_generation"
 version = "0.1.0"
-authors = ["christinewang5 <chrissywang54@gmail.com>"]
+authors = [
+    "Kevin Boos <kevinaboos@gmail.com>",
+    "christinewang5 <chrissywang54@gmail.com>",
+]
+description = "Parses the directory of built object files and generates the multiboot2-compliant grub.cfg file"
 
 [dependencies]
 getopts = "0.2"
