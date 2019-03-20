@@ -14,27 +14,26 @@ if ! command -v python > /dev/null ; then
 fi
 
 
-### first argument is required:  directory that is being exposed as the root of the HTTP web server
-if [ -z $1 ] ; then 
-	echo "Error: expected one argument, the top-level directory accessible to the clients via an HTTP server."
+### required argument:  directory that is being exposed as the root of the HTTP web server
+if [ -z $HTTP_ROOT ] ; then 
+	echo "Error: missing HTTP_ROOT var: the top-level directory accessible to the clients via an HTTP server."
 	exit 1
 fi
-HTTP_ROOT=$(readlink -m $1)
+HTTP_ROOT=$(readlink -m $HTTP_ROOT)
 
-### second argument is required:  directory of where the new modules were just built
-if [ -z $2 ] ; then 
-	echo "Error: missing second argument: the directory containing all of the newly-built module files"
+### required argument:  directory of where the new modules were just built
+if [ -z $MODULES_DIR ] ; then 
+	echo "Error: missing MODULES_DIR var: the directory containing all of the newly-built module files"
 	exit 1
 fi
-MODULES_DIR=$(readlink -m $2)
+MODULES_DIR=$(readlink -m $MODULES_DIR)
 
-### third argument is optional:  the name of the directory that will contain the new modules
-if [ -z $3 ] ; then 
+### optional argument:  the name of the directory that will contain the new modules
+if [ -z $NEW_DIR_NAME ] ; then 
   NEW_DIR_NAME=$(date - u | sed '/s/ /_/g')
 	echo "No new directory name given, using the current date instead: $NEW_DIR_NAME"
-else 
-  NEW_DIR_NAME=$3
 fi
+
 
 ### create a directory to hold the newly-built module files and their checksums
 NEW_DIR=$(readlink -m $HTTP_ROOT/$NEW_DIR_NAME)
@@ -58,6 +57,17 @@ done
 ### create a simple listing of all module files
 cd $NEW_DIR/
 ls *.o > $NEW_DIR/listing.txt
+
+
+### if the optional argument of the crate diff file was provided, copy it into the new 
+if [ -f $DIFF_FILE ] ; then 
+  # DIFF_FILE=$(readlink -e $DIFF_FILE)
+  cp -r $DIFF_FILE $NEW_DIR/
+else
+	echo "Error: couldn't find the provided DIFF_FILE \"$DIFF_FILE\""
+	exit 1
+fi
+
 
 ### Update the root listing to reflect all available update directories.
 ### The root listing sorts directories in reverse chronological order (newest at top, oldest at bottom),

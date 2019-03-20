@@ -61,7 +61,7 @@ pub fn init(keyboard_queue_producer: DFQueueProducer<Event>) {
 pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
-    // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
+    debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
 
     // first, update the modifier keys
     match scan_code {

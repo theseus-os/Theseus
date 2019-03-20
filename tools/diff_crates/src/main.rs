@@ -97,8 +97,8 @@ fn main() -> Result<(), String> {
     let replacements = compare_dirs(old_dir_contents, new_dir_contents).map_err(|e| e.to_string())?;
     pr!("\nREPLACEMENTS:\n{:?}", replacements);
     let serialized = serde_json::to_string_pretty(&replacements).map_err(|e| format!("Couldn't serialize multimap of replacements: {:?}", e))?;
-    println!("{}", serialized);
-    
+    pr!("{}", serialized);
+
     Ok(())
 }
 
@@ -120,7 +120,7 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
             let old_file = fs::read(old_path).map_err(|e| e.to_string())?;
             let new_file = fs::read(new_path).map_err(|e| e.to_string())?;
             if old_file != new_file {
-                pr!("{0} -> {0}", new_filename.as_str());
+                println!("{0} -> {0}", new_filename.as_str());
                 replacements.insert(new_filename.clone().into(), new_filename.clone().into());
             }
         }
@@ -130,13 +130,13 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
             match &matching_old_crates[..] {
                 [] => {
                     // if empty, there were no matches, so the crate is brand new and should be added but not replace anything. 
-                    pr!("+ {}", new_filename.as_str());
+                    println!("+ {}", new_filename.as_str());
                     replacements.insert(String::new(), new_filename.clone().into());
                 }
                 [(old_filename, _old_path)] => {
                     // If there was one match, it means we updated from an old crate to a new crate of the same name, but the hash changed.
                     // This is the most common scenario.
-                    pr!("{} -> {}", old_filename.as_str(), new_filename.as_str());
+                    println!("{} -> {}", old_filename.as_str(), new_filename.as_str());
                     replacements.insert(old_filename.clone().into(), new_filename.clone().into());
                 }
                 other => {
@@ -155,7 +155,7 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
     // Second, we got through the old directory to make sure we didn't miss any files that were present in the old directory but not in the new
     for (old_filename, _old_path) in old_dir_contents.iter() {
         if new_dir_contents.iter_prefix_str(crate_name_without_hash(old_filename.as_str())).next().is_none() {
-            pr!("- {}", old_filename.as_str());
+            println!("- {}", old_filename.as_str());
             replacements.insert(old_filename.clone().into(), String::new());
         }
     }
