@@ -59,13 +59,14 @@ fn main() -> Result<(), String> {
         _ => return Err(format!("expected two directories as arguments")),
     };
 
+    let object_file_extension = std::ffi::OsStr::new("o");
     
     // A closure that returns a Trie map of (file_name, path) from all of the files in the given directory `dir_path`
     let get_files_in_dir = |dir_path| { 
         WalkDir::new(dir_path)
             .into_iter()
             .filter_map(|res| res.ok())
-            .filter(|entry| entry.path().is_file())
+            .filter(|entry| entry.path().is_file() && entry.path().extension() == Some(object_file_extension))
             .filter_map(|entry| entry.path().file_name()
                 .map(|fname| {
                     (

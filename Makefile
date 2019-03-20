@@ -268,7 +268,6 @@ build_simd:
 
 
 
-BUILD_SERVER_DIR := $(HOME)/.theseus_build_server
 DIFF_FILE := $(BUILD_DIR)/diff.txt
 
 preserve_old_modules:
@@ -279,8 +278,10 @@ preserve_old_modules:
 ### and then sets up an HTTP server that provides module object files 
 ### for a running instance of Theseus to download for OTA live updates.
 build_server: preserve_old_modules iso
-	cargo run --manifest-path $(ROOT_DIR)/tools/diff_crates/Cargo.toml -- $(OBJECT_FILES_BUILD_DIR)_old $(OBJECT_FILES_BUILD_DIR) > $(DIFF_FILE)
-	HTTP_ROOT=$(BUILD_SERVER_DIR) MODULES_DIR=$(OBJECT_FILES_BUILD_DIR) NEW_DIR_NAME=$(UPDATE_DIR) DIFF_FILE=$(DIFF_FILE) bash scripts/build_server.sh
+	OLD_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR)_old \
+		NEW_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR) \
+		NEW_DIR_NAME=$(UPDATE_DIR) \
+		bash scripts/build_server.sh
 
 
 ## The top-level (root) documentation file
