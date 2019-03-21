@@ -33,6 +33,8 @@ pub fn main(args: Vec<String>) -> isize {
 pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
+    opts.optflag("r", "recursive", 
+        "recursively delete directories and files under this directory");
     
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -42,6 +44,12 @@ pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
             return Ok(-1);
         }
     };
+
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return Ok(0);
+    }
+
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
@@ -77,8 +85,23 @@ pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
         return Err("cannot remove root"); 
     }
 
-    let parent = delete_node.get_parent_dir()?;
-    parent.lock().delete_child(delete_node)?;
+    // Check the underlying type of the FileOrDir node and if it's a directory,
+    // if we can remove it if the user specified -r. 
+    let mut remove_dir = false;
+    match &delete_node {
+        FileOrDir::File(_file) => {remove_dir = true; },
+        FileOrDir::Dir(_dir) => {remove_dir = matches.opt_present("r");}
+        
+    }
+
+    if remove_dir {
+        let parent = delete_node.get_parent_dir()?;
+        parent.lock().delete_child(delete_node)?;
+    } else {
+        println!("cannot remove '{}': Is a directory", delete_node.get_name());
+        return Ok(-1);
+    }
+
     Ok(0)
 }
 
