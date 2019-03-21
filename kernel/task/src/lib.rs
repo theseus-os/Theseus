@@ -685,7 +685,7 @@ impl TaskRef {
 
         #[cfg(runqueue_state_spill_evaluation)] 
         {   
-            let task_on_rq = { self.0.lock().on_runqueue.clone() };
+            let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(self, rq)?;
