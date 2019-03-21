@@ -42,7 +42,7 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ}
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
-use apic::{INTERRUPT_CHIP, InterruptChip};
+use apic::{INTERRUPT_CHIP, InterruptChip, get_my_apic_id};
 use pic::PIC_MASTER_OFFSET;
 
 
@@ -249,7 +249,9 @@ static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // debug!("In handler 0x21");
+    // debug!("Keyboard irq handler, APIC {}", get_my_apic_id().unwrap_or(0xFF));
+    // return;
+
     let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60
@@ -318,10 +320,16 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
     eoi(Some(PIC_MASTER_OFFSET + 0xc));
 }
 
+
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+
+pub fn get_timer(_:()) {
+    debug!("APIC timer on core: {} = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS.load(Ordering::Relaxed));
+}
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // debug!("In handler 0x22");
+
+    // debug!("In handler 0x22 on core {}", apic::get_my_apic_id().unwrap_or(0xFF));
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
     
@@ -642,7 +650,9 @@ extern "x86-interrupt" fn apic_irq_0x36_handler(_stack_frame: &mut ExceptionStac
 /// 0x37
 extern "x86-interrupt" fn apic_irq_0x37_handler(_stack_frame: &mut ExceptionStackFrame) {
 
-    debug!("In handler 0x37");
+    let apic_id = get_my_apic_id();
+
+    debug!("In handler 0x37 on core: {}", apic_id.unwrap());
 
     eoi(Some(0x37));
 }

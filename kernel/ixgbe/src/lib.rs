@@ -916,7 +916,6 @@ impl IxgbeNic{
         }
         // Register interrupts
         // TODO: find a cleaner way
-        register_interrupt(0x3F, ixgbe_handler_0);
         // register_interrupt(interrupt_nums[0] as u8, ixgbe_handler_0);
         // register_interrupt(interrupt_nums[1] as u8, ixgbe_handler_1);
         // register_interrupt(interrupt_nums[2] as u8, ixgbe_handler_2);
@@ -934,7 +933,9 @@ impl IxgbeNic{
         // register_interrupt(interrupt_nums[14] as u8, ixgbe_handler_14);
         // register_interrupt(interrupt_nums[15] as u8, ixgbe_handler_15);
 
-        // Initialze 16 msi vectors
+        register_interrupt(0x3F as u8, ixgbe_handler_0);
+
+        // Initialize 16 msi vectors
         for i in 0..NUM_MSI_VEC_ENABLED{
             // find core to redirect interrupt to
             let core_id = SOCKET_1_LAPICS[i] as u32;
@@ -942,7 +943,7 @@ impl IxgbeNic{
             vector_table.msi_vector[i].vector_control.write(0);
             let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
             // debug!("MSI lower addr {}", lower_addr);
-            vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !0xFF0) | 0xFEE << 20 | 0xFF << 12); 
+            vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !0xFF0) | 0xFEE << 20 | 118 << 12); 
             // redirect_interrupt(interrupt_nums[i] - PIC_MASTER_OFFSET, 118); // Don't need this, interrupts are re-directed from the pci capability space
             vector_table.msi_vector[i].msg_data.write(0x3F as u32);
             // debug!("Created MSI vector: control: {}, core: {}, int: {}", vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);

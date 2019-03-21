@@ -33,6 +33,52 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
 use pit_clock::pit_wait;
 
+pub fn busy_task(_:()) {
+    let mut i = 0;
+    let mut a = 0;
+    loop {
+        a = 2 * i;
+        i += 1;
+    }
+}
+
+pub fn print_irr_isr(_:()) {
+
+    let my_apic_id = get_my_apic_id().unwrap();
+    let my_apic = get_my_apic(); //get_apic_with_id(apic_id);
+
+    if my_apic.is_none() {
+        debug!("Couldn't get my apic");
+    }
+
+    let irr = my_apic.unwrap().read().get_irr();
+
+    let isr = my_apic.unwrap().read().get_isr();
+
+    debug!("IRR: {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}", irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);
+    debug!("ISR: {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}", isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7);
+
+}
+
+pub fn send_interrupt( dest: u8) {
+
+    let my_apic_id = get_my_apic_id().unwrap();
+
+    debug!("Sending interrupt 0x37 to core {} from {}", dest, my_apic_id);
+
+    let my_apic = get_my_apic(); //get_apic_with_id(apic_id);
+
+    if my_apic.is_none() {
+        debug!("Couldn't get my apic");
+    }
+
+    else {
+        let mut apic = my_apic.unwrap().write();
+
+        apic.send_ipi(0x37, LapicIpiDestination::One(dest));
+    }
+
+}
 
 pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
 
@@ -69,7 +115,8 @@ pub fn has_x2apic() -> bool {
     let res: &bool = IS_X2APIC.call_once( || {
         CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
     });
-    *res // because call_once returns a reference to the cached IS_X2APIC value
+    // *res // because call_once returns a reference to the cached IS_X2APIC value
+    false //TODO: just a hack to disable x2apic
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core
@@ -104,6 +151,10 @@ pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
     get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
 }
 
+/// Returns a reference to the LocalApic for the given processor.
+pub fn get_apic_with_id(id: u8) -> Option<&'static RwLockIrqSafe<LocalApic>> {
+    LOCAL_APICS.get(&id)
+}
 
 /// The possible destination shorthand values for IPI ICR.
 /// 
@@ -331,7 +382,7 @@ impl LocalApic {
 
         let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
         // globally enable the apic by setting the xapic_enable bit
-        unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
+        unsafe { wrmsr(IA32_APIC_BASE, (rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE) & !IA32_APIC_X2APIC_ENABLE); }
         //info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
             INTERRUPT_CHIP.store(InterruptChip::APIC, Ordering::Release);
@@ -348,7 +399,10 @@ impl LocalApic {
             regs.lvt_lint1.write(APIC_DISABLE);
             regs.task_priority.write(0);
 
-            // debug!("Enabled apic for :{}" , self.apic_id);
+            regs.interrupt_command_low.write(0);
+            regs.logical_destination.write(0);
+
+            debug!("Enabled apic for :{}" , self.apic_id);
 
             // set bit 8 to allow receiving interrupts (still need to "sti")
             regs.spurious_interrupt_vector.write(APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE);   

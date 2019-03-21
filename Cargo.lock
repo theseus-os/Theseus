@@ -150,6 +150,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "broadcast_interrupt"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "ioapic 0.1.0",
+ "spawn 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "byte-tools"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

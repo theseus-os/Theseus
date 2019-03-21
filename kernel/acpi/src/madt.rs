@@ -127,7 +127,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                 // TODO FIXME: I'm unsure if this is actually correct!
                 for ioapic in ioapic::get_ioapics().iter() {
                     let mut ioapic_ref = ioapic.1.lock();
-
+                    // let bsp_id = 3;
                     // set the BSP to receive regular PIC interrupts routed through the IoApic
                     ioapic_ref.set_irq(0x0, bsp_id, PIC_MASTER_OFFSET + 0x0);
                     ioapic_ref.set_irq(0x1, bsp_id, PIC_MASTER_OFFSET + 0x1); // keyboard interrupt 0x1 -> 0x21 in IDT
@@ -148,7 +148,6 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
 
                     //set pci irqs 16..19
                     ioapic_ref.set_irq(0x10, bsp_id, PIC_MASTER_OFFSET + 0x10);
-                    //ioapic_ref.set_irq(0x10, 119, PIC_MASTER_OFFSET + 0x10);
                     ioapic_ref.set_irq(0x11, bsp_id, PIC_MASTER_OFFSET + 0x11);
                     ioapic_ref.set_irq(0x12, bsp_id, PIC_MASTER_OFFSET + 0x12);
                     ioapic_ref.set_irq(0x13, bsp_id, PIC_MASTER_OFFSET + 0x13);
@@ -159,7 +158,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                     ioapic_ref.set_irq(0x16, bsp_id, PIC_MASTER_OFFSET + 0x16);
                     ioapic_ref.set_irq(0x17, bsp_id, PIC_MASTER_OFFSET + 0x17);
 
-                    ioapic_ref.set_irq(0x1F, 0xFF, PIC_MASTER_OFFSET + 0x1F); 
+                    // ioapic_ref.set_irq(0x17, 0xFF, PIC_MASTER_OFFSET + 0x17); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                 }
                 
