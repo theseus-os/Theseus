@@ -598,19 +598,22 @@ fn task_wrapper<F, A, R>() -> !
         }
 
         // (2) Remove it from its runqueue
-        if let Err(e) = apic::get_my_apic_id()
-            .and_then(|id| runqueue::get_runqueue(id))
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
         {
-            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            if let Err(e) = apic::get_my_apic_id()
+                .and_then(|id| runqueue::get_runqueue(id))
+                .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+                .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+            {
+                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            }
         }
-
-        // (3) Yield the CPU
-        scheduler::schedule();
 
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
+
+    // (3) Yield the CPU
+    scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point
 
