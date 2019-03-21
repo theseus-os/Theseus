@@ -66,6 +66,11 @@ impl Directory for RootDirectory {
     fn list_children(&mut self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
+
+    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+        self.children.remove(&child.get_name());
+        Ok(())
+    }
 }
 
 impl FsNode for RootDirectory {

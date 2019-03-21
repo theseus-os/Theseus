@@ -64,6 +64,11 @@ impl Directory for VFSDirectory {
     fn list_children(&mut self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
+
+    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+        self.children.remove(&child.get_name());
+        Ok(())
+    }
 }
 
 impl FsNode for VFSDirectory {
@@ -106,10 +111,7 @@ impl VFSFile {
 impl File for VFSFile {
     fn read(&self, _buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { unimplemented!()    }
     fn write(&mut self, _buf: &[u8], offset: usize) -> Result<usize, &'static str> { unimplemented!(); }
-    
-    fn delete(self) -> Result<(), &'static str> {
-        Err("unimplemented")
-    }
+
     
     fn size(&self) -> usize {
         self.size

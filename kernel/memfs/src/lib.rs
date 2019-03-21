@@ -136,9 +136,6 @@ impl File for MemFile {
         }
     }
 
-    fn delete(self) -> Result<(), &'static str> { 
-        Err("unimplemented")
-    }
 
     fn size(&self) -> usize {
         self.size

@@ -36,10 +36,10 @@ pub type FileRef = Arc<Mutex<Box<File + Send>>>;
 /// Traits that both files and directories share
 pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         let mut path = self.get_name();
         if let Ok(cur_dir) =  self.get_parent_dir()  {
-            let parent_path = &cur_dir.lock().get_path_as_string();
+            let parent_path = &cur_dir.lock().get_absolute_path();
             // Check if the parent path is root 
             if parent_path == "/" {
                 path.insert_str(0, &format!("{}", parent_path));
@@ -63,8 +63,6 @@ pub trait File : FsNode {
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str>; 
     /// Writes the given `buffer` to this file starting at the given `offset`.
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str>;
-    /// Deletes the file
-    fn delete(self) -> Result<(), &'static str>;
     /// Returns the size in bytes of the file.
     fn size(&self) -> usize;
     /// Returns a view of the file as an immutable memory-mapped region.
@@ -77,6 +75,8 @@ pub trait Directory : FsNode + Send {
     fn get_child(&self, child_name: &str) -> Option<FileOrDir>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
     fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
+    // Deletes a child from whatever collection the Directory uses to store children nodes
+    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
     /// Lists the names of the children nodes of the current directory
     fn list_children(&mut self) -> Vec<String>;
 }
@@ -91,10 +91,10 @@ pub enum FileOrDir {
 // Allows us to call methods directly on an enum so we don't have to match on the underlying type
 impl FsNode for FileOrDir {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         match self {
-            FileOrDir::File(file) => file.lock().get_path_as_string(),
-            FileOrDir::Dir(dir) => dir.lock().get_path_as_string(),
+            FileOrDir::File(file) => file.lock().get_absolute_path(),
+            FileOrDir::Dir(dir) => dir.lock().get_absolute_path(),
         }
     }
     fn get_name(&self) -> String {

@@ -79,11 +79,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
         let cfile = MemFile::new(String::from(objfilename), &update_build_dir)?;
         cfile.lock().write(content,0)?;
-<<<<<<< HEAD
-        debug!("    created new file at path: {}", cfile.lock().get_path_as_string());
-=======
         debug!("    created new file at path: {}", cfile.lock().get_absolute_path());
->>>>>>> 15de899728d385b2f445ff9695f4946bd1d930ab
     }
 
     // now create the list of swap requests detailing which newly-downloaded crates we want to swap in
