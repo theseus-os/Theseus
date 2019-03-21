@@ -216,18 +216,19 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     #[cfg(simd_personality)]
     {
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
+        spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
-    // NOTE: do not put any code below this point, as it should never run
-    // (unless there are no other tasks available to run on the BSP core, which doesnt happen)
+    // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
+    // (unless there are no other tasks available to run on the BSP core, which never happens)
     
 
     loop { 
+        scheduler::schedule();
         spin_loop_hint();
         // TODO: exit this loop cleanly upon a shutdown signal
     }

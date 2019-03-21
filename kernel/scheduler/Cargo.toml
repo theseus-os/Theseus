@@ -5,6 +5,7 @@ description = "Provides scheduling functionality for selecting the next task and
 version = "0.1.0"
 build = "../../build.rs"
 
+
 [dependencies]
 spin = "0.4.10"
 
@@ -23,6 +24,12 @@ path = "../task"
 
 [dependencies.runqueue]
 path = "../runqueue"
+
+[dependencies.scheduler_round_robin]
+path = "../scheduler_round_robin"
+
+[dependencies.scheduler_priority]
+path = "../scheduler_priority"
 
 [lib]
 crate-type = ["rlib"]

@@ -111,10 +111,17 @@ impl TaskFs {
 
 impl FsNode for TaskFs {
     /// Recursively gets the absolute pathname as a String
+<<<<<<< HEAD
     fn get_path_as_string(&self) -> String {
         let mut path = String::from(TASKS_DIRECTORY_NAME);
         if let Ok(cur_dir) =  self.get_parent_dir() {
             path.insert_str(0, &format!("{}",&cur_dir.lock().get_path_as_string()));
+=======
+    fn get_absolute_path(&self) -> String {
+        let mut path = String::from(TASKS_DIRECTORY_NAME);
+        if let Ok(cur_dir) =  self.get_parent_dir() {
+            path.insert_str(0, &format!("{}",&cur_dir.lock().get_absolute_path()));
+>>>>>>> 15de899728d385b2f445ff9695f4946bd1d930ab
         }
         path
     }

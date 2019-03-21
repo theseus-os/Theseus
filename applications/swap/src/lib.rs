@@ -29,7 +29,7 @@ use getopts::Options;
 use mod_mgmt::SwapRequest;
 use acpi::get_hpet;
 use path::Path;
-use fs_node::{FileOrDir, DirRef};
+use fs_node::{FileOrDir, FsNode, DirRef};
 
 
 #[no_mangle]
@@ -149,7 +149,7 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 }
 
 
-/// Performs the actual swapping of crate.
+/// Performs the actual swapping of crates.
 fn swap_modules(
     tuples: Vec<(&str, &str, bool)>, 
     curr_dir: &DirRef, 
@@ -167,11 +167,16 @@ fn swap_modules(
                 .ok_or_else(|| format!("Couldn't find old crate loaded into namespace that matched {:?}", o))?;
 
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
-            let new_crate_path = match Path::new(String::from(n)).get(curr_dir) {
-                Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_path_as_string())),
-                _ => namespace.get_kernel_file_starting_with(n).ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n)),
+            let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
+                Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
+                _ => namespace.get_kernel_file_starting_with(n)
+                        .and_then(|p| p.get(namespace.kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())).ok())
+                        .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
             }?;
-            mods.push(SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_path, r));
+            mods.push(
+                SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_abs_path, r)
+                    .map_err(|_e| format!("BUG: the path of the new crate (passed in as {:?}) was not an absolute Path.", n))?
+            );
         }
         mods
     };

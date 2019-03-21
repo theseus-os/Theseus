@@ -201,11 +201,6 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "compiler_builtins"
-version = "0.1.4"
-source = "git+https://github.com/rust-lang-nursery/compiler-builtins#0c5dffb5ba791251ae6d2a92d4491d444a5c45b2"
-
-[[package]]
 name = "context_switch"
 version = "0.1.0"
 dependencies = [
@@ -1036,6 +1031,7 @@ name = "ps"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "scheduler 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -1189,6 +1185,32 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue_priority 0.1.0",
+ "runqueue_round_robin 0.1.0",
+ "single_simd_task_optimization 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "runqueue_priority"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "single_simd_task_optimization 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "runqueue_round_robin"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "single_simd_task_optimization 0.1.0",
  "task 0.1.0",
 ]
@@ -1214,6 +1236,41 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
+ "scheduler_priority 0.1.0",
+ "scheduler_round_robin 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scheduler_eval"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "scheduler 0.1.0",
+ "spawn 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scheduler_priority"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
+ "runqueue_priority 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "scheduler_round_robin"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "runqueue 0.1.0",
+ "runqueue_round_robin 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
@@ -1270,7 +1327,6 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "compiler_builtins 0.1.4 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "fs_node 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -1627,7 +1683,6 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
 "checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
-"checksum compiler_builtins 0.1.4 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
