@@ -223,13 +223,14 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
+    scheduler::schedule();
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
     // (unless there are no other tasks available to run on the BSP core, which never happens)
     
 
     loop { 
-        scheduler::schedule();
         spin_loop_hint();
+        // TODO: put this core into a low-power state
         // TODO: exit this loop cleanly upon a shutdown signal
     }
 }
