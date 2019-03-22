@@ -1927,7 +1927,7 @@ impl CrateNamespace {
             }
         }
 
-        error!("Symbol \"{}\" not found. Try loading the crate manually first.", demangled_full_symbol);
+        error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
         Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
     }
 
