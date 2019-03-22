@@ -1,4 +1,6 @@
-// Writes the "/cfg/grub_test.cfg" file
+//! Parses the directory of built object files
+//! and generates the multiboot2-compliant grub.cfg file.
+
 
 extern crate getopts;
 
@@ -8,17 +10,14 @@ use std::io::Write;
 use std::process;
 use std::env;
 
-fn main() {
+fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
 
     let mut opts = Options::new();
     opts.optopt("o", "", "set output file path, e.g., \"/my/dir/grub.cfg\"", "OUTPUT_PATH");
     opts.optflag("h", "help", "print this help menu");
 
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m }
-        Err(f) => { panic!(f.to_string()) }
-    };
+    let matches = opts.parse(&args[1..]).map_err(|e| e.to_string())?;
 
     if matches.opt_present("h") {
         print_usage("cargo run -- ", opts);
@@ -27,38 +26,25 @@ fn main() {
 
     // Require input directory 
     let input_directory = match matches.free.len() {
-        0 => {
-            eprintln!("No input directory");
-            process::exit(-1);
-        },
+        0 => return Err(format!("no input directory provided")),
         1 => matches.free[0].clone(), 
-        _ => { 
-            eprintln!("Too many arguments entered");
-            process::exit(-1);
-        },
+        _ => return Err(format!("Too many arguments entered")),
     };
     
-    let grub_cfg_string = match create_grub_cfg_string(input_directory) {
-		Ok(s) => s,
-		Err(_e) => { 
-			eprintln!("Error: {:?}", _e);
-			process::exit(-1);
-		}
-	};
+    let grub_cfg_string = create_grub_cfg_string(input_directory)?;
     
-    // Write to file 
+    // Write to output file (if provided) 
     if matches.opt_present("o") {
-        let output_file_path = match matches.opt_str("o") {
-            Some(s) => s, 
-            None    => process::exit(-1)
-        };
+        let output_file_path = matches.opt_str("o")
+            .ok_or_else(|| String::from("failed to match output file argument."))?;
         write_content(grub_cfg_string, output_file_path);
     }
-    // Write to stdout by default
+    // Otherwise, write to stdout by default
     else {
         println!("{}", grub_cfg_string);
     }
 
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: Options) {
@@ -86,7 +72,7 @@ fn create_grub_cfg_string(input_directory: String) -> Result<String, String> {
         let path = path.map_err(|e| e.to_string())?;
         let p = path.path();
         let file_name = p.file_name().and_then(|f| f.to_str()).ok_or(format!("Path error in path {:?}", path))?;
-        content.push_str(&format!("\tmodule2 /modules/{0:25}\t\t{1:25}\n", file_name, file_name));
+        content.push_str(&format!("\tmodule2 /modules/{0:50}\t\t{1:50}\n", file_name, file_name));
     }
 
     content.push_str("\n\tboot\n}\n");

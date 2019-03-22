@@ -1,6 +1,6 @@
 use port_io::Port;
 use core::sync::atomic::{AtomicUsize, Ordering};
-pub use irq_safety::{disable_interrupts, enable_interrupts, interrupts_enabled};
+pub use irq_safety::{hold_interrupts, enable_interrupts, interrupts_enabled};
 use util;
 use kernel_config::time::{CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
 use spin::Mutex;
@@ -95,7 +95,7 @@ pub fn read_rtc()->time{
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 pub fn enable_rtc_interrupt()
 {
-    disable_interrupts();
+    let _held_interrupts = hold_interrupts();
     write_cmos(0x0C);
     read_cmos();
     //select cmos register 0x8B
@@ -112,11 +112,7 @@ pub fn enable_rtc_interrupt()
     
     unsafe{CMOS_WRITE_SETTINGS.lock().write(prev | 0x40)};
 
-    
-    // enable_interrupts();
-
     trace!("RTC Enabled!");
-
 }
 
 
@@ -133,7 +129,7 @@ pub fn change_rtc_frequency(rate: usize){
         panic!("RTC rate was {}, must be a power of two between [2: 8192]");
     }
 
-    disable_interrupts();
+    let _held_interrupts = hold_interrupts();
     
     // formula is "rate = 32768 Hz >> (dividor - 1)"
     let dividor: u8 = util::log2(rate) as u8 + 2; 
@@ -145,7 +141,6 @@ pub fn change_rtc_frequency(rate: usize){
 
     unsafe{CMOS_WRITE_SETTINGS.lock().write(((prev & 0xF0)|dividor))};
 
-    // enable_interrupts();
     trace!("rtc rate frequency changed!");
 }
 

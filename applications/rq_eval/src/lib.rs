@@ -97,6 +97,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
             .name(format!("rq_whole_task_{}", i))
             .spawn()?;
         taskref.join()?;
+        let _ = taskref.take_exit_value();
     }
 
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();

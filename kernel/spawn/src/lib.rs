@@ -612,7 +612,7 @@ fn task_wrapper<F, A, R>() -> !
     let arg: A = *arg; 
 
     
-    enable_interrupts();
+    enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
     debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
 
@@ -637,19 +637,22 @@ fn task_wrapper<F, A, R>() -> !
         }
 
         // (2) Remove it from its runqueue
-        if let Err(e) = apic::get_my_apic_id()
-            .and_then(|id| runqueue::get_runqueue(id))
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
         {
-            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            if let Err(e) = apic::get_my_apic_id()
+                .and_then(|id| runqueue::get_runqueue(id))
+                .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+                .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+            {
+                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            }
         }
-
-        // (3) Yield the CPU
-        scheduler::schedule();
 
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
+
+    // (3) Yield the CPU
+    scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point
 

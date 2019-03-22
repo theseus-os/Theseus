@@ -60,11 +60,20 @@ pub fn main(_args: Vec<String>) -> isize {
             return -1;
         }
     };
-    // waits for the terminal loop to exit before exiting the main function
-    match term_task_ref.join() {
-        Ok(_) => { }
-        Err(err) => {error!("{}", err)}
+
+    loop {
+        // block this task, because it never needs to actually run again
+        if let Some(my_task) = task::get_my_current_task() {
+            my_task.lock_mut().runstate = task::RunState::Blocked;
+        }
     }
+    // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop
+    // waits for the terminal loop to exit before exiting the main function
+    // match term_task_ref.join() {
+    //     Ok(_) => { }
+    //     Err(err) => {error!("{}", err)}
+    // }
+    
     return 0;
 }
 

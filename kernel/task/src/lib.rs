@@ -53,6 +53,7 @@ use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use core::panic::PanicInfo;
+use core::ops::Deref;
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
@@ -685,7 +686,12 @@ impl fmt::Display for Task {
 /// `TaskRef` implements the `PartialEq` trait; 
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 #[derive(Debug, Clone)]
-pub struct TaskRef(Arc<MutexIrqSafe<Task>>);
+pub struct TaskRef(
+    Arc<(
+        MutexIrqSafe<Task>,  // the actual task
+        AtomicBool,          // true if it has exited, this is used for faster `join()` calls that avoid disabling interrupts
+    )>
+); 
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
@@ -694,13 +700,13 @@ impl TaskRef {
     /// to determine the current `Task` on each processor core.
     pub fn new(task: Task) -> TaskRef {
         let task_id = task.id;
-        let taskref = TaskRef(Arc::new(MutexIrqSafe::new(task)));
+        let taskref = TaskRef(Arc::new((MutexIrqSafe::new(task), AtomicBool::new(false))));
         let tld = TaskLocalData {
             current_taskref: taskref.clone(),
             current_task_id: task_id,
         };
         let tld_ptr = Box::into_raw(Box::new(tld));
-        taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
+        taskref.0.deref().0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
         taskref
     }
 
@@ -726,14 +732,15 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if self.0.lock().has_exited() {
+            // if self.0.lock().has_exited() {
+            if self.0.deref().1.load(Ordering::SeqCst) == true {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            if !self.0.lock().is_running() {
+            if !self.0.deref().0.lock().is_running() {
                 return Ok(());
             }
         }
@@ -744,11 +751,12 @@ impl TaskRef {
     /// It also performs select cleanup routines, e.g., removing the task from the task list.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
-            let mut task = self.0.lock();
+            let mut task = self.0.deref().0.lock();
             if let RunState::Exited(_) = task.runstate {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
+            self.0.deref().1.store(true, Ordering::SeqCst);
 
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
@@ -760,7 +768,7 @@ impl TaskRef {
 
         #[cfg(runqueue_state_spill_evaluation)] 
         {   
-            let task_on_rq = { self.0.lock().on_runqueue.clone() };
+            let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(self, rq)?;
@@ -811,14 +819,14 @@ impl TaskRef {
     /// This is okay because we want to allow any other part of the OS to read 
     /// the details of the `Task` struct.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-        MutexIrqSafeGuardRef::new(self.0.lock())
+        MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
     }
 
     /// Registers a function or closure that will be called if this `Task` panics.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.lock().set_panic_handler(callback)
+        self.0.deref().0.lock().set_panic_handler(callback)
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
@@ -827,7 +835,7 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.lock().take_panic_handler()
+        self.0.deref().0.lock().take_panic_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -836,18 +844,18 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_exit_value(&self) -> Option<ExitValue> {
-        self.0.lock().take_exit_value()
+        self.0.deref().0.lock().take_exit_value()
     }
 
     /// Sets environment
     pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
-        self.0.lock().set_env(new_env);
+        self.0.deref().0.lock().set_env(new_env);
     }
     
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
     #[deprecated] // TODO FIXME since 2018-09-06
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
-        MutexIrqSafeGuardRefMut::new(self.0.lock())
+        MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
 }
 
@@ -916,7 +924,7 @@ pub fn create_idle_task(
     let task_ref = TaskRef::new(idle_task);
 
     // set this as this core's current task, since it's obviously running
-    task_ref.0.lock().set_as_current_task();
+    task_ref.0.deref().0.lock().set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: create_idle_task(): failed to properly set the new idle task as the current task on AP {}", 
             apic_id);

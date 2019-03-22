@@ -66,7 +66,7 @@ endif ## BYPASS_XARGO_CHECK
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
-BUILD_DIR := build
+BUILD_DIR := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
 iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
@@ -74,9 +74,9 @@ OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
-nano_core_static_lib := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
+nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := kernel/nano_core/src
+NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the nano_core_binary to the assembly files
@@ -123,7 +123,7 @@ $(iso): build check_captain
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
@@ -212,7 +212,7 @@ userspace:
 	@$(MAKE) -C userspace all
 ## copy userspace binary files and add the __u_ prefix
 	@mkdir -p $(GRUB_ISOFILES)/modules
-	@for f in `find ./userspace/build -type f` ; do \
+	@for f in `find $(ROOT_DIR)/userspace/build -type f` ; do \
 		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
 	done
 
@@ -248,7 +248,7 @@ simd_personality: build_simd build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -277,17 +277,22 @@ build_avx:
 
 
 
+preserve_old_modules:
+	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+
 
 ### build_server is a target that builds Theseus into a regular ISO
 ### and then sets up an HTTP server that provides module object files 
 ### for a running instance of Theseus to download for OTA live updates.
-build_server: iso
-	@sh scripts/build_server.sh  /tmp/theseus_build_server  $(OBJECT_FILES_BUILD_DIR)  $(UPDATE_DIR)
-
+build_server: preserve_old_modules iso
+	OLD_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR)_old \
+		NEW_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR) \
+		NEW_DIR_NAME=$(UPDATE_DIR) \
+		bash scripts/build_server.sh
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -357,7 +362,16 @@ help:
 
 	@echo -e "   build_server:"
 	@echo -e "\t Builds Theseus (as with the 'iso' target) and then runs a build server hosted on this machine"
-	@echo -e "\t that can be used over-the-air live evolution."
+	@echo -e "\t that can be used for over-the-air live evolution."
+	@echo -e "\t You can specify the name of the directory of newly-built modules by setting the 'UPDATE_DIR' environment variable."
+	@echo -e "\t This target should be invoked as an incremental build after a prior build has already completed."
+	@echo -e "\t For example, first checkout version 1 (e.g., a specific git commit), build it as normal,"
+	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
+	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
+	
+
+	
+
 
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
