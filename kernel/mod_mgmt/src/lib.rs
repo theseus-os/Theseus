@@ -1857,6 +1857,43 @@ impl CrateNamespace {
             }
         }
 
+        // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
+        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
+        if self.fuzzy_symbol_matching {
+            if let Some(backup) = backup_namespace {
+                let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
+                
+                if fuzzy_matches.len() == 1 {
+                    let (_sec_name, weak_sec) = &fuzzy_matches[0];
+                    if let Some(sec) = weak_sec.upgrade() {
+                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
+                        // to this namespace so it can't be dropped while this namespace is still relying on it.  
+                        let pcref_opt = { sec.lock().parent_crate.upgrade() };
+                        if let Some(parent_crate_ref) = pcref_opt {
+                            let parent_crate_name = {
+                                let parent_crate = parent_crate_ref.lock_as_ref();
+                                self.add_symbols(Some(sec.clone()).iter(), true);
+                                parent_crate.crate_name.clone()
+                            };
+                            warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
+                                demangled_full_symbol, _sec_name, parent_crate_name, backup.name, self.name);
+                            self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+                            return weak_sec.clone();
+                        }
+                        else {
+                            error!("BUG: get_symbol_or_load(): found fuzzy-matched symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
+                                demangled_full_symbol);
+                            return Weak::default();
+                        }
+                    }
+                }
+                else {
+                    warn!("Cannot resolve dependency because there are {} fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
+                        fuzzy_matches.len(), demangled_full_symbol, backup.name, fuzzy_matches.into_iter().map(|tup| tup.0).collect::<String>());
+                }
+            }
+        }
+
         // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
         // We are only able to do this for mangled symbols, those that have a leading crate name,
         // such as "my_crate::foo". 
@@ -1885,47 +1922,8 @@ impl CrateNamespace {
                 }
             }
             else {
-                if !self.fuzzy_symbol_matching {
-                    error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
-                        demangled_full_symbol, crate_dependency_name);
-                }
-            }
-        }
-
-        // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
-        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
-        if self.fuzzy_symbol_matching {
-            if let Some(backup) = backup_namespace {
-                let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
-                
-                if fuzzy_matches.len() == 1 {
-                    let (_sec_name, weak_sec) = &fuzzy_matches[0];
-                    if let Some(sec) = weak_sec.upgrade() {
-                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
-                        // to this namespace so it can't be dropped while this namespace is still relying on it.  
-                        let pcref_opt = { sec.lock().parent_crate.upgrade() };
-                        if let Some(parent_crate_ref) = pcref_opt {
-                            let parent_crate_name = {
-                                let parent_crate = parent_crate_ref.lock_as_ref();
-                                self.add_symbols(Some(sec.clone()).iter(), true);
-                                parent_crate.crate_name.clone()
-                            };
-                            warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
-                                demangled_full_symbol, _sec_name, parent_crate_name, backup.name, self.name);
-                            self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
-                            return weak_sec.clone();
-                        }
-                        else {
-                            error!("get_symbol_or_load(): found fuzzy-matched symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
-                                demangled_full_symbol);
-                            return Weak::default();
-                        }
-                    }
-                }
-                else {
-                    warn!("Cannot resolve dependency because there are multiple ({}) fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
-                        fuzzy_matches.len(), demangled_full_symbol, backup.name, fuzzy_matches.into_iter().map(|tup| tup.0).collect::<String>());
-                }
+                error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
+                    demangled_full_symbol, crate_dependency_name);
             }
         }
 
