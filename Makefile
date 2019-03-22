@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd build_avx gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -201,7 +201,7 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ## This compiles the assembly files in the nano_core
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@
+	@nasm -felf64 $< -o $@ $(CFLAGS)
 
 
 
@@ -265,6 +265,15 @@ build_simd:
 ## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
 	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
 	@$(MAKE) build
+
+## "build_avx" makes AVX is enabled at boot code
+## It also makes crates be compiled with AVX instructions/regs
+build_avx :	export TARGET := x86_64-theseus-avx
+build_avx : export override RUSTFLAGS += -C no-vectorize-loops
+build_avx : export override RUSTFLAGS += -C no-vectorize-slp
+build_avx : export override THESEUS_CONFIG += avx_ctx
+build_avx:
+	@$(MAKE) CFLAGS+=-DAVX_ENABLED
 
 
 

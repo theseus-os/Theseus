@@ -19,6 +19,10 @@ bits 32 ;We are still in protected mode
 
 extern set_up_SSE
 
+%ifdef AVX_ENABLED
+extern set_up_AVX
+%endif
+
 global ap_start_protected_mode
 ap_start_protected_mode:
 	; xchg bx, bx ; bochs magic breakpoint
@@ -26,6 +30,10 @@ ap_start_protected_mode:
 	mov esp, 0xFC00; set a new stack pointer, 512 bytes below our AP_STARTUP code region
 
 	call set_up_SSE ; in boot.asm
+
+%ifdef AVX_ENABLED
+	call set_up_AVX ; in boot.asm
+%endif
     
 	call set_up_paging_ap
 	

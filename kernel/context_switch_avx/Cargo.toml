@@ -1,0 +1,15 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "context_switch_avx"
+description = "Context switching routines and structs for AVX-enabled register sets"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies.context_switch_regular]
+path = "../context_switch_regular"
+
+[dependencies.context_switch_sse]
+path = "../context_switch_sse"
+
+[lib]
+crate-type = ["rlib"]

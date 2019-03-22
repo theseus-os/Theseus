@@ -33,7 +33,7 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use task::{Task, TaskRef, SimdTy, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
 
@@ -64,8 +64,6 @@ type MainFuncRet = isize;
 /// as it is the entry point into each application `Task`.
 type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
-
-
 /// A struct that uses the Builder pattern to create and customize new kernel `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct KernelTaskBuilder<F, A, R> {
@@ -74,6 +72,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
+    _simd: SimdTy,      // this WILL deprecate `simd: bool'
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -93,6 +92,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
+            _simd: SimdTy::none,
 
             #[cfg(simd_personality)]
             simd: false,
@@ -119,6 +119,18 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
+    /// Mark this new Task as an SSE2-enabled Task
+    pub fn sse2(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
+        self._simd = SimdTy::sse2;
+        Ok(self)
+    }
+
+    /// Mark this new Task as an AVX-enabled Task
+    pub fn avx(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
+        self._simd = SimdTy::avx;
+        Ok(self)
+    }
+
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
@@ -133,6 +145,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
     
+        new_task._simd = self._simd;
         #[cfg(simd_personality)]
         {
             new_task.simd = self.simd;
@@ -185,7 +198,6 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
 }
 
-
 /// A struct that uses the Builder pattern to create and customize new application `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct ApplicationTaskBuilder {
@@ -194,6 +206,7 @@ pub struct ApplicationTaskBuilder {
     name: Option<String>,
     pin_on_core: Option<u8>,
     singleton: bool,
+    _simd: SimdTy,      // this WILL deprecate `simd: bool'
 
     #[cfg(simd_personality)]
     simd: bool,
@@ -209,6 +222,7 @@ impl ApplicationTaskBuilder {
             name: None,
             pin_on_core: None,
             singleton: false,
+            _simd: SimdTy::none,
 
             #[cfg(simd_personality)]
             simd: false,
@@ -233,6 +247,18 @@ impl ApplicationTaskBuilder {
     pub fn simd(mut self) -> ApplicationTaskBuilder {
         self.simd = true;
         self
+    }
+
+    /// Mark this new Task as an SSE2-enabled Task
+    pub fn sse2(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
+        self._simd = SimdTy::sse2;
+        Ok(self)
+    }
+
+    /// Mark this new Task as an AVX-enabled Task
+    pub fn avx(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
+        self._simd = SimdTy::avx;
+        Ok(self)
     }
 
     /// Set the argument strings for this Task.
@@ -359,10 +385,23 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
             set_context!(context_switch::ContextRegular);
         }
     }
-    #[cfg(not(simd_personality))]
+
+    // Leave this for now, for compilation.
+    // Will be deprecated
+    // #[cfg(not(simd_personality))]
+    #[cfg(all(not(simd_personality), not(target_feature = "avx")))]
     {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
+    }
+
+    #[cfg(target_feature = "avx")]
+    {
+        match new_task._simd {
+            SimdTy::none => {set_context!(context_switch::ContextRegular);},
+            SimdTy::sse2 => {set_context!(context_switch::ContextSSE);},
+            SimdTy::avx => {set_context!(context_switch::ContextAVX);}
+        }
     }
 }
 

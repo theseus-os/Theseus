@@ -56,6 +56,7 @@ extern crate network_manager;
 #[cfg(test_ota_update)] extern crate test_ota_update;
 
 #[cfg(simd_personality)] extern crate simd_personality;
+#[cfg(test_avx)] extern crate test_avx;
 
 
 
@@ -218,6 +219,16 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
         warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
         spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
             .name(String::from("setup_simd_personality"))
+            .spawn()?;
+    }
+
+
+    #[cfg(test_avx)]
+    {
+        debug!("[AVX] Testing AVX-enabled apps");
+        spawn::KernelTaskBuilder::new(test_avx::auto_test, ())
+            .name(String::from("AVX_TEST"))
+            // .avx()?     // because test_avx is compiled with AVX enabled
             .spawn()?;
     }
 
