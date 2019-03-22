@@ -39,7 +39,7 @@ const TRIES: usize = 10;
 
 // don't change it. 
 const READ_BUF_SIZE: usize = 64*1024;
-const WRITE_BUF_SIZE: usize = 128*1024;
+const WRITE_BUF_SIZE: usize = 1024*1024;
 const WRITE_BUF: [u8; WRITE_BUF_SIZE] = [65; WRITE_BUF_SIZE];
 
 #[cfg(bm_in_us)]
@@ -216,6 +216,7 @@ fn do_null() {
 	}
 
 	printlninfo!("NULL result: {} {}", lat, T_UNIT);
+	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
 }
 
 fn pick_child_core() -> Result<u8, &'static str> {
@@ -290,6 +291,7 @@ fn do_spawn() {
 	}
 
 	printlninfo!("SPAWN result: {} {}", lat, T_UNIT);
+	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
 }
 
 fn get_cwd() -> Option<DirRef> {
@@ -482,8 +484,8 @@ fn do_fs_cap_check() {
 
 fn do_fs_create_del() {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
-	// let	fsizes_b = [1024_usize, 4096, 10*1024];
-	let	fsizes_b = [1024_usize];
+	let	fsizes_b = [1024_usize, 4096, 10*1024];
+	// let	fsizes_b = [1024_usize];
 
 	let overhead_ct = timing_overhead();
 
@@ -543,7 +545,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
 
-	let to_sec: u64 = if cfg!(bm_in_us) {1_000} else {1_000_000};
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
 	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
 	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
 
@@ -661,6 +663,11 @@ fn do_fs_read(with_open: bool) {
 	let overhead_ct = timing_overhead();
 
 	do_fs_read_with_size(overhead_ct, fsize_kb, with_open);
+	if with_open {
+		printlninfo!("This test is equivalent to `bw_file_rd open2close` in LMBench");
+	} else {
+		printlninfo!("This test is equivalent to `bw_file_rd io_only` in LMBench");
+	}
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
