@@ -56,28 +56,29 @@ pub trait FsNode {
     fn get_parent_dir(&self) -> Result<DirRef, &'static str>;
 } 
 
-// Traits for files, implementors of File must also implement FsNode
+// Trait for files, implementors of File must also implement FsNode
 pub trait File : FsNode {
     /// Reads the contents of this file starting at the given `offset` and copies them into the given `buffer`.
     /// The length of the given `buffer` determines the maximum number of bytes to be read.
     fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str>; 
     /// Writes the given `buffer` to this file starting at the given `offset`.
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str>;
-    /// Returns the size in bytes of the file.
+    /// Returns the size in bytes of this file.
     fn size(&self) -> usize;
-    /// Returns a view of the file as an immutable memory-mapped region.
+    /// Returns a view of this file as an immutable memory-mapped region.
     fn as_mapping(&self) -> Result<&MappedPages, &'static str>;
 }
 
-/// Traits for directories, implementors of Directory must also implement FsNode
-pub trait Directory : FsNode + Send {
-    /// Gets an individual child node from the current directory based on the name field of that node
-    fn get(&self, child_name: &str) -> Option<FileOrDir>; 
-    /// Inserts a child into whatever collection the Directory uses to track children nodes
-    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
-    // Deletes a child from whatever collection the Directory uses to store children nodes
-    fn remove(&mut self, child: FileOrDir) -> Result<(), &'static str>;
-    /// Lists the names of the children nodes of the current directory
+/// Trait for directories, implementors of Directory must also implement FsNode
+pub trait Directory : FsNode {
+    /// Gets the file or directory from the current directory based on its name.
+    fn get(&self, name: &str) -> Option<FileOrDir>; 
+    /// Inserts the given new file or directory into this directory.
+    /// If an existing node has the same name, that node is replaced and returned.
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
+    // Removes a file or directory from this directory.
+    fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str>;
+    /// Lists the names of the nodes in this directory.
     fn list(&mut self) -> Vec<String>;
 }
 

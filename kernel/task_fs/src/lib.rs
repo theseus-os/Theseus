@@ -97,8 +97,8 @@ impl TaskFs {
     }
 
 
-    fn get_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
-        let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
+    fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
+        let id = node.parse::<usize>().map_err(|_e| "could not parse usize")?;
         let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer()?;
         let name = task_ref.lock().id.to_string(); 
@@ -131,12 +131,12 @@ impl FsNode for TaskFs {
 
 impl Directory for TaskFs {
     /// This function adds a newly created fs node (the argument) to the TASKS directory's children map  
-    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-        Err("cannot add children to read-only TaskFs")
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+        Err("TaskFs is read-only")
     }
 
-    fn get(&self, child: &str) -> Option<FileOrDir> {
-        match self.get_internal(child) {
+    fn get(&self, node: &str) -> Option<FileOrDir> {
+        match self.get_internal(node) {
             Ok(d) => Some(d),
             Err(e) => {
                 error!("TaskFs::get() error: {:?}", e);
@@ -154,8 +154,8 @@ impl Directory for TaskFs {
         tasks_string
     }
 
-    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
-        Err("cannot delete children from read-only TaskFs")
+    fn remove(&mut self, _node: &FileOrDir) -> Result<(), &'static str> {
+        Err("cannot remove nodes from read-only TaskFs")
     }
 
 }
@@ -190,8 +190,8 @@ impl TaskDir {
 }
 
 impl Directory for TaskDir {
-    fn insert(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-        Err("cannot insert child into virtual task directory")
+    fn insert(&mut self, _node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+        Err("cannot insert node into read-only TaskFs")
     }
 
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
@@ -217,8 +217,8 @@ impl Directory for TaskDir {
         children
     }
 
-    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
-        Err("cannot delete child from virtual task directory")
+    fn remove(&mut self, _node: &FileOrDir) -> Result<(), &'static str> {
+        Err("cannot remove node from read-only TaskFs")
     }
 }
 
@@ -344,8 +344,8 @@ impl MmiDir {
 }
 
 impl Directory for MmiDir {
-    fn insert(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-        Err("cannot insert child into virtual task directory")
+    fn insert(&mut self, _node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+        Err("cannot insert node into read-only TaskFs")
     }
 
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
@@ -365,8 +365,8 @@ impl Directory for MmiDir {
         children
     }
 
-    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
-        Err("cannot remove child from virtual task directory")
+    fn remove(&mut self, _node: &FileOrDir) -> Result<(), &'static str> {
+        Err("cannot remove node from read-only TaskFs")
     }
 }
 

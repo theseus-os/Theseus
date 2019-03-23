@@ -22,89 +22,77 @@ use fs_node::{FsNode, FileOrDir};
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     match remove_node(args) {
-        Ok(exit_val) => {return exit_val;},
+        Ok(_) => 0,
         Err(err) => {
             println!("{}", err);
-            return -1;
+            -1
         }
     }
 }
 
-pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
+pub fn remove_node(args: Vec<String>) -> Result<(), String> {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optflag("r", "recursive", 
-        "recursively delete directories and files under this directory");
+    opts.optflag("r", "recursive", "recursively remove directories and their contents");
     
     let matches = match opts.parse(&args) {
         Ok(m) => m,
-        Err(_f) => {
-            println!("{}", _f);
+        Err(e) => {
             print_usage(opts);
-            return Ok(-1);
+            return Err(e.to_string());
         }
     };
 
     if matches.opt_present("h") {
         print_usage(opts);
-        return Ok(0);
+        return Ok(());
     }
 
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
         None => {
-            return Err("failed to get current task");
+            return Err("failed to get current task".into());
         }
     };
-    // grabs the current environment pointer
-    let curr_env = {
-        let locked_task = taskref.lock();
-        Arc::clone(&locked_task.env)
-    };
 
-    let curr_wr = {
+    let working_dir = {
         let locked_task = taskref.lock();
         let curr_env = locked_task.env.lock();
         Arc::clone(&curr_env.working_dir)
     };
 
     if matches.free.is_empty() {
-        return Err("rm: missing argument");
+        return Err("rm: missing argument".into());
     }
 
-    let path = Path::new(matches.free[0].to_string());
-    let delete_node: FileOrDir;
-    // navigate to the filepath specified by first argument
-    match path.get(&curr_wr) {
-        Ok(node) => {
-            delete_node = node;
-        },
-        Err(err) => {
-            return Err(err); 
+    for path_string in &matches.free {
+        let path = Path::new(path_string.clone());
+        let node_to_delete = match path.get(&working_dir) {
+            Ok(node) => node,
+            Err(e) => return Err(e.into()),
+        };
+
+        // Only remove directories if the user specified "-r". 
+        let mut can_remove_dirs = matches.opt_present("r");
+        let parent = node_to_delete.get_parent_dir()?;
+
+        match node_to_delete {
+            FileOrDir::File(_) => {
+                parent.lock().remove(&node_to_delete)?;
+            } 
+            FileOrDir::Dir(_) => {
+                if can_remove_dirs {
+                    parent.lock().remove(&node_to_delete)?;
+                } else {
+                    println!("Skipping the removal of directory '{}', try specifying the \"-r\" flag", 
+                        node_to_delete.get_name());
+                }
+            }
         }
-    }; 
-
-
-    // Check the underlying type of the FileOrDir node and if it's a directory,
-    // if we can remove it if the user specified -r. 
-    let mut remove_dir = false;
-    match &delete_node {
-        FileOrDir::File(_file) => {remove_dir = true; },
-        FileOrDir::Dir(_dir) => {remove_dir = matches.opt_present("r");}
-        
     }
 
-    if remove_dir {
-        let parent = delete_node.get_parent_dir()?;
-        debug!("about to remove directory");
-        parent.lock().remove(delete_node)?;
-    } else {
-        println!("cannot remove '{}': Is a directory", delete_node.get_name());
-        return Ok(-1);
-    }
-
-    Ok(0)
+    Ok(())
 }
 
 fn print_usage(opts: Options) {
@@ -113,4 +101,4 @@ fn print_usage(opts: Options) {
 
 
 const USAGE: &'static str = "Usage: rm [PATH]
-Remove node from filesystem";
+Remove files or directories from filesystem";

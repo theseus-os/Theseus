@@ -27,7 +27,7 @@ use memory::MappedPages;
 pub struct VFSDirectory {
     /// The name of the directory
     pub name: String,
-    /// A list of DirRefs or pointers to the child directories   
+    /// A list of DirRefs or pointers to the node directories   
     pub children: BTreeMap<String, FileOrDir>,
     /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
     pub parent: WeakDirRef,
@@ -49,15 +49,15 @@ impl VFSDirectory {
 }
 
 impl Directory for VFSDirectory {
-    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-         // gets the name of the child node to be added
-        let name = child.get_name();
-        // inserts new child, if that child already exists the old value is returned
-        Ok(self.children.insert(name, child))
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+         // gets the name of the node node to be added
+        let name = node.get_name();
+        // inserts new node, if that node already exists the old value is returned
+        Ok(self.children.insert(name, node))
     }
 
-    fn get(&self, child_name: &str) -> Option<FileOrDir> {
-        self.children.get(child_name).cloned()
+    fn get(&self, name: &str) -> Option<FileOrDir> {
+        self.children.get(name).cloned()
     }
 
     /// Returns a string listing all the children in the directory
@@ -65,8 +65,8 @@ impl Directory for VFSDirectory {
         self.children.keys().cloned().collect()
     }
 
-    fn remove(&mut self, child: FileOrDir) -> Result<(), &'static str> {
-        self.children.remove(&child.get_name());
+    fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str> {
+        self.children.remove(&node.get_name());
         Ok(())
     }
 }
