@@ -271,7 +271,7 @@ build_simd:
 build_avx :	export TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
-build_avx : export override THESEUS_CONFIG += avx_ctx
+build_avx : export override THESEUS_CONFIG += simd_personality
 build_avx:
 	@$(MAKE) CFLAGS+=-DAVX_ENABLED
 

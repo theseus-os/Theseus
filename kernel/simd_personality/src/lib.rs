@@ -131,7 +131,7 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	let task1 = KernelTaskBuilder::new(func1, ())
 		.name(String::from("simd_test_1-sse"))
 		.pin_on_core(this_core)
-		.simd()
+		.sse2()?
 		.spawn()?;
 	debug!("finished spawning simd_test::test1 task");
 
@@ -148,7 +148,7 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	let task2 = KernelTaskBuilder::new(func, ())
 		.name(String::from("simd_test_2-sse"))
 		.pin_on_core(this_core)
-		.simd()
+		.sse2()?
 		.spawn()?;
 	debug!("finished spawning simd_test::test2 task");
 
@@ -165,7 +165,7 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	let task3 = KernelTaskBuilder::new(func, ())
 		.name(String::from("simd_test_short-sse"))
 		.pin_on_core(this_core)
-		.simd()
+		.sse2()?
 		.spawn()?;
 	debug!("finished spawning simd_test::test_short task");
 

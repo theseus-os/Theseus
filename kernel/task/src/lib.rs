@@ -186,7 +186,9 @@ pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'stat
 /// SIMD type of the task
 pub enum SimdTy {
     none,
+    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
     sse2,
+    #[cfg(target_feature = "avx")]
     avx
 }
 
@@ -234,11 +236,10 @@ pub struct Task {
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
-    pub _simd: SimdTy,  // this WILL deprecate `simd: bool'
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled, i.e.,
     /// whether it uses SIMD registers and instructions.
-    pub simd: bool,
+    pub simd: SimdTy,
 }
 
 impl fmt::Debug for Task {
@@ -286,9 +287,8 @@ impl Task {
             app_crate: None,
             panic_handler: None,
             env: Arc::new(Mutex::new(env)), 
-            _simd: SimdTy::none,
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdTy::none,
         }
     }
 
@@ -531,10 +531,7 @@ impl Task {
         // Now it's time to perform the actual context switch.
         // If `simd_personality` is NOT enabled, then we proceed as normal 
         // using the singular context_switch routine that matches the actual build target. 
-        // #[cfg(not(simd_personality))]
-        // Leave this for now, for compilation.
-        // Will be deprecated
-        #[cfg(all(not(simd_personality), not(target_feature = "avx")))]
+        #[cfg(not(simd_personality))]
         {
             unsafe {
                 call_context_switch!(context_switch::context_switch);
@@ -542,31 +539,32 @@ impl Task {
         }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-        #[cfg(simd_personality)]
+        // #[cfg(simd_personality)]
+        #[cfg(all(target_feature = "sse2", not(target_feature = "avx")))]   // must be "sse2" only
         {
-            match (self.simd, next.simd) {
-                (false, false) => {
+            match (&self.simd, &next.simd) {
+                (SimdTy::none, SimdTy::none) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular);
                     }
                 }
 
-                (false, true)  => {
+                (SimdTy::none, SimdTy::sse2)  => {
                     // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_sse);
                     }
                 }
                 
-                (true, false)  => {
+                (SimdTy::sse2, SimdTy::none)  => {
                     // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse_to_regular);
                     }
                 }
 
-                (true, true)   => {
+                (SimdTy::sse2, SimdTy::sse2)   => {
                     // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse);
@@ -577,7 +575,7 @@ impl Task {
 
         #[cfg(target_feature = "avx")]
         {
-            match (&self._simd, &next._simd) {
+            match (&self.simd, &next.simd) {
                 // none -> none/sse2/avx
                 (SimdTy::none, SimdTy::none) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);

@@ -72,10 +72,9 @@ pub struct KernelTaskBuilder<F, A, R> {
     _rettype: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
-    _simd: SimdTy,      // this WILL deprecate `simd: bool'
 
     #[cfg(simd_personality)]
-    simd: bool,
+    simd: SimdTy,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -92,10 +91,9 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             _rettype: PhantomData,
             name: None,
             pin_on_core: None,
-            _simd: SimdTy::none,
 
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdTy::none,
         }
     }
 
@@ -113,21 +111,23 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
-    #[cfg(simd_personality)]
-    pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
-        self.simd = true;
-        self
-    }
+    // #[cfg(simd_personality)]
+    // pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
+    //     self.simd = true;
+    //     self
+    // }
 
     /// Mark this new Task as an SSE2-enabled Task
+    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
     pub fn sse2(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
-        self._simd = SimdTy::sse2;
+        self.simd = SimdTy::sse2;
         Ok(self)
     }
 
     /// Mark this new Task as an AVX-enabled Task
+    #[cfg(target_feature = "avx")]
     pub fn avx(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
-        self._simd = SimdTy::avx;
+        self.simd = SimdTy::avx;
         Ok(self)
     }
 
@@ -145,8 +145,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
     
-        new_task._simd = self._simd;
-        #[cfg(simd_personality)]
+        #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
         {
             new_task.simd = self.simd;
         }
@@ -206,10 +205,9 @@ pub struct ApplicationTaskBuilder {
     name: Option<String>,
     pin_on_core: Option<u8>,
     singleton: bool,
-    _simd: SimdTy,      // this WILL deprecate `simd: bool'
 
     #[cfg(simd_personality)]
-    simd: bool,
+    simd: SimdTy,
 }
 
 impl ApplicationTaskBuilder {
@@ -222,10 +220,9 @@ impl ApplicationTaskBuilder {
             name: None,
             pin_on_core: None,
             singleton: false,
-            _simd: SimdTy::none,
 
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdTy::none,
         }
     }
 
@@ -243,21 +240,23 @@ impl ApplicationTaskBuilder {
 
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
-    #[cfg(simd_personality)]
-    pub fn simd(mut self) -> ApplicationTaskBuilder {
-        self.simd = true;
-        self
-    }
+    // #[cfg(simd_personality)]
+    // pub fn simd(mut self) -> ApplicationTaskBuilder {
+    //     self.simd = true;
+    //     self
+    // }
 
     /// Mark this new Task as an SSE2-enabled Task
+    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
     pub fn sse2(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
-        self._simd = SimdTy::sse2;
+        self.simd = SimdTy::sse2;
         Ok(self)
     }
 
     /// Mark this new Task as an AVX-enabled Task
+    #[cfg(target_feature = "avx")]
     pub fn avx(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
-        self._simd = SimdTy::avx;
+        self.simd = SimdTy::avx;
         Ok(self)
     }
 
@@ -312,7 +311,12 @@ impl ApplicationTaskBuilder {
         };
 
         #[cfg(simd_personality)]
-        let ktb = if self.simd { ktb.simd() } else { ktb };
+        let ktb = match &self.simd {
+            SimdTy::sse2 => { ktb.sse2()? },
+            #[cfg(target_feature = "avx")]
+            SimdTy::avx => { ktb.sse2()? },
+            SimdTy::none => { ktb }
+        };
 
 
         let app_task = ktb.spawn()?;
@@ -374,34 +378,29 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
     // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
     // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
     // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
+    // #[cfg(target_feature = "sse2")]
     #[cfg(simd_personality)]
     {
-        if new_task.simd {
-            // warn!("USING SSE CONTEXT for Task {:?}", new_task);
-            set_context!(context_switch::ContextSSE);
-        }
-        else {
-            // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
-            set_context!(context_switch::ContextRegular);
+        match new_task.simd {
+            SimdTy::sse2 => {
+                // warn!("USING SSE CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextSSE);
+            }
+            SimdTy::none => {
+                // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextRegular);
+            }
+
+            #[cfg(target_feature = "avx")]
+            SimdTy::avx => {set_context!(context_switch::ContextAVX);}
         }
     }
 
     // Leave this for now, for compilation.
-    // Will be deprecated
-    // #[cfg(not(simd_personality))]
-    #[cfg(all(not(simd_personality), not(target_feature = "avx")))]
+    #[cfg(not(simd_personality))]
     {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
-    }
-
-    #[cfg(target_feature = "avx")]
-    {
-        match new_task._simd {
-            SimdTy::none => {set_context!(context_switch::ContextRegular);},
-            SimdTy::sse2 => {set_context!(context_switch::ContextSSE);},
-            SimdTy::avx => {set_context!(context_switch::ContextAVX);}
-        }
     }
 }
 
