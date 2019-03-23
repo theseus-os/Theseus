@@ -52,7 +52,7 @@ impl MemFile {
             parent: Arc::downgrade(parent), 
         };
         let file_ref = Arc::new(Mutex::new(Box::new(memfile) as Box<File + Send>));
-        parent.lock().insert_child(FileOrDir::File(file_ref.clone()))?; // adds the newly created file to the tree
+        parent.lock().insert(FileOrDir::File(file_ref.clone()))?; // adds the newly created file to the tree
         Ok(file_ref)
     }
 }
@@ -136,9 +136,6 @@ impl File for MemFile {
         }
     }
 
-    fn delete(self) -> Result<(), &'static str> { 
-        Err("unimplemented")
-    }
 
     fn size(&self) -> usize {
         self.size

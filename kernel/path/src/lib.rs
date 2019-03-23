@@ -203,7 +203,7 @@ impl Path {
                 }
                 cmpnt => {
                     // navigate to child directory, or return the child file
-                    let child_dir = match curr_dir.lock().get_child(cmpnt) {
+                    let child_dir = match curr_dir.lock().get(cmpnt) {
                         Some(FileOrDir::File(f)) => return Ok(FileOrDir::File(f)),
                         Some(FileOrDir::Dir(d)) => d,
                         None => return Err("file or directory not found"),
