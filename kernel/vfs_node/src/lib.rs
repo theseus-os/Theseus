@@ -43,29 +43,29 @@ impl VFSDirectory {
             parent: Arc::downgrade(parent),
         };
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
-        parent.lock().insert_child(FileOrDir::Dir(dir_ref.clone()))?;
+        parent.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
         Ok(dir_ref)
     }
 }
 
 impl Directory for VFSDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
          // gets the name of the child node to be added
         let name = child.get_name();
         // inserts new child, if that child already exists the old value is returned
         Ok(self.children.insert(name, child))
     }
 
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+    fn get(&self, child_name: &str) -> Option<FileOrDir> {
         self.children.get(child_name).cloned()
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
 
-    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, child: FileOrDir) -> Result<(), &'static str> {
         self.children.remove(&child.get_name());
         Ok(())
     }
@@ -103,7 +103,7 @@ impl VFSFile {
             parent: Arc::downgrade(parent),
         };
         let file_ref = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
-        parent.lock().insert_child(FileOrDir::File(file_ref.clone()))?;
+        parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
         Ok(file_ref)
     }
 }

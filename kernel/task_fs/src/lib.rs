@@ -82,7 +82,7 @@ impl TaskFs {
         let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
         let strong_parent = Arc::clone(parent_dir);
-        strong_parent.lock().insert_child(FileOrDir::Dir(dir_ref))?;
+        strong_parent.lock().insert(FileOrDir::Dir(dir_ref))?;
         Ok(dir_ref_copy)
     }
 
@@ -90,14 +90,14 @@ impl TaskFs {
     fn get_self_pointer(&self) -> Result<DirRef, &'static str> {
         let parent = self.get_parent_dir()?;
         let parent_locked = parent.lock();
-        match parent_locked.get_child(&self.get_name()) {
+        match parent_locked.get(&self.get_name()) {
             Some(FileOrDir::Dir(dir)) => Ok(dir),
             _ => Err("BUG: a TaskFile's parent directory didn't contain the TaskFile itself")
         }
     }
 
 
-    fn get_child_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
+    fn get_internal(&self, child: &str) -> Result<FileOrDir, &'static str> {
         let id = child.parse::<usize>().map_err(|_e| "could not parse usize")?;
         let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer()?;
@@ -131,22 +131,22 @@ impl FsNode for TaskFs {
 
 impl Directory for TaskFs {
     /// This function adds a newly created fs node (the argument) to the TASKS directory's children map  
-    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot add children to read-only TaskFs")
     }
 
-    fn get_child(&self, child: &str) -> Option<FileOrDir> {
-        match self.get_child_internal(child) {
+    fn get(&self, child: &str) -> Option<FileOrDir> {
+        match self.get_internal(child) {
             Ok(d) => Some(d),
             Err(e) => {
-                error!("TaskFs::get_child() error: {:?}", e);
+                error!("TaskFs::get() error: {:?}", e);
                 None
             }
         }
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         let mut tasks_string = Vec::new();
         for (id, _taskref) in TASKLIST.lock().iter() {
             tasks_string.push(format!("{}", id));
@@ -154,7 +154,7 @@ impl Directory for TaskFs {
         tasks_string
     }
 
-    fn delete_child(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
         Err("cannot delete children from read-only TaskFs")
     }
 
@@ -190,11 +190,11 @@ impl TaskDir {
 }
 
 impl Directory for TaskDir {
-    fn insert_child(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot insert child into virtual task directory")
     }
 
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+    fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "taskInfo" {
             let task_file = TaskFile::new(self.taskref.clone());
             return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
@@ -210,14 +210,14 @@ impl Directory for TaskDir {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         let mut children = Vec::new();
         children.push("mmi".to_string());
         children.push("taskInfo".to_string());
         children
     }
 
-    fn delete_child(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
         Err("cannot delete child from virtual task directory")
     }
 }
@@ -344,11 +344,11 @@ impl MmiDir {
 }
 
 impl Directory for MmiDir {
-    fn insert_child(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, _child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("cannot insert child into virtual task directory")
     }
 
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+    fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "MmiInfo" {
             let task_file = MmiFile::new(self.taskref.clone());
             return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
@@ -359,13 +359,13 @@ impl Directory for MmiDir {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         let mut children = Vec::new();
         children.push("MmiInfo".to_string());
         children
     }
 
-    fn delete_child(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, _child: FileOrDir) -> Result<(), &'static str> {
         Err("cannot remove child from virtual task directory")
     }
 }

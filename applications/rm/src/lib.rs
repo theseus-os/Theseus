@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 
 extern crate alloc;
 extern crate task;
@@ -69,6 +69,10 @@ pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
         Arc::clone(&curr_env.working_dir)
     };
 
+    if matches.free.is_empty() {
+        return Err("rm: missing argument");
+    }
+
     let path = Path::new(matches.free[0].to_string());
     let delete_node: FileOrDir;
     // navigate to the filepath specified by first argument
@@ -81,9 +85,6 @@ pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
         }
     }; 
 
-    if &delete_node.get_name() == root::ROOT_DIRECTORY_NAME {
-        return Err("cannot remove root"); 
-    }
 
     // Check the underlying type of the FileOrDir node and if it's a directory,
     // if we can remove it if the user specified -r. 
@@ -96,7 +97,8 @@ pub fn remove_node(args: Vec<String>) -> Result<isize, &'static str> {
 
     if remove_dir {
         let parent = delete_node.get_parent_dir()?;
-        parent.lock().delete_child(delete_node)?;
+        debug!("about to remove directory");
+        parent.lock().remove(delete_node)?;
     } else {
         println!("cannot remove '{}': Is a directory", delete_node.get_name());
         return Ok(-1);

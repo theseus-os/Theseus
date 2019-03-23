@@ -51,23 +51,32 @@ pub struct RootDirectory {
 }
 
 impl Directory for RootDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         // gets the name of the child node to be added
         let name = child.get_name();
         // inserts new child, if that child already exists the old value is returned
         Ok(self.children.insert(name, child))
     }
 
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
+    fn get(&self, child_name: &str) -> Option<FileOrDir> {
         self.children.get(child_name).cloned()
     }
 
     /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
 
-    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, child: FileOrDir) -> Result<(), &'static str> {
+        // Prevents removal of root
+        match &child {
+            FileOrDir::Dir(dir) => {
+                if Arc::ptr_eq(dir, get_root()) {
+                    return Err("Cannot remove root");
+                }
+            },
+            _ => {}
+        }
         self.children.remove(&child.get_name());
         Ok(())
     }

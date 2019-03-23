@@ -72,13 +72,13 @@ pub trait File : FsNode {
 /// Traits for directories, implementors of Directory must also implement FsNode
 pub trait Directory : FsNode + Send {
     /// Gets an individual child node from the current directory based on the name field of that node
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir>; 
+    fn get(&self, child_name: &str) -> Option<FileOrDir>; 
     /// Inserts a child into whatever collection the Directory uses to track children nodes
-    fn insert_child(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
+    fn insert(&mut self, child: FileOrDir) -> Result<Option<FileOrDir>, &'static str>;
     // Deletes a child from whatever collection the Directory uses to store children nodes
-    fn delete_child(&mut self, child: FileOrDir) -> Result<(), &'static str>;
+    fn remove(&mut self, child: FileOrDir) -> Result<(), &'static str>;
     /// Lists the names of the children nodes of the current directory
-    fn list_children(&mut self) -> Vec<String>;
+    fn list(&mut self) -> Vec<String>;
 }
 
 /// Allows us to return a generic type that can be matched by the caller to extract the underlying type

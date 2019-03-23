@@ -89,7 +89,7 @@ pub fn get_default_namespace() -> Option<&'static CrateNamespace> {
 
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
-    match root::get_root().lock().get_child(NAMESPACES_DIRECTORY_NAME) {
+    match root::get_root().lock().get(NAMESPACES_DIRECTORY_NAME) {
         Some(FileOrDir::Dir(dir)) => Some(dir),
         _ => None,
     }
@@ -398,15 +398,15 @@ impl CrateNamespace {
     /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
     /// * `base_dir`: the base directory for this namespace, which must contain crate file subdirectories. 
     pub fn with_base_dir(name: String, base_dir: DirRef) -> Result<CrateNamespace, &'static str> {
-        let kernel_dir = match base_dir.lock().get_child(KERNEL_CRATES_DIRECTORY_NAME) {
+        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace kernel directory"),
         };
-        let app_dir = match base_dir.lock().get_child(APPLICATION_CRATES_DIRECTORY_NAME) {
+        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace application directory"),
         };
-        let user_dir = match base_dir.lock().get_child(USERSPACE_FILES_DIRECTORY_NAME) {
+        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace userspace directory"),
         };
@@ -2007,7 +2007,7 @@ impl CrateNamespace {
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full name of the crate file. 
     pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = self.kernel_directory().lock().list_children();
+        let children = self.kernel_directory().lock().list();
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
@@ -2022,7 +2022,7 @@ impl CrateNamespace {
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full names of the crate files. 
     pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
-        let mut children = self.kernel_directory().lock().list_children();
+        let mut children = self.kernel_directory().lock().list();
         children.retain(|child_name| child_name.starts_with(prefix)); // remove non-matches
         children.into_iter().map(|name| Path::new(name)).collect()
     }
