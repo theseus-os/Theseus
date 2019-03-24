@@ -7,8 +7,6 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_sse build_avx gdb doc docs view-doc view-docs
-
 all: iso
 
 
@@ -105,6 +103,15 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
+### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
+.PHONY: all \
+		check_rustc check_xargo check_captain \
+		clean run debug iso build userspace cargo simd_personality build_sse build_avx \
+		$(assembly_source_files) \
+		gdb doc docs view-doc view-docs
+
+
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
 ### then we need to define a preprocessor variable 
 ### that will cause the AVX flag to be enabled in the boot-up assembly code. 
@@ -197,18 +204,19 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	@ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
-	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
-## This compiles the assembly files in the nano_core
+### This compiles the assembly files in the nano_core. 
+### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	nasm -felf64 $< -o $@ $(CFLAGS)
+	@nasm -felf64 $< -o $@ $(CFLAGS)
 
 
 
