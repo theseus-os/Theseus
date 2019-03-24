@@ -7,7 +7,7 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd build_avx gdb doc docs view-doc view-docs
+.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_sse build_avx gdb doc docs view-doc view-docs
 
 all: iso
 
@@ -105,6 +105,13 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
+### then we need to define a preprocessor variable 
+### that will cause the AVX flag to be enabled in the boot-up assembly code. 
+ifneq (,$(findstring avx, $(TARGET)))
+$(eval CFLAGS += -DENABLE_AVX)
+endif
+
 
 ### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
 NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
@@ -134,15 +141,15 @@ iso: $(iso)
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy all object files into the main build directory and prepend the kernel prefix
-## Al object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
+## Copy all object files into the main build directory and prepend the kernel prefix.
+## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 
-## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix
+## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
-##            if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
+## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
@@ -195,13 +202,13 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
-	echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
 ## This compiles the assembly files in the nano_core
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@ $(CFLAGS)
+	nasm -felf64 $< -o $@ $(CFLAGS)
 
 
 
@@ -238,11 +245,11 @@ userspace:
 ## "simd_personality" is a special target that enables SIMD personalities.
 ## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
 ## and then builds everything again with the regular x86_64-theseus target. 
-## The "normal" target must come last ('build_simd', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
+## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality : export TARGET := x86_64-theseus
 simd_personality : export BUILD_MODE = release
 simd_personality : export override THESEUS_CONFIG += simd_personality
-simd_personality: build_simd build
+simd_personality: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -254,31 +261,27 @@ simd_personality: build_simd build
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### build_simd is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
-### It is the latter half of the simd_personality target.
-build_simd : export TARGET := x86_64-theseus-sse
-build_simd : export override RUSTFLAGS += -C no-vectorize-loops
-build_simd : export override RUSTFLAGS += -C no-vectorize-slp
-build_simd : export KERNEL_PREFIX := ksimd\#
-build_simd : export APP_PREFIX := asimd\#
-build_simd:
-## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
-	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
+### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
+### It can serve as part of the simd_personality target.
+build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override RUSTFLAGS += -C no-vectorize-loops
+build_sse : export override RUSTFLAGS += -C no-vectorize-slp
+build_sse : export KERNEL_PREFIX := ksse\#
+build_sse : export APP_PREFIX := asse\#
+build_sse:
 	@$(MAKE) build
 
-## "build_avx" makes AVX is enabled at boot code
-## It also makes crates be compiled with AVX instructions/regs
-build_avx :	export TARGET := x86_64-theseus-avx
+
+### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
+### It can serve as part of the simd_personality target.
+build_avx : export TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
-build_avx : export override THESEUS_CONFIG += simd_personality
+build_avx : export KERNEL_PREFIX := kavx\#
+build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@$(MAKE) CFLAGS+=-DAVX_ENABLED
+	@$(MAKE) build
 
-
-
-preserve_old_modules:
-	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
 
 
 ### build_server is a target that builds Theseus into a regular ISO
@@ -289,6 +292,10 @@ build_server: preserve_old_modules iso
 		NEW_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR) \
 		NEW_DIR_NAME=$(UPDATE_DIR) \
 		bash scripts/build_server.sh
+
+preserve_old_modules:
+	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+
 
 
 ## The top-level (root) documentation file
@@ -370,8 +377,6 @@ help:
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
 
-	
-
 
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -386,7 +391,7 @@ help:
 	@echo -e "   kvm=yes:"
 	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
-	@echo -e "\t Use the host CPU model, which is required for using x86 PMU hardware and others. Enables KVM too."
+	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
 	@echo ""
@@ -435,14 +440,16 @@ ifeq ($(int),yes)
 endif
 
 ifeq ($(host),yes)
-	QEMU_FLAGS += -cpu host -enable-kvm
+	## KVM acceleration is required when using the host cpu model
+	QEMU_FLAGS += -cpu host -accel kvm
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
 
-ifeq ($(kvm),yes)
-	QEMU_FLAGS += -enable-kvm
-endif
+## Currently, kvm by itself causes problems, but works with the host option (above).
+# ifeq ($(kvm),yes)
+# 	QEMU_FLAGS += -accel kvm
+# endif
 
 
 
@@ -460,16 +467,10 @@ odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-
 ### Currently, loadable module mode requires release build mode
 loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
-
-### Create a make prioirty option to build and run priority scheduler
-priority : export override THESEUS_CONFIG += priority_scheduler
-priority : export BUILD_MODE = release
-priority: run
 
 
 ### builds and runs Theseus in QEMU

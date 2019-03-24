@@ -80,8 +80,10 @@ use spawn::KernelTaskBuilder;
 use fs_node::FileOrDir; 
 use path::Path;
 
-/// By default, the simd namespace base directory will be in ".../namespaces/simd/"
-const DEFAULT_SIMD_NAMESPACE_BASE_DIR: &str = "simd";
+/// By default, the SSE namespace base directory will be in "..../namespaces/sse2/"
+const DEFAULT_SSE_NAMESPACE_BASE_DIR: &str = "sse2";
+/// By default, the AVX namespace base directory will be in "..../namespaces/avx/"
+const DEFAULT_AVX_NAMESPACE_BASE_DIR: &str = "avx";
 
 
 /// Initializes the simd personality, with an optional `Path` argument that can be used 
@@ -91,13 +93,13 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
-	// assuming 'simd' was the prefix used to build the SIMD versions of each crate:
-	//     .../namespaces/simd/
-	//     .../namespaces/simd/kernel
-	//     .../namespaces/simd/application
-	//     .../namespaces/simd/userspace
-	let path = namespace_path.unwrap_or_else(|| Path::new(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR)));
-	let mut simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR), path)?;
+	// for example, if 'sse2' was the prefix used to build the SSE versions of each crate:
+	//     .../namespaces/sse2/
+	//     .../namespaces/sse2/kernel
+	//     .../namespaces/sse2/application
+	//     .../namespaces/sse2/userspace
+	let path = namespace_path.unwrap_or_else(|| Path::new(String::from(DEFAULT_SSE_NAMESPACE_BASE_DIR)));
+	let mut simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SSE_NAMESPACE_BASE_DIR), path)?;
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")

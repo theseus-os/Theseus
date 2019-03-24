@@ -59,7 +59,6 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::Arc,
-    vec::Vec,
 };
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
@@ -183,14 +182,18 @@ pub enum RunState {
 /// Should be initialized by the runqueue crate.
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
-/// SIMD type of the task
-pub enum SimdTy {
-    none,
-    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
-    sse2,
-    #[cfg(target_feature = "avx")]
-    avx
+
+/// The supported levels of SIMD extensions that a `Task` can use.
+#[derive(Clone, PartialEq)]
+pub enum SimdExt {
+    /// AVX (and below) instructions and registers will be used.
+    AVX,
+    /// SSE instructions and registers will be used.
+    SSE,
+    /// The regular case: no SIMD instructions or registers of any kind will be used.
+    None,
 }
+
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
@@ -236,10 +239,10 @@ pub struct Task {
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+
     #[cfg(simd_personality)]
-    /// Whether this Task is SIMD enabled, i.e.,
-    /// whether it uses SIMD registers and instructions.
-    pub simd: SimdTy,
+    /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
+    pub simd: SimdExt,
 }
 
 impl fmt::Debug for Task {
@@ -286,9 +289,10 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-            env: Arc::new(Mutex::new(env)), 
+            env: Arc::new(Mutex::new(env)),
+
             #[cfg(simd_personality)]
-            simd: SimdTy::none,
+            simd: SimdExt::None,
         }
     }
 
@@ -539,103 +543,66 @@ impl Task {
         }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-        // #[cfg(simd_personality)]
-        #[cfg(all(target_feature = "sse2", not(target_feature = "avx")))]   // must be "sse2" only
+        #[cfg(simd_personality)]
         {
-            match (&self.simd, &next.simd) {
-                (SimdTy::none, SimdTy::none) => {
+            match (self.simd, next.simd) {
+                (SimdExt::None, SimdExt::None) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular);
                     }
                 }
 
-                (SimdTy::none, SimdTy::sse2)  => {
-                    // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_sse);
-                    }
-                }
-                
-                (SimdTy::sse2, SimdTy::none)  => {
-                    // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_regular);
-                    }
-                }
-
-                (SimdTy::sse2, SimdTy::sse2)   => {
-                    // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse);
-                    }
-                }
-            }
-        }
-
-        #[cfg(target_feature = "avx")]
-        {
-            match (&self.simd, &next.simd) {
-                // none -> none/sse2/avx
-                (SimdTy::none, SimdTy::none) => {
-                    // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular);
-                    }
-                }
-
-                (SimdTy::none, SimdTy::sse2) => {
+                (SimdExt::None, SimdExt::SSE)  => {
                     warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_sse);
                     }
                 }
-
-                (SimdTy::none, SimdTy::avx) => {
+                
+                (SimdExt::None, SimdExt::AVX)  => {
                     warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_avx);
                     }
                 }
 
-                // sse2 -> none/sse2/avx
-                (SimdTy::sse2, SimdTy::none) => {
+                (SimdExt::SSE, SimdExt::None)  => {
                     warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse_to_regular);
                     }
                 }
 
-                (SimdTy::sse2, SimdTy::sse2) => {
+                (SimdExt::SSE, SimdExt::SSE)   => {
                     warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse);
                     }
                 }
 
-                (SimdTy::sse2, SimdTy::avx) => {
+                (SimdExt::SSE, SimdExt::AVX) => {
                     warn!("SWITCHING from SSE to AVX task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse_to_avx);
                     }
                 }
 
-                // avx -> none/sse2/avx
-                (SimdTy::avx, SimdTy::none) => {
+                (SimdExt::AVX, SimdExt::None) => {
                     warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_avx_to_regular);
                     }
                 }
 
-                (SimdTy::avx, SimdTy::sse2) => {
+                (SimdExt::AVX, SimdExt::SSE) => {
                     warn!("SWITCHING from AVX to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_avx_to_sse);
                     }
                 }
 
-                (SimdTy::avx, SimdTy::avx) => {
+                (SimdExt::AVX, SimdExt::AVX) => {
                     warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
                     loop{}
                     unsafe {
@@ -652,7 +619,7 @@ impl Task {
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
         let _prev_task_data_to_drop = self.drop_after_task_switch.take();
-        
+
     }
 }
 

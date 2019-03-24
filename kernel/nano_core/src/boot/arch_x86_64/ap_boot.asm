@@ -19,7 +19,7 @@ bits 32 ;We are still in protected mode
 
 extern set_up_SSE
 
-%ifdef AVX_ENABLED
+%ifdef ENABLE_AVX
 extern set_up_AVX
 %endif
 
@@ -31,7 +31,7 @@ ap_start_protected_mode:
 
 	call set_up_SSE ; in boot.asm
 
-%ifdef AVX_ENABLED
+%ifdef ENABLE_AVX
 	call set_up_AVX ; in boot.asm
 %endif
     

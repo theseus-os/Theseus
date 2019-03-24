@@ -1,5 +1,5 @@
 //! This crate contains structures and routines for context switching 
-//! when AVX/SSE extensions are enabled. 
+//! when AVX extensions are enabled. 
 
 #![no_std]
 #![feature(asm, naked_functions)]
@@ -10,7 +10,8 @@
 use context_switch_regular::ContextRegular;
 
 
-/// The registers saved before a context switch and restored after a context switch.
+/// The registers saved before a context switch and restored after a context switch
+/// for AVX-enabled Tasks.
 #[repr(C, packed)]
 pub struct ContextAVX {
     // The order of the registers here MUST MATCH the order of 
@@ -61,14 +62,14 @@ impl ContextAVX {
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
+/// An assembly macro for saving AVX registers
 /// by pushing them onto the stack.
 #[macro_export]
 macro_rules! save_registers_avx {
     () => (
         asm!("
             # save all of the ymm registers (for AVX)
-            # each register is 32 bytes, and there are 16 of them
+            # each register is 32 bytes (256 bits), and there are 16 of them
             lea rsp, [rsp - 32*16]
             vmovupd [rsp + 32*0],  ymm0   # push ymm0
             vmovupd [rsp + 32*1],  ymm1   # push ymm1
@@ -93,8 +94,8 @@ macro_rules! save_registers_avx {
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
-/// by pushing them onto the stack.
+/// An assembly macro for restoring AVX registers
+/// by popping them off of the stack.
 #[macro_export]
 macro_rules! restore_registers_avx {
     () => (

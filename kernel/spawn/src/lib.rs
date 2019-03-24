@@ -33,7 +33,7 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, SimdTy, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use task::{Task, TaskRef, SimdExt, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
 
@@ -74,7 +74,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     pin_on_core: Option<u8>,
 
     #[cfg(simd_personality)]
-    simd: SimdTy,
+    simd: SimdExt,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -93,7 +93,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             pin_on_core: None,
 
             #[cfg(simd_personality)]
-            simd: SimdTy::none,
+            simd: SimdExt::none,
         }
     }
 
@@ -111,24 +111,10 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
-    // #[cfg(simd_personality)]
-    // pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
-    //     self.simd = true;
-    //     self
-    // }
-
-    /// Mark this new Task as an SSE2-enabled Task
-    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
-    pub fn sse2(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
-        self.simd = SimdTy::sse2;
-        Ok(self)
-    }
-
-    /// Mark this new Task as an AVX-enabled Task
-    #[cfg(target_feature = "avx")]
-    pub fn avx(mut self) -> Result<KernelTaskBuilder<F, A, R>, &'static str> {
-        self.simd = SimdTy::avx;
-        Ok(self)
+    #[cfg(simd_personality)]
+    pub fn simd(mut self, extension: SimdExt) -> KernelTaskBuilder<F, A, R> {
+        self.simd = extension;
+        self
     }
 
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
@@ -145,8 +131,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
     
-        #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
-        {
+        #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
         }
 
@@ -207,7 +192,7 @@ pub struct ApplicationTaskBuilder {
     singleton: bool,
 
     #[cfg(simd_personality)]
-    simd: SimdTy,
+    simd: SimdExt,
 }
 
 impl ApplicationTaskBuilder {
@@ -222,7 +207,7 @@ impl ApplicationTaskBuilder {
             singleton: false,
 
             #[cfg(simd_personality)]
-            simd: SimdTy::none,
+            simd: SimdExt::None,
         }
     }
 
@@ -240,24 +225,10 @@ impl ApplicationTaskBuilder {
 
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
-    // #[cfg(simd_personality)]
-    // pub fn simd(mut self) -> ApplicationTaskBuilder {
-    //     self.simd = true;
-    //     self
-    // }
-
-    /// Mark this new Task as an SSE2-enabled Task
-    #[cfg(simd_personality)] // in other words, #[cfg(any(target_feature = "sse2", target_feature = "avx"))]
-    pub fn sse2(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
-        self.simd = SimdTy::sse2;
-        Ok(self)
-    }
-
-    /// Mark this new Task as an AVX-enabled Task
-    #[cfg(target_feature = "avx")]
-    pub fn avx(mut self) -> Result<ApplicationTaskBuilder, &'static str> {
-        self.simd = SimdTy::avx;
-        Ok(self)
+    #[cfg(simd_personality)]
+    pub fn simd(mut self, extension: SimdExt) -> ApplicationTaskBuilder {
+        self.simd = extension;
+        self
     }
 
     /// Set the argument strings for this Task.
@@ -311,13 +282,7 @@ impl ApplicationTaskBuilder {
         };
 
         #[cfg(simd_personality)]
-        let ktb = match &self.simd {
-            SimdTy::sse2 => { ktb.sse2()? },
-            #[cfg(target_feature = "avx")]
-            SimdTy::avx => { ktb.sse2()? },
-            SimdTy::none => { ktb }
-        };
-
+        let ktb = ktb.simd(self.simd);
 
         let app_task = ktb.spawn()?;
         app_task.lock_mut().app_crate = Some(app_crate_ref);
@@ -378,27 +343,24 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
     // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
     // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
     // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
-    // #[cfg(target_feature = "sse2")]
-    #[cfg(simd_personality)]
-    {
+    #[cfg(simd_personality)] {
         match new_task.simd {
-            SimdTy::sse2 => {
-                // warn!("USING SSE CONTEXT for Task {:?}", new_task);
+            SimdExt::AVX => {
+                warn!("USING AVX CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextAVX);
+            }
+            SimdExt::SSE => {
+                warn!("USING SSE CONTEXT for Task {:?}", new_task);
                 set_context!(context_switch::ContextSSE);
             }
-            SimdTy::none => {
+            SimdExt::None => {
                 // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
                 set_context!(context_switch::ContextRegular);
             }
-
-            #[cfg(target_feature = "avx")]
-            SimdTy::avx => {set_context!(context_switch::ContextAVX);}
         }
     }
 
-    // Leave this for now, for compilation.
-    #[cfg(not(simd_personality))]
-    {
+    #[cfg(not(simd_personality))] {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
     }

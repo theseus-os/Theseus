@@ -38,7 +38,7 @@ start:
 	call check_long_mode
 
 	call set_up_SSE
-%ifdef AVX_ENABLED
+%ifdef ENABLE_AVX
 	call set_up_AVX
 %endif
 
@@ -193,7 +193,7 @@ check_long_mode:
 	jmp _error
 
 
-; Check for SSE and enable it. Throw error 'a' if unsupported
+; Check for SSE and enable it. Prints error 'a' if unsupported
 global set_up_SSE
 set_up_SSE:
 	mov eax, 0x1
@@ -216,8 +216,9 @@ set_up_SSE:
 	mov al, "a"
 	jmp _error
 
-; Check for AVX and enable it. Throw error 'b' if unsupported
-%ifdef AVX_ENABLED
+
+; Check for AVX and enable it. Prints error 'b' if unsupported
+%ifdef ENABLE_AVX
 global set_up_AVX
 set_up_AVX:
 	; check architectural support
@@ -236,7 +237,7 @@ set_up_AVX:
 	; enable AVX
 	mov ecx, 0
 	xgetbv
-	or eax, 110b		; enablx SSE/AVX
+	or eax, 110b		; enable SSE and AVX
 	mov ecx, 0
 	xsetbv
 
