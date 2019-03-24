@@ -93,7 +93,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             pin_on_core: None,
 
             #[cfg(simd_personality)]
-            simd: SimdExt::none,
+            simd: SimdExt::None,
         }
     }
 

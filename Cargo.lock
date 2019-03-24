@@ -1344,6 +1344,7 @@ dependencies = [
  "path 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]

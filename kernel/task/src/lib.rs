@@ -184,7 +184,7 @@ pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'stat
 
 
 /// The supported levels of SIMD extensions that a `Task` can use.
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum SimdExt {
     /// AVX (and below) instructions and registers will be used.
     AVX,
@@ -545,7 +545,7 @@ impl Task {
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
         #[cfg(simd_personality)]
         {
-            match (self.simd, next.simd) {
+            match (&self.simd, &next.simd) {
                 (SimdExt::None, SimdExt::None) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
@@ -554,7 +554,7 @@ impl Task {
                 }
 
                 (SimdExt::None, SimdExt::SSE)  => {
-                    warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
+                    // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_sse);
                     }
@@ -568,14 +568,14 @@ impl Task {
                 }
 
                 (SimdExt::SSE, SimdExt::None)  => {
-                    warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
+                    // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse_to_regular);
                     }
                 }
 
                 (SimdExt::SSE, SimdExt::SSE)   => {
-                    warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
+                    // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse);
                     }

@@ -153,8 +153,7 @@ build: $(nano_core_binary)
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
-
-## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
+## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
@@ -267,6 +266,20 @@ simd_personality: build_sse build
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
+
+
+# ### This target builds the kernel and applications with the x86_64-theseus-% target,
+# ### where "%" is a wildcard (like "*") for Theseus targets, e.g., "sse", "avx".
+# ### The "%" wildcard will generate multiple target based on the provided TARGET variable,
+# ### such as "build_sse", "build_avx", etc.
+# ### This serves as part of the simd_personality target.
+# build_% : export TARGET := x86_64-theseus-%
+# build_% : export override RUSTFLAGS += -C no-vectorize-loops
+# build_% : export override RUSTFLAGS += -C no-vectorize-slp
+# build_% : export KERNEL_PREFIX := k%\#
+# build_% : export APP_PREFIX := a%\#
+# build_%:
+# 	@$(MAKE) build
 
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
