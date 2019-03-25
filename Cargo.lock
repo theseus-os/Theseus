@@ -159,7 +159,6 @@ dependencies = [
  "syscall 0.1.0",
  "task 0.1.0",
  "task_fs 0.1.0",
- "test_avx 0.1.0",
  "test_ota_update 0.1.0",
  "tsc 0.1.0",
  "vga_buffer 0.1.0",
@@ -216,7 +215,6 @@ name = "context_switch_avx"
 version = "0.1.0"
 dependencies = [
  "context_switch_regular 0.1.0",
- "context_switch_sse 0.1.0",
 ]
 
 [[package]]
@@ -1518,16 +1516,6 @@ dependencies = [
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "x86_64 0.1.2",
-]
-
-[[package]]
-name = "test_avx"
-version = "0.1.0"
-dependencies = [
- "apic 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "spawn 0.1.0",
  "x86_64 0.1.2",
 ]
 

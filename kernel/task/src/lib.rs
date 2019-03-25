@@ -184,7 +184,7 @@ pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'stat
 
 
 /// The supported levels of SIMD extensions that a `Task` can use.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SimdExt {
     /// AVX (and below) instructions and registers will be used.
     AVX,
@@ -561,7 +561,7 @@ impl Task {
                 }
                 
                 (SimdExt::None, SimdExt::AVX)  => {
-                    warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
+                    // warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_avx);
                     }
@@ -589,7 +589,7 @@ impl Task {
                 }
 
                 (SimdExt::AVX, SimdExt::None) => {
-                    warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
+                    // warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_avx_to_regular);
                     }
@@ -603,8 +603,7 @@ impl Task {
                 }
 
                 (SimdExt::AVX, SimdExt::AVX) => {
-                    warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
-                    loop{}
+                    // warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_avx);
                     }

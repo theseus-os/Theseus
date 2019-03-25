@@ -107,7 +107,8 @@ APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc check_xargo check_captain \
-		clean run debug iso build userspace cargo simd_personality build_sse build_avx \
+		clean run debug iso build userspace cargo \
+		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
 
@@ -249,14 +250,14 @@ userspace:
 
 
 
-## "simd_personality" is a special target that enables SIMD personalities.
-## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
+## This is a special target that enables SIMD personalities.
+## It builds everything with the SIMD-enabled x86_64-theseus-sse target,
 ## and then builds everything again with the regular x86_64-theseus target. 
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
-simd_personality : export TARGET := x86_64-theseus
-simd_personality : export BUILD_MODE = release
-simd_personality : export override THESEUS_CONFIG += simd_personality
-simd_personality: build_sse build
+simd_personality_sse : export TARGET := x86_64-theseus
+simd_personality_sse : export BUILD_MODE = release
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality
+simd_personality_sse: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -268,22 +269,30 @@ simd_personality: build_sse build
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-# ### This target builds the kernel and applications with the x86_64-theseus-% target,
-# ### where "%" is a wildcard (like "*") for Theseus targets, e.g., "sse", "avx".
-# ### The "%" wildcard will generate multiple target based on the provided TARGET variable,
-# ### such as "build_sse", "build_avx", etc.
-# ### This serves as part of the simd_personality target.
-# build_% : export TARGET := x86_64-theseus-%
-# build_% : export override RUSTFLAGS += -C no-vectorize-loops
-# build_% : export override RUSTFLAGS += -C no-vectorize-slp
-# build_% : export KERNEL_PREFIX := k%\#
-# build_% : export APP_PREFIX := a%\#
-# build_%:
-# 	@$(MAKE) build
+
+## This target is like "simd_personality_sse", but uses AVX instead of SSE.
+## It builds everything with the SIMD-enabled x86_64-theseus-avx target,
+## and then builds everything again with the regular x86_64-theseus target. 
+## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
+simd_personality_avx : export TARGET := x86_64-theseus
+simd_personality_avx : export BUILD_MODE = release
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override CFLAGS += -DENABLE_AVX
+simd_personality_avx: build_avx build
+## after building all the modules, copy the kernel boot image files
+	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
+## autogenerate the grub.cfg file
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+## run it in QEMU
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
 
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
-### It can serve as part of the simd_personality target.
+### It can serve as part of the simd_personality_sse target.
 build_sse : export TARGET := x86_64-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
@@ -294,7 +303,7 @@ build_sse:
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
-### It can serve as part of the simd_personality target.
+### It can serve as part of the simd_personality_avx target.
 build_avx : export TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
@@ -384,8 +393,8 @@ help:
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
 
-	@echo -e "   simd_personality:"
-	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
+	@echo -e "   simd_personality_[sse|avx]:"
+	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality (either SSE or AVX),"
 	@echo -e "\t then runs it just like the 'make run' target."
 
 	@echo -e "   build_server:"
@@ -467,7 +476,7 @@ else
 	QEMU_FLAGS += -cpu Broadwell
 endif
 
-## Currently, kvm by itself causes problems, but works with the host option (above).
+## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
 # ifeq ($(kvm),yes)
 # 	QEMU_FLAGS += -accel kvm
 # endif

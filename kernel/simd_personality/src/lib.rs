@@ -52,7 +52,11 @@
 #![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
-#[macro_use] pub extern crate alloc;
+#[cfg(simd_personality)]
+#[macro_use] extern crate alloc;
+#[cfg(not(simd_personality))] 
+extern crate alloc;
+
 
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
@@ -69,7 +73,7 @@ extern crate compiler_builtins as _compiler_builtins;
 */
 
 
-#[macro_use] pub extern crate log;
+#[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate task;
@@ -119,7 +123,13 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	//     .../namespaces/sse/kernel
 	//     .../namespaces/sse/application
 	//     .../namespaces/sse/userspace
-	let mut simd_namespace = CrateNamespace::with_base_dir_path(String::from(namespace_name), Path::new(String::from(namespace_name)))?;
+	let mut simd_namespace = CrateNamespace::with_base_dir_path(
+		String::from(namespace_name), 
+		Path::new(String::from(namespace_name))
+	).map_err(|e| {
+		error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
+		e
+	})?;
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
@@ -151,7 +161,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
 	let task1 = KernelTaskBuilder::new(func1, ())
-		.name(String::from("simd_test_1-sse"))
+		.name(format!("simd_test_1-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;
@@ -168,7 +178,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
 	let task2 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_2-sse"))
+		.name(format!("simd_test_2-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;
@@ -185,7 +195,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
 	let task3 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_short-sse"))
+		.name(format!("simd_test_short-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;

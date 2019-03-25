@@ -8,8 +8,5 @@ build = "../../build.rs"
 [dependencies.context_switch_regular]
 path = "../context_switch_regular"
 
-[dependencies.context_switch_sse]
-path = "../context_switch_sse"
-
 [lib]
 crate-type = ["rlib"]

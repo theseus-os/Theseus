@@ -5,7 +5,6 @@
 #![feature(asm, naked_functions)]
 
 #[macro_use] extern crate context_switch_regular;
-#[macro_use] extern crate context_switch_sse;
 
 use context_switch_regular::ContextRegular;
 
@@ -71,22 +70,22 @@ macro_rules! save_registers_avx {
             # save all of the ymm registers (for AVX)
             # each register is 32 bytes (256 bits), and there are 16 of them
             lea rsp, [rsp - 32*16]
-            vmovupd [rsp + 32*0],  ymm0   # push ymm0
-            vmovupd [rsp + 32*1],  ymm1   # push ymm1
-            vmovupd [rsp + 32*2],  ymm2   # push ymm2
-            vmovupd [rsp + 32*3],  ymm3   # push ymm3
-            vmovupd [rsp + 32*4],  ymm4   # push ymm4
-            vmovupd [rsp + 32*5],  ymm5   # push ymm5
-            vmovupd [rsp + 32*6],  ymm6   # push ymm6
-            vmovupd [rsp + 32*7],  ymm7   # push ymm7
-            vmovupd [rsp + 32*8],  ymm8   # push ymm8
-            vmovupd [rsp + 32*9],  ymm9   # push ymm9
-            vmovupd [rsp + 32*10], ymm10  # push ymm10
-            vmovupd [rsp + 32*11], ymm11  # push ymm11
-            vmovupd [rsp + 32*12], ymm12  # push ymm12
-            vmovupd [rsp + 32*13], ymm13  # push ymm13
-            vmovupd [rsp + 32*14], ymm14  # push ymm14
-            vmovupd [rsp + 32*15], ymm15  # push ymm15
+            vmovups [rsp + 32*0],  ymm0   # push ymm0
+            vmovups [rsp + 32*1],  ymm1   # push ymm1
+            vmovups [rsp + 32*2],  ymm2   # push ymm2
+            vmovups [rsp + 32*3],  ymm3   # push ymm3
+            vmovups [rsp + 32*4],  ymm4   # push ymm4
+            vmovups [rsp + 32*5],  ymm5   # push ymm5
+            vmovups [rsp + 32*6],  ymm6   # push ymm6
+            vmovups [rsp + 32*7],  ymm7   # push ymm7
+            vmovups [rsp + 32*8],  ymm8   # push ymm8
+            vmovups [rsp + 32*9],  ymm9   # push ymm9
+            vmovups [rsp + 32*10], ymm10  # push ymm10
+            vmovups [rsp + 32*11], ymm11  # push ymm11
+            vmovups [rsp + 32*12], ymm12  # push ymm12
+            vmovups [rsp + 32*13], ymm13  # push ymm13
+            vmovups [rsp + 32*14], ymm14  # push ymm14
+            vmovups [rsp + 32*15], ymm15  # push ymm15
             "
             : : : "memory" : "intel", "volatile"
         );
@@ -101,22 +100,22 @@ macro_rules! restore_registers_avx {
     () => (
         asm!("
             # restore all of the ymm registers
-            vmovupd ymm15, [rsp + 32*15]   # pop ymm15
-            vmovupd ymm14, [rsp + 32*14]   # pop ymm14
-            vmovupd ymm13, [rsp + 32*13]   # pop ymm13
-            vmovupd ymm12, [rsp + 32*12]   # pop ymm12
-            vmovupd ymm11, [rsp + 32*11]   # pop ymm11
-            vmovupd ymm10, [rsp + 32*10]   # pop ymm10
-            vmovupd ymm9,  [rsp + 32*9]    # pop ymm9
-            vmovupd ymm8,  [rsp + 32*8]    # pop ymm8
-            vmovupd ymm7,  [rsp + 32*7]    # pop ymm7
-            vmovupd ymm5,  [rsp + 32*5]    # pop ymm5
-            vmovupd ymm6,  [rsp + 32*6]    # pop ymm6
-            vmovupd ymm4,  [rsp + 32*4]    # pop ymm4
-            vmovupd ymm3,  [rsp + 32*3]    # pop ymm3
-            vmovupd ymm2,  [rsp + 32*2]    # pop ymm2
-            vmovupd ymm1,  [rsp + 32*1]    # pop ymm1
-            vmovupd ymm0,  [rsp + 32*0]    # pop ymm0
+            vmovups ymm15, [rsp + 32*15]   # pop ymm15
+            vmovups ymm14, [rsp + 32*14]   # pop ymm14
+            vmovups ymm13, [rsp + 32*13]   # pop ymm13
+            vmovups ymm12, [rsp + 32*12]   # pop ymm12
+            vmovups ymm11, [rsp + 32*11]   # pop ymm11
+            vmovups ymm10, [rsp + 32*10]   # pop ymm10
+            vmovups ymm9,  [rsp + 32*9]    # pop ymm9
+            vmovups ymm8,  [rsp + 32*8]    # pop ymm8
+            vmovups ymm7,  [rsp + 32*7]    # pop ymm7
+            vmovups ymm5,  [rsp + 32*5]    # pop ymm5
+            vmovups ymm6,  [rsp + 32*6]    # pop ymm6
+            vmovups ymm4,  [rsp + 32*4]    # pop ymm4
+            vmovups ymm3,  [rsp + 32*3]    # pop ymm3
+            vmovups ymm2,  [rsp + 32*2]    # pop ymm2
+            vmovups ymm1,  [rsp + 32*1]    # pop ymm1
+            vmovups ymm0,  [rsp + 32*0]    # pop ymm0
             lea rsp, [rsp + 32*16]
             "
             : : : "memory" : "intel", "volatile"

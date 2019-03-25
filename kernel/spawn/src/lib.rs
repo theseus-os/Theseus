@@ -346,11 +346,11 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
     #[cfg(simd_personality)] {
         match new_task.simd {
             SimdExt::AVX => {
-                warn!("USING AVX CONTEXT for Task {:?}", new_task);
+                // warn!("USING AVX CONTEXT for Task {:?}", new_task);
                 set_context!(context_switch::ContextAVX);
             }
             SimdExt::SSE => {
-                warn!("USING SSE CONTEXT for Task {:?}", new_task);
+                // warn!("USING SSE CONTEXT for Task {:?}", new_task);
                 set_context!(context_switch::ContextSSE);
             }
             SimdExt::None => {
