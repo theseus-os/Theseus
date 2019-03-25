@@ -38,6 +38,9 @@ start:
 	call check_long_mode
 
 	call set_up_SSE
+%ifdef ENABLE_AVX
+	call set_up_AVX
+%endif
 
 	call set_up_page_tables
 	call enable_paging
@@ -190,7 +193,7 @@ check_long_mode:
 	jmp _error
 
 
-; Check for SSE and enable it. Throw error 'a' if unsupported
+; Check for SSE and enable it. Prints error 'a' if unsupported
 global set_up_SSE
 set_up_SSE:
 	mov eax, 0x1
@@ -212,6 +215,37 @@ set_up_SSE:
 .no_SSE:
 	mov al, "a"
 	jmp _error
+
+
+; Check for AVX and enable it. Prints error 'b' if unsupported
+%ifdef ENABLE_AVX
+global set_up_AVX
+set_up_AVX:
+	; check architectural support
+	mov eax, 0x1
+	cpuid
+	test ecx, 1 << 26	; is XSAVE supported?
+	jz .no_AVX
+	test ecx, 1 << 28	; is AVX supported?
+	jz .no_AVX
+
+	; enable OSXSAVE
+	mov eax, cr4
+	or eax, 1 << 18		; enable OSXSAVE
+	mov cr4, eax
+
+	; enable AVX
+	mov ecx, 0
+	xgetbv
+	or eax, 110b		; enable SSE and AVX
+	mov ecx, 0
+	xsetbv
+
+	ret
+.no_AVX:
+	mov al, "b"
+	jmp _error
+%endif
 
 ; Prints `ERR: ` and the given error code to screen and hangs.
 ; parameter: error code (in ascii) in al

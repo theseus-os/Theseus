@@ -215,11 +215,13 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     // create a SIMD personality
     #[cfg(simd_personality)]
     {
-        warn!("SIMD_PERSONALTIY FEATURE ENABLED!");
-        spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, None)
+        let simd_ext = task::SimdExt::SSE;
+        warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
+        spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
             .name(String::from("setup_simd_personality"))
             .spawn()?;
     }
+
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
