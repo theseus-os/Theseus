@@ -1,5 +1,5 @@
 //! This crate contains structures and routines for context switching 
-//! when SSE/SIMD extensions are enabled. 
+//! when SSE extensions are enabled. 
 
 #![no_std]
 #![feature(asm, naked_functions)]
@@ -9,7 +9,8 @@
 use context_switch_regular::ContextRegular;
 
 
-/// The registers saved before a context switch and restored after a context switch.
+/// The registers saved before a context switch and restored after a context switch
+/// for SSE-enabled Tasks.
 #[repr(C, packed)]
 pub struct ContextSSE {
     // The order of the registers here MUST MATCH the order of 
@@ -35,7 +36,7 @@ pub struct ContextSSE {
 
 impl ContextSSE {
     /// Creates a new ContextSSE struct that will cause the
-    /// SIMD-enabled Task containing it to begin its execution at the given `rip`.
+    /// SSE-enabled Task containing it to begin its execution at the given `rip`.
     pub fn new(rip: usize) -> ContextSSE {
         ContextSSE {
             xmm15: 0,
@@ -67,7 +68,7 @@ macro_rules! save_registers_sse {
     () => (
         asm!("
             # save all of the xmm registers (for SSE)
-            # each register is 16 bytes, and there are 16 of them
+            # each register is 16 bytes (128 bits), and there are 16 of them
             lea rsp, [rsp - 16*16]
             movdqu [rsp + 16*0],  xmm0   # push xmm0
             movdqu [rsp + 16*1],  xmm1   # push xmm1

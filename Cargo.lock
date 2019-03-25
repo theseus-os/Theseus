@@ -205,8 +205,16 @@ name = "context_switch"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "context_switch_avx 0.1.0",
  "context_switch_regular 0.1.0",
  "context_switch_sse 0.1.0",
+]
+
+[[package]]
+name = "context_switch_avx"
+version = "0.1.0"
+dependencies = [
+ "context_switch_regular 0.1.0",
 ]
 
 [[package]]
@@ -1347,6 +1355,7 @@ dependencies = [
  "path 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]

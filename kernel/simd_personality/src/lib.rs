@@ -52,21 +52,31 @@
 #![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
-#[macro_use] pub extern crate alloc;
+#[cfg(simd_personality)]
+#[macro_use] extern crate alloc;
+#[cfg(not(simd_personality))] 
+extern crate alloc;
+
 
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(simd_personality)] {
 
 
-// // This crate is required for the SIMD environment,
-// // so we can resolve symbols that the core lib requires. 
-// #[cfg(target_feature = "sse2")]
-// extern crate compiler_builtins as _compiler_builtins; 
+/* 
+ * NOTE: now, we're using the compiler_builtins crate that is built by xargo by default, but we can switch back
+ * to this one if needed since it does export different symbols based on Cargo.toml feature choices.
+// This crate is required for the SIMD environment,
+// so we can resolve symbols that the core lib requires. 
+#[cfg(target_feature = "sse2")]
+extern crate compiler_builtins as _compiler_builtins; 
+*/
 
-#[macro_use] pub extern crate log;
+
+#[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate task;
 extern crate spawn;
 extern crate apic;
 extern crate fs_node;
@@ -79,25 +89,47 @@ use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, 
 use spawn::KernelTaskBuilder;
 use fs_node::FileOrDir; 
 use path::Path;
-
-/// By default, the simd namespace base directory will be in ".../namespaces/simd/"
-const DEFAULT_SIMD_NAMESPACE_BASE_DIR: &str = "simd";
+use task::SimdExt;
 
 
-/// Initializes the simd personality, with an optional `Path` argument that can be used 
-/// to point the new SIMD `CrateNamespace` to the directory containing the crate object files it should use.
-pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'static str> {
+/// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.
+pub fn setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
+	match internal_setup_simd_personality(simd_ext) {
+		Ok(o) => {
+			debug!("SIMD personality setup completed successfully.");
+			Ok(o)
+		}
+		Err(e) => {
+			error!("Error setting up SIMD personality: {}", e); 
+			Err(e)
+		}
+	}
+}
+
+
+fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
+	let namespace_name = match simd_ext {
+		SimdExt::AVX => "avx",
+		SimdExt::SSE => "sse",
+		SimdExt::None => return Err("Cannot create a new SIMD personality with SimdExt::None!"),
+	};
+
 	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
 	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
-	// assuming 'simd' was the prefix used to build the SIMD versions of each crate:
-	//     .../namespaces/simd/
-	//     .../namespaces/simd/kernel
-	//     .../namespaces/simd/application
-	//     .../namespaces/simd/userspace
-	let path = namespace_path.unwrap_or_else(|| Path::new(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR)));
-	let mut simd_namespace = CrateNamespace::with_base_dir_path(String::from(DEFAULT_SIMD_NAMESPACE_BASE_DIR), path)?;
+	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:
+	//     .../namespaces/sse/
+	//     .../namespaces/sse/kernel
+	//     .../namespaces/sse/application
+	//     .../namespaces/sse/userspace
+	let mut simd_namespace = CrateNamespace::with_base_dir_path(
+		String::from(namespace_name), 
+		Path::new(String::from(namespace_name))
+	).map_err(|e| {
+		error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
+		e
+	})?;
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
@@ -129,9 +161,9 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
 	let task1 = KernelTaskBuilder::new(func1, ())
-		.name(String::from("simd_test_1-sse"))
+		.name(format!("simd_test_1-{}", namespace_name))
 		.pin_on_core(this_core)
-		.simd()
+		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test1 task");
 
@@ -146,9 +178,9 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
 	let task2 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_2-sse"))
+		.name(format!("simd_test_2-{}", namespace_name))
 		.pin_on_core(this_core)
-		.simd()
+		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test2 task");
 
@@ -163,9 +195,9 @@ pub fn setup_simd_personality(namespace_path: Option<Path>) -> Result<(), &'stat
 	};
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
 	let task3 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_short-sse"))
+		.name(format!("simd_test_short-{}", namespace_name))
 		.pin_on_core(this_core)
-		.simd()
+		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test_short task");
 
