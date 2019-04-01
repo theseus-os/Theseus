@@ -83,7 +83,7 @@ pub fn main(_args: Vec<String>) -> isize {
 enum ScrollError {
     /// Occurs when a index-calculation returns an index that is outside of the 
     /// bounds of the scroll buffer
-    offEndBound
+    OffEndBound
 }
 
 // Error type for errors when attempting to run an application from the terminal. 
@@ -375,7 +375,7 @@ impl Terminal {
                 if end_idx <= self.scrollback_buffer.len() -1 {
                     return Ok(end_idx); 
                 } else {
-                    return Err(ScrollError::offEndBound);
+                    return Err(ScrollError::OffEndBound);
                 }
             }
 
@@ -416,7 +416,7 @@ impl Terminal {
             if end_idx <= self.scrollback_buffer.len() -1 {
                 return Ok(end_idx); 
             } else {
-                return Err(ScrollError::offEndBound);
+                return Err(ScrollError::OffEndBound);
             }
         } else {
             return Ok(self.scrollback_buffer.len() - 1)
@@ -470,7 +470,7 @@ impl Terminal {
         let result = self.calc_end_idx(prev_start_idx, display_name);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(ScrollError::offEndBound) => self.scrollback_buffer.len() -1,
+            Err(ScrollError::OffEndBound) => self.scrollback_buffer.len() -1,
         };
 
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
@@ -522,7 +522,7 @@ impl Terminal {
         let result = self.calc_end_idx(start_idx, display_name);
         let new_start_idx = match result {
             Ok(idx) => idx+ 1, 
-            Err(ScrollError::offEndBound) => {
+            Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
@@ -533,7 +533,7 @@ impl Terminal {
         let result = self.calc_end_idx(new_start_idx, display_name);
         let new_end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(ScrollError::offEndBound) => {
+            Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
                 self.scroll_start_idx = new_start_idx;
@@ -555,7 +555,7 @@ impl Terminal {
         let result= self.calc_end_idx(start_idx, display_name); 
         let end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(ScrollError::offEndBound) => {
+            Err(ScrollError::OffEndBound) => {
                 let new_end_idx = self.scrollback_buffer.len() -1;
                 let new_start_idx = self.calc_start_idx(new_end_idx, display_name).0;
                 self.scroll_start_idx = new_start_idx;
