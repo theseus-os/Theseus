@@ -42,6 +42,7 @@ use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
 use spin::Mutex;
+use fs_node::FileOrDir;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
@@ -81,11 +82,17 @@ enum ScrollError {
     offEndBound
 }
 
+enum AppErr {
+    NotFound(String),
+    NamespaceErr,
+    SpawnErr(String)
+}
+
 struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
     /// The string that stores the users keypresses after the prompt
-    input_string: String,
+    cmdline: String,
     /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
     /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
     correct_prompt_position: bool,
@@ -163,7 +170,7 @@ impl Terminal {
         prompt_string = format!("{}: ",prompt_string);
         let mut terminal = Terminal {
             window: window_object,
-            input_string: String::new(),
+            cmdline: String::new(),
             display_name: String::from("content"),
             correct_prompt_position: true,
             command_history: Vec::new(),
@@ -622,7 +629,7 @@ impl Terminal {
                 if self.buffer_string.len() > 0 {
                     let temp = self.buffer_string.clone();
                     self.print_to_terminal(temp.clone())?;
-                    self.input_string = temp;
+                    self.cmdline = temp;
                     self.buffer_string.clear();
                 }
                 // Resets the bool to true once the print prompt has been redisplayed
@@ -670,7 +677,7 @@ impl Terminal {
             let task_ref_copy = match self.current_task_ref {
                 Some(ref task_ref) => task_ref.clone(), 
                 None => {
-                    self.input_string.clear();
+                    self.cmdline.clear();
                     self.buffer_string.clear();
                     self.print_to_terminal("^C\n".to_string())?;
                     self.redisplay_prompt();
@@ -694,15 +701,15 @@ impl Terminal {
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
             // Prevents user from moving cursor to the left of the typing bounds
-            if self.input_string.len() == 0 || self.input_string.len() - self.left_shift == 0 { 
+            if self.cmdline.len() == 0 || self.cmdline.len() - self.left_shift == 0 { 
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
                 if let Some(text_display) = self.window.get_displayable(display_name){
                     text_display.disable_cursor();
                 }
-                let remove_idx: usize =  self.input_string.len() - self.left_shift -1;
-                self.input_string.remove(remove_idx);
+                let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
+                self.cmdline.remove(remove_idx);
                 self.pop_from_stdin(true);
                 return Ok(());
             }
@@ -710,16 +717,16 @@ impl Terminal {
 
         if keyevent.keycode == Keycode::Delete {
             // if there's no characters to the right of the cursor, does nothing
-            if self.input_string.len() == 0 || self.left_shift == 0 { 
+            if self.cmdline.len() == 0 || self.left_shift == 0 { 
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
                 if let Some(text_display) = self.window.get_displayable(display_name){
                     text_display.disable_cursor();
                 }
-                let remove_idx: usize =  self.input_string.len() - self.left_shift;
+                let remove_idx: usize =  self.cmdline.len() - self.left_shift;
                 // we're moving the cursor one position to the right relative to the end of the input string
-                self.input_string.remove(remove_idx);
+                self.cmdline.remove(remove_idx);
                 self.pop_from_stdin(false);
                 self.left_shift -= 1; 
                 return Ok(());
@@ -728,7 +735,7 @@ impl Terminal {
 
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-            if self.input_string.len() == 0 {
+            if self.cmdline.len() == 0 {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.print_to_terminal("\n".to_string())?;
                 self.redisplay_prompt();
@@ -736,30 +743,25 @@ impl Terminal {
             } else if self.current_task_ref.is_some() { // prevents the user from trying to execute a new command while one is currently running
                 self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
             } else {
-                // Calls the parse_input function to see if the command exists in the command table and obtains a command struct
-                let input_string = self.input_string.clone();
-                let command_structure = self.parse_input(&input_string);
-                let prompt_string = self.prompt_string.clone();
-                let current_input = self.input_string.clone();
-                self.command_history.push(current_input);
+                self.command_history.push(self.cmdline.clone());
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
-                match self.run_command_new_thread(command_structure) {
+                match self.eval_cmdline() {
                     Ok(new_task_ref) => { 
                         let task_id = {new_task_ref.lock().id};
                         self.current_task_ref = Some(new_task_ref);
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
-                    } Err("Error: no module with this name found!") => {
-                        self.print_to_terminal(format!("\n{}: command not found\n",input_string))?;
+                    } Err(AppErr::NotFound(command)) => {
+                        self.print_to_terminal(format!("\ncommand not found: {}\n", command))?;
                         self.redisplay_prompt();
-                        self.input_string.clear();
+                        self.cmdline.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(());
-                    } Err(&_) => {
+                    } Err(_) => {
                         self.print_to_terminal("\nrunning command on new thread failed\n".to_string())?;
                         self.redisplay_prompt();
-                        self.input_string.clear();
+                        self.cmdline.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(())
@@ -767,7 +769,7 @@ impl Terminal {
                 }
             }
             // Clears the buffer for another command once current command is finished executing
-            self.input_string.clear();
+            self.cmdline.clear();
             self.left_shift = 0;
         }
 
@@ -837,18 +839,18 @@ impl Terminal {
                 self.correct_prompt_position  = true;
             }
             self.left_shift = 0;
-            let previous_input = self.input_string.clone();
+            let previous_input = self.cmdline.clone();
             for _i in 0..previous_input.len() {
                 self.pop_from_stdin(true);
             }
-            if self.history_index == 0 && self.input_string.len() != 0 {
+            if self.history_index == 0 && self.cmdline.len() != 0 {
                 self.command_history.push(previous_input);
                 self.history_index += 1;
             } 
             self.history_index += 1;
             let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
-            self.input_string = selected_command;
+            self.cmdline = selected_command;
             self.push_to_stdin(selected_command2);
             self.correct_prompt_position = true;
             return Ok(());
@@ -859,7 +861,7 @@ impl Terminal {
                 return Ok(());
             }
             self.left_shift = 0;
-            let previous_input = self.input_string.clone();
+            let previous_input = self.cmdline.clone();
             for _i in 0..previous_input.len() {
                 self.pop_from_stdin(true);
             }
@@ -867,7 +869,7 @@ impl Terminal {
             if self.history_index == 0 {return Ok(())}
             let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
             let selected_command2 = selected_command.clone();
-            self.input_string = selected_command;
+            self.cmdline = selected_command;
             self.push_to_stdin(selected_command2);
             self.correct_prompt_position = true;
             return Ok(());
@@ -875,7 +877,7 @@ impl Terminal {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.left_shift = self.input_string.len();
+            self.left_shift = self.cmdline.len();
             return Ok(());
         }
 
@@ -886,7 +888,7 @@ impl Terminal {
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            if self.left_shift < self.input_string.len() {
+            if self.left_shift < self.cmdline.len() {
                 self.left_shift += 1;
             }
                 return Ok(());
@@ -910,7 +912,7 @@ impl Terminal {
                                     self.buffer_string.push(c);
                                     return Ok(());
                                 } else {
-                                    self.input_string.push(c);
+                                    self.cmdline.push(c);
                                 }
                             },
                             None => {
@@ -923,8 +925,8 @@ impl Terminal {
                     // controls cursor movement and associated variables if the cursor is not at the end of the current line
                     match keyevent.keycode.to_ascii(keyevent.modifiers) {
                         Some(c) => {
-                            let insert_idx: usize = self.input_string.len() - self.left_shift;
-                            self.input_string.insert(insert_idx, c);
+                            let insert_idx: usize = self.cmdline.len() - self.left_shift;
+                            self.cmdline.insert(insert_idx, c);
                         },
                         None => {
                             return Err("Couldn't get key event");
@@ -934,13 +936,13 @@ impl Terminal {
 
                 // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
                 if !self.correct_prompt_position{
-                    let mut input_string = self.input_string.clone();
-                    match input_string.pop() {
+                    let mut cmdline = self.cmdline.clone();
+                    match cmdline.pop() {
                         Some(_) => { }
                         None => {return Err("couldn't pop newline from input event string")}
                     }
                     self.redisplay_prompt();
-                    self.print_to_terminal(input_string)?;
+                    self.print_to_terminal(cmdline)?;
                     self.correct_prompt_position = true;
                 }
         }
@@ -953,20 +955,31 @@ impl Terminal {
         Ok(())
     }
     
-    /// Parses the string that the user inputted when Enter is pressed into the form of command (String) + arguments (Vec<String>)
-    fn parse_input(&self, input_string: &str) -> (String, Vec<String>) {
-        let mut words: Vec<String> = input_string.split_whitespace().map(|s| s.to_string()).collect();
-        // This will never panic because pressing the enter key does not register if she has not entered anything
-        let command_string = words.remove(0);
-        return (command_string, words);
-    }
-
 
     /// Execute the command on a new thread 
-    fn run_command_new_thread(&mut self, (command_string, arguments): (String, Vec<String>)) -> Result<TaskRef, &'static str> {
-        let taskref = ApplicationTaskBuilder::new(Path::new(command_string))
-            .argument(arguments)
-            .spawn()?;
+    fn eval_cmdline(&mut self) -> Result<TaskRef, AppErr> {
+        // Parse the cmdline
+        let mut args: Vec<String> = self.cmdline.split_whitespace().map(|s| s.to_string()).collect();
+        let command = args.remove(0).to_string(); 
+
+	    // Check that the application actually exists
+        let appPath = Path::new("/namespaces/default/application".to_string());
+        let app_list = match appPath.get(root::get_root()) {
+            Ok(FileOrDir::Dir(appDir)) => {appDir.lock().list()},
+            _ => return Err(AppErr::NamespaceErr)
+        };
+        let mut executable = command.clone();
+        executable.push_str(".o");
+        if !app_list.contains(&executable) {
+            return Err(AppErr::NotFound(command));
+        }
+
+        let taskref = match ApplicationTaskBuilder::new(Path::new(command))
+            .argument(args)
+            .spawn() {
+                Ok(taskref) => taskref, 
+                Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
+            };
         
         taskref.set_env(Arc::clone(&self.env)); // Set environment variable of application to the same as terminal task
 
