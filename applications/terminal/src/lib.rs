@@ -46,7 +46,7 @@ use fs_node::FileOrDir;
 
 pub const FONT_COLOR:u32 = 0x93ee90;
 pub const BACKGROUND_COLOR:u32 = 0x000000;
-
+pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/application";
 
 
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
@@ -78,13 +78,23 @@ pub fn main(_args: Vec<String>) -> isize {
     return 0;
 }
 
+/// Error type for tracking different scroll errors that a terminal
+/// application could encounter.
 enum ScrollError {
+    /// Occurs when a index-calculation returns an index that is outside of the 
+    /// bounds of the scroll buffer
     offEndBound
 }
 
+// Error type for errors when attempting to run an application from the terminal. 
 enum AppErr {
+    /// The command does not match the name of any existing application in the 
+    /// application namespace directory. 
     NotFound(String),
+    /// The terminal could not obtain the application namespace due to a filesystem error. 
     NamespaceErr,
+    /// The terminal could not spawn/run the application due to an error originating in 
+    /// the spawn crate. 
     SpawnErr(String)
 }
 
@@ -963,7 +973,7 @@ impl Terminal {
         let command = args.remove(0).to_string(); 
 
 	    // Check that the application actually exists
-        let appPath = Path::new("/namespaces/default/application".to_string());
+        let appPath = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
         let app_list = match appPath.get(root::get_root()) {
             Ok(FileOrDir::Dir(appDir)) => {appDir.lock().list()},
             _ => return Err(AppErr::NamespaceErr)
