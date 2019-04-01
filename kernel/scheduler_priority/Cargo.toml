@@ -1,0 +1,25 @@
+[package]
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+name = "scheduler_priority"
+description = "Provides priority scheduling functionality and picks the next task"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.runqueue]
+path = "../runqueue"
+
+[dependencies.runqueue_priority]
+path = "../runqueue_priority"
+
+[lib]
+crate-type = ["rlib"]

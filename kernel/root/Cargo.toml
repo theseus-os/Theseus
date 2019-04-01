@@ -19,8 +19,6 @@ path = "../fs_node"
 default-features = false
 version = "0.3.7"
 
-[dependencies.memfs]
-path = "../memfs"
 
 [lib]
 crate-type = ["rlib"]

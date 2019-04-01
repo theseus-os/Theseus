@@ -105,6 +105,8 @@ path = "../test_ota_update"
 [dependencies.simd_personality]
 path = "../simd_personality"
 
+[dependencies.task_fs]
+path = "../task_fs"
 
 [lib]
 crate-type = ["rlib"]

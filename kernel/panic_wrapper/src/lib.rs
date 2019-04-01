@@ -13,11 +13,9 @@ extern crate apic;
 extern crate task;
 extern crate runqueue;
 
-
 use core::panic::PanicInfo;
 use alloc::string::String;
 use task::{KillReason, PanicInfoOwned};
-
 
 /// performs the standard panic handling routine, which involves the following:
 /// 
@@ -53,7 +51,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         // kill the offending task (the current task)
         error!("Killing panicked task \"{}\"", curr_task_name);
         curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
-        runqueue::RunQueue::remove_task_from_all(curr_task)?;
+        runqueue::remove_task_from_all(curr_task)?;
         Ok(())
     }
     else {

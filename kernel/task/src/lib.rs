@@ -41,12 +41,8 @@ extern crate mod_mgmt;
 extern crate context_switch;
 extern crate environment;
 extern crate root;
-extern crate vfs_node;
-extern crate fs_node;
-extern crate path;
 extern crate x86_64;
 extern crate spin;
-extern crate memfs;
 
 #[cfg(runqueue_state_spill_evaluation)]
 use spin::Once;
@@ -57,12 +53,12 @@ use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
 use core::any::Any;
 use core::panic::PanicInfo;
+use core::ops::Deref;
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
     string::String,
     sync::Arc,
-    vec::Vec,
 };
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
@@ -74,7 +70,6 @@ use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
-pub mod fs; 
 
 /// The signature of the callback function that can hook into receiving a panic. 
 pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
@@ -118,8 +113,6 @@ lazy_static! {
     pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
 
-// Variable to initialize the taskfs
-static INIT_TASKFS: spin::Once<Result<(), &'static str>> = spin::Once::new();
 
 /// returns a shared reference to the `Task` specified by the given `task_id`
 pub fn get_task(task_id: usize) -> Option<TaskRef> {
@@ -190,6 +183,18 @@ pub enum RunState {
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
 
+/// The supported levels of SIMD extensions that a `Task` can use.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SimdExt {
+    /// AVX (and below) instructions and registers will be used.
+    AVX,
+    /// SSE instructions and registers will be used.
+    SSE,
+    /// The regular case: no SIMD instructions or registers of any kind will be used.
+    None,
+}
+
+
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
     /// the unique id of this Task.
@@ -234,10 +239,10 @@ pub struct Task {
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+
     #[cfg(simd_personality)]
-    /// Whether this Task is SIMD enabled, i.e.,
-    /// whether it uses SIMD registers and instructions.
-    pub simd: bool,
+    /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
+    pub simd: SimdExt,
 }
 
 impl fmt::Debug for Task {
@@ -284,9 +289,10 @@ impl Task {
             is_an_idle_task: false,
             app_crate: None,
             panic_handler: None,
-            env: Arc::new(Mutex::new(env)), 
+            env: Arc::new(Mutex::new(env)),
+
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdExt::None,
         }
     }
 
@@ -539,32 +545,67 @@ impl Task {
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
         #[cfg(simd_personality)]
         {
-            match (self.simd, next.simd) {
-                (false, false) => {
+            match (&self.simd, &next.simd) {
+                (SimdExt::None, SimdExt::None) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular);
                     }
                 }
 
-                (false, true)  => {
+                (SimdExt::None, SimdExt::SSE)  => {
                     // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_regular_to_sse);
                     }
                 }
                 
-                (true, false)  => {
+                (SimdExt::None, SimdExt::AVX)  => {
+                    // warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_regular_to_avx);
+                    }
+                }
+
+                (SimdExt::SSE, SimdExt::None)  => {
                     // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse_to_regular);
                     }
                 }
 
-                (true, true)   => {
+                (SimdExt::SSE, SimdExt::SSE)   => {
                     // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
                     unsafe {
                         call_context_switch!(context_switch::context_switch_sse);
+                    }
+                }
+
+                (SimdExt::SSE, SimdExt::AVX) => {
+                    warn!("SWITCHING from SSE to AVX task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_sse_to_avx);
+                    }
+                }
+
+                (SimdExt::AVX, SimdExt::None) => {
+                    // warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_avx_to_regular);
+                    }
+                }
+
+                (SimdExt::AVX, SimdExt::SSE) => {
+                    warn!("SWITCHING from AVX to SSE task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_avx_to_sse);
+                    }
+                }
+
+                (SimdExt::AVX, SimdExt::AVX) => {
+                    // warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
+                    unsafe {
+                        call_context_switch!(context_switch::context_switch_avx);
                     }
                 }
             }
@@ -577,7 +618,7 @@ impl Task {
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
         let _prev_task_data_to_drop = self.drop_after_task_switch.take();
-        
+
     }
 }
 
@@ -609,7 +650,12 @@ impl fmt::Display for Task {
 /// `TaskRef` implements the `PartialEq` trait; 
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 #[derive(Debug, Clone)]
-pub struct TaskRef(Arc<MutexIrqSafe<Task>>);
+pub struct TaskRef(
+    Arc<(
+        MutexIrqSafe<Task>,  // the actual task
+        AtomicBool,          // true if it has exited, this is used for faster `join()` calls that avoid disabling interrupts
+    )>
+); 
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
@@ -618,13 +664,13 @@ impl TaskRef {
     /// to determine the current `Task` on each processor core.
     pub fn new(task: Task) -> TaskRef {
         let task_id = task.id;
-        let taskref = TaskRef(Arc::new(MutexIrqSafe::new(task)));
+        let taskref = TaskRef(Arc::new((MutexIrqSafe::new(task), AtomicBool::new(false))));
         let tld = TaskLocalData {
             current_taskref: taskref.clone(),
             current_task_id: task_id,
         };
         let tld_ptr = Box::into_raw(Box::new(tld));
-        taskref.0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
+        taskref.0.deref().0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
         taskref
     }
 
@@ -650,14 +696,15 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            if self.0.lock().has_exited() {
+            // if self.0.lock().has_exited() {
+            if self.0.deref().1.load(Ordering::SeqCst) == true {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            if !self.0.lock().is_running() {
+            if !self.0.deref().0.lock().is_running() {
                 return Ok(());
             }
         }
@@ -668,11 +715,12 @@ impl TaskRef {
     /// It also performs select cleanup routines, e.g., removing the task from the task list.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
-            let mut task = self.0.lock();
+            let mut task = self.0.deref().0.lock();
             if let RunState::Exited(_) = task.runstate {
                 return Err("task was already exited! (did not overwrite its existing exit value)");
             }
             task.runstate = RunState::Exited(val);
+            self.0.deref().1.store(true, Ordering::SeqCst);
 
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
@@ -684,7 +732,7 @@ impl TaskRef {
 
         #[cfg(runqueue_state_spill_evaluation)] 
         {   
-            let task_on_rq = { self.0.lock().on_runqueue.clone() };
+            let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(self, rq)?;
@@ -735,14 +783,14 @@ impl TaskRef {
     /// This is okay because we want to allow any other part of the OS to read 
     /// the details of the `Task` struct.
     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-        MutexIrqSafeGuardRef::new(self.0.lock())
+        MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
     }
 
     /// Registers a function or closure that will be called if this `Task` panics.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.lock().set_panic_handler(callback)
+        self.0.deref().0.lock().set_panic_handler(callback)
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
@@ -751,7 +799,7 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.lock().take_panic_handler()
+        self.0.deref().0.lock().take_panic_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -760,18 +808,18 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn take_exit_value(&self) -> Option<ExitValue> {
-        self.0.lock().take_exit_value()
+        self.0.deref().0.lock().take_exit_value()
     }
 
     /// Sets environment
     pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
-        self.0.lock().set_env(new_env);
+        self.0.deref().0.lock().set_env(new_env);
     }
     
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
     #[deprecated] // TODO FIXME since 2018-09-06
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
-        MutexIrqSafeGuardRefMut::new(self.0.lock())
+        MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
 }
 
@@ -840,7 +888,7 @@ pub fn create_idle_task(
     let task_ref = TaskRef::new(idle_task);
 
     // set this as this core's current task, since it's obviously running
-    task_ref.0.lock().set_as_current_task();
+    task_ref.0.deref().0.lock().set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: create_idle_task(): failed to properly set the new idle task as the current task on AP {}", 
             apic_id);
@@ -854,12 +902,6 @@ pub fn create_idle_task(
             idle_task_id, apic_id);
         return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
     }
-
-    // one-time initialization of the taskfs
-    match INIT_TASKFS.call_once(|| fs::task_dir::init()) {
-        Ok(()) => (),
-        Err(err) => return Err(err)
-    };
     
     Ok(task_ref)
 }

@@ -7,8 +7,6 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-.PHONY: all check_rustc check_xargo check_captain clean run debug iso build userspace cargo simd_personality build_simd gdb doc docs view-doc view-docs
-
 all: iso
 
 
@@ -16,8 +14,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.32.0-nightly (f1e2fa8f0 2018-11-20)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2018-11-21
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.34.0-nightly (633d75ac1 2019-02-21)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-02-22
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -42,7 +40,7 @@ endif ## BYPASS_RUSTC_CHECK
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.12
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.13
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -66,7 +64,7 @@ endif ## BYPASS_XARGO_CHECK
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
-BUILD_DIR := build
+BUILD_DIR := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
 iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
@@ -74,9 +72,9 @@ OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
-nano_core_static_lib := target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
+nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := kernel/nano_core/src
+NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the nano_core_binary to the assembly files
@@ -105,6 +103,23 @@ APP_CRATES := $(filter-out .*/, $(APP_CRATES))
 APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
 
 
+### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
+### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
+.PHONY: all \
+		check_rustc check_xargo check_captain \
+		clean run debug iso build userspace cargo \
+		simd_personality_sse build_sse simd_personality_avx build_avx \
+		$(assembly_source_files) \
+		gdb doc docs view-doc view-docs
+
+
+### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
+### then we need to define a preprocessor variable 
+### that will cause the AVX flag to be enabled in the boot-up assembly code. 
+ifneq (,$(findstring avx, $(TARGET)))
+$(eval CFLAGS += -DENABLE_AVX)
+endif
+
 
 ### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
 NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
@@ -123,7 +138,7 @@ $(iso): build check_captain
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
@@ -134,15 +149,14 @@ iso: $(iso)
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
 ## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy all object files into the main build directory and prepend the kernel prefix
-## Al object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
+## Copy all object files into the main build directory and prepend the kernel prefix.
+## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
-
-## Above, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix
+## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
-##            if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
+## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
@@ -190,18 +204,19 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	@ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
-	cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
-	echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
-## This compiles the assembly files in the nano_core
+### This compiles the assembly files in the nano_core. 
+### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@
+	@nasm -felf64 $< -o $@ $(CFLAGS)
 
 
 
@@ -212,7 +227,7 @@ userspace:
 	@$(MAKE) -C userspace all
 ## copy userspace binary files and add the __u_ prefix
 	@mkdir -p $(GRUB_ISOFILES)/modules
-	@for f in `find ./userspace/build -type f` ; do \
+	@for f in `find $(ROOT_DIR)/userspace/build -type f` ; do \
 		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
 	done
 
@@ -235,50 +250,86 @@ userspace:
 
 
 
-## "simd_personality" is a special target that enables SIMD personalities.
-## This builds everything with the SIMD-enabled x86_64-theseus-sse target,
+## This is a special target that enables SIMD personalities.
+## It builds everything with the SIMD-enabled x86_64-theseus-sse target,
 ## and then builds everything again with the regular x86_64-theseus target. 
-## The "normal" target must come last ('build_simd', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
-simd_personality : export TARGET := x86_64-theseus
-simd_personality : export BUILD_MODE = release
-simd_personality : export override THESEUS_CONFIG += simd_personality
-simd_personality: build_simd build
+## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
+simd_personality_sse : export TARGET := x86_64-theseus
+simd_personality_sse : export BUILD_MODE = release
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality
+simd_personality_sse: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### build_simd is an internal target that builds the kernel and applications with the x86_64-theseus-sse target.
-### It is the latter half of the simd_personality target.
-build_simd : export TARGET := x86_64-theseus-sse
-build_simd : export override RUSTFLAGS += -C no-vectorize-loops
-build_simd : export override RUSTFLAGS += -C no-vectorize-slp
-build_simd : export KERNEL_PREFIX := ksimd\#
-build_simd : export APP_PREFIX := asimd\#
-build_simd:
-## now we build the full OS again with SIMD support enabled (it has already been built normally in the "build" target)
-	@echo -e "\n======== BUILDING SIMD KERNEL, TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX) ========"
+
+## This target is like "simd_personality_sse", but uses AVX instead of SSE.
+## It builds everything with the SIMD-enabled x86_64-theseus-avx target,
+## and then builds everything again with the regular x86_64-theseus target. 
+## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
+simd_personality_avx : export TARGET := x86_64-theseus
+simd_personality_avx : export BUILD_MODE = release
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override CFLAGS += -DENABLE_AVX
+simd_personality_avx: build_avx build
+## after building all the modules, copy the kernel boot image files
+	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
+## autogenerate the grub.cfg file
+	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+## run it in QEMU
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
+
+
+### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
+### It can serve as part of the simd_personality_sse target.
+build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override RUSTFLAGS += -C no-vectorize-loops
+build_sse : export override RUSTFLAGS += -C no-vectorize-slp
+build_sse : export KERNEL_PREFIX := ksse\#
+build_sse : export APP_PREFIX := asse\#
+build_sse:
 	@$(MAKE) build
 
+
+### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
+### It can serve as part of the simd_personality_avx target.
+build_avx : export TARGET := x86_64-theseus-avx
+build_avx : export override RUSTFLAGS += -C no-vectorize-loops
+build_avx : export override RUSTFLAGS += -C no-vectorize-slp
+build_avx : export KERNEL_PREFIX := kavx\#
+build_avx : export APP_PREFIX := aavx\#
+build_avx:
+	@$(MAKE) build
 
 
 
 ### build_server is a target that builds Theseus into a regular ISO
 ### and then sets up an HTTP server that provides module object files 
 ### for a running instance of Theseus to download for OTA live updates.
-build_server: iso
-	@sh scripts/build_server.sh  /tmp/theseus_build_server  $(OBJECT_FILES_BUILD_DIR)  $(UPDATE_DIR)
+build_server: preserve_old_modules iso
+	OLD_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR)_old \
+		NEW_MODULES_DIR=$(OBJECT_FILES_BUILD_DIR) \
+		NEW_DIR_NAME=$(UPDATE_DIR) \
+		bash scripts/build_server.sh
+
+preserve_old_modules:
+	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
 
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -342,13 +393,20 @@ help:
 	@echo -e "\t You can specify a new network device with netdev=<interface-name>, e.g., 'make pxe netdev=eth0'."
 	@echo -e "\t You can also specify the IP address with 'ip=<addr>'. This target requires sudo."
 
-	@echo -e "   simd_personality:"
-	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality,"
+	@echo -e "   simd_personality_[sse|avx]:"
+	@echo -e "\t Builds Theseus with a regular personality and a SIMD-enabled personality (either SSE or AVX),"
 	@echo -e "\t then runs it just like the 'make run' target."
 
 	@echo -e "   build_server:"
 	@echo -e "\t Builds Theseus (as with the 'iso' target) and then runs a build server hosted on this machine"
-	@echo -e "\t that can be used over-the-air live evolution."
+	@echo -e "\t that can be used for over-the-air live evolution."
+	@echo -e "\t You can specify the name of the directory of newly-built modules by setting the 'UPDATE_DIR' environment variable."
+	@echo -e "\t This target should be invoked as an incremental build after a prior build has already completed."
+	@echo -e "\t For example, first checkout version 1 (e.g., a specific git commit), build it as normal,"
+	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
+	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
+	
+
 
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -363,7 +421,7 @@ help:
 	@echo -e "   kvm=yes:"
 	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
-	@echo -e "\t Use the host CPU model, which is required for using x86 PMU hardware and others. Enables KVM too."
+	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
 	@echo ""
@@ -412,14 +470,16 @@ ifeq ($(int),yes)
 endif
 
 ifeq ($(host),yes)
-	QEMU_FLAGS += -cpu host -enable-kvm
+	## KVM acceleration is required when using the host cpu model
+	QEMU_FLAGS += -cpu host -accel kvm
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
 
-ifeq ($(kvm),yes)
-	QEMU_FLAGS += -enable-kvm
-endif
+## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
+# ifeq ($(kvm),yes)
+# 	QEMU_FLAGS += -accel kvm
+# endif
 
 
 
@@ -435,7 +495,6 @@ orun:
 ### Old Debug: runs the most recent build with debugging without rebuilding
 odebug:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
-
 
 
 ### Currently, loadable module mode requires release build mode

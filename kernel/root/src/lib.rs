@@ -31,6 +31,7 @@ lazy_static! {
         };
 
         let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
+    
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 
     };
@@ -50,26 +51,37 @@ pub struct RootDirectory {
 }
 
 impl Directory for RootDirectory {
-    fn insert_child(&mut self, child: FileOrDir) -> Result<(), &'static str> {
-        // gets the name of the child node to be added
-        let name = child.get_name();
-        self.children.insert(name, child);
-        return Ok(())
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+        let name = node.get_name();
+        Ok(self.children.insert(name, node))
     }
 
-    fn get_child(&self, child_name: &str) -> Option<FileOrDir> {
-        self.children.get(child_name).cloned()
+    fn get(&self, name: &str) -> Option<FileOrDir> {
+        self.children.get(name).cloned()
     }
 
-    /// Returns a string listing all the children in the directory
-    fn list_children(&mut self) -> Vec<String> {
+    fn list(&mut self) -> Vec<String> {
         self.children.keys().cloned().collect()
+    }
+
+    fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str> {
+        // Prevents removal of root
+        match node {
+            &FileOrDir::Dir(ref dir) => {
+                if Arc::ptr_eq(dir, get_root()) {
+                    return Err("Removing the root directory is forbidden");
+                }
+            },
+            _ => {}
+        }
+        self.children.remove(&node.get_name());
+        Ok(())
     }
 }
 
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
-    fn get_path_as_string(&self) -> String {
+    fn get_absolute_path(&self) -> String {
         format!("{}/", ROOT_DIRECTORY_NAME.to_string()).to_string()
     }
 
@@ -77,8 +89,8 @@ impl FsNode for RootDirectory {
         ROOT_DIRECTORY_NAME.to_string()
     }
 
-    /// Returns a pointer to the parent if it exists
+    /// we just return the root itself because it is the top of the filesystem
     fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        return Err("root does not have a parent");
+        Ok(get_root().clone())
     }
 }

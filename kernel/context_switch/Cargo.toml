@@ -14,5 +14,8 @@ path = "../context_switch_sse"
 [dependencies.context_switch_regular]
 path = "../context_switch_regular"
 
+[dependencies.context_switch_avx]
+path = "../context_switch_avx"
+
 [lib]
 crate-type = ["rlib"]

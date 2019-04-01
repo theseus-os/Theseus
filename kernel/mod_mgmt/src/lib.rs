@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(alloc)]
 #![feature(rustc_private)]
-#![feature(transpose_result)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
@@ -90,7 +89,7 @@ pub fn get_default_namespace() -> Option<&'static CrateNamespace> {
 
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
-    match root::get_root().lock().get_child(NAMESPACES_DIRECTORY_NAME) {
+    match root::get_root().lock().get(NAMESPACES_DIRECTORY_NAME) {
         Some(FileOrDir::Dir(dir)) => Some(dir),
         _ => None,
     }
@@ -262,9 +261,12 @@ impl SwapRequest {
         old_crate_name: String, 
         new_crate_object_file_abs_path: Path, 
         reexport_new_symbols_as_old: bool,
-    ) -> SwapRequest {
-        SwapRequest {
-            old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old,
+    ) -> Result<SwapRequest, &'static str> {
+        if new_crate_object_file_abs_path.is_absolute() {
+            Ok( SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } )
+        }
+        else {
+            Err("new_crate_object_file_abs_path was not an absolute Path")
         }
     }
 }
@@ -361,6 +363,18 @@ pub struct CrateNamespace {
     /// 
     /// This is soft state that can be removed at any time with no effect on correctness.
     unloaded_crate_cache: Mutex<HashMap<SwapRequestList, CrateNamespace>>,
+
+    /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
+    /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
+    /// on any other `my_crate::foo::*` regardless of hash value. 
+    /// Fuzzy matching should only be successful if there is just a single matching symbol; 
+    /// if there are multiple matches (e.g., `my_crate::foo::h456` and `my_crate::foo::h789` both exist),
+    /// then the dependency should fail to be resolved.
+    /// 
+    /// This is a potentially dangerous setting because it overrides the compiler-chosen dependency links.
+    /// Thus, it is false by default, and should only be enabled with expert knowledge, 
+    /// ideally only temporarily in order to manually load a given crate.
+    fuzzy_symbol_matching: bool,
 }
 
 impl CrateNamespace {
@@ -375,6 +389,7 @@ impl CrateNamespace {
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
+            fuzzy_symbol_matching: false,
         }
     } 
 
@@ -383,15 +398,15 @@ impl CrateNamespace {
     /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
     /// * `base_dir`: the base directory for this namespace, which must contain crate file subdirectories. 
     pub fn with_base_dir(name: String, base_dir: DirRef) -> Result<CrateNamespace, &'static str> {
-        let kernel_dir = match base_dir.lock().get_child(KERNEL_CRATES_DIRECTORY_NAME) {
+        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace kernel directory"),
         };
-        let app_dir = match base_dir.lock().get_child(APPLICATION_CRATES_DIRECTORY_NAME) {
+        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace application directory"),
         };
-        let user_dir = match base_dir.lock().get_child(USERSPACE_FILES_DIRECTORY_NAME) {
+        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
             _ => return Err("couldn't find expected CrateNamespace userspace directory"),
         };
@@ -437,6 +452,14 @@ impl CrateNamespace {
     /// Returns this `CrateNamespace`'s directory of userspace files.
     pub fn userspace_directory(&self) -> &DirRef {
         &self.dirs.user
+    }
+
+    pub fn enable_fuzzy_symbol_matching(&mut self) {
+        self.fuzzy_symbol_matching = true;
+    }
+
+    pub fn disable_fuzzy_symbol_matching(&mut self) {
+        self.fuzzy_symbol_matching = false;
     }
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
@@ -668,6 +691,7 @@ impl CrateNamespace {
             crate_tree: Mutex::new(new_crate_tree),
             symbol_map: Mutex::new(new_symbol_map),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
+            fuzzy_symbol_matching: self.fuzzy_symbol_matching,
         }
     }
 
@@ -697,10 +721,20 @@ impl CrateNamespace {
     /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
-    /// # Note
+    /// # Warning: Correctness not guaranteed
     /// This function currently makes no attempt to guarantee correct operation after a crate is swapped. 
     /// For example, if the new crate changes a function or data structure, there is no guarantee that 
-    /// other crates will be swapped alongside that one -- that responsibility is currently left to the caller.
+    /// other crates will be swapped alongside that one. 
+    /// It will most likely error out, but this responsibility is currently left to the caller.
+    /// 
+    /// # Enabling swapping optimizations
+    /// When one or more crates is swapped out, they are not fully unloaded, but rather saved in a cache
+    /// in order to accelerate future swapping commands. 
+    /// You must use full absolute `Path`s in the given list of `swap_requests` to ensure that the 
+    /// optimizer can find the correct previously-swapped out crate cache.
+    /// This is because in order for the cached crates to be found, 
+    /// the swap request list must be the exact inverse of a prior swap request list. 
+    /// 
     pub fn swap_crates(
         &self,
         swap_requests: SwapRequestList,
@@ -709,10 +743,12 @@ impl CrateNamespace {
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
+        debug!("SWAP REQUESTS: {:?}", swap_requests);
+
         // First, before we perform any expensive crate loading, let's try an optimization
         // based on cached crates that were unloaded during a previous swap operation. 
         let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-            info!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+            warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
             (cached_crates, true)
         } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
@@ -971,7 +1007,7 @@ impl CrateNamespace {
                         String::from(new_crate_name), 
                         old_crate.object_file_abs_path.clone(), 
                         !old_crate.reexported_symbols.is_empty()
-                    );
+                    )?;
                     future_swap_requests.push(future_swap_req);
                     
                     // Remove all of the symbols belonging to the old crate from this namespace.
@@ -1026,8 +1062,8 @@ impl CrateNamespace {
         });
 
 
-        // debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-        //     future_swap_requests, cached_crates.crate_names());
+        debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+            future_swap_requests, cached_crates.crate_names());
         self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
@@ -1057,7 +1093,7 @@ impl CrateNamespace {
         
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.size();
-        let abs_path      = Path::new(crate_file.get_path_as_string());
+        let abs_path      = Path::new(crate_file.get_absolute_path());
         let crate_name    = abs_path.file_stem().to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 
@@ -1749,18 +1785,23 @@ impl CrateNamespace {
 
 
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string,
-    /// similar to the simpler function `get_symbol()`.
+    /// similar to the simpler function `get_symbol()`, but takes the additional step of trying to 
+    /// automatically find and/or load the crate containing that symbol 
+    /// (and does so recursively for any of its crate dependencies).
     /// 
-    /// If the symbol cannot be found in this namespace, it does the following:    
-    /// (1) First, try to find the missing symbol in the `backup_namespace`. 
-    ///     If we find it there, then add that shared crate into this namespace,
-    ///     and add all of that shared crate's symbols into this crate as well. 
+    /// (1) First, it looks up the symbol in this namespace's symbol map, and returns it if present. 
     /// 
-    /// (2) Second, if the missing symbol isn't in the backup namespace either, 
+    /// (2) Second, if the symbol is missing from this namespace, it looks in the `backup_namespace`. 
+    ///     If we find it there, then add that shared crate into this namespace.
+    /// 
+    /// (3) Third, if the missing symbol isn't in the backup namespace either, 
     ///     try to load its containing crate from the module file. 
     ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
-    ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it
+    ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
+    /// 
+    /// (4) Fourth, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
+    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
     /// 
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
@@ -1781,10 +1822,10 @@ impl CrateNamespace {
             return sec;
         }
 
-        // If not, our second try is to check the backup_namespace
+        // If not, our second option is to check the backup_namespace
         // to see if that namespace already has the section we want
         if let Some(backup) = backup_namespace {
-            // info!("Symbol \"{}\" not initially found, attemping to load it from backup namespace {:?}", 
+            // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
@@ -1796,7 +1837,7 @@ impl CrateNamespace {
                         let parent_crate_name = {
                             let parent_crate = parent_crate_ref.lock_as_ref();
                             // Here, there is a potential for optimization: add all symbols from the parent_crate into the current namespace.
-                            // While this would save time if future symbols were needed from this crate,
+                            // While this would save lookup/loading time if future symbols were needed from this crate,
                             // we *cannot* do this because it violates the expectations of certain namespaces. 
                             // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
                             self.add_symbols(Some(sec.clone()).iter(), true);
@@ -1816,12 +1857,49 @@ impl CrateNamespace {
             }
         }
 
+        // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
+        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
+        if self.fuzzy_symbol_matching {
+            if let Some(backup) = backup_namespace {
+                let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
+                
+                if fuzzy_matches.len() == 1 {
+                    let (_sec_name, weak_sec) = &fuzzy_matches[0];
+                    if let Some(sec) = weak_sec.upgrade() {
+                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
+                        // to this namespace so it can't be dropped while this namespace is still relying on it.  
+                        let pcref_opt = { sec.lock().parent_crate.upgrade() };
+                        if let Some(parent_crate_ref) = pcref_opt {
+                            let parent_crate_name = {
+                                let parent_crate = parent_crate_ref.lock_as_ref();
+                                self.add_symbols(Some(sec.clone()).iter(), true);
+                                parent_crate.crate_name.clone()
+                            };
+                            warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
+                                demangled_full_symbol, _sec_name, parent_crate_name, backup.name, self.name);
+                            self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+                            return weak_sec.clone();
+                        }
+                        else {
+                            error!("BUG: get_symbol_or_load(): found fuzzy-matched symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
+                                demangled_full_symbol);
+                            return Weak::default();
+                        }
+                    }
+                }
+                else {
+                    warn!("Cannot resolve dependency because there are {} fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
+                        fuzzy_matches.len(), demangled_full_symbol, backup.name, fuzzy_matches.into_iter().map(|tup| tup.0).collect::<String>());
+                }
+            }
+        }
+
         // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
         // We are only able to do this for mangled symbols, those that have a leading crate name,
         // such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
-            info!("Symbol \"{}\" not initially found, attemping to load its containing crate {:?}", 
+            info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             
             let crate_dependency_name = format!("{}-", crate_dependency_name);
@@ -1844,13 +1922,12 @@ impl CrateNamespace {
                 }
             }
             else {
-                error!("Symbol \"{}\" not found, and couldn't find its containing crate's file \"{}\".", 
+                error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
                     demangled_full_symbol, crate_dependency_name);
             }
         }
 
-        error!("Symbol \"{}\" not found. Try loading the crate manually first.", demangled_full_symbol);    
-    
+        error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
         Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
     }
 
@@ -1920,19 +1997,32 @@ impl CrateNamespace {
     }
 
 
-    /// Finds the kernel crate object file in this `CrateNamespace`'s directory of kernel crates
-    /// that starts with the given `prefix`, if and only if there is a single match. 
-    /// If multiple crates match the prefix, `None` is returned. 
+    /// Same as `get_kernel_files_starting_with()`, 
+    /// but returns `Some(Path)` only if there is a single match.
+    /// If there are multiple matches, `None` is returned.
     /// 
     /// Returns the relative `Path` of the matching kernel crate file, 
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full name of the crate file. 
     pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = self.kernel_directory().lock().list_children();
+        let children = self.kernel_directory().lock().list();
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
             .map(|name| Path::new(name))
+    }
+
+
+    /// Finds the kernel crate object files in this `CrateNamespace`'s directory of kernel crates
+    /// that start with the given `prefix`.
+    /// 
+    /// Returns the relative `Path`s of the matching kernel crate files, 
+    /// relative to this `CrateNamespace`'s kernel crate directory,
+    /// effectively just the full names of the crate files. 
+    pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
+        let mut children = self.kernel_directory().lock().list();
+        children.retain(|child_name| child_name.starts_with(prefix)); // remove non-matches
+        children.into_iter().map(|name| Path::new(name)).collect()
     }
 
 }

@@ -7,21 +7,23 @@ extern crate irq_safety;
 extern crate apic;
 extern crate task;
 extern crate runqueue;
+#[cfg(priority_scheduler)] extern crate scheduler_priority;
+#[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
 
 
 use core::ops::DerefMut;
-use irq_safety::{disable_interrupts};
+use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
-use task::{Task, TaskRef, get_my_current_task};
-use runqueue::RunQueue;
-
+use task::{Task, get_my_current_task, TaskRef};
+#[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
+#[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
-    disable_interrupts();
+    let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
 
     let current_task: *mut Task;
     let next_task: *mut Task; 
@@ -34,12 +36,14 @@ pub fn schedule() -> bool {
         }
     };
 
-    if let Some(selected_next_task) = select_next_task(apic_id) {
-        next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
-    }
-    else {
-        // keep running the same current task
-        return false;
+    {
+        if let Some(selected_next_task) = select_next_task(apic_id) {
+            next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
+        }
+        else {
+            // keep running the same current task
+            return false;
+        }
     }
 
     if next_task as usize == 0 {
@@ -72,54 +76,28 @@ pub fn schedule() -> bool {
     true
 }
 
-
-
-/// this defines the scheduler policy.
-/// returns None if there is no schedule-able task
-fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
-
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            error!("BUG: select_next_task(): couldn't get runqueue for core {}", apic_id); 
-            return None;
-        }
-    };
-    
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
-
-    for (i, taskref) in runqueue_locked.iter().enumerate() {
-        let t = taskref.lock();
-
-        // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.is_an_idle_task {
-            idle_task_index = Some(i);
-            continue;
-        }
-
-        // must be runnable
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return None;
-            }
-        }
-            
-        // found a runnable task!
-        chosen_task_index = Some(i);
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
-        break; 
+/// Changes the priority of the given task with the given priority level.
+/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
+/// This function returns an error when a scheduler without priority is loaded. 
+pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    #[cfg(priority_scheduler)] {
+        scheduler_priority::set_priority(task, priority)
     }
-
-    // idle task is a backup iff no other task has been chosen
-    chosen_task_index
-        .or(idle_task_index)
-        .and_then(|index| runqueue_locked.move_to_end(index))
+    #[cfg(not(priority_scheduler))] {
+        Err("no scheduler that uses task priority is currently loaded")
+    }
 }
+
+/// Returns the priority of a given task.
+/// This function returns None when a scheduler without priority is loaded.
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    #[cfg(priority_scheduler)] {
+        scheduler_priority::get_priority(task)
+    }
+    #[cfg(not(priority_scheduler))] {
+        //Err("no scheduler that uses task priority is currently loaded")
+        None
+    }
+}
+
+

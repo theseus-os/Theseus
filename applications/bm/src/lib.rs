@@ -25,8 +25,13 @@ use fs_node::{DirRef, FileOrDir, FileRef};
 // const ITERATIONS: usize = 1_000_000;
 // const TRIES: usize = 10;
 const THRESHOLD_ERROR_RATIO: u64 = 1;
-const DIVISOR_FEMTO_TO_MICRO: u64 = 1_000_000_000;
-const DIVISOR_FEMTO_TO_NANO: u64 = 1_000_000;
+const MICRO_TO_FEMTO: u64 = 1_000_000_000;
+const NANO_TO_FEMTO: u64 = 1_000_000;
+const SEC_TO_NANO: u64 = 1_000_000_000;
+const SEC_TO_MICRO: u64 = 1_000_000;
+// const MB_IN_KB: usize = 1024;
+const MB: u64 = 1024 * 1024;
+const KB: u64 = 1024;
 
 // for testing..
 const ITERATIONS: usize = 1_000;
@@ -34,6 +39,8 @@ const TRIES: usize = 10;
 
 // don't change it. 
 const READ_BUF_SIZE: usize = 64*1024;
+const WRITE_BUF_SIZE: usize = 1024*1024;
+const WRITE_BUF: [u8; WRITE_BUF_SIZE] = [65; WRITE_BUF_SIZE];
 
 #[cfg(bm_in_us)]
 const T_UNIT: &str = "micro sec";
@@ -42,23 +49,23 @@ const T_UNIT: &str = "micro sec";
 const T_UNIT: &str = "nano sec";
 
 /*macro_rules! printlninfo {
-    ($fmt:expr) => (warn!(concat!("BM-INFO: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-INFO: ", $fmt), $($arg)*));
+	($fmt:expr) => (warn!(concat!("BM-INFO: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-INFO: ", $fmt), $($arg)*));
 }
 
 macro_rules! printlnwarn {
-    ($fmt:expr) => (warn!(concat!("BM-WARN: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-WARN: ", $fmt), $($arg)*));
+	($fmt:expr) => (warn!(concat!("BM-WARN: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }*/
 
 macro_rules! printlninfo {
-    ($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
+	($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
 }
 
 macro_rules! printlnwarn {
-    ($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
-    ($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
+	($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }
 
 macro_rules! CPU_ID {
@@ -67,7 +74,7 @@ macro_rules! CPU_ID {
 
 fn get_prog_name() -> String {
 	let taskref = match task::get_my_current_task() {
-        Some(t) => t,
+	   Some(t) => t,
         None => {
             printlninfo!("failed to get current task");
             return "Unknown".to_string();
@@ -93,13 +100,12 @@ fn getpid() -> usize {
 
 fn hpet_2_us(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	hpet * hpet_period as u64 / DIVISOR_FEMTO_TO_MICRO
+	hpet * hpet_period as u64 / MICRO_TO_FEMTO
 }
 
 fn hpet_2_ns(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	let rtn = hpet * hpet_period as u64 / DIVISOR_FEMTO_TO_NANO;
-	rtn
+	hpet * hpet_period as u64 / NANO_TO_FEMTO
 }
 
 fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
@@ -182,7 +188,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
 
-	printlninfo!("null_test_inner ({}/{}): {} total_time -> {} {} (ignore: {})", 
+	printlninfo!("null_test_inner ({}/{}): {} total_time -> {} {} (ignore: {})",
 		th, nr, delta_time, delta_time_avg, T_UNIT, mypid);
 
 	delta_time_avg
@@ -210,6 +216,7 @@ fn do_null() {
 	}
 
 	printlninfo!("NULL result: {} {}", lat, T_UNIT);
+	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
 }
 
 fn pick_child_core() -> Result<u8, &'static str> {
@@ -245,7 +252,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
     let delta_hpet = end_hpet - start_hpet - overhead_ct;
     let delta_time = hpet_2_time("", delta_hpet);
     let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("spawn_test_inner ({}/{}): : {} total_time -> {} {}", 
+	printlninfo!("spawn_test_inner ({}/{}): {} total_time -> {} {}",
 		th, nr, delta_time, delta_time_avg, T_UNIT);
 
 	Ok(delta_time_avg)
@@ -284,6 +291,7 @@ fn do_spawn() {
 	}
 
 	printlninfo!("SPAWN result: {} {}", lat, T_UNIT);
+	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
 }
 
 fn get_cwd() -> Option<DirRef> {
@@ -296,32 +304,101 @@ fn get_cwd() -> Option<DirRef> {
     None
 }
 
+// Don't call this function inside of a measuring loop.
 fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
+	if sz > WRITE_BUF_SIZE {
+		return Err("Cannot test because the file size is too big");
+	}
+
 	if let Some(fileref) = get_file(filename) {
 		if fileref.lock().size() == sz {
-			printlninfo!("{} exits", filename);
 			return Ok(());
 		}
 	}
 
-	let mut output = String::new();
-	for i in 0..sz-1 {
-		output.push((i as u8 % 10 + 48) as char);
+	let file = MemFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
+	file.lock().write(&WRITE_BUF[0..sz], 0)?;
+
+	Ok(())
+}
+
+fn del_or_err(filename: &str) -> Result<(), &'static str> {
+	if let Some(_fileref) = get_file(filename) {
+		return Err("Need to delete a file, but delete() is not implemented yet :(");
 	}
-	output.push('!'); // my magic char for the last byte
 
-    MemFile::new(filename.to_string(), output.as_bytes(), &get_cwd().unwrap()).expect("File cannot be created.");
+	Ok(())
+}
 
-	printlninfo!("{} is created.", filename);
+fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static str> {
+	let mut filenames = vec!["".to_string(); ITERATIONS];
+	let pid = getpid();
+	let start_hpet_create: u64;
+	let end_hpet_create: u64;
+	// let start_hpet_del: u64;
+	// let end_hpet_del: u64;
+
+	// don't put these (populating files, checks, etc) into the loop to be timed
+	// The loop must be doing minimal operations to exclude unnecessary overhead
+	// populate filenames
+	for i in 0..ITERATIONS {
+		filenames[i] = format!("tmp_{}_{}_{}.txt", pid, fsize_b, i);
+	}
+
+	// check if we have enough data to write. We use just const data to avoid unnecessary overhead
+	if fsize_b > WRITE_BUF_SIZE {
+		return Err("Cannot test because the file size is too big");
+	}
+
+	// delete existing files. To make sure that the file creation below succeeds.
+	for filename in &filenames {
+		del_or_err(filename).expect("Cannot continue the test. We need 'delete()'.");
+	}
+
+	let cwd = match get_cwd() {
+		Some(dirref) => {dirref}
+		_ => {return Err("Cannot get CWD");}
+	};
+
+	let wbuf = &WRITE_BUF[0..fsize_b];
+
+	// Measuring loop - create
+	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	for filename in &filenames {
+		// checking if filename exists is done above
+		// here, we only create files
+
+		// We can create a file from mapped pages using 'from_mapped_pages(),'
+		// but we first create a file and then write to resemble LMBench.
+		let file = MemFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		file.lock().write(wbuf, 0)?;
+	}
+	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+
+	// delete --- complete this once delete() is implemented
+	/*start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+	for filename in filenames {
+		if let Some(fileref) = get_file_in(filename, &cwd) {
+			// fileref.lock().delete();
+		}
+	}
+	end_hpet_del = get_hpet().as_ref().unwrap().get_counter();*/
+
+	let delta_hpet_create = end_hpet_create - start_hpet_create - overhead_ct;
+	let delta_time_create = hpet_2_time("", delta_hpet_create);
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let files_per_time = (ITERATIONS * ITERATIONS) as u64 * to_sec / delta_time_create;
+
+	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
 	Ok(())
 }
 
 fn cat(fileref: &FileRef, sz: usize, msg: &str) {
 	printlninfo!("{}", msg);
-	let mut file = fileref.lock();
+	let file = fileref.lock();
 	let mut buf = vec![0 as u8; sz];
 
-	match file.read(&mut buf) {
+	match file.read(&mut buf,0) {
 		Ok(nr_read) => {
 			printlninfo!("tries to read {} bytes, and {} bytes are read", sz, nr_read);
 			printlninfo!("read: '{}'", str::from_utf8(&buf).unwrap());
@@ -339,7 +416,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 	}
 
 	let mut file = fileref.lock();
-	match file.write(&buf) {
+	match file.write(&buf,0) {
 		Ok(nr_write) => {
 			printlninfo!("tries to write {} bytes, and {} bytes are written", sz, nr_write);
 			printlninfo!("written: '{}'", str::from_utf8(&buf).unwrap());
@@ -350,6 +427,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 
 fn test_file_inner(fileref: FileRef) {
 	let sz = {fileref.lock().size()};
+	printlninfo!("File size: {}", sz);
 
 	cat(&fileref, sz, 	"== Do CAT-NORMAL ==");
 	cat(&fileref, sz*2,	"== Do CAT-MORE   ==");
@@ -376,13 +454,27 @@ fn get_file(filename: &str) -> Option<FileRef> {
 	}
 }
 
+// the function is not used now. but it can be used in the future, e.g., remove
+/*fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
+	let path = Path::new(filename.to_string());
+	match path.get(dirref) {
+		Ok(file_dir_enum) => {
+			match file_dir_enum {
+                FileOrDir::File(fileref) => { Some(fileref) }
+                _ => {None}
+            }
+		}
+		_ => { None }
+	}
+}*/
+
 fn test_file(filename: &str) {
 	if let Some(fileref) = get_file(filename) {
 		test_file_inner(fileref);
 	}
 }
 
-fn do_fs() {
+fn do_fs_cap_check() {
 	let filename = format!("tmp{}.txt", getpid());
 	if mk_tmp_file(&filename, 4).is_ok() {
 		printlninfo!("Testing with the file...");
@@ -391,21 +483,32 @@ fn do_fs() {
 }
 
 fn do_fs_create_del() {
-	printlninfo!("Cannot test without MemFile::Delete()...");
+	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
+	let	fsizes_b = [1024_usize, 4096, 10*1024];
+	// let	fsizes_b = [1024_usize];
+
+	let overhead_ct = timing_overhead();
+
+	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
+	printlninfo!("SIZE(KB)    Iteration    created(files/s)");
+	for fsize_b in fsizes_b.iter() {
+		do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+	}
 }
 
-fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
 	let mut dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
-	let mut unread_size = match get_file(filename) {
+	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
 		_ => {
 			return Err("Cannot get the size");
 		}
 	} as i64;
+	let mut unread_size = size;
 
 	if unread_size % READ_BUF_SIZE as i64 != 0 {
 		return Err("File size is not alligned");
@@ -418,11 +521,15 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
             FileOrDir::File(fileref) => { 
             	let mut file = fileref.lock();	// so far, open()
 
+            	unread_size = size;
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf).expect("Cannot read");
+                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
 					unread_size -= nr_read as i64;
+
+					// LMbench based on C does the magic to cast a type from char to int
+					// But, we dont' have the luxury with type-safe Rust, so we do...
 					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 
@@ -437,24 +544,30 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let delta_hpet = end_hpet - start_hpet - overhead_ct;
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("read_with_open_inner ({}/{}): : {} total_time -> {} {} (ignore: {})", 
-		th, nr, delta_time, delta_time_avg, T_UNIT, dummy_sum);
 
-	Ok(delta_time_avg)
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
+	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
+
+	printlninfo!("read_with_open_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+
+	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
 
-fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
 	let mut dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
-	let mut unread_size = match get_file(filename) {
+	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
 		_ => {
 			return Err("Cannot get the size");
 		}
 	} as i64;
+	let mut unread_size = size;
 
 	if unread_size % READ_BUF_SIZE as i64 != 0 {
 		return Err("File size is not alligned");
@@ -467,11 +580,15 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 
 			start_hpet = get_hpet().as_ref().unwrap().get_counter();
 			for _ in 0..ITERATIONS 	{
+				unread_size = size;
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf).expect("Cannot read");
+                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
 					unread_size -= nr_read as i64;
+
+					// LMbench based on C does the magic to cast a type from char to int
+					// But, we dont' have the luxury with type-safe Rust, so we do...
 					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 			}	// for
@@ -486,52 +603,75 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let delta_hpet = end_hpet - start_hpet - overhead_ct;
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("read_only_inner ({}/{}): : {} total_time -> {} {} (ignore: {})", 
-		th, nr, delta_time, delta_time_avg, T_UNIT, dummy_sum);
 
-	Ok(delta_time_avg)
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let mb_per_sec = (size as u64 * to_sec) / (MB * delta_time_avg);	// prefer this
+	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
+
+	printlninfo!("read_only_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+
+	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
 
 fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 	let mut tries: u64 = 0;
+	let mut tries_mb: u64 = 0;
+	let mut tries_kb: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
+	let fsize_b = fsize_kb * KB as usize;
 
 	let filename = format!("tmp_{}k.txt", fsize_kb);
-	mk_tmp_file(&filename, fsize_kb*1024).expect("Cannot create a file");
+
+	// we can use `mk_tmp_file()` because it is outside of the loop
+	mk_tmp_file(&filename, fsize_b).expect("Cannot create a file");
 
 	for i in 0..TRIES {
-		let lat = if with_open {
+		let (lat, tput_mb, tput_kb) = if with_open {
 			do_fs_read_with_open_inner(&filename, overhead_ct, i+1, TRIES).expect("Error in read_open inner()")
 		} else {
 			do_fs_read_only_inner(&filename, overhead_ct, i+1, TRIES).expect("Error in read_only inner()")
 		};
 
 		tries += lat;
+		tries_mb += tput_mb;
+		tries_kb += tput_kb;
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
 
 	let lat = tries / TRIES as u64;
+	let tput_mb = tries_mb / TRIES as u64;
+	let tput_kb = tries_kb / TRIES as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
 	if 	max - lat > err || lat - min > err {
 		printlnwarn!("test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
 
-	printlninfo!("{} for {} KB: {} {}", if with_open {"READ WITH OPEN"} else {"READ ONLY"}, fsize_kb, lat, T_UNIT);
+	printlninfo!("{} for {} KB: {} {} {} MB/sec {} KB/sec", 
+		if with_open {"READ WITH OPEN"} else {"READ ONLY"}, 
+		fsize_kb, lat, T_UNIT, tput_mb, tput_kb);
 }
 
 fn do_fs_read(with_open: bool) {
+	let fsize_kb = 1024;
+	printlninfo!("File size     : {} KB", fsize_kb);
+	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
+	printlninfo!("========================================");
+
 	let overhead_ct = timing_overhead();
 
-	// min: 64K
-	for i in [64, 128, 256, 512, 1024].iter() {
-        do_fs_read_with_size(overhead_ct, *i, with_open);
-    }
+	do_fs_read_with_size(overhead_ct, fsize_kb, with_open);
+	if with_open {
+		printlninfo!("This test is equivalent to `bw_file_rd open2close` in LMBench");
+	} else {
+		printlninfo!("This test is equivalent to `bw_file_rd io_only` in LMBench");
+	}
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::RunQueue::get_runqueue(core).map(|rq| rq.read()) {
+	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.iter().count()) }
 		_ => { None }
 	}
@@ -567,43 +707,43 @@ fn print_header() {
 pub fn main(args: Vec<String>) -> isize {
 	let prog = get_prog_name();
 
-    if args.len() != 1 {
-    	print_usage(&prog);
-    	return 0;
-    }
+	if args.len() != 1 {
+		print_usage(&prog);
+		return 0;
+	}
 
-    if !check_myrq() {
-    	printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
-    	return 0;
-    }
+	if !check_myrq() {
+		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
+		return 0;
+	}
 
 	print_header();
-    
-    match args[0].as_str() {
-    	"null" => {
-    		do_null();
-    	}
-    	"spawn" => {
-    		do_spawn();
-    	}
-    	"fs_read_with_open" | "fs1" => {
-    		do_fs_read(true /*with_open*/);
-    	}
-    	"fs_read_only" | "fs2" => {
-    		do_fs_read(false /*with_open*/);
-    	}
-    	"fs_create" | "fs3" => {
-    		do_fs_create_del();
-    	}
-    	"fs" => {	// test code for checking FS' ability
-    		do_fs();
-    	}
-    	_arg => {
-    		printlninfo!("Unknown command: {}", args[0]);
-    		print_usage(&prog);
-    		return 0;
-    	}
-    }
-    
-    0
+
+	match args[0].as_str() {
+		"null" => {
+			do_null();
+		}
+		"spawn" => {
+			do_spawn();
+		}
+		"fs_read_with_open" | "fs1" => {
+			do_fs_read(true /*with_open*/);
+		}
+		"fs_read_only" | "fs2" => {
+			do_fs_read(false /*with_open*/);
+		}
+		"fs_create" | "fs3" => {
+			do_fs_create_del();
+		}
+		"fs" => {	// test code for checking FS' ability
+			do_fs_cap_check();
+		}
+		_arg => {
+			printlninfo!("Unknown command: {}", args[0]);
+			print_usage(&prog);
+			return 0;
+		}
+	}
+
+	0
 }
