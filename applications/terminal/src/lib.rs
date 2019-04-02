@@ -53,7 +53,7 @@ pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/appli
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-   let term_task_ref =  match Terminal::new() {
+   let _task_ref =  match Terminal::new() {
         Ok(task_ref) => {task_ref}
         Err(err) => {
             error!("{}", err);
@@ -74,8 +74,6 @@ pub fn main(_args: Vec<String>) -> isize {
     //     Ok(_) => { }
     //     Err(err) => {error!("{}", err)}
     // }
-    
-    return 0;
 }
 
 /// Error type for tracking different scroll errors that a terminal
@@ -973,9 +971,9 @@ impl Terminal {
         let command = args.remove(0).to_string(); 
 
 	    // Check that the application actually exists
-        let appPath = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
-        let app_list = match appPath.get(root::get_root()) {
-            Ok(FileOrDir::Dir(appDir)) => {appDir.lock().list()},
+        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
+        let app_list = match app_path.get(root::get_root()) {
+            Ok(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
             _ => return Err(AppErr::NamespaceErr)
         };
         let mut executable = command.clone();
@@ -995,7 +993,6 @@ impl Terminal {
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         return Ok(taskref);
-        
     }
     
     fn refresh_display(&mut self, display_name:&str) {
