@@ -53,8 +53,12 @@ use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer
 use owning_ref::BoxRefMut;
 use server_info::SOCKET_1_LAPICS;
 
+
+const DEBUG: bool = true;
+
 /// max 64
-const NUM_MSI_VEC_ENABLED:      usize = 1;
+const NUM_MSI_VEC_ENABLED:      usize = 16;
+static mut INTERRUPT_NUMS: [u8; NUM_MSI_VEC_ENABLED] = [0; NUM_MSI_VEC_ENABLED];
 
 const IXGBE_10GB_LINK:          bool = true;
 const IXGBE_1GB_LINK:           bool = !(IXGBE_10GB_LINK);
@@ -246,6 +250,10 @@ impl IxgbeNic{
         pci_enable_msix(ixgbe_pci_dev)?;
         pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
         Self::enable_msix_interrupts(&mut mapped_registers, &mut vector_table);
+
+        for i in 0..NUM_MSI_VEC_ENABLED {
+            unsafe { INTERRUPT_NUMS[i] = interrupt_num[i] };
+        }
 
         let (rx_descs, rx_buffers, rx_headers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
@@ -998,7 +1006,7 @@ impl IxgbeNic{
             let rss_type = rx_descs[rx_cur].get_rss_type();
             let rss_hash = rx_descs[rx_cur].get_rss_hash();
             let packet_type = rx_descs[rx_cur].get_packet_type();
-            debug!("ixgbe: received rx buffer [{}]: length: {}, status: {:#X}, rss type: {:#X}, rss hash: {:#X}, packet_type: {:#X}", self.rx_cur[queue_num], length, status, rss_type, rss_hash, packet_type);
+            // debug!("ixgbe: received rx buffer [{}]: length: {}, status: {:#X}, rss type: {:#X}, rss hash: {:#X}, packet_type: {:#X}", self.rx_cur[queue_num], length, status, rss_type, rss_hash, packet_type);
 
             total_packet_length += length as u16;
 
@@ -1194,7 +1202,250 @@ pub fn rx_poll_mq(_: Option<u64>) -> Result<(), &'static str> {
     
 }
 
-extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn ixgbe_handler_0(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 0;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(0) {
+            error!("ixgbe_handler_0(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[0]));
+    } else {
+        error!("BUG: ixgbe_handler_0(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_1(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 1;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(1) {
+            error!("ixgbe_handler_1(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[1]));
+    } else {
+        error!("BUG: ixgbe_handler_1(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_2(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 2;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(2) {
+            error!("ixgbe_handler_2(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[2]));
+    } else {
+        error!("BUG: ixgbe_handler_2(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_3(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 3;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(3) {
+            error!("ixgbe_handler_3(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[3]));
+    } else {
+        error!("BUG: ixgbe_handler_3(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_4(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 4;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(4) {
+            error!("ixgbe_handler_4(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[4]));
+    } else {
+        error!("BUG: ixgbe_handler_4(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_5(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 5;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(5) {
+            error!("ixgbe_handler_5(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[5]));
+    } else {
+        error!("BUG: ixgbe_handler_5(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_6(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 6;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(6) {
+            error!("ixgbe_handler_6(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[6]));
+    } else {
+        error!("BUG: ixgbe_handler_6(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_7(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 7;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(7) {
+            error!("ixgbe_handler_7(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[7]));
+    } else {
+        error!("BUG: ixgbe_handler_7(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_8(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 8;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(8) {
+            error!("ixgbe_handler_8(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[8]));
+    } else {
+        error!("BUG: ixgbe_handler_8(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_9(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 9;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(9) {
+            error!("ixgbe_handler_9(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[9]));
+    } else {
+        error!("BUG: ixgbe_handler_9(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_10(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 10;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(10) {
+            error!("ixgbe_handler_10(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[10]));
+    } else {
+        error!("BUG: ixgbe_handler_10(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_11(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 11;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(11) {
+            error!("ixgbe_handler_11(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[11]));
+    } else {
+        error!("BUG: ixgbe_handler_11(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_12(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 12;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(12) {
+            error!("ixgbe_handler_12(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[12]));
+    } else {
+        error!("BUG: ixgbe_handler_12(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_13(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 13;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(13) {
+            error!("ixgbe_handler_13(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[13]));
+    } else {
+        error!("BUG: ixgbe_handler_13(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+extern "x86-interrupt" fn ixgbe_handler_14(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 14;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
     if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
         let mut ixgbe_nic = ixgbe_nic_ref.lock();
         if let Err(e) = ixgbe_nic.handle_interrupt() {
@@ -1205,6 +1456,31 @@ extern "x86-interrupt" fn ixgbe_handler(_stack_frame: &mut ExceptionStackFrame) 
         error!("BUG: ixgbe_handler(): IXGBE NIC hasn't yet been initialized!");
     }
 }
+
+extern "x86-interrupt" fn ixgbe_handler_15(_stack_frame: &mut ExceptionStackFrame) {
+    let int_queue = 15;
+    if DEBUG {
+        let me = get_my_apic_id().unwrap();
+        unsafe {debug!("ixgbe int {} on apic :{} in queue {}", INTERRUPT_NUMS[int_queue], me, int_queue)};
+    }
+    if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        let mut ixgbe_nic = ixgbe_nic_ref.lock();
+        if let Err(e) = ixgbe_nic.handle_receive(15) {
+            error!("ixgbe_handler_15(): error handling interrupt: {:?}", e);
+        }
+        eoi(Some(ixgbe_nic.interrupt_num[15]));
+    } else {
+        error!("BUG: ixgbe_handler_15(): IXGBE NIC hasn't yet been initialized!");
+    }
+}
+
+
+
+
+
+
+
+
 
 // pub fn check_eicr(){
 //     let nic = NIC_82599.lock();
