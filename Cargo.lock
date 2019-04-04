@@ -205,8 +205,16 @@ name = "context_switch"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "context_switch_avx 0.1.0",
  "context_switch_regular 0.1.0",
  "context_switch_sse 0.1.0",
+]
+
+[[package]]
+name = "context_switch_avx"
+version = "0.1.0"
+dependencies = [
+ "context_switch_regular 0.1.0",
 ]
 
 [[package]]
@@ -1141,6 +1149,19 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rm"
+version = "0.1.0"
+dependencies = [
+ "fs_node 0.1.0",
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "path 0.1.0",
+ "root 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "root"
 version = "0.1.0"
 dependencies = [
@@ -1335,6 +1356,7 @@ dependencies = [
  "path 0.1.0",
  "pit_clock 0.1.0",
  "spawn 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]

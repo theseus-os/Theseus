@@ -33,7 +33,7 @@ use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use task::{Task, TaskRef, SimdExt, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
 
@@ -64,8 +64,6 @@ type MainFuncRet = isize;
 /// as it is the entry point into each application `Task`.
 type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
-
-
 /// A struct that uses the Builder pattern to create and customize new kernel `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct KernelTaskBuilder<F, A, R> {
@@ -76,7 +74,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     pin_on_core: Option<u8>,
 
     #[cfg(simd_personality)]
-    simd: bool,
+    simd: SimdExt,
 }
 
 impl<F, A, R> KernelTaskBuilder<F, A, R> 
@@ -95,7 +93,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             pin_on_core: None,
 
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdExt::None,
         }
     }
 
@@ -114,8 +112,8 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self) -> KernelTaskBuilder<F, A, R> {
-        self.simd = true;
+    pub fn simd(mut self, extension: SimdExt) -> KernelTaskBuilder<F, A, R> {
+        self.simd = extension;
         self
     }
 
@@ -133,8 +131,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             unsafe { ::core::intrinsics::type_name::<F>() }
         ));
     
-        #[cfg(simd_personality)]
-        {
+        #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
         }
 
@@ -185,7 +182,6 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
 }
 
-
 /// A struct that uses the Builder pattern to create and customize new application `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct ApplicationTaskBuilder {
@@ -196,7 +192,7 @@ pub struct ApplicationTaskBuilder {
     singleton: bool,
 
     #[cfg(simd_personality)]
-    simd: bool,
+    simd: SimdExt,
 }
 
 impl ApplicationTaskBuilder {
@@ -211,7 +207,7 @@ impl ApplicationTaskBuilder {
             singleton: false,
 
             #[cfg(simd_personality)]
-            simd: false,
+            simd: SimdExt::None,
         }
     }
 
@@ -230,8 +226,8 @@ impl ApplicationTaskBuilder {
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self) -> ApplicationTaskBuilder {
-        self.simd = true;
+    pub fn simd(mut self, extension: SimdExt) -> ApplicationTaskBuilder {
+        self.simd = extension;
         self
     }
 
@@ -286,8 +282,7 @@ impl ApplicationTaskBuilder {
         };
 
         #[cfg(simd_personality)]
-        let ktb = if self.simd { ktb.simd() } else { ktb };
-
+        let ktb = ktb.simd(self.simd);
 
         let app_task = ktb.spawn()?;
         app_task.lock_mut().app_crate = Some(app_crate_ref);
@@ -348,19 +343,24 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
     // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
     // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
     // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
-    #[cfg(simd_personality)]
-    {
-        if new_task.simd {
-            // warn!("USING SSE CONTEXT for Task {:?}", new_task);
-            set_context!(context_switch::ContextSSE);
-        }
-        else {
-            // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
-            set_context!(context_switch::ContextRegular);
+    #[cfg(simd_personality)] {
+        match new_task.simd {
+            SimdExt::AVX => {
+                // warn!("USING AVX CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextAVX);
+            }
+            SimdExt::SSE => {
+                // warn!("USING SSE CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextSSE);
+            }
+            SimdExt::None => {
+                // warn!("USING REGULAR CONTEXT for Task {:?}", new_task);
+                set_context!(context_switch::ContextRegular);
+            }
         }
     }
-    #[cfg(not(simd_personality))]
-    {
+
+    #[cfg(not(simd_personality))] {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
     }
@@ -573,7 +573,7 @@ fn task_wrapper<F, A, R>() -> !
     let arg: A = *arg; 
 
     
-    enable_interrupts();
+    enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
     debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
 
@@ -598,19 +598,22 @@ fn task_wrapper<F, A, R>() -> !
         }
 
         // (2) Remove it from its runqueue
-        if let Err(e) = apic::get_my_apic_id()
-            .and_then(|id| runqueue::get_runqueue(id))
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
         {
-            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            if let Err(e) = apic::get_my_apic_id()
+                .and_then(|id| runqueue::get_runqueue(id))
+                .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+                .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+            {
+                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            }
         }
-
-        // (3) Yield the CPU
-        scheduler::schedule();
 
         // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
     }
+
+    // (3) Yield the CPU
+    scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point
 

@@ -77,7 +77,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn print_children(dir: &DirRef) {
     let mut child_string = String::new();
-    let mut child_list = dir.lock().list_children(); 
+    let mut child_list = dir.lock().list(); 
     child_list.reverse();
     for child in child_list.iter() {
         child_string.push_str(&format!("{}\n", child));

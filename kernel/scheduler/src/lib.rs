@@ -12,7 +12,7 @@ extern crate runqueue;
 
 
 use core::ops::DerefMut;
-use irq_safety::{disable_interrupts};
+use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
 use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
@@ -23,7 +23,7 @@ use task::{Task, get_my_current_task, TaskRef};
 ///
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
-    disable_interrupts();
+    let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
 
     let current_task: *mut Task;
     let next_task: *mut Task; 
