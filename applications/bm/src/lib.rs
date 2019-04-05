@@ -12,6 +12,7 @@ extern crate spawn;
 extern crate path;
 extern crate runqueue;
 extern crate memfs;
+extern crate scheduler;
 
 use core::str;
 use alloc::vec::Vec;
@@ -294,6 +295,97 @@ fn do_spawn() {
 	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
 }
 
+fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
+	use spawn::KernelTaskBuilder;
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let overhead_end_hpet: u64;
+
+	// we first span two tasks to get the overhead
+
+	start_hpet = get_hpet().as_ref().unwrap().get_counter();
+
+		let taskref3 = KernelTaskBuilder::new(overhead_task ,1)
+        .name(String::from("overhead_task"))
+        .pin_on_core(child_core)
+        .spawn().expect("failed to initiate task");
+
+		let taskref4 = KernelTaskBuilder::new(overhead_task ,2)
+			.name(String::from("overhead_task"))
+			.pin_on_core(child_core)
+			.spawn().expect("failed to initiate task");
+
+		taskref3.join().expect("Task 1 join failed");
+		taskref4.join().expect("Task 2 join failed");
+
+	overhead_end_hpet = get_hpet().as_ref().unwrap().get_counter();
+
+	// we then span them with yielding enabled
+
+		let taskref1 = KernelTaskBuilder::new(yield_task ,1)
+        .name(String::from("yield_task"))
+        .pin_on_core(child_core)
+        .spawn().expect("failed to initiate task");
+
+		let taskref2 = KernelTaskBuilder::new(yield_task ,2)
+			.name(String::from("yield_task"))
+			.pin_on_core(child_core)
+			.spawn().expect("failed to initiate task");
+
+		taskref1.join().expect("Task 1 join failed");
+		taskref2.join().expect("Task 2 join failed");
+
+    end_hpet = get_hpet().as_ref().unwrap().get_counter();
+
+    let delta_overhead = overhead_end_hpet - start_hpet;
+	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = hpet_2_time("", delta_hpet);
+	let overhead_time = hpet_2_time("", delta_overhead);
+    let delta_time_avg = delta_time / (ITERATIONS*2) as u64; //*2 because each thread yields ITERATION number of times
+	printlninfo!("ctx_switch_test_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+fn do_ctx() {
+	let child_core = match pick_child_core() {
+		Ok(child_core) => { 
+			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+			child_core
+		}
+		_ => {
+			printlninfo!("Cannot conduct spawn test because cores are busy");
+			return;
+		}
+	};
+
+	// let child_core: u8 = CPU_ID!() as u8 - 1;
+
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+
+	// let overhead_ct = timing_overhead(); // timing overhead is already calculated within inner
+	
+	for i in 0..TRIES {
+		let lat = do_ctx_inner(i+1, TRIES, child_core).expect("Error in ctx inner()");
+
+		tries += lat;
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+
+	let lat = tries / TRIES as u64;
+	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("ctx_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+
+	printlninfo!("Context switch result: {} {}", lat, T_UNIT);
+	// printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
+}
+
 fn get_cwd() -> Option<DirRef> {
 	if let Some(taskref) = task::get_my_current_task() {
         let locked_task = &taskref.lock();
@@ -387,7 +479,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let delta_hpet_create = end_hpet_create - start_hpet_create - overhead_ct;
 	let delta_time_create = hpet_2_time("", delta_hpet_create);
 	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
-	let files_per_time = (ITERATIONS * ITERATIONS) as u64 * to_sec / delta_time_create;
+	let files_per_time = (ITERATIONS) as u64 * to_sec / delta_time_create;
 
 	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
 	Ok(())
@@ -735,6 +827,9 @@ pub fn main(args: Vec<String>) -> isize {
 		"fs_create" | "fs3" => {
 			do_fs_create_del();
 		}
+		"ctx" => {
+			do_ctx();
+		}
 		"fs" => {	// test code for checking FS' ability
 			do_fs_cap_check();
 		}
@@ -746,4 +841,15 @@ pub fn main(args: Vec<String>) -> isize {
 	}
 
 	0
+}
+
+fn yield_task(_a: u32) -> u32 {
+    for _i in 0..ITERATIONS {
+       scheduler::schedule();
+    }
+    _a
+}
+
+fn overhead_task(_a: u32) -> u32 {
+    _a
 }

@@ -530,7 +530,7 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
         
-        debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
+        // debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
         let crate_file_ref = match crate_file_path.get(&self.application_directory())
             .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory())) // retry with the ".o" extension
         {
@@ -553,7 +553,7 @@ impl CrateNamespace {
             self.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
         } else {
             let new_crate = new_crate_ref.lock_as_ref();
-            info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+            // info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
         }
         Ok(new_crate_ref)
     }
@@ -1114,7 +1114,7 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
-        debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
+        // debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;

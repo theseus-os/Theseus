@@ -14,6 +14,7 @@ use alloc::vec::Vec;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> (){
+    
     let taskref1 = KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))
         .pin_on_core(1)

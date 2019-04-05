@@ -207,7 +207,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let round_robin_taskref = RoundRobinTaskRef::new(task);
         self.push_back(round_robin_taskref);
         

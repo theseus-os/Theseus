@@ -43,3 +43,6 @@ path = "../../kernel/memfs"
 
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

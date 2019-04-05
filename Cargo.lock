@@ -113,6 +113,7 @@ dependencies = [
  "memfs 0.1.0",
  "path 0.1.0",
  "runqueue 0.1.0",
+ "scheduler 0.1.0",
  "spawn 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",

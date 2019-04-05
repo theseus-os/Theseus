@@ -799,11 +799,11 @@ impl MappedPages {
     pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
         let size = mem::size_of::<F>();
         if true {
-            debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<F>() }, 
-                size, offset, self.size_in_bytes()
-            );
+            // debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
+            //     // SAFE: just for debugging
+            //     unsafe { ::core::intrinsics::type_name::<F>() }, 
+            //     size, offset, self.size_in_bytes()
+            // );
         }
 
         // check that size of the type F fits within the size of the mapping
@@ -848,7 +848,7 @@ impl Drop for MappedPages {
         
         // skip logging temp page unmapping, since it's the most common
         if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
+            // trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
         }
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
