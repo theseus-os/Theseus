@@ -46,7 +46,8 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
     let default_namespace = mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?;
     let namespaces_dir = mod_mgmt::get_namespaces_directory().ok_or("couldn't get directory of namespaces")?;
 
-    let update_builds = ota_update_client::download_available_update_builds(&iface)?;
+    let remote_endpoint = ota_update_client::default_remote_endpoint();
+    let update_builds = ota_update_client::download_available_update_builds(&iface, remote_endpoint)?;
     warn!("AVAILABLE UPDATE BUILDS: {:?}", update_builds);
     let keyboard_log_ub = update_builds.iter()
         .find(|&e| e == "keyboard_log")
@@ -61,7 +62,7 @@ pub fn simple_keyboard_swap(iface: NetworkInterfaceRef) -> Result<(), &'static s
         set.insert(String::from("k#alloc-f655a0dd1878a29d.o"));
         set
     };
-    let new_crates = ota_update_client::download_crates(&iface, keyboard_log_ub, crates_to_download)?;
+    let new_crates = ota_update_client::download_crates(&iface, remote_endpoint, keyboard_log_ub, crates_to_download)?;
     if new_crates.is_empty() {
         return Err("failed to download any crate files");
     }
