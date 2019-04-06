@@ -12,10 +12,16 @@
 extern crate itertools;
 
 extern crate getopts;
+extern crate task;
 extern crate ota_update_client;
 extern crate network_manager;
 extern crate memory;
+extern crate mod_mgmt;
 extern crate smoltcp;
+extern crate path;
+extern crate memfs;
+extern crate fs_node;
+extern crate vfs_node;
 
 
 use alloc::{
@@ -28,6 +34,15 @@ use core::str::FromStr;
 use getopts::{Matches, Options};
 use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use smoltcp::wire::IpEndpoint;
+use mod_mgmt::{
+    CrateNamespace,
+    NamespaceDirectorySet,
+    metadata::CrateType,
+};
+use memfs::MemFile;
+use path::Path;
+use vfs_node::VFSDirectory;
+use fs_node::DirRef;
 
 
 
@@ -58,20 +73,7 @@ pub fn main(args: Vec<String>) -> isize {
         return -1;
     }
 
-    // let taskref = match task::get_my_current_task() {
-    //     Some(t) => t,
-    //     None => {
-    //         println!("failed to get current task");
-    //         return -1;
-    //     }
-    // };
-    // let curr_dir = {
-    //     let locked_task = taskref.lock();
-    //     let curr_env = locked_task.env.lock();
-    //     Arc::clone(&curr_env.working_dir)
-    // };
-
-    let verbose = matches.opt_present("v");
+    let _verbose = matches.opt_present("v");
 
     match rmain(matches) {
         Ok(_) => 0,
@@ -152,8 +154,6 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     let iface = get_default_iface()?;
     let crate_list = if crate_list == Some(&[]) { None } else { crate_list };
 
-    println!("DOWNLOAD crate_list: {:?}", crate_list);
-
     let crates = if let Some(crate_list) = crate_list {
         let crate_set = crate_list.iter().cloned().collect::<BTreeSet<String>>();
         ota_update_client::download_crates(&iface, remote_endpoint, update_build, crate_set).map_err(|e| e.to_string())?
@@ -162,12 +162,32 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
             .map_err(|e| format!("failed to download diff file for {}, error: {}", update_build, e))?;
         let diff_tuples = ota_update_client::parse_diff_file(&diff_lines).map_err(|e| e.to_string())?;
 
-        println!("DIFF TUPLES:\n{:?}", diff_tuples);
-
-        Vec::new() // TODO: download the actual crates
+        // download all of the new crates
+        let new_crates_to_download: BTreeSet<String> = diff_tuples.iter().map(|(_old, new)| new.clone()).collect();
+        ota_update_client::download_crates(&iface, remote_endpoint, update_build, new_crates_to_download).map_err(|e| e.to_string())?
     };
     
-    // TODO: save crates to file
+    // save each new crate to a file 
+    let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let new_namespace_dir = make_unique_directory(update_build, &curr_dir)?;
+    let new_namespace_name = new_namespace_dir.lock().get_name();
+    let new_namespace = CrateNamespace::new(new_namespace_name, NamespaceDirectorySet::new(new_namespace_dir)?);
+    for df in crates.into_iter() {
+        let content = df.content.as_result_err_str()?;
+        println!("Saving downloaded crate to file: {:?}, size {}", df.name, content.len());
+        // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
+        // We need to get just the basename of the file, then remove the crate type prefix ("k#").
+        let df_path = Path::new(df.name);
+        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
+        let dest_dir = match crate_type {
+            CrateType::Kernel      => new_namespace.kernel_directory(),
+            CrateType::Application => new_namespace.application_directory(),
+            CrateType::Userspace   => new_namespace.userspace_directory(),
+        };
+        let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
+        cfile.lock().write(content, 0)?;
+        println!("    created new file at path: {}", cfile.lock().get_absolute_path());
+    }
 
     Ok(())
 }
@@ -180,6 +200,24 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .next()
         .cloned()
         .ok_or_else(|| format!("no network interfaces available"))
+}
+
+
+/// Creates a new directory with a unique name in the given `parent_dir`. 
+/// For example, given a base_name of "my_dir", 
+/// it will create a directory "my_dir.2" if "my_dir" and "my_dir.1" already exist.
+fn make_unique_directory(base_name: &str, parent_dir: &DirRef) -> Result<DirRef, &'static str> {
+    if parent_dir.lock().get(base_name).is_none() {
+        return VFSDirectory::new(base_name.to_string(), parent_dir);
+    }
+    for i in 1.. {
+        let new_base_name = format!("{}.{}", base_name, i);
+        if parent_dir.lock().get(&new_base_name).is_none() {
+            return VFSDirectory::new(new_base_name, parent_dir);
+        }   
+    }
+
+    Err("unable to create new unique directory")
 }
 
 

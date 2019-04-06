@@ -1469,6 +1469,7 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
  "environment 0.1.0",
+ "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1619,14 +1620,19 @@ dependencies = [
 name = "upd"
 version = "0.1.0"
 dependencies = [
+ "fs_node 0.1.0",
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memfs 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "network_manager 0.1.0",
  "ota_update_client 0.1.0",
+ "path 0.1.0",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
  "terminal_print 0.1.0",
+ "vfs_node 0.1.0",
 ]
 
 [[package]]

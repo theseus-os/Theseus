@@ -46,8 +46,8 @@ use http_client::{HttpResponse, ConnectedTcpSocket, send_request, millis_since, 
 
 
 /// The IP address of the update server.
-/// This is currently the static IP of `kevin.recg.rice.edu`.
-const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
+// const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`
+const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
 
 /// The TCP port on the update server that listens for update requests 
 const DEFAULT_DESTINATION_PORT: u16 = 8090;
@@ -186,15 +186,15 @@ pub fn parse_diff_file(diffs: &Vec<String>) -> Result<Vec<(String, String)>, &'s
         if diff.starts_with("+") {
             result.push((
                 String::new(), 
-                diff.get(1..).ok_or("error parsing (+) diff line")?.to_string()
+                diff.get(1..).ok_or("error parsing (+) diff line")?.trim().to_string(),
             ));
         } else if diff.starts_with("-") {
             result.push((
-                diff.get(1..).ok_or("error parsing (-) diff line")?.to_string(), 
+                diff.get(1..).ok_or("error parsing (-) diff line")?.trim().to_string(), 
                 String::new()
             ));
         } else if let Some((old, new)) = diff.split("->").collect_tuple() {
-            result.push((old.to_string(), new.to_string()));
+            result.push((old.trim().to_string(), new.trim().to_string()));
         } else {
             error!("parse_diff_file(): error parsing diff line: {:?}", diff);
             return Err("error parsing diff line");

@@ -21,6 +21,21 @@ path = "../../kernel/mod_mgmt"
 [dependencies.memory]
 path = "../../kernel/memory"
 
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.memfs]
+path = "../../kernel/memfs"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.vfs_node]
+path = "../../kernel/vfs_node"
+
 [dependencies.ota_update_client]
 path = "../../kernel/ota_update_client/"
 

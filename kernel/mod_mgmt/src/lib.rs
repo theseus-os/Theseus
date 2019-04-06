@@ -146,16 +146,8 @@ fn parse_bootloader_modules_into_files(
 
         // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
         let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
-            let base_dir   = VFSDirectory::new(prefix.to_string(),                            &namespaces_dir)?;
-            let kernel_dir = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
-            let app_dir    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
-            let user_dir   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
-            Ok(NamespaceDirectorySet {
-                base:   base_dir,
-                kernel: kernel_dir,
-                app:    app_dir,
-                user:   user_dir,
-            })
+            let base_dir = VFSDirectory::new(prefix.to_string(), &namespaces_dir)?;
+            NamespaceDirectorySet::new(base_dir)
         };
 
         for m in boot_info.module_tags() {
@@ -177,9 +169,9 @@ fn parse_bootloader_modules_into_files(
 
             let create_file = |dirs: &NamespaceDirectorySet| {
                 let parent_dir = match crate_type { 
-                    CrateType::Kernel => &dirs.kernel,
-                    CrateType::Application => &dirs.app,
-                    CrateType::Userspace => &dirs.user,
+                    CrateType::Kernel      => dirs.kernel_dir(),
+                    CrateType::Application => dirs.app_dir(),
+                    CrateType::Userspace   => dirs.user_dir(),
                 };
                 MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
             };
@@ -291,10 +283,46 @@ pub struct NamespaceDirectorySet {
     app:    DirRef,
     /// The directory that contains all userspace object files.
     user:   DirRef,
+    /// To ensure that no one accidentally constructs this object without using the `new()` fn.
+    _p:     core::marker::PhantomData<usize>,
 }
 impl NamespaceDirectorySet {
-    pub fn new(base: DirRef, kernel: DirRef, app: DirRef, user: DirRef) -> NamespaceDirectorySet {
-        NamespaceDirectorySet { base, kernel, app, user }
+    /// Create a new `NamespaceDirectorySet` with each directory 
+    pub fn new(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
+        let kernel = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
+        let app    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
+        let user   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
+        Ok(NamespaceDirectorySet {
+            base: base_dir, 
+            kernel, 
+            app, 
+            user, 
+            _p: core::marker::PhantomData 
+        })
+    }
+
+    /// Creates a new `NamespaceDirectorySet` from existing directories 
+    pub fn from_existing_base_dir(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
+        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
+        };
+        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace application directory"),
+        };
+        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
+        };
+
+        Ok(NamespaceDirectorySet {
+            base: base_dir, 
+            kernel: kernel_dir, 
+            app: app_dir,
+            user: user_dir,
+            _p: core::marker::PhantomData 
+        })
     }
 
     /// Returns a reference to the base directory.
@@ -392,47 +420,6 @@ impl CrateNamespace {
             fuzzy_symbol_matching: false,
         }
     } 
-
-    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
-    /// # Arguments
-    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `base_dir`: the base directory for this namespace, which must contain crate file subdirectories. 
-    pub fn with_base_dir(name: String, base_dir: DirRef) -> Result<CrateNamespace, &'static str> {
-        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
-        };
-        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace application directory"),
-        };
-        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
-        };
-        Ok(CrateNamespace::new(
-            name, 
-            NamespaceDirectorySet {
-                base:   base_dir,
-                kernel: kernel_dir,
-                app:    app_dir, 
-                user:   user_dir,
-            }
-        ))
-    }
-
-    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
-    /// # Arguments
-    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `base_dir_path`: the `Path` of the base directory for this namespace, which must contain crate file subdirectories. 
-    pub fn with_base_dir_path(name: String, base_dir_path: Path) -> Result<CrateNamespace, &'static str> {
-        let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
-        let base_dir = match base_dir_path.get(&namespaces_dir) {
-            Ok(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find directory at given path"),
-        };
-        CrateNamespace::with_base_dir(name, base_dir)
-    }
 
     /// Returns the directory that this `CrateNamespace` is based on.
     pub fn base_directory(&self) -> &DirRef {
@@ -754,14 +741,13 @@ impl CrateNamespace {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
             // Also, use the optionally-provided directory of kernel crates instead of the current namespace's kernel dir.
+            let mut new_namespace_dirs = self.dirs.clone(); 
+            if let Some(kernel_dir) = kernel_crates_dir {
+                new_namespace_dirs.kernel = kernel_dir;
+            }
             let nn = CrateNamespace::new(
                 String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
-                NamespaceDirectorySet::new(
-                    self.dirs.base_dir().clone(), 
-                    kernel_crates_dir.unwrap_or_else(|| self.dirs.kernel_dir().clone()),
-                    self.dirs.app_dir().clone(),
-                    self.dirs.user_dir().clone(),
-                ),
+                new_namespace_dirs,
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
             nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;
