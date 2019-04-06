@@ -1630,6 +1630,7 @@ dependencies = [
  "ota_update_client 0.1.0",
  "path 0.1.0",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
  "vfs_node 0.1.0",

@@ -22,15 +22,17 @@ extern crate path;
 extern crate memfs;
 extern crate fs_node;
 extern crate vfs_node;
+extern crate spin;
 
 
+use core::str::FromStr;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
     collections::BTreeSet,
     slice::SliceConcatExt,
 };
-use core::str::FromStr;
+use spin::Once;
 use getopts::{Matches, Options};
 use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use smoltcp::wire::IpEndpoint;
@@ -44,6 +46,12 @@ use path::Path;
 use vfs_node::VFSDirectory;
 use fs_node::DirRef;
 
+
+
+static VERBOSE: Once<bool> = Once::new();
+macro_rules! verbose {
+    () => (VERBOSE.try() == Some(&true));
+}
 
 
 #[no_mangle]
@@ -73,7 +81,7 @@ pub fn main(args: Vec<String>) -> isize {
         return -1;
     }
 
-    let _verbose = matches.opt_present("v");
+    VERBOSE.call_once(|| matches.opt_present("v"));
 
     match rmain(matches) {
         Ok(_) => 0,
@@ -96,7 +104,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         remote_endpoint.port = ota_update_client::default_remote_endpoint().port;
     }
 
-    println!("MATCHES: {:?}", matches.free);
+    if verbose!() { println!("MATCHES: {:?}", matches.free); }
 
     match &*matches.free[0] {
         "list" | "ls" => {
@@ -174,7 +182,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     let new_namespace = CrateNamespace::new(new_namespace_name, NamespaceDirectorySet::new(new_namespace_dir)?);
     for df in crates.into_iter() {
         let content = df.content.as_result_err_str()?;
-        println!("Saving downloaded crate to file: {:?}, size {}", df.name, content.len());
+        let size = content.len();
         // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
         // We need to get just the basename of the file, then remove the crate type prefix ("k#").
         let df_path = Path::new(df.name);
@@ -186,7 +194,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         };
         let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
         cfile.lock().write(content, 0)?;
-        println!("    created new file at path: {}", cfile.lock().get_absolute_path());
+        println!("Saved new crate to file: {:?}, size {}", cfile.lock().get_absolute_path(), size);
     }
 
     Ok(())
