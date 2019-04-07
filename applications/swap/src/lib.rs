@@ -170,7 +170,7 @@ fn swap_modules(
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
                 Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
                 _ => namespace.get_kernel_file_starting_with(n)
-                        .and_then(|p| p.get(namespace.kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())).ok())
+                        .and_then(|p| p.get(namespace.dirs().kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())).ok())
                         .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
             }?;
             mods.push(

@@ -78,7 +78,7 @@ const LISTING_FILE_NAME: &'static str = "listing.txt";
 
 /// The name (and relative path) of the diff file inside each update build directory,
 /// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
-const DIFF_FILE_NAME: &'static str = "diff.txt";
+pub const DIFF_FILE_NAME: &'static str = "diff.txt";
 
 /// The name of the directory containing the checksums of each crate object file
 /// inside of a given update build.
@@ -158,14 +158,20 @@ fn download_string_file(
 ) -> Result<Vec<String>, &'static str> {
     let file = download_file(iface, remote_endpoint, file_path)?;
     let content = file.content.as_result_err_str()?;
-    str::from_utf8(content)
-        .map_err(|_e| "couldn't convert received file into a UTF8 string")
+    as_lines(content)
+}
+
+
+/// Convenience function for converting a byte stream
+/// that is delimited by newlines into a list of Strings.
+pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
+    str::from_utf8(bytes)
+        .map_err(|_e| "couldn't convert file into a UTF8 string")
         .map(|files| files.lines().map(|s| String::from(s)).collect())
 }
 
 
-
-/// Parses a diff file contents into a list of pairs, 
+/// Parses a series of diff lines into a list of pairs, 
 /// in which the first element is the old crate and the second element is the new crate.
 /// If the first element is the empty string, the second element is a new addition (replacing nothing),
 /// and if the second element is the empty string, the first element is to be removed without replacement.
@@ -180,7 +186,7 @@ fn download_string_file(
 /// - k#scheduler-7f6134ffbb934a27.o
 /// + k#spawn-f1c87a8fc4e03893.o
 /// ```
-pub fn parse_diff_file(diffs: &Vec<String>) -> Result<Vec<(String, String)>, &'static str> {
+pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Vec<(String, String)>, &'static str> {
     let mut result: Vec<(String, String)> = Vec::with_capacity(diffs.len());
     for diff in diffs {
         if diff.starts_with("+") {
@@ -196,7 +202,7 @@ pub fn parse_diff_file(diffs: &Vec<String>) -> Result<Vec<(String, String)>, &'s
         } else if let Some((old, new)) = diff.split("->").collect_tuple() {
             result.push((old.trim().to_string(), new.trim().to_string()));
         } else {
-            error!("parse_diff_file(): error parsing diff line: {:?}", diff);
+            error!("parse_diff_lines(): error parsing diff line: {:?}", diff);
             return Err("error parsing diff line");
         }
     }

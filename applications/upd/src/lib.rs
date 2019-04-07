@@ -39,12 +39,13 @@ use smoltcp::wire::IpEndpoint;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDirectorySet,
-    metadata::CrateType,
+    SwapRequest, SwapRequestList,
 };
 use memfs::MemFile;
 use path::Path;
 use vfs_node::VFSDirectory;
-use fs_node::DirRef;
+use fs_node::{FileOrDir, DirRef};
+use ota_update_client::DIFF_FILE_NAME;
 
 
 
@@ -118,6 +119,10 @@ fn rmain(matches: Matches) -> Result<(), String> {
             let update_build = matches.free.get(1).ok_or_else(|| String::from("missing UPDATE_BUILD argument"))?;
             download(remote_endpoint, update_build, matches.free.get(2..))
         }
+        "apply" | "ap" => {
+            let base_dir_path = matches.free.get(1).ok_or_else(|| String::from("missing BASE_DIR path argument"))?;
+            apply(&Path::new(base_dir_path.clone()))
+        }
         other => {
             Err(format!("unrecognized command {:?}", other))
         }
@@ -162,17 +167,21 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     let iface = get_default_iface()?;
     let crate_list = if crate_list == Some(&[]) { None } else { crate_list };
 
+    let mut diff_strings: Option<Vec<String>> = None;
+
     let crates = if let Some(crate_list) = crate_list {
         let crate_set = crate_list.iter().cloned().collect::<BTreeSet<String>>();
         ota_update_client::download_crates(&iface, remote_endpoint, update_build, crate_set).map_err(|e| e.to_string())?
     } else {
         let diff_lines = ota_update_client::download_diff(&iface, remote_endpoint, update_build)
             .map_err(|e| format!("failed to download diff file for {}, error: {}", update_build, e))?;
-        let diff_tuples = ota_update_client::parse_diff_file(&diff_lines).map_err(|e| e.to_string())?;
+        let diff_tuples = ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string())?;
 
         // download all of the new crates
         let new_crates_to_download: BTreeSet<String> = diff_tuples.iter().map(|(_old, new)| new.clone()).collect();
-        ota_update_client::download_crates(&iface, remote_endpoint, update_build, new_crates_to_download).map_err(|e| e.to_string())?
+        let crates = ota_update_client::download_crates(&iface, remote_endpoint, update_build, new_crates_to_download).map_err(|e| e.to_string())?;
+        diff_strings = Some(diff_lines);
+        crates
     };
     
     // save each new crate to a file 
@@ -186,18 +195,91 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
         // We need to get just the basename of the file, then remove the crate type prefix ("k#").
         let df_path = Path::new(df.name);
-        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(df_path.basename())?;
-        let dest_dir = match crate_type {
-            CrateType::Kernel      => new_namespace.kernel_directory(),
-            CrateType::Application => new_namespace.application_directory(),
-            CrateType::Userspace   => new_namespace.userspace_directory(),
-        };
-        let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
-        cfile.lock().write(content, 0)?;
-        println!("Saved new crate to file: {:?}, size {}", cfile.lock().get_absolute_path(), size);
+        let cfile = new_namespace.dirs().insert_crate_object_file(df_path.basename(), content)?;
+        println!("Downloaded crate: {:?}, size {}", cfile.lock().get_absolute_path(), size);
+    }
+
+    // if downloaded, save the diff file into the base directory
+    if let Some(diffs) = diff_strings {
+        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), new_namespace.dirs().base_directory())?;
+        cfile.lock().write(diffs.join("\n").as_bytes(), 0)?;
     }
 
     Ok(())
+}
+
+
+/// Applies an already-downloaded update according the "diff.txt" file
+/// that must be in the given base directory.
+fn apply(base_dir_path: &Path) -> Result<(), String> {
+    if cfg!(not(loadable)) {
+        return Err(format!("Evolutionary updates can only be applied when Theseus is built in loadable mode."));
+    }
+
+    let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let base_dir = match base_dir_path.get(&curr_dir) {
+        Ok(FileOrDir::Dir(d)) => d,
+        _ => return Err(format!("cannot find base directory at path {}", base_dir_path)),
+    };
+    let new_namespace_dirs = NamespaceDirectorySet::from_existing_base_dir(base_dir.clone()).map_err(|e| e.to_string())?;
+
+    let diff_file = match base_dir.lock().get(DIFF_FILE_NAME) { 
+        Some(FileOrDir::File(f)) => f,
+        _ => return Err(format!("cannot find diff file at {}/{}", base_dir_path, DIFF_FILE_NAME)),
+    };
+    let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().size()); 
+    let _bytes_read = diff_file.lock().read(&mut diff_content, 0)?;
+    let diffs = ota_update_client::as_lines(&diff_content).map_err(|e| e.to_string())
+        .and_then(|diff_lines| ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string()))?;
+
+
+    // We can't immediately just replace the existing files in the current namespace 
+    // because that would cause inconsistencies if another crate was loaded (using the new files)
+    // before the currently-loaded ones were replaced. 
+    // Instead, we need to just keep the new files in a new folder for now (which they already are),
+    // and tell the crate swapping routine to use them. 
+    // But first, we must check to make sure that the current namespace actually has all of the old crates
+    // that are expected/listed in the diff file.
+    // After the live swap of all loaded crates in the namespace has completed,
+    // it is safe to actually replace the old crate object files with the new ones. 
+    
+    let curr_namespace = get_my_current_namespace();
+    // create swap requests to replace the currently loaded old crates with the new crates 
+    let mut swap_requests = SwapRequestList::new();
+    for (old_crate_file_name, new_crate_file_name) in &diffs {
+        println!("Looking at diff {} -> {}", old_crate_file_name, new_crate_file_name);
+        // first, check to make sure the old crate actually exists
+        let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
+            .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
+        // the old needs to be swapped if it's currently loaded
+        let old_crate_name = old_crate_file.lock().get_name();
+        let old_crate_path = Path::new(old_crate_name.clone());
+        println!("old_crate_name: {}, old_crate_path file_stem: {}", old_crate_name, old_crate_path.file_stem());
+        if let Some(_old_crate) = curr_namespace.get_crate(old_crate_path.file_stem()) {
+            let new_crate_file = new_namespace_dirs.get_crate_object_file(new_crate_file_name)
+                .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dirs {}", new_crate_file_name, base_dir_path))?;
+            let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
+            swap_requests.push(swap_req);
+        }
+        else {
+
+        }
+    }
+
+
+    // now do the actual live swap at runtime
+    println!("swap_requests: ");
+    for sr in &swap_requests {
+        println!("  {:?}", sr);
+    }
+
+    Err(format!("the \"apply\" command is unfinished"))
+}
+
+
+// TODO: fix this later once each task's environment contains a current namespace
+fn get_my_current_namespace() -> &'static CrateNamespace {
+    mod_mgmt::get_default_namespace().unwrap()
 }
 
 
@@ -246,6 +328,13 @@ Runs the given update-related COMMAND. Choices include:
         Lists the patch-like diff for the given UPDATE_BUILD,
         which specifies which crates should be swapped with other crates.
 
-    download UPDATE_BUILD [CRATES]
-        Downloads all of different crates (from the diff file) for the given UPDATE_BUILD.
-        If the list of CRATES is given, it downloads each one of those instead.";
+    download UPDATE_BUILD
+        Downloads all different crates (from the diff file) for the given UPDATE_BUILD.
+        
+    download UPDATE_BUILD CRATES
+        Downloads the given list of CRATES for the given UPDATE_BUILD.
+        
+    apply BASE_DIR
+        Applies the evolutionary update specified by the diff file 
+        in the given BASE_DIR, which also must contain a set of 
+        CrateNamespace subdirectories: \"kernel\" and \"applications\", at the least.";

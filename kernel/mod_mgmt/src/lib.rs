@@ -72,7 +72,7 @@ pub const DEFAULT_NAMESPACE_NAME: &'static str = "default";
 /// The name of the directory in each namespace directory that contains kernel crates.
 pub const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
 /// The name of the directory in each namespace directory that contains application crates.
-pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "application";
+pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "applications";
 /// The name of the directory in each namespace directory that contains userspace files.
 pub const USERSPACE_FILES_DIRECTORY_NAME: &'static str = "userspace";
 
@@ -169,9 +169,9 @@ fn parse_bootloader_modules_into_files(
 
             let create_file = |dirs: &NamespaceDirectorySet| {
                 let parent_dir = match crate_type { 
-                    CrateType::Kernel      => dirs.kernel_dir(),
-                    CrateType::Application => dirs.app_dir(),
-                    CrateType::Userspace   => dirs.user_dir(),
+                    CrateType::Kernel      => &dirs.kernel,
+                    CrateType::Application => &dirs.app,
+                    CrateType::Userspace   => &dirs.user,
                 };
                 MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
             };
@@ -309,7 +309,7 @@ impl NamespaceDirectorySet {
         };
         let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace application directory"),
+            _ => return Err("couldn't find expected CrateNamespace applications directory"),
         };
         let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
             Some(FileOrDir::Dir(d)) => d,
@@ -325,23 +325,70 @@ impl NamespaceDirectorySet {
         })
     }
 
+    
+    /// Gets the given object file based on its crate name prefix. 
+    /// 
+    /// # Arguments
+    /// * `crate_object_file_name`: the name of the object file to be inserted, 
+    ///    with a preceding `CrateType` prefix.
+    /// * `content`: the bytes that will be writte into the file.
+    /// 
+    /// # Examples 
+    /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "./kernel/keyboard-36be916209949cef.o". 
+    /// * The name "a#ps.o" will look for and return the file "./applications/ps.o". 
+    pub fn get_crate_object_file(&self, crate_object_file_name: &str) -> Option<FileRef> {
+        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
+        let dest_dir = match crate_type {
+            CrateType::Kernel      => &self.kernel,
+            CrateType::Application => &self.app,
+            CrateType::Userspace   => &self.user,
+        };
+        match dest_dir.lock().get(objfilename) { 
+            Some(FileOrDir::File(f)) => Some(f),
+            _ => None,
+        }
+    }
+
+
+    /// Insert the given crate object file based on its crate type prefix. 
+    /// 
+    /// # Arguments
+    /// * `crate_object_file_name`: the name of the object file to be inserted, 
+    ///    with a preceding `CrateType` prefix.
+    /// * `content`: the bytes that will be writte into the file.
+    /// 
+    /// # Examples 
+    /// * The file "k#keyboard-36be916209949cef.o" will be placed into "./kernel/keyboard-36be916209949cef.o". 
+    /// * The file "a#ps.o" will be placed into "./applications/ps.o". 
+    pub fn insert_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
+        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
+        let dest_dir = match crate_type {
+            CrateType::Kernel      => &self.kernel,
+            CrateType::Application => &self.app,
+            CrateType::Userspace   => &self.user,
+        };
+        let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
+        cfile.lock().write(content, 0)?;
+        Ok(cfile)
+    }
+
     /// Returns a reference to the base directory.
-    pub fn base_dir(&self) -> &DirRef {
+    pub fn base_directory(&self) -> &DirRef {
         &self.base
     }
 
     /// Returns a reference to the directory of kernel crates.
-    pub fn kernel_dir(&self) -> &DirRef {
+    pub fn kernel_directory(&self) -> &DirRef {
         &self.kernel
     }
 
     /// Returns a reference to the directory of application crates.
-    pub fn app_dir(&self) -> &DirRef {
+    pub fn applications_directory(&self) -> &DirRef {
         &self.app
     }
 
     /// Returns a reference to the directory of userspace programs.
-    pub fn user_dir(&self) -> &DirRef {
+    pub fn userspace_directory(&self) -> &DirRef {
         &self.user
     }
 }
@@ -357,7 +404,7 @@ impl NamespaceDirectorySet {
 /// but are significantly more efficient than library OS-style personalities. 
 pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
-    name: String,
+    pub name: String,
 
     /// The directories owned by this namespace. 
     /// When this namespace is looking for a missing symbol or crate,
@@ -421,24 +468,10 @@ impl CrateNamespace {
         }
     } 
 
-    /// Returns the directory that this `CrateNamespace` is based on.
-    pub fn base_directory(&self) -> &DirRef {
-        &self.dirs.base
-    }
-
-    /// Returns this `CrateNamespace`'s directory of kernel crates.
-    pub fn kernel_directory(&self) -> &DirRef {
-        &self.dirs.kernel
-    }
-
-    /// Returns this `CrateNamespace`'s directory of application crates.
-    pub fn application_directory(&self) -> &DirRef {
-        &self.dirs.app
-    }
-
-    /// Returns this `CrateNamespace`'s directory of userspace files.
-    pub fn userspace_directory(&self) -> &DirRef {
-        &self.dirs.user
+    /// Returns the set of directories that this `CrateNamespace` is based on,
+    /// which include its subdirectories of crate object files.
+    pub fn dirs(&self) -> &NamespaceDirectorySet {
+        &self.dirs
     }
 
     pub fn enable_fuzzy_symbol_matching(&mut self) {
@@ -518,8 +551,8 @@ impl CrateNamespace {
     ) -> Result<StrongCrateRef, &'static str> {
         
         debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.application_directory())
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory())) // retry with the ".o" extension
+        let crate_file_ref = match crate_file_path.get(&self.dirs.app)
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.app)) // retry with the ".o" extension
         {
             Ok(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified application crate file path"),
@@ -568,8 +601,8 @@ impl CrateNamespace {
     ) -> Result<usize, &'static str> {
 
         debug!("load_kernel_crate: trying to load kernel crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.kernel_directory())
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.kernel_directory())) // retry with the ".o" extension
+        let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
+            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
         {
             Ok(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified kernel crate file path"),
@@ -612,7 +645,7 @@ impl CrateNamespace {
         // first, validate all of the crate paths by turning them into direct file references
         let mut crate_files: Vec<FileRef> = Vec::new();
         for crate_file_path in crate_file_paths {
-            let crate_file_ref: FileRef = match crate_file_path.get(&self.kernel_directory()) {
+            let crate_file_ref: FileRef = match crate_file_path.get(&self.dirs.kernel) {
                 Ok(FileOrDir::File(f)) => f,
                 _ => {
                     error!("Couldn't find specified kernel crate file path: {:?}", crate_file_path);
@@ -1991,7 +2024,7 @@ impl CrateNamespace {
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full name of the crate file. 
     pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = self.kernel_directory().lock().list();
+        let children = self.dirs.kernel.lock().list();
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
@@ -2006,7 +2039,7 @@ impl CrateNamespace {
     /// relative to this `CrateNamespace`'s kernel crate directory,
     /// effectively just the full names of the crate files. 
     pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
-        let mut children = self.kernel_directory().lock().list();
+        let mut children = self.dirs.kernel.lock().list();
         children.retain(|child_name| child_name.starts_with(prefix)); // remove non-matches
         children.into_iter().map(|name| Path::new(name)).collect()
     }
