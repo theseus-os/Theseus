@@ -252,27 +252,23 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
             .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
         // the old needs to be swapped if it's currently loaded
-        let old_crate_name = old_crate_file.lock().get_name();
-        let old_crate_path = Path::new(old_crate_name.clone());
-        println!("old_crate_name: {}, old_crate_path file_stem: {}", old_crate_name, old_crate_path.file_stem());
-        if let Some(_old_crate) = curr_namespace.get_crate(old_crate_path.file_stem()) {
+        let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
+        let old_crate_name = old_crate_file_name.file_stem().to_string();
+        if let Some(_old_crate) = curr_namespace.get_crate(&old_crate_name) {
             let new_crate_file = new_namespace_dirs.get_crate_object_file(new_crate_file_name)
                 .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dirs {}", new_crate_file_name, base_dir_path))?;
             let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
             swap_requests.push(swap_req);
         }
         else {
-
+            println!("   not swapping non-loaded old crate: {}", old_crate_name);
         }
     }
 
-
-    // now do the actual live swap at runtime
-    println!("swap_requests: ");
-    for sr in &swap_requests {
-        println!("  {:?}", sr);
-    }
-
+    // now do the actual live crate swap at runtime
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
+    curr_namespace.swap_crates(swap_requests, Some(new_namespace_dirs), &mut kernel_mmi_ref.lock(), false)
+        .map_err(|e| format!("crate swapping failed, error: {}", e))?;
     Err(format!("the \"apply\" command is unfinished"))
 }
 

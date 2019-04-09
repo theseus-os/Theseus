@@ -16,6 +16,7 @@
 extern crate spin;
 extern crate memory;
 
+use core::hash::Hash;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
