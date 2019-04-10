@@ -555,8 +555,9 @@ endif  ## end of checking for "sd"
 endif  ## end of checking for WSL
 
 
-### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
+### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso.
 ## boot : export override THESEUS_CONFIG += mirror_log_to_vga
+## boot : export override THESEUS_CONFIG += loadable 
 boot: check_usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL

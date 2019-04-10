@@ -341,7 +341,7 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
     let delta_time = hpet_2_time("", delta_hpet);
 	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / (ITERATIONS*2) as u64; //*2 because each thread yields ITERATION number of times
+    let delta_time_avg = delta_time / (ITERATIONS*1000*2) as u64; //*2 because each thread yields ITERATION number of times
 	printlninfo!("ctx_switch_test_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
 		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
 
@@ -844,7 +844,8 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn yield_task(_a: u32) -> u32 {
-    for _i in 0..ITERATIONS {
+	let times = ITERATIONS*1000;
+    for _i in 0..times {
        scheduler::schedule();
     }
     _a
