@@ -175,7 +175,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
 	for _ in 0..ITERATIONS {
-		mypid = getpid();
+		mypid = task::get_my_current_task_id().unwrap();
 	}
 	end_hpet = get_hpet().as_ref().unwrap().get_counter();
 
@@ -189,8 +189,8 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let delta_time = hpet_2_time("", delta_hpet);
 	let delta_time_avg = delta_time / ITERATIONS as u64;
 
-	printlninfo!("null_test_inner ({}/{}): {} total_time -> {} {} (ignore: {})",
-		th, nr, delta_time, delta_time_avg, T_UNIT, mypid);
+	printlninfo!("null_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {} (ignore: {})",
+		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT, mypid);
 
 	delta_time_avg
 }
@@ -223,14 +223,15 @@ fn do_null() {
 fn pick_child_core() -> Result<u8, &'static str> {
 	// try with current core -1
 	let child_core: u8 = CPU_ID!() as u8 - 1;
+	// return Ok(child_core); //Comment for real hardware debugging
 	if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
 
 	// if failed, try from the last to the first
 	for child_core in (0..apic::core_count() as u8).rev() {
 		if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
 	}
-
-	Err("Cannot pick a core for children")
+	printlninfo!("Cannot pick a child core because cores are busy");
+	return Ok(child_core);
 }
 
 fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
@@ -242,7 +243,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	for _ in 0..ITERATIONS {
 		let child = ApplicationTaskBuilder::new(Path::new(String::from("hello")))
 	        .pin_on_core(child_core) // the child is always in the my core -1
-	        .argument(Vec::new())
+	        //.argument(Vec::new())
 	        .spawn()?;
 
 	    child.join().expect("Cannot join child");
@@ -253,8 +254,8 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
     let delta_hpet = end_hpet - start_hpet - overhead_ct;
     let delta_time = hpet_2_time("", delta_hpet);
     let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("spawn_test_inner ({}/{}): {} total_time -> {} {}",
-		th, nr, delta_time, delta_time_avg, T_UNIT);
+	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
+		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
 	Ok(delta_time_avg)
 }
@@ -806,7 +807,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 	if !check_myrq() {
 		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
-		return 0;
+		// return 0; //uncomment for real hardware debugging
 	}
 
 	print_header();
