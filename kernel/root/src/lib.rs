@@ -60,7 +60,7 @@ impl Directory for RootDirectory {
         self.children.get(name).cloned()
     }
 
-    fn list(&mut self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
 

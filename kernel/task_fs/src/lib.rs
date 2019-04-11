@@ -146,7 +146,7 @@ impl Directory for TaskFs {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list(&mut self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         let mut tasks_string = Vec::new();
         for (id, _taskref) in TASKLIST.lock().iter() {
             tasks_string.push(format!("{}", id));
@@ -210,7 +210,7 @@ impl Directory for TaskDir {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list(&mut self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         let mut children = Vec::new();
         children.push("mmi".to_string());
         children.push("taskInfo".to_string());
@@ -359,7 +359,7 @@ impl Directory for MmiDir {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list(&mut self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         let mut children = Vec::new();
         children.push("MmiInfo".to_string());
         children

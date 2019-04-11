@@ -80,7 +80,7 @@ pub trait Directory : FsNode {
     // Removes a file or directory from this directory.
     fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str>;
     /// Lists the names of the nodes in this directory.
-    fn list(&mut self) -> Vec<String>;
+    fn list(&self) -> Vec<String>;
 }
 
 /// Allows us to return a generic type that can be matched by the caller to extract the underlying type

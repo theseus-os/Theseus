@@ -634,6 +634,6 @@ impl LoadedSection {
 
 impl fmt::Debug for LoadedSection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X})", self.name, self.virt_addr)
+        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.virt_addr, self.size)
     }
 }

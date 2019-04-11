@@ -167,7 +167,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     let iface = get_default_iface()?;
     let crate_list = if crate_list == Some(&[]) { None } else { crate_list };
 
-    let mut diff_strings: Option<Vec<String>> = None;
+    let mut diff_file_lines: Option<Vec<String>> = None;
 
     let crates = if let Some(crate_list) = crate_list {
         let crate_set = crate_list.iter().cloned().collect::<BTreeSet<String>>();
@@ -175,12 +175,12 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     } else {
         let diff_lines = ota_update_client::download_diff(&iface, remote_endpoint, update_build)
             .map_err(|e| format!("failed to download diff file for {}, error: {}", update_build, e))?;
-        let diff_tuples = ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string())?;
+        let diff = ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string())?;
 
         // download all of the new crates
-        let new_crates_to_download: BTreeSet<String> = diff_tuples.iter().map(|(_old, new)| new.clone()).collect();
+        let new_crates_to_download: BTreeSet<String> = diff.pairs.iter().map(|(_old, new)| new.clone()).collect();
         let crates = ota_update_client::download_crates(&iface, remote_endpoint, update_build, new_crates_to_download).map_err(|e| e.to_string())?;
-        diff_strings = Some(diff_lines);
+        diff_file_lines = Some(diff_lines);
         crates
     };
     
@@ -200,7 +200,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     }
 
     // if downloaded, save the diff file into the base directory
-    if let Some(diffs) = diff_strings {
+    if let Some(diffs) = diff_file_lines {
         let cfile = MemFile::new(String::from(DIFF_FILE_NAME), new_namespace.dirs().base_directory())?;
         cfile.lock().write(diffs.join("\n").as_bytes(), 0)?;
     }
@@ -216,6 +216,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         return Err(format!("Evolutionary updates can only be applied when Theseus is built in loadable mode."));
     }
 
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
     let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
     let base_dir = match base_dir_path.get(&curr_dir) {
         Ok(FileOrDir::Dir(d)) => d,
@@ -246,7 +247,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     let curr_namespace = get_my_current_namespace();
     // create swap requests to replace the currently loaded old crates with the new crates 
     let mut swap_requests = SwapRequestList::new();
-    for (old_crate_file_name, new_crate_file_name) in &diffs {
+    for (old_crate_file_name, new_crate_file_name) in &diffs.pairs {
         println!("Looking at diff {} -> {}", old_crate_file_name, new_crate_file_name);
         // first, check to make sure the old crate actually exists
         let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
@@ -266,10 +267,15 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     // now do the actual live crate swap at runtime
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
-    curr_namespace.swap_crates(swap_requests, Some(new_namespace_dirs), &mut kernel_mmi_ref.lock(), false)
+    curr_namespace.swap_crates(
+        swap_requests, 
+        Some(new_namespace_dirs), 
+        diffs.state_transfer_functions, 
+        &mut kernel_mmi_ref.lock(), 
+        false)
         .map_err(|e| format!("crate swapping failed, error: {}", e))?;
-    Err(format!("the \"apply\" command is unfinished"))
+
+    Ok(())
 }
 
 

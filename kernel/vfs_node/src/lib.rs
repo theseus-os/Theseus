@@ -61,7 +61,7 @@ impl Directory for VFSDirectory {
     }
 
     /// Returns a string listing all the children in the directory
-    fn list(&mut self) -> Vec<String> {
+    fn list(&self) -> Vec<String> {
         self.children.keys().cloned().collect()
     }
 

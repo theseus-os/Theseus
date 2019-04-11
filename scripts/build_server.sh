@@ -63,10 +63,14 @@ cd $NEW_DIR/
 ls *.o > $NEW_DIR/listing.txt
 
 
-### if the directory of old modules was optionally provided, create a diff file in the new update dir
+### If the directory of old modules was optionally provided, create a diff file in the new update dir.
+### If a state transfer function was specified, then append it to the end of the diff
 if [ -d $OLD_MODULES_DIR ] ; then 
   # DIFF_FILE=$(readlink -e $DIFF_FILE)
 	cargo run --manifest-path $TOOLS_DIR/diff_crates/Cargo.toml -- $OLD_MODULES_DIR  $NEW_MODULES_DIR  >  $NEW_DIR/diff.txt
+if [ -n $STATE_TRANSFER ] ; then
+  echo "@$STATE_TRANSFER" >>  $NEW_DIR/diff.txt
+fi
 fi
 
 

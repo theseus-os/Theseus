@@ -66,14 +66,21 @@ impl Path {
             .filter(|&x| x != "")
     }
 
+    /// Returns a reverse iterator over the components of this `Path`,
+    /// split by the path delimiter `"/"`.
+    pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.path.rsplit(PATH_DELIMITER)
+            .filter(|&x| x != "")
+    }
+
     /// Returns just the file name, i.e., the trailling component of the path.
     /// # Examples
-    /// `"/path/to/me/file.a"` -> "file.a"
-    /// `"me/file.a"` -> "file.a"
+    /// `"/path/to/my/file.a"` -> "file.a"
+    /// `"my/file.a"` -> "file.a"
     /// `"file.a"` -> "file.a"
     pub fn basename<'a>(&'a self) -> &'a str {
-        self.components()
-            .last()
+        self.rcomponents()
+            .next()
             .unwrap_or_else(|| &self.path)
     }
 
@@ -91,12 +98,14 @@ impl Path {
     /// then the last one will be treated as the extension. 
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
-            .split(EXTENSION_DELIMITER)
+            .rsplit(EXTENSION_DELIMITER)
             .filter(|&x| x != "")
-            .last()
+            .next()
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
+    /// TODO: FIXME:  this doesn't work if the `current_path` is absolute.
+    #[allow(dead_code)]
     fn canonicalize(&self, current_path: &Path) -> Path {
         let mut new_components = Vec::new();
         // Push the components of the working directory to the components of the new path

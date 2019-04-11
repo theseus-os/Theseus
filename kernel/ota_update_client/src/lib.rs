@@ -171,10 +171,18 @@ pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
 }
 
 
-/// Parses a series of diff lines into a list of pairs, 
-/// in which the first element is the old crate and the second element is the new crate.
-/// If the first element is the empty string, the second element is a new addition (replacing nothing),
-/// and if the second element is the empty string, the first element is to be removed without replacement.
+/// A representation of an diff file used to define an evolutionary crate swapping update.
+pub struct Diff {
+    /// A list of tuples in which the first element is the old crate and the second element is the new crate.
+    /// If the first element is the empty string, the second element is a new addition (replacing nothing),
+    /// and if the second element is the empty string, the first element is to be removed without replacement.
+    pub pairs: Vec<(String, String)>,
+    /// The list of state transfer functions which should be applied at the end of a crate swapping operation.
+    pub state_transfer_functions: Vec<String>,
+}
+
+
+/// Parses a series of diff lines into a representation of an update diff.
 /// 
 /// # Arguments
 /// * `diffs`: a list of lines, in which each line is a diff entry.
@@ -186,28 +194,41 @@ pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
 /// - k#scheduler-7f6134ffbb934a27.o
 /// + k#spawn-f1c87a8fc4e03893.o
 /// ```
-pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Vec<(String, String)>, &'static str> {
-    let mut result: Vec<(String, String)> = Vec::with_capacity(diffs.len());
+pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
+    let mut pairs: Vec<(String, String)> = Vec::with_capacity(diffs.len());
+    let mut state_transfer_functions: Vec<String> = Vec::new();
     for diff in diffs {
+        // addition of new crate
         if diff.starts_with("+") {
-            result.push((
+            pairs.push((
                 String::new(), 
                 diff.get(1..).ok_or("error parsing (+) diff line")?.trim().to_string(),
             ));
-        } else if diff.starts_with("-") {
-            result.push((
+        } 
+        // removal of old crate
+        else if diff.starts_with("-") {
+            pairs.push((
                 diff.get(1..).ok_or("error parsing (-) diff line")?.trim().to_string(), 
                 String::new()
             ));
-        } else if let Some((old, new)) = diff.split("->").collect_tuple() {
-            result.push((old.trim().to_string(), new.trim().to_string()));
-        } else {
+        }
+        // replacement of old crate with new crate
+        else if let Some((old, new)) = diff.split("->").collect_tuple() {
+            pairs.push((old.trim().to_string(), new.trim().to_string()));
+        }
+        // state transfer function
+        else if diff.starts_with("@") {
+            state_transfer_functions.push(
+                diff.get(1..).ok_or("error parsing (@state_transfer) diff line")?.trim().to_string(),
+            )
+        }
+        else {
             error!("parse_diff_lines(): error parsing diff line: {:?}", diff);
             return Err("error parsing diff line");
         }
     }
 
-    Ok(result)
+    Ok(Diff { pairs, state_transfer_functions })
 }
 
 

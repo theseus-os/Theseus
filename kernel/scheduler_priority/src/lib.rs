@@ -73,7 +73,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
-            error!("BUG: select_next_task(): couldn't get runqueue for core {}", apic_id); 
+            error!("BUG: select_next_task_priority(): couldn't get runqueue for core {}", apic_id); 
             return None;
         }
     };

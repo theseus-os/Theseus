@@ -1,0 +1,27 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "state_transfer"
+description = "state transfer functions for applying during evolutionary crate swapping"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[lib]
+crate-type = ["rlib"]

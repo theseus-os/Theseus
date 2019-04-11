@@ -37,7 +37,8 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
-    opts.optopt("d", "directory-crates", "specify the absolute path of the base directory where new crates will be loaded from", "PATH");
+    opts.optopt("d", "directory-crates", "the absolute path of the base directory where new crates will be loaded from", "PATH");
+    opts.optmulti("t", "state-transfer", "the fully-qualified symbol names of state transfer functions, to be run in the order given", "SYMBOL");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -86,14 +87,22 @@ fn rmain(matches: Matches) -> Result<(), String> {
     };
 
     let verbose = matches.opt_present("v");
+    let state_transfer_functions = matches.opt_strs("t");
 
-    let matches = matches.free.join(" ");
-    println!("matches: {}", matches);
+    let free_args = matches.free.join(" ");
+    println!("arguments: {}", free_args);
 
-    let tuples = parse_input_tuples(&matches)?;
+    let tuples = parse_input_tuples(&free_args)?;
     println!("tuples: {:?}", tuples);
+        
 
-    swap_modules(tuples, &curr_dir, override_namespace_crate_dirs, verbose)
+    swap_modules(
+        tuples, 
+        &curr_dir, 
+        override_namespace_crate_dirs,
+        state_transfer_functions,
+        verbose
+    )
 }
 
 
@@ -146,6 +155,7 @@ fn swap_modules(
     tuples: Vec<(&str, &str, bool)>, 
     curr_dir: &DirRef, 
     override_namespace_crate_dirs: Option<NamespaceDirectorySet>, 
+    state_transfer_functions: Vec<String>,
     verbose_log: bool
 ) -> Result<(), String> {
     let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
@@ -181,6 +191,7 @@ fn swap_modules(
     let swap_result = namespace.swap_crates(
         swap_requests, 
         override_namespace_crate_dirs,
+        state_transfer_functions,
         kernel_mmi.deref_mut(), 
         verbose_log
     );
