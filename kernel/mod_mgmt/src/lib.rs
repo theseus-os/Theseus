@@ -439,8 +439,7 @@ pub struct CrateNamespace {
     /// part of every single namespace, simply because most other crates rely upon it. 
     pub crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
 
-    /// The "system map" of all global (publicly-visible) symbols
-    /// that are present in all of the crates in this `CrateNamespace`.
+    /// The "system map" of all symbols that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
     /// which is guaranteed to be part of one of the crates in this `CrateNamespace`.  
     /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
@@ -720,14 +719,11 @@ impl CrateNamespace {
     /// but they would no longer be part of the new namespace. 
     /// 
     pub fn clone_on_write(&self) -> CrateNamespace {
-        let new_crate_tree = self.crate_tree.lock().clone();
-        let new_symbol_map = self.symbol_map.lock().clone();
-
         CrateNamespace {
             name: self.name.clone(),
             dirs: self.dirs.clone(),
-            crate_tree: Mutex::new(new_crate_tree),
-            symbol_map: Mutex::new(new_symbol_map),
+            crate_tree: Mutex::new(self.crate_tree.lock().clone()),
+            symbol_map: Mutex::new(self.symbol_map.lock().clone()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
             fuzzy_symbol_matching: self.fuzzy_symbol_matching,
         }
@@ -909,10 +905,10 @@ impl CrateNamespace {
                                     .or_else(|| namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash).upgrade())
                             }
                         }.ok_or_else(|| {
-                            error!("swap_crates(): couldn't find section in the new crate that corresponds to a fuzzy match of the old section {:?}", old_sec.name);
-                            "couldn't find section in the new crate that corresponds to a fuzzy match of the old section"
+                            error!("swap_crates(): couldn't find section in the new crate that corresponds to a match of the old section {:?}", old_sec.name);
+                            "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
-                        // debug!("swap_crates(): found fuzzy match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
+                        debug!("swap_crates(): found match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                             let reexported_name = BString::from(old_sec.name.as_str());
@@ -944,7 +940,7 @@ impl CrateNamespace {
                             new_sec_ref.get_or_insert(nsr)
                         };
                         let mut new_source_sec = new_source_sec_ref.lock();
-                        debug!("swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
+                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -2134,7 +2130,7 @@ fn is_valid_crate_name_char(c: char) -> bool {
 /// <alloc::boxed::Box<T>>::into_unique   -->  alloc
 /// keyboard::init                        -->  keyboard
 /// ```
-fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
+pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
     demangled_full_symbol.split("::").next().and_then(|s| {
         // Get the last word right before the first "::"
         s.rsplit(|c| !is_valid_crate_name_char(c))
