@@ -656,6 +656,12 @@ pub struct TaskRef(
     )>
 ); 
 
+// impl Drop for TaskRef {
+//     fn drop(&mut self) {
+//         trace!("Dropping TaskRef: strong_refs: {}, {:?}", Arc::strong_count(&self.0), self);
+//     }
+// }
+
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     /// 
@@ -724,7 +730,7 @@ impl TaskRef {
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
             if !task.is_running() {
-                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
                 let _tld = task.take_task_local_data();
             }
         }
