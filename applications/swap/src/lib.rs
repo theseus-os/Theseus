@@ -184,7 +184,6 @@ fn swap_modules(
     };
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
     
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
@@ -192,7 +191,7 @@ fn swap_modules(
         swap_requests, 
         override_namespace_crate_dirs,
         state_transfer_functions,
-        kernel_mmi.deref_mut(), 
+        &kernel_mmi_ref,
         verbose_log
     );
     

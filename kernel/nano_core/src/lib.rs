@@ -158,10 +158,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(loadable)] 
     {
         let captain_path = try_exit!(default_namespace.get_kernel_file_starting_with("captain-").ok_or("couldn't find the singular \"captain\" kernel file"));
-        let _num_captain_syms = try_exit!(default_namespace.load_kernel_crate(&captain_path, None, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_captain_syms = try_exit!(default_namespace.load_kernel_crate(&captain_path, None, &kernel_mmi_ref, false));
         
         let panic_wrapper_path = try_exit!(default_namespace.get_kernel_file_starting_with("panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" kernel file"));
-        let _num_libcore_syms = try_exit!(default_namespace.load_kernel_crate(&panic_wrapper_path, None, kernel_mmi_ref.lock().deref_mut(), false));
+        let _num_libcore_syms = try_exit!(default_namespace.load_kernel_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
     }
 
 

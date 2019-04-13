@@ -3,7 +3,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-// extern crate memory;
+extern crate memory;
 extern crate mod_mgmt;
 // #[macro_use] extern crate lazy_static;
 extern crate irq_safety;
@@ -24,7 +24,28 @@ use task::TaskRef;
 /// Used for the evolution from a round robin scheduler to a priority scheduler
 pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace) -> Result<(), &'static str> {
 
-    warn!("IN PRIO SCHED STATE TRANSFER FUNCTION");
+    warn!("prio_sched(): at the top.");
+    // Since we don't currently support updating a running application's code with the new object code, 
+    // we just hack together a solution for the terminal, since it's the only long-running app. 
+    // We only need to fix up this dependency:
+    //     runqueue_round_robin::RunQueue::remove_task  -->  runqueue_priority::RunQueue::remove_task
+    let old_section = old_namespace.get_symbol_starting_with("runqueue_round_robin::RunQueue::remove_task::").upgrade()
+        .ok_or_else(|| {
+            error!("prio_sched(): Couldn't find symbol in old namespace: \"runqueue_round_robin::RunQueue::remove_task::\"");
+            "prio_sched(): Couldn't find symbol in old namespace: \"runqueue_round_robin::RunQueue::remove_task::\""
+        })?;
+    let new_section = new_namespace.get_symbol_starting_with("runqueue_priority::RunQueue::remove_task::").upgrade()
+        .ok_or_else(|| {
+            error!("prio_sched(): Couldn't find symbol in old namespace: \"runqueue_priority::RunQueue::remove_task::\"");
+            "prio_sched(): Couldn't find symbol in old namespace: \"runqueue_priority::RunQueue::remove_task::\""
+        })?;
+    
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI ref")?;
+    warn!("prio_sched(): calling rewrite_section_dependents...");
+    CrateNamespace::rewrite_section_dependents(&old_section, &new_section, &kernel_mmi_ref)?;
+    warn!("prio_sched(): finished rewrite_section_dependents.");
+
+
     // Extract the taskrefs from the round robin Runqueue, 
     // then convert them into priority taskrefs and place them on the priority Runqueue.
     let rq_rr_crate = old_namespace.get_crate_starting_with("runqueue_round_robin").map(|(_crate_name, crate_ref)| crate_ref)
@@ -54,7 +75,7 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
         runqueue_priority::RunQueue::init(*core)?;
         for t in rq.read().iter() {
             let rrtref: &_RoundRobinTaskRef = unsafe { core::mem::transmute(t) };
-            runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, rrtref.taskref.clone())?;
+            runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, rrtref._taskref.clone())?;
         }
     }
 
@@ -68,8 +89,8 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
 
 
 struct _RoundRobinTaskRef{
-    taskref: TaskRef,
-    context_switches: u32,
+    _taskref: TaskRef,
+    _context_switches: u32,
 }
 
 

@@ -43,7 +43,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
@@ -562,7 +562,7 @@ impl CrateNamespace {
     pub fn load_application_crate(
         &self, 
         crate_file_path: &Path, 
-        kernel_mmi: &mut MemoryManagementInfo, 
+        kernel_mmi_ref: &MmiRef, 
         load_symbols_as_singleton: bool,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
@@ -575,10 +575,10 @@ impl CrateNamespace {
             _ => return Err("couldn't find specified application crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi_ref, verbose_log)?;
         
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
-        self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
 
         if load_symbols_as_singleton {
             // if this is a singleton application, we add its public symbols (except "main")
@@ -607,13 +607,13 @@ impl CrateNamespace {
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
     ///   If `backup_namespace` is `None`, then no other namespace will be searched, 
     ///   and any missing symbols will return an `Err`. 
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_kernel_crate(
         &self,
         crate_file_path: &Path,
         backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi: &mut MemoryManagementInfo, 
+        kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
@@ -625,8 +625,8 @@ impl CrateNamespace {
             _ => return Err("couldn't find specified kernel crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi, verbose_log)?;
-        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi_ref, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
@@ -654,7 +654,7 @@ impl CrateNamespace {
         &self,
         crate_file_paths: I,
         backup_namespace: Option<&CrateNamespace>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
         where I: Iterator<Item = &'p Path>
@@ -681,14 +681,14 @@ impl CrateNamespace {
         // third, do all of the section parsing and loading
         let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(crate_files.len()); 
         for locked_crate_file in &locked_crate_files {            
-            let (new_crate_ref, elf_file) = self.load_crate_sections(&locked_crate_file, kernel_mmi, verbose_log)?;
+            let (new_crate_ref, elf_file) = self.load_crate_sections(&locked_crate_file, kernel_mmi_ref, verbose_log)?;
             let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
         
         // finally, we do all of the relocations 
         for (new_crate_ref, elf_file) in partially_loaded_crates {
-            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
+            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
             self.crate_tree.lock().insert(name.into(), new_crate_ref);
         }
@@ -763,7 +763,7 @@ impl CrateNamespace {
     ///   in which the `current_namespace` is the one currently running that contains the old crates,
     ///   and the `new_namespace` contains only newly-loaded crates that are not yet being used.
     ///   Both namespaces may (and likely will) contain more crates than just the old and new crates specified in the swap request list.
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
     /// # Warning: Correctness not guaranteed
@@ -785,7 +785,7 @@ impl CrateNamespace {
         swap_requests: SwapRequestList,
         override_namespace_dirs: Option<NamespaceDirectorySet>,
         state_transfer_functions: Vec<String>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
@@ -808,7 +808,7 @@ impl CrateNamespace {
                 override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;
+            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
             (nn, false)
         };
 
@@ -875,7 +875,7 @@ impl CrateNamespace {
                     let old_sec_ref = this_symbol_map.get(old_sec_name)
                         .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
                         .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
-                    // debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
+                    debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
                     let mut old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
@@ -908,7 +908,7 @@ impl CrateNamespace {
                             error!("swap_crates(): couldn't find section in the new crate that corresponds to a match of the old section {:?}", old_sec.name);
                             "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
-                        debug!("swap_crates(): found match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
+                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, new_crate_source_sec);
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                             let reexported_name = BString::from(old_sec.name.as_str());
@@ -940,7 +940,7 @@ impl CrateNamespace {
                             new_sec_ref.get_or_insert(nsr)
                         };
                         let mut new_source_sec = new_source_sec_ref.lock();
-                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
+                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -948,7 +948,7 @@ impl CrateNamespace {
                             let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                             let target_sec_initial_flags = target_sec_mapped_pages.flags();
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                                     target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                                 }
                                 else {
@@ -966,7 +966,7 @@ impl CrateNamespace {
 
                             // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                                     target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
                                 }
                                 else {
@@ -1003,8 +1003,6 @@ impl CrateNamespace {
                     }
                 }
 
-                warn!("Old crate {} has BSS sections:\n{:?}", old_crate_name, old_crate.bss_sections.keys().map(|k| k.clone().into()).collect::<Vec<String>>().join("\n"));
-
                 // Go through all the BSS sections and copy over the old_sec into the new source_sec,
                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
                 // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
@@ -1029,7 +1027,7 @@ impl CrateNamespace {
                         "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
                     )?;
 
-                    warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
+                    // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
                     old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
                 }
             } // end of scope, drops lock for `self.symbol_map` and `new_crate_ref`
@@ -1038,7 +1036,7 @@ impl CrateNamespace {
 
         // apply the state transfer function, if provided
         for symbol in state_transfer_functions {
-            let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(self), kernel_mmi, verbose_log).upgrade()
+            let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(self), kernel_mmi_ref, verbose_log).upgrade()
                 // as a backup, search fuzzily to accommodate state transfer function symbol names without full hashes
                 .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&symbol).upgrade())
                 .ok_or("couldn't find specified state transfer function in the new CrateNamespace")?;
@@ -1127,8 +1125,8 @@ impl CrateNamespace {
             }
             else {
                 // debug!("swap_crates(): adding new crate symbols: {:?}", new_crate_ref);
-                self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
                 debug!("swap_crates(): adding new crate itself: {:?}", new_crate_ref);
+                self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
         });
@@ -1139,6 +1137,90 @@ impl CrateNamespace {
         self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
+    }
+
+
+    /// Finds all of the weak dependents (sections that depend on the given `old_section`)
+    /// and rewrites their relocation entries to point to the given `new_section`.
+    /// This effectively replaces the usage of the `old_section` with the `new_section`,
+    /// but does not make any modifications to symbol maps.
+    pub fn rewrite_section_dependents(
+        old_section: &StrongSectionRef,
+        new_section: &StrongSectionRef,
+        kernel_mmi_ref: &MmiRef
+    ) -> Result<(), &'static str> {
+
+        let old_sec = old_section.lock();
+
+        for weak_dep in &old_sec.sections_dependent_on_me {
+            let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+            let mut target_sec = target_sec_ref.lock();
+            let relocation_entry = weak_dep.relocation;
+
+            let mut new_source_sec = new_section.lock();
+            debug!("rewrite_section_dependents(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
+
+            // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+            // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+            {
+                let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                let target_sec_initial_flags = target_sec_mapped_pages.flags();
+                if !target_sec_initial_flags.is_writable() {
+                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                    }
+                    else {
+                        return Err("couldn't get kernel's active page table");
+                    }
+                }
+
+                write_relocation(
+                    relocation_entry, 
+                    &mut target_sec_mapped_pages, 
+                    target_sec.mapped_pages_offset, 
+                    new_source_sec.virt_addr(), 
+                    false
+                )?;
+
+                // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+                if !target_sec_initial_flags.is_writable() {
+                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                    }
+                    else {
+                        return Err("couldn't get kernel's active page table");
+                    }
+                };
+            }
+            
+            // Tell the new source_sec that the existing target_sec depends on it.
+            // Note that we don't need to do this if we're re-swapping in a cached crate,
+            // because that crate's sections' dependents are already properly set up from when it was first swapped in.
+            // if !is_optimized {
+                new_source_sec.sections_dependent_on_me.push(WeakDependent {
+                    section: Arc::downgrade(&target_sec_ref),
+                    relocation: relocation_entry,
+                });
+            // }
+
+            // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
+            // and that it now depends on the new source_sec.
+            let mut found_strong_dependency = false;
+            for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
+                if Arc::ptr_eq(&strong_dep.section, old_section) && strong_dep.relocation == relocation_entry {
+                    strong_dep.section = Arc::clone(new_section);
+                    found_strong_dependency = true;
+                    break;
+                }
+            }
+            if !found_strong_dependency {
+                error!("Couldn't find/remove the existing StrongDependency from target_sec {:?} to old_sec {:?}",
+                    target_sec.name, old_sec.name);
+                return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
+            }
+        }
+
+        Ok(())
     }
 
 
@@ -1154,12 +1236,12 @@ impl CrateNamespace {
     /// 
     /// # Arguments
     /// * `crate_file`: the object file for the crate that will be loaded into this `CrateNamespace`.
-    /// * `kernel_mmi`: the kernel's MMI struct, for memory mapping use.
+    /// * `kernel_mmi_ref`: the kernel's MMI struct, for memory mapping use.
     /// * `verbose_log`: whether to log detailed messages for debugging.
     fn load_crate_sections<'f>(
         &self,
         crate_file: &'f Box<File + Send>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
         
@@ -1189,7 +1271,7 @@ impl CrateNamespace {
         debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
-        let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+        let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
         let text_pages    = section_pages.text_pages  .map(|tp| Arc::new(Mutex::new(tp)));
         let rodata_pages  = section_pages.rodata_pages.map(|rp| Arc::new(Mutex::new(rp)));
         let data_pages    = section_pages.data_pages  .map(|dp| Arc::new(Mutex::new(dp)));
@@ -1566,7 +1648,7 @@ impl CrateNamespace {
         elf_file: &ElfFile,
         new_crate_ref: &StrongCrateRef,
         backup_namespace: Option<&CrateNamespace>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
         let new_crate = new_crate_ref.lock_as_ref();
@@ -1664,7 +1746,7 @@ impl CrateNamespace {
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi, verbose_log)
+                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi_ref, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1723,7 +1805,7 @@ impl CrateNamespace {
 
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
             if let Some(ref tp) = new_crate.text_pages { 
                 tp.lock().remap(active_table, TEXT_SECTION_FLAGS())?;
             }
@@ -1881,12 +1963,12 @@ impl CrateNamespace {
     ///   if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
     ///   If `backup_namespace` is `None`, then no other namespace will be searched.
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
         backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> WeakSectionRef {
         // First, see if the section for the given symbol is already available and loaded
@@ -1979,7 +2061,7 @@ impl CrateNamespace {
             if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name)
                 .or_else(|| backup_namespace.and_then(|backup| backup.get_kernel_file_starting_with(&crate_dependency_name)))
             {
-                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi, verbose_log) {
+                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
                         return sec;
@@ -2190,7 +2272,7 @@ struct SectionPages {
 
 /// Allocates enough space for the sections that are found in the given `ElfFile`.
 /// Returns a tuple of `MappedPages` for the .text, .rodata, and .data/.bss sections, in that order.
-fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementInfo) 
+fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) 
     -> Result<SectionPages, &'static str> 
 {
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
@@ -2237,7 +2319,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementI
         let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
 
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                 // Right now we're just simply copying small sections to the new memory,
                 // so we have to map those pages to real (randomly chosen) frames first. 
                 // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
