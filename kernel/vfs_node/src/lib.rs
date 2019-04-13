@@ -15,7 +15,6 @@ extern crate memory;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;

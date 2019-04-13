@@ -27,7 +27,6 @@ extern crate memfs;
 
 use core::ops::{DerefMut, Deref};
 use alloc::{
-    boxed::Box,
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
     string::{String, ToString},

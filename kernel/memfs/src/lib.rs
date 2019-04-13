@@ -20,7 +20,6 @@ use fs_node::{DirRef, WeakDirRef, File, FsNode};
 use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PageTable, FRAME_ALLOCATOR, EntryFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
-use alloc::boxed::Box;
 use fs_node::{FileOrDir, FileRef};
 
 /// The struct that represents a file in memory that is backed by MappedPages

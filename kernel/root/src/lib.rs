@@ -12,7 +12,6 @@ extern crate fs_node;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
