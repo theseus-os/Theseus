@@ -25,8 +25,7 @@ extern crate path;
 extern crate memfs;
 
 
-use core::ops::DerefMut;
-use core::ops::Deref;
+use core::ops::{DerefMut, Deref};
 use alloc::{
     boxed::Box,
     vec::Vec,
@@ -1069,8 +1068,6 @@ impl CrateNamespace {
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
     }
-
-    //pub type F = File + Send;
 
     /// The primary internal routine for parsing and loading all of the sections.
     /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,

@@ -23,16 +23,15 @@ use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use memory::MappedPages;
 
-/// An strong reference (Arc) to a trait object that implements Directory
+/// An strong reference (Arc) and a Mutex wrapper around a Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 
 /// concrete implementations of Directories 
 pub type DirRef =  Arc<Mutex<Directory + Send>>;
-/// An weak reference (Weak) and a Mutex wrapper around a trait object that implements Directory
+/// An weak reference (Weak) and a Mutex wrapper around a Directory
 pub type WeakDirRef = Weak<Mutex<Directory + Send>>;
-/// A strong reference to a trait object that implements file. We don't need a weak reference because there
-/// should not be cyclic pointers from a file to another object
+/// A strong reference to a trait object that implements File. 
 pub type FileRef = Arc<Mutex<File + Send>>;
-
+/// A weak reference (Weak) and a Mutex wrapper around a File
 pub type WeakFileRef = Weak<Mutex<File + Send>>;
 
 /// Traits that both files and directories share
