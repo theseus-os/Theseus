@@ -173,8 +173,9 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let end_hpet: u64;
 	let mut mypid = core::usize::MAX;
 
+	let tmp_iterations = ITERATIONS *1000;
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
-	for _ in 0..ITERATIONS {
+	for _ in 0..tmp_iterations {
 		mypid = task::get_my_current_task_id().unwrap();
 	}
 	end_hpet = get_hpet().as_ref().unwrap().get_counter();
@@ -187,7 +188,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	}
 
 	let delta_time = hpet_2_time("", delta_hpet);
-	let delta_time_avg = delta_time / ITERATIONS as u64;
+	let delta_time_avg = delta_time / ((ITERATIONS*1000) as u64);
 
 	printlninfo!("null_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {} (ignore: {})",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT, mypid);
@@ -238,9 +239,9 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	use spawn::ApplicationTaskBuilder;
     let start_hpet: u64;
 	let end_hpet: u64;
-
+	let tmp_iterations: u64 = 100;
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
-	for _ in 0..ITERATIONS {
+	for _ in 0..tmp_iterations {
 		let child = ApplicationTaskBuilder::new(Path::new(String::from("hello")))
 	        .pin_on_core(child_core) // the child is always in the my core -1
 	        //.argument(Vec::new())
@@ -253,7 +254,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 
     let delta_hpet = end_hpet - start_hpet - overhead_ct;
     let delta_time = hpet_2_time("", delta_hpet);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
+    let delta_time_avg = delta_time / tmp_iterations as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
