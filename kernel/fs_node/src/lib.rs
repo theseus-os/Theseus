@@ -26,12 +26,14 @@ use memory::MappedPages;
 /// An strong reference (Arc) to a trait object that implements Directory
 /// This is a trait object that will allow us to seamlessly call fs methods on different 
 /// concrete implementations of Directories 
-pub type DirRef = Arc<Mutex<Box<Directory + Send>>>;
+pub type DirRef =  Arc<Mutex<Directory + Send>>;
 /// An weak reference (Weak) and a Mutex wrapper around a trait object that implements Directory
-pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
+pub type WeakDirRef = Weak<Mutex<Directory + Send>>;
 /// A strong reference to a trait object that implements file. We don't need a weak reference because there
 /// should not be cyclic pointers from a file to another object
-pub type FileRef = Arc<Mutex<Box<File + Send>>>;
+pub type FileRef = Arc<Mutex<File + Send>>;
+
+pub type WeakFileRef = Weak<Mutex<File + Send>>;
 
 /// Traits that both files and directories share
 pub trait FsNode {
