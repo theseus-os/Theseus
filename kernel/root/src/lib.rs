@@ -12,7 +12,6 @@ extern crate fs_node;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
@@ -30,7 +29,7 @@ lazy_static! {
             children: BTreeMap::new() 
         };
 
-        let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
+        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
     
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
 

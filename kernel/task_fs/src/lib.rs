@@ -38,7 +38,6 @@ extern crate root;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
@@ -79,7 +78,7 @@ impl TaskFs {
             name: name,
             parent: Arc::downgrade(parent_dir),
         };
-        let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
+        let dir_ref = Arc::new(Mutex::new(directory)) as Arc<Mutex<Directory + Send>>;
         let dir_ref_copy = Arc::clone(&dir_ref); // so we can return this copy
         let strong_parent = Arc::clone(parent_dir);
         strong_parent.lock().insert(FileOrDir::Dir(dir_ref))?;
@@ -104,7 +103,7 @@ impl TaskFs {
         let name = task_ref.lock().id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
         let task_dir = TaskDir::new(name, &parent_dir, task_ref.clone())?;        
-        let boxed_task_dir = Arc::new(Mutex::new(Box::new(task_dir) as Box<Directory + Send>));
+        let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as Arc<Mutex<Directory + Send>>;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
 }
@@ -197,13 +196,13 @@ impl Directory for TaskDir {
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "taskInfo" {
             let task_file = TaskFile::new(self.taskref.clone());
-            return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
+            return Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as Arc<Mutex<File + Send>>));
 
         }
 
         if child_name == "mmi" {
             let mmi_dir = MmiDir::new(self.taskref.clone());
-            return Some(FileOrDir::Dir(Arc::new(Mutex::new(Box::new(mmi_dir) as Box<Directory + Send>))));
+            return Some(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) as Arc<Mutex<Directory + Send>>));
             
         }
         None
@@ -351,8 +350,7 @@ impl Directory for MmiDir {
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "MmiInfo" {
             let task_file = MmiFile::new(self.taskref.clone());
-            return Some(FileOrDir::File(Arc::new(Mutex::new(Box::new(task_file) as Box<File + Send>))));
-
+            return Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as Arc<Mutex<File + Send>>));
         }
         None
         // create a new mmi dir here
