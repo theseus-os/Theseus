@@ -78,7 +78,7 @@ pub fn parse_nano_core(
         Ok(FileOrDir::File(f)) => f,
         _ => return Err(("BUG: no nano_core file at expected path", [text_pages, rodata_pages, data_pages])),
     };
-    let nano_core_file = &**nano_core_file_ref.lock();
+    let nano_core_file = &*nano_core_file_ref.lock();
 
     debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
     // We don't need to actually load the nano_core as a new crate, since we're already running it.
