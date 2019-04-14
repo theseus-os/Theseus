@@ -25,9 +25,8 @@ extern crate path;
 extern crate memfs;
 
 
-use core::ops::DerefMut;
+use core::ops::{DerefMut, Deref};
 use alloc::{
-    boxed::Box,
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
     string::{String, ToString},
@@ -575,7 +574,7 @@ impl CrateNamespace {
             _ => return Err("couldn't find specified application crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi_ref, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
         
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
         self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
@@ -625,7 +624,7 @@ impl CrateNamespace {
             _ => return Err("couldn't find specified kernel crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(&crate_file, kernel_mmi_ref, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
         self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
@@ -681,7 +680,7 @@ impl CrateNamespace {
         // third, do all of the section parsing and loading
         let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(crate_files.len()); 
         for locked_crate_file in &locked_crate_files {            
-            let (new_crate_ref, elf_file) = self.load_crate_sections(&locked_crate_file, kernel_mmi_ref, verbose_log)?;
+            let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)?;
             let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
@@ -1272,7 +1271,7 @@ impl CrateNamespace {
     /// * `verbose_log`: whether to log detailed messages for debugging.
     fn load_crate_sections<'f>(
         &self,
-        crate_file: &'f Box<File + Send>,
+        crate_file: &'f File,
         kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {

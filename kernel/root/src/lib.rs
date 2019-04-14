@@ -12,7 +12,6 @@ extern crate fs_node;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
@@ -28,11 +27,8 @@ lazy_static! {
         let root_dir = RootDirectory {
             children: BTreeMap::new() 
         };
-
-        let strong_root = Arc::new(Mutex::new(Box::new(root_dir) as Box<Directory + Send>));
-    
+        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
-
     };
 }
 
@@ -51,7 +47,7 @@ impl Directory for RootDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         let name = node.get_name();
         if let Some(mut old_node) = self.children.insert(name, node) {
-            old_node.set_parent_dir(Weak::new());
+            old_node.set_parent_dir(Weak::<Mutex<RootDirectory>>::new());
             Ok(Some(old_node))
         } else {
             Ok(None)
@@ -79,7 +75,7 @@ impl Directory for RootDirectory {
         }
         
         if let Some(mut old_node) = self.children.remove(&node.get_name()) {
-            old_node.set_parent_dir(Weak::new());
+            old_node.set_parent_dir(Weak::<Mutex<RootDirectory>>::new());
             Some(old_node)
         } else {
             None

@@ -15,7 +15,6 @@ extern crate memory;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
@@ -42,7 +41,7 @@ impl VFSDirectory {
             children: BTreeMap::new(),
             parent: Arc::downgrade(parent),
         };
-        let dir_ref = Arc::new(Mutex::new(Box::new(directory) as Box<Directory + Send>));
+        let dir_ref = Arc::new(Mutex::new(directory)) as Arc<Mutex<Directory + Send>>;
         parent.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
         Ok(dir_ref)
     }
@@ -52,7 +51,7 @@ impl Directory for VFSDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         let name = node.get_name();
         if let Some(mut old_node) = self.children.insert(name, node) {
-            old_node.set_parent_dir(Weak::new());
+            old_node.set_parent_dir(Weak::<Mutex<VFSDirectory>>::new());
             Ok(Some(old_node))
         } else {
             Ok(None)
@@ -70,7 +69,7 @@ impl Directory for VFSDirectory {
 
     fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
         if let Some(mut old_node) = self.children.remove(&node.get_name()) {
-            old_node.set_parent_dir(Weak::new());
+            old_node.set_parent_dir(Weak::<Mutex<VFSDirectory>>::new());
             Some(old_node)
         } else {
             None
@@ -112,7 +111,7 @@ impl VFSFile {
             _contents: contents,
             parent: Arc::downgrade(parent),
         };
-        let file_ref = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
+        let file_ref = Arc::new(Mutex::new(file)) as Arc<Mutex<File + Send>>;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
         Ok(file_ref)
     }

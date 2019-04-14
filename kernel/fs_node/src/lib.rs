@@ -18,22 +18,22 @@ extern crate memory;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use memory::MappedPages;
 
-/// An strong reference (Arc) to a trait object that implements Directory
-/// This is a trait object that will allow us to seamlessly call fs methods on different 
-/// concrete implementations of Directories 
-pub type DirRef = Arc<Mutex<Box<Directory + Send>>>;
-/// An weak reference (Weak) and a Mutex wrapper around a trait object that implements Directory
-pub type WeakDirRef = Weak<Mutex<Box<Directory + Send>>>;
-/// A strong reference to a trait object that implements file. We don't need a weak reference because there
-/// should not be cyclic pointers from a file to another object
-pub type FileRef = Arc<Mutex<Box<File + Send>>>;
 
-/// Traits that both files and directories share
+/// A reference to any type that implements the Directory trait.
+pub type DirRef =  Arc<Mutex<Directory + Send>>;
+/// A weak reference to any type that implements the Directory trait.
+pub type WeakDirRef = Weak<Mutex<Directory + Send>>;
+/// A reference to any type that implements the File trait.
+pub type FileRef = Arc<Mutex<File + Send>>;
+/// A weak reference to any type that implements the File trait.
+pub type WeakFileRef = Weak<Mutex<File + Send>>;
+
+
+/// A trait that covers any filesystem node, both files and directories.
 pub trait FsNode {
     /// Recursively gets the absolute pathname as a String
     fn get_absolute_path(&self) -> String {
