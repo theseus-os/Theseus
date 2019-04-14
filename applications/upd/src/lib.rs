@@ -219,7 +219,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
     let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
     let base_dir = match base_dir_path.get(&curr_dir) {
-        Ok(FileOrDir::Dir(d)) => d,
+        Some(FileOrDir::Dir(d)) => d,
         _ => return Err(format!("cannot find base directory at path {}", base_dir_path)),
     };
     let new_namespace_dirs = NamespaceDirectorySet::from_existing_base_dir(base_dir.clone()).map_err(|e| e.to_string())?;

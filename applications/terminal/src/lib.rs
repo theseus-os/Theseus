@@ -972,7 +972,7 @@ impl Terminal {
 	    // Check that the application actually exists
         let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
         let app_list = match app_path.get(root::get_root()) {
-            Ok(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
+            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
             _ => return Err(AppErr::NamespaceErr)
         };
         let mut executable = command.clone();

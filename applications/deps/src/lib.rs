@@ -103,7 +103,11 @@ fn sections_dependent_on_me(section_name: &str) -> Result<(), String> {
     println!("Sections that depend on {}  (weak dependents):", sec_ref.lock().name);
     for dependent_sec_ref in sec_ref.lock().sections_dependent_on_me.iter().filter_map(|weak_dep| weak_dep.section.upgrade()) {
         let dependent_sec = dependent_sec_ref.lock();
-        println!("    {}  in {:?}", dependent_sec.name, dependent_sec.parent_crate.upgrade());
+        if verbose!() { 
+            println!("    {}  in {:?}", dependent_sec.name, dependent_sec.parent_crate.upgrade());
+        } else {
+            println!("    {}", dependent_sec.name);
+        }
     }
     Ok(())
 }
@@ -119,7 +123,11 @@ fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
     println!("Sections that {} depends on  (strong dependencies):", sec_ref.lock().name);
     for dependency_sec_ref in sec_ref.lock().sections_i_depend_on.iter().map(|dep| &dep.section) {
         let dependency_sec = dependency_sec_ref.lock();
-        println!("    {}  in {:?}", dependency_sec.name, dependency_sec.parent_crate.upgrade());
+        if verbose!() { 
+            println!("    {}  in {:?}", dependency_sec.name, dependency_sec.parent_crate.upgrade());
+        } else {
+            println!("    {}", dependency_sec.name);
+        }
     }
     Ok(())
 }
@@ -130,7 +138,7 @@ fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
 /// 
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching crate names separated by the newline character `'\n'`.
-fn crates_dependent_on_me(crate_name: &str) -> Result<(), String> {
+fn crates_dependent_on_me(_crate_name: &str) -> Result<(), String> {
     Err(format!("unimplemented"))
 }
 
@@ -140,7 +148,7 @@ fn crates_dependent_on_me(crate_name: &str) -> Result<(), String> {
 /// 
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching crate names separated by the newline character `'\n'`.
-fn crates_i_depend_on(crate_name: &str) -> Result<(), String> {
+fn crates_i_depend_on(_crate_name: &str) -> Result<(), String> {
     Err(format!("unimplemented"))
 }
 
@@ -156,7 +164,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
         return matching_symbols[0].1.upgrade()
             .ok_or_else(|| format!("Found matching symbol name but couldn't get reference to section"));
     } else if matching_symbols.len() > 1 {
-        return Err(matching_symbols.into_iter().map(|(k, v)| k).collect::<Vec<String>>().join("\n"));
+        return Err(matching_symbols.into_iter().map(|(k, _v)| k).collect::<Vec<String>>().join("\n"));
     } else {
         // continue on
     }
@@ -191,7 +199,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 /// 
 /// If there are multiple matches, this returns an Error containing all of the matching crate names,
 /// separated by the newline character `'\n'`.
-fn find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
+fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
     let namespace = get_my_current_namespace();
     let matching_crate_names: Vec<String> = namespace.crate_names()
         .into_iter()

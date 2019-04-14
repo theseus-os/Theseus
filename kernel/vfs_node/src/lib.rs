@@ -27,9 +27,9 @@ use memory::MappedPages;
 pub struct VFSDirectory {
     /// The name of the directory
     pub name: String,
-    /// A list of DirRefs or pointers to the node directories   
+    /// A list of child filesystem nodes
     pub children: BTreeMap<String, FileOrDir>,
-    /// A weak reference to the parent directory, wrapped in Option because the root directory does not have a parent
+    /// A weak reference to the parent directory
     pub parent: WeakDirRef,
 }
 
@@ -50,10 +50,13 @@ impl VFSDirectory {
 
 impl Directory for VFSDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-         // gets the name of the node node to be added
         let name = node.get_name();
-        // inserts new node, if that node already exists the old value is returned
-        Ok(self.children.insert(name, node))
+        if let Some(mut old_node) = self.children.insert(name, node) {
+            old_node.set_parent_dir(Weak::new());
+            Ok(Some(old_node))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
@@ -65,9 +68,13 @@ impl Directory for VFSDirectory {
         self.children.keys().cloned().collect()
     }
 
-    fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str> {
-        self.children.remove(&node.get_name());
-        Ok(())
+    fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
+        if let Some(mut old_node) = self.children.remove(&node.get_name()) {
+            old_node.set_parent_dir(Weak::new());
+            Some(old_node)
+        } else {
+            None
+        }
     }
 }
 
@@ -77,8 +84,12 @@ impl FsNode for VFSDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
+    fn get_parent_dir(&self) -> Option<DirRef> {
+        self.parent.upgrade()
+    }
+
+    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
+        self.parent = new_parent;
     }
 }
 
@@ -88,18 +99,17 @@ pub struct VFSFile {
     /// The file size 
     size: usize, 
     /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
-    contents: String,
+    _contents: String,
     /// A weak reference to the parent directory
     parent: WeakDirRef,
 }
 
 impl VFSFile {
     pub fn new(name: String, size: usize, contents: String, parent: &DirRef) -> Result<FileRef, &'static str> {
-        // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let file = VFSFile {
             name: name, 
             size: size, 
-            contents: contents,
+            _contents: contents,
             parent: Arc::downgrade(parent),
         };
         let file_ref = Arc::new(Mutex::new(Box::new(file) as Box<File + Send>));
@@ -109,9 +119,13 @@ impl VFSFile {
 }
 
 impl File for VFSFile {
-    fn read(&self, _buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { unimplemented!()    }
-    fn write(&mut self, _buf: &[u8], offset: usize) -> Result<usize, &'static str> { unimplemented!(); }
+    fn read(&self, _buf: &mut [u8], _offset: usize) -> Result<usize, &'static str> { 
+        Err("VFSFile::read() is unimplemented")
+    }
 
+    fn write(&mut self, _buf: &[u8], _offset: usize) -> Result<usize, &'static str> {
+        Err("VFSFile::write() is unimplemented")
+    }
     
     fn size(&self) -> usize {
         self.size
@@ -127,8 +141,11 @@ impl FsNode for VFSFile {
         self.name.clone()
     }
     
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
+    fn get_parent_dir(&self) -> Option<DirRef> {
+        self.parent.upgrade()
+    }
+
+    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
+        self.parent = new_parent;
     }
 }

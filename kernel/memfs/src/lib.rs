@@ -5,7 +5,7 @@
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
 //! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -152,9 +152,12 @@ impl FsNode for MemFile {
         self.name.clone()
     }
     
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
+    fn get_parent_dir(&self) -> Option<DirRef> {
+        self.parent.upgrade()
+    }
+
+    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
+        self.parent = new_parent;
     }
 }
 

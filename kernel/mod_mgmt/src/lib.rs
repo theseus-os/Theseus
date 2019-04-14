@@ -569,9 +569,9 @@ impl CrateNamespace {
         
         debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
         let crate_file_ref = match crate_file_path.get(&self.dirs.app)
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.app)) // retry with the ".o" extension
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.app)) // retry with the ".o" extension
         {
-            Ok(FileOrDir::File(f)) => f,
+            Some(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified application crate file path"),
         };
         let crate_file = crate_file_ref.lock();
@@ -619,9 +619,9 @@ impl CrateNamespace {
 
         debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
         let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
         {
-            Ok(FileOrDir::File(f)) => f,
+            Some(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified kernel crate file path"),
         };
         let crate_file = crate_file_ref.lock();
@@ -663,7 +663,7 @@ impl CrateNamespace {
         let mut crate_files: Vec<FileRef> = Vec::new();
         for crate_file_path in crate_file_paths {
             let crate_file_ref: FileRef = match crate_file_path.get(&self.dirs.kernel) {
-                Ok(FileOrDir::File(f)) => f,
+                Some(FileOrDir::File(f)) => f,
                 _ => {
                     error!("Couldn't find specified kernel crate file path: {:?}", crate_file_path);
                     return Err("couldn't find specified kernel crate file path");
@@ -1052,7 +1052,8 @@ impl CrateNamespace {
         }
 
 
-        // remove all of the old crates now that we're fully done using them
+        // Remove all of the old crates now that we're fully done using them.
+        // This doesn't mean each crate will be immediately dropped -- they still might be in use by other crates or tasks.
         {
             let mut this_symbol_map = self.symbol_map.lock();
             for req in swap_requests {
@@ -1130,6 +1131,37 @@ impl CrateNamespace {
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
         });
+
+
+        // TODO FIXME: change the above cached crate entries to reflect that the 
+
+
+        // Now that we've fixed up the already-loaded (running) crates, 
+        // we need to move the new crate object files from new namespace directory set to the old (self),
+        // such that future usage of those crates will load the appropriate new crate object files. 
+        let copy_directory_contents = |source_dir_ref: &DirRef, dest_dir_ref: &DirRef| -> Result<(), &'static str> {
+            let mut source_dir = source_dir_ref.lock();
+            let mut dest_dir   = dest_dir_ref.lock();
+            for fs_node_name in &source_dir.list() {
+                let file_node = match source_dir.get(fs_node_name) {
+                    Some(FileOrDir::File(f)) => FileOrDir::File(f),
+                    _ => {
+                        warn!("Skipping unexpected directory {} in source namespace directory", fs_node_name);
+                        continue;
+                    }
+                };
+                if let Some(mut node) = source_dir.remove(&file_node) {
+                    node.set_parent_dir(Arc::downgrade(dest_dir_ref));
+                    let _old_node = dest_dir.insert(node)?;
+                    use fs_node::FsNode;
+                    debug!("swap_crates(): replaced old crate object file {:?}", _old_node.map(|n| n.get_name()));
+                }
+            }
+            Ok(())
+        };
+        copy_directory_contents(&namespace_of_new_crates.dirs.kernel, &self.dirs.kernel)?;
+        copy_directory_contents(&namespace_of_new_crates.dirs.app, &self.dirs.app)?;
+        // copy_directory_contents(&namespace_of_new_crates.dirs.user, &self.dirs.user)?; // not used currently
 
 
         debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 

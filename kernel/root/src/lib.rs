@@ -14,9 +14,9 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use spin::Mutex;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{DirRef, Directory, FileOrDir, FsNode};
+use fs_node::{DirRef, Directory, FileOrDir, FsNode, WeakDirRef};
 
 
 pub const ROOT_DIRECTORY_NAME: &'static str = "";
@@ -26,7 +26,6 @@ lazy_static! {
     /// Returns a tuple for easy access to the name of the root so we don't have to lock it
     pub static ref ROOT: (String, DirRef) = {
         let root_dir = RootDirectory {
-            name: ROOT_DIRECTORY_NAME.to_string(),
             children: BTreeMap::new() 
         };
 
@@ -44,8 +43,6 @@ pub fn get_root() -> &'static DirRef {
 
 /// A struct that represents a node in the VFS 
 pub struct RootDirectory {
-    /// The name of the directory
-    name: String,
     /// A list of DirRefs or pointers to the child directories   
     children: BTreeMap<String, FileOrDir>,
 }
@@ -53,7 +50,12 @@ pub struct RootDirectory {
 impl Directory for RootDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         let name = node.get_name();
-        Ok(self.children.insert(name, node))
+        if let Some(mut old_node) = self.children.insert(name, node) {
+            old_node.set_parent_dir(Weak::new());
+            Ok(Some(old_node))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
@@ -64,18 +66,24 @@ impl Directory for RootDirectory {
         self.children.keys().cloned().collect()
     }
 
-    fn remove(&mut self, node: &FileOrDir) -> Result<(), &'static str> {
+    fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
         // Prevents removal of root
         match node {
             &FileOrDir::Dir(ref dir) => {
                 if Arc::ptr_eq(dir, get_root()) {
-                    return Err("Removing the root directory is forbidden");
+                    error!("Ignoring attempt to remove the root directory.");
+                    return None;
                 }
             },
             _ => {}
         }
-        self.children.remove(&node.get_name());
-        Ok(())
+        
+        if let Some(mut old_node) = self.children.remove(&node.get_name()) {
+            old_node.set_parent_dir(Weak::new());
+            Some(old_node)
+        } else {
+            None
+        }
     }
 }
 
@@ -90,7 +98,11 @@ impl FsNode for RootDirectory {
     }
 
     /// we just return the root itself because it is the top of the filesystem
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        Ok(get_root().clone())
+    fn get_parent_dir(&self) -> Option<DirRef> {
+        Some(get_root().clone())
+    }
+
+    fn set_parent_dir(&mut self, _: WeakDirRef) {
+        // do nothing
     }
 }

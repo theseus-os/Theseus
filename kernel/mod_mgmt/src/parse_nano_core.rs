@@ -75,7 +75,7 @@ pub fn parse_nano_core(
     );
 
     let nano_core_file_ref = match nano_core_file_path.get(&namespace.dirs().kernel_directory()) {
-        Ok(FileOrDir::File(f)) => f,
+        Some(FileOrDir::File(f)) => f,
         _ => return Err(("BUG: no nano_core file at expected path", [text_pages, rodata_pages, data_pages])),
     };
     let nano_core_file = &**nano_core_file_ref.lock();

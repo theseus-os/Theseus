@@ -18,7 +18,6 @@ extern crate task;
 extern crate path;
 extern crate fs_node;
 
-use core::ops::DerefMut;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -78,7 +77,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     let override_namespace_crate_dirs = if let Some(path) = matches.opt_str("d") {
         let path = Path::new(path);
         let base_dir = match path.get(&curr_dir) {
-            Ok(FileOrDir::Dir(dir)) => dir,
+            Some(FileOrDir::Dir(dir)) => dir,
             _ => return Err(format!("Error: could not find specified namespace crate directory: {}.", path)),
         };
         Some(NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| e.to_string())?)
@@ -170,9 +169,9 @@ fn swap_modules(
 
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
-                Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
+                Some(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
                 _ => namespace.get_kernel_file_starting_with(n)
-                        .and_then(|p| p.get(namespace.dirs().kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())).ok())
+                        .and_then(|p| p.get(namespace.dirs().kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())))
                         .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
             }?;
             mods.push(

@@ -43,11 +43,11 @@ pub struct RoundRobinTaskRef{
     context_switches: u32,
 }
 
-impl Drop for RoundRobinTaskRef {
-    fn drop(&mut self) {
-        warn!("DROPPING RoundRobinTaskRef with taskref {:?}", self.taskref);
-    }
-}
+// impl Drop for RoundRobinTaskRef {
+//     fn drop(&mut self) {
+//         warn!("DROPPING RoundRobinTaskRef with taskref {:?}", self.taskref);
+//     }
+// }
 
 impl Deref for RoundRobinTaskRef {
     type Target = TaskRef;
@@ -99,11 +99,11 @@ pub struct RunQueue {
     core: u8,
     queue: VecDeque<RoundRobinTaskRef>,
 }
-impl Drop for RunQueue {
-    fn drop(&mut self) {
-        warn!("DROPPING Round Robing Runqueue for core {}", self.core);
-    }
-}
+// impl Drop for RunQueue {
+//     fn drop(&mut self) {
+//         warn!("DROPPING Round Robing Runqueue for core {}", self.core);
+//     }
+// }
 
 impl Deref for RunQueue {
     type Target = VecDeque<RoundRobinTaskRef>;

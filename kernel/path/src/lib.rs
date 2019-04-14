@@ -53,6 +53,13 @@ impl From<String> for Path {
     }
 }
 
+impl From<Path> for String {
+    #[inline]
+    fn from(path: Path) -> String {
+        path.path
+    }
+}
+
 impl Path {
     /// Creates a new `Path` from the given String.
     pub fn new(path: String) -> Self {
@@ -186,7 +193,7 @@ impl Path {
 
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
-    pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
+    pub fn get(&self, starting_dir: &DirRef) -> Option<FileOrDir> {
         let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
             if self.is_absolute() {
@@ -204,33 +211,30 @@ impl Path {
                 }
                 ".." => {
                     // navigate to parent directory
-                    let parent_dir = curr_dir.lock().get_parent_dir().map_err(|_e| {
-                        error!("Path::get(): failed to move up to parent dir, path {}", current_path);
-                        "failed to move up to parent dir"
-                    })?;
+                    let parent_dir = curr_dir.lock().get_parent_dir()?;
                     curr_dir = parent_dir;
                 }
                 cmpnt => {
                     // navigate to child directory, or return the child file
                     let child_dir = match curr_dir.lock().get(cmpnt) {
-                        Some(FileOrDir::File(f)) => return Ok(FileOrDir::File(f)),
+                        Some(FileOrDir::File(f)) => return Some(FileOrDir::File(f)),
                         Some(FileOrDir::Dir(d)) => d,
-                        None => return Err("file or directory not found"),
+                        None => return None,
                     };
                     curr_dir = child_dir;
                 }
             }
         }
-        Ok(FileOrDir::Dir(curr_dir))
+        Some(FileOrDir::Dir(curr_dir))
     }
 
 
     /// Returns the file or directory specified by the given absolute path
-    pub fn get_absolute(path: &Path) -> Result<FileOrDir, &'static str> {
+    pub fn get_absolute(path: &Path) -> Option<FileOrDir> {
         if path.is_absolute() {
             path.get(root::get_root())
         } else {
-            Err("given path was not absolute")
+            None
         }
     }
 }
