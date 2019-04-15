@@ -43,9 +43,7 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-
-#[cfg(runqueue_state_spill_evaluation)]
-use spin::Once;
+extern crate fs_node; 
 
 
 
@@ -69,6 +67,7 @@ use mod_mgmt::metadata::StrongCrateRef;
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
+use fs_node::DirRef;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
@@ -296,7 +295,7 @@ impl Task {
         }
     }
 
-    pub fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
+    fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
         self.env = new_env;
     }
 
@@ -657,6 +656,12 @@ pub struct TaskRef(
     )>
 ); 
 
+// impl Drop for TaskRef {
+//     fn drop(&mut self) {
+//         trace!("Dropping TaskRef: strong_refs: {}, {:?}", Arc::strong_count(&self.0), self);
+//     }
+// }
+
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     /// 
@@ -725,7 +730,7 @@ impl TaskRef {
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
             if !task.is_running() {
-                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
                 let _tld = task.take_task_local_data();
             }
         }
@@ -811,9 +816,14 @@ impl TaskRef {
         self.0.deref().0.lock().take_exit_value()
     }
 
-    /// Sets environment
+    /// Sets the `Environment` of this Task.
     pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
         self.0.deref().0.lock().set_env(new_env);
+    }
+
+    /// Gets a reference to this task's `Environment`.
+    pub fn get_env(&self) -> Arc<Mutex<Environment>> {
+        Arc::clone(&self.0.deref().0.lock().env)
     }
     
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
@@ -953,4 +963,14 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
 /// stored in the FS base MSR register.
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
+}
+
+/// Returns the current Task's working Directory
+/// from its `Environment` object.
+pub fn get_my_working_dir() -> Option<DirRef> {
+    get_my_current_task().map(|taskref| {
+        let env = taskref.get_env();
+        let env_locked = env.lock();
+        Arc::clone(&env_locked.working_dir)
+    })
 }

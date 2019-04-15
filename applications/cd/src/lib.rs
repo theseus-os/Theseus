@@ -63,7 +63,7 @@ pub fn main(args: Vec<String>) -> isize {
     
     // navigate to the filepath specified by first argument
     match path.get(&curr_wr) {
-        Ok(file_dir_enum) => {
+        Some(file_dir_enum) => {
             match file_dir_enum {
                 FileOrDir::Dir(dir) => {
                     curr_env.lock().working_dir = dir;
@@ -74,8 +74,8 @@ pub fn main(args: Vec<String>) -> isize {
                 }
             }
         },
-        Err(err) => {
-            println!("Path error: {}", err); 
+        _ => {
+            println!("Couldn't find directory {}", path); 
             return -1;
         }
     };

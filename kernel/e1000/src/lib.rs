@@ -630,7 +630,7 @@ impl E1000Nic {
             // get information about the current receive buffer
             let length = self.rx_descs[self.rx_cur as usize].length.read();
             let status = self.rx_descs[self.rx_cur as usize].status.read();
-            debug!("e1000: received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
+            // debug!("e1000: received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
 
             // //print rx_buf
             // let length = self.rx_descs[self.rx_cur as usize].length;

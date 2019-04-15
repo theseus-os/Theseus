@@ -1,22 +1,22 @@
-//! A generic map based on a singly-linked list data structure that is lock-free 
-//! and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.
-//! Each node remains in the same spot in memory once it is allocated,
-//! and will not be reallocated,
-//! which allows an external thread to maintain a reference to it safely.
-//!
-//! Currently we do not allow nodes to be deleted, so it's only useful for certain purposes.
-//! Later on, once deletions are supported, it will not be safe to maintain out-of-band references
-//! to items in the data structure, rather only weak references. 
-//!
-//! New elements are inserted at the head of the list, and then the head's next pointer 
-//! is set up to the point to the node that was previously the head. 
-//! Thus, the head always points to the most recently added node. 
+/// A generic map based on a singly-linked list data structure that is lock-free 
+/// and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.
+/// Each node remains in the same spot in memory once it is allocated,
+/// and will not be reallocated,
+/// which allows an external thread to maintain a reference to it safely.
+///
+/// Currently we do not allow nodes to be deleted, so it's only useful for certain purposes.
+/// Later on, once deletions are supported, it will not be safe to maintain out-of-band references
+/// to items in the data structure, rather only weak references. 
+///
+/// New elements are inserted at the head of the list, and then the head's next pointer 
+/// is set up to the point to the node that was previously the head. 
+/// Thus, the head always points to the most recently added node. 
 
 
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicPtr, Ordering};
 
-
+#[derive(Debug)]
 struct Node<K, V> where K: PartialEq {
     key: K,
 	value: V,
@@ -94,12 +94,12 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
             else {
                 // it didn't work, the head value wasn't updated, meaning that another process updated it before we could
                 // so we need to start over by reading the head ptr again and trying to swap it in again
-                #[test]
+                #[cfg(test)]
                 println!("        attempt {}", _attempt);
             }
         }
 
-        // clean up the unboxed node and allow it to be dropped
+        // If we failed to insert, clean up the unboxed node and allow it to be dropped.
         // SAFE: no one has touched this node except for us when we created it above
         unsafe {
             let _ = Box::from_raw(node_ptr);
@@ -155,6 +155,19 @@ impl<K, V> AtomicMap<K, V> where K: PartialEq {
     }
 }
 
+impl<K, V> Drop for AtomicMap<K, V> where K: PartialEq {
+    fn drop(&mut self) {
+        let mut curr_ptr = self.head.load(Ordering::Acquire);
+        while !curr_ptr.is_null() {
+            // SAFE: checked for null above
+            let next_ptr = unsafe {&*curr_ptr}.next.load(Ordering::Acquire);
+            let _ = unsafe { Box::from_raw(curr_ptr) }; // drop the actual Node
+            curr_ptr = next_ptr;
+        }
+    }
+}
+
+
 
 
 pub struct AtomicMapIter<'a, K: PartialEq + 'a, V: 'a> {
@@ -201,34 +214,31 @@ impl<'a, K: PartialEq + 'a, V: 'a> Iterator for AtomicMapIterMut<'a, K, V> {
 #[test]
 /// To run this test, execute: `cargo test test_map -- --nocapture`
 fn test_map() {
-    use alloc::sync::Arc;
-    use std::thread;
-
-    let list: AtomicMap<&'static str, u64> = AtomicMap::new();
+    let map: AtomicMap<&'static str, u64> = AtomicMap::new();
     
-	let should_be_none = list.get("yo");
+	let should_be_none = map.get(&"yo");
 	println!("should_be_none = {:?}", should_be_none);
 
-	list.insert("yo", 2); 
+	map.insert("yo", 2); 
 
 	println!("after yo 2");
-    for i in list.iter() {
+    for i in map.iter() {
         println!("    {:?}", i);
     }
 
-	list.insert("hi", 45);
-	let old_yo = list.insert("yo", 1234); 
+	map.insert("hi", 45);
+	let old_yo = map.insert("yo", 1234); 
     println!("old_yo = {:?}", old_yo);
 
 	println!("after yo 4");
-    for i in list.iter() {
+    for i in map.iter() {
         println!("    {:?}", i);
     }
 
-	let should_be_45 = list.get("hi");
+	let should_be_45 = map.get(&"hi");
 	println!("should_be_45 = {:?}", should_be_45);
 
-    let should_now_be_1234 = list.get("yo");
+    let should_now_be_1234 = map.get(&"yo");
     println!("should_now_be_1234 = {:?}", should_now_be_1234);
     
 }

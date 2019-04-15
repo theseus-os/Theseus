@@ -45,11 +45,11 @@ pub fn main(args: Vec<String>) -> isize {
 
     if matches.opt_present("a") {
         out.push_str("==== Kernel Crate Files ====\n");
-        for f in namespace.kernel_directory().lock().list() {
+        for f in namespace.dirs().kernel_directory().lock().list() {
             out.push_str(&format!("{}\n", f)); 
         }
         out.push_str("\n==== Application Crate Files ====\n");
-        for f in namespace.application_directory().lock().list() {
+        for f in namespace.dirs().applications_directory().lock().list() {
             out.push_str(&format!("{}\n", f)); 
         }
     }
