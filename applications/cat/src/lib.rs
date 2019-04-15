@@ -55,7 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
     
     // navigate to the filepath specified by first argument
     match path.get(&curr_wr) {
-        Ok(file_dir_enum) => { 
+        Some(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {
                     println!("{:?} is a directory, cannot 'cat' non-files.", directory.lock().get_name());
@@ -83,10 +83,9 @@ pub fn main(args: Vec<String>) -> isize {
                     println!("{}", read_string);
                 }
             }
-
         },
-        Err(err) => {
-            println!("get call failed in cat because: {}", err);
+        _ => {
+            println!("Couldn't find file at path {}", path);
             return -1;
         }
     };

@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(alloc)]
+#![feature(stmt_expr_attributes)]
 
 #[cfg(test)]
 #[macro_use] extern crate std;

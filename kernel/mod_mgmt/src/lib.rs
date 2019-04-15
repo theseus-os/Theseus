@@ -42,7 +42,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
@@ -71,7 +71,7 @@ pub const DEFAULT_NAMESPACE_NAME: &'static str = "default";
 /// The name of the directory in each namespace directory that contains kernel crates.
 pub const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
 /// The name of the directory in each namespace directory that contains application crates.
-pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "application";
+pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "applications";
 /// The name of the directory in each namespace directory that contains userspace files.
 pub const USERSPACE_FILES_DIRECTORY_NAME: &'static str = "userspace";
 
@@ -145,16 +145,8 @@ fn parse_bootloader_modules_into_files(
 
         // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
         let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
-            let base_dir   = VFSDirectory::new(prefix.to_string(),                            &namespaces_dir)?;
-            let kernel_dir = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
-            let app_dir    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
-            let user_dir   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
-            Ok(NamespaceDirectorySet {
-                base:   base_dir,
-                kernel: kernel_dir,
-                app:    app_dir,
-                user:   user_dir,
-            })
+            let base_dir = VFSDirectory::new(prefix.to_string(), &namespaces_dir)?;
+            NamespaceDirectorySet::new(base_dir)
         };
 
         for m in boot_info.module_tags() {
@@ -176,9 +168,9 @@ fn parse_bootloader_modules_into_files(
 
             let create_file = |dirs: &NamespaceDirectorySet| {
                 let parent_dir = match crate_type { 
-                    CrateType::Kernel => &dirs.kernel,
+                    CrateType::Kernel      => &dirs.kernel,
                     CrateType::Application => &dirs.app,
-                    CrateType::Userspace => &dirs.user,
+                    CrateType::Userspace   => &dirs.user,
                 };
                 MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
             };
@@ -290,32 +282,133 @@ pub struct NamespaceDirectorySet {
     app:    DirRef,
     /// The directory that contains all userspace object files.
     user:   DirRef,
+    /// To ensure that no one accidentally constructs this object without using the `new()` fn.
+    _p:     core::marker::PhantomData<usize>,
 }
 impl NamespaceDirectorySet {
-    pub fn new(base: DirRef, kernel: DirRef, app: DirRef, user: DirRef) -> NamespaceDirectorySet {
-        NamespaceDirectorySet { base, kernel, app, user }
+    /// Create a new `NamespaceDirectorySet` with each directory 
+    pub fn new(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
+        let kernel = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
+        let app    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
+        let user   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
+        Ok(NamespaceDirectorySet {
+            base: base_dir, 
+            kernel, 
+            app, 
+            user, 
+            _p: core::marker::PhantomData 
+        })
+    }
+
+    /// Creates a new `NamespaceDirectorySet` from existing directories 
+    pub fn from_existing_base_dir(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
+        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
+        };
+        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace applications directory"),
+        };
+        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
+            Some(FileOrDir::Dir(d)) => d,
+            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
+        };
+
+        Ok(NamespaceDirectorySet {
+            base: base_dir, 
+            kernel: kernel_dir, 
+            app: app_dir,
+            user: user_dir,
+            _p: core::marker::PhantomData 
+        })
+    }
+
+    
+    /// Gets the given object file based on its crate name prefix. 
+    /// 
+    /// # Arguments
+    /// * `crate_object_file_name`: the name of the object file to be returned, 
+    ///    with a preceding `CrateType` prefix.
+    /// 
+    /// # Examples 
+    /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "./kernel/keyboard-36be916209949cef.o". 
+    /// * The name "a#ps.o" will look for and return the file "./applications/ps.o". 
+    pub fn get_crate_object_file(&self, crate_object_file_name: &str) -> Option<FileRef> {
+        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
+        let dest_dir = match crate_type {
+            CrateType::Kernel      => &self.kernel,
+            CrateType::Application => &self.app,
+            CrateType::Userspace   => &self.user,
+        };
+        match dest_dir.lock().get(objfilename) { 
+            Some(FileOrDir::File(f)) => Some(f),
+            _ => None,
+        }
+    }
+
+    /// Gets the kernel crate file by searching the kernel directory only. 
+    /// 
+    /// # Arguments
+    /// * `crate_file_name`: the name of the kernel crate file, e.g., 
+    ///   "keyboard-36be916209949cef" or "keyboard-36be916209949cef.o".
+    pub fn get_kernel_crate_file(&self, crate_file_name: &str) -> Option<FileRef> {
+        let kernel_dir = self.kernel.lock();
+        match kernel_dir.get(crate_file_name)
+            .or_else(|| kernel_dir.get(&format!("{}.o", crate_file_name))) // retry with the ".o" extension
+        { 
+            Some(FileOrDir::File(f)) => Some(f),
+            _ => None,
+        }
+    }
+
+    /// Insert the given crate object file based on its crate type prefix. 
+    /// 
+    /// # Arguments
+    /// * `crate_object_file_name`: the name of the object file to be inserted, 
+    ///    with a preceding `CrateType` prefix.
+    /// * `content`: the bytes that will be writte into the file.
+    /// 
+    /// # Examples 
+    /// * The file "k#keyboard-36be916209949cef.o" will be placed into "./kernel/keyboard-36be916209949cef.o". 
+    /// * The file "a#ps.o" will be placed into "./applications/ps.o". 
+    pub fn insert_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
+        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
+        let dest_dir = match crate_type {
+            CrateType::Kernel      => &self.kernel,
+            CrateType::Application => &self.app,
+            CrateType::Userspace   => &self.user,
+        };
+        let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
+        cfile.lock().write(content, 0)?;
+        Ok(cfile)
     }
 
     /// Returns a reference to the base directory.
-    pub fn base_dir(&self) -> &DirRef {
+    pub fn base_directory(&self) -> &DirRef {
         &self.base
     }
 
     /// Returns a reference to the directory of kernel crates.
-    pub fn kernel_dir(&self) -> &DirRef {
+    pub fn kernel_directory(&self) -> &DirRef {
         &self.kernel
     }
 
     /// Returns a reference to the directory of application crates.
-    pub fn app_dir(&self) -> &DirRef {
+    pub fn applications_directory(&self) -> &DirRef {
         &self.app
     }
 
     /// Returns a reference to the directory of userspace programs.
-    pub fn user_dir(&self) -> &DirRef {
+    pub fn userspace_directory(&self) -> &DirRef {
         &self.user
     }
 }
+
+
+/// A state transfer function is an arbitrary function called when swapping crates. 
+/// See [`swap_crates()`](fn.CrateNamespace.swap_crates.html).
+pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<(), &'static str>;
 
 
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
@@ -328,7 +421,7 @@ impl NamespaceDirectorySet {
 /// but are significantly more efficient than library OS-style personalities. 
 pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
-    name: String,
+    pub name: String,
 
     /// The directories owned by this namespace. 
     /// When this namespace is looking for a missing symbol or crate,
@@ -345,8 +438,7 @@ pub struct CrateNamespace {
     /// part of every single namespace, simply because most other crates rely upon it. 
     pub crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
 
-    /// The "system map" of all global (publicly-visible) symbols
-    /// that are present in all of the crates in this `CrateNamespace`.
+    /// The "system map" of all symbols that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
     /// which is guaranteed to be part of one of the crates in this `CrateNamespace`.  
     /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
@@ -392,65 +484,10 @@ impl CrateNamespace {
         }
     } 
 
-    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
-    /// # Arguments
-    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `base_dir`: the base directory for this namespace, which must contain crate file subdirectories. 
-    pub fn with_base_dir(name: String, base_dir: DirRef) -> Result<CrateNamespace, &'static str> {
-        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
-        };
-        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace application directory"),
-        };
-        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
-        };
-        Ok(CrateNamespace::new(
-            name, 
-            NamespaceDirectorySet {
-                base:   base_dir,
-                kernel: kernel_dir,
-                app:    app_dir, 
-                user:   user_dir,
-            }
-        ))
-    }
-
-    /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
-    /// # Arguments
-    /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `base_dir_path`: the `Path` of the base directory for this namespace, which must contain crate file subdirectories. 
-    pub fn with_base_dir_path(name: String, base_dir_path: Path) -> Result<CrateNamespace, &'static str> {
-        let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
-        let base_dir = match base_dir_path.get(&namespaces_dir) {
-            Ok(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find directory at given path"),
-        };
-        CrateNamespace::with_base_dir(name, base_dir)
-    }
-
-    /// Returns the directory that this `CrateNamespace` is based on.
-    pub fn base_directory(&self) -> &DirRef {
-        &self.dirs.base
-    }
-
-    /// Returns this `CrateNamespace`'s directory of kernel crates.
-    pub fn kernel_directory(&self) -> &DirRef {
-        &self.dirs.kernel
-    }
-
-    /// Returns this `CrateNamespace`'s directory of application crates.
-    pub fn application_directory(&self) -> &DirRef {
-        &self.dirs.app
-    }
-
-    /// Returns this `CrateNamespace`'s directory of userspace files.
-    pub fn userspace_directory(&self) -> &DirRef {
-        &self.dirs.user
+    /// Returns the set of directories that this `CrateNamespace` is based on,
+    /// which include its subdirectories of crate object files.
+    pub fn dirs(&self) -> &NamespaceDirectorySet {
+        &self.dirs
     }
 
     pub fn enable_fuzzy_symbol_matching(&mut self) {
@@ -524,23 +561,23 @@ impl CrateNamespace {
     pub fn load_application_crate(
         &self, 
         crate_file_path: &Path, 
-        kernel_mmi: &mut MemoryManagementInfo, 
+        kernel_mmi_ref: &MmiRef, 
         load_symbols_as_singleton: bool,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
         
         debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.application_directory())
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.application_directory())) // retry with the ".o" extension
+        let crate_file_ref = match crate_file_path.get(&self.dirs.app)
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.app)) // retry with the ".o" extension
         {
-            Ok(FileOrDir::File(f)) => f,
+            Some(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified application crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
         
         // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
-        self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
 
         if load_symbols_as_singleton {
             // if this is a singleton application, we add its public symbols (except "main")
@@ -563,32 +600,32 @@ impl CrateNamespace {
     /// as a result of loading this crate.
     /// 
     /// # Arguments
-    /// * `crate_module`: the crate that should be loaded into this `CrateNamespace`.
+    /// * `crate_file_path`: the path to the crate object file that will be loaded into this `CrateNamespace`.
     /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
     ///   If `backup_namespace` is `None`, then no other namespace will be searched, 
     ///   and any missing symbols will return an `Err`. 
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_kernel_crate(
         &self,
         crate_file_path: &Path,
         backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi: &mut MemoryManagementInfo, 
+        kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
-        debug!("load_kernel_crate: trying to load kernel crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.kernel_directory())
-            .or_else(|_e| Path::new(format!("{}.o", crate_file_path)).get(&self.kernel_directory())) // retry with the ".o" extension
+        debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
+        let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
         {
-            Ok(FileOrDir::File(f)) => f,
+            Some(FileOrDir::File(f)) => f,
             _ => return Err("couldn't find specified kernel crate file path"),
         };
         let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi, verbose_log)?;
-        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
@@ -616,7 +653,7 @@ impl CrateNamespace {
         &self,
         crate_file_paths: I,
         backup_namespace: Option<&CrateNamespace>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
         where I: Iterator<Item = &'p Path>
@@ -624,8 +661,8 @@ impl CrateNamespace {
         // first, validate all of the crate paths by turning them into direct file references
         let mut crate_files: Vec<FileRef> = Vec::new();
         for crate_file_path in crate_file_paths {
-            let crate_file_ref: FileRef = match crate_file_path.get(&self.kernel_directory()) {
-                Ok(FileOrDir::File(f)) => f,
+            let crate_file_ref: FileRef = match crate_file_path.get(&self.dirs.kernel) {
+                Some(FileOrDir::File(f)) => f,
                 _ => {
                     error!("Couldn't find specified kernel crate file path: {:?}", crate_file_path);
                     return Err("couldn't find specified kernel crate file path");
@@ -643,14 +680,14 @@ impl CrateNamespace {
         // third, do all of the section parsing and loading
         let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(crate_files.len()); 
         for locked_crate_file in &locked_crate_files {            
-            let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi, verbose_log)?;
+            let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)?;
             let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
         
         // finally, we do all of the relocations 
         for (new_crate_ref, elf_file) in partially_loaded_crates {
-            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi, verbose_log)?;
+            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
             self.crate_tree.lock().insert(name.into(), new_crate_ref);
         }
@@ -681,14 +718,11 @@ impl CrateNamespace {
     /// but they would no longer be part of the new namespace. 
     /// 
     pub fn clone_on_write(&self) -> CrateNamespace {
-        let new_crate_tree = self.crate_tree.lock().clone();
-        let new_symbol_map = self.symbol_map.lock().clone();
-
         CrateNamespace {
             name: self.name.clone(),
             dirs: self.dirs.clone(),
-            crate_tree: Mutex::new(new_crate_tree),
-            symbol_map: Mutex::new(new_symbol_map),
+            crate_tree: Mutex::new(self.crate_tree.lock().clone()),
+            symbol_map: Mutex::new(self.symbol_map.lock().clone()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
             fuzzy_symbol_matching: self.fuzzy_symbol_matching,
         }
@@ -715,9 +749,20 @@ impl CrateNamespace {
     ///   as a single "atomic" procedure, which prevents weird linking/relocation errors, 
     ///   such as a new crate linking against an old crate that already exists in this namespace
     ///   instead of linking against the new one that we want to replace that old crate with. 
-    /// * `new_kernel_crates_dir`: the directory of object files from which missing kernel crates should be loaded.
-    ///   If `None`, this `CrateNamespace`'s kernel directory will be used to look for missing kernel crates.
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `override_namespace_dirs`: the set of directories of object files from which missing crates should be loaded.
+    ///   If a crate cannot be found in this directory set, the current namespace's (self's) directory set 
+    ///   will be searched for the crate. 
+    ///   If `None`, only this `CrateNamespace`'s directory set will be used to find missing crates to be loaded.
+    /// * `state_transfer_functions`: the fully-qualified symbol names of the state transfer functions, 
+    ///   arbitrary functions that are invoked after all of the new crates are loaded but before the old crates are unloaded, 
+    ///   in order to allow transfer of states from old crates to new crates or proper setup of states for the new crates.
+    ///   These function should exist in the new namespace (or its directory set) and should take the form of a 
+    ///   [`StateTransferFunction`](../type.StateTransferFunction.html).
+    ///   The given functions are invoked with the arguments `(current_namespace, new_namespace)`, 
+    ///   in which the `current_namespace` is the one currently running that contains the old crates,
+    ///   and the `new_namespace` contains only newly-loaded crates that are not yet being used.
+    ///   Both namespaces may (and likely will) contain more crates than just the old and new crates specified in the swap request list.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
     /// # Warning: Correctness not guaranteed
@@ -737,12 +782,16 @@ impl CrateNamespace {
     pub fn swap_crates(
         &self,
         swap_requests: SwapRequestList,
-        kernel_crates_dir: Option<DirRef>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        override_namespace_dirs: Option<NamespaceDirectorySet>,
+        state_transfer_functions: Vec<String>,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
-        debug!("SWAP REQUESTS: {:?}", swap_requests);
+        debug!("swap_crates()[0]: override dirs: {:?}\nswap_requests: {:?}", 
+            override_namespace_dirs.as_ref().map(|d| d.base_directory().lock().get_name()), 
+            swap_requests
+        );
 
         // First, before we perform any expensive crate loading, let's try an optimization
         // based on cached crates that were unloaded during a previous swap operation. 
@@ -752,20 +801,19 @@ impl CrateNamespace {
         } else {
             // If no optimization is possible (no cached crates exist for this swap request), 
             // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
-            // Also, use the optionally-provided directory of kernel crates instead of the current namespace's kernel dir.
             let nn = CrateNamespace::new(
                 String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
-                NamespaceDirectorySet::new(
-                    self.dirs.base_dir().clone(), 
-                    kernel_crates_dir.unwrap_or_else(|| self.dirs.kernel_dir().clone()),
-                    self.dirs.app_dir().clone(),
-                    self.dirs.user_dir().clone(),
-                ),
+                // use the optionally-provided directory of crates instead of the current namespace's directories.
+                override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
             );
             let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi, verbose_log)?;
+            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
             (nn, false)
         };
+
+        warn!("\n=============== Crates in new namespace ==============");
+        namespace_of_new_crates.crate_iter(|crate_name, crate_ref| warn!("\t{:?}. {}", crate_name, crate_ref.lock_as_ref().object_file_abs_path));
+        warn!("\n=============== symbols in new namespace ==============\n{}", namespace_of_new_crates.dump_symbol_map());
 
         let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
         let cached_crates: CrateNamespace = CrateNamespace::new(
@@ -774,15 +822,15 @@ impl CrateNamespace {
         );
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
-        // we simply need to remove all of the old crates
-        // and fix up all of the relocations `WeakDependents` for each of the existing sections
+        // we simply need to fix up all of the relocations `WeakDependents` for each of the existing sections
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
-        for req in swap_requests {
+        for req in &swap_requests {
             let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+            let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
             let new_crate_name = new_crate_object_file_abs_path.file_stem();
             
-            let old_crate_ref = self.get_crate(&old_crate_name).ok_or_else(|| {
+            let old_crate_ref = self.get_crate(&*old_crate_name).ok_or_else(|| {
                 error!("swap_crates(): couldn't find requested old_crate {:?} in namespace", old_crate_name);
                 "swap_crates(): couldn't find requested old crate in namespace"
             })?;
@@ -792,11 +840,11 @@ impl CrateNamespace {
             })?;
 
             let new_crate_ref = if is_optimized {
-                debug!("swap_crates(): OPTIMIZED: trying to get new crate {:?} from cache", new_crate_name);
+                debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
                 namespace_of_new_crates.get_crate(new_crate_name)
                     .ok_or_else(|| "BUG: swap_crates(): Couldn't get new crate from optimized cache")?
             } else {
-                debug!("trying to get newly-loaded crate {:?} from temp namespace", new_crate_name);
+                debug!("looking for newly-loaded crate {:?} in temp namespace", new_crate_name);
                 namespace_of_new_crates.get_crate(new_crate_name)
                     .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
             };
@@ -826,7 +874,7 @@ impl CrateNamespace {
                     let old_sec_ref = this_symbol_map.get(old_sec_name)
                         .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
                         .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
-                    // debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
+                    debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
                     let mut old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
@@ -841,20 +889,25 @@ impl CrateNamespace {
                         // The new namespace should already have that symbol available (i.e., we shouldn't have to load it on demand);
                         // if not, the swapping action was never going to work and we shouldn't go through with it.
 
-                        // Find the section in the new crate that "fuzzily" matches the current section from the old crate. There should only be one possible match.
+                        // Find the section in the new crate that matches (or "fuzzily" matches) the current section from the old crate.
                         let new_crate_source_sec = if crates_have_same_name {
-                            namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash)
+                            namespace_of_new_crates.get_symbol(&old_sec.name).upgrade()
+                                .or_else(|| namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash).upgrade())
                         } else {
+                            // here, the crates *don't* have the same name
                             if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
-                                namespace_of_new_crates.get_symbol_starting_with(&s)
+                                namespace_of_new_crates.get_symbol(&s).upgrade()
+                                    .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&s).upgrade())
                             } else {
-                                namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash)
+                                // same as the default case above (crates have same name)
+                                namespace_of_new_crates.get_symbol(&old_sec.name).upgrade()
+                                    .or_else(|| namespace_of_new_crates.get_symbol_starting_with(old_sec_name_without_hash).upgrade())
                             }
-                        }.upgrade().ok_or_else(|| {
-                            error!("swap_crates(): couldn't find section in the new crate that corresponds to a fuzzy match of the old section {:?}", old_sec.name);
-                            "couldn't find section in the new crate that corresponds to a fuzzy match of the old section"
+                        }.ok_or_else(|| {
+                            error!("swap_crates(): couldn't find section in the new crate that corresponds to a match of the old section {:?}", old_sec.name);
+                            "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
-                        // debug!("swap_crates(): found fuzzy match for old source_sec {:?} in new crate: {:?}", old_sec.name, new_crate_source_sec);
+                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, new_crate_source_sec);
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                             let reexported_name = BString::from(old_sec.name.as_str());
@@ -865,16 +918,6 @@ impl CrateNamespace {
                             }
                         }
                         Ok(new_crate_source_sec)
-
-                        // We aren't using exact matches right now, since that basically never happens across 2 different crates, even with the same crate name
-                        // else {
-                        //     namespace_of_new_crates.get_symbol(&old_sec.name)
-                        //         .upgrade()
-                        //         .ok_or_else(|| {
-                        //             error!("swap_crates(): couldn't find section in the new crate that corresponds to an exact match of the old section {:?}", old_sec.name);
-                        //             "couldn't find section in the new crate that corresponds to an exact match of the old section"
-                        //         })
-                        // }
                     };
 
 
@@ -896,7 +939,7 @@ impl CrateNamespace {
                             new_sec_ref.get_or_insert(nsr)
                         };
                         let mut new_source_sec = new_source_sec_ref.lock();
-                        // debug!("swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec.name, old_sec.name, new_source_sec.name);
+                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -904,7 +947,7 @@ impl CrateNamespace {
                             let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                             let target_sec_initial_flags = target_sec_mapped_pages.flags();
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                                     target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                                 }
                                 else {
@@ -922,7 +965,7 @@ impl CrateNamespace {
 
                             // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                                     target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
                                 }
                                 else {
@@ -959,7 +1002,6 @@ impl CrateNamespace {
                     }
                 }
 
-
                 // Go through all the BSS sections and copy over the old_sec into the new source_sec,
                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
                 // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
@@ -984,65 +1026,94 @@ impl CrateNamespace {
                         "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
                     )?;
 
-                    // debug!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
+                    // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
                     old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
                 }
-
-                
-                // Remove the old crate from this namespace, and remove its sections' symbols too
-                if let Some(removed_old_crate) = self.crate_tree.lock().remove_str(&old_crate.crate_name) {
-                    // Here, `old_crate` and `removed_old_crate` are the same, but `old_crate` is already locked, 
-                    // so we use that instead of trying to lock `removed_old_crate` again, because it would cause deadlock.
-                    
-                    // info!("  Removed old crate {} (path {})", old_crate.crate_name, old_crate.object_file_abs_path);
-
-                    // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
-                    // This removed old crate will be useful when a future swap request includes the following:
-                    // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
-                    // (2) the future `old_crate_name`               ==  the current `new_crate_name`
-                    // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
-                    //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                    let future_swap_req = SwapRequest::new(
-                        String::from(new_crate_name), 
-                        old_crate.object_file_abs_path.clone(), 
-                        !old_crate.reexported_symbols.is_empty()
-                    )?;
-                    future_swap_requests.push(future_swap_req);
-                    
-                    // Remove all of the symbols belonging to the old crate from this namespace.
-                    // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
-                    // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
-                    if !reexport_new_symbols_as_old {
-                        for symbol in &old_crate.global_symbols {
-                            if this_symbol_map.remove(symbol).is_none() {
-                                error!("swap_crates(): couldn't find old symbol {:?} in this namespace's symbol map!", symbol);
-                                return Err("couldn't find old symbol {:?} in this namespace's symbol map!");
-                            }
-                        }
-                    }
-
-                    // If the old crate had reexported its symbols, we should remove those reexports here,
-                    // because they're no longer active since the old crate is being removed. 
-                    for sym in &old_crate.reexported_symbols {
-                        this_symbol_map.remove(sym);
-                    }
-
-                    // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
-                    //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
-                    //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
-                    cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
-                    cached_crates.crate_tree.lock().insert_str(&old_crate.crate_name, removed_old_crate);
-                }
-                else {
-                    error!("BUG: swap_crates(): failed to remove old crate {}", old_crate.crate_name);
-                }
             } // end of scope, drops lock for `self.symbol_map` and `new_crate_ref`
+        } // end of iteration over all swap requests
 
+
+        // apply the state transfer function, if provided
+        for symbol in state_transfer_functions {
+            let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(self), kernel_mmi_ref, verbose_log).upgrade()
+                // as a backup, search fuzzily to accommodate state transfer function symbol names without full hashes
+                .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&symbol).upgrade())
+                .ok_or("couldn't find specified state transfer function in the new CrateNamespace")?;
+            
+            let mut space: usize = 0;
+            let st_fn = {
+                let state_transfer_fn_sec = state_transfer_fn_sec_ref.lock();
+                let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
+                mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
+            };
+            info!("swap_crates(): invoking the state transfer function {:?}", symbol);
+            st_fn(self, &namespace_of_new_crates)?;
         }
 
-        // Here, we need to move all non-shared crates from the new namespace into this namespace, not just the ones from the swap request list.
+
+        // Remove all of the old crates now that we're fully done using them.
+        // This doesn't mean each crate will be immediately dropped -- they still might be in use by other crates or tasks.
+        {
+            let mut this_symbol_map = self.symbol_map.lock();
+            for req in swap_requests {
+                let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+                let new_crate_name = new_crate_object_file_abs_path.file_stem();
+                // Remove the old crate from this namespace, and remove its sections' symbols too
+                if let Some(old_crate_ref) = self.crate_tree.lock().remove_str(&old_crate_name) {
+                    {
+                        let old_crate = old_crate_ref.lock_as_ref();
+                        
+                        info!("  Removed old crate {}({}) (path {})", old_crate_name, old_crate.crate_name, old_crate.object_file_abs_path);
+
+                        // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                        // This removed old crate will be useful when a future swap request includes the following:
+                        // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
+                        // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                        // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
+                        //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
+                        let future_swap_req = SwapRequest::new(
+                            String::from(new_crate_name), 
+                            old_crate.object_file_abs_path.clone(), 
+                            !old_crate.reexported_symbols.is_empty()
+                        )?;
+                        future_swap_requests.push(future_swap_req);
+                        
+                        // Remove all of the symbols belonging to the old crate from this namespace.
+                        // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
+                        // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
+                        if !reexport_new_symbols_as_old {
+                            for symbol in &old_crate.global_symbols {
+                                if this_symbol_map.remove(symbol).is_none() {
+                                    error!("swap_crates(): couldn't find old symbol {:?} in this namespace's symbol map!", symbol);
+                                    return Err("couldn't find old symbol {:?} in this namespace's symbol map!");
+                                }
+                            }
+                        }
+
+                        // If the old crate had reexported its symbols, we should remove those reexports here,
+                        // because they're no longer active since the old crate is being removed. 
+                        for sym in &old_crate.reexported_symbols {
+                            this_symbol_map.remove(sym);
+                        }
+
+                        // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
+                        //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
+                        //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
+                        cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
+                    } // drops lock for `old_crate_ref`
+                    
+                    cached_crates.crate_tree.lock().insert_str(&old_crate_name, old_crate_ref);
+                }
+                else {
+                    error!("BUG: swap_crates(): failed to remove old crate {}", old_crate_name);
+                }
+            }
+        }
+
+        // Here, we move new crates from the temp namespace into the current namespace (self). 
         // We can't just move the crates in the swap request list, because we may have loaded other crates from their object files (for the first time).
-        // We only add the non-shared (exclusive) ones because the shared crates are ones that came from the backup namespace (and have already been added to this namespace).
+        // Thus, we need to move all newly-loaded crates from the temp namespace into this namespace;
+        // for this, we add only the non-shared (exclusive) crates, because shared crates are those that came from the backup namespace.
         namespace_of_new_crates.crate_iter(|new_crate_name, new_crate_ref| {
             if new_crate_ref.is_shared() {
                 if self.get_crate(new_crate_name).is_none() { 
@@ -1054,11 +1125,42 @@ impl CrateNamespace {
             }
             else {
                 // debug!("swap_crates(): adding new crate symbols: {:?}", new_crate_ref);
+                debug!("swap_crates(): adding new crate itself: {:?}", new_crate_ref);
                 self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
-                // debug!("swap_crates(): adding new crate itself: {:?}", new_crate_ref);
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
         });
+
+
+        // TODO FIXME: change the above cached crate entries to reflect that the 
+
+
+        // Now that we've fixed up the already-loaded (running) crates, 
+        // we need to move the new crate object files from new namespace directory set to the old (self),
+        // such that future usage of those crates will load the appropriate new crate object files. 
+        let copy_directory_contents = |source_dir_ref: &DirRef, dest_dir_ref: &DirRef| -> Result<(), &'static str> {
+            let mut source_dir = source_dir_ref.lock();
+            let mut dest_dir   = dest_dir_ref.lock();
+            for fs_node_name in &source_dir.list() {
+                let file_node = match source_dir.get(fs_node_name) {
+                    Some(FileOrDir::File(f)) => FileOrDir::File(f),
+                    _ => {
+                        warn!("Skipping unexpected directory {} in source namespace directory", fs_node_name);
+                        continue;
+                    }
+                };
+                if let Some(mut node) = source_dir.remove(&file_node) {
+                    node.set_parent_dir(Arc::downgrade(dest_dir_ref));
+                    let _old_node = dest_dir.insert(node)?;
+                    use fs_node::FsNode;
+                    debug!("swap_crates(): replaced old crate object file {:?}", _old_node.map(|n| n.get_name()));
+                }
+            }
+            Ok(())
+        };
+        copy_directory_contents(&namespace_of_new_crates.dirs.kernel, &self.dirs.kernel)?;
+        copy_directory_contents(&namespace_of_new_crates.dirs.app, &self.dirs.app)?;
+        // copy_directory_contents(&namespace_of_new_crates.dirs.user, &self.dirs.user)?; // not used currently
 
 
         debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
@@ -1067,6 +1169,91 @@ impl CrateNamespace {
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
     }
+
+
+    /// Finds all of the weak dependents (sections that depend on the given `old_section`)
+    /// and rewrites their relocation entries to point to the given `new_section`.
+    /// This effectively replaces the usage of the `old_section` with the `new_section`,
+    /// but does not make any modifications to symbol maps.
+    pub fn rewrite_section_dependents(
+        old_section: &StrongSectionRef,
+        new_section: &StrongSectionRef,
+        kernel_mmi_ref: &MmiRef
+    ) -> Result<(), &'static str> {
+
+        let old_sec = old_section.lock();
+
+        for weak_dep in &old_sec.sections_dependent_on_me {
+            let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+            let mut target_sec = target_sec_ref.lock();
+            let relocation_entry = weak_dep.relocation;
+
+            let mut new_source_sec = new_section.lock();
+            debug!("rewrite_section_dependents(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
+
+            // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
+            // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
+            {
+                let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                let target_sec_initial_flags = target_sec_mapped_pages.flags();
+                if !target_sec_initial_flags.is_writable() {
+                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                    }
+                    else {
+                        return Err("couldn't get kernel's active page table");
+                    }
+                }
+
+                write_relocation(
+                    relocation_entry, 
+                    &mut target_sec_mapped_pages, 
+                    target_sec.mapped_pages_offset, 
+                    new_source_sec.virt_addr(), 
+                    false
+                )?;
+
+                // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+                if !target_sec_initial_flags.is_writable() {
+                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                    }
+                    else {
+                        return Err("couldn't get kernel's active page table");
+                    }
+                };
+            }
+            
+            // Tell the new source_sec that the existing target_sec depends on it.
+            // Note that we don't need to do this if we're re-swapping in a cached crate,
+            // because that crate's sections' dependents are already properly set up from when it was first swapped in.
+            // if !is_optimized {
+                new_source_sec.sections_dependent_on_me.push(WeakDependent {
+                    section: Arc::downgrade(&target_sec_ref),
+                    relocation: relocation_entry,
+                });
+            // }
+
+            // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
+            // and that it now depends on the new source_sec.
+            let mut found_strong_dependency = false;
+            for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
+                if Arc::ptr_eq(&strong_dep.section, old_section) && strong_dep.relocation == relocation_entry {
+                    strong_dep.section = Arc::clone(new_section);
+                    found_strong_dependency = true;
+                    break;
+                }
+            }
+            if !found_strong_dependency {
+                error!("Couldn't find/remove the existing StrongDependency from target_sec {:?} to old_sec {:?}",
+                    target_sec.name, old_sec.name);
+                return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
+            }
+        }
+
+        Ok(())
+    }
+
 
     /// The primary internal routine for parsing and loading all of the sections.
     /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,
@@ -1080,12 +1267,12 @@ impl CrateNamespace {
     /// 
     /// # Arguments
     /// * `crate_file`: the object file for the crate that will be loaded into this `CrateNamespace`.
-    /// * `kernel_mmi`: the kernel's MMI struct, for memory mapping use.
+    /// * `kernel_mmi_ref`: the kernel's MMI struct, for memory mapping use.
     /// * `verbose_log`: whether to log detailed messages for debugging.
     fn load_crate_sections<'f>(
         &self,
         crate_file: &'f File,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
         
@@ -1115,7 +1302,7 @@ impl CrateNamespace {
         debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
-        let section_pages = allocate_section_pages(&elf_file, kernel_mmi)?;
+        let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
         let text_pages    = section_pages.text_pages  .map(|tp| Arc::new(Mutex::new(tp)));
         let rodata_pages  = section_pages.rodata_pages.map(|rp| Arc::new(Mutex::new(rp)));
         let data_pages    = section_pages.data_pages  .map(|dp| Arc::new(Mutex::new(dp)));
@@ -1492,7 +1679,7 @@ impl CrateNamespace {
         elf_file: &ElfFile,
         new_crate_ref: &StrongCrateRef,
         backup_namespace: Option<&CrateNamespace>,
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
         let new_crate = new_crate_ref.lock_as_ref();
@@ -1590,7 +1777,7 @@ impl CrateNamespace {
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi, verbose_log)
+                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi_ref, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1649,7 +1836,7 @@ impl CrateNamespace {
 
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
             if let Some(ref tp) = new_crate.text_pages { 
                 tp.lock().remap(active_table, TEXT_SECTION_FLAGS())?;
             }
@@ -1807,12 +1994,12 @@ impl CrateNamespace {
     ///   if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
     ///   If `backup_namespace` is `None`, then no other namespace will be searched.
-    /// * `kernel_mmi`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
         backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi: &mut MemoryManagementInfo,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> WeakSectionRef {
         // First, see if the section for the given symbol is already available and loaded
@@ -1838,7 +2025,7 @@ impl CrateNamespace {
                             // While this would save lookup/loading time if future symbols were needed from this crate,
                             // we *cannot* do this because it violates the expectations of certain namespaces. 
                             // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
-                            self.add_symbols(Some(sec.clone()).iter(), true);
+                            self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                             parent_crate.crate_name.clone()
                         };
                         info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
@@ -1870,7 +2057,7 @@ impl CrateNamespace {
                         if let Some(parent_crate_ref) = pcref_opt {
                             let parent_crate_name = {
                                 let parent_crate = parent_crate_ref.lock_as_ref();
-                                self.add_symbols(Some(sec.clone()).iter(), true);
+                                self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                                 parent_crate.crate_name.clone()
                             };
                             warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
@@ -1893,18 +2080,19 @@ impl CrateNamespace {
         }
 
         // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
-        // We are only able to do this for mangled symbols, those that have a leading crate name,
-        // such as "my_crate::foo". 
+        // We are only able to do this for mangled symbols that have a leading crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
             info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
-            
             let crate_dependency_name = format!("{}-", crate_dependency_name);
  
-            if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name) {
-                // try to load the missing symbol's containing crate
-                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi, verbose_log) {
+            // Try to find and load the missing crate object file from this namespace's directory set,
+            // (or from the backup namespace's directory set).
+            if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name)
+                .or_else(|| backup_namespace.and_then(|backup| backup.get_kernel_file_starting_with(&crate_dependency_name)))
+            {
+                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
                         return sec;
@@ -1999,28 +2187,39 @@ impl CrateNamespace {
     /// but returns `Some(Path)` only if there is a single match.
     /// If there are multiple matches, `None` is returned.
     /// 
-    /// Returns the relative `Path` of the matching kernel crate file, 
-    /// relative to this `CrateNamespace`'s kernel crate directory,
-    /// effectively just the full name of the crate file. 
+    /// Returns the absolute `Path` of the matching kernel crate file.
     pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = self.kernel_directory().lock().list();
+        let children = { self.dirs.kernel.lock().list() };
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
         iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .map(|name| Path::new(name))
+            .and_then(|name| { 
+                let file_or_dir = { self.dirs.kernel.lock().get(&name) };
+                match file_or_dir {
+                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
+                    _ => None,
+                }
+            })
     }
 
 
     /// Finds the kernel crate object files in this `CrateNamespace`'s directory of kernel crates
     /// that start with the given `prefix`.
     /// 
-    /// Returns the relative `Path`s of the matching kernel crate files, 
-    /// relative to this `CrateNamespace`'s kernel crate directory,
-    /// effectively just the full names of the crate files. 
+    /// Returns a list of the absolute `Path`s of matching kernel crate files.
     pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
-        let mut children = self.kernel_directory().lock().list();
-        children.retain(|child_name| child_name.starts_with(prefix)); // remove non-matches
-        children.into_iter().map(|name| Path::new(name)).collect()
+        let children = { self.dirs.kernel.lock().list() };
+        children.into_iter().filter_map(|name| {
+            if name.starts_with(prefix) {
+                let file_or_dir = { self.dirs.kernel.lock().get(&name) };
+                match file_or_dir {
+                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
+                    _ => None,
+                }
+            } else {
+                None // remove non-matches
+            }
+        }).collect()
     }
 
 }
@@ -2044,7 +2243,7 @@ fn is_valid_crate_name_char(c: char) -> bool {
 /// <alloc::boxed::Box<T>>::into_unique   -->  alloc
 /// keyboard::init                        -->  keyboard
 /// ```
-fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
+pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
     demangled_full_symbol.split("::").next().and_then(|s| {
         // Get the last word right before the first "::"
         s.rsplit(|c| !is_valid_crate_name_char(c))
@@ -2104,7 +2303,7 @@ struct SectionPages {
 
 /// Allocates enough space for the sections that are found in the given `ElfFile`.
 /// Returns a tuple of `MappedPages` for the .text, .rodata, and .data/.bss sections, in that order.
-fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementInfo) 
+fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) 
     -> Result<SectionPages, &'static str> 
 {
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
@@ -2151,7 +2350,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi: &mut MemoryManagementI
         let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
 
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
                 // Right now we're just simply copying small sections to the new memory,
                 // so we have to map those pages to real (randomly chosen) frames first. 
                 // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
