@@ -333,6 +333,7 @@ fn do_spawn() {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::new();
 
 	let overhead_ct = timing_overhead();
 	
@@ -340,9 +341,13 @@ fn do_spawn() {
 		let lat = do_spawn_inner(overhead_ct, i+1, TRIES, child_core).expect("Error in spawn inner()");
 
 		tries += lat;
+		vec.push(lat);
+
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
+
+	print_stats(vec);
 
 	let lat = tries / TRIES as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
@@ -424,16 +429,21 @@ fn do_ctx() {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::new();
 
 	// let overhead_ct = timing_overhead(); // timing overhead is already calculated within inner
 	
 	for i in 0..TRIES {
 		let lat = do_ctx_inner(i+1, TRIES, child_core).expect("Error in ctx inner()");
-
+	
 		tries += lat;
+		vec.push(lat);
+
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
+
+	print_stats(vec);
 
 	let lat = tries / TRIES as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
@@ -477,7 +487,6 @@ fn del_or_err(filename: &str) -> Result<(), &'static str> {
 	if let Some(_fileref) = get_file(filename) {
 		return Err("Need to delete a file, but delete() is not implemented yet :(");
 	}
-
 	Ok(())
 }
 
@@ -486,8 +495,8 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let pid = getpid();
 	let start_hpet_create: u64;
 	let end_hpet_create: u64;
-	// let start_hpet_del: u64;
-	// let end_hpet_del: u64;
+	let start_hpet_del: u64;
+	let end_hpet_del: u64;
 
 	// don't put these (populating files, checks, etc) into the loop to be timed
 	// The loop must be doing minimal operations to exclude unnecessary overhead
@@ -526,19 +535,25 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	}
 	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
 
-	// delete --- complete this once delete() is implemented
-	/*start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
-	for filename in filenames {
-		if let Some(fileref) = get_file_in(filename, &cwd) {
-			// fileref.lock().delete();
-		}
-	}
-	end_hpet_del = get_hpet().as_ref().unwrap().get_counter();*/
+	// // Measuring loop - delete
+	// let mut cwd_locked = cwd.lock();
+	// start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+
+	// for filename in filenames {
+	// 	if let Some(fileref) = get_file(&filename) {
+	// 		cwd_locked.remove(&FileOrDir::File(fileref)).expect("Cannot remove File in Create & Del inner");
+	// 	}
+	// }
+
+	// end_hpet_del = get_hpet().as_ref().unwrap().get_counter();
 
 	let delta_hpet_create = end_hpet_create - start_hpet_create - overhead_ct;
+	// let delta_hpet_delete = end_hpet_del - start_hpet_del - overhead_ct;
 	let delta_time_create = hpet_2_time("", delta_hpet_create);
+	// let delta_time_delete = hpet_2_time("", delta_hpet_delete);
 	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
 	let files_per_time = (ITERATIONS) as u64 * to_sec / delta_time_create;
+	// let deletes_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
 
 	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
 	Ok(())
@@ -606,7 +621,7 @@ fn get_file(filename: &str) -> Option<FileRef> {
 }
 
 // the function is not used now. but it can be used in the future, e.g., remove
-/*fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
+fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
 	let path = Path::new(filename.to_string());
 	match path.get(dirref) {
 		Ok(file_dir_enum) => {
@@ -617,7 +632,7 @@ fn get_file(filename: &str) -> Option<FileRef> {
 		}
 		_ => { None }
 	}
-}*/
+}
 
 fn test_file(filename: &str) {
 	if let Some(fileref) = get_file(filename) {
@@ -641,10 +656,12 @@ fn do_fs_create_del() {
 	let overhead_ct = timing_overhead();
 
 	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
-	printlninfo!("SIZE(KB)    Iteration    created(files/s)");
-	for fsize_b in fsizes_b.iter() {
-		do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
-	}
+	printlninfo!("SIZE(KB)    Iteration    created(files/s) ");
+	// for i in 0..TRIES {
+		for fsize_b in fsizes_b.iter() {
+			do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+		}
+	//}
 }
 
 fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
@@ -772,6 +789,7 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let fsize_b = fsize_kb * KB as usize;
+	let mut vec = Vec::new();
 
 	let filename = format!("tmp_{}k.txt", fsize_kb);
 
@@ -788,9 +806,13 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 		tries += lat;
 		tries_mb += tput_mb;
 		tries_kb += tput_kb;
+		vec.push(tput_kb);
+
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
+
+	print_stats(vec);
 
 	let lat = tries / TRIES as u64;
 	let tput_mb = tries_mb / TRIES as u64;
@@ -843,6 +865,7 @@ fn print_usage(prog: &String) {
 	printlninfo!("\n    fs_read_with_open: file read including open");
 	printlninfo!("\n    fs_read_only     : file read");
 	printlninfo!("\n    fs_create        : file create + del");
+	printlninfo!("\n    ctx        		 : inter thread context switching overhead");
 }
 
 fn print_header() {
