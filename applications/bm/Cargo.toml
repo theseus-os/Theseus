@@ -36,8 +36,8 @@ path = "../../kernel/path"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.memfs]
-path = "../../kernel/memfs"
+[dependencies.heapfile]
+path = "../../kernel/heapfile"
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
 

@@ -239,7 +239,7 @@ impl RunQueue {
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
+        // debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]

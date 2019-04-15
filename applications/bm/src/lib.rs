@@ -11,7 +11,7 @@ extern crate apic;
 extern crate spawn;
 extern crate path;
 extern crate runqueue;
-extern crate memfs;
+extern crate heapfile;
 extern crate scheduler;
 
 use core::str;
@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use acpi::get_hpet;
-use memfs::MemFile;
+use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 
@@ -477,7 +477,7 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 		}
 	}
 
-	let file = MemFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
+	let file = HeapFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
 	file.lock().write(&WRITE_BUF[0..sz], 0)?;
 
 	Ok(())
@@ -530,7 +530,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 
 		// We can create a file from mapped pages using 'from_mapped_pages(),'
 		// but we first create a file and then write to resemble LMBench.
-		let file = MemFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
 		file.lock().write(wbuf, 0)?;
 	}
 	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
@@ -621,18 +621,18 @@ fn get_file(filename: &str) -> Option<FileRef> {
 }
 
 // the function is not used now. but it can be used in the future, e.g., remove
-fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
-	let path = Path::new(filename.to_string());
-	match path.get(dirref) {
-		Ok(file_dir_enum) => {
-			match file_dir_enum {
-                FileOrDir::File(fileref) => { Some(fileref) }
-                _ => {None}
-            }
-		}
-		_ => { None }
-	}
-}
+// fn get_file_in(filename: String, dirref: &DirRef) -> Option<FileRef> {
+// 	let path = Path::new(filename.to_string());
+// 	match path.get(dirref) {
+// 		Ok(file_dir_enum) => {
+// 			match file_dir_enum {
+//                 FileOrDir::File(fileref) => { Some(fileref) }
+//                 _ => {None}
+//             }
+// 		}
+// 		_ => { None }
+// 	}
+// }
 
 fn test_file(filename: &str) {
 	if let Some(fileref) = get_file(filename) {
