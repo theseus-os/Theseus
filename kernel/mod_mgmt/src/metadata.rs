@@ -57,7 +57,7 @@ impl CrateType {
     /// assert_eq!(result, (CrateType::Kernel, "", "my_crate.o") );
     /// 
     /// let result = CrateType::from_module_name("ksse#my_crate.o");
-    /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate") );
+    /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
     pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
         let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
@@ -634,6 +634,6 @@ impl LoadedSection {
 
 impl fmt::Debug for LoadedSection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X})", self.name, self.virt_addr)
+        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.virt_addr, self.size)
     }
 }

@@ -1,0 +1,54 @@
+[package]
+name = "upd"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Front-end application to communicate with Theseus update server"
+build = "../../build.rs"
+
+[dependencies]
+getopts = "0.2.18"
+spin = "0.4.10"
+
+[dependencies.itertools]
+version = "0.7.9"
+default-features = false
+
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.memfs]
+path = "../../kernel/memfs"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.vfs_node]
+path = "../../kernel/vfs_node"
+
+[dependencies.ota_update_client]
+path = "../../kernel/ota_update_client/"
+
+[dependencies.network_manager]
+path = "../../kernel/network_manager"
+
+[dependencies.smoltcp]
+version = "0.5.0"
+default-features = false
+features = [
+    "alloc", 
+    # "log", "verbose", 
+    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
+    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
+]

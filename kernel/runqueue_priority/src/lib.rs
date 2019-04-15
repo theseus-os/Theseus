@@ -126,14 +126,11 @@ impl RunQueue {
     /// switches is increased by one. This function is used when the task is selected by the scheduler
     pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
         if let Some(mut priority_task_ref) = self.remove(index) {
-            {
-                priority_task_ref.tokens_remaining = tokens;
-            }
-            {
-                priority_task_ref.increment_context_switches();
-            }
-            self.push_back(priority_task_ref.clone());
-            Some(priority_task_ref.taskref)
+            priority_task_ref.tokens_remaining = tokens;
+            priority_task_ref.increment_context_switches();
+            let taskref = priority_task_ref.taskref.clone();
+            self.push_back(priority_task_ref);
+            Some(taskref)
         } 
         else {
             None 
@@ -142,7 +139,7 @@ impl RunQueue {
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8) -> Result<(), &'static str> {
-        trace!("Created runqueue for core {}", which_core);
+        trace!("Created runqueue (priority) for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
@@ -242,7 +239,7 @@ impl RunQueue {
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        // debug!("Removing task from runqueue {}, {:?}", self.core, task);
+        debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]

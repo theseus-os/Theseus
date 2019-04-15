@@ -610,7 +610,7 @@ fn test_file_inner(fileref: FileRef) {
 fn get_file(filename: &str) -> Option<FileRef> {
 	let path = Path::new(filename.to_string());
 	match path.get(&get_cwd().unwrap()) {
-		Ok(file_dir_enum) => {
+		Some(file_dir_enum) => {
 			match file_dir_enum {
                 FileOrDir::File(fileref) => { Some(fileref) }
                 _ => {None}

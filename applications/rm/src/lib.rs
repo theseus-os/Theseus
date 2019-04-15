@@ -1,9 +1,9 @@
 #![no_std]
 #![feature(alloc)]
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate task;
 extern crate getopts;
 extern crate path;
@@ -69,21 +69,22 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
     for path_string in &matches.free {
         let path = Path::new(path_string.clone());
         let node_to_delete = match path.get(&working_dir) {
-            Ok(node) => node,
-            Err(e) => return Err(e.into()),
+            Some(node) => node,
+            _ => return Err(format!("Couldn't find path {}", path)),
         };
 
         // Only remove directories if the user specified "-r". 
-        let mut can_remove_dirs = matches.opt_present("r");
-        let parent = node_to_delete.get_parent_dir()?;
+        let can_remove_dirs = matches.opt_present("r");
+        let path_error = || { format!("Couldn't remove {} from its parent directory.", &path) };
+        let parent = node_to_delete.get_parent_dir().ok_or_else(path_error)?;
 
         match node_to_delete {
             FileOrDir::File(_) => {
-                parent.lock().remove(&node_to_delete)?;
+                parent.lock().remove(&node_to_delete).ok_or_else(path_error)?;
             } 
             FileOrDir::Dir(_) => {
                 if can_remove_dirs {
-                    parent.lock().remove(&node_to_delete)?;
+                    parent.lock().remove(&node_to_delete).ok_or_else(path_error)?;
                 } else {
                     println!("Skipping the removal of directory '{}', try specifying the \"-r\" flag", 
                         node_to_delete.get_name());

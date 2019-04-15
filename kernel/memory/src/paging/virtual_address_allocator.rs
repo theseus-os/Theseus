@@ -56,13 +56,13 @@ impl AllocatedPages {
 //     }
 // }
 
-impl Drop for AllocatedPages {
-    fn drop(&mut self) {
-        if let Err(_) = deallocate_pages(self) {
-			error!("AllocatedPages::drop(): error deallocating pages");
-		}
-    }
-}
+// impl Drop for AllocatedPages {
+//     fn drop(&mut self) {
+//         if let Err(_) = deallocate_pages(self) {
+// 			error!("AllocatedPages::drop(): error deallocating pages");
+// 		}
+//     }
+// }
 
 
 

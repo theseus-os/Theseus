@@ -255,9 +255,8 @@ impl ApplicationTaskBuilder {
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
         let app_crate_ref = {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-            let mut kernel_mmi = kernel_mmi_ref.lock();
             mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?
-                .load_application_crate(&self.path, kernel_mmi.deref_mut(), self.singleton, false)?
+                .load_application_crate(&self.path, &kernel_mmi_ref, self.singleton, false)?
         };
 
         // get the LoadedSection for the "main" function in the app_crate
@@ -546,12 +545,12 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper(): couldn't get_my_current_task().");
+    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
     let curr_task_name = curr_task_ref.lock().name.clone();
 
     let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
         let t = curr_task_ref.lock();
-        let kstack = t.kstack.as_ref().expect("BUG: task_wrapper(): failed to get current task's kstack.");
+        let kstack = t.kstack.as_ref().expect("BUG: task_wrapper: failed to get current task's kstack.");
         // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
         // let off: isize = 0;
         unsafe {
@@ -617,7 +616,7 @@ fn task_wrapper<F, A, R>() -> !
 
     // nothing below here should ever run again, we should never ever reach this point
 
-    error!("BUG: task_wrapper() WAS RESCHEDULED AFTER BEING DEAD!");
+    error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
     loop { }
 }
 
