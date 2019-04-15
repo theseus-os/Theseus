@@ -510,6 +510,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "heapfile"
+version = "0.1.0"
+dependencies = [
+ "fs_node 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
+]
+
+[[package]]
 name = "hello"
 version = "0.1.0"
 dependencies = [
