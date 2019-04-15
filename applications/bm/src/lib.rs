@@ -168,6 +168,59 @@ fn timing_overhead() -> u64 {
 	overhead
 }
 
+fn print_stats(vec: Vec<u64>) {
+	let avg;
+  	let median;
+  	let perf_75;
+	let perf_25;
+	let min;
+	let max;
+	let var;
+
+  	{ // calculate average
+      let mut sum: u64 = 0;
+      for x in &vec {
+          sum = sum + x;
+      }
+
+      avg = sum as u64 / vec.len() as u64;
+  	}
+
+	{ // calculate median
+	  let mut vec2 = vec.clone();
+      vec2.sort();
+      let mid = vec2.len() / 2;
+	  let p_75 = vec2.len() *3 / 4;
+	  let p_25 = vec2.len() *1 / 4;
+
+      median = vec2[mid];
+	  perf_25 = vec2[p_25];
+	  perf_75 = vec2[p_75];
+	  min = vec2[0];
+	  max = vec2[vec.len() - 1];
+  	}
+
+	{
+		//calculate standard deviation
+		let mut sum: u64 = 0;
+		let mut sq_sum: u64 = 0;
+      	for x in &vec {
+			sq_sum = sq_sum + x*x;
+      	}
+
+    	var = ((sq_sum as u64) - (vec.len() as u64)*(avg)*(avg)) / (vec.len() as u64 - 1);
+
+	}
+	printlninfo!("\n  mean : {}",avg);
+	printlninfo!("\n  var  : {}",var);
+	printlninfo!("\n  max  : {}",max);
+	printlninfo!("\n  min  : {}",min);
+	printlninfo!("\n  p_50 : {}",median);
+	printlninfo!("\n  p_25 : {}",perf_25);
+	printlninfo!("\n  p_75 : {}",perf_75);
+	printlninfo!("\n");
+}
+
 fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let start_hpet: u64;
 	let end_hpet: u64;
@@ -200,6 +253,7 @@ fn do_null() {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::new();
 
 	let overhead_ct = timing_overhead();
 	
@@ -207,10 +261,13 @@ fn do_null() {
 		let lat = do_null_inner(overhead_ct, i+1, TRIES);
 
 		tries += lat;
+		vec.push(lat);
+
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
 
+	print_stats(vec);
 	let lat = tries / TRIES as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
 	if 	max - lat > err || lat - min > err {
