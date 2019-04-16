@@ -9,6 +9,7 @@ extern crate mod_mgmt;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
+extern crate hpet;
 
 extern crate runqueue_round_robin;
 extern crate runqueue_priority;
@@ -61,6 +62,13 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
 
     warn!("REPLACING LAZY_STATIC RUNQUEUES...");
 
+    #[cfg(loscd_eval)]
+    let hpet_ref = hpet::get_hpet();
+    #[cfg(loscd_eval)]
+    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    #[cfg(loscd_eval)]
+    let hpet_start_state_transfer = hpet.get_counter();
+
     // __lazy_static_create!(RQEMPTY, AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>);
     // lazy_static! { static ref RQEMPTY: AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>> = AtomicMap::new(); }
     let rq_ptr = runqueue_round_robin::RUNQUEUES.deref() as *const _ as usize;
@@ -69,14 +77,25 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
         AtomicMap::new()
     );
 
+    #[cfg(not(loscd_eval))]
     warn!("obtained ownership of runqueues:");
     for (core, rq) in once_rq.iter() {
+        #[cfg(not(loscd_eval))]
         warn!("\t{:?}: {:?}", core, rq);
         runqueue_priority::RunQueue::init(*core)?;
         for t in rq.read().iter() {
             let rrtref: &_RoundRobinTaskRef = unsafe { core::mem::transmute(t) };
             runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, rrtref._taskref.clone())?;
         }
+    }
+
+    #[cfg(loscd_eval)] {
+        let hpet_end_state_transfer = hpet.get_counter();
+        warn!("
+                state transfer, {}
+                ",
+                hpet_end_state_transfer - hpet_start_state_transfer,
+            );
     }
 
     core::mem::drop(once_rq);
