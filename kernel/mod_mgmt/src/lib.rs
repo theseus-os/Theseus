@@ -617,6 +617,7 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
+        #[cfg(not(loscd_eval))]
         debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
         let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
             .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
@@ -633,6 +634,7 @@ impl CrateNamespace {
             (new_crate.crate_name.clone(), new_syms)
         };
             
+        #[cfg(not(loscd_eval))]
         info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
         Ok(new_syms)
@@ -1176,6 +1178,8 @@ impl CrateNamespace {
                     
                     #[cfg(not(loscd_eval))]
                     cached_crates.crate_tree.lock().insert_str(&old_crate_name, old_crate_ref);
+                    #[cfg(loscd_eval)]
+                    core::mem::forget(old_crate_ref);
                 }
                 else {
                     error!("BUG: swap_crates(): failed to remove old crate {}", old_crate_name);
@@ -1405,6 +1409,7 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
+        #[cfg(not(loscd_eval))]
         debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
@@ -2134,6 +2139,7 @@ impl CrateNamespace {
                             self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                             parent_crate.crate_name.clone()
                         };
+                        #[cfg(not(loscd_eval))]
                         info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
                             demangled_full_symbol, parent_crate_name, backup.name, self.name);
                         self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
@@ -2189,6 +2195,7 @@ impl CrateNamespace {
         // We are only able to do this for mangled symbols that have a leading crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
+            #[cfg(not(loscd_eval))]
             info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             let crate_dependency_name = format!("{}-", crate_dependency_name);
