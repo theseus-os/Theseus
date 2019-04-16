@@ -13,8 +13,8 @@ cfg-if = "0.1.6"
 default-features = false
 version = "0.3.7"
 
-[dependencies.acpi]
-path = "../../kernel/acpi"
+[dependencies.hpet]
+path = "../../kernel/hpet"
 
 [dependencies.tsc]
 path = "../../kernel/tsc"

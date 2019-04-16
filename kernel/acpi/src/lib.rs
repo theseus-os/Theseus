@@ -21,6 +21,8 @@ extern crate pit_clock;
 extern crate ap_start;
 extern crate pic; 
 extern crate apic;
+extern crate hpet;
+extern crate sdt;
 
 
 macro_rules! try_opt {
@@ -39,8 +41,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use owning_ref::BoxRefMut;
-use spin::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use spin::{Mutex, RwLock};
 
 
 use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
@@ -50,21 +51,18 @@ use kernel_config::memory::{PAGE_SIZE, address_page_offset};
 pub use self::fadt::Fadt;
 pub use self::madt::Madt;
 pub use self::rsdt::Rsdt;
-pub use self::sdt::Sdt;
 pub use self::xsdt::Xsdt;
 pub use self::rxsdt::Rxsdt;
 pub use self::rsdp::RSDP;
+use sdt::Sdt;
 
-use self::hpet::Hpet;
 // use self::aml::{parse_aml_table, AmlError, AmlValue};
 
 // mod dmar;
 // mod aml;
-pub mod hpet;
 mod fadt;
 pub mod madt;
 mod rsdt;
-mod sdt;
 mod xsdt;
 mod rxsdt;
 mod rsdp;
@@ -78,18 +76,15 @@ const AP_STARTUP: PhysicalAddress = 0x10000;
 const TRAMPOLINE: PhysicalAddress = AP_STARTUP - PAGE_SIZE;
 
 
-/// The larger container that holds all data structure obtained from the ACPI table, 
-/// such as HPET, FADT, etc. 
+/// The larger container that holds all data structure obtained from the ACPI table.
 pub struct Acpi {
     pub fadt: RwLock<Option<Fadt>>,
-    pub hpet: RwLock<Option<BoxRefMut<MappedPages, Hpet>>>,
     // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
     pub next_ctx: RwLock<u64>,
 }
 
 static ACPI_TABLE: Acpi = Acpi {
     fadt: RwLock::new(None),
-    hpet: RwLock::new(None),
     // namespace: RwLock::new(None),
     next_ctx: RwLock::new(0),
 };
@@ -186,7 +181,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
 //         *namespace = Some(BTreeMap::new());
 //     }
 
-//     let dsdt = find_sdt("DSDT");
+//     let dsdt = find_matching_sdts("DSDT");
 //     if dsdt.len() == 1 {
 //         debug!("  DSDT");
 //         load_table(get_sdt_signature(dsdt[0]));
@@ -196,7 +191,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
 //         return;
 //     };
 
-//     let ssdts = find_sdt("SSDT");
+//     let ssdts = find_matching_sdts("SSDT");
 
 //     for ssdt in ssdts {
 //         debug!("  SSDT");
@@ -270,15 +265,21 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         }
 
         // FADT is mandatory
-        try!(Fadt::init(active_table));
+        Fadt::init(active_table)?;
         
         // HPET is optional
-        if let Ok(mut hpet) = hpet::init(active_table) {
-            let mut hpet_entry = ACPI_TABLE.hpet.write();
-            *hpet_entry = Some(hpet);
-        }
-        else {
-            warn!("This machine has no HPET, skipping HPET init.");
+        let hpet_result = {
+            let hpet_sdt = find_matching_sdts("HPET");
+            if hpet_sdt.len() == 1 {
+                load_table(get_sdt_signature(hpet_sdt[0]));
+                hpet::init(hpet_sdt[0], active_table)
+            }
+            else {
+                Err("unable to find HPET SDT")
+            }
+        };
+        if let Err(_e) = hpet_result {
+            warn!("This machine has no HPET.");
         }
         
 
@@ -298,26 +299,6 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
     }
 }
 
-
-/// Returns a reference to the HPET timer structure, wrapped in an Option,
-/// because it is not guaranteed that HPET exists or has been initialized.
-/// # Example
-/// ```
-/// let counter_val = get_hpet().as_ref().unwrap().get_counter();
-/// ```
-pub fn get_hpet() -> RwLockReadGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
-    ACPI_TABLE.hpet.read()
-}
-
-/// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
-/// because it is not guaranteed that HPET exists or has been initialized.
-/// # Example
-/// ```
-/// get_hpet_mut().as_mut().unwrap().enable_counter(true);
-/// ```
-pub fn get_hpet_mut() -> RwLockWriteGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
-    ACPI_TABLE.hpet.write()
-}
 
 
 // pub fn set_global_s_state(state: u8) {
@@ -352,7 +333,7 @@ type SdtSignature = (String, [u8; 6], [u8; 8]);
 pub static SDT_POINTERS: RwLock<Option<BTreeMap<SdtSignature, &'static Sdt>>> = RwLock::new(None);
 pub static SDT_ORDER: RwLock<Option<Vec<SdtSignature>>> = RwLock::new(None);
 
-pub fn find_sdt(name: &str) -> Vec<&'static Sdt> {
+pub fn find_matching_sdts(name: &str) -> Vec<&'static Sdt> {
     let mut sdts: Vec<&'static Sdt> = vec!();
 
     if let Some(ref ptrs) = *(SDT_POINTERS.read()) {

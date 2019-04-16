@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate log;
 extern crate memory;
 extern crate getopts;
-extern crate acpi;
+extern crate hpet;
 extern crate kernel_config;
 extern crate tsc;
 
@@ -27,7 +27,7 @@ if #[cfg(mapper_spillful)] {
 
 use core::ops::DerefMut;
 use getopts::{Matches, Options};
-use acpi::get_hpet;
+use hpet::get_hpet;
 use kernel_config::memory::PAGE_SIZE;
 
 
