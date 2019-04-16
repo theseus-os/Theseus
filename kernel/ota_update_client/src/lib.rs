@@ -372,7 +372,8 @@ fn download_files<S: AsRef<str>>(
         }
 
         // Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
-        if !is_connected(&mut sockets, tcp_handle)
+        // if !is_connected(&mut sockets, tcp_handle) {
+        // for now, we just always close the old socket and connect a new one
         {
             debug!("ota_update_client: remote endpoint closed socket after response, opening a new socket.");
             // first, close the existing socket

@@ -969,10 +969,7 @@ impl CrateNamespace {
                     for weak_dep in &old_sec.sections_dependent_on_me {
                         let target_sec_ref = match weak_dep.section.upgrade() {
                             Some(ssr) => ssr,
-                            _ => {
-                                warn!("swap_crates(): skipping removed WeakDependent.section (with {:?})", weak_dep.relocation);
-                                continue;
-                            }
+                            _ => continue, // TODO remove this `weak_dep` from `old_sec.sections_dependent_on_me`
                         };
                         let mut target_sec = target_sec_ref.lock();
                         let relocation_entry = weak_dep.relocation;
