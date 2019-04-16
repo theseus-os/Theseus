@@ -6,7 +6,7 @@ use memory::Frame;
 use paging::{ActivePageTable, PhysicalAddress};
 use paging::entry::EntryFlags;
 
-use super::{find_sdt, load_table, get_sdt_signature};
+use super::{find_matching_sdts, load_table, get_sdt_signature};
 
 pub mod drhd;
 
@@ -21,7 +21,7 @@ pub struct Dmar {
 
 impl Dmar {
     pub fn init(active_table: &mut ActivePageTable) {
-        let dmar_sdt = find_sdt("DMAR");
+        let dmar_sdt = find_matching_sdts("DMAR");
         let dmar = if dmar_sdt.len() == 1 {
             load_table(get_sdt_signature(dmar_sdt[0]));
             Dmar::new(dmar_sdt[0])

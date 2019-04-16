@@ -13,7 +13,7 @@ use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use pit_clock;
 
 use super::sdt::Sdt;
-use super::{AP_STARTUP, TRAMPOLINE, find_sdt, load_table, get_sdt_signature};
+use super::{AP_STARTUP, TRAMPOLINE, find_matching_sdts, load_table, get_sdt_signature};
 
 
 use core::sync::atomic::spin_loop_hint;
@@ -45,7 +45,7 @@ impl Madt {
             return Err("Cannot call Madt::init() from non-bsp cores");
         }
         
-        let madt_sdt = find_sdt("APIC");
+        let madt_sdt = find_matching_sdts("APIC");
         if madt_sdt.len() == 1 {
             load_table(get_sdt_signature(madt_sdt[0]));
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));

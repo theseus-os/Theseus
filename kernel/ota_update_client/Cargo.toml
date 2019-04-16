@@ -21,8 +21,8 @@ git = "https://github.com/kevinaboos/irq_safety"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.hpet]
+path = "../hpet"
 
 [dependencies.spawn]
 path = "../spawn"

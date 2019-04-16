@@ -1,14 +1,50 @@
+//! Support for the x86 HPET: High Precision Event Timer.
+
+#![no_std]
+#![feature(alloc)]
+
+extern crate alloc;
+#[macro_use] extern crate log;
+extern crate kernel_config;
+extern crate memory;
+extern crate volatile;
+extern crate sdt;
+extern crate spin;
+extern crate owning_ref;
+
 use core::{mem, ptr};
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
 use owning_ref::BoxRefMut;
 use kernel_config::memory::address_page_offset;
 use alloc::boxed::Box;
-
+use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
+use sdt::Sdt;
 
-use super::sdt::Sdt;
-use super::{find_sdt, load_table, get_sdt_signature};
+/// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
+static HPET: RwLock<Option<BoxRefMut<MappedPages, Hpet>>> = RwLock::new(None);
+
+
+/// Returns a reference to the HPET timer structure, wrapped in an Option,
+/// because it is not guaranteed that HPET exists or has been initialized.
+/// # Example
+/// ```
+/// let counter_val = get_hpet().as_ref().unwrap().get_counter();
+/// ```
+pub fn get_hpet() -> RwLockReadGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
+    HPET.read()
+}
+
+/// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
+/// because it is not guaranteed that HPET exists or has been initialized.
+/// # Example
+/// ```
+/// get_hpet_mut().as_mut().unwrap().enable_counter(true);
+/// ```
+pub fn get_hpet_mut() -> RwLockWriteGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
+    HPET.write()
+}
 
 
 /// A structure that offers access to HPET through its I/O registers, 
@@ -98,16 +134,8 @@ pub struct HpetTimer {
 
 /// Finds and initializes the HPET, and enables its main counter.
 /// Returns a mutable reference to the `Hpet` struct
-pub fn init(active_table: &mut ActivePageTable) -> Result<BoxRefMut<MappedPages, Hpet>, &'static str> {
-    let hpet_sdt = find_sdt("HPET");
-    let hpet_inner = try!( 
-        if hpet_sdt.len() == 1 {
-            load_table(get_sdt_signature(hpet_sdt[0]));
-            HpetInner::new(hpet_sdt[0])
-        } else {
-            Err("unable to find HPET SDT")
-        }
-    );
+pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    let hpet_inner = HpetInner::new(hpet_sdt)?;    
 
     let phys_addr = hpet_inner.gen_addr_struct.address as PhysicalAddress;
     let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
@@ -126,7 +154,9 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<BoxRefMut<MappedPages,
         );
     }
 
-    Ok(hpet)
+    *HPET.write() = Some(hpet);
+
+    Ok(())
 }
 
 
