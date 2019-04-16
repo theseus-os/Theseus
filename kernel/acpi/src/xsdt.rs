@@ -1,7 +1,7 @@
 use core::mem;
 use alloc::boxed::Box;
 
-use super::sdt::Sdt;
+use super::Sdt;
 use super::rxsdt::Rxsdt;
 
 #[derive(Debug)]

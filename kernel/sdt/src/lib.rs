@@ -1,6 +1,12 @@
+//! ACPI table definitions and basic SDT structures.
+
+#![no_std]
+
 use core::mem;
 use core::slice;
 
+
+/// An ACPI System Descriptor Table.
 #[derive(Copy, Clone, Debug)]
 #[repr(packed)]
 pub struct Sdt {
