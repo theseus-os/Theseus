@@ -854,6 +854,8 @@ impl CrateNamespace {
         let mut hpet_total_rewriting_relocations = 0;
         #[cfg(loscd_eval)]
         let mut hpet_total_fixing_dependencies = 0;
+        #[cfg(loscd_eval)]
+        let mut hpet_total_bss_transfer = 0;
 
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
@@ -1072,6 +1074,9 @@ impl CrateNamespace {
                     }
                 }
 
+                #[cfg(loscd_eval)]
+                let hpet_start_bss_transfer = hpet.get_counter();
+
                 // Go through all the BSS sections and copy over the old_sec into the new source_sec,
                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
                 // Currently, AFAIK, static variables (states) only exist in the form of .bss sections
@@ -1098,6 +1103,11 @@ impl CrateNamespace {
 
                     // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
                     old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
+                }
+
+                #[cfg(loscd_eval)] {
+                    let hpet_end_bss_transfer = hpet.get_counter();
+                    hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
                 }
             } // end of scope, drops lock for `self.symbol_map` and `new_crate_ref`
         } // end of iteration over all swap requests
@@ -1263,7 +1273,8 @@ impl CrateNamespace {
                 load crates, {}
                 find symbols, {}
                 rewrite relocations, {}
-                fix dependences, {}
+                fix dependencies, {}
+                BSS transfer, {}
                 symbol cleanup, {}
                 HPET PERIOD (femtosec): {}
                 ",
@@ -1271,6 +1282,7 @@ impl CrateNamespace {
                 hpet_total_symbol_finding,
                 hpet_total_rewriting_relocations,
                 hpet_total_fixing_dependencies,
+                hpet_total_bss_transfer,
                 end_symbol_cleanup - start_symbol_cleanup,
                 hpet.counter_period_femtoseconds(),
             );

@@ -92,10 +92,10 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
     #[cfg(loscd_eval)] {
         let hpet_end_state_transfer = hpet.get_counter();
         warn!("
-                state transfer, {}
-                ",
-                hpet_end_state_transfer - hpet_start_state_transfer,
-            );
+            state transfer, {}
+            ",
+            hpet_end_state_transfer - hpet_start_state_transfer,
+        );
     }
 
     core::mem::drop(once_rq);
