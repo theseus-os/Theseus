@@ -38,5 +38,8 @@ path = "../runqueue_round_robin"
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
 
+[dependencies.hpet]
+path = "../hpet"
+
 [lib]
 crate-type = ["rlib"]
