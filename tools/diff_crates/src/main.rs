@@ -127,7 +127,7 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
         }
         // otherwise we try to search the old dir to see if there's a single matching crate that has a different hash
         else {
-            let matching_old_crates: Vec<(BString, PathBuf)> = old_dir_contents.iter_prefix_str(crate_name_without_hash(new_filename.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let matching_old_crates: Vec<(BString, PathBuf)> = old_dir_contents.iter_prefix_str(&crate_name_without_hash(new_filename.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
             match &matching_old_crates[..] {
                 [] => {
                     // if empty, there were no matches, so the crate is brand new and should be added but not replace anything. 
@@ -155,7 +155,7 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
 
     // Second, we got through the old directory to make sure we didn't miss any files that were present in the old directory but not in the new
     for (old_filename, _old_path) in old_dir_contents.iter() {
-        if new_dir_contents.iter_prefix_str(crate_name_without_hash(old_filename.as_str())).next().is_none() {
+        if new_dir_contents.iter_prefix_str(&crate_name_without_hash(old_filename.as_str())).next().is_none() {
             println!("- {}", old_filename.as_str());
             replacements.insert(old_filename.clone().into(), String::new());
         }
@@ -165,10 +165,11 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
 }
 
 
-fn crate_name_without_hash<'s>(name: &'s str) -> &'s str {
+fn crate_name_without_hash(name: &str) -> String {
     name.split("-")
         .next()
-        .unwrap_or_else(|| name.as_ref())
+	.map(|s| format!("{}-", s))
+        .unwrap_or_else(|| String::from(name))
 }
 
 
