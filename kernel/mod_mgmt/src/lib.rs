@@ -864,6 +864,9 @@ impl CrateNamespace {
         // such that they refer to the new_module instead of the old_crate.
         for req in &swap_requests {
             let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+            if old_crate_name == "" {
+                continue; // just adding a new crate, no replacements needed
+            }
             let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
             let new_crate_name = new_crate_object_file_abs_path.file_stem();
             
@@ -1140,6 +1143,7 @@ impl CrateNamespace {
             let mut this_symbol_map = self.symbol_map.lock();
             for req in swap_requests {
                 let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+                if old_crate_name == "" { continue; }
                 let new_crate_name = new_crate_object_file_abs_path.file_stem();
                 // Remove the old crate from this namespace, and remove its sections' symbols too
                 if let Some(old_crate_ref) = self.crate_tree.lock().remove_str(&old_crate_name) {
