@@ -202,13 +202,17 @@ fn print_stats(vec: Vec<u64>) {
 
 	{
 		//calculate standard deviation
-		let mut sum: u64 = 0;
-		let mut sq_sum: u64 = 0;
+		let mut diff_sum: u64 = 0;
       	for x in &vec {
-			sq_sum = sq_sum + x*x;
+			if x > &avg {
+				diff_sum = diff_sum + ((x-avg)*(x-avg));
+			}
+			else {
+				diff_sum = diff_sum + ((avg - x)*(avg -x));
+			}
       	}
 
-    	var = ((sq_sum as u64) - (vec.len() as u64)*(avg)*(avg)) / (vec.len() as u64 - 1);
+    	var = (diff_sum) / (vec.len() as u64 - 1);
 
 	}
 	printlninfo!("\n  mean : {}",avg);
@@ -537,7 +541,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 
 	// // Measuring loop - delete
 	// let mut cwd_locked = cwd.lock();
-	// start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+	// // start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
 
 	// for filename in filenames {
 	// 	if let Some(fileref) = get_file(&filename) {
