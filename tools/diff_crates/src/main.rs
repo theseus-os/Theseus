@@ -174,7 +174,7 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
 
     // Second, we got through the old directory to make sure we didn't miss any files that were present in the old directory but not in the new
     for (old_filename, _old_path) in old_dir_contents.iter() {
-        if new_dir_contents.iter_prefix_str(&crate_name_without_hash(old_filename.as_str())).next().is_none() {
+        if new_dir_contents.iter_prefix_str(crate_name_without_hash(old_filename.as_str())).next().is_none() {
             println!("- {}", old_filename.as_str());
             replacements.insert(old_filename.clone().into(), String::new());
         }
