@@ -127,7 +127,9 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
         }
         // otherwise we try to search the old dir to see if there's a single matching crate that has a different hash
         else {
-            let matching_old_crates: Vec<(BString, PathBuf)> = old_dir_contents.iter_prefix_str(&crate_name_without_hash(new_filename.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
+            // initially, we search just the crate name itself (e.g., "terminal", "apic") without the trailing hash to allow for matching applications.
+            let crate_name_search_str = format!("{}", crate_name_without_hash(new_filename.as_str()));
+            let matching_old_crates: Vec<(BString, PathBuf)> = old_dir_contents.iter_prefix_str(&crate_name_search_str).map(|(k, v)| (k.clone(), v.clone())).collect();
             match &matching_old_crates[..] {
                 [] => {
                     // if empty, there were no matches, so the crate is brand new and should be added but not replace anything. 
@@ -140,15 +142,32 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
                     println!("{} -> {}", old_filename.as_str(), new_filename.as_str());
                     replacements.insert(old_filename.clone().into(), new_filename.clone().into());
                 }
-                other => {
-                    let mut err_str = format!("Unsupported: multiple old crates matched the new crate {}:\n", new_filename.as_str());
-                    for (k, _v) in other {
-                        err_str = format!("{}\t{}\n", err_str, k.as_str());
+                _multiple_matches => {
+                    // here, we found multiple matches. So now, we search for the crate name plus the delimiter "-" (e.g., "terminal-", "apic-") to remove false positive matches.
+                    let crate_name_search_str = format!("{}-", crate_name_search_str);
+                    let matching_old_crates: Vec<(BString, PathBuf)> = old_dir_contents.iter_prefix_str(&crate_name_search_str).map(|(k, v)| (k.clone(), v.clone())).collect();
+                    match &matching_old_crates[..] {
+                        [] => {
+                            // if empty, there were no matches, so the crate is brand new and should be added but not replace anything. 
+                            println!("+ {}", new_filename.as_str());
+                            replacements.insert(String::new(), new_filename.clone().into());
+                        }
+                        [(old_filename, _old_path)] => {
+                            // If there was one match, it means we updated from an old crate to a new crate of the same name, but the hash changed.
+                            // This is the most common scenario.
+                            println!("{} -> {}", old_filename.as_str(), new_filename.as_str());
+                            replacements.insert(old_filename.clone().into(), new_filename.clone().into());
+                        }
+                        other => {
+                            let mut err_str = format!("Unsupported: multiple old crates matched the new crate {}:\n", new_filename.as_str());
+                            for (k, _v) in other {
+                                err_str = format!("{}\t{}\n", err_str, k.as_str());
+                            }
+                            return Err(err_str)
+                        }
                     }
-                    return Err(err_str)
                 }
             }
-
         }
     }
 
@@ -165,11 +184,10 @@ fn compare_dirs(old_dir_contents: Trie<BString, PathBuf>, new_dir_contents: Trie
 }
 
 
-fn crate_name_without_hash(name: &str) -> String {
+fn crate_name_without_hash<'s>(name: &'s str) -> &'s str {
     name.split("-")
         .next()
-	.map(|s| format!("{}-", s))
-        .unwrap_or_else(|| String::from(name))
+        .unwrap_or_else(|| name)
 }
 
 
