@@ -10,6 +10,7 @@ extern crate spawn;
 extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
+extern crate tlb_shootdown;
 
 use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
@@ -78,6 +79,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
             }
         }
     };
+    tlb_shootdown::init();
     if get_my_apic_id() != Some(apic_id) {
         error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
     }
