@@ -436,8 +436,8 @@ fn do_ctx() {
 	let mut vec = Vec::new();
 
 	// let overhead_ct = timing_overhead(); // timing overhead is already calculated within inner
-	
-	for i in 0..TRIES {
+	let lots_of_tries = 1000;
+	for i in 0..lots_of_tries {
 		let lat = do_ctx_inner(i+1, TRIES, child_core).expect("Error in ctx inner()");
 	
 		tries += lat;
@@ -449,7 +449,7 @@ fn do_ctx() {
 
 	print_stats(vec);
 
-	let lat = tries / TRIES as u64;
+	let lat = tries / lots_of_tries as u64;
 	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
 	if 	max - lat > err || lat - min > err {
 		printlnwarn!("ctx_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
@@ -563,6 +563,87 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	Ok(())
 }
 
+fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static str> {
+	let mut filenames = vec!["".to_string(); ITERATIONS];
+	let pid = getpid();
+	let start_hpet_create: u64;
+	let end_hpet_create: u64;
+	let start_hpet_del: u64;
+	let end_hpet_del: u64;
+	let mut file_list = Vec::new();
+
+	// don't put these (populating files, checks, etc) into the loop to be timed
+	// The loop must be doing minimal operations to exclude unnecessary overhead
+	// populate filenames
+	for i in 0..ITERATIONS {
+		filenames[i] = format!("tmp_{}_{}_{}.txt", pid, fsize_b, i);
+	}
+
+	// check if we have enough data to write. We use just const data to avoid unnecessary overhead
+	if fsize_b > WRITE_BUF_SIZE {
+		return Err("Cannot test because the file size is too big");
+	}
+
+	// delete existing files. To make sure that the file creation below succeeds.
+	for filename in &filenames {
+		del_or_err(filename).expect("Cannot continue the test. We need 'delete()'.");
+	}
+
+	let cwd = match get_cwd() {
+		Some(dirref) => {dirref}
+		_ => {return Err("Cannot get CWD");}
+	};
+
+	let wbuf = &WRITE_BUF[0..fsize_b];
+
+	// Non measuring loop for file create
+	for filename in &filenames {
+		// checking if filename exists is done above
+		// here, we only create files
+
+		// We can create a file from mapped pages using 'from_mapped_pages(),'
+		// but we first create a file and then write to resemble LMBench.
+		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		file.lock().write(wbuf, 0)?;
+		file_list.push(file);
+	}
+	
+
+	let mut cwd_locked = cwd.lock();
+
+	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+
+	// Measuring loop file delete
+	for fileref in file_list{
+		cwd_locked.remove(&FileOrDir::File(fileref)).expect("Cannot remove File in Create & Del inner");
+	}
+
+	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+
+	// // Measuring loop - delete. If file is searched (very expensive)
+	// let mut cwd_locked = cwd.lock();
+	// // start_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+
+	// for filename in filenames {
+	// 	if let Some(fileref) = get_file(&filename) {
+	// 		cwd_locked.remove(&FileOrDir::File(fileref)).expect("Cannot remove File in Create & Del inner");
+	// 	}
+	// }
+
+	// end_hpet_del = get_hpet().as_ref().unwrap().get_counter();
+
+	let delta_hpet_delete = end_hpet_create - start_hpet_create - overhead_ct;
+	// let delta_hpet_delete = end_hpet_del - start_hpet_del - overhead_ct;
+	let delta_time_delete = hpet_2_time("", delta_hpet_delete);
+	// let delta_time_delete = hpet_2_time("", delta_hpet_delete);
+	let to_sec: u64 = if cfg!(bm_in_us) {SEC_TO_MICRO} else {SEC_TO_NANO};
+	let files_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
+	// let deletes_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
+
+	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
+	Ok(())
+}
+
 fn cat(fileref: &FileRef, sz: usize, msg: &str) {
 	printlninfo!("{}", msg);
 	let file = fileref.lock();
@@ -664,6 +745,22 @@ fn do_fs_create_del() {
 	// for i in 0..TRIES {
 		for fsize_b in fsizes_b.iter() {
 			do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+		}
+	//}
+}
+
+fn do_fs_delete() {
+	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
+	let	fsizes_b = [1024_usize, 4096, 10*1024];
+	// let	fsizes_b = [1024_usize];
+
+	let overhead_ct = timing_overhead();
+
+	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
+	printlninfo!("SIZE(KB)    Iteration    deleted(files/s) ");
+	// for i in 0..TRIES {
+		for fsize_b in fsizes_b.iter() {
+			do_fs_delete_inner(*fsize_b, overhead_ct).expect("Cannot test File Delete");
 		}
 	//}
 }
@@ -868,7 +965,8 @@ fn print_usage(prog: &String) {
 	printlninfo!("\n    spawn            : process creation");
 	printlninfo!("\n    fs_read_with_open: file read including open");
 	printlninfo!("\n    fs_read_only     : file read");
-	printlninfo!("\n    fs_create        : file create + del");
+	printlninfo!("\n    fs_create        : file create");
+	printlninfo!("\n    fs_delete        : file delete");
 	printlninfo!("\n    ctx        		 : inter thread context switching overhead");
 }
 
@@ -912,6 +1010,9 @@ pub fn main(args: Vec<String>) -> isize {
 		}
 		"fs_create" | "fs3" => {
 			do_fs_create_del();
+		}
+		"fs_delete" | "fs4" => {
+			do_fs_delete();
 		}
 		"ctx" => {
 			do_ctx();
