@@ -39,7 +39,7 @@ const ITERATIONS: usize = 1_000;
 const TRIES: usize = 10;
 
 // don't change it. 
-const READ_BUF_SIZE: usize = 64*1024;
+const READ_BUF_SIZE: usize = 10*1024;
 const WRITE_BUF_SIZE: usize = 1024*1024;
 const WRITE_BUF: [u8; WRITE_BUF_SIZE] = [65; WRITE_BUF_SIZE];
 
@@ -469,7 +469,7 @@ fn get_cwd() -> Option<DirRef> {
     None
 }
 
-// Don't call this function inside of a measuring loop.
+// DON'T call this function inside of a measuring loop.
 fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 	if sz > WRITE_BUF_SIZE {
 		return Err("Cannot test because the file size is too big");
@@ -528,13 +528,13 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 
 	// Measuring loop - create
 	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
-	for filename in &filenames {
+	for filename in filenames {
 		// checking if filename exists is done above
 		// here, we only create files
 
 		// We can create a file from mapped pages using 'from_mapped_pages(),'
 		// but we first create a file and then write to resemble LMBench.
-		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		let file = HeapFile::new(filename, &cwd).expect("File cannot be created.");
 		file.lock().write(wbuf, 0)?;
 	}
 	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
@@ -559,7 +559,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let files_per_time = (ITERATIONS) as u64 * to_sec / delta_time_create;
 	// let deletes_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
 
-	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
+	printlninfo!("{:8}    {:9}    {:16}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time,delta_time_create / (ITERATIONS) as u64);
 	Ok(())
 }
 
@@ -640,7 +640,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	let files_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
 	// let deletes_per_time = (ITERATIONS) as u64 * to_sec / delta_time_delete;
 
-	printlninfo!("{:8}    {:9}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time);
+	printlninfo!("{:8}    {:9}    {:16}    {:16}", fsize_b/KB as usize, ITERATIONS, files_per_time, delta_time_delete /(ITERATIONS) as u64);
 	Ok(())
 }
 
@@ -735,8 +735,8 @@ fn do_fs_cap_check() {
 
 fn do_fs_create_del() {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
-	let	fsizes_b = [1024_usize, 4096, 10*1024];
-	// let	fsizes_b = [1024_usize];
+	// let	fsizes_b = [1024_usize, 4096, 10*1024];
+	let	fsizes_b = [1024*1024];
 
 	let overhead_ct = timing_overhead();
 
@@ -751,8 +751,8 @@ fn do_fs_create_del() {
 
 fn do_fs_delete() {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
-	let	fsizes_b = [1024_usize, 4096, 10*1024];
-	// let	fsizes_b = [1024_usize];
+	//let	fsizes_b = [1024_usize, 4096, 10*1024];
+	let	fsizes_b = [1024*1024];
 
 	let overhead_ct = timing_overhead();
 
@@ -929,7 +929,7 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 }
 
 fn do_fs_read(with_open: bool) {
-	let fsize_kb = 1024;
+	let fsize_kb = 10;
 	printlninfo!("File size     : {} KB", fsize_kb);
 	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
 	printlninfo!("========================================");
