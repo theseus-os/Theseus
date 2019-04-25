@@ -699,7 +699,7 @@ impl TaskRef {
             return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
         }
         
-        // First, wait for this Task to be marked as Exited (no longer runnable)
+        // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
             // if self.0.lock().has_exited() {
             if self.0.deref().1.load(Ordering::SeqCst) == true {

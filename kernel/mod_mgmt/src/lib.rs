@@ -1299,6 +1299,7 @@ impl CrateNamespace {
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
     }
 
+
     /// Finds all of the weak dependents (sections that depend on the given `old_section`)
     /// and rewrites their relocation entries to point to the given `new_section`.
     /// This effectively replaces the usage of the `old_section` with the `new_section`,
