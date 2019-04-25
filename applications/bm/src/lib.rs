@@ -35,11 +35,11 @@ const MB: u64 = 1024 * 1024;
 const KB: u64 = 1024;
 
 // for testing..
-const ITERATIONS: usize = 1_000;
+const ITERATIONS: usize = 10_000;
 const TRIES: usize = 10;
 
 // don't change it. 
-const READ_BUF_SIZE: usize = 10*1024;
+const READ_BUF_SIZE: usize = 64*1024;
 const WRITE_BUF_SIZE: usize = 1024*1024;
 const WRITE_BUF: [u8; WRITE_BUF_SIZE] = [65; WRITE_BUF_SIZE];
 
@@ -168,6 +168,7 @@ fn timing_overhead() -> u64 {
 	overhead
 }
 
+// Print statistics of the provided data
 fn print_stats(vec: Vec<u64>) {
 	let avg;
   	let median;
@@ -178,30 +179,29 @@ fn print_stats(vec: Vec<u64>) {
 	let var;
 
   	{ // calculate average
-      let mut sum: u64 = 0;
-      for x in &vec {
-          sum = sum + x;
-      }
+		let mut sum: u64 = 0;
+		for x in &vec {
+			sum = sum + x;
+		}
 
-      avg = sum as u64 / vec.len() as u64;
+		avg = sum as u64 / vec.len() as u64;
   	}
 
 	{ // calculate median
-	  let mut vec2 = vec.clone();
-      vec2.sort();
-      let mid = vec2.len() / 2;
-	  let p_75 = vec2.len() *3 / 4;
-	  let p_25 = vec2.len() *1 / 4;
+		let mut vec2 = vec.clone();
+		vec2.sort();
+		let mid = vec2.len() / 2;
+		let p_75 = vec2.len() *3 / 4;
+		let p_25 = vec2.len() *1 / 4;
 
-      median = vec2[mid];
-	  perf_25 = vec2[p_25];
-	  perf_75 = vec2[p_75];
-	  min = vec2[0];
-	  max = vec2[vec.len() - 1];
+		median = vec2[mid];
+		perf_25 = vec2[p_25];
+		perf_75 = vec2[p_75];
+		min = vec2[0];
+		max = vec2[vec.len() - 1];
   	}
 
-	{
-		//calculate standard deviation
+	{ // calculate sample variance
 		let mut diff_sum: u64 = 0;
       	for x in &vec {
 			if x > &avg {
@@ -225,6 +225,7 @@ fn print_stats(vec: Vec<u64>) {
 	printlninfo!("\n");
 }
 
+// Null syscall inner function
 fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	let start_hpet: u64;
 	let end_hpet: u64;
@@ -253,6 +254,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
 	delta_time_avg
 }
 
+// Null syscall outer function
 fn do_null() {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
@@ -285,17 +287,18 @@ fn do_null() {
 fn pick_child_core() -> Result<u8, &'static str> {
 	// try with current core -1
 	let child_core: u8 = CPU_ID!() as u8 - 1;
-	// return Ok(child_core); //Comment for real hardware debugging
 	if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
 
 	// if failed, try from the last to the first
 	for child_core in (0..apic::core_count() as u8).rev() {
 		if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
 	}
-	printlninfo!("Cannot pick a child core because cores are busy");
+	printlninfo!("WARNING : Cannot pick a child core because cores are busy");
+	printlninfo!("WARNING : Selecting current core");
 	return Ok(child_core);
 }
 
+// Application task spawn inner function
 fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
 	use spawn::ApplicationTaskBuilder;
     let start_hpet: u64;
@@ -322,6 +325,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	Ok(delta_time_avg)
 }
 
+// Application task spawn outer function
 fn do_spawn() {
 	let child_core = match pick_child_core() {
 		Ok(child_core) => { 
@@ -363,6 +367,7 @@ fn do_spawn() {
 	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
 }
 
+// Inter thread context switching inner function
 fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
 	use spawn::KernelTaskBuilder;
     let start_hpet: u64;
@@ -416,6 +421,7 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 	Ok(delta_time_avg)
 }
 
+// Inter thread context switching outer function
 fn do_ctx() {
 	let child_core = match pick_child_core() {
 		Ok(child_core) => { 
@@ -456,9 +462,10 @@ fn do_ctx() {
 	}
 
 	printlninfo!("Context switch result: {} {}", lat, T_UNIT);
-	// printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
+	printlninfo!("This test does not have an equivalent test in LMBench");
 }
 
+// Get current working directory
 fn get_cwd() -> Option<DirRef> {
 	if let Some(taskref) = task::get_my_current_task() {
         let locked_task = &taskref.lock();
@@ -469,6 +476,7 @@ fn get_cwd() -> Option<DirRef> {
     None
 }
 
+// Creates a temporary file
 // DON'T call this function inside of a measuring loop.
 fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 	if sz > WRITE_BUF_SIZE {
@@ -487,6 +495,7 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 	Ok(())
 }
 
+// Delete an existing file
 fn del_or_err(filename: &str) -> Result<(), &'static str> {
 	if let Some(_fileref) = get_file(filename) {
 		return Err("Need to delete a file, but delete() is not implemented yet :(");
@@ -494,6 +503,7 @@ fn del_or_err(filename: &str) -> Result<(), &'static str> {
 	Ok(())
 }
 
+// Create and write a file inner function
 fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static str> {
 	let mut filenames = vec!["".to_string(); ITERATIONS];
 	let pid = getpid();
@@ -563,6 +573,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	Ok(())
 }
 
+//Delete a file inner function
 fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static str> {
 	let mut filenames = vec!["".to_string(); ITERATIONS];
 	let pid = getpid();
@@ -742,11 +753,10 @@ fn do_fs_create_del() {
 
 	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
 	printlninfo!("SIZE(KB)    Iteration    created(files/s) ");
-	// for i in 0..TRIES {
-		for fsize_b in fsizes_b.iter() {
-			do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
-		}
-	//}
+	for fsize_b in fsizes_b.iter() {
+		do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+	}
+	printlninfo!("This test is equivalent to file create in `lat_fs` in LMBench");
 }
 
 fn do_fs_delete() {
@@ -758,13 +768,13 @@ fn do_fs_delete() {
 
 	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
 	printlninfo!("SIZE(KB)    Iteration    deleted(files/s) ");
-	// for i in 0..TRIES {
-		for fsize_b in fsizes_b.iter() {
-			do_fs_delete_inner(*fsize_b, overhead_ct).expect("Cannot test File Delete");
-		}
-	//}
+	for fsize_b in fsizes_b.iter() {
+		do_fs_delete_inner(*fsize_b, overhead_ct).expect("Cannot test File Delete");
+	}
+	printlninfo!("This test is equivalent to file delete in `lat_fs` in LMBench");
 }
 
+// File open read sum inner function
 fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
@@ -799,7 +809,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 
 					// LMbench based on C does the magic to cast a type from char to int
 					// But, we dont' have the luxury with type-safe Rust, so we do...
-					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
+					// dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 
             }
@@ -824,6 +834,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
 
+// File read sum inner function
 fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
@@ -858,7 +869,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 
 					// LMbench based on C does the magic to cast a type from char to int
 					// But, we dont' have the luxury with type-safe Rust, so we do...
-					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
+					// dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 			}	// for
 			end_hpet = get_hpet().as_ref().unwrap().get_counter();
@@ -929,7 +940,7 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 }
 
 fn do_fs_read(with_open: bool) {
-	let fsize_kb = 10;
+	let fsize_kb = 1024;
 	printlninfo!("File size     : {} KB", fsize_kb);
 	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
 	printlninfo!("========================================");
@@ -1030,6 +1041,7 @@ pub fn main(args: Vec<String>) -> isize {
 	0
 }
 
+// Task generated for context switching
 fn yield_task(_a: u32) -> u32 {
 	let times = ITERATIONS*1000;
     for _i in 0..times {
@@ -1038,6 +1050,7 @@ fn yield_task(_a: u32) -> u32 {
     _a
 }
 
+// Task to measure overhead of context switching
 fn overhead_task(_a: u32) -> u32 {
     _a
 }
