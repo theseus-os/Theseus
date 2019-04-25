@@ -2,8 +2,7 @@ use alloc::boxed::Box;
 
 use memory::ActivePageTable;
 
-use super::sdt::Sdt;
-use super::get_sdt;
+use super::{Sdt, get_sdt};
 
 pub trait Rxsdt {
     fn iter(&self) -> Box<Iterator<Item = usize>>;

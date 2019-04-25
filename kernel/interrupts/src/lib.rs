@@ -29,6 +29,7 @@ extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
 extern crate ps2;
+extern crate tlb_shootdown;
 
 
 
@@ -147,7 +148,7 @@ pub fn init_handlers_apic() {
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
 
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
-        idt[apic::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
+        idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
 
 

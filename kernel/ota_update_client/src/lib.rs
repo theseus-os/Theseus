@@ -10,7 +10,7 @@
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate acpi;
+extern crate hpet;
 extern crate owning_ref;
 extern crate spawn;
 extern crate task;
@@ -29,7 +29,7 @@ use alloc::{
     string::{String, ToString},
 };
 use itertools::Itertools;
-use acpi::get_hpet;
+use hpet::get_hpet;
 use smoltcp::{
     wire::{IpAddress, Ipv4Address, IpEndpoint},
     socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},

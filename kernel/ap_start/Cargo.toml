@@ -37,6 +37,9 @@ path = "../kernel_config"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.tlb_shootdown]
+path = "../tlb_shootdown"
+
 
 [lib]
 crate-type = ["rlib"]

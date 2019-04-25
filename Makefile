@@ -324,7 +324,8 @@ build_server: preserve_old_modules iso
 		bash scripts/build_server.sh
 
 preserve_old_modules:
-	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+	@mv $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+	cargo clean
 
 
 

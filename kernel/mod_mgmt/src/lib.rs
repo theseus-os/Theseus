@@ -23,6 +23,7 @@ extern crate vfs_node;
 extern crate fs_node;
 extern crate path;
 extern crate memfs;
+extern crate hpet;
 
 
 use core::ops::{DerefMut, Deref};
@@ -616,6 +617,7 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
+        #[cfg(not(loscd_eval))]
         debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
         let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
             .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
@@ -632,6 +634,7 @@ impl CrateNamespace {
             (new_crate.crate_name.clone(), new_syms)
         };
             
+        #[cfg(not(loscd_eval))]
         info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
         Ok(new_syms)
@@ -788,38 +791,72 @@ impl CrateNamespace {
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
+        #[cfg(not(loscd_eval))]
         debug!("swap_crates()[0]: override dirs: {:?}\nswap_requests: {:?}", 
             override_namespace_dirs.as_ref().map(|d| d.base_directory().lock().get_name()), 
             swap_requests
         );
 
-        // First, before we perform any expensive crate loading, let's try an optimization
-        // based on cached crates that were unloaded during a previous swap operation. 
-        let (namespace_of_new_crates, is_optimized) = if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-            warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
-            (cached_crates, true)
-        } else {
-            // If no optimization is possible (no cached crates exist for this swap request), 
-            // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
-            let nn = CrateNamespace::new(
-                String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
-                // use the optionally-provided directory of crates instead of the current namespace's directories.
-                override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
-            );
-            let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-            nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
-            (nn, false)
+        #[cfg(loscd_eval)]
+        let hpet_ref = hpet::get_hpet();
+        #[cfg(loscd_eval)]
+        let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+        #[cfg(loscd_eval)]
+        let hpet_start_swap = hpet.get_counter();
+        
+        let (namespace_of_new_crates, is_optimized) = {
+            #[cfg(not(loscd_eval))] {
+                // First, before we perform any expensive crate loading, let's try an optimization
+                // based on cached crates that were unloaded during a previous swap operation. 
+                if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
+                    warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+                    (cached_crates, true)
+                } else {
+                    // If no optimization is possible (no cached crates exist for this swap request), 
+                    // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
+                    let nn = CrateNamespace::new(
+                        String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
+                        // use the optionally-provided directory of crates instead of the current namespace's directories.
+                        override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
+                    );
+                    let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
+                    nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                    (nn, false)
+                }
+            }
+            #[cfg(loscd_eval)] {
+                let nn = CrateNamespace::new(
+                    String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
+                    // use the optionally-provided directory of crates instead of the current namespace's directories.
+                    override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
+                );
+                let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
+                nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                (nn, false)
+            }
         };
+            
+        #[cfg(loscd_eval)]
+        let hpet_after_load_crates = hpet.get_counter();
 
-        warn!("\n=============== Crates in new namespace ==============");
-        namespace_of_new_crates.crate_iter(|crate_name, crate_ref| warn!("\t{:?}. {}", crate_name, crate_ref.lock_as_ref().object_file_abs_path));
-        warn!("\n=============== symbols in new namespace ==============\n{}", namespace_of_new_crates.dump_symbol_map());
-
+        #[cfg(not(loscd_eval))]
         let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
+        #[cfg(not(loscd_eval))]
         let cached_crates: CrateNamespace = CrateNamespace::new(
             format!("cached_crates--{:?}", swap_requests), 
             self.dirs.clone(),
         );
+
+
+        #[cfg(loscd_eval)]
+        let mut hpet_total_symbol_finding = 0;
+        #[cfg(loscd_eval)]
+        let mut hpet_total_rewriting_relocations = 0;
+        #[cfg(loscd_eval)]
+        let mut hpet_total_fixing_dependencies = 0;
+        #[cfg(loscd_eval)]
+        let mut hpet_total_bss_transfer = 0;
+
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to fix up all of the relocations `WeakDependents` for each of the existing sections
@@ -827,6 +864,9 @@ impl CrateNamespace {
         // such that they refer to the new_module instead of the old_crate.
         for req in &swap_requests {
             let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+            if old_crate_name == "" {
+                continue; // just adding a new crate, no replacements needed
+            }
             let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
             let new_crate_name = new_crate_object_file_abs_path.file_stem();
             
@@ -844,7 +884,9 @@ impl CrateNamespace {
                 namespace_of_new_crates.get_crate(new_crate_name)
                     .ok_or_else(|| "BUG: swap_crates(): Couldn't get new crate from optimized cache")?
             } else {
+                #[cfg(not(loscd_eval))]
                 debug!("looking for newly-loaded crate {:?} in temp namespace", new_crate_name);
+                
                 namespace_of_new_crates.get_crate(new_crate_name)
                     .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
             };
@@ -874,6 +916,8 @@ impl CrateNamespace {
                     let old_sec_ref = this_symbol_map.get(old_sec_name)
                         .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
                         .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
+
+                    #[cfg(not(loscd_eval))]
                     debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
                     let mut old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
@@ -907,6 +951,7 @@ impl CrateNamespace {
                             error!("swap_crates(): couldn't find section in the new crate that corresponds to a match of the old section {:?}", old_sec.name);
                             "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
+                        #[cfg(not(loscd_eval))]
                         debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, new_crate_source_sec);
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
@@ -925,9 +970,16 @@ impl CrateNamespace {
                     let mut new_sec_ref: Option<StrongSectionRef> = None;
 
                     for weak_dep in &old_sec.sections_dependent_on_me {
-                        let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+                        let target_sec_ref = match weak_dep.section.upgrade() {
+                            Some(ssr) => ssr,
+                            _ => continue, // TODO remove this `weak_dep` from `old_sec.sections_dependent_on_me`
+                        };
                         let mut target_sec = target_sec_ref.lock();
                         let relocation_entry = weak_dep.relocation;
+
+                        #[cfg(loscd_eval)]
+                        let start_symbol_finding = hpet.get_counter();
+                        
 
                         // get the section from the new crate that corresponds to the `old_sec`
                         let new_source_sec_ref = if let Some(ref nsr) = new_sec_ref {
@@ -938,12 +990,22 @@ impl CrateNamespace {
                             let nsr = find_corresponding_new_section(&mut new_crate.reexported_symbols)?;
                             new_sec_ref.get_or_insert(nsr)
                         };
+
+                        #[cfg(loscd_eval)] {
+                            let end_symbol_finding = hpet.get_counter();
+                            hpet_total_symbol_finding += (end_symbol_finding - start_symbol_finding);
+                        }
+
                         let mut new_source_sec = new_source_sec_ref.lock();
+                        #[cfg(not(loscd_eval))]
                         debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
                         {
+                            #[cfg(loscd_eval)]
+                            let start_rewriting_relocations = hpet.get_counter();
+
                             let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                             let target_sec_initial_flags = target_sec_mapped_pages.flags();
                             if !target_sec_initial_flags.is_writable() {
@@ -963,17 +1025,28 @@ impl CrateNamespace {
                                 verbose_log
                             )?;
 
-                            // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
-                            if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                                    target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-                                }
-                                else {
-                                    return Err("couldn't get kernel's active page table");
-                                }
-                            };
+                            #[cfg(loscd_eval)] {
+                                let end_rewriting_relocations = hpet.get_counter();
+                                hpet_total_rewriting_relocations += (end_rewriting_relocations - start_rewriting_relocations);
+                            }
+
+                            #[cfg(not(loscd_eval))] {
+                                // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
+                                if !target_sec_initial_flags.is_writable() {
+                                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
+                                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
+                                    }
+                                    else {
+                                        return Err("couldn't get kernel's active page table");
+                                    }
+                                };
+                            }
                         }
-                        
+                    
+
+                        #[cfg(loscd_eval)]
+                        let start_fixing_dependencies = hpet.get_counter();
+
                         // Tell the new source_sec that the existing target_sec depends on it.
                         // Note that we don't need to do this if we're re-swapping in a cached crate,
                         // because that crate's sections' dependents are already properly set up from when it was first swapped in.
@@ -999,8 +1072,16 @@ impl CrateNamespace {
                                 target_sec.name, old_sec.name);
                             return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
                         }
+
+                        #[cfg(loscd_eval)] {
+                            let end_fixing_dependencies = hpet.get_counter();
+                            hpet_total_fixing_dependencies += (end_fixing_dependencies - start_fixing_dependencies);
+                        }
                     }
                 }
+
+                #[cfg(loscd_eval)]
+                let hpet_start_bss_transfer = hpet.get_counter();
 
                 // Go through all the BSS sections and copy over the old_sec into the new source_sec,
                 // if they represent a static variable (state spill that would otherwise result in a loss of data).
@@ -1028,6 +1109,11 @@ impl CrateNamespace {
 
                     // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
                     old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
+                }
+
+                #[cfg(loscd_eval)] {
+                    let hpet_end_bss_transfer = hpet.get_counter();
+                    hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
                 }
             } // end of scope, drops lock for `self.symbol_map` and `new_crate_ref`
         } // end of iteration over all swap requests
@@ -1057,26 +1143,30 @@ impl CrateNamespace {
             let mut this_symbol_map = self.symbol_map.lock();
             for req in swap_requests {
                 let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
+                if old_crate_name == "" { continue; }
                 let new_crate_name = new_crate_object_file_abs_path.file_stem();
                 // Remove the old crate from this namespace, and remove its sections' symbols too
                 if let Some(old_crate_ref) = self.crate_tree.lock().remove_str(&old_crate_name) {
                     {
                         let old_crate = old_crate_ref.lock_as_ref();
                         
-                        info!("  Removed old crate {}({}) (path {})", old_crate_name, old_crate.crate_name, old_crate.object_file_abs_path);
+                        #[cfg(not(loscd_eval))]
+                        {
+                            info!("  Removed old crate {}({}) (path {})", old_crate_name, old_crate.crate_name, old_crate.object_file_abs_path);
 
-                        // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
-                        // This removed old crate will be useful when a future swap request includes the following:
-                        // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
-                        // (2) the future `old_crate_name`               ==  the current `new_crate_name`
-                        // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
-                        //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                        let future_swap_req = SwapRequest::new(
-                            String::from(new_crate_name), 
-                            old_crate.object_file_abs_path.clone(), 
-                            !old_crate.reexported_symbols.is_empty()
-                        )?;
-                        future_swap_requests.push(future_swap_req);
+                            // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                            // This removed old crate will be useful when a future swap request includes the following:
+                            // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
+                            // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                            // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
+                            //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
+                            let future_swap_req = SwapRequest::new(
+                                String::from(new_crate_name), 
+                                old_crate.object_file_abs_path.clone(), 
+                                !old_crate.reexported_symbols.is_empty()
+                            )?;
+                            future_swap_requests.push(future_swap_req);
+                        }
                         
                         // Remove all of the symbols belonging to the old crate from this namespace.
                         // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
@@ -1099,16 +1189,23 @@ impl CrateNamespace {
                         // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
                         //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
                         //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
+                        #[cfg(not(loscd_eval))]
                         cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
                     } // drops lock for `old_crate_ref`
                     
+                    #[cfg(not(loscd_eval))]
                     cached_crates.crate_tree.lock().insert_str(&old_crate_name, old_crate_ref);
+                    #[cfg(loscd_eval)]
+                    core::mem::forget(old_crate_ref);
                 }
                 else {
                     error!("BUG: swap_crates(): failed to remove old crate {}", old_crate_name);
                 }
             }
         }
+
+        #[cfg(loscd_eval)]
+        let start_symbol_cleanup = hpet.get_counter();
 
         // Here, we move new crates from the temp namespace into the current namespace (self). 
         // We can't just move the crates in the swap request list, because we may have loaded other crates from their object files (for the first time).
@@ -1124,12 +1221,16 @@ impl CrateNamespace {
                 // }
             }
             else {
-                // debug!("swap_crates(): adding new crate symbols: {:?}", new_crate_ref);
+                #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): adding new crate itself: {:?}", new_crate_ref);
                 self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
         });
+
+        #[cfg(loscd_eval)]
+        let end_symbol_cleanup = hpet.get_counter();
+
 
 
         // TODO FIXME: change the above cached crate entries to reflect that the 
@@ -1139,6 +1240,9 @@ impl CrateNamespace {
         // we need to move the new crate object files from new namespace directory set to the old (self),
         // such that future usage of those crates will load the appropriate new crate object files. 
         let copy_directory_contents = |source_dir_ref: &DirRef, dest_dir_ref: &DirRef| -> Result<(), &'static str> {
+            if Arc::ptr_eq(source_dir_ref, dest_dir_ref) { 
+                return Ok(()); // no action required if the directories are the same (not overridden)
+            }
             let mut source_dir = source_dir_ref.lock();
             let mut dest_dir   = dest_dir_ref.lock();
             for fs_node_name in &source_dir.list() {
@@ -1162,10 +1266,35 @@ impl CrateNamespace {
         copy_directory_contents(&namespace_of_new_crates.dirs.app, &self.dirs.app)?;
         // copy_directory_contents(&namespace_of_new_crates.dirs.user, &self.dirs.user)?; // not used currently
 
+        #[cfg(not(loscd_eval))]
+        {
+            debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+                future_swap_requests, cached_crates.crate_names());
+            self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
+        }
 
-        debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-            future_swap_requests, cached_crates.crate_names());
-        self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
+
+        #[cfg(loscd_eval)] {
+            // done with everything, print out values
+            warn!("
+                load crates, {}
+                find symbols, {}
+                rewrite relocations, {}
+                fix dependencies, {}
+                BSS transfer, {}
+                symbol cleanup, {}
+                HPET PERIOD (femtosec): {}
+                ",
+                hpet_after_load_crates - hpet_start_swap,
+                hpet_total_symbol_finding,
+                hpet_total_rewriting_relocations,
+                hpet_total_fixing_dependencies,
+                hpet_total_bss_transfer,
+                end_symbol_cleanup - start_symbol_cleanup,
+                hpet.counter_period_femtoseconds(),
+            );
+        }
+
         Ok(())
         // here, "namespace_of_new_crates is dropped, but its crates have already been added to the current namespace 
     }
@@ -1298,6 +1427,7 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
+        #[cfg(not(loscd_eval))]
         debug!("Parsing Elf kernel crate: {:?}, size {:#x}({})", crate_name, size_in_bytes, size_in_bytes);
 
         // allocate enough space to load the sections
@@ -1862,9 +1992,9 @@ impl CrateNamespace {
         log_replacements: bool,
     ) -> bool {
         match existing_symbol_map.entry(new_section_key.into()) {
-            qp_trie::Entry::Occupied(mut _old_val) => {
+            qp_trie::Entry::Occupied(mut old_val) => {
                 if log_replacements {
-                    if let Some(old_sec_ref) = _old_val.get().upgrade() {
+                    if let Some(old_sec_ref) = old_val.get().upgrade() {
                         if !Arc::ptr_eq(&old_sec_ref, new_section_ref) {
                             // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
                             let old_sec = old_sec_ref.lock();
@@ -1878,7 +2008,7 @@ impl CrateNamespace {
                         }
                     }
                 }
-                _old_val.insert(Arc::downgrade(new_section_ref));
+                old_val.insert(Arc::downgrade(new_section_ref));
                 false
             }
             qp_trie::Entry::Vacant(new_entry) => {
@@ -2027,6 +2157,7 @@ impl CrateNamespace {
                             self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                             parent_crate.crate_name.clone()
                         };
+                        #[cfg(not(loscd_eval))]
                         info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
                             demangled_full_symbol, parent_crate_name, backup.name, self.name);
                         self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
@@ -2082,6 +2213,7 @@ impl CrateNamespace {
         // We are only able to do this for mangled symbols that have a leading crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
+            #[cfg(not(loscd_eval))]
             info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
                 demangled_full_symbol, crate_dependency_name);
             let crate_dependency_name = format!("{}-", crate_dependency_name);

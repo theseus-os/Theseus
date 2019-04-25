@@ -139,6 +139,7 @@ impl RunQueue {
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8) -> Result<(), &'static str> {
+        #[cfg(not(loscd_eval))]
         trace!("Created runqueue (priority) for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
@@ -221,7 +222,8 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        #[cfg(not(loscd_eval))]
+        debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
         self.push_back(priority_task_ref);
         

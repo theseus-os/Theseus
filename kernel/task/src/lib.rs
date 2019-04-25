@@ -690,18 +690,16 @@ impl TaskRef {
     /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
     ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
     pub fn join(&self) -> Result<(), &'static str> {
-        // let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
-        // if Arc::ptr_eq(&self.0, &curr_task.0) {
-        //     return Err("BUG: cannot call join() on yourself (the current task).");
-        // }
+        let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
+        if Arc::ptr_eq(&self.0, &curr_task.0) {
+            return Err("BUG: cannot call join() on yourself (the current task).");
+        }
 
-        // if !interrupts_enabled() {
-        //     return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
-        // }
+        if !interrupts_enabled() {
+            return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
+        }
         
         // First, wait for this Task to be marked as Exited (no longer runnable)
-
-        // error!("join called\n"); 
         loop {
             // if self.0.lock().has_exited() {
             if self.0.deref().1.load(Ordering::SeqCst) == true {
