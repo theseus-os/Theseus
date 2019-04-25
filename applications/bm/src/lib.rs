@@ -3,7 +3,7 @@
 
 #[macro_use] extern crate alloc;
 extern crate task;
-extern crate acpi;
+extern crate hpet;
 #[macro_use] extern crate terminal_print;
 // #[macro_use] extern crate log;
 extern crate fs_node;
@@ -17,7 +17,7 @@ use core::str;
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use acpi::get_hpet;
+use hpet::get_hpet;
 use memfs::MemFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};

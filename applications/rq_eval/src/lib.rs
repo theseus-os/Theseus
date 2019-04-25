@@ -11,12 +11,12 @@ extern crate task;
 extern crate spawn;
 extern crate runqueue;
 extern crate getopts;
-extern crate acpi;
+extern crate hpet;
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use getopts::{Matches, Options};
-use acpi::get_hpet;
+use hpet::get_hpet;
 use task::{Task, TaskRef};
 
 

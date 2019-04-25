@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
 extern crate spin;
-extern crate acpi;
+extern crate hpet;
 extern crate httparse;
 extern crate percent_encoding;
 
@@ -21,7 +21,7 @@ use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Once;
-use acpi::get_hpet;
+use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, TcpSocket, SocketHandle},
     time::Instant

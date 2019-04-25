@@ -43,6 +43,12 @@ path = "../pic"
 [dependencies.ap_start]
 path = "../ap_start"
 
+[dependencies.sdt]
+path = "../sdt"
+
+[dependencies.hpet]
+path = "../hpet"
+
 
 [lib]
 crate-type = ["rlib"]

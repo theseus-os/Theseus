@@ -1,7 +1,7 @@
 use core::{mem, ptr};
 
 use super::sdt::Sdt;
-use super::{ACPI_TABLE, SDT_POINTERS, get_sdt, find_sdt, get_sdt_signature, load_table};
+use super::{ACPI_TABLE, SDT_POINTERS, get_sdt, find_matching_sdts, get_sdt_signature, load_table};
 
 use memory::ActivePageTable;
 
@@ -98,7 +98,7 @@ impl Fadt {
     }
 
     pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-        let fadt_sdt = find_sdt("FACP");
+        let fadt_sdt = find_matching_sdts("FACP");
         let fadt = if fadt_sdt.len() == 1 {
             load_table(get_sdt_signature(fadt_sdt[0]));
             Fadt::new(fadt_sdt[0])

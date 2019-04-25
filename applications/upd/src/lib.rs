@@ -249,21 +249,25 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     let mut swap_requests = SwapRequestList::new();
     for (old_crate_file_name, new_crate_file_name) in &diffs.pairs {
         println!("Looking at diff {} -> {}", old_crate_file_name, new_crate_file_name);
-        // first, check to make sure the old crate actually exists
-        let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
-            .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
-        // the old needs to be swapped if it's currently loaded
-        let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
-        let old_crate_name = old_crate_file_name.file_stem().to_string();
-        if let Some(_old_crate) = curr_namespace.get_crate(&old_crate_name) {
-            let new_crate_file = new_namespace_dirs.get_crate_object_file(new_crate_file_name)
-                .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dirs {}", new_crate_file_name, base_dir_path))?;
-            let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
-            swap_requests.push(swap_req);
-        }
-        else {
-            println!("   not swapping non-loaded old crate: {}", old_crate_name);
-        }
+        let old_crate_name = if old_crate_file_name == "" {
+            String::new() // skip checks for empty old crates (just the new crate will be loaded w/o replacing anything)
+        } else {
+            // check to make sure the old crate actually exists
+            let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
+                .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
+            // the old needs to be swapped if it's currently loaded
+            let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
+            let old_crate_name = old_crate_file_name.file_stem().to_string();
+            if curr_namespace.get_crate(&old_crate_name).is_none() {
+                println!("   not swapping non-loaded old crate: {}", old_crate_name);
+                continue;
+            }
+            old_crate_name
+        };
+        let new_crate_file = new_namespace_dirs.get_crate_object_file(new_crate_file_name)
+            .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dirs {}", new_crate_file_name, base_dir_path))?;
+        let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
+        swap_requests.push(swap_req);
     }
 
     // now do the actual live crate swap at runtime

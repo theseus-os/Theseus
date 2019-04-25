@@ -1,0 +1,24 @@
+[package]
+name = "hpet"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Support for the x86 HPET: High Precision Event Timer"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+volatile = "0.2.5"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.sdt]
+path = "../sdt"

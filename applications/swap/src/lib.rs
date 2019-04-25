@@ -13,7 +13,7 @@ extern crate itertools;
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate acpi;
+extern crate hpet;
 extern crate task;
 extern crate path;
 extern crate fs_node;
@@ -26,7 +26,7 @@ use alloc::{
 };
 use getopts::{Options, Matches};
 use mod_mgmt::{SwapRequest, NamespaceDirectorySet};
-use acpi::get_hpet;
+use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, FsNode, DirRef};
 

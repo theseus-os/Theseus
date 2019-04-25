@@ -73,6 +73,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
+            #[cfg(not(loscd_eval))]
             error!("BUG: select_next_task_priority(): couldn't get runqueue for core {}", apic_id); 
             return None;
         }
@@ -144,6 +145,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
+            #[cfg(not(loscd_eval))]
             error!("BUG: assign_tokens(): couldn't get runqueue for core {}", apic_id); 
             return false;
         }

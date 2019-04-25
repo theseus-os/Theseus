@@ -59,5 +59,8 @@ path = "../path"
 [dependencies.memfs]
 path = "../memfs"
 
+[dependencies.hpet]
+path = "../hpet"
+
 [lib]
 crate-type = ["rlib"]

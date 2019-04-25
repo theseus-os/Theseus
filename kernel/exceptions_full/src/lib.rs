@@ -7,6 +7,7 @@ extern crate x86_64;
 extern crate task;
 extern crate runqueue;
 extern crate apic;
+extern crate tlb_shootdown;
 extern crate pmu_x86;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
@@ -119,10 +120,10 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     }
 
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddrs = apic::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
+    let vaddrs = tlb_shootdown::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
     if !vaddrs.is_empty() {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(&vaddrs);
+        tlb_shootdown::handle_tlb_shootdown_ipi(&vaddrs);
         expected_nmi = true;
     }
 
