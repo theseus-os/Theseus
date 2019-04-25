@@ -221,7 +221,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
         self.push_back(priority_task_ref);
         

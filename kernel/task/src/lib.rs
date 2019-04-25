@@ -623,7 +623,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        // trace!("Task::drop(): {}", self);
+        trace!("Task::drop(): {}", self);
     }
 }
 

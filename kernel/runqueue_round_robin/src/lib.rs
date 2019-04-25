@@ -220,7 +220,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        // debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        debug!("Adding task to runqueue {}, {:?}", self.core, task);
         let round_robin_taskref = RoundRobinTaskRef::new(task);
         self.push_back(round_robin_taskref);
         
@@ -239,7 +239,7 @@ impl RunQueue {
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        // debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
+        debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
