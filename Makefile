@@ -489,9 +489,10 @@ else
 endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
-# ifeq ($(kvm),yes)
-# 	QEMU_FLAGS += -accel kvm
-# endif
+ifeq ($(kvm),yes)
+	$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead.")
+	# QEMU_FLAGS += -accel kvm
+endif
 
 
 
