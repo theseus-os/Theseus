@@ -204,6 +204,11 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "compiler_builtins"
+version = "0.1.11"
+source = "git+https://github.com/rust-lang-nursery/compiler-builtins#045de6e5166ebaf8b74ad9d97b6bb09d5d28c982"
+
+[[package]]
 name = "context_switch"
 version = "0.1.0"
 dependencies = [
@@ -855,6 +860,7 @@ name = "nano_core"
 version = "0.1.0"
 dependencies = [
  "captain 0.1.0",
+ "compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "exceptions_early 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -1800,6 +1806,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
 "checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
+"checksum compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
