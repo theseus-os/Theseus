@@ -26,7 +26,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(asm, naked_functions)]
 #![feature(panic_info_message)]
 

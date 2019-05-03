@@ -1,7 +1,6 @@
 //! The vga buffer that implements basic printing in VGA text mode.
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 

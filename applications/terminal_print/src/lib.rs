@@ -8,7 +8,6 @@
 //! *Note: this printing crate only supports single-task child applications
 
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;

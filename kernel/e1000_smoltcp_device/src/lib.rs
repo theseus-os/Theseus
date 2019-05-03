@@ -1,7 +1,6 @@
 //! This crate implements an interface/glue layer between our e1000 driver
 //! and the smoltcp network stack.
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;

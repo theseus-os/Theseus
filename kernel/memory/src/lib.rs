@@ -4,7 +4,6 @@
 //! Originally based on Phil Opp's blog_os. 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(asm)]
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]

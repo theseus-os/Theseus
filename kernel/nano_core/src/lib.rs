@@ -16,7 +16,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 
 
 #[cfg(loadable)] 

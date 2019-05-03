@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 // #![feature(plugin)]
 // #![plugin(application_main_fn)]
 //! Tests the read/write capability of the memory-backed file (memfs::MemFile)

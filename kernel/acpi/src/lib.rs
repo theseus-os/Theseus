@@ -1,6 +1,5 @@
 //! Code to parse the ACPI tables, based off of Redox. 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods

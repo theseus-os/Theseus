@@ -2,7 +2,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(try_from)]
 #![feature(slice_concat_ext)]
 

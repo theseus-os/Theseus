@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unboxed_closures)]
 #![feature(abi_x86_interrupt)]

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate keycodes_ascii;
 extern crate alloc;

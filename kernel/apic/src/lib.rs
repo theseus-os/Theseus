@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #![allow(dead_code)]
 

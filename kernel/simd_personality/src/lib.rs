@@ -49,7 +49,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
 #[cfg(simd_personality)]

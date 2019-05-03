@@ -4,7 +4,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate lazy_static;

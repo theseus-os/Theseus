@@ -16,7 +16,6 @@
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(asm)]
 

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(asm)]
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
