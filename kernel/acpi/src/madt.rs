@@ -346,7 +346,7 @@ pub fn handle_ap_cores(madt_iter: MadtIter, kernel_mmi_ref: Arc<MutexIrqSafe<Mem
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let mut count = get_lapics().iter().count();
     while count < ap_count + 1 {
-        trace!("BSP-known count: {}", count);
+        // trace!("BSP-known count: {}", count);
         spin_loop_hint();
         count = get_lapics().iter().count();
     }
