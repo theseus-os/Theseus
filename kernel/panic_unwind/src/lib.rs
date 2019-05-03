@@ -5,7 +5,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
 #![feature(panic_info_message)]

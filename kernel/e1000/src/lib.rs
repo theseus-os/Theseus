@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 

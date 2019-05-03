@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 //! Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic 
 //! that of a standard unix virtual filesystem, where directories follow a hierarchical system
 //! and all directories have a parent directory (except for the special root directory). 

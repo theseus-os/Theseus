@@ -2,7 +2,6 @@
 //! which is used to compare a standard runqueue with a state spill-free runqueue.
 
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;

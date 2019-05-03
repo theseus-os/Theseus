@@ -25,7 +25,6 @@
 
 #![no_std]
 #![feature(asm)]
-#![feature(alloc)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;

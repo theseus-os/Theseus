@@ -8,7 +8,6 @@
 //! The syscall overwrites the rcx register. 
 //! The return value is in rax.
 #![no_std]
-#![feature(alloc)]
 #![feature(asm)]
 // #![feature(compiler_fence)]
 #![feature(naked_functions)]

@@ -1,7 +1,6 @@
 //! Support for broadcasting and handling TLB shootdown IPIs. 
 
 #![no_std]
-#![feature(alloc)]
 
 
 extern crate alloc;
