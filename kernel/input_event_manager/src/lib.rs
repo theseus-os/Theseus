@@ -8,7 +8,6 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
-#![feature(alloc)]
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;

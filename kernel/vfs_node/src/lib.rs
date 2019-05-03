@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 //! This crate contains a very basic, generic concrete implementation of the Directory
 //! and File traits. 

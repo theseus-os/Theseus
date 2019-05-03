@@ -3,7 +3,6 @@
 //! with a standard memory mapping implementation based on `VirtualMemoryArea`s.
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate cfg_if;

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 //! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files

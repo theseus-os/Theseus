@@ -2,7 +2,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]

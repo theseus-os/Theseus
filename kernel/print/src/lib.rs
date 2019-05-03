@@ -4,7 +4,6 @@
 //! The current system simply enqueus the Print event into the print queue of the default terminal
 
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 extern crate spin;

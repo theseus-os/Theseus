@@ -1,7 +1,6 @@
 //! Support for the x86 HPET: High Precision Event Timer.
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
 #[macro_use] extern crate log;

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(rustc_private)]
 #![feature(slice_concat_ext)]
 

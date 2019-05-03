@@ -3,7 +3,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
