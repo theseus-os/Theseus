@@ -14,8 +14,8 @@ all: iso
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.34.0-nightly (633d75ac1 2019-02-21)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-02-22
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.36.0-nightly (9b67bd42b 2019-05-01)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-05-02
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -531,28 +531,23 @@ bochs: $(iso)
 
 
 
-IS_WSL = $(shell grep 'Microsoft' /proc/version)
+IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
 check_usb:
-## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app
+## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
-ifneq (,$(findstring sd, $(usb))) ## if the specified USB device properly contained "sd"...
-ifeq ("$(wildcard /dev/$(usb))", "") ## if a non-existent "/dev/sd*" drive was specified...
-	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
-	@exit 1
-endif 
-else 
-## if the specified USB device didn't contain "sd", then it wasn't a proper removable block device.
-	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
+## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
+ifeq (,$(findstring $(usb),$(USB_DRIVES)))
+	@echo -e "\nError: please specify a USB drive that exists, e.g., \"sdc\" (not a partition like \"sdc1\")."
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
-	@echo -e "The following usb drives are currently attached to this system:"
-	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
+	@echo -e "The following USB drives are currently attached to this system:\n$(USB_DRIVES)"
 	@echo ""
 	@exit 1
-endif  ## end of checking for "sd"
+endif  ## end of checking that the 'usb' variable is a USB drive that exists
 endif  ## end of checking for WSL
 
 

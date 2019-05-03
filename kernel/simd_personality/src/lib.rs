@@ -83,7 +83,6 @@ extern crate fs_node;
 extern crate path;
 
 
-use core::ops::DerefMut;
 use alloc::string::String;
 use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
@@ -130,11 +129,11 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 	let mut simd_namespace = CrateNamespace::new(
 		String::from(namespace_name), 
-		NamespaceDirectorySet::from_existing_base_dir(base_dir: DirRef)?,
-	).map_err(|e| {
-		error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
-		e
-	})?;
+		NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| {
+			error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
+			e
+		})?,
+	);
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
@@ -142,14 +141,14 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
 		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
 	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
 
 
 	// load the actual crate that we want to run in the simd namespace, "simd_test"
 	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
 		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
 	simd_namespace.enable_fuzzy_symbol_matching();
-	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
 	simd_namespace.disable_fuzzy_symbol_matching();
 
 
