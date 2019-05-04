@@ -42,9 +42,9 @@ macro_rules! print {
     });
 }
 
-/// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
-/// applications so that applications can print to the correct terminal
 lazy_static! {
+    /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
+    /// applications so that applications can print to the correct terminal
     static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 }
 

@@ -4,7 +4,7 @@
 //! Tests the read/write capability of the memory-backed file (memfs::MemFile)
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
 extern crate memfs;
 extern crate root;
@@ -15,8 +15,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::str;
 use core::ops::DerefMut;
-use memory::{MappedPages, FRAME_ALLOCATOR, EntryFlags};
-use alloc::sync::Arc;
+use memory::{MappedPages, FRAME_ALLOCATOR};
 
 
 
@@ -71,7 +70,7 @@ fn test_filerw() -> Result<(), &'static str> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
     let mut mapped_pages = MappedPages::empty(); // we're going to overwrite this in the conditional
     if let memory::PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-        let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+        let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
         // Allocate and map the least number of pages we need to store the information contained in the buffer
         // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
         // need (because it entered this conditional statement)
@@ -83,7 +82,7 @@ fn test_filerw() -> Result<(), &'static str> {
     let non_writable_file = MemFile::from_mapped_pages(mapped_pages, "non-writable testfile".to_string(), 1, &parent)?;
     match non_writable_file.lock().write(&mut string_slice_as_bytes, 0) {
         Ok(_) => println!("should not have been able to write"),
-        Err(err) => println!("sixth test successful\nsuccessfully failed to write to nonwritable mapped pages")
+        Err(_err) => println!("sixth test successful\nsuccessfully failed to write to nonwritable mapped pages")
     }
 
 

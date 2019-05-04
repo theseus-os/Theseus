@@ -135,9 +135,9 @@ impl Mapper {
         for page in pages.clone() {
             let frame = try!(allocator.allocate_frame().ok_or("Mapper::internal_map(): couldn't allocate new frame, out of memory!"));
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("Mapper::internal_map(): page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -176,9 +176,9 @@ impl Mapper {
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.clone().zip(frames) {
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());

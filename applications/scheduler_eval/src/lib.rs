@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 
 
 #[no_mangle]
-pub fn main(args: Vec<String>) -> (){
+pub fn main(_args: Vec<String>) -> (){
     let taskref1 = KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))
         .pin_on_core(1)
@@ -48,15 +48,15 @@ pub fn main(args: Vec<String>) -> (){
 
     debug!("Spawned all tasks");
 
-    let priority1 = scheduler::get_priority(&taskref1);
-    let priority2 = scheduler::get_priority(&taskref2);
-    let priority3 = scheduler::get_priority(&taskref3);
+    let _priority1 = scheduler::get_priority(&taskref1);
+    let _priority2 = scheduler::get_priority(&taskref2);
+    let _priority3 = scheduler::get_priority(&taskref3);
 
     #[cfg(priority_scheduler)]
     {
-        assert_eq!(priority1,Some(30));
-        assert_eq!(priority2,Some(20));
-        assert_eq!(priority3,Some(10));
+        assert_eq!(_priority1,Some(30));
+        assert_eq!(_priority2,Some(20));
+        assert_eq!(_priority3,Some(10));
     }
 
     taskref1.join().expect("Task 1 join failed");

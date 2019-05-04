@@ -646,7 +646,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let (heap_mapped_pages, heap_vma) = {
         let mut allocator = allocator_mutex.lock();
 
-        use heap_irq_safe;
         let pages = Page::range_inclusive_addr(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
         let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");

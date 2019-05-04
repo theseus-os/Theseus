@@ -2,7 +2,6 @@
 //! 
 
 #![no_std]
-#![feature(try_from)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
@@ -30,7 +29,7 @@ use alloc::{
 use itertools::Itertools;
 use hpet::get_hpet;
 use smoltcp::{
-    wire::{IpAddress, Ipv4Address, IpEndpoint},
+    wire::{Ipv4Address, IpEndpoint},
     socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
@@ -456,12 +455,12 @@ fn download_files<S: AsRef<str>>(
 }
 
 
-/// A convenience function that checks whether a socket is connected, 
-/// which is currently true when both `may_send()` and `may_recv()` are true.
-fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
-    let socket = sockets.get::<TcpSocket>(tcp_handle);
-    socket.may_send() && socket.may_recv()
-}
+// /// A convenience function that checks whether a socket is connected, 
+// /// which is currently true when both `may_send()` and `may_recv()` are true.
+// fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
+//     let socket = sockets.get::<TcpSocket>(tcp_handle);
+//     socket.may_send() && socket.may_recv()
+// }
 
 
 /// A convenience function for connecting a socket.
