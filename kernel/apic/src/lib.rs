@@ -19,16 +19,15 @@ extern crate atomic;
 
 
 use core::ops::DerefMut;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
+use core::sync::atomic::Ordering;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
-use irq_safety::{hold_interrupts, RwLockIrqSafe};
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
+use irq_safety::RwLockIrqSafe;
+use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;

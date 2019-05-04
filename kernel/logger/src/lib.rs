@@ -76,7 +76,6 @@ impl Log for Logger {
             LogLevel::Trace => ("[T] ", LogColor::Purple),
         };
 
-        use serial_port;
         let _ = serial_port::write_fmt_log(color.as_terminal_string(), prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
 
         

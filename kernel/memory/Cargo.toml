@@ -8,12 +8,10 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 bitflags = "1.0.4"
-# multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
-multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
+multiboot2 = "0.7.1"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-once = "0.3.3"
 
 
 [dependencies.log]
