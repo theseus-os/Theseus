@@ -31,7 +31,7 @@ impl RawVgaBuffer {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let mut buffer = unsafe { self.buffer.as_mut() };
+                let buffer = unsafe { self.buffer.as_mut() };
                 let character = buffer[row][col].read();
                 buffer[row - 1][col].write(character);
             }

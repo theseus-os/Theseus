@@ -21,7 +21,7 @@
 #![feature(core_intrinsics)]
 
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 
@@ -50,9 +50,6 @@ extern crate frame_buffer;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
-
-#[cfg(test_ota_update)] extern crate ota_update_client;
-#[cfg(test_ota_update)] extern crate test_ota_update;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -150,19 +147,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     device_manager::init(input_event_queue_producer)?;
 
     task_fs::init()?;
-
-
-    #[cfg(test_ota_update)]
-    {
-        if let Some(iface) = network_manager::NETWORK_INTERFACES.lock().iter().next().cloned() {
-            spawn::KernelTaskBuilder::new(test_ota_update::simple_keyboard_swap, iface)
-                .name(String::from("test_ota_update"))
-                .pin_on_core(bsp_apic_id)
-                .spawn()?;
-        } else {
-            error!("captain: Couldn't test the OTA update functionality because no e1000 NIC exists.");
-        }
-    }
 
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]

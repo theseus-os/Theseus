@@ -9,7 +9,7 @@ extern crate runqueue;
 extern crate apic;
 extern crate tlb_shootdown;
 extern crate pmu_x86;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
 

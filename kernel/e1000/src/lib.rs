@@ -604,7 +604,7 @@ impl E1000Nic {
     /// either in a polling fashion or from a receive interrupt handler.
     fn handle_receive(&mut self) -> Result<(), &'static str> {
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut total_packet_length: u16 = 0;
+        let mut _total_packet_length: u16 = 0;
 
         // The main idea here is to go through all of the receive buffers that the NIC has populated,
         // and collect all of them into a single ethernet frame, i.e., a `ReceivedFrame`.
@@ -643,7 +643,7 @@ impl E1000Nic {
             //     debug!("{:x}",points_at);
             // }  
 
-            total_packet_length += length;
+            _total_packet_length += length;
 
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),

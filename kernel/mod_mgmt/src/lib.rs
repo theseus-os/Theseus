@@ -918,7 +918,7 @@ impl CrateNamespace {
 
                     #[cfg(not(loscd_eval))]
                     debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
-                    let mut old_sec = old_sec_ref.lock();
+                    let old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
@@ -2475,7 +2475,6 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef)
     // create a closure here to allocate N contiguous virtual memory pages
     // and map them to random frames as writable, returns Result<MappedPages, &'static str>
     let (text_pages, rodata_pages, data_pages): (Option<MappedPages>, Option<MappedPages>, Option<MappedPages>) = {
-        use memory::FRAME_ALLOCATOR;
         let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
 
         let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {

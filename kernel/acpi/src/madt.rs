@@ -118,7 +118,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                 debug!("        This is my (the BSP's) local APIC");
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                let mut bsp_lapic = try!(LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags));
+                let bsp_lapic = LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
                 let bsp_id = bsp_lapic.id();
 
                 // redirect every IoApic's interrupts to the one BSP

@@ -96,9 +96,6 @@ path = "../network_manager"
 [dependencies.ota_update_client]
 path = "../ota_update_client"
 
-[dependencies.test_ota_update]
-path = "../test_ota_update"
-
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.

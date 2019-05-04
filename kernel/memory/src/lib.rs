@@ -21,7 +21,6 @@ extern crate xmas_elf;
 extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
-#[macro_use] extern crate once; // for assert_has_not_been_called!()
 
 mod area_frame_allocator;
 mod paging;
@@ -332,52 +331,55 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    assert_has_not_been_called!("memory::init must be called only once");
     // let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
     // debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
     
-    let memory_map_tag = try!(boot_info.memory_map_tag().ok_or("Memory map tag not found"));
-    let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("Elf sections tag not found"));
+    let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
+    let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
 
     // Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
     // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
     // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
     // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.
-    let kernel_phys_start: PhysicalAddress = try!(elf_sections_tag.sections()
+    let kernel_phys_start: PhysicalAddress = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
         .map(|s| s.start_address())
         .min()
-        .ok_or("Couldn't find kernel start address")) as PhysicalAddress;
-    let kernel_virt_end: VirtualAddress = try!(elf_sections_tag.sections()
+        .ok_or("Couldn't find kernel start address")? as PhysicalAddress;
+    let kernel_virt_end: VirtualAddress = elf_sections_tag.sections()
         .filter(|s| s.is_allocated())
         .map(|s| s.end_address())
         .max()
-        .ok_or("Couldn't find kernel end address")) as PhysicalAddress;
+        .ok_or("Couldn't find kernel end address")? as VirtualAddress;
     let kernel_phys_end: PhysicalAddress = kernel_virt_end - KERNEL_OFFSET;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
-             kernel_phys_start,
-             kernel_phys_end,
-             kernel_virt_end);
+        kernel_phys_start,
+        kernel_phys_end,
+        kernel_virt_end
+    );
   
     // parse the list of physical memory areas from multiboot
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
     let mut avail_index = 0;
     for area in memory_map_tag.memory_areas() {
-        debug!("memory area base_addr={:#x} length={:#x} ({:?})", area.start_address(), area.size(), area);
+        let area_start = area.start_address() as PhysicalAddress;
+        let area_end   = area.end_address() as PhysicalAddress;
+        let area_size  = area.size() as usize;
+        debug!("memory area base_addr={:#x} length={:#x} ({:?})", area_start, area_size, area);
         
         // optimization: we reserve memory from areas below the end of the kernel's physical address,
         // which includes addresses beneath 1 MB
-        if area.end_address() < kernel_phys_end {
+        if area_end < kernel_phys_end {
             debug!("--> skipping region before kernel_phys_end");
             continue;
         }
-        let start_paddr: PhysicalAddress = if area.start_address() >= kernel_phys_end { area.start_address() } else { kernel_phys_end };
+        let start_paddr: PhysicalAddress = if area_start >= kernel_phys_end { area_start } else { kernel_phys_end };
         let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
 
         available[avail_index] = PhysicalMemoryArea {
             base_addr: start_paddr,
-            size_in_bytes: area.end_address() - start_paddr,
+            size_in_bytes: area_size,
             typ: 1, 
             acpi: 0, 
         };
