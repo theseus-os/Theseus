@@ -136,7 +136,7 @@ pub struct HpetTimer {
 pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let hpet_inner = HpetInner::new(hpet_sdt)?;    
 
-    let phys_addr = hpet_inner.gen_addr_struct.address as PhysicalAddress;
+    let phys_addr = PhysicalAddress::new(hpet_inner.gen_addr_struct.address as usize)?;
     let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
     let frame = Frame::range_inclusive_addr(phys_addr, 1);  // 1 byte long, we just want 1 page
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
@@ -144,7 +144,7 @@ pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Resul
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
     );
 
-    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr)))?;
+    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr.value())))?;
     // get an HPET instance here just to initially enable the main counter
     {
         hpet.enable_counter(true);

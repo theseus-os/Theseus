@@ -21,6 +21,9 @@ path = "../../libs/util"
 [dependencies.gdt]
 path = "../gdt"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.apic]
 path = "../apic"
 

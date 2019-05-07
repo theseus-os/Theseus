@@ -267,7 +267,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     .map_err(|e| {
                         error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                         "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
-                    }),
+                    }).and_then(|v| VirtualAddress::new(v)),
                     loop_result
                 );
                 let sec_size = try_break!(usize::from_str_radix(sec_size, 10)
@@ -537,7 +537,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
                 if bind == xmas_elf::symbol_table::Binding::Global {
                     if let Ok(typ) = entry.get_type() {
                         if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
-                            let sec_vaddr = entry.value() as VirtualAddress;
+                            let sec_vaddr = VirtualAddress::new_canonical(entry.value() as usize);
                             let sec_size = entry.size() as usize;
                             let name = try_break!(entry.get_name(&elf_file), loop_result);
 

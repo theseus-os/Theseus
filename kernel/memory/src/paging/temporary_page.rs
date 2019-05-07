@@ -10,7 +10,7 @@
 use {FrameIter};
 use paging::{ActivePageTable, MappedPages};
 use super::table::{Table, Level1};
-use super::{Page, Frame, FrameAllocator};
+use super::{Page, Frame, FrameAllocator, VirtualAddress};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 
@@ -53,7 +53,7 @@ impl TemporaryPage {
         // Find a free page that is not already mapped, starting from the top of the kernel heap region.
         // It'd be nice to use the virtual address allocator (allocate_pages), but we CANNOT use it
         // because this code is needed before those functions are available (cuz they require heap memory)
-        let mut page = Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR);
+        let mut page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
         while active_table.translate_page(page).is_some() {
             // this never happens
             warn!("temporary page {:?} is already mapped, trying the next lowest Page", page);

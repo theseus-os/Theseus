@@ -67,12 +67,12 @@ mod rxsdt;
 mod rsdp;
 
 
-/// The address that an AP jumps to when it first is booted by the BSP
+/// The physical address that an AP jumps to when it first is booted by the BSP
 /// For x2apic systems, this must be at 0x10000 or higher! 
-const AP_STARTUP: PhysicalAddress = 0x10000; 
-/// small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
+const AP_STARTUP: usize = 0x10000; 
+/// Physical address of the small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
 /// Value: 0xF000
-const TRAMPOLINE: PhysicalAddress = AP_STARTUP - PAGE_SIZE;
+const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 
 
 /// The larger container that holds all data structure obtained from the ACPI table.
@@ -97,7 +97,7 @@ lazy_static! {
 fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> Result<&'static Sdt, &'static str> {
     
     let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
-    let addr_offset = address_page_offset(sdt_address);
+    let addr_offset = address_page_offset(sdt_address.value());
     let first_frame = Frame::containing_address(sdt_address);
 
     // first, make sure the given sdt_address is mapped to a virtual memory Page, so we can access it
@@ -132,7 +132,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
     };
 
     // SAFE: sdt_virt_addr was mapped above
-    let sdt = unsafe { &*(sdt_virt_addr as *const Sdt) };
+    let sdt = unsafe { &*(sdt_virt_addr.value() as *const Sdt) };
     // debug!("get_sdt(): sdt = {:?}", sdt);
 
     // Map extra SDT frames if required
@@ -231,7 +231,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         // inform the frame allocator that the physical frames where the top-level RSDT/XSDT table exists
         // is now off-limits and should not be touched
         {
-            let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address() as usize, rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
+            let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address(), rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
             try!(
                 try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock().add_area(rxsdt_area, false)
             );
@@ -247,7 +247,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
         for sdt_paddr in rxsdt.iter() {
             let sdt_vaddr: VirtualAddress = {
-                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
+                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(PhysicalAddress::new_canonical(sdt_paddr))) {
                     page.start_address() + address_page_offset(sdt_paddr)
                 }
                 else {
@@ -255,7 +255,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
                     return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for every sdt_paddr");
                 }
             };
-            let sdt = unsafe { &*(sdt_vaddr as *const Sdt) };
+            let sdt = unsafe { &*(sdt_vaddr.value() as *const Sdt) };
 
             let signature = get_sdt_signature(sdt);
             if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {
