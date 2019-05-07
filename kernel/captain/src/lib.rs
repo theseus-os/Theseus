@@ -60,7 +60,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
-use memory::{MemoryManagementInfo, MappedPages, PageTable};
+use memory::{VirtualAddress, MemoryManagementInfo, MappedPages, PageTable};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
@@ -77,12 +77,14 @@ pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: c
 /// Initialize the Captain, which is the main module that steers the ship of Theseus. 
 /// This does all the rest of the module loading and initialization so that the OS 
 /// can continue running and do actual useful work.
-pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
-            identity_mapped_pages: Vec<MappedPages>,
-            bsp_stack_bottom: usize, bsp_stack_top: usize,
-            ap_start_realmode_begin: usize, ap_start_realmode_end: usize) 
-            -> Result<(), &'static str>
-{
+pub fn init(
+    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+    identity_mapped_pages: Vec<MappedPages>,
+    bsp_stack_bottom: VirtualAddress,
+    bsp_stack_top: VirtualAddress,
+    ap_start_realmode_begin: VirtualAddress,
+    ap_start_realmode_end: VirtualAddress,
+) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)

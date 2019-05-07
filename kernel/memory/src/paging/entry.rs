@@ -10,7 +10,14 @@
 use super::super::Frame;
 use multiboot2;
 use xmas_elf;
+use PhysicalAddress;
+use bit_field::BitField;
+use kernel_config::memory::PAGE_SHIFT;
 
+
+/// A page table entry, which is a `u64` value under the hood.
+/// It contains a physical frame address and entry flag access bits.
+#[repr(transparent)]
 pub struct Entry(u64);
 
 impl Entry {
@@ -28,15 +35,16 @@ impl Entry {
 
     pub fn pointed_frame(&self) -> Option<Frame> {
         if self.flags().contains(EntryFlags::PRESENT) {
-            Some(Frame::containing_address(self.0 as usize & 0x000fffff_fffff000))
+            let mut frame_paddr = self.0 as usize;
+            frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
+            Some(Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr)))
         } else {
             None
         }
     }
 
     pub fn set(&mut self, frame: Frame, flags: EntryFlags) {
-        assert!(frame.start_address() & !0x000fffff_fffff000 == 0);
-        self.0 = (frame.start_address() as u64) | flags.bits();
+        self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 
     // we use this to force explicit copying rather than deriving Copy/Clone

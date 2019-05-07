@@ -52,7 +52,7 @@ pub fn nano_core_public_func(val: u8) {
 
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
-
+use memory::VirtualAddress;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
@@ -119,8 +119,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    if !memory::Page::is_valid_address(multiboot_information_virtual_address) {
-        try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
+    if VirtualAddress::new(multiboot_information_virtual_address).is_err() {
+        try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
     println_raw!("nano_core_start(): booted via multiboot2."); 
@@ -180,7 +180,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         );
         info!("The nano_core is invoking the captain init function: {:?}", section_ref.lock().name);
 
-        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let (mapped_pages, mapped_pages_offset) = { 
             let section = section_ref.lock();
@@ -226,27 +226,27 @@ extern {
 
 use kernel_config::memory::KERNEL_OFFSET;
 /// Returns the starting virtual address of where the ap_start realmode code is.
-fn get_ap_start_realmode_begin() -> usize {
+fn get_ap_start_realmode_begin() -> VirtualAddress {
     let addr = unsafe { &ap_start_realmode as *const _ as usize };
     // debug!("ap_start_realmode addr: {:#x}", addr);
-    addr + KERNEL_OFFSET
+    VirtualAddress::new_canonical(addr + KERNEL_OFFSET)
 }
 
 /// Returns the ending virtual address of where the ap_start realmode code is.
-fn get_ap_start_realmode_end() -> usize {
+fn get_ap_start_realmode_end() -> VirtualAddress {
     let addr = unsafe { &ap_start_realmode_end as *const _ as usize };
     // debug!("ap_start_realmode_end addr: {:#x}", addr);
-    addr + KERNEL_OFFSET
+    VirtualAddress::new_canonical(addr + KERNEL_OFFSET)
 } 
 
-fn get_bsp_stack_bottom() -> usize {
-    unsafe {
-        &initial_bsp_stack_bottom as *const _ as usize
-    }
+fn get_bsp_stack_bottom() -> VirtualAddress {
+    VirtualAddress::new_canonical(
+        unsafe { &initial_bsp_stack_bottom as *const _ as usize }
+    )
 }
 
-fn get_bsp_stack_top() -> usize {
-    unsafe {
-        &initial_bsp_stack_top as *const _ as usize
-    }
+fn get_bsp_stack_top() -> VirtualAddress {
+    VirtualAddress::new_canonical(
+        unsafe { &initial_bsp_stack_top as *const _ as usize }
+    )
 }

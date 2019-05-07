@@ -4,8 +4,10 @@ use core::mem;
 use owning_ref::BoxRef;
 use alloc::boxed::Box;
 
-const RDSP_SEARCH_START: PhysicalAddress = 0xE_0000;
-const RDSP_SEARCH_END:   PhysicalAddress = 0xF_FFFF;
+/// The starting physical address of the region of memory where the RDSP table exists.
+const RDSP_SEARCH_START: usize = 0xE_0000;
+/// The ending physical address of the region of memory where the RDSP table exists.
+const RDSP_SEARCH_END:   usize = 0xF_FFFF;
 
 /// RSDP
 #[derive(Copy, Clone, Debug)]
@@ -29,8 +31,8 @@ impl RSDP {
         let size: usize = RDSP_SEARCH_END - RDSP_SEARCH_START;
         let pages = try_opt!(allocate_pages_by_bytes(size));
         let search_range = Frame::range_inclusive(
-            Frame::containing_address(RDSP_SEARCH_START),
-            Frame::containing_address(RDSP_SEARCH_END)
+            Frame::containing_address(PhysicalAddress::new_canonical(RDSP_SEARCH_START)),
+            Frame::containing_address(PhysicalAddress::new_canonical(RDSP_SEARCH_END))
         );
         
         let mapped_pages = {
@@ -59,9 +61,9 @@ impl RSDP {
     /// Get the RSDT or XSDT address
     pub fn sdt_address(&self) -> PhysicalAddress {
         if self.revision >= 2 {
-            self.xsdt_address as PhysicalAddress
+            PhysicalAddress::new_canonical(self.xsdt_address as usize)
         } else {
-            self.rsdt_address as PhysicalAddress
+            PhysicalAddress::new_canonical(self.rsdt_address as usize)
         }
     }
 }
