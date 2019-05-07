@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use memory::ActivePageTable;
+use memory::{PhysicalAddress, ActivePageTable};
 
 use super::{Sdt, get_sdt};
 
@@ -9,7 +9,7 @@ pub trait Rxsdt {
 
     fn map_all(&self, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
         for sdt_paddr in self.iter() {
-            try!(get_sdt(sdt_paddr, active_table));
+            try!(get_sdt(PhysicalAddress::new_canonical(sdt_paddr), active_table));
         }
         Ok(())
     }

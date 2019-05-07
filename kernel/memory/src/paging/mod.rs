@@ -47,19 +47,14 @@ impl fmt::Debug for Page {
 }
 
 impl Page {
-    /// Returns true if the given `VirtualAddress` is canonical, i.e., within the valid range.
-    pub fn is_valid_address(address: VirtualAddress) -> bool {
-        address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000
+    /// Returns the `Page` that contains the given `VirtualAddress`.
+    pub fn containing_address(virt_addr: VirtualAddress) -> Page {
+        Page { number: virt_addr.value() / PAGE_SIZE }
     }
 
-	/// returns the first virtual address as the start of this Page
-    pub fn containing_address(address: VirtualAddress) -> Page {
-        assert!(Page::is_valid_address(address), "Page::containing_address(): invalid address: 0x{:x}", address);
-        Page { number: address / PAGE_SIZE }
-    }
-
-    pub fn start_address(&self) -> usize {
-        self.number * PAGE_SIZE
+	/// Returns the VirtualAddress as the start of this Page
+    pub fn start_address(&self) -> VirtualAddress {
+        VirtualAddress(self.number * PAGE_SIZE)
     }
 
 	/// returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list
@@ -269,7 +264,6 @@ impl ActivePageTable {
     /// No need to return the old_table as an InactivePageTable, since we're not doing that anymore.
     /// Instead, the old_table remains "active" because other cores may use it.
     pub fn switch(&mut self, new_table: &PageTable) -> ActivePageTable {
-        use x86_64::PhysicalAddress;
         // debug!("ActivePageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // if this is the first time the new page table has been used, it will be an InactivePageTable,
@@ -282,7 +276,7 @@ impl ActivePageTable {
 
         // perform the actual page table switch
         unsafe {
-            control_regs::cr3_write(PhysicalAddress(new_active_table_p4.start_address() as u64));
+            control_regs::cr3_write(x86_64::PhysicalAddress(new_active_table_p4.start_address().value() as u64));
         }
         // debug!("ActivePageTable::switch(): NEW TABLE!!!");
         
@@ -311,10 +305,11 @@ impl fmt::Debug for InactivePageTable {
 impl InactivePageTable {
     /// Initializes a new InactivePageTable using the given `TemporaryPage`.
     /// The `TemporaryPage` is consumed here.
-    pub fn new(frame: Frame,
-               active_table: &mut ActivePageTable,
-               mut temporary_page: TemporaryPage)
-               -> Result<InactivePageTable, &'static str> {
+    pub fn new(
+        frame: Frame,
+        active_table: &mut ActivePageTable,
+        mut temporary_page: TemporaryPage
+    ) -> Result<InactivePageTable, &'static str> {
         {
             let table = try!(temporary_page.map_table_frame(frame.clone(), active_table));
             table.zero();
@@ -346,7 +341,7 @@ pub enum PageTable {
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 pub fn get_current_p4() -> Frame {
-    Frame::containing_address(control_regs::cr3().0 as usize)
+    Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
 }
 
 
@@ -384,14 +379,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // bootstrap an active_table from the currently-loaded page table
     let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
 
-    let boot_info_start_vaddr: VirtualAddress  = boot_info.start_address();
-    let boot_info_start_paddr: PhysicalAddress = try!(active_table.translate(boot_info_start_vaddr)
-                                                     .ok_or("Couldn't get boot_info physical address")
-    );
-    let boot_info_end_vaddr: VirtualAddress  = boot_info.end_address();
-    let boot_info_end_paddr: PhysicalAddress = try!(active_table.translate(boot_info_end_vaddr)
-                                                   .ok_or("Couldn't get boot_info physical address")
-    );
+    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
+    let boot_info_start_paddr = active_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
+    let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
+    let boot_info_end_paddr = active_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
     // print_raw!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
     //         boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
@@ -406,14 +397,12 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         // a quick closure to allocate one frame
         let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
         (
-            try!(alloc_frame()),
-            (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
-            (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
+            alloc_frame()?,
+            (alloc_frame()?, alloc_frame()?, alloc_frame()?),
+            (alloc_frame()?, alloc_frame()?, alloc_frame()?)
         )
     };
-    let mut new_table: InactivePageTable = {
-        try!(InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1)))
-    };
+    let mut new_table: InactivePageTable = InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1))?;
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
@@ -476,20 +465,22 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
                 // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
                 // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-                let mut start_phys_addr = section.start_address() as PhysicalAddress;
+                let mut start_phys_addr = section.start_address() as usize;
                 if start_phys_addr >= KERNEL_OFFSET { 
                     // true for all sections but the first section (inittext)
                     start_phys_addr -= KERNEL_OFFSET;
                 }
                 
-                let mut start_virt_addr = section.start_address() as VirtualAddress;
+                let mut start_virt_addr = section.start_address() as usize;
                 if start_virt_addr < KERNEL_OFFSET { 
                     // special case to handle the first section only
                     start_virt_addr += KERNEL_OFFSET;
                 }
 
-                let end_virt_addr = start_virt_addr + section.size() as VirtualAddress;
-                let end_phys_addr = start_phys_addr + section.size() as PhysicalAddress;
+                let start_phys_addr = PhysicalAddress::new(start_phys_addr)?;
+                let start_virt_addr = VirtualAddress::new(start_virt_addr)?;
+                let end_virt_addr = start_virt_addr + (section.size() as usize);
+                let end_phys_addr = start_phys_addr + (section.size() as usize);
 
 
                 // the linker script (linker_higher_half.ld) defines the following order of sections:
@@ -535,11 +526,14 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 // to allow the APs to boot up, we identity map the kernel sections too.
                 // (lower half virtual addresses mapped to same lower half physical addresses)
                 // we will unmap these later before we start booting to userspace processes
-                identity_mapped_pages[index] = Some(try!( mapper.map_frames(
-                    Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
-                    Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
-                    flags, allocator.deref_mut())
-                ));
+                identity_mapped_pages[index] = Some(
+                    mapper.map_frames(
+                        Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
+                        Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
+                        flags,
+                        allocator.deref_mut()
+                    )?
+                );
                 debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, section.size());
 
                 index += 1;      
@@ -547,54 +541,54 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             } // end of section iterator
 
 
-            let (text_start_virt,    text_start_phys)    = try!(text_start  .ok_or("Couldn't find start of .text section"));
-            let (_text_end_virt,     text_end_phys)      = try!(text_end    .ok_or("Couldn't find end of .text section"));
-            let (rodata_start_virt,  rodata_start_phys)  = try!(rodata_start.ok_or("Couldn't find start of .rodata section"));
-            let (_rodata_end_virt,   rodata_end_phys)    = try!(rodata_end  .ok_or("Couldn't find end of .rodata section"));
-            let (data_start_virt,    data_start_phys)    = try!(data_start  .ok_or("Couldn't find start of .data section"));
-            let (_data_end_virt,     data_end_phys)      = try!(data_end    .ok_or("Couldn't find start of .data section"));
+            let (text_start_virt,    text_start_phys)    = text_start  .ok_or("Couldn't find start of .text section")?;
+            let (_text_end_virt,     text_end_phys)      = text_end    .ok_or("Couldn't find end of .text section")?;
+            let (rodata_start_virt,  rodata_start_phys)  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
+            let (_rodata_end_virt,   rodata_end_phys)    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
+            let (data_start_virt,    data_start_phys)    = data_start  .ok_or("Couldn't find start of .data section")?;
+            let (_data_end_virt,     data_end_phys)      = data_end    .ok_or("Couldn't find start of .data section")?;
 
-            let text_flags    = try!(text_flags  .ok_or("Couldn't find .text section flags"));
-            let rodata_flags  = try!(rodata_flags.ok_or("Couldn't find .rodata section flags"));
-            let data_flags    = try!(data_flags  .ok_or("Couldn't find .data section flags"));
+            let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
+            let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
+            let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
 
 
             // now we map the 5 main sections into 3 groups according to flags
             text_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(text_start_phys, text_end_phys - text_start_phys), 
+                Frame::range_inclusive_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
                 text_flags, allocator.deref_mut())
             ));
             rodata_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(rodata_start_phys, rodata_end_phys - rodata_start_phys), 
+                Frame::range_inclusive_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
                 Page::containing_address(rodata_start_virt), 
                 rodata_flags, allocator.deref_mut())
             ));
             data_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(data_start_phys, data_end_phys - data_start_phys),
+                Frame::range_inclusive_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
                 Page::containing_address(data_start_virt), 
                 data_flags, allocator.deref_mut())
             ));
 
-            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xA_0000;
-            const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
-
             // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
             // VGA text mode only goes from 0xB_8000 - 0XC_0000
-            let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
+            const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
+            const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
+            let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_START, size_in_bytes), 
+                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 
-                vga_display_flags, allocator.deref_mut())
+                vga_display_flags,
+                allocator.deref_mut())
             ));
             vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(VGA_DISPLAY_PHYS_START, size_in_bytes), 
-                Page::containing_address(vga_display_virt_addr - KERNEL_OFFSET), 
+                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, size_in_bytes), 
+                Page::containing_address(VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START)), 
                 vga_display_flags, allocator.deref_mut())
             ));
             index += 1;
@@ -646,10 +640,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let (heap_mapped_pages, heap_vma) = {
         let mut allocator = allocator_mutex.lock();
 
-        let pages = Page::range_inclusive_addr(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
+        let pages = Page::range_inclusive_addr(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
-        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-        let heap_mp = try!(new_active_table.map_pages(pages, heap_flags, allocator.deref_mut()));
+        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
+        let heap_mp = new_active_table.map_pages(pages, heap_flags, allocator.deref_mut())?;
         heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
         
         allocator.alloc_ready(); // heap is ready
@@ -693,28 +687,33 @@ pub fn stack_trace() {
         let active_table = ActivePageTable::new(get_current_p4());
         for _frame in 0..64 {
             if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
-                if Page::is_valid_address(rbp) && Page::is_valid_address(rip_rbp) {
-                    // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
-                    error!(" {:>016X}: INVALID_ADDRESS", rbp);
-                    break;
-                }
-                
-                if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
-                    let rip = *(rip_rbp as *const usize);
-                    if rip == 0 {
-                        // println_raw!(" {:>016X}: EMPTY RETURN", rbp);
-                        error!(" {:>016X}: EMPTY RETURN", rbp);
+                // TODO: is this the right condition?
+                match (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
+                    (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) => {
+                        if active_table.translate(rbp_vaddr).is_some() && active_table.translate(rip_rbp_vaddr).is_some() {
+                            let rip = *(rip_rbp as *const usize);
+                            if rip == 0 {
+                                // println_raw!(" {:>016X}: EMPTY RETURN", rbp);
+                                error!(" {:>016X}: EMPTY RETURN", rbp);
+                                break;
+                            }
+                            // println_raw!("  {:>016X}: {:>016X}", rbp, rip);
+                            error!("  {:>016X}: {:>016X}", rbp, rip);
+                            rbp = *(rbp as *const usize);
+                            // symbol_trace(rip);
+                        } else {
+                            // println_raw!("  {:>016X}: GUARD PAGE", rbp);
+                            error!("  {:>016X}: GUARD PAGE", rbp);
+                            break;
+                        }
+                    }
+                    _ => {
+                        // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
+                        error!(" {:>016X}: INVALID_ADDRESS", rbp);
                         break;
                     }
-                    // println_raw!("  {:>016X}: {:>016X}", rbp, rip);
-                    error!("  {:>016X}: {:>016X}", rbp, rip);
-                    rbp = *(rbp as *const usize);
-                    // symbol_trace(rip);
-                } else {
-                    // println_raw!("  {:>016X}: GUARD PAGE", rbp);
-                    error!("  {:>016X}: GUARD PAGE", rbp);
-                    break;
                 }
+                
             } else {
                 // println_raw!("  {:>016X}: RBP OVERFLOW", rbp);
                 error!("  {:>016X}: RBP OVERFLOW", rbp);

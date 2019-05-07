@@ -13,6 +13,7 @@
 #![feature(naked_functions)]
 
 #[macro_use] extern crate log;
+extern crate memory;
 extern crate util;
 extern crate gdt;
 extern crate apic;
@@ -25,6 +26,7 @@ use core::sync::atomic::{Ordering, compiler_fence};
 use util::c_str::{c_char, CStr, CString};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use apic::get_my_apic_id;
+use memory::VirtualAddress;
 
 
 
@@ -77,7 +79,7 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
 }
 
 
-pub fn init(syscall_stack_top_usable: usize) {
+pub fn init(syscall_stack_top_usable: VirtualAddress) {
     enable_syscall_sysret(syscall_stack_top_usable);
 }
 
@@ -168,7 +170,7 @@ unsafe extern "C" fn syscall_handler() {
 
 
 /// Configures and enables the usage and behavior of `syscall` and `sysret` instructions. 
-fn enable_syscall_sysret(syscall_stack_pointer: usize) {
+fn enable_syscall_sysret(syscall_stack_pointer: VirtualAddress) {
 
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
@@ -176,7 +178,7 @@ fn enable_syscall_sysret(syscall_stack_pointer: usize) {
     use x86_64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     use alloc::boxed::Box;
     let gs_data: UserTaskGsData = UserTaskGsData {
-        kernel_stack: syscall_stack_pointer as u64,
+        kernel_stack: syscall_stack_pointer.value() as u64,
         // the other 3 elements below are 0, but will be init'd at the entry of every syscall_handler invocation
         user_stack: 0,
         user_ip: 0,

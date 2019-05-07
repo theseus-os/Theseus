@@ -73,7 +73,7 @@ lazy_static!{
 		// and goes until the end of the kernel free text section
 		let initial_chunk: Chunk = Chunk {
 			allocated: false,
-			start_page: Page::containing_address(KERNEL_TEXT_START),
+			start_page: Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
 			size_in_pages: KERNEL_TEXT_MAX_SIZE / PAGE_SIZE,
 		};
 		let mut list: LinkedList<Chunk> = LinkedList::new();

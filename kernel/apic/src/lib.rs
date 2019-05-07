@@ -141,7 +141,7 @@ impl LapicIpiDestination {
 /// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.
 pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
-    let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
+    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
 
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
@@ -162,7 +162,7 @@ fn map_apic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static 
     // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
     unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     
-    let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
+    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
     let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();

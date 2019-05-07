@@ -16,7 +16,7 @@ use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCA
 use paging::{PageIter, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{address_page_offset, ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 
 pub struct Mapper {
@@ -74,16 +74,15 @@ impl Mapper {
         }
     }
 
-    /// translates a VirtualAddress to a PhysicalAddress
+    /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
-        let offset = virtual_address % PAGE_SIZE;
         // get the frame number of the page containing the given virtual address,
-        // and then the corresponding physical address is that PFN*sizeof(Page) + offset
-        self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
-            frame.number * PAGE_SIZE + offset
-        })
+        // and then the corresponding physical address is that page frame number * page size + offset
+        self.translate_page(Page::containing_address(virtual_address))
+            .map(|frame| frame.start_address() + address_page_offset(virtual_address.value()))
     }
 
+    /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
         let p3 = self.p4().next_table(page.p4_index());
 
@@ -338,7 +337,7 @@ impl MappedPages {
     pub fn offset_of_address(&self, vaddr: VirtualAddress) -> Option<usize> {
         let start = self.pages.start_address();
         if (vaddr >= start) && (vaddr <= start + self.size_in_bytes()) {
-            Some(vaddr - start)
+            Some(vaddr.value() - start.value())
         }
         else {
             None
@@ -542,8 +541,8 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
         }
@@ -582,8 +581,8 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
+            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
             
@@ -719,7 +718,7 @@ impl MappedPages {
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let slc: &[T] = unsafe {
-            slice::from_raw_parts((self.pages.start_address() + byte_offset) as *const T, length)
+            slice::from_raw_parts((self.pages.start_address().value() + byte_offset) as *const T, length)
         };
 
         Ok(slc)
@@ -762,7 +761,7 @@ impl MappedPages {
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let slc: &mut [T] = unsafe {
-            slice::from_raw_parts_mut((self.pages.start_address() + byte_offset) as *mut T, length)
+            slice::from_raw_parts_mut((self.pages.start_address().value() + byte_offset) as *mut T, length)
         };
 
         Ok(slc)
@@ -817,7 +816,7 @@ impl MappedPages {
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
 
-        *space = self.pages.start_address() + offset; 
+        *space = self.pages.start_address().value() + offset; 
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let t: &'a F = unsafe {

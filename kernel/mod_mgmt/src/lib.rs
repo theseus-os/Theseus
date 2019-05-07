@@ -151,7 +151,7 @@ fn parse_bootloader_modules_into_files(
 
         for m in boot_info.module_tags() {
             let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-            let frames = Frame::range_inclusive_addr(m.start_address() as PhysicalAddress, size_in_bytes);
+            let frames = Frame::range_inclusive_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
             let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
             let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
             let name = String::from(file_name);
@@ -2535,25 +2535,25 @@ fn write_relocation(
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_64 => {
             let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         R_X86_64_PC32 => {
             let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_PC64 => {
             let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
