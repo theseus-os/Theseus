@@ -60,26 +60,31 @@ impl Entry {
 bitflags! {
     #[derive(Default)]
     pub struct EntryFlags: u64 {
-        const PRESENT =         1 << 0;
-        const WRITABLE =        1 << 1;
-        const USER_ACCESSIBLE = 1 << 2;
-        const WRITE_THROUGH =   1 << 3;
-        const NO_CACHE =        1 << 4;
-        const ACCESSED =        1 << 5;
-        const DIRTY =           1 << 6;
-        const HUGE_PAGE =       1 << 7;
-        // const GLOBAL =          1 << 8;
-        const GLOBAL =          0; // disabling because VirtualBox doesn't like it
-        const NO_EXECUTE =      1 << 63;
+        const PRESENT           = 1 << 0;
+        const WRITABLE          = 1 << 1;
+        const USER_ACCESSIBLE   = 1 << 2;
+        const WRITE_THROUGH     = 1 << 3;
+        const NO_CACHE          = 1 << 4;
+        const ACCESSED          = 1 << 5;
+        const DIRTY             = 1 << 6;
+        const HUGE_PAGE         = 1 << 7;
+        // const GLOBAL            = 1 << 8;
+        const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
+        const NO_EXECUTE        = 1 << 63;
     }
 }
 
 impl EntryFlags {
-    /// Returns true if this flags object has the `WRITABLE` bit set.
+    /// Returns true if these flags have the `WRITABLE` bit set.
     pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
+    /// Returns true if these flags are executable, 
+    /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
+    pub fn is_executable(&self) -> bool {
+        !self.intersects(EntryFlags::NO_EXECUTE)
+    }
 
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
