@@ -343,8 +343,29 @@ pub struct AtaIdentifyData
 
 impl Default for AtaIdentifyData {
 	fn default() -> AtaIdentifyData {
-		// SAFE: Plain old data
-		unsafe { ::core::mem::zeroed() }
+		AtaIdentifyData {
+			flags: 0,
+			_unused1: [0; 9],
+			serial_number: [0; 20],
+			_unused2: [0; 3],
+			firmware_ver: [0; 8],
+			model_number: [0; 40],
+			sect_per_int: 0,
+			_unused3: 0,
+			capabilities: [0; 2],
+			_unused4: [0; 2],
+			valid_ext_data: 0,
+			_unused5: [0; 5],
+			size_of_rw_multiple: 0,
+			sector_count_28: 0,
+			_unused6: [0; 100-62],
+			sector_count_48: 0,
+			_unused7: [0; 2],
+			physical_sector_size: 0,
+			_unused8: [0; 9],
+			words_per_logical_sector: 0,
+			_unusedz: [0; 257-119],
+		}
 	}
 
 }

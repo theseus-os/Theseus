@@ -55,6 +55,9 @@ macro_rules! try_break {
 /// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
+/// If successful, this returns a tuple of `(init_symbols, usize)`, in which `init_symbols` is a map of symbol name to its constant value,
+/// and the `usize` is the number of new symbols added.
+/// 
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
 pub fn parse_nano_core(
@@ -63,7 +66,7 @@ pub fn parse_nano_core(
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
     verbose_log:  bool
-) -> Result<usize, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<(BTreeMap<String, usize>, usize), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
 
     let text_pages   = Arc::new(Mutex::new(text_pages));
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
@@ -83,7 +86,7 @@ pub fn parse_nano_core(
     debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
     // We don't need to actually load the nano_core as a new crate, since we're already running it.
     // We just need to parse it to discover the symbols. 
-    let new_crate_ref = match nano_core_file_path.extension() {
+    let (new_crate_ref, init_symbols) = match nano_core_file_path.extension() {
         Some("sym") => parse_nano_core_symbol_file(nano_core_file, text_pages, rodata_pages, data_pages)?,
         Some("bin") => parse_nano_core_binary(nano_core_file, text_pages, rodata_pages, data_pages)?,
         _ => return Err((
@@ -99,7 +102,7 @@ pub fn parse_nano_core(
     trace!("parse_nano_core(): finished adding symbols.");
     namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
     info!("parsed nano_core crate, {} new symbols.", new_syms);
-    Ok(new_syms)
+    Ok((init_symbols, new_syms))
 }
 
 
@@ -113,7 +116,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
     text_pages:   Arc<Mutex<MappedPages>>,
     rodata_pages: Arc<Mutex<MappedPages>>,
     data_pages:   Arc<Mutex<MappedPages>>,
-) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<(StrongCrateRef, BTreeMap<String, usize>), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
     
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size = nano_core_object_file.size();
@@ -126,6 +129,9 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
     // because the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
     let mut section_counter = 0;
     let mut sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
+
+    // we build a list of other non-section symbols too, such as constants defined in assembly code
+    let mut init_symbols: BTreeMap<String, usize> = BTreeMap::new();
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name,
@@ -267,7 +273,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     .map_err(|e| {
                         error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                         "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
-                    }).and_then(|v| VirtualAddress::new(v)),
+                    }),
                     loop_result
                 );
                 let sec_size = try_break!(usize::from_str_radix(sec_size, 10)
@@ -297,6 +303,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                 // debug!("parse_nano_core_symbol_file(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", name, sec_vaddr, sec_size, sec_ndx);
 
                 if sec_ndx == text_shndx {
+                    let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
                         Arc::new(Mutex::new(LoadedSection::new(
@@ -312,6 +319,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     );
                 }
                 else if sec_ndx == rodata_shndx {
+                    let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
                         Arc::new(Mutex::new(LoadedSection::new(
@@ -327,6 +335,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     );
                 }
                 else if sec_ndx == data_shndx {
+                    let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
                         Arc::new(Mutex::new(LoadedSection::new(
@@ -342,6 +351,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     );
                 }
                 else if sec_ndx == bss_shndx {
+                    let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
                         Arc::new(Mutex::new(LoadedSection::new(
@@ -357,7 +367,8 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     );
                 }
                 else {
-                    trace!("parse_nano_core_symbol_file(): skipping sec[{}] (probably in .init): name: {}, vaddr: {:#X}, size: {:#X}", sec_ndx, name, sec_vaddr, sec_size);
+                    // trace!("parse_nano_core_symbol_file(): found symbol constant: name {}, value: {}", name, sec_vaddr);
+                    init_symbols.insert(name.to_string(), sec_vaddr);
                 }
 
                 section_counter += 1;
@@ -381,7 +392,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
         new_crate_mut.sections = sections;
     }
     
-    Ok(new_crate)
+    Ok((new_crate, init_symbols))
 }
 
 
@@ -396,7 +407,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
     text_pages:   Arc<Mutex<MappedPages>>, 
     rodata_pages: Arc<Mutex<MappedPages>>, 
     data_pages:   Arc<Mutex<MappedPages>>, 
-) -> Result<StrongCrateRef, (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<(StrongCrateRef, BTreeMap<String, usize>), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
 
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size_in_bytes = nano_core_object_file.size();
@@ -508,7 +519,10 @@ fn parse_nano_core_binary<F: File + ?Sized>(
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
     let mut loop_result: Result<(), &'static str> = Ok(());
-    
+
+    // the list of other non-section symbols, such as constants defined in assembly code
+    let mut init_symbols: BTreeMap<String, usize> = BTreeMap::new();
+
     let sections = {
         let text_pages_locked = text_pages.lock();
         let rodata_pages_locked = rodata_pages.lock();
@@ -521,31 +535,21 @@ fn parse_nano_core_binary<F: File + ?Sized>(
 
         use xmas_elf::symbol_table::Entry;
         for entry in symtab.iter() {
-            // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)
-
-            // use xmas_elf::symbol_table::Visibility;
-            // match entry.get_other() {
-            //     Visibility::Default | Visibility::Hidden => {
-            //         // do nothing, fall through to proceed
-            //     }
-            //     _ => {
-            //         continue; // skip this
-            //     }
-            // };
-            
+            // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)            
             if let Ok(bind) = entry.get_binding() {
                 if bind == xmas_elf::symbol_table::Binding::Global {
                     if let Ok(typ) = entry.get_type() {
                         if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
-                            let sec_vaddr = VirtualAddress::new_canonical(entry.value() as usize);
+                            let sec_value = entry.value() as usize;
                             let sec_size = entry.size() as usize;
                             let name = try_break!(entry.get_name(&elf_file), loop_result);
 
                             let demangled = demangle(name).to_string();
-                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_vaddr, sec_size);
+                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
 
                             let new_section = {
                                 if entry.shndx() as usize == text_shndx {
+                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
                                     Some(LoadedSection::new(
                                         SectionType::Text,
                                         demangled,
@@ -558,6 +562,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
                                     ))
                                 }
                                 else if entry.shndx() as usize == rodata_shndx {
+                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
                                     Some(LoadedSection::new(
                                         SectionType::Rodata,
                                         demangled,
@@ -570,6 +575,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
                                     ))
                                 }
                                 else if entry.shndx() as usize == data_shndx {
+                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
                                     Some(LoadedSection::new(
                                         SectionType::Data,
                                         demangled,
@@ -582,6 +588,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
                                     ))
                                 }
                                 else if entry.shndx() as usize == bss_shndx {
+                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
                                     Some(LoadedSection::new(
                                         SectionType::Bss,
                                         demangled,
@@ -594,7 +601,8 @@ fn parse_nano_core_binary<F: File + ?Sized>(
                                     ))
                                 }
                                 else {
-                                    error!("Unexpected entry.shndx(): {}", entry.shndx());
+                                    trace!("Unexpected entry.shndx(): {}", entry.shndx());
+                                    init_symbols.insert(demangled, sec_value);
                                     None
                                 }
                             };
@@ -625,5 +633,5 @@ fn parse_nano_core_binary<F: File + ?Sized>(
         new_crate_mut.sections = sections;
     }
 
-    Ok(new_crate)
+    Ok((new_crate, init_symbols))
 }

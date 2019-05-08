@@ -44,9 +44,7 @@ use spin::{Mutex, RwLock};
 
 
 use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
-use kernel_config::memory::{PAGE_SIZE, address_page_offset};
 
-// pub use self::dmar::Dmar;
 pub use self::fadt::Fadt;
 pub use self::madt::Madt;
 pub use self::rsdt::Rsdt;
@@ -55,10 +53,7 @@ pub use self::rxsdt::Rxsdt;
 pub use self::rsdp::RSDP;
 use sdt::Sdt;
 
-// use self::aml::{parse_aml_table, AmlError, AmlValue};
 
-// mod dmar;
-// mod aml;
 mod fadt;
 pub mod madt;
 mod rsdt;
@@ -67,25 +62,13 @@ mod rxsdt;
 mod rsdp;
 
 
-/// The physical address that an AP jumps to when it first is booted by the BSP
-/// For x2apic systems, this must be at 0x10000 or higher! 
-const AP_STARTUP: usize = 0x10000; 
-/// Physical address of the small 512-byte area for AP startup data passed from the BSP in long mode (Rust) code.
-/// Value: 0xF000
-const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
-
-
 /// The larger container that holds all data structure obtained from the ACPI table.
 pub struct Acpi {
     pub fadt: RwLock<Option<Fadt>>,
-    // pub namespace: RwLock<Option<BTreeMap<String, AmlValue>>>,
-    pub next_ctx: RwLock<u64>,
 }
 
 static ACPI_TABLE: Acpi = Acpi {
     fadt: RwLock::new(None),
-    // namespace: RwLock::new(None),
-    next_ctx: RwLock::new(0),
 };
 
 lazy_static! {
@@ -97,7 +80,7 @@ lazy_static! {
 fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> Result<&'static Sdt, &'static str> {
     
     let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
-    let addr_offset = address_page_offset(sdt_address.value());
+    let addr_offset = sdt_address.frame_offset();
     let first_frame = Frame::containing_address(sdt_address);
 
     // first, make sure the given sdt_address is mapped to a virtual memory Page, so we can access it
@@ -156,48 +139,6 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
     Ok(sdt)
 }
 
-// fn init_aml_table(sdt: &'static Sdt) {
-//     match parse_aml_table(sdt) {
-//         Ok(_) => debug!(": Parsed"),
-//         Err(AmlError::AmlParseError(e)) => error!(": {}", e),
-//         Err(AmlError::AmlInvalidOpCode) => error!(": Invalid opcode"),
-//         Err(AmlError::AmlValueError) => error!(": Type constraints or value bounds not met"),
-//         Err(AmlError::AmlDeferredLoad) => debug!(": Deferred load reached top level"),
-//         Err(AmlError::AmlFatalError(_, _, _)) => {
-//             error!(": Fatal error occurred");
-//             unsafe { kstop(); }
-//         },
-//         Err(AmlError::AmlHardFatal) => {
-//             error!(": Fatal error occurred");
-//             unsafe { kstop(); }
-//         }
-//     }
-// }
-
-// fn init_namespace() {
-//     {
-//         let mut namespace = ACPI_TABLE.namespace.write();
-//         *namespace = Some(BTreeMap::new());
-//     }
-
-//     let dsdt = find_matching_sdts("DSDT");
-//     if dsdt.len() == 1 {
-//         debug!("  DSDT");
-//         load_table(get_sdt_signature(dsdt[0]));
-//         init_aml_table(dsdt[0]);
-//     } else {
-//         error!("Unable to find DSDT");
-//         return;
-//     };
-
-//     let ssdts = find_matching_sdts("SSDT");
-
-//     for ssdt in ssdts {
-//         debug!("  SSDT");
-//         load_table(get_sdt_signature(ssdt));
-//         init_aml_table(ssdt);
-//     }
-// }
 
 /// Parse the ACPI tables to gather CPU, interrupt, and timer information
 pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'static str> {
@@ -246,13 +187,14 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
 
 
         for sdt_paddr in rxsdt.iter() {
+            let sdt_paddr = PhysicalAddress::new_canonical(sdt_paddr);
             let sdt_vaddr: VirtualAddress = {
-                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(PhysicalAddress::new_canonical(sdt_paddr))) {
-                    page.start_address() + address_page_offset(sdt_paddr)
+                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
+                    page.start_address() + sdt_paddr.frame_offset()
                 }
                 else {
                     error!("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr: {:#X}", sdt_paddr);
-                    return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for every sdt_paddr");
+                    return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr");
                 }
             };
             let sdt = unsafe { &*(sdt_vaddr.value() as *const Sdt) };

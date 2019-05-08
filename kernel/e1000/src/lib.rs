@@ -637,12 +637,6 @@ impl E1000Nic {
             // //print rx_buf of length bytes
             // debug!("rx_buf {}: ", self.rx_cur);
 
-            // for i in 0..length {
-            //     let points_at = unsafe{ *rx_buf.offset(i as isize ) };
-            //     //debug!("{}",points_at);
-            //     debug!("{:x}",points_at);
-            // }  
-
             _total_packet_length += length;
 
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,

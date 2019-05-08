@@ -1,25 +1,34 @@
 use core::mem;
 use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
-use core::ptr::{read_volatile, write_volatile};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use spin::Mutex;
-use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT};
+use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT, PAGE_SIZE};
 use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use pit_clock;
+use volatile::Volatile;
 
 use super::sdt::Sdt;
-use super::{AP_STARTUP, TRAMPOLINE, find_matching_sdts, load_table, get_sdt_signature};
+use super::{find_matching_sdts, load_table, get_sdt_signature};
 
 
 use core::sync::atomic::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
-const GRAPHIC_INFO_TRAMPOLINE_OFFSET:usize = 0x100;
+
+/// The physical address that an AP jumps to when it first is booted by the BSP.
+/// For x2apic systems, this must be at 0x10000 or higher! 
+const AP_STARTUP: usize = 0x10000; 
+/// The physical address of the memory area for AP startup data passed from the BSP in long mode (Rust) code.
+/// Located one page below the AP_STARTUP code entry point.
+/// Value: 0xF000
+const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
+
+const GRAPHIC_INFO_TRAMPOLINE_OFFSET: usize = 0x100;
 
 // graphic mode information
 pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
@@ -207,67 +216,60 @@ pub fn handle_ap_cores(
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let active_table_phys_addr: PhysicalAddress;
-    let trampoline_mapped_pages: MappedPages; // must be held throughout APs being booted up
+    let mut trampoline_mapped_pages: MappedPages; // must be held throughout APs being booted up
     let _trampoline_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
     let ap_startup_mapped_pages: MappedPages; // must be held throughout APs being booted up
     let _ap_startup_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let &mut MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-        } = &mut *kernel_mmi;
+        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
+            // first, double check that the ap_start_realmode address is mapped and valid
+            active_table.translate(ap_start_realmode_begin).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address")?;
 
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                // first, double check that the ap_start_realmode address is mapped and valid
-                active_table.translate(ap_start_realmode_begin).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address")?;
+            // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
+            // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
+            let trampoline_page        = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
+            let trampoline_page_higher = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE + KERNEL_OFFSET));
+            let trampoline_frame       = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
+            let ap_startup_page        = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
+            let ap_startup_page_higher = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP + KERNEL_OFFSET));
+            let ap_startup_frames      = Frame::range_inclusive_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
-                // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
-                // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
-                let trampoline_page        = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
-                let trampoline_page_higher = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE + KERNEL_OFFSET));
-                let trampoline_frame       = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
-                let ap_startup_page        = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
-                let ap_startup_page_higher = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP + KERNEL_OFFSET));
-                let ap_startup_frames      = Frame::range_inclusive_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
+            let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+            
+            trampoline_mapped_pages = active_table.map_to(
+                trampoline_page, 
+                trampoline_frame.clone(), 
+                EntryFlags::PRESENT | EntryFlags::WRITABLE, 
+                allocator.deref_mut()
+            )?;
+            ap_startup_mapped_pages = active_table.map_frames(
+                ap_startup_frames.clone(),
+                ap_startup_page,
+                EntryFlags::PRESENT | EntryFlags::WRITABLE,
+                allocator.deref_mut()
+            )?;
 
-                let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
-                
-                trampoline_mapped_pages = active_table.map_to(
-                    trampoline_page, 
-                    trampoline_frame.clone(), 
-                    EntryFlags::PRESENT | EntryFlags::WRITABLE, 
-                    allocator.deref_mut()
-                )?;
-                ap_startup_mapped_pages = active_table.map_frames(
-                    ap_startup_frames.clone(),
-                    ap_startup_page,
-                    EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                    allocator.deref_mut()
-                )?;
+            // do same mappings for higher half (not sure if needed)
+            _trampoline_mapped_pages_higher = active_table.map_to(
+                trampoline_page_higher,
+                trampoline_frame,
+                EntryFlags::PRESENT | EntryFlags::WRITABLE,
+                allocator.deref_mut()
+            )?;
+            _ap_startup_mapped_pages_higher = active_table.map_frames(
+                ap_startup_frames,
+                ap_startup_page_higher,
+                EntryFlags::PRESENT | EntryFlags::WRITABLE,
+                allocator.deref_mut()
+            )?;
 
-                // do same mappings for higher half (not sure if needed)
-                _trampoline_mapped_pages_higher = active_table.map_to(
-                    trampoline_page_higher,
-                    trampoline_frame,
-                    EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                    allocator.deref_mut()
-                )?;
-                _ap_startup_mapped_pages_higher = active_table.map_frames(
-                    ap_startup_frames,
-                    ap_startup_page_higher,
-                    EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                    allocator.deref_mut()
-                )?;
-
-                active_table_phys_addr = active_table.physical_address();
-            }
-            _ => {
-                error!("handle_ap_cores(): couldn't get kernel's active_table!");
-                return Err("Couldn't get kernel's active_table");
-            }
+            active_table_phys_addr = active_table.physical_address();
+        }
+        else {
+            error!("handle_ap_cores(): couldn't get kernel's active_table!");
+            return Err("Couldn't get kernel's active_table");
         }
     }
 
@@ -289,6 +291,7 @@ pub fn handle_ap_cores(
 
 
     let mut ap_count = 0;
+    let ap_trampoline_data: &mut ApTrampolineData = trampoline_mapped_pages.as_type_mut(0)?;
 
     // in this function, we only handle LocalApics
     for madt_entry in madt_iter.clone() {
@@ -328,7 +331,7 @@ pub fn handle_ap_cores(
 
                     bring_up_ap(bsp_lapic.deref_mut(), 
                                 lapic_entry,
-                                trampoline_mapped_pages.start_address(), 
+                                ap_trampoline_data,
                                 active_table_phys_addr, 
                                 ap_stack, 
                                 nmi_lint,
@@ -354,7 +357,7 @@ pub fn handle_ap_cores(
                     physical_address:graphic_info.physical_address,
                 };
             },
-            Err(_) => { debug!("Fail to get the graphic information"); }
+            Err(_) => { error!("Fail to get the graphic information"); }
         };
     }
     
@@ -390,38 +393,57 @@ fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16)
 }
 
 
+/// The data items used when an AP core is booting up in real mode.
+/// # Important Layout Note
+/// The order of the members in this struct must exactly match how they are used
+/// in the AP bootup code (at the top of `ap_boot.asm`).
+#[repr(C)]
+struct ApTrampolineData {
+    /// A flag that indicates whether the new AP is ready. 
+    /// The Rust setup code sets it to 0, and the AP boot code sets it to 1.
+    ap_ready:          Volatile<u64>,
+    /// The processor ID of the new AP that is being brought up.
+    ap_processor_id:   Volatile<u8>,
+    _padding0:         [u8; 7],
+    /// The APIC ID of the new AP that is being brought up.
+    ap_apic_id:        Volatile<u8>,
+    _padding1:         [u8; 7],
+    /// The physical address of the top-level P4 page table root (value of CR3).
+    ap_page_table:     Volatile<PhysicalAddress>,
+    /// The starting virtual address (bottom) of the stack that was allocated for the new AP.
+    ap_stack_start:    Volatile<VirtualAddress>,
+    /// The ending virtual address (top) of the stack that was allocated for the new AP.
+    ap_stack_end:      Volatile<VirtualAddress>,
+    /// The virtual address of the Rust entry point that the new AP should jump to after 
+    ap_code:           Volatile<VirtualAddress>,
+    /// The NMI LINT (Non-Maskable Interrupt Local Interrupt) value for the new AP.
+    ap_nmi_lint:       Volatile<u8>,
+    _padding2:         [u8; 7],
+    /// The NMI (Non-Maskable Interrupt) flags value for the new AP.
+    ap_nmi_flags:      Volatile<u16>,
+    _padding3:         [u8; 6],
+}
+
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
-fn bring_up_ap(bsp_lapic: &mut LocalApic,
-               new_lapic: &MadtLocalApic, 
-               trampoline_vaddr: VirtualAddress,
-               active_table_paddr: PhysicalAddress, 
-               ap_stack: Stack,
-               nmi_lint: u8, 
-               nmi_flags: u16) 
-{
-    
-    // NOTE: These definitions MUST match those in ap_boot.asm
-    let ap_ready         = trampoline_vaddr.value() as *mut u64;
-    let ap_processor_id  = unsafe { ap_ready.offset(1) };
-    let ap_apic_id       = unsafe { ap_ready.offset(2) };
-    let ap_page_table    = unsafe { ap_ready.offset(3) };
-    let ap_stack_start   = unsafe { ap_ready.offset(4) };
-    let ap_stack_end     = unsafe { ap_ready.offset(5) };
-    let ap_code          = unsafe { ap_ready.offset(6) };
-    let ap_nmi_lint      = unsafe { ap_ready.offset(7) };
-    let ap_nmi_flags     = unsafe { ap_ready.offset(8) };
-
-    // Set the ap_ready to 0, volatile
-    unsafe { write_volatile(ap_ready,         0) };
-    unsafe { write_volatile(ap_processor_id,  new_lapic.processor as u64) };
-    unsafe { write_volatile(ap_apic_id,       new_lapic.apic_id as u64) };
-    unsafe { write_volatile(ap_page_table,    active_table_paddr.value() as u64) };
-    unsafe { write_volatile(ap_stack_start,   ap_stack.bottom().value() as u64) };
-    unsafe { write_volatile(ap_stack_end,     ap_stack.top_unusable().value() as u64) };
-    unsafe { write_volatile(ap_code,          kstart_ap as u64) };
-    unsafe { write_volatile(ap_nmi_lint,      nmi_lint as u64) };
-    unsafe { write_volatile(ap_nmi_flags,     nmi_flags as u64) };
+fn bring_up_ap(
+    bsp_lapic: &mut LocalApic,
+    new_lapic: &MadtLocalApic, 
+    ap_trampoline_data: &mut ApTrampolineData,
+    active_table_paddr: PhysicalAddress, 
+    ap_stack: Stack,
+    nmi_lint: u8, 
+    nmi_flags: u16
+) {
+    ap_trampoline_data.ap_ready.write(0);
+    ap_trampoline_data.ap_processor_id.write(new_lapic.processor);
+    ap_trampoline_data.ap_apic_id.write(new_lapic.apic_id);
+    ap_trampoline_data.ap_page_table.write(active_table_paddr);
+    ap_trampoline_data.ap_stack_start.write(ap_stack.bottom());
+    ap_trampoline_data.ap_stack_end.write(ap_stack.top_unusable());
+    ap_trampoline_data.ap_code.write(VirtualAddress::new_canonical(kstart_ap as usize));
+    ap_trampoline_data.ap_nmi_lint.write(nmi_lint);
+    ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
@@ -496,7 +518,7 @@ fn bring_up_ap(bsp_lapic: &mut LocalApic,
 
     // Wait for trampoline ready
     debug!(" Wait...");
-    while unsafe { read_volatile(ap_ready) } == 0 {
+    while ap_trampoline_data.ap_ready.read() == 0 {
         spin_loop_hint();
     }
     debug!(" Trampoline...");
