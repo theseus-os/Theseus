@@ -3,7 +3,6 @@
 //! This task is then moved to the back of the queue. 
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

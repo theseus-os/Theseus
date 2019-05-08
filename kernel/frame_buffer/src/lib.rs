@@ -1,7 +1,6 @@
 //! This crate is a frame buffer for display on the screen in 2D mode
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]
@@ -50,7 +49,7 @@ pub fn init() -> Result<(), &'static str > {
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
-        VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
+        VESA_DISPLAY_PHYS_START = PhysicalAddress::new(graphic_info.physical_address as usize)?;
         BUFFER_WIDTH = graphic_info.width as usize;
         BUFFER_HEIGHT = graphic_info.height as usize;
         VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;

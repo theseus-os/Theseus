@@ -1,7 +1,6 @@
 //! An implementation of in-memory files, backed by heap memory, i.e., `Vec`s.
 
 #![no_std]
-#![feature(alloc)]
 
 #[cfg(test)]
 #[macro_use] extern crate std;

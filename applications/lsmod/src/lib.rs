@@ -1,7 +1,6 @@
 //! This application dumps out information about modules and crates in the system.
 
 #![no_std]
-#![feature(alloc)]
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 

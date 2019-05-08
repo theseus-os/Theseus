@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 extern crate task;
@@ -391,7 +390,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
-	let mut dummy_sum: u64 = 0;
+	let mut _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
@@ -410,7 +409,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 		let file_dir_enum = path.get(&get_cwd().unwrap()).expect("Cannot find file");
 		match file_dir_enum {
             FileOrDir::File(fileref) => { 
-            	let mut file = fileref.lock();	// so far, open()
+            	let file = fileref.lock();	// so far, open()
 
             	unread_size = size;
             	while unread_size > 0 {	// now read()
@@ -421,7 +420,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 
 					// LMbench based on C does the magic to cast a type from char to int
 					// But, we dont' have the luxury with type-safe Rust, so we do...
-					dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
+					_dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 
             }
@@ -441,7 +440,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
 
 	printlninfo!("read_with_open_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
-		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, _dummy_sum);
 
 	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
@@ -453,7 +452,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let path = Path::new(filename.to_string());
-	let mut dummy_sum: u64 = 0;
+	let _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
 		Some(fileref) => {fileref.lock().size()}
@@ -470,7 +469,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let file_dir_enum = path.get(&get_cwd().unwrap()).expect("Cannot find file");
 	match file_dir_enum {
         FileOrDir::File(fileref) => { 
-        	let mut file = fileref.lock();	// so far, open()
+        	let file = fileref.lock();	// so far, open()
 
 			start_hpet = get_hpet().as_ref().unwrap().get_counter();
 			for _ in 0..ITERATIONS 	{
@@ -483,7 +482,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 
 					// LMbench based on C does the magic to cast a type from char to int
 					// But, we dont' have the luxury with type-safe Rust, so we do...
-					// dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
+					// _dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 			}	// for
 			end_hpet = get_hpet().as_ref().unwrap().get_counter();
@@ -503,7 +502,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let kb_per_sec = (size as u64 * to_sec) / (KB * delta_time_avg);
 
 	printlninfo!("read_only_inner ({}/{}): {} total_time -> {} {} {} MB/sec {} KB/sec (ignore: {})",
-		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, dummy_sum);
+		th, nr, delta_time, delta_time_avg, T_UNIT, mb_per_sec, kb_per_sec, _dummy_sum);
 
 	Ok((delta_time_avg, mb_per_sec, kb_per_sec))
 }
@@ -532,8 +531,8 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let pid = getpid();
 	let start_hpet_create: u64;
 	let end_hpet_create: u64;
-	let start_hpet_del: u64;
-	let end_hpet_del: u64;
+	let _start_hpet_del: u64;
+	let _end_hpet_del: u64;
 
 	// don't put these (populating files, checks, etc) into the loop to be timed
 	// The loop must be doing minimal operations to exclude unnecessary overhead
@@ -604,8 +603,8 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	let pid = getpid();
 	let start_hpet_create: u64;
 	let end_hpet_create: u64;
-	let start_hpet_del: u64;
-	let end_hpet_del: u64;
+	let _start_hpet_del: u64;
+	let _end_hpet_del: u64;
 	let mut file_list = Vec::new();
 
 	// don't put these (populating files, checks, etc) into the loop to be timed

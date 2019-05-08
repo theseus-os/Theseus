@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
@@ -112,8 +111,8 @@ pub struct E1000RxDesc {
 impl E1000RxDesc {
     /// Initializes a receive descriptor by clearing its status 
     /// and setting the descriptor's physical address.
-    fn init(&mut self, rx_buf_paddr: u64) {
-        self.phys_addr.write(rx_buf_paddr);
+    fn init(&mut self, rx_buf_paddr: PhysicalAddress) {
+        self.phys_addr.write(rx_buf_paddr.value() as u64);
         self.status.write(0);
     }
 }
@@ -264,7 +263,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         
-        self.tx_descs[self.tx_cur as usize].phys_addr.write(transmit_buffer.phys_addr as u64);
+        self.tx_descs[self.tx_cur as usize].phys_addr.write(transmit_buffer.phys_addr.value() as u64);
         self.tx_descs[self.tx_cur as usize].length.write(transmit_buffer.length);
         self.tx_descs[self.tx_cur as usize].cmd.write((regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8);
         self.tx_descs[self.tx_cur as usize].status.write(0);
@@ -335,7 +334,7 @@ impl E1000Nic {
         // IO Base Address
         let io_base = e1000_pci_dev.bars[0] & !1;     
         // memory mapped base address
-        let mem_base = (e1000_pci_dev.bars[0] as usize) & !3; //hard coded for 32 bit, need to make conditional 
+        let mem_base = PhysicalAddress::new((e1000_pci_dev.bars[0] as usize) & !3)?; //hard coded for 32 bit, need to make conditional 
 
         let mut mapped_registers = Self::mem_map(e1000_pci_dev, mem_base)?;
         
@@ -522,12 +521,12 @@ impl E1000Nic {
                 })?;
             let paddr = rx_buf.phys_addr;
             rx_bufs_in_use.push(rx_buf);
-            rd.init(paddr as u64);
+            rd.init(paddr);
         }
         
         debug!("e1000::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
-        let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr as u32;
-        let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr >> 32) as u32;
+        let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr.value() as u32;
+        let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
         
         // write the physical address of the rx descs array
         regs.rdbal.write(rx_desc_phys_addr_lower);
@@ -568,8 +567,8 @@ impl E1000Nic {
         }
 
         debug!("e1000::tx_init(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
-        let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr as u32;
-        let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr >> 32) as u32;
+        let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
+        let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 
         // write the physical address of the rx descs array
         regs.tdbal.write(tx_desc_phys_addr_lower);        
@@ -605,7 +604,7 @@ impl E1000Nic {
     /// either in a polling fashion or from a receive interrupt handler.
     fn handle_receive(&mut self) -> Result<(), &'static str> {
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut total_packet_length: u16 = 0;
+        let mut _total_packet_length: u16 = 0;
 
         // The main idea here is to go through all of the receive buffers that the NIC has populated,
         // and collect all of them into a single ethernet frame, i.e., a `ReceivedFrame`.
@@ -644,7 +643,7 @@ impl E1000Nic {
             //     debug!("{:x}",points_at);
             // }  
 
-            total_packet_length += length;
+            _total_packet_length += length;
 
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),
@@ -661,7 +660,7 @@ impl E1000Nic {
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            self.rx_descs[self.rx_cur as usize].phys_addr.write(new_receive_buf.phys_addr as u64);
+            self.rx_descs[self.rx_cur as usize].phys_addr.write(new_receive_buf.phys_addr.value() as u64);
             self.rx_descs[self.rx_cur as usize].status.write(0);
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,

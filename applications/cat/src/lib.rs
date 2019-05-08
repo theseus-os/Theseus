@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #[macro_use] extern crate terminal_print;
 // #[macro_use] extern crate log;
 
@@ -62,7 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
                     return -1;
                 }
                 FileOrDir::File(file) => {
-                    let mut file_locked = file.lock();
+                    let file_locked = file.lock();
                     let file_size = file_locked.size();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     

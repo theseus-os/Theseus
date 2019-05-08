@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(stmt_expr_attributes)]
 
 #[cfg(test)]

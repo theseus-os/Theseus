@@ -26,7 +26,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(asm, naked_functions)]
 #![feature(panic_info_message)]
 
@@ -277,7 +276,7 @@ impl Task {
             on_runqueue: None,
             
             saved_sp: 0,
-            task_local_data_ptr: 0,
+            task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
             name: format!("task{}", task_id),
             kstack: None,
@@ -385,7 +384,7 @@ impl Task {
     /// into the FS segment register base MSR.
     fn set_as_current_task(&self) {
         unsafe {
-            wrmsr(IA32_FS_BASE, self.task_local_data_ptr as u64);
+            wrmsr(IA32_FS_BASE, self.task_local_data_ptr.value() as u64);
         }
     }
 
@@ -393,9 +392,9 @@ impl Task {
     /// This should only be called once, after the Task will never ever be used again. 
     fn take_task_local_data(&mut self) -> Option<Box<TaskLocalData>> {
         // sanity check to ensure we haven't dropped this Task's TaskLocalData twice.
-        if self.task_local_data_ptr != 0 {
-            let tld = unsafe { Box::from_raw(self.task_local_data_ptr as *mut TaskLocalData) };
-            self.task_local_data_ptr = 0;
+        if self.task_local_data_ptr.value() != 0 {
+            let tld = unsafe { Box::from_raw(self.task_local_data_ptr.value() as *mut TaskLocalData) };
+            self.task_local_data_ptr = VirtualAddress::zero();
             Some(tld)
         }
         else {
@@ -675,7 +674,7 @@ impl TaskRef {
             current_task_id: task_id,
         };
         let tld_ptr = Box::into_raw(Box::new(tld));
-        taskref.0.deref().0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
+        taskref.0.deref().0.lock().task_local_data_ptr = VirtualAddress::new_canonical(tld_ptr as usize);
         taskref
     }
 
@@ -888,7 +887,7 @@ pub fn create_idle_task(
             stack_top, 
             stack_bottom, 
             MappedPages::from_existing(
-                Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom),
+                Page::range_inclusive_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
                 EntryFlags::WRITABLE | EntryFlags::PRESENT
             ),
         )

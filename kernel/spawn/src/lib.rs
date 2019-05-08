@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(asm)]
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
@@ -151,7 +150,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         // debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
 
         // currently we're using the very bottom of the kstack for kthread arguments
-        let arg_ptr = kstack.bottom();
+        let arg_ptr = kstack.bottom().value();
         let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
         unsafe {
             *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
@@ -329,7 +328,7 @@ fn setup_context_trampoline(kstack: &mut Stack, new_task: &mut Task, entry_point
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
-            let new_context_ptr = (kstack.top_usable() - mem::size_of::<$ContextType>()) as *mut $ContextType;
+            let new_context_ptr = (kstack.top_usable().value() - mem::size_of::<$ContextType>()) as *mut $ContextType;
             // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
             unsafe {
                 *new_context_ptr = <($ContextType)>::new(entry_point_function as usize);
@@ -555,7 +554,7 @@ fn task_wrapper<F, A, R>() -> !
         // let off: isize = 0;
         unsafe {
             // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            *(kstack.bottom() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
+            *(kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
         }
     };
 
@@ -633,8 +632,8 @@ fn userspace_wrapper() -> ! {
 
     { // scoped to release current task's lock before calling jump_to_userspace
         let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").lock();
-        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable();
-        entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!");
+        ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable().value();
+        entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!").value();
     }
     debug!("userspace_wrapper [1]: ustack_top: {:#x}, module_entry: {:#x}", ustack_top, entry_func);
 

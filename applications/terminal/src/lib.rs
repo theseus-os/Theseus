@@ -6,7 +6,6 @@
 //! keypresses, resize, print events, etc. 
 
 #![no_std]
-#![feature(alloc)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;

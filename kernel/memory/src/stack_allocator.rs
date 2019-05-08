@@ -1,5 +1,5 @@
 use super::paging::*;
-use super::{PAGE_SIZE, FrameAllocator, VirtualMemoryArea};
+use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea};
 use super::Mapper;
 
 pub struct StackAllocator {
@@ -67,7 +67,7 @@ impl StackAllocator {
 
                 let stack_vma = VirtualMemoryArea::new(
                     start.start_address(),
-                    end.start_address() - start.start_address() + PAGE_SIZE, // + 1 Page because it's an inclusive range
+                    end.start_address().value() - start.start_address().value() + PAGE_SIZE, // + 1 Page because it's an inclusive range
                     flags, 
                     if flags.contains(EntryFlags::USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
                 );
@@ -87,13 +87,13 @@ impl StackAllocator {
 
 #[derive(Debug)]
 pub struct Stack {
-    top: usize,
-    bottom: usize,
+    top: VirtualAddress,
+    bottom: VirtualAddress,
     pages: MappedPages,
 }
 
 impl Stack {
-    pub fn new(top: usize, bottom: usize, pages: MappedPages) -> Stack {
+    pub fn new(top: VirtualAddress, bottom: VirtualAddress, pages: MappedPages) -> Stack {
         assert!(top > bottom);
         Stack {
             top: top,
@@ -104,23 +104,23 @@ impl Stack {
 
     /// the top of this Stack. This address is not dereferenceable, the one right below it is. 
     /// to get the highest usable address in this Stack, call `top_usable()`
-    pub fn top_unusable(&self) -> usize {
+    pub fn top_unusable(&self) -> VirtualAddress {
         self.top
     }
 
     /// Returns the highest usable address of this Stack, 
-    /// which is top_unusable() - sizeof(usize)
-    pub fn top_usable(&self) -> usize {
+    /// which is top_unusable() - sizeof(VirtualAddress)
+    pub fn top_usable(&self) -> VirtualAddress {
         use core::mem;
-        self.top - mem::size_of::<usize>()
+        self.top - mem::size_of::<VirtualAddress>()
     }
 
 
-    pub fn bottom(&self) -> usize {
+    pub fn bottom(&self) -> VirtualAddress {
         self.bottom
     }
 
     pub fn size(&self) -> usize {
-        self.top_unusable() - self.bottom
+        self.top_unusable().value() - self.bottom.value()
     }
 }

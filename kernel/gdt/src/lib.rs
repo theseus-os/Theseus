@@ -11,9 +11,13 @@ extern crate tss;
 extern crate memory;
 
 use atomic_linked_list::atomic_map::AtomicMap;
-use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::gdt::SegmentSelector;
-use x86_64::PrivilegeLevel;
+use x86_64::{
+    structures::{
+        tss::TaskStateSegment,
+        gdt::SegmentSelector,
+    },
+    PrivilegeLevel,
+};
 use spin::Once;
 use memory::VirtualAddress;
 
@@ -82,7 +86,6 @@ pub fn create_tss_gdt(apic_id: u8,
                   privilege_stack_top_unusable: VirtualAddress) {
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
-    use x86_64::PrivilegeLevel;
 
     
     let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);

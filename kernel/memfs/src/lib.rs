@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 //! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
@@ -101,7 +100,7 @@ impl File for MemFile {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 			let mut kernel_mmi = kernel_mmi_ref.lock();
             if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+                let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
                 let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
                 let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
                 
@@ -116,13 +115,13 @@ impl File for MemFile {
                         copy_limit = offset;
                     }
                     let existing_bytes = self.mp.as_slice(0, copy_limit)?;
-                    let mut copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
+                    let copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
                     copy_slice.copy_from_slice(existing_bytes);
                 } 
                 
                 // second, we write the new content into the reallocated mapped pages
                 {
-                    let mut dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
+                    let dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
                     dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
                 }
                 self.mp = new_mapped_pages;

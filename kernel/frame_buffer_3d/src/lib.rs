@@ -2,7 +2,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]
@@ -21,7 +20,7 @@ extern crate alloc;
 use core::ptr::Unique;
 use spin::Mutex;
 use alloc::vec::Vec;
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
+use memory::{FRAME_ALLOCATOR, Frame, PageTable, VirtualAddress, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref, AllocatedPages};
 use core::ops::DerefMut;
@@ -46,8 +45,8 @@ static mut FRAME_BUFFER_PAGES:Option<MappedPages> = None;
 pub fn init() -> Result<(), &'static str > {
 
     //Wenqiu Allocate VESA frame buffer
-    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+    const VESA_DISPLAY_PHYS_START: usize = 0xFD00_0000;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH * FRAME_BUFFER_HEIGHT;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -80,7 +79,7 @@ pub fn init() -> Result<(), &'static str > {
             let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
             let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
-                Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
+                Frame::range_inclusive_addr(PhysicalAddress::new_canonical(VESA_DISPLAY_PHYS_START), VESA_DISPLAY_PHYS_SIZE), 
                 vesa_display_flags, 
                 allocator.deref_mut())
             );
@@ -98,7 +97,7 @@ pub fn init() -> Result<(), &'static str > {
 
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
-        start_address:0,
+        start_address: VirtualAddress::zero(),
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
         depth: [[core::usize::MAX;FRAME_BUFFER_WIDTH/3];FRAME_BUFFER_HEIGHT],
     })
@@ -148,7 +147,7 @@ struct Point {
 }
 
 struct Drawer {
-    start_address: usize,
+    start_address: VirtualAddress,
     buffer: Unique<Buffer>,
     depth : [[usize; FRAME_BUFFER_WIDTH/3]; FRAME_BUFFER_HEIGHT], 
 }
@@ -239,10 +238,10 @@ impl Drawer {
         unsafe { self.buffer.as_mut() }
     } 
 
-    fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
-        if self.start_address == 0 {
+    fn init_frame_buffer(&mut self, virtual_address: VirtualAddress) -> Result<(), &'static str>{
+        if self.start_address.value() == 0 {
             self.start_address = virtual_address;
-            match Unique::new((virtual_address) as *mut _) {
+            match Unique::new(virtual_address.value() as *mut _) {
                 Some(buffer) => { 
                     self.buffer = buffer; 
                     trace!("Set frame buffer address {:#x}", virtual_address);

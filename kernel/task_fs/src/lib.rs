@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 //! This crate contains the direcotires and files that comprise the taskfs, which is similar
 //! to the /proc directory in linux. There are four main sections in this code:

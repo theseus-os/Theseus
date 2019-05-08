@@ -337,7 +337,7 @@ impl LoadedCrate {
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
-            for mut strong_dep in new_sec.sections_i_depend_on.iter_mut() {
+            for strong_dep in new_sec.sections_i_depend_on.iter_mut() {
                 // we can skip modifying "absolute" relocations, since those only depend on the source section,
                 // which we haven't actually changed (we've duplicated the target section here, not the source)
                 if !strong_dep.relocation.is_absolute() {
