@@ -40,7 +40,7 @@ use spin::Once;
 // use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
@@ -234,7 +234,7 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFra
 
 
 // see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655
-static mut EXTENDED_SCANCODE: bool = false;
+static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
@@ -250,7 +250,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
             // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
 
 
-            let extended = unsafe { EXTENDED_SCANCODE };
+            let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
 
             // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
             if scan_code == 0xE0 {
@@ -258,15 +258,15 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
                     error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
                 }
                 // mark it true for the next interrupt
-                unsafe { EXTENDED_SCANCODE = true; }
+                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
             } else if scan_code == 0xE1 {
                 error!("PAUSE/BREAK key pressed ... ignoring it!");
                 // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
-                unsafe { EXTENDED_SCANCODE = true; }
+                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
             } else { // a regular scancode, go ahead and handle it
                 // if the previous interrupt's scan_code was an extended scan_code, then this one is not
                 if extended {
-                    unsafe { EXTENDED_SCANCODE = false; }
+                    EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
                 }
                 if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
                     if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
@@ -324,11 +324,11 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // info!("COM1 serial handler");
 
-    unsafe {
-        x86_64::instructions::port::inb(0x3F8); // read serial port value
-    }
+    // unsafe {
+    //     x86_64::instructions::port::inb(0x3F8); // read serial port value
+    // }
 
-    eoi(Some(PIC_MASTER_OFFSET + 0x4));
+    // eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
 
@@ -340,7 +340,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
     //     x86_64::instructions::port::inb(0x3F8); // read serial port value
     // }
 
-    eoi(Some(PIC_MASTER_OFFSET + 0x6));
+    // eoi(Some(PIC_MASTER_OFFSET + 0x6));
 }
 
 
@@ -379,16 +379,12 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mu
 
 
 
-pub static mut SPURIOUS_COUNT: u64 = 0;
-
 /// The Spurious interrupt handler. 
 /// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
 /// Spurious interrupts occur a lot when using PIC on real hardware, but only occurs once when using apic/x2apic. 
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
 extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    unsafe { SPURIOUS_COUNT += 1; } // cheap counter just for debug info
-
     if let Some(pic) = PIC.try() {
         let irq_regs = pic.read_isr_irr();
         // check if this was a real IRQ7 (parallel port) (bit 7 will be set)

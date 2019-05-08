@@ -15,7 +15,6 @@ use core::{mem, ptr};
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
 use owning_ref::BoxRefMut;
-use kernel_config::memory::address_page_offset;
 use alloc::boxed::Box;
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
@@ -144,7 +143,7 @@ pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Resul
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
     );
 
-    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr.value())))?;
+    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;
     // get an HPET instance here just to initially enable the main counter
     {
         hpet.enable_counter(true);

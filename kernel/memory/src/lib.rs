@@ -44,7 +44,7 @@ use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HE
 use bit_field::BitField;
 
 
-/// A virtual memory address, which is a `usize`.
+/// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
     Debug, Display, Binary, Octal, LowerHex, UpperHex,
@@ -84,6 +84,14 @@ impl VirtualAddress {
     #[inline]
     pub fn value(&self) -> usize {
         self.0
+    }
+
+    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
+    /// 
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    /// the least significant 12 bits (12:0] of this VirtualAddress.
+    pub fn page_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
     }
 }
 
@@ -129,7 +137,7 @@ impl From<VirtualAddress> for usize {
 }
 
 
-/// A physical memory address, which is a `usize`.
+/// A physical memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
     Debug, Display, Binary, Octal, LowerHex, UpperHex,
@@ -168,6 +176,13 @@ impl PhysicalAddress {
         PhysicalAddress(0)
     }
 
+    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
+    /// 
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    /// the least significant 12 bits (12:0] of this PhysicalAddress.
+    pub fn frame_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
+    }
 }
 
 

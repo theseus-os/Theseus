@@ -16,7 +16,7 @@ use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCA
 use paging::{PageIter, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
-use kernel_config::memory::{address_page_offset, ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 
 pub struct Mapper {
@@ -79,7 +79,7 @@ impl Mapper {
         // get the frame number of the page containing the given virtual address,
         // and then the corresponding physical address is that page frame number * page size + offset
         self.translate_page(Page::containing_address(virtual_address))
-            .map(|frame| frame.start_address() + address_page_offset(virtual_address.value()))
+            .map(|frame| frame.start_address() + virtual_address.page_offset())
     }
 
     /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
