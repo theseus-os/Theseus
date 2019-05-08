@@ -181,6 +181,7 @@ pub enum RunState {
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
 
+#[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SimdExt {

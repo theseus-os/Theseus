@@ -30,7 +30,7 @@ use super::*;
 use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
@@ -454,7 +454,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 
                 debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
 
-                if !address_is_page_aligned(section.start_address() as usize) {
+                if PhysicalAddress::new_canonical(section.start_address() as usize).frame_offset() != 0 {
                     error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
                     return Err("Kernel ELF Section was not page-aligned");
                 }

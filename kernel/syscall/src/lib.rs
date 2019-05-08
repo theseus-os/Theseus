@@ -112,7 +112,6 @@ unsafe extern "C" fn syscall_handler() {
 
 
     // switch to the kernel stack dedicated for syscall handling, and save the user task's details
-    // link to similar features in tifflin: https://github.com/thepowersgang/rust_os/blob/deb156d263e0a0af9195955cccfc150ea12f466f/Kernel/Core/arch/amd64/start.asm#L335
     // here, rcx = user task's IP, r11 = user task's EFLAGS
     // The gs offsets used below must match the order of elements in the UserTaskGsData struct above!!!
     asm!("swapgs; \
@@ -122,12 +121,6 @@ unsafe extern "C" fn syscall_handler() {
           mov rsp, gs:[0x0];"
           : : : "memory" : "intel", "volatile");
 
- /*unsafe{
-    let rdi:u64;
-    asm!("mov rax, rdi": : : "memory" : "intel", "volatile");
-    asm!("" : "={rax}"(rdi): : "memory" : "intel", "volatile");
-    trace!("The sender is {}", rdi);
-}*/
     // asm!("push r11" : : : : "intel"); // stack must be 16-byte aligned, so just pushing another random item so we push an even number of things
     let (rax, rdi, rsi, rdx, r10, r8, r9): (u64, u64, u64, u64, u64, u64, u64); 
     asm!("" : "={rax}"(rax), "={rdi}"(rdi), "={rsi}"(rsi), "={rdx}"(rdx), "={r10}"(r10), "={r8}"(r8), "={r9}"(r9)  : : "memory" : "intel", "volatile");

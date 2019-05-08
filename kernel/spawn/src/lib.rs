@@ -31,8 +31,9 @@ use alloc::sync::Arc;
 use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
-use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR, address_is_page_aligned};
-use task::{Task, TaskRef, SimdExt, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+#[cfg(simd_personality)] use task::SimdExt;
 use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
 
@@ -432,7 +433,9 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 };
 
                 // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
-                assert!(address_is_page_aligned(module.start_address()), "modules must be page aligned!");
+                if module.start_address().frame_offset() != 0 {
+                    return Err("modules must be page aligned!");
+                }
                 // first we need to temporarily map the module memory region into our address space, 
                 // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
                 let (elf_progs, entry_point) = {

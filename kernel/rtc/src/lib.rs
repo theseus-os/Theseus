@@ -146,7 +146,6 @@ pub fn get_rtc_ticks() -> Result<usize, ()> {
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 fn enable_rtc_interrupt()
 {
-    // disable interrupts until _held_interrupts goes out of scope
     let _held_interrupts = hold_interrupts();
 
     write_cmos(0x0C);
@@ -193,13 +192,12 @@ fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
         return Err(());
     }
 
-    // disable interrupts until _held_interrupts goes out of scope
-    let _held_interrupts = hold_interrupts();
-
     // formula is "rate = 32768 Hz >> (dividor - 1)"
     let dividor: u8 = log2(rate) as u8 + 2; 
 
-    //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
+    let _held_interrupts = hold_interrupts();
+
+    // bottom 4 bits of register A are the "rate dividor", setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
     let prev = read_cmos();
     write_cmos(0x8A); 
