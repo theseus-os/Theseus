@@ -63,9 +63,6 @@ path = "../spawn"
 [dependencies.tsc]
 path = "../tsc"
 
-[dependencies.syscall]
-path = "../syscall"
-
 [dependencies.interrupts]
 path = "../interrupts"
 

@@ -19,6 +19,7 @@ extern crate owning_ref;
 extern crate apic;
 extern crate context_switch;
 extern crate path;
+extern crate type_name;
 
 
 use core::mem;
@@ -121,14 +122,11 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> 
-        // where A: Send + 'static, 
-        //       R: Send + 'static,
-        //       F: FnOnce(A) -> R, 
     {
         let mut new_task = Task::new();
         new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
-            unsafe { ::core::intrinsics::type_name::<F>() }
+            type_name::get::<F>(),
         ));
     
         #[cfg(simd_personality)] {  

@@ -38,7 +38,6 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
 extern crate task; 
-extern crate syscall;
 extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
@@ -100,12 +99,11 @@ pub fn init(
     let madt_iter = device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
-    let (double_fault_stack, privilege_stack, syscall_stack) = { 
+    let (double_fault_stack, privilege_stack) = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).ok_or("could not allocate double fault stack")?,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate privilege stack")?,
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate syscall stack")?
         )
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
@@ -114,9 +112,6 @@ pub fn init(
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
     
-    // initialize the syscall 
-    syscall::init(syscall_stack.top_usable());
-
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
@@ -137,7 +132,7 @@ pub fn init(
             trace!("Frame_buffer initialized successfully.");
         }
         Err(err) => { 
-            println_raw!("captain::init(): failed to initialize frame_buffer");
+            error!("captain::init(): failed to initialize frame_buffer");
             return Err(err);
         }
     }
@@ -168,34 +163,6 @@ pub fn init(
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
         }
     }
-
-    // create and jump to the first userspace thread
-    #[cfg(spawn_userspace)] {
-        debug!("trying to jump to userspace");
-        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
-        spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
-    }
-
-    #[cfg(spawn_userspace)] {
-        debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
-        spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
-    }
-
-    // create and jump to a userspace thread that tests syscalls
-    #[cfg(spawn_userspace)] {
-        debug!("trying out a system call module");
-        let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
-        spawn::spawn_userspace(module, None)?;
-    }
-
-    // a second duplicate syscall test user task
-    #[cfg(spawn_userspace)] {
-        debug!("trying out a receive system call module");
-        let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
-        spawn::spawn_userspace(module, None)?;
-    }
-
     
     // create a SIMD personality
     #[cfg(simd_personality)]

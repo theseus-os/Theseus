@@ -369,7 +369,7 @@ view-docs: view-doc
 clean:
 	cargo clean
 	@rm -rf build
-	@$(MAKE) -C userspace clean
+#@$(MAKE) -C userspace clean
 	
 
 

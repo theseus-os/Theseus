@@ -384,9 +384,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
     let boot_info_end_paddr = active_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
-    // print_raw!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
-    //         boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
-    // );
     info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
             boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
     );
@@ -604,11 +601,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     // skip pages that are already mapped
                     continue;
                 }
-                // print_raw!("MAPPING BOOT_INFO PAGE {:?}\n", page);
                 higher_half_mapped_pages[index] = Some( try!( mapper.map_to(
                     page, frame.clone(), EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
                 ));
-                // print_raw!("mapped bootloader info at addr: {:?}\n", vmas[index]);
                 // also do an identity mapping, if maybe we need it?
                 identity_mapped_pages[index] = Some( try!( mapper.map_to(
                     Page::containing_address(page.start_address() - KERNEL_OFFSET), frame, 
@@ -681,7 +676,6 @@ pub fn stack_trace() {
         let mut rbp: usize;
         asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
 
-        // println_raw!("TRACE: {:>016X}", rbp);
         error!("STACK TRACE: {:>016X}", rbp);
         //Maximum 64 frames
         let active_table = ActivePageTable::new(get_current_p4());
@@ -693,29 +687,24 @@ pub fn stack_trace() {
                         if active_table.translate(rbp_vaddr).is_some() && active_table.translate(rip_rbp_vaddr).is_some() {
                             let rip = *(rip_rbp as *const usize);
                             if rip == 0 {
-                                // println_raw!(" {:>016X}: EMPTY RETURN", rbp);
                                 error!(" {:>016X}: EMPTY RETURN", rbp);
                                 break;
                             }
-                            // println_raw!("  {:>016X}: {:>016X}", rbp, rip);
                             error!("  {:>016X}: {:>016X}", rbp, rip);
                             rbp = *(rbp as *const usize);
                             // symbol_trace(rip);
                         } else {
-                            // println_raw!("  {:>016X}: GUARD PAGE", rbp);
                             error!("  {:>016X}: GUARD PAGE", rbp);
                             break;
                         }
                     }
                     _ => {
-                        // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
                         error!(" {:>016X}: INVALID_ADDRESS", rbp);
                         break;
                     }
                 }
                 
             } else {
-                // println_raw!("  {:>016X}: RBP OVERFLOW", rbp);
                 error!("  {:>016X}: RBP OVERFLOW", rbp);
             }
         }
