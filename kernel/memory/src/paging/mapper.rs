@@ -18,6 +18,7 @@ use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
+use type_name;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -612,8 +613,7 @@ impl MappedPages {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 size, offset, self.size_in_bytes()
             );
         }
@@ -622,9 +622,8 @@ impl MappedPages {
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_type(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
@@ -645,8 +644,7 @@ impl MappedPages {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 size, offset, self.size_in_bytes()
             );
         }
@@ -654,9 +652,8 @@ impl MappedPages {
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.flags
+                type_name::get::<T>(),
+                size, offset, self.flags
             );
             return Err("as_type_mut(): MappedPages were not writable");
         }
@@ -665,9 +662,8 @@ impl MappedPages {
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
@@ -699,8 +695,7 @@ impl MappedPages {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
@@ -709,9 +704,8 @@ impl MappedPages {
         let end = byte_offset + (length * mem::size_of::<T>());
         if end > self.size_in_bytes() {
             error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
             return Err("requested slice length and offset would not fit within the MappedPages bounds");
         }
@@ -732,8 +726,7 @@ impl MappedPages {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(), 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
@@ -741,9 +734,8 @@ impl MappedPages {
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?}",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.flags
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.flags
             );
             return Err("as_slice_mut(): MappedPages were not writable");
         }
@@ -752,9 +744,8 @@ impl MappedPages {
         let end = byte_offset + (length * mem::size_of::<T>());
         if end > self.size_in_bytes() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
             return Err("requested slice length and offset would not fit within the MappedPages bounds");
         }
@@ -807,8 +798,7 @@ impl MappedPages {
         let size = mem::size_of::<F>();
         if true {
             debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<F>() }, 
+                type_name::get::<F>(),
                 size, offset, self.size_in_bytes()
             );
         }
@@ -816,8 +806,7 @@ impl MappedPages {
         // check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
         if !self.flags.is_executable() {
             error!("MappedPages::as_func(): requested {}, but MappedPages weren't executable (flags: {:?})",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<F>() }, 
+                type_name::get::<F>(),
                 self.flags
             );
             return Err("as_func(): MappedPages were not executable");
@@ -827,8 +816,7 @@ impl MappedPages {
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<F>() }, 
+                type_name::get::<F>(),
                 size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");

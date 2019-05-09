@@ -620,36 +620,3 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 }
 
 */
-
-
-//Test functions for performance evaluation
-/*pub fn set_time_start() {
-    let hpet_lock = get_hpet();
-    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
-}
-
-pub fn calculate_time_statistic() {
-    let statistic = STATISTIC.call_once(|| {
-        Mutex::new(Vec::new())
-    });
-
-  unsafe{
-
-    let hpet_lock = get_hpet();
-    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
-
-   
-    let mut queue = statistic.lock();
-    queue.push(end_time - STARTING_TIME);
-
-    STARTING_TIME = 0;
-
-    COUNTER  = COUNTER+1;
-
-    if COUNTER == 1000 {
-        for i in 0..queue.len(){
-            trace!("Time\t{}", queue.pop().unwrap());
-        }
-        COUNTER = 0;
-    }
-}*/
