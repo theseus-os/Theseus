@@ -16,7 +16,6 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
-#[macro_use] extern crate vga_buffer;
 
 
 use core::ptr::Unique;
@@ -117,7 +116,6 @@ static FRAME_DRAWER: Mutex<Drawer> = {
 
 /// draw a pixel with coordinates and color
 pub fn draw_pixel(x:usize, y:usize, color:u32) {
-    trace!("draw a pixel");
     FRAME_DRAWER.lock().draw_pixel(x, y, color);
 }
 
@@ -234,7 +232,8 @@ impl Drawer {
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
             Err(err) => {
-                debug!("Fail to get frame buffer"); return;},
+                debug!("Fail to get frame buffer"); return;
+            },
         }
 
         if width.abs() > height.abs() {
@@ -446,7 +445,6 @@ impl Drawer {
 
         let mut x = start_x;
         let mut y = start_y;
-        trace!("Wenqiu:3D fill rectangle");
         loop {
             if x == end_x {
                 y += 1;
