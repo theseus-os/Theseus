@@ -160,15 +160,15 @@ pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Resul
 
 #[repr(packed)]
 struct HpetInner {
-    header: Sdt,
+    _header: Sdt,
 
-    hw_rev_id: u8,
-    comparator_descriptor: u8,
-    pci_vendor_id: u16,
+    _hw_rev_id: u8,
+    _comparator_descriptor: u8,
+    _pci_vendor_id: u16,
     gen_addr_struct: GenericAddressStructure,
-    hpet_number: u8,
-    min_periodic_clk_tick: u16,
-    oem_attribute: u8
+    _hpet_number: u8,
+    _min_periodic_clk_tick: u16,
+    _oem_attribute: u8
 }
 
 impl HpetInner {

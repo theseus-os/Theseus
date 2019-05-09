@@ -96,7 +96,7 @@ impl Mapper {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
-                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
+                            number: start_frame.number + (page.p2_index().into(): usize) * ENTRIES_PER_PAGE_TABLE + (page.p1_index().into(): usize),
                         });
                     }
                 }
@@ -107,7 +107,7 @@ impl Mapper {
                         if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
-                            return Some(Frame { number: start_frame.number + page.p1_index() });
+                            return Some(Frame { number: start_frame.number + (page.p1_index().into(): usize) });
                         }
                     }
                 }

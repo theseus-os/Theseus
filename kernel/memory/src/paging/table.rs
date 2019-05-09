@@ -8,10 +8,11 @@
 // except according to those terms.
 
 use super::entry::{Entry, EntryFlags};
-use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
-use super::super::FrameAllocator;
+use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
+use super::super::{VirtualAddress, FrameAllocator};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
+use ux::u9;
 
 
 // Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel, 
@@ -37,23 +38,17 @@ impl<L> Table<L>
         }
     }
 
-    pub fn copy_entry_from_table(&mut self, from_table: &Table<Level4>, index: usize) {
-        // bounds check
-        assert!(index < ENTRIES_PER_PAGE_TABLE, "copy_entry_from_table: index of was out of bounds!");
+    pub fn copy_entry_from_table(&mut self, from_table: &Table<Level4>, index: u9) {
         // simply copy the table entry, which is just a u64
-        self.entries[index] = from_table[index].copy();
+        self[index] = from_table[index].copy();
     }
 
-    pub fn clear_entry(&mut self, index: usize) {
-        // bounds check
-        assert!(index < ENTRIES_PER_PAGE_TABLE, "clear_entry: index of was out of bounds!");
-        self.entries[index].set_unused();
+    pub fn clear_entry(&mut self, index: u9) {
+        self[index].set_unused();
     }
 
-    pub fn get_entry_value(&self, index: usize) -> u64 {
-        // bounds check
-        assert!(index < ENTRIES_PER_PAGE_TABLE, "get_entry_value: index of was out of bounds!");
-        self.entries[index].value()
+    pub fn get_entry_value(&self, index: u9) -> u64 {
+        self[index].value()
     }
 }
 
@@ -62,72 +57,62 @@ impl<L> Table<L>
 {
 
     /// uses 'index' as an index into this table's list of 512 entries
-    /// returns the address of the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1) as a raw u64 pointer
-    fn next_table_address(&self, index: usize) -> Option<usize> {
+    /// returns the virtual address of the next lowest page table 
+    /// (so P4 would give P3, P3 -> P2, P2 -> P1).
+    fn next_table_address(&self, index: u9) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
         if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE) {
             let table_address = self as *const _ as usize;
-            let retval: usize = (table_address << 9) | (index << 12);
-            
-            // if bit 47 is zero, then we must sign extend the top 16 bits as zeroes.
-            if retval & 0x800000000000 == 0 {
-                Some(retval & 0x0000_FFFF_FFFF_FFFF)
-            }
-            else {
-                // otherwise, they should be sign extended as ones.
-                Some(retval | 0xFFFF_0000_0000_0000)
-            }
-
-            // Some(retval)
-
+            let next_table_vaddr: usize = (table_address << 9) | ((index.into(): usize) << PAGE_SHIFT);
+            Some(VirtualAddress::new_canonical(next_table_vaddr))
         } else {
             None
         }
     }
 
     /// returns the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1)
-    pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
+    pub fn next_table(&self, index: u9) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
-        self.next_table_address(index).map(|address| unsafe { &*(address as *const _) })
+        self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
-    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
-        self.next_table_address(index).map(|address| unsafe { &mut *(address as *mut _) })
+    pub fn next_table_mut(&mut self, index: u9) -> Option<&mut Table<L::NextLevel>> {
+        self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
     pub fn next_table_create<A>(&mut self,
-                                index: usize,
+                                index: u9,
                                 flags: EntryFlags,
                                 allocator: &mut A)
                                 -> &mut Table<L::NextLevel>
         where A: FrameAllocator
     {
         if self.next_table(index).is_none() {
-            assert!(!self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
+            assert!(!self[index].flags().contains(EntryFlags::HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
+            self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()
     }
 }
 
-impl<L> Index<usize> for Table<L>
+impl<L> Index<u9> for Table<L>
     where L: TableLevel
 {
     type Output = Entry;
 
-    fn index(&self, index: usize) -> &Entry {
-        &self.entries[index]
+    fn index(&self, index: u9) -> &Entry {
+        &self.entries[index.into(): usize]
     }
 }
 
-impl<L> IndexMut<usize> for Table<L>
+impl<L> IndexMut<u9> for Table<L>
     where L: TableLevel
 {
-    fn index_mut(&mut self, index: usize) -> &mut Entry {
-        &mut self.entries[index]
+    fn index_mut(&mut self, index: u9) -> &mut Entry {
+        &mut self.entries[index.into(): usize]
     }
 }
 

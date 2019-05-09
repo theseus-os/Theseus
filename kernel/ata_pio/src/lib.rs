@@ -391,22 +391,14 @@ impl AtaIdentifyData{
 }
 
 //holds AtaIdentifyData for possible pci drives, zeroed if no ata device on that bus
-pub struct AtaDevices
-{
+#[derive(Default)]
+pub struct AtaDevices {
 	pub primary_master: AtaIdentifyData,
 	pub primary_slave: AtaIdentifyData,
 	pub secondary_master: AtaIdentifyData,
 	pub secondary_slave: AtaIdentifyData,
 
 }
-impl Default for AtaDevices{
-	fn default()->AtaDevices{
-		// SAFE: Plain old data
-		unsafe{::core::mem::zeroed()}
-	}
-
-}
-
 
 //used to print ATAIdentifyData information to console
 impl ::core::fmt::Display for AtaIdentifyData {

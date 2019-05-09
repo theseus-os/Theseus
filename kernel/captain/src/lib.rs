@@ -157,7 +157,7 @@ pub fn init(
             // }
 
             // clear the 0th P4 entry, which covers any existing identity mappings
-            active_table.p4_mut().clear_entry(0); 
+            active_table.p4_mut().clear_entry(0.into()); 
         }
         else {
             return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
