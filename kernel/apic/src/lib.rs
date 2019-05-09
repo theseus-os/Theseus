@@ -580,12 +580,10 @@ impl LocalApic {
 
     pub fn eoi(&mut self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
-        unsafe {
-            if has_x2apic() {
-                wrmsr(IA32_X2APIC_EOI, 0); 
-            } else {
-                self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
-            }
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_EOI, 0); }
+        } else {
+            self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
         }
     }
 

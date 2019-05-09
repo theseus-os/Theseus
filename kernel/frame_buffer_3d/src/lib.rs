@@ -18,7 +18,7 @@ extern crate alloc;
 //#[macro_use] extern crate acpi;
 
 use core::ptr::Unique;
-use spin::Mutex;
+use spin::{Mutex, Once};
 use alloc::vec::Vec;
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, VirtualAddress, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
@@ -38,7 +38,7 @@ pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 
-static mut FRAME_BUFFER_PAGES:Option<MappedPages> = None;
+static FRAME_BUFFER_PAGES: Once<MappedPages> = Once::new();
 
 
 ///Init the frame buffer in 3D mode. Allocate a block of memory and map it to the physical frame buffer.
@@ -84,7 +84,7 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            unsafe { FRAME_BUFFER_PAGES = Some(mapped_frame_buffer); }
+            FRAME_BUFFER_PAGES.call_once(|| mapped_frame_buffer);
 
             Ok(())
         }

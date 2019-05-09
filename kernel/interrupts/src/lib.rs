@@ -322,25 +322,17 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x24
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // info!("COM1 serial handler");
+    info!("COM1 serial handler");
 
-    // unsafe {
-    //     x86_64::instructions::port::inb(0x3F8); // read serial port value
-    // }
-
-    // eoi(Some(PIC_MASTER_OFFSET + 0x4));
+    eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
 
 /// 0x26
 extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // info!("APIX 0x26 IRQ handler");
+    info!("APIX 0x26 IRQ handler");
 
-    // unsafe {
-    //     x86_64::instructions::port::inb(0x3F8); // read serial port value
-    // }
-
-    // eoi(Some(PIC_MASTER_OFFSET + 0x6));
+    eoi(Some(PIC_MASTER_OFFSET + 0x6));
 }
 
 
