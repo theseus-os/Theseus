@@ -111,10 +111,6 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-        unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
-        // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-
         pmu_x86::handle_sample(stack_frame);
         expected_nmi = true;
     }

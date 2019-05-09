@@ -5,7 +5,6 @@ extern crate spin;
 extern crate irq_safety;
 extern crate memory;
 extern crate interrupts;
-extern crate syscall;
 extern crate spawn;
 extern crate scheduler;
 extern crate kernel_config;
@@ -41,18 +40,15 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
-    let (double_fault_stack, privilege_stack, syscall_stack) = { 
+    let (double_fault_stack, privilege_stack) = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).expect("kstart_ap(): could not allocate double fault stack"),
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate privilege stack"),
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate syscall stack")
         )
     };
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
-
-    syscall::init(syscall_stack.top_usable());
 
     spawn::init(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
 

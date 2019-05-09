@@ -23,6 +23,7 @@ extern crate x86_64;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
+extern crate type_name;
 
 mod area_frame_allocator;
 mod paging;
