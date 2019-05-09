@@ -8,6 +8,7 @@
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
+#![feature(type_ascription)]
 
 extern crate spin;
 extern crate multiboot2;
@@ -24,6 +25,7 @@ extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
+extern crate ux;
 
 mod area_frame_allocator;
 mod paging;
