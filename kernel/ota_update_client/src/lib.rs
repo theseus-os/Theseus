@@ -59,7 +59,7 @@ pub fn default_remote_endpoint() -> IpEndpoint {
 }
 
 /// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
-const STARTING_FREE_PORT: u16 = 49152;
+pub const STARTING_FREE_PORT: u16 = 49152;
 
 /// The time limit in milliseconds to wait for a response to an HTTP request.
 const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
@@ -465,7 +465,7 @@ fn download_files<S: AsRef<str>>(
 
 /// A convenience function for connecting a socket.
 /// If the given socket is already open, it is forcibly closed immediately and reconnected.
-fn connect(
+pub fn connect(
     iface: &NetworkInterfaceRef,
     sockets: &mut SocketSet, 
     tcp_handle: SocketHandle,

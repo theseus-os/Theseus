@@ -12,3 +12,27 @@ path = "../../kernel/print"
 
 [dependencies.ixgbe]
 path = "../../kernel/ixgbe"
+
+[dependencies.ota_update_client]
+path = "../../kernel/ota_update_client"
+
+[dependencies.smoltcp]
+version = "0.5.0"
+default-features = false
+features = [
+    "alloc", 
+    # "log", "verbose", 
+    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
+    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
+]
+
+[dependencies.network_manager]
+path = "../../kernel/network_manager"
+
+[dependencies.rand]
+version = "0.6"
+default-features = false 
+features = [ "alloc" ]
+
+[dependencies.hpet]
+path = "../../kernel/hpet"

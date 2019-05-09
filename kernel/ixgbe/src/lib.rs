@@ -57,6 +57,7 @@ use server_info::SOCKET_1_LAPICS;
 const DEBUG: bool = true;
 
 /// max 64
+const INTERRUPT_ENABLE:         bool = false;
 const NUM_MSI_VEC_ENABLED:      usize = 16;
 static mut INTERRUPT_NUMS: [u8; NUM_MSI_VEC_ENABLED] = [0; NUM_MSI_VEC_ENABLED];
 
@@ -71,6 +72,7 @@ const IXGBE_RX_BUFFER_SIZE_IN_BYTES:     u16 = 8192;
 const IXGBE_RX_HEADER_SIZE_IN_BYTES:     u16 = 256;
 const IXGBE_TX_BUFFER_SIZE_IN_BYTES:     usize = 256;
 
+const MRQ_ENABLE:               bool = false;
 const IXGBE_NUM_RX_QUEUES:       usize = 1;
 
 /// to hold memory mappings
@@ -206,7 +208,13 @@ impl NetworkInterfaceCard for IxgbeNic {
     /// TODO: Need to adjust function for multiple receive queues. Do no use this function.
     /// Use our own polling function for individual receive queues
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-       Ok(())
+       // check if the NIC has received a new frame that we need to handle
+        if (self.rx_descs[0][self.rx_cur[0] as usize].get_ext_status() as u8 & RX_DD) != 0 {
+            self.handle_receive(0)
+        } else {
+            // else, no new frames
+            Ok(())
+        }
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -234,6 +242,7 @@ impl IxgbeNic{
         let mem_base = (ixgbe_pci_dev.bars[0] as usize) & !3; //TODO: hard coded for 32 bit, need to make conditional      
 
         let mut mapped_registers = Self::mem_map(ixgbe_pci_dev, mem_base)?;
+        let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
 
         Self::start_link(&mut mapped_registers)?;
 
@@ -246,10 +255,18 @@ impl IxgbeNic{
         register_interrupt(interrupt_num + PIC_MASTER_OFFSET, ixgbe_handler);
         redirect_interrupt(interrupt_num, 119); // Don't need this, interrupts are re-directed from the pci capability space
 
-        let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
-        pci_enable_msix(ixgbe_pci_dev)?;
-        pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
-        Self::enable_msix_interrupts(&mut mapped_registers, &mut vector_table);
+        if INTERRUPT_ENABLE {
+            pci_enable_msix(ixgbe_pci_dev)?;
+            pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
+        }
+
+        let interrupt_num =
+            if INTERRUPT_ENABLE {
+                Self::enable_msix_interrupts(&mut mapped_registers, &mut vector_table)?
+            }
+            else {
+                [0; NUM_MSI_VEC_ENABLED]
+            };
 
         for i in 0..NUM_MSI_VEC_ENABLED {
             unsafe { INTERRUPT_NUMS[i] = interrupt_num[i] };
@@ -258,7 +275,9 @@ impl IxgbeNic{
         let (rx_descs, rx_buffers, rx_headers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
 
-        // Self::setup_mrq(&mut mapped_registers);
+        if MRQ_ENABLE {
+            Self::setup_mrq(&mut mapped_registers);
+        }
 
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
@@ -1041,7 +1060,10 @@ impl IxgbeNic{
             rx_queue_regs.rx_queue[queue].rdt.write(old_cur); 
 
             if (status & RX_EOP as u64) == RX_EOP as u64 {
-                break;
+                let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
+                self.received_frames.push_back(ReceivedFrame(buffers));
+            } else {
+                warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
             }
 
         }
