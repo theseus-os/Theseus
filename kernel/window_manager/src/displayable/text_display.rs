@@ -82,7 +82,7 @@ impl TextDisplay
                         y + (line as usize) * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
                 },
-                Err(err) => { }
+                Err(_) => { }
             }                
         }
     }

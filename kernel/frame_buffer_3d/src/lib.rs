@@ -1,7 +1,6 @@
 //! This crate is a frame buffer for display on the screen in 2D mode
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]
@@ -18,13 +17,11 @@ extern crate util;
 extern crate alloc;
 
 
-use core::ptr::Unique;
 use spin::{Mutex};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
-use kernel_config::memory::KERNEL_OFFSET;
 use alloc::boxed::Box;
 
 //The buffer for text printing
@@ -35,29 +32,26 @@ pub mod font;
 const PIXEL_BYTES:usize = 4;
 const COLOR_BITS:usize = 24;
 
-static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
-
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     
     //Get the graphic mode information
-    let VESA_DISPLAY_PHYS_START:PhysicalAddress;
-    let VESA_DISPLAY_PHYS_SIZE: usize;
-    let BUFFER_WIDTH:usize;
-    let BUFFER_HEIGHT:usize;
+    let vesa_display_phys_start:PhysicalAddress;
+    let vesa_display_phys_size: usize;
+    let buffer_width:usize;
+    let buffer_height:usize;
     {
         let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
-        VESA_DISPLAY_PHYS_START = PhysicalAddress::new(graphic_info.physical_address as usize)?;
-        BUFFER_WIDTH = graphic_info.width as usize;
-        BUFFER_HEIGHT = graphic_info.height as usize;
-        VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)?;
+        buffer_width = graphic_info.width as usize;
+        buffer_height = graphic_info.height as usize;
+        vesa_display_phys_size= buffer_width * buffer_height * PIXEL_BYTES;
     };
 
     // init the font for text printing
-    let rs = font::init();
     match font::init() {
         Ok(_) => { trace!("frame_buffer text initialized."); },
         Err(err) => { return Err(err); }
@@ -75,7 +69,7 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
-            let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
+            let pages = match allocate_pages_by_bytes(vesa_display_phys_size) {
                 Some(pages) => { pages },
                 None => { return Err("frame_buffer::init() couldn't allocate pages."); }
             };
@@ -88,14 +82,14 @@ pub fn init() -> Result<(), &'static str > {
             }
 
             let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-            let mut mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
+            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
                 pages, 
-                Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
+                Frame::range_inclusive_addr(vesa_display_phys_start, vesa_display_phys_size), 
                 vesa_display_flags, 
                 allocator.deref_mut())
             );
 
-            FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
+            FRAME_DRAWER.lock().set_mode_info(buffer_width, buffer_height, mapped_frame_buffer);
 
             Ok(())
         }
@@ -105,7 +99,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-// Window manager uses this drawer to draw/print to the screen
+// Applications use this drawer to draw/print to the screen
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
         width:0,
@@ -151,7 +145,7 @@ pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, c
     FRAME_DRAWER.lock().fill_rectangle_3d(start_x, start_y, width, height, 0, color)
 }
 
-/// fill a rectangle with upper left coordinates, width, height and color
+/// fill a rectangle with upper left coordinates, width, height and color in 3D mode
 pub fn fill_rectangle_3d(start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32) {
     FRAME_DRAWER.lock().fill_rectangle_3d(start_x, start_y, width, height, z, color)
 }
@@ -196,7 +190,7 @@ impl Drawer {
         let mut buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
-            Err(err) => { debug!("Fail to get frame buffer"); return; },
+            Err(err) => { debug!("Fail to get frame buffer: {}", err); return; },
         }
         if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
             draw_in_buffer_3d(index(x, y), z, color, &mut buffer);
@@ -213,9 +207,9 @@ impl Drawer {
         let (buffer_width, buffer_height) = {drawer.get_resolution()};
         let index = drawer.get_index_fn();
 
-        let mut buffer = match drawer.buffer() {
+        let buffer = match drawer.buffer() {
             Ok(rs) => {rs},
-            Err(err) => { debug!("Fail to get frame buffer"); return; },
+            Err(err) => { debug!("Fail to get frame buffer: {}", err); return; },
         };
 
         if width.abs() > height.abs() {
@@ -256,9 +250,9 @@ impl Drawer {
         let (buffer_width, buffer_height) = {drawer.get_resolution()};
         let index = drawer.get_index_fn();
 
-        let mut buffer = match drawer.buffer() {
+        let buffer = match drawer.buffer() {
             Ok(rs) => {rs},
-            Err(err) => { debug!("Fail to get frame buffer"); return; },
+            Err(err) => { debug!("Fail to get frame buffer: {}", err); return; },
         };
 
         let end_x:usize = {if start_x + width < buffer_width { start_x + width } 
@@ -295,9 +289,9 @@ impl Drawer {
         let (buffer_width, buffer_height) = {drawer.get_resolution()};
         let index = drawer.get_index_fn();
 
-        let mut buffer = match drawer.buffer() {
+        let buffer = match drawer.buffer() {
             Ok(rs) => {rs},
-            Err(err) => { debug!("Fail to get frame buffer"); return; },
+            Err(err) => { debug!("Fail to get frame buffer: {}", err); return; },
         };
         
         let end_x:usize = {if start_x + width < buffer_width { start_x + width } 

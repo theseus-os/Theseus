@@ -304,7 +304,7 @@ impl WindowAllocator{
     fn send_event(&mut self, event:Event) -> Result<(), &'static str> {
         let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
         if let Some(window) = reference {
-            let mut window = window.lock();
+            let window = window.lock();
             window.key_producer.enqueue(event);
         }
         Ok(())
