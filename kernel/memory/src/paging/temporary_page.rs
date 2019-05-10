@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use {FrameIter};
-use paging::{ActivePageTable, MappedPages};
+use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
 use super::{Page, Frame, FrameAllocator, VirtualAddress};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
@@ -44,9 +44,9 @@ impl TemporaryPage {
     /// # Arguments
     /// 
     /// * `frame`: the [`Frame`] containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].     
-    /// * `active_table`: the currently active [`ActivePageTable`]. 
+    /// * `page_table`: the currently active [`PageTable`]. 
     /// 
-    pub fn map_table_frame(&mut self, frame: Frame, active_table: &mut ActivePageTable) -> Result<&mut Table<Level1>, &'static str>
+    pub fn map_table_frame(&mut self, frame: Frame, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str>
     {
         use super::entry::EntryFlags;
 
@@ -54,14 +54,14 @@ impl TemporaryPage {
         // It'd be nice to use the virtual address allocator (allocate_pages), but we CANNOT use it
         // because this code is needed before those functions are available (cuz they require heap memory)
         let mut page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
-        while active_table.translate_page(page).is_some() {
+        while page_table.translate_page(page).is_some() {
             // this never happens
             warn!("temporary page {:?} is already mapped, trying the next lowest Page", page);
             page -= 1;
         }
         
         self.mapped_page = Some( 
-            try!(active_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
+            try!(page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
         );
         
         let table: &mut Table<Level1> = try!( 

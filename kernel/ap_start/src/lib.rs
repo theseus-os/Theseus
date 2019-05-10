@@ -13,7 +13,7 @@ extern crate tlb_shootdown;
 
 use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
-use memory::{VirtualAddress, MemoryManagementInfo, PageTable, get_kernel_mmi_ref};
+use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics, get_my_apic_id};
 
@@ -59,21 +59,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     let lapic = {
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: couldn't get ref to kernel mmi");
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let &mut MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            .. 
-        } = &mut *kernel_mmi;
-
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                LocalApic::new(active_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-                    .expect("kstart_ap(): failed to create LocalApic")
-            }
-            _ => {
-                error!("kstart_ap(): couldn't get kernel's active_table!");
-                panic!("kstart_ap(): couldn't get kernel's active_table");
-            }
-        }
+        LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+            .expect("kstart_ap(): failed to create LocalApic")
     };
     tlb_shootdown::init();
     if get_my_apic_id() != Some(apic_id) {

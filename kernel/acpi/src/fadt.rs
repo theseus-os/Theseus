@@ -3,7 +3,7 @@ use core::{mem, ptr};
 use super::sdt::Sdt;
 use super::{ACPI_TABLE, SDT_POINTERS, get_sdt, find_matching_sdts, get_sdt_signature, load_table};
 
-use memory::{ActivePageTable, PhysicalAddress};
+use memory::{PageTable, PhysicalAddress};
 
 #[repr(packed)]
 #[derive(Debug)]
@@ -97,7 +97,7 @@ impl Fadt {
         }
     }
 
-    pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let fadt_sdt = find_matching_sdts("FACP");
         let fadt = if fadt_sdt.len() == 1 {
             load_table(get_sdt_signature(fadt_sdt[0]));
@@ -110,7 +110,7 @@ impl Fadt {
         if let Some(fadt) = fadt {
             debug!("  FACP: {:X}  {:?}", fadt.dsdt, fadt);
 
-            let dsdt_sdt = try!(get_sdt(PhysicalAddress::new_canonical(fadt.dsdt as usize), active_table));
+            let dsdt_sdt = try!(get_sdt(PhysicalAddress::new_canonical(fadt.dsdt as usize), page_table));
 
             let signature = get_sdt_signature(dsdt_sdt);
             if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {

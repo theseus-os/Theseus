@@ -59,7 +59,7 @@ use alloc::{
 };
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
+use memory::{Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
@@ -475,30 +475,12 @@ impl Task {
             }
             else {
                 // time to change to a different address space and switch the page tables!
-
                 let mut prev_mmi_locked = prev_mmi.lock();
-                let mut next_mmi_locked = next_mmi.lock();
+                let next_mmi_locked = next_mmi.lock();
                 // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
                 //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
-                
 
-                let new_active_table = {
-                    // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
-                    match &mut prev_mmi_locked.page_table {
-                        &mut PageTable::Active(ref mut active_table) => {
-                            active_table.switch(&next_mmi_locked.page_table)
-                        }
-                        _ => {
-                            panic!("BUG: task_switch(): prev_table must be an ActivePageTable!");
-                        }
-                    }
-                };
-                
-                // since we're no longer changing the prev page table to be inactive, just leave it be,
-                // and only change the next task's page table to active 
-                // (it was either active already, or it was previously inactive (and now active) if it was the first time it had been run)
-                next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); 
-
+                let _new_active_table = prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
        

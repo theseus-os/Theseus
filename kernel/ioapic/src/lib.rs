@@ -15,7 +15,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
+use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
@@ -76,13 +76,13 @@ pub struct IoApic {
 
 impl IoApic {
     /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`.
-    pub fn new(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
+    pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
 
         let ioapic_mapped_page = {
     		let new_page = try!(allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!"));
             let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
 			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
-            try!(active_table.map_allocated_pages_to(new_page, frame, 
+            try!(page_table.map_allocated_pages_to(new_page, frame, 
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
                 fa.deref_mut())
             )

@@ -257,7 +257,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
 pub struct MemoryManagementInfo {
-    /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
+    /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
     
     /// the list of virtual memory areas mapped currently in this Task's address space
@@ -274,32 +274,22 @@ pub struct MemoryManagementInfo {
 
 impl MemoryManagementInfo {
 
-    pub fn set_page_table(&mut self, pgtbl: PageTable) {
-        self.page_table = pgtbl;
-    }
-
-
     /// Allocates a new stack in the currently-running Task's address space.
-    /// The task that called this must be currently running! 
-    /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
     /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
+    /// 
+    /// # Important Note
+    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
+    /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
     
-        if let PageTable::Active(ref mut active_table) = page_table {
-            if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(active_table, fa.lock().deref_mut(), size_in_pages)) {
-                vmas.push(stack_vma);
-                Some(stack)
-            }
-            else {
-                error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
-                None
-            }
+        if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(page_table, fa.lock().deref_mut(), size_in_pages)) {
+            vmas.push(stack_vma);
+            Some(stack)
         }
         else {
-            error!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable! \
-                    You must not call alloc_stack on an MMI page table that isn't currently the ActivePageTable.");
+            error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
             None
         }
     }
@@ -320,19 +310,14 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-        let mut frame_allocator = FRAME_ALLOCATOR.try()
-            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-            .lock();
-        let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
-            .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
-        let starting_phys_addr = frames.start_address();
-        let mp = active_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
-        Ok((mp, starting_phys_addr))
-    } 
-    else {
-        return Err("create_contiguous_mapping(): Couldn't get kernel's active_table");
-    }
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+    let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
+        .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
+    let starting_phys_addr = frames.start_address();
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
+    Ok((mp, starting_phys_addr))
 }
 
 
@@ -541,13 +526,12 @@ pub fn init(boot_info: &BootInformation)
 
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
-    let (active_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
+    let (page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
         paging::init(frame_allocator_mutex, &boot_info)
     );
     // HERE: heap is initialized! Can now use alloc types.
 
-    debug!("Done with paging::init()!, active_table: {:?}", active_table);
-    // print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
+    debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
     
     // init the kernel stack allocator, a singleton
@@ -560,7 +544,7 @@ pub fn init(boot_info: &BootInformation)
 
     // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
-        page_table: PageTable::Active(active_table),
+        page_table: page_table,
         vmas: kernel_vmas,
         extra_mapped_pages: higher_half_mapped_pages,
         stack_allocator: kernel_stack_allocator, 

@@ -43,7 +43,7 @@ use core::ops::DerefMut;
 use spin::{Mutex, RwLock};
 
 
-use memory::{ActivePageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{PageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 
 pub use self::fadt::Fadt;
 pub use self::madt::Madt;
@@ -77,7 +77,7 @@ lazy_static! {
 
 
 
-fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> Result<&'static Sdt, &'static str> {
+fn get_sdt(sdt_address: PhysicalAddress, page_table: &mut PageTable) -> Result<&'static Sdt, &'static str> {
     
     let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
     let addr_offset = sdt_address.frame_offset();
@@ -102,7 +102,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
         else {
             // here, the given sdt_address has not yet been mapped, so map it
             let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
-            let mapped_page = try!(active_table.map_allocated_pages_to(
+            let mapped_page = try!(page_table.map_allocated_pages_to(
                 pages, Frame::range_inclusive(first_frame.clone(), first_frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
             );
             let vaddr = mapped_page.start_address() + addr_offset;
@@ -130,7 +130,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
         }
 
         let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
-        let mapped_page = try!(active_table.map_allocated_pages_to(
+        let mapped_page = try!(page_table.map_allocated_pages_to(
             pages, Frame::range_inclusive(frame.clone(), frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
         );
         frame_to_page_mappings.insert(frame, mapped_page);
@@ -141,7 +141,7 @@ fn get_sdt(sdt_address: PhysicalAddress, active_table: &mut ActivePageTable) -> 
 
 
 /// Parse the ACPI tables to gather CPU, interrupt, and timer information
-pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'static str> {
+pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> {
     {
         let mut sdt_ptrs = SDT_POINTERS.write();
         *sdt_ptrs = Some(BTreeMap::new());
@@ -153,9 +153,9 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
     }
 
     // Search for RSDP
-    if let Some(rsdp) = RSDP::get_rsdp(active_table) {
+    if let Some(rsdp) = RSDP::get_rsdp(page_table) {
 
-        let rxsdt = try!(get_sdt(rsdp.sdt_address(), active_table));
+        let rxsdt = try!(get_sdt(rsdp.sdt_address(), page_table));
         debug!("rxsdt: {:?}", rxsdt);
 
         let rxsdt: Box<Rxsdt + Send + Sync> = {
@@ -178,7 +178,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
             );
         }
 
-        try!(rxsdt.map_all(active_table));
+        try!(rxsdt.map_all(page_table));
 
         // {
         //     let _mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
@@ -206,14 +206,14 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         }
 
         // FADT is mandatory
-        Fadt::init(active_table)?;
+        Fadt::init(page_table)?;
         
         // HPET is optional
         let hpet_result = {
             let hpet_sdt = find_matching_sdts("HPET");
             if hpet_sdt.len() == 1 {
                 load_table(get_sdt_signature(hpet_sdt[0]));
-                hpet::init(hpet_sdt[0], active_table)
+                hpet::init(hpet_sdt[0], page_table)
             }
             else {
                 Err("unable to find HPET SDT")
@@ -225,8 +225,8 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<madt::MadtIter, &'stat
         
 
         // MADT is mandatory
-        let madt_iter = Madt::init(active_table);
-        // Dmar::init(active_table);
+        let madt_iter = Madt::init(page_table);
+        // Dmar::init(page_table);
         // init_namespace();
 
         madt_iter

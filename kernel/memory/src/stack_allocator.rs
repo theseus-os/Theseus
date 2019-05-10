@@ -21,12 +21,12 @@ impl StackAllocator {
 impl StackAllocator {
     
     /// Allocates a new stack and maps it to the active page table. 
-    /// The given `active_table` can be an `ActivePageTable` or a `Mapper`, 
-    /// because `ActivePageTable` automatically derefs into a `Mapper`.
+    /// The given `page_table` can be a `PageTable` or a `Mapper`, 
+    /// because `PageTable` automatically derefs into a `Mapper`.
     /// Reserves an unmapped guard page to catch stack overflows. 
     /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
-    pub fn alloc_stack<FA>(&mut self, active_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
+    pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
             -> Option<(Stack, VirtualMemoryArea)> where FA: FrameAllocator 
     {
         if size_in_pages == 0 {
@@ -57,7 +57,7 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                let stack_pages = match active_table.map_pages(Page::range_inclusive(start, end), flags, frame_allocator) {
+                let stack_pages = match page_table.map_pages(Page::range_inclusive(start, end), flags, frame_allocator) {
                     Ok(pages) => pages,
                     Err(e) => {
                         error!("alloc_stack(): couldn't map_pages for the new Stack, error: {}", e);

@@ -189,20 +189,20 @@ impl Iterator for PageIter {
 }
 
 
-/// A root (P4) page table that has been or is being actively used.
+/// A root (P4) page table.
 /// 
 /// Auto-derefs into a `Mapper` for easy invocation of memory mapping functions.
-pub struct ActivePageTable {
+pub struct PageTable {
     mapper: Mapper,
     p4_table: Frame,
 }
-impl fmt::Debug for ActivePageTable {
+impl fmt::Debug for PageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ActivePageTable(p4: {:#X})", self.p4_table.start_address()) 
+        write!(f, "PageTable(p4: {:#X})", self.p4_table.start_address()) 
     }
 }
 
-impl Deref for ActivePageTable {
+impl Deref for PageTable {
     type Target = Mapper;
 
     fn deref(&self) -> &Mapper {
@@ -210,52 +210,86 @@ impl Deref for ActivePageTable {
     }
 }
 
-impl DerefMut for ActivePageTable {
+impl DerefMut for PageTable {
     fn deref_mut(&mut self) -> &mut Mapper {
         &mut self.mapper
     }
 }
 
-impl ActivePageTable {
-    /// An internal function to create a new ActivePageTable 
-    /// with its root P4 page table in the given `p4` `Frame`.
-    /// 
-    /// The new `ActivePageTable` assumes ownership of the given `p4` `Frame`.
-    fn new(p4: Frame) -> ActivePageTable {
-        ActivePageTable { 
-            mapper: Mapper::new(),
-            p4_table: p4,
+impl PageTable {
+    /// An internal function to create a new top-level PageTable 
+    /// based on the currently-active page table register (e.g., CR3). 
+    fn from_current() -> PageTable {
+        PageTable { 
+            mapper: Mapper::from_current(),
+            p4_table: get_current_p4(),
         }
     }
 
-    /// Temporarily maps the given `InactivePageTable` to the recursive entry (510th entry) 
-    /// so that we can set up new mappings on the new `table` before actually switching to it.
-    /// Accepts a closure that is given a `Mapper` such that it can set up new mappings on the given `InactivePageTable`.
+    /// Initializes a brand new top-level P4 `PageTable` (previously called an `InactivePageTable`)
+    /// that is based on the given `current_active_table` and is located in the given `new_p4_frame`.
+    /// The `TemporaryPage` is used for recursive mapping, and is auto-unmapped upon return. 
+    /// 
+    /// Returns the new `PageTable` that exists in physical memory at the given `new_p4_frame`, 
+    /// and has the kernel memory region mappings copied in from the given `current_page_table`
+    /// to ensure that the system will continue running 
+    pub fn new_table(
+        current_page_table: &mut PageTable,
+        new_p4_frame: Frame,
+        mut temporary_page: TemporaryPage,
+    ) -> Result<PageTable, &'static str> {
+        {
+            let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
+            table.zero();
+
+            table[u9::new(RECURSIVE_P4_INDEX as u16)].set(new_p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+
+            // start out by copying all the kernel sections into the new table
+            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_TEXT_P4_INDEX as u16));
+            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_HEAP_P4_INDEX as u16));
+            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_STACK_P4_INDEX as u16));
+            // TODO: FIXME: we should probably copy all of the mappings here just to be safe (except 510, the recursive P4 entry.)
+        }
+
+        Ok( PageTable { 
+            mapper: Mapper::with_p4_frame(new_p4_frame.clone()),
+            p4_table: new_p4_frame 
+        })
+        // temporary_page is auto unmapped here 
+    }
+
+    /// Temporarily maps the given other `PageTable` to the recursive entry (510th entry) 
+    /// so that the given closure `f` can set up new mappings on the new `other_table` without actually switching to it yet.
+    /// Accepts a closure `f` that is passed  a `Mapper`, such that it can set up new mappings on the other table.
     /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
-    /// Note: THIS DOES NOT PERFORM ANY TASK SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
+    /// # Note
+    /// This does not perform any task switching or changing of the current page table register (e.g., cr3).
     pub fn with<F>(&mut self,
-                   table: &mut InactivePageTable,
+                   other_table: &mut PageTable,
                    mut temporary_page: temporary_page::TemporaryPage,
                    f: F)
         -> Result<(), &'static str>
         where F: FnOnce(&mut Mapper) -> Result<(), &'static str>
     {
         let backup = get_current_p4();
+        if self.p4_table != backup {
+            return Err("To invoke PageTable::with(), that PageTable ('self') must be currently active.");
+        }
 
         // map temporary_page to current p4 table
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[u9::new(RECURSIVE_P4_INDEX as u16)].set(table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[u9::new(RECURSIVE_P4_INDEX as u16)].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
         tlb::flush_all();
 
-        // set mapper's target frame to reflect that future mappings will be mapped into the new InactivePageTable
-        self.mapper.target_p4 = table.p4_table.clone();
+        // set mapper's target frame to reflect that future mappings will be mapped into the other_table
+        self.mapper.target_p4 = other_table.p4_table.clone();
 
         // execute f in the new context
         let ret = f(self);
 
-        // restore mapper's target frame to reflect that future mappings are mapped using the current ActivePageTable
+        // restore mapper's target frame to reflect that future mappings will be mapped using the currently-active (original) PageTable
         self.mapper.target_p4 = self.p4_table.clone();
 
         // restore recursive mapping to original p4 table
@@ -267,27 +301,19 @@ impl ActivePageTable {
     }
 
 
-    /// returns the newly-created ActivePageTable, based on the given new_table.
-    /// No need to return the old_table as an InactivePageTable, since we're not doing that anymore.
-    /// Instead, the old_table remains "active" because other cores may use it.
-    pub fn switch(&mut self, new_table: &PageTable) -> ActivePageTable {
-        // debug!("ActivePageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
-
-        // if this is the first time the new page table has been used, it will be an InactivePageTable,
-        // otherwise, it will already be an ActivePageTable. 
-        // Either way, we need its p4_table value, since that's what we'll be changing cr3 to. 
-        let new_active_table_p4: Frame = match new_table {
-            &PageTable::Inactive(ref inactive_table) => inactive_table.p4_table.clone(),
-            &PageTable::Active(ref active_table) => active_table.p4_table.clone(),
-        };
+    /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
+    /// Returns the newly-switched-to PageTable.
+    pub fn switch(&mut self, new_table: &PageTable) -> PageTable {
+        // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
         unsafe {
-            control_regs::cr3_write(x86_64::PhysicalAddress(new_active_table_p4.start_address().value() as u64));
+            control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
         }
-        // debug!("ActivePageTable::switch(): NEW TABLE!!!");
-        
-        ActivePageTable::new(new_active_table_p4)
+
+        let current_table_after_switch = PageTable::from_current();
+        debug!("PageTable::switch(): NEW TABLE: {:?} (should be same as current: {:?})", new_table, current_table_after_switch);
+        current_table_after_switch
     }
 
 
@@ -298,82 +324,16 @@ impl ActivePageTable {
 }
 
 
-
-/// A top-level (root/P4) page table that has not yet been switched to. 
-/// Once an InactivePageTable is switched to for the first time, 
-/// it becomes an ActivePageTable and will remain so forever.
-/// 
-/// It owns the Frame that contains the P4 page table.
-pub struct InactivePageTable {
-    p4_table: Frame,
-}
-impl fmt::Debug for InactivePageTable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "InactivePageTable({:#X})", self.p4_table.start_address())
-    }
-}
-
-impl InactivePageTable {
-    /// Initializes a new InactivePageTable using the given `TemporaryPage`.
-    /// The `TemporaryPage` is consumed here,
-    /// and the new `InactivePageTable` assumes ownership of the given `Frame`.
-    pub fn new(
-        frame: Frame,
-        current_active_table: &mut ActivePageTable,
-        mut temporary_page: TemporaryPage,
-    ) -> Result<InactivePageTable, &'static str> {
-        {
-            let table = try!(temporary_page.map_table_frame(frame.clone(), current_active_table));
-            table.zero();
-
-            table[u9::new(RECURSIVE_P4_INDEX as u16)].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
-
-            // start out by copying all the kernel sections into the new inactive table
-            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_TEXT_P4_INDEX as u16));
-            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_HEAP_P4_INDEX as u16));
-            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_STACK_P4_INDEX as u16));
-        }
-
-        Ok(
-            InactivePageTable { p4_table: frame }
-        )
-
-        // temporary_page is auto unmapped here 
-    }
-}
-
-
-#[derive(Debug)]
-pub enum PageTable {
-    Active(ActivePageTable),
-    Inactive(InactivePageTable),
-}
-
-
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 pub fn get_current_p4() -> Frame {
     Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
 }
 
 
-#[derive(Copy, Clone, Default)]
-pub struct TempModule {
-    mod_start_paddr: u32,
-    mod_end_paddr: u32,
-    name: &'static str,
-}
-impl fmt::Debug for TempModule {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "TempModule(\"{}\", start: {:#X}, end: {:#X})", 
-                   self.name, self.mod_start_paddr, self.mod_end_paddr) 
-    }
-}
-
-
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 
-///  * The kernel's new ActivePageTable,
+///  * The kernel's new PageTable, which is now currently active,
 ///  * the kernel's list of VirtualMemoryAreas,
 ///  * the kernels' text section MappedPages,
 ///  * the kernels' rodata section MappedPages,
@@ -385,22 +345,22 @@ impl fmt::Debug for TempModule {
 /// 
 /// Note: this was previously called remap_the_kernel.
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
-    -> Result<(ActivePageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
-    // bootstrap an active_table from the currently-loaded page table
-    let mut active_table: ActivePageTable = ActivePageTable::new(get_current_p4());
+    // bootstrap a PageTable from the currently-loaded page table
+    let mut page_table = PageTable::from_current();
 
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
-    let boot_info_start_paddr = active_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
+    let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
-    let boot_info_end_paddr = active_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
+    let boot_info_end_paddr = page_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
     info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
             boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
     );
 
-    // frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
-    let (frame, temp_frames1, temp_frames2) = {
+    // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
+    let (new_frame, temp_frames1, temp_frames2) = {
         let mut allocator = allocator_mutex.lock();
         // a quick closure to allocate one frame
         let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
@@ -410,7 +370,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             (alloc_frame()?, alloc_frame()?, alloc_frame()?)
         )
     };
-    let mut new_table: InactivePageTable = InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1))?;
+    let mut new_table = PageTable::new_table(&mut page_table, new_frame, TemporaryPage::new(temp_frames1))?;
 
     let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
@@ -421,10 +381,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
     // consumes and auto unmaps temporary page
-    try!( active_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
+    try!( page_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
         
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
-        // (they were initialized in InactivePageTable::new())
+        // (they were initialized in PageTable::new_table())
         mapper.p4_mut().clear_entry(u9::new(KERNEL_TEXT_P4_INDEX as u16));
         mapper.p4_mut().clear_entry(u9::new(KERNEL_HEAP_P4_INDEX as u16));
         mapper.p4_mut().clear_entry(u9::new(KERNEL_STACK_P4_INDEX as u16));
@@ -638,8 +598,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
 
     debug!("switching to new page table {:?}", new_table);
-    let mut new_active_table = active_table.switch(&PageTable::Inactive(new_table));
-    debug!("switched to new page table {:?}.", new_active_table);           
+    let mut new_page_table = page_table.switch(&new_table); 
+    // here, new_page_table and new_table should be identical
+    debug!("switched to new page table {:?}.", new_page_table);           
 
 
     // We must map the heap memory here, before it can initialized! 
@@ -649,14 +610,14 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         let pages = Page::range_inclusive_addr(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
         let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-        let heap_mp = new_active_table.map_pages(pages, heap_flags, allocator.deref_mut())?;
+        let heap_mp = new_page_table.map_pages(pages, heap_flags, allocator.deref_mut())?;
         heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
         
         allocator.alloc_ready(); // heap is ready
         (heap_mp, heap_vma)
     };
 
-    // debug!("mapped and inited the heap, VMA: {:?}", heap_vma);
+    debug!("mapped and inited the heap, VMA: {:?}", heap_vma);
     // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
 
     let mut kernel_vmas: Vec<VirtualMemoryArea> = vmas.to_vec();
@@ -669,8 +630,8 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     higher_half.push(heap_mapped_pages);
     let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
 
-    // Return the new_active_table because that's the one that should be used by the kernel (task_zero) in future mappings. 
-    Ok((new_active_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
+    // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
+    Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
 }
 
 
@@ -689,13 +650,13 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
 //         error!("STACK TRACE: {:>016X}", rbp);
 //         //Maximum 64 frames
-//         let active_table = ActivePageTable::new(get_current_p4());
+//         let page_table = PageTable::from_current();
 //         for _frame in 0..64 {
 //             if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
 //                 // TODO: is this the right condition?
 //                 match (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
 //                     (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) => {
-//                         if active_table.translate(rbp_vaddr).is_some() && active_table.translate(rip_rbp_vaddr).is_some() {
+//                         if page_table.translate(rbp_vaddr).is_some() && page_table.translate(rip_rbp_vaddr).is_some() {
 //                             let rip = *(rip_rbp as *const usize);
 //                             if rip == 0 {
 //                                 error!(" {:>016X}: EMPTY RETURN", rbp);
