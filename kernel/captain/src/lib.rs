@@ -23,8 +23,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate vga_buffer;
-
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
@@ -55,7 +53,6 @@ extern crate network_manager;
 
 
 use alloc::sync::Arc;
-use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
@@ -149,7 +146,7 @@ pub fn init(
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
-    ::core::mem::drop(identity_mapped_pages);
+    drop(identity_mapped_pages);
     {
         // for i in 0 .. 512 { 
         //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
@@ -164,7 +161,7 @@ pub fn init(
         let simd_ext = task::SimdExt::SSE;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
-            .name(String::from("setup_simd_personality"))
+            .name(alloc::string::String::from("setup_simd_personality"))
             .spawn()?;
     }
 

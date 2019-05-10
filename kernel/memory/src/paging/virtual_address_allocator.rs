@@ -155,6 +155,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 }
 
 
+#[allow(dead_code)]
 fn deallocate_pages(_pages: &mut AllocatedPages) -> Result<(), ()> {
 	trace!("Virtual Address Allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", _pages);
 	Ok(())
