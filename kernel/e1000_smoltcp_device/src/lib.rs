@@ -27,7 +27,7 @@ use owning_ref::BoxRef;
 use network_manager::NetworkInterface;
 
 /// standard MTU for ethernet cards
-const DEFAULT_MTU: usize = 1500;
+const DEFAULT_MTU: usize = 9000;
 
 
 /// A struct that implements the `NetworkInterface` trait for an e1000 NIC. 
@@ -218,7 +218,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
             return Err(smoltcp::Error::Exhausted)
         }
 
-        // debug!("E1000Device::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
+        debug!("E1000Device::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
         // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
         let mut txbuf = TransmitBuffer::new(len as u16).map_err(|e| {
             error!("E1000Device::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);
