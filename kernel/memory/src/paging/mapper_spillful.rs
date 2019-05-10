@@ -22,8 +22,8 @@ pub struct MapperSpillful {
 }
 
 impl MapperSpillful {
-    pub unsafe fn new() -> MapperSpillful {
-        MapperSpillful { p4: Unique::new_unchecked(table::P4) }
+    pub fn new() -> MapperSpillful {
+        MapperSpillful { p4: Unique::new(table::P4).unwrap() } // cannot panic, we know P4 is valid.
     }
 
     pub fn p4(&self) -> &Table<Level4> {

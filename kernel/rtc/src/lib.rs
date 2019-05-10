@@ -12,12 +12,15 @@ extern crate spin;
 extern crate state_store;
 #[macro_use] extern crate log;
 extern crate x86_64;
+extern crate ux;
 
 use port_io::Port;
 use irq_safety::hold_interrupts;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use spin::{Mutex, Once};
+use spin::Mutex;
+// use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
+use ux::u13;
 
 
 //standard port to write to on CMOS to select registers
@@ -43,7 +46,7 @@ lazy_static! {
 
 pub type RtcInterruptFunction = fn(Option<usize>);
 
-static RTC_INTERRUPT_FUNC: Once<RtcInterruptFunction> = Once::new();
+// static RTC_INTERRUPT_FUNC: Once<RtcInterruptFunction> = Once::new();
 
 // /// Initialize the RTC interrupt with the given frequency
 // /// and the given closure that will run on each RTC interrupt.
@@ -144,7 +147,7 @@ pub fn get_rtc_ticks() -> Result<usize, ()> {
 
 
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
-fn enable_rtc_interrupt()
+pub fn enable_rtc_interrupt()
 {
     let _held_interrupts = hold_interrupts();
 
@@ -185,9 +188,10 @@ fn log2(value: usize) -> usize {
 
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
-
-    if (!rate.is_power_of_two()) || rate < 2 || rate > 8192 {
+pub fn set_rtc_frequency(rate: u13) -> Result<(), ()> {
+    // the `rate` arg being a `u13` prevents it from being greater than 8192 (2^13)
+    let rate: usize = rate.into();
+    if !(rate.is_power_of_two() && rate >= 2) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
         return Err(());
     }
@@ -211,6 +215,3 @@ fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     
     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
 }
-
-use x86_64::instructions::port::outb;
-use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};

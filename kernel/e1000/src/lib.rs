@@ -32,7 +32,7 @@ use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, Frame, PageTable, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, Frame, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
