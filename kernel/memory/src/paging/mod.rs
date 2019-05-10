@@ -189,14 +189,16 @@ impl Iterator for PageIter {
 }
 
 
-/// the owner of the recursively defined P4 page table. 
+/// A root (P4) page table that has been or is being actively used.
+/// 
+/// Auto-derefs into a `Mapper` for easy invocation of memory mapping functions.
 pub struct ActivePageTable {
     mapper: Mapper,
-    p4_frame: Frame,
+    p4_table: Frame,
 }
 impl fmt::Debug for ActivePageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ActivePageTable(p4: {:#X})", self.p4_frame.start_address()) 
+        write!(f, "ActivePageTable(p4: {:#X})", self.p4_table.start_address()) 
     }
 }
 
@@ -215,16 +217,20 @@ impl DerefMut for ActivePageTable {
 }
 
 impl ActivePageTable {
+    /// An internal function to create a new ActivePageTable 
+    /// with its root P4 page table in the given `p4` `Frame`.
+    /// 
+    /// The new `ActivePageTable` assumes ownership of the given `p4` `Frame`.
     fn new(p4: Frame) -> ActivePageTable {
         ActivePageTable { 
             mapper: Mapper::new(),
-            p4_frame: p4,
+            p4_table: p4,
         }
     }
 
     /// Temporarily maps the given `InactivePageTable` to the recursive entry (510th entry) 
     /// so that we can set up new mappings on the new `table` before actually switching to it.
-    /// Accepts a closure that is given a `Mapper` such that it can set up new mappins on the given `InactivePageTable`.
+    /// Accepts a closure that is given a `Mapper` such that it can set up new mappings on the given `InactivePageTable`.
     /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
     /// Note: THIS DOES NOT PERFORM ANY TASK SWITCHING OR CHANGING OF THE CURRENT PAGE TABLE REGISTER (e.g., CR3)
     pub fn with<F>(&mut self,
@@ -237,20 +243,20 @@ impl ActivePageTable {
         let backup = get_current_p4();
 
         // map temporary_page to current p4 table
-        let p4_table = try!(temporary_page.map_table_frame(backup.clone(), self));
+        let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[u9::new(RECURSIVE_P4_INDEX as u16)].set(table.p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[u9::new(RECURSIVE_P4_INDEX as u16)].set(table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
         tlb::flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the new InactivePageTable
-        self.mapper.target_p4 = table.p4_frame.clone();
+        self.mapper.target_p4 = table.p4_table.clone();
 
         // execute f in the new context
         let ret = f(self);
 
         // restore mapper's target frame to reflect that future mappings are mapped using the current ActivePageTable
-        self.mapper.target_p4 = self.p4_frame.clone();
+        self.mapper.target_p4 = self.p4_table.clone();
 
         // restore recursive mapping to original p4 table
         p4_table[u9::new(RECURSIVE_P4_INDEX as u16)].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
@@ -269,10 +275,10 @@ impl ActivePageTable {
 
         // if this is the first time the new page table has been used, it will be an InactivePageTable,
         // otherwise, it will already be an ActivePageTable. 
-        // Either way, we need its p4_frame value, since that's what we'll be changing cr3 to. 
+        // Either way, we need its p4_table value, since that's what we'll be changing cr3 to. 
         let new_active_table_p4: Frame = match new_table {
-            &PageTable::Inactive(ref inactive_table) => inactive_table.p4_frame.clone(),
-            &PageTable::Active(ref active_table) => active_table.p4_frame.clone(),
+            &PageTable::Inactive(ref inactive_table) => inactive_table.p4_table.clone(),
+            &PageTable::Active(ref active_table) => active_table.p4_table.clone(),
         };
 
         // perform the actual page table switch
@@ -287,48 +293,52 @@ impl ActivePageTable {
 
     /// Returns the physical address of this page table's top-level p4 frame
     pub fn physical_address(&self) -> PhysicalAddress {
-        self.p4_frame.start_address()
+        self.p4_table.start_address()
     }
 }
 
 
 
-
+/// A top-level (root/P4) page table that has not yet been switched to. 
+/// Once an InactivePageTable is switched to for the first time, 
+/// it becomes an ActivePageTable and will remain so forever.
+/// 
+/// It owns the Frame that contains the P4 page table.
 pub struct InactivePageTable {
-    p4_frame: Frame,
+    p4_table: Frame,
 }
 impl fmt::Debug for InactivePageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "InactivePageTable(p4: {:#X})", self.p4_frame.start_address()) 
+        write!(f, "InactivePageTable({:#X})", self.p4_table.start_address())
     }
 }
 
 impl InactivePageTable {
     /// Initializes a new InactivePageTable using the given `TemporaryPage`.
-    /// The `TemporaryPage` is consumed here.
+    /// The `TemporaryPage` is consumed here,
+    /// and the new `InactivePageTable` assumes ownership of the given `Frame`.
     pub fn new(
         frame: Frame,
-        active_table: &mut ActivePageTable,
-        mut temporary_page: TemporaryPage
+        current_active_table: &mut ActivePageTable,
+        mut temporary_page: TemporaryPage,
     ) -> Result<InactivePageTable, &'static str> {
         {
-            let table = try!(temporary_page.map_table_frame(frame.clone(), active_table));
+            let table = try!(temporary_page.map_table_frame(frame.clone(), current_active_table));
             table.zero();
 
             table[u9::new(RECURSIVE_P4_INDEX as u16)].set(frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
 
             // start out by copying all the kernel sections into the new inactive table
-            table.copy_entry_from_table(active_table.p4(), u9::new(KERNEL_TEXT_P4_INDEX as u16));
-            table.copy_entry_from_table(active_table.p4(), u9::new(KERNEL_HEAP_P4_INDEX as u16));
-            table.copy_entry_from_table(active_table.p4(), u9::new(KERNEL_STACK_P4_INDEX as u16));
+            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_TEXT_P4_INDEX as u16));
+            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_HEAP_P4_INDEX as u16));
+            table.copy_entry_from_table(current_active_table.p4(), u9::new(KERNEL_STACK_P4_INDEX as u16));
         }
 
         Ok(
-            InactivePageTable { p4_frame: frame }
+            InactivePageTable { p4_table: frame }
         )
 
         // temporary_page is auto unmapped here 
-        // temporary_page.unmap(active_table);
     }
 }
 
