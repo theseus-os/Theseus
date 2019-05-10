@@ -1,15 +1,15 @@
 use alloc::boxed::Box;
 
-use memory::{PhysicalAddress, ActivePageTable};
+use memory::{PhysicalAddress, PageTable};
 
 use super::{Sdt, get_sdt};
 
 pub trait Rxsdt {
     fn iter(&self) -> Box<Iterator<Item = usize>>;
 
-    fn map_all(&self, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+    fn map_all(&self, page_table: &mut PageTable) -> Result<(), &'static str> {
         for sdt_paddr in self.iter() {
-            try!(get_sdt(PhysicalAddress::new_canonical(sdt_paddr), active_table));
+            try!(get_sdt(PhysicalAddress::new_canonical(sdt_paddr), page_table));
         }
         Ok(())
     }

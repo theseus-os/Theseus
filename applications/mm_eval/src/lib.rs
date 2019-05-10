@@ -287,7 +287,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
-    let mut mapper_normal   = unsafe { Mapper::new() };
+    let mut mapper_normal   = unsafe { Mapper::from_current() };
     let mut mapper_spillful = unsafe { MapperSpillful::new() };
 
     let start_vaddr = 0xFFFF_FA00_0000_0000; // the start of the 500th P4 (PML4) entry

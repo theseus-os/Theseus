@@ -16,7 +16,7 @@ extern crate irq_safety;
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PageTable, FRAME_ALLOCATOR, EntryFlags};
+use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, FRAME_ALLOCATOR, EntryFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
 use fs_node::{FileOrDir, FileRef};
@@ -99,38 +99,33 @@ impl File for MemFile {
             
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 			let mut kernel_mmi = kernel_mmi_ref.lock();
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
-                let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
-                let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
-                
-                // first, we need to copy over the bytes from the previous mapped pages
-                {
-                    // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
-                    let copy_limit;
-                    // The write does not overlap with existing content, so we copy all existing content
-                    if offset > self.size { 
-                        copy_limit = self.size;
-                    } else { // Otherwise, we only copy up to where the overlap begins
-                        copy_limit = offset;
-                    }
-                    let existing_bytes = self.mp.as_slice(0, copy_limit)?;
-                    let copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
-                    copy_slice.copy_from_slice(existing_bytes);
-                } 
-                
-                // second, we write the new content into the reallocated mapped pages
-                {
-                    let dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
-                    dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
+            let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+            let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
+            let mut new_mapped_pages = kernel_mmi.page_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
+            
+            // first, we need to copy over the bytes from the previous mapped pages
+            {
+                // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
+                let copy_limit;
+                // The write does not overlap with existing content, so we copy all existing content
+                if offset > self.size { 
+                    copy_limit = self.size;
+                } else { // Otherwise, we only copy up to where the overlap begins
+                    copy_limit = offset;
                 }
-                self.mp = new_mapped_pages;
-                self.size = end;
-                Ok(buffer.len())
+                let existing_bytes = self.mp.as_slice(0, copy_limit)?;
+                let copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
+                copy_slice.copy_from_slice(existing_bytes);
+            } 
+            
+            // second, we write the new content into the reallocated mapped pages
+            {
+                let dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
+                dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }
-            else {
-                Err("could not get active table")
-            }
+            self.mp = new_mapped_pages;
+            self.size = end;
+            Ok(buffer.len())
         }
     }
 

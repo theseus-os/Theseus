@@ -22,7 +22,7 @@ use alloc::sync::Arc;
 use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
-use memory::{MemoryManagementInfo, PageTable};
+use memory::MemoryManagementInfo;
 use pci::get_pci_device_vd;
 use smoltcp::wire::{IpCidr, Ipv4Address};
 use core::str::FromStr;
@@ -41,28 +41,14 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
-    // destructure the kernel's MMI so we can access its page table and vmas
-    let &mut MemoryManagementInfo { 
-        page_table: ref mut kernel_page_table, 
-        ..  // don't need to access the kernel's vmas or stack allocator, we already allocated a kstack above
-    } = kernel_mmi;
+    // first, init the local apic info
+    apic::init(&mut kernel_mmi.page_table)?;
+    
+    // then init/parse the ACPI tables to fill in the APIC details, among other things
+    // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
+    let madt_iter = acpi::init(&mut kernel_mmi.page_table)?;
 
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-            // first, init the local apic info
-            apic::init(active_table)?;
-            
-            // then init/parse the ACPI tables to fill in the APIC details, among other things
-            // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
-            let madt_iter = acpi::init(active_table)?;
-
-            Ok(madt_iter)
-        }
-        _ => {
-            error!("drivers::early_init(): couldn't get kernel's active_table!");
-            Err("Couldn't get kernel's active_table")
-        }
-    }
+    Ok(madt_iter)
 }
 
 

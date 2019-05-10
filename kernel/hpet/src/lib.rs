@@ -17,7 +17,7 @@ use volatile::{Volatile, ReadOnly};
 use owning_ref::BoxRefMut;
 use alloc::boxed::Box;
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
+use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, EntryFlags};
 use sdt::Sdt;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
@@ -132,14 +132,14 @@ pub struct HpetTimer {
 
 /// Finds and initializes the HPET, and enables its main counter.
 /// Returns a mutable reference to the `Hpet` struct
-pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+pub fn init(hpet_sdt: &'static Sdt, page_table: &mut PageTable) -> Result<(), &'static str> {
     let hpet_inner = HpetInner::new(hpet_sdt)?;    
 
     let phys_addr = PhysicalAddress::new(hpet_inner.gen_addr_struct.address as usize)?;
     let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
     let frame = Frame::range_inclusive_addr(phys_addr, 1);  // 1 byte long, we just want 1 page
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
-    let hpet_page = try!(active_table.map_allocated_pages_to(page, frame, 
+    let hpet_page = try!(page_table.map_allocated_pages_to(page, frame, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
     );
 

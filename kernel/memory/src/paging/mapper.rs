@@ -27,10 +27,14 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub fn new() -> Mapper {
+    pub fn from_current() -> Mapper {
+        Self::with_p4_frame(get_current_p4())
+    }
+
+    pub fn with_p4_frame(p4: Frame) -> Mapper {
         Mapper { 
             p4: Unique::new(P4).unwrap(), // cannot panic because we know the P4 value is valid
-            target_p4: get_current_p4(),
+            target_p4: p4,
         }
     }
 
@@ -858,7 +862,7 @@ impl Drop for MappedPages {
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
         
-        let mut mapper = Mapper::new();
+        let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
             error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
                 cannot unmap MappedPages from a different page table than they were originally mapped to!",

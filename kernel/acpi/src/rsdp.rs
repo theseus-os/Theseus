@@ -1,4 +1,4 @@
-use memory::{ActivePageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use memory::{PageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use core::ops::DerefMut;
 use core::mem;
 use owning_ref::BoxRef;
@@ -27,7 +27,7 @@ pub struct RSDP {
 impl RSDP {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
     /// Returns the RDSP structure and the pages that are currently mapping it.
-    pub fn get_rsdp(active_table: &mut ActivePageTable) -> Option<BoxRef<MappedPages, RSDP>> {
+    pub fn get_rsdp(page_table: &mut PageTable) -> Option<BoxRef<MappedPages, RSDP>> {
         let size: usize = RDSP_SEARCH_END - RDSP_SEARCH_START;
         let pages = try_opt!(allocate_pages_by_bytes(size));
         let search_range = Frame::range_inclusive(
@@ -38,7 +38,7 @@ impl RSDP {
         let mapped_pages = {
             let allocator_mutex = try_opt!(FRAME_ALLOCATOR.try());
             let mut allocator = allocator_mutex.lock();
-            try_opt!(active_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.deref_mut()).ok())
+            try_opt!(page_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.deref_mut()).ok())
         };
         
         RSDP::search(mapped_pages)

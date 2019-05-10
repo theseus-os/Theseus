@@ -42,7 +42,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
@@ -141,53 +141,47 @@ fn parse_bootloader_modules_into_files(
     let mut prefix_map: BTreeMap<String, NamespaceDirectorySet> = BTreeMap::new();
 
     let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
 
-        // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
-        let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
-            let base_dir = VFSDirectory::new(prefix.to_string(), &namespaces_dir)?;
-            NamespaceDirectorySet::new(base_dir)
+    // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
+    let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
+        let base_dir = VFSDirectory::new(prefix.to_string(), &namespaces_dir)?;
+        NamespaceDirectorySet::new(base_dir)
+    };
+
+    for m in boot_info.module_tags() {
+        let size_in_bytes = (m.end_address() - m.start_address()) as usize;
+        let frames = Frame::range_inclusive_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+        let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
+        let name = String::from(file_name);
+
+        let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+        let mp = kernel_mmi.page_table.map_allocated_pages_to(
+            pages, 
+            frames, 
+            EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
+            fa.lock().deref_mut()
+        )?;
+
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+
+        let create_file = |dirs: &NamespaceDirectorySet| {
+            let parent_dir = match crate_type { 
+                CrateType::Kernel      => &dirs.kernel,
+                CrateType::Application => &dirs.app,
+                CrateType::Userspace   => &dirs.user,
+            };
+            MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
         };
 
-        for m in boot_info.module_tags() {
-            let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-            let frames = Frame::range_inclusive_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
-            let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
-            let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
-            let name = String::from(file_name);
-
-            let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
-            let mp = active_table.map_allocated_pages_to(
-                pages, 
-                frames, 
-                EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-                fa.lock().deref_mut()
-            )?;
-
-            // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
-
-            let create_file = |dirs: &NamespaceDirectorySet| {
-                let parent_dir = match crate_type { 
-                    CrateType::Kernel      => &dirs.kernel,
-                    CrateType::Application => &dirs.app,
-                    CrateType::Userspace   => &dirs.user,
-                };
-                MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
-            };
-
-            // get the set of directories corresponding to the given prefix, or create it. 
-            let _new_file = match prefix_map.entry(prefix.to_string()) {
-                btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dirs(prefix)?) )?,
-                btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
-            };
-        }
-    }
-    else {
-        return Err("Couldn't get kernel's ActivePageTable to parse and map bootloader modules");
+        // get the set of directories corresponding to the given prefix, or create it. 
+        let _new_file = match prefix_map.entry(prefix.to_string()) {
+            btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dirs(prefix)?) )?,
+            btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
+        };
     }
 
     debug!("Created namespace directories: {:?}", prefix_map.keys().map(|s| &**s).collect::<Vec<&str>>().join(", "));
-
     Ok((
         namespaces_dir,
         prefix_map.remove(DEFAULT_NAMESPACE_NAME).ok_or("BUG: no default namespace found")?,
@@ -1008,12 +1002,7 @@ impl CrateNamespace {
                             let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                             let target_sec_initial_flags = target_sec_mapped_pages.flags();
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                                    target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
-                                }
-                                else {
-                                    return Err("couldn't get kernel's active page table");
-                                }
+                                target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                             }
 
                             write_relocation(
@@ -1032,12 +1021,7 @@ impl CrateNamespace {
                             #[cfg(not(loscd_eval))] {
                                 // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                                 if !target_sec_initial_flags.is_writable() {
-                                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-                                    }
-                                    else {
-                                        return Err("couldn't get kernel's active page table");
-                                    }
+                                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags)?;
                                 };
                             }
                         }
@@ -1325,12 +1309,7 @@ impl CrateNamespace {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 let target_sec_initial_flags = target_sec_mapped_pages.flags();
                 if !target_sec_initial_flags.is_writable() {
-                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
-                    }
-                    else {
-                        return Err("couldn't get kernel's active page table");
-                    }
+                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                 }
 
                 write_relocation(
@@ -1343,12 +1322,7 @@ impl CrateNamespace {
 
                 // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                 if !target_sec_initial_flags.is_writable() {
-                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-                    }
-                    else {
-                        return Err("couldn't get kernel's active page table");
-                    }
+                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags)?;
                 };
             }
             
@@ -1965,18 +1939,13 @@ impl CrateNamespace {
 
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
-        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-            if let Some(ref tp) = new_crate.text_pages { 
-                tp.lock().remap(active_table, TEXT_SECTION_FLAGS())?;
-            }
-            if let Some(ref rp) = new_crate.rodata_pages {
-                rp.lock().remap(active_table, RODATA_SECTION_FLAGS())?;
-            }
-            // data/bss sections are already mapped properly, since they're supposed to be writable
+        if let Some(ref tp) = new_crate.text_pages { 
+            tp.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS())?;
         }
-        else {
-            return Err("couldn't get kernel's active page table");
+        if let Some(ref rp) = new_crate.rodata_pages {
+            rp.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS())?;
         }
+        // data/bss sections are already mapped properly, since they're supposed to be writable
 
         Ok(())
     }
@@ -2480,17 +2449,11 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef)
         let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {
             let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
 
-            if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                // Right now we're just simply copying small sections to the new memory,
-                // so we have to map those pages to real (randomly chosen) frames first. 
-                // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
-                // and then change the page permissions (by using remap) later. 
-                active_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
-            }
-            else {
-                return Err("couldn't get kernel's active page table");
-            }
-    
+            // Right now we're just simply copying small sections to the new memory,
+            // so we have to map those pages to real (randomly chosen) frames first. 
+            // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
+            // and then change the page permissions (by using remap) later. 
+            kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
         };
 
         // we must allocate these pages separately because they will have different flags later
