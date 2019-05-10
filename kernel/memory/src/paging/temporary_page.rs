@@ -104,7 +104,7 @@ impl FrameAllocator for TinyAllocator {
                 return;
             }
         }
-        panic!("Tiny allocator can hold only 3 frames.");
+        error!("BUG: TinyAllocator::deallocate_frame(): deallocated too many frames, can hold only 3 frames.");
     }
 
     fn alloc_ready(&mut self) {

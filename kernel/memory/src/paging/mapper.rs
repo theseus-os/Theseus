@@ -22,16 +22,15 @@ use type_name;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
+    /// The Frame contaning the top-level P4 page table.
     pub target_p4: Frame,
 }
 
 impl Mapper {
     pub fn new() -> Mapper {
-        unsafe {
-            Mapper { 
-                p4: Unique::new_unchecked(P4),
-                target_p4: get_current_p4(),
-            }
+        Mapper { 
+            p4: Unique::new(P4).unwrap(), // cannot panic because we know the P4 value is valid
+            target_p4: get_current_p4(),
         }
     }
 
@@ -281,7 +280,7 @@ const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 /// while that Mutex's lock is held. 
 #[derive(Debug)]
 pub struct MappedPages {
-    /// The P4 Frame of the page table that this MappedPages was originally mapped into. 
+    /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
     /// The actual range of pages contained by this mapping
     pages: PageIter,
