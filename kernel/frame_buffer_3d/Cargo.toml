@@ -16,9 +16,6 @@ version = "1.2.0"
 [dependencies.serial_port]
 path = "../serial_port"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
 [dependencies.state_store]
 path = "../state_store"
 

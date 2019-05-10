@@ -10,7 +10,6 @@ extern crate acpi;
 
 extern crate volatile;
 extern crate serial_port;
-extern crate kernel_config;
 extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
