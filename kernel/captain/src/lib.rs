@@ -59,7 +59,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
 use core::sync::atomic::spin_loop_hint;
-use memory::{VirtualAddress, MemoryManagementInfo, MappedPages, PageTable};
+use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 
@@ -151,17 +151,11 @@ pub fn init(
     // we cannot do this until we have booted up all the APs
     ::core::mem::drop(identity_mapped_pages);
     {
-        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-            // for i in 0 .. 512 { 
-            //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
-            // }
-
-            // clear the 0th P4 entry, which covers any existing identity mappings
-            active_table.p4_mut().clear_entry(0.into()); 
-        }
-        else {
-            return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
-        }
+        // for i in 0 .. 512 { 
+        //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
+        // }
+        // clear the 0th P4 entry, which covers any existing identity mappings
+        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0.into()); 
     }
     
     // create a SIMD personality

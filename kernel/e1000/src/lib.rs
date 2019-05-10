@@ -414,16 +414,9 @@ impl E1000Nic {
 
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-
-        let regs = if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            let mut fa = FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
-            let nic_mapped_page = active_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
-            
-            BoxRefMut::new(Box::new(nic_mapped_page))
-                .try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?
-        } else {
-            return Err("e1000:mem_map Couldn't get kernel's active_table");
-        };
+        let mut fa = FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
+        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+        let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?;
             
         debug!("E1000 status register: {:#X}", regs.status.read());
         Ok(regs)

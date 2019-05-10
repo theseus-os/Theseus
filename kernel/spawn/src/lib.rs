@@ -31,7 +31,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::boxed::Box;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
-use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, InactivePageTable, Frame};
+use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, Frame};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 #[cfg(simd_personality)] use task::SimdExt;
@@ -392,129 +392,108 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
         // because we can just utilize the task's userspace entry point member
 
 
-        // destructure the kernel's MMI so we can access its page table and vmas
-        let MemoryManagementInfo { 
-            page_table: ref mut kernel_page_table, 
-            ..  // don't need to access the kernel's VMA list or stack allocator, we already allocated a kstack above
-        } = *kernel_mmi_locked;
         
-        match kernel_page_table {
-            &mut PageTable::Active(ref mut active_table) => {
-                
-                // get frame allocator reference
-                let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
+        // get frame allocator reference
+        let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
 
-                // frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
-                let (frame, temp_frames1, temp_frames2) = {
+        // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
+        let (new_frame, temp_frames1, temp_frames2) = {
+            let mut allocator = allocator_mutex.lock();
+            // a quick closure to allocate one frame
+            let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
+            (
+                try!(alloc_frame()),
+                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
+                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
+            )
+        };
+
+        // now that we have the kernel's active table, we need a totally new page table for the userspace Task
+        let mut new_page_table = PageTable::new_table(&mut kernel_mmi_locked.page_table, new_frame, TemporaryPage::new(temp_frames1))?;
+
+        // create a new stack allocator for this userspace process
+        let mut user_stack_allocator = {
+            use memory::StackAllocator;
+            let stack_alloc_start = Page::containing_address(USER_STACK_ALLOCATOR_BOTTOM); 
+            let stack_alloc_end = Page::containing_address(USER_STACK_ALLOCATOR_TOP_ADDR);
+            let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+            StackAllocator::new(stack_alloc_range, true) // true means it's for userspace
+        };
+
+        // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
+        if module.start_address().frame_offset() != 0 {
+            return Err("modules must be page aligned!");
+        }
+        // first we need to temporarily map the module memory region into our address space, 
+        // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
+        let (elf_progs, entry_point) = {
+            let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module"));
+            let temp_module_mapping = {
+                let mut allocator = allocator_mutex.lock();
+                kernel_mmi_locked.page_table.map_allocated_pages_to(
+                    new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                    EntryFlags::PRESENT, allocator.deref_mut()
+                )?
+            };
+
+            try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
+            
+            // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+        };
+        
+        let mut new_mapped_pages: Vec<MappedPages> = Vec::new();
+        let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
+
+        debug!("spawn_userspace [4]: ELF entry point: {:#x}", entry_point);
+        new_task.new_userspace_entry_addr = Some(entry_point);
+
+        kernel_mmi_locked.page_table.with(&mut new_page_table, TemporaryPage::new(temp_frames2), |mapper| {
+            // Note that in PageTable::new_table(), the shared kernel mappings have already been copied over to the `new_page_table`,
+            // to ensure that a new page table can never be created without including the shared kernel mappings.
+            // Thus, we do not need to handle that here.
+
+            // map the userspace module into the new address space.
+            // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
+            // debug!("!! mapping userspace module with name: {}", module.name());
+            for prog in elf_progs.iter() {
+                // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
+                debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
+                let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
+                let mapped_pages = {
                     let mut allocator = allocator_mutex.lock();
-                    // a quick closure to allocate one frame
-                    let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
-                    (
-                        try!(alloc_frame()),
-                        (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
-                        (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
-                    )
-                };
-
-                // now that we have the kernel's active table, we need a new inactive table for the userspace Task
-                let mut new_inactive_table: InactivePageTable = {
-                    try!(InactivePageTable::new(frame, active_table, TemporaryPage::new(temp_frames1)))
-                };
-
-                // create a new stack allocator for this userspace process
-                let mut user_stack_allocator = {
-                    use memory::StackAllocator;
-                    let stack_alloc_start = Page::containing_address(USER_STACK_ALLOCATOR_BOTTOM); 
-                    let stack_alloc_end = Page::containing_address(USER_STACK_ALLOCATOR_TOP_ADDR);
-                    let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
-                    StackAllocator::new(stack_alloc_range, true) // true means it's for userspace
-                };
-
-                // set up the userspace module flags/vma, the actual mapping happens in the .with() closure below 
-                if module.start_address().frame_offset() != 0 {
-                    return Err("modules must be page aligned!");
-                }
-                // first we need to temporarily map the module memory region into our address space, 
-                // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
-                let (elf_progs, entry_point) = {
-                    let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module"));
-                    let temp_module_mapping = {
-                        let mut allocator = allocator_mutex.lock();
-                        try!( active_table.map_allocated_pages_to(
-                                  new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
-                                  EntryFlags::PRESENT, allocator.deref_mut())
-                        )
-                    };
-
-                    try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
-                    
-                    // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+                    mapper.map_frames(
+                        Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
+                        Page::containing_address(prog.vma.start_address()),
+                        new_flags, allocator.deref_mut()
+                    )?
                 };
                 
-                let mut new_mapped_pages: Vec<MappedPages> = Vec::new();
-                let mut new_user_vmas: Vec<VirtualMemoryArea> = Vec::with_capacity(elf_progs.len() + 2); // doesn't matter, but 2 is for stack and heap
-
-                debug!("spawn_userspace [4]: ELF entry point: {:#x}", entry_point);
-                new_task.new_userspace_entry_addr = Some(entry_point);
-
-                // consumes temporary page, which auto unmaps it
-                try!( active_table.with(&mut new_inactive_table, TemporaryPage::new(temp_frames2), |mapper| {
-                    /*
-                        * We need to set the kernel-related entries of our new inactive_table's P4 to the same values used in the kernel's P4.
-                        * However, this is done in InactivePageTable::new(), just to make sure a new page table can never be created without including the shared kernel mappings.
-                        * Thus, we do not need to handle that here.
-                        */
-
-
-                    // map the userspace module into the new address space.
-                    // we can use identity mapping here because we have a higher-half mapped kernel, YAY! :)
-                    // debug!("!! mapping userspace module with name: {}", module.name());
-                    for prog in elf_progs.iter() {
-                        // each program section in the ELF file could be more than one page, but they are contiguous in physical memory
-                        debug!("  -- Elf prog: Mapping vaddr {:#x} to paddr {:#x}, size: {:#x}", prog.vma.start_address(), module.start_address() + prog.offset, prog.vma.size());
-                        let new_flags = prog.vma.flags() | EntryFlags::USER_ACCESSIBLE;
-                        let mapped_pages = {
-                            let mut allocator = allocator_mutex.lock();
-                            try!(mapper.map_frames(
-                                    Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
-                                    Page::containing_address(prog.vma.start_address()),
-                                    new_flags, allocator.deref_mut())
-                            )
-                        };
-                        
-                        new_mapped_pages.push(mapped_pages);
-                        new_user_vmas.push(VirtualMemoryArea::new(prog.vma.start_address(), prog.vma.size(), new_flags, prog.vma.desc()));
-                    }
-
-                    // allocate a new userspace stack
-                    let (user_stack, user_stack_vma) = {
-                        let mut allocator = allocator_mutex.lock();                        
-                        try!( user_stack_allocator.alloc_stack(mapper, allocator.deref_mut(), 16)
-                                                  .ok_or("spawn_userspace: couldn't allocate new user stack!")
-                        )
-                    };
-                    ustack = Some(user_stack); 
-                    new_user_vmas.push(user_stack_vma);
-
-                    // TODO: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
-
-                    Ok(()) // mapping closure completed successfully
-
-                })); // TemporaryPage is dropped here
-                
-
-                // return a new mmi struct (for the new userspace task) to the enclosing scope
-                MemoryManagementInfo {
-                    page_table: PageTable::Inactive(new_inactive_table),
-                    vmas: new_user_vmas,
-                    extra_mapped_pages: new_mapped_pages,
-                    stack_allocator: user_stack_allocator,
-                }
+                new_mapped_pages.push(mapped_pages);
+                new_user_vmas.push(VirtualMemoryArea::new(prog.vma.start_address(), prog.vma.size(), new_flags, prog.vma.desc()));
             }
 
-            _ => {
-                panic!("spawn_userspace(): current page_table must be an ActivePageTable!");
-            }
+            // allocate a new userspace stack
+            let (user_stack, user_stack_vma) = {
+                let mut allocator = allocator_mutex.lock();                        
+                user_stack_allocator.alloc_stack(mapper, allocator.deref_mut(), 16)
+                    .ok_or("spawn_userspace: couldn't allocate new user stack!")?
+            };
+            ustack = Some(user_stack); 
+            new_user_vmas.push(user_stack_vma);
+
+            // TODO: give this process a new heap? (assign it a range of virtual addresses but don't alloc phys mem yet)
+
+            Ok(()) // mapping closure completed successfully
+
+        })?; // TemporaryPage is dropped here
+        
+
+        // return a new mmi struct (for the new userspace task) to the enclosing scope
+        MemoryManagementInfo {
+            page_table: new_page_table,
+            vmas: new_user_vmas,
+            extra_mapped_pages: new_mapped_pages,
+            stack_allocator: user_stack_allocator,
         }
     };
 

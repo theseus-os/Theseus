@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use spin::Mutex;
 use kernel_config::memory::{KERNEL_OFFSET, PAGE_SHIFT, PAGE_SIZE};
-use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
+use memory::{Stack, FRAME_ALLOCATOR, Page, MappedPages, MemoryManagementInfo, Frame, PageTable, PhysicalAddress, VirtualAddress, EntryFlags}; 
 use ioapic;
 use apic::{LocalApic, has_x2apic, get_my_apic_id, get_lapics, is_bsp, get_bsp_id};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
@@ -47,7 +47,7 @@ pub struct Madt {
 }
 
 impl Madt {
-    pub fn init(active_table: &mut ActivePageTable) -> Result<MadtIter, &'static str> {
+    pub fn init(page_table: &mut PageTable) -> Result<MadtIter, &'static str> {
         
         if !is_bsp() {
             error!("You can only call Madt::init() from the bootstrap processor (bsp), not other cores!");
@@ -65,8 +65,8 @@ impl Madt {
             //     debug!("  {:?}", e);
             // }
 
-            try!(handle_ioapic_entries(iter.clone(), active_table));
-            try!(handle_bsp_entry(iter.clone(), active_table));
+            try!(handle_ioapic_entries(iter.clone(), page_table));
+            try!(handle_bsp_entry(iter.clone(), page_table));
             Ok(iter)
         } else {
             error!("Unable to find MADT");
@@ -98,11 +98,11 @@ impl Madt {
 }
 
 
-fn handle_ioapic_entries(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     for madt_entry in madt_iter {
         match madt_entry {
             MadtEntry::IoApic(ioa) => {
-                let ioapic = ioapic::IoApic::new(active_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
+                let ioapic = ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
                 ioapic::get_ioapics().insert(ioa.id, Mutex::new(ioapic));
             }
             // we only handle IoApic entries here
@@ -114,7 +114,7 @@ fn handle_ioapic_entries(madt_iter: MadtIter, active_table: &mut ActivePageTable
 }
 
 
-fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+fn handle_bsp_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     use pic::PIC_MASTER_OFFSET;
 
     let all_lapics = get_lapics();
@@ -127,7 +127,7 @@ fn handle_bsp_entry(madt_iter: MadtIter, active_table: &mut ActivePageTable) -> 
                 debug!("        This is my (the BSP's) local APIC");
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                let bsp_lapic = LocalApic::new(active_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
+                let bsp_lapic = LocalApic::new(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
                 let bsp_id = bsp_lapic.id();
 
                 // redirect every IoApic's interrupts to the one BSP
@@ -215,7 +215,7 @@ pub fn handle_ap_cores(
 ) -> Result<usize, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
-    let active_table_phys_addr: PhysicalAddress;
+    let page_table_phys_addr: PhysicalAddress;
     let mut trampoline_mapped_pages: MappedPages; // must be held throughout APs being booted up
     let _trampoline_mapped_pages_higher: MappedPages; // must be held throughout APs being booted up
     let ap_startup_mapped_pages: MappedPages; // must be held throughout APs being booted up
@@ -223,54 +223,49 @@ pub fn handle_ap_cores(
 
     {
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            // first, double check that the ap_start_realmode address is mapped and valid
-            active_table.translate(ap_start_realmode_begin).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address")?;
+        let page_table = &mut kernel_mmi.page_table;
+        // first, double check that the ap_start_realmode address is mapped and valid
+        page_table.translate(ap_start_realmode_begin).ok_or("handle_ap_cores(): couldn't translate ap_start_realmode address")?;
 
-            // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
-            // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
-            let trampoline_page        = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
-            let trampoline_page_higher = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE + KERNEL_OFFSET));
-            let trampoline_frame       = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
-            let ap_startup_page        = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
-            let ap_startup_page_higher = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP + KERNEL_OFFSET));
-            let ap_startup_frames      = Frame::range_inclusive_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
+        // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
+        // These frames MUST be identity mapped because they're accessed in AP boot up code, which has no page tables.
+        let trampoline_page        = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
+        let trampoline_page_higher = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE + KERNEL_OFFSET));
+        let trampoline_frame       = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
+        let ap_startup_page        = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
+        let ap_startup_page_higher = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP + KERNEL_OFFSET));
+        let ap_startup_frames      = Frame::range_inclusive_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
-            let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
-            
-            trampoline_mapped_pages = active_table.map_to(
-                trampoline_page, 
-                trampoline_frame.clone(), 
-                EntryFlags::PRESENT | EntryFlags::WRITABLE, 
-                allocator.deref_mut()
-            )?;
-            ap_startup_mapped_pages = active_table.map_frames(
-                ap_startup_frames.clone(),
-                ap_startup_page,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                allocator.deref_mut()
-            )?;
+        let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+        
+        trampoline_mapped_pages = page_table.map_to(
+            trampoline_page, 
+            trampoline_frame.clone(), 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE, 
+            allocator.deref_mut()
+        )?;
+        ap_startup_mapped_pages = page_table.map_frames(
+            ap_startup_frames.clone(),
+            ap_startup_page,
+            EntryFlags::PRESENT | EntryFlags::WRITABLE,
+            allocator.deref_mut()
+        )?;
 
-            // do same mappings for higher half (not sure if needed)
-            _trampoline_mapped_pages_higher = active_table.map_to(
-                trampoline_page_higher,
-                trampoline_frame,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                allocator.deref_mut()
-            )?;
-            _ap_startup_mapped_pages_higher = active_table.map_frames(
-                ap_startup_frames,
-                ap_startup_page_higher,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE,
-                allocator.deref_mut()
-            )?;
+        // do same mappings for higher half (not sure if needed)
+        _trampoline_mapped_pages_higher = page_table.map_to(
+            trampoline_page_higher,
+            trampoline_frame,
+            EntryFlags::PRESENT | EntryFlags::WRITABLE,
+            allocator.deref_mut()
+        )?;
+        _ap_startup_mapped_pages_higher = page_table.map_frames(
+            ap_startup_frames,
+            ap_startup_page_higher,
+            EntryFlags::PRESENT | EntryFlags::WRITABLE,
+            allocator.deref_mut()
+        )?;
 
-            active_table_phys_addr = active_table.physical_address();
-        }
-        else {
-            error!("handle_ap_cores(): couldn't get kernel's active_table!");
-            return Err("Couldn't get kernel's active_table");
-        }
+        page_table_phys_addr = page_table.physical_address();
     }
 
     let all_lapics = get_lapics();
@@ -332,7 +327,7 @@ pub fn handle_ap_cores(
                     bring_up_ap(bsp_lapic.deref_mut(), 
                                 lapic_entry,
                                 ap_trampoline_data,
-                                active_table_phys_addr, 
+                                page_table_phys_addr, 
                                 ap_stack, 
                                 nmi_lint,
                                 nmi_flags 
@@ -430,7 +425,7 @@ fn bring_up_ap(
     bsp_lapic: &mut LocalApic,
     new_lapic: &MadtLocalApic, 
     ap_trampoline_data: &mut ApTrampolineData,
-    active_table_paddr: PhysicalAddress, 
+    page_table_paddr: PhysicalAddress, 
     ap_stack: Stack,
     nmi_lint: u8, 
     nmi_flags: u16
@@ -438,7 +433,7 @@ fn bring_up_ap(
     ap_trampoline_data.ap_ready.write(0);
     ap_trampoline_data.ap_processor_id.write(new_lapic.processor);
     ap_trampoline_data.ap_apic_id.write(new_lapic.apic_id);
-    ap_trampoline_data.ap_page_table.write(active_table_paddr);
+    ap_trampoline_data.ap_page_table.write(page_table_paddr);
     ap_trampoline_data.ap_stack_start.write(ap_stack.bottom());
     ap_trampoline_data.ap_stack_end.write(ap_stack.top_unusable());
     ap_trampoline_data.ap_code.write(VirtualAddress::new_canonical(kstart_ap as usize));
