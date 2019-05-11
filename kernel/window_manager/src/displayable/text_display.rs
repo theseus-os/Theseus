@@ -1,7 +1,7 @@
 
-use super::super::{FrameTextBuffer, WindowObj, frame_buffer};
+use super::super::{FrameTextBuffer, WindowObj, display, DRAWER};
 use super::super::{String};
-use frame_buffer::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use display::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 /// A displayable component for text display
 pub struct TextDisplay {
@@ -56,7 +56,7 @@ impl TextDisplay
         cursor.update(line as usize, column as usize, reset);
         match self.get_display_pos(window) {
             Ok((x, y)) => {
-                frame_buffer::fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                DRAWER.fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
                         y + (line as usize) * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
             },
@@ -78,7 +78,7 @@ impl TextDisplay
             match self.get_display_pos(window) {
                 Ok((x, y)) => {
                     let color = if show { font_color } else { bg_color };
-                    frame_buffer::fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                    DRAWER.fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
                         y + (line as usize) * CHARACTER_HEIGHT, 
                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
                 },

@@ -142,6 +142,18 @@ pub fn init(
         }
     }
 
+    // init font
+    let rs = display::font::init();
+    match rs {
+        Ok(_) => {
+            trace!("font initialized successfully.");
+        }
+        Err(err) => { 
+            println_raw!("captain::init(): failed to initialize font");
+            return Err(err);
+        }
+    }
+
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
 

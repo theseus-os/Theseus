@@ -24,7 +24,7 @@ extern crate irq_safety;
 extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
-extern crate frame_buffer;
+extern crate display;
 extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
@@ -40,7 +40,8 @@ use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
-use frame_buffer::text_buffer::{FrameTextBuffer};
+use display::text_buffer::{FrameTextBuffer};
+use display::Drawer;
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -53,6 +54,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+static DRAWER:Drawer = Drawer{};
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
@@ -127,7 +129,7 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
 
 /// Returns the width and height (in pixels) of the screen 
 pub fn get_screen_size() -> (usize, usize) {
-    frame_buffer::get_resolution()
+    DRAWER.get_resolution()
 }
 
 impl WindowAllocator{
@@ -146,7 +148,7 @@ impl WindowAllocator{
                 buffer[index(0,0)] = 0x777777;
         }*/
 
-        let (buffer_width, buffer_height) = frame_buffer::get_resolution();
+        let (buffer_width, buffer_height) = DRAWER.get_resolution();
         if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
             return Err("Window size must be greater than the margin");
         }
@@ -391,7 +393,7 @@ impl WindowObj{
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return;
         }
-        frame_buffer::draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        DRAWER.draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
     }
 
     /// draw a line in a window
@@ -403,8 +405,8 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return;
         }
-        frame_buffer::draw_line(start_x + inner.x + 1, start_y + inner.y + 1, 
-            end_x + inner.x + 1, end_y + inner.y + 1, color);
+        DRAWER.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+            (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
     }
 
     /// draw a square in a window
@@ -414,7 +416,7 @@ impl WindowObj{
             || y + height > inner.height - 2 {
             return;
         }
-        frame_buffer::draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+        DRAWER.draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
             color);
     }
 
@@ -527,13 +529,13 @@ impl WindowInner {
 
     // clean the content of a window
     fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + self.margin, self.y + self.margin,
+        DRAWER.fill_rectangle(self.x + self.margin, self.y + self.margin,
             self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
     }
 
     // draw the border of the window
     fn draw_border(&self, color:u32) {
-        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
+        DRAWER.draw_rectangle(self.x, self.y, self.width, self.height, color);           }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
@@ -598,7 +600,7 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
+    let window_height = (display::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
     let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
     let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
 
