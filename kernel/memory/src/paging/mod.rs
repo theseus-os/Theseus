@@ -26,7 +26,6 @@ pub use self::virtual_address_allocator::*;
 use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
 use multiboot2;
 use super::*;
-use ux::u9;
 
 use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;
@@ -59,25 +58,25 @@ impl Page {
     }
 
 	/// returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list
-    fn p4_index(&self) -> u9 {
-        u9::new(((self.number >> 27) & 0x1FF) as u16)
+    fn p4_index(&self) -> usize {
+        (self.number >> 27) & 0x1FF
     }
 
     /// returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list
-    fn p3_index(&self) -> u9 {
-        u9::new(((self.number >> 18) & 0x1FF) as u16)
+    fn p3_index(&self) -> usize {
+        (self.number >> 18) & 0x1FF
     }
 
     /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list
-    fn p2_index(&self) -> u9 {
-        u9::new(((self.number >> 9) & 0x1FF) as u16)
+    fn p2_index(&self) -> usize {
+        (self.number >> 9) & 0x1FF
     }
 
     /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
     /// using this returned usize value as an index into the P1 entries list will give you the final PTE, 
     /// from which you can extract the physical address using pointed_frame()
-    fn p1_index(&self) -> u9 {
-        u9::new(((self.number >> 0) & 0x1FF) as u16)
+    fn p1_index(&self) -> usize {
+        (self.number >> 0) & 0x1FF
     }
 
     pub fn range_inclusive(start: Page, end: Page) -> PageIter {
@@ -242,12 +241,12 @@ impl PageTable {
             let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
             table.zero();
 
-            table[u9::new(RECURSIVE_P4_INDEX as u16)].set(new_p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
 
             // start out by copying all the kernel sections into the new table
-            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_TEXT_P4_INDEX as u16));
-            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_HEAP_P4_INDEX as u16));
-            table.copy_entry_from_table(current_page_table.p4(), u9::new(KERNEL_STACK_P4_INDEX as u16));
+            table.copy_entry_from_table(current_page_table.p4(), KERNEL_TEXT_P4_INDEX);
+            table.copy_entry_from_table(current_page_table.p4(), KERNEL_HEAP_P4_INDEX);
+            table.copy_entry_from_table(current_page_table.p4(), KERNEL_STACK_P4_INDEX);
             // TODO: FIXME: we should probably copy all of the mappings here just to be safe (except 510, the recursive P4 entry.)
         }
 
@@ -280,7 +279,7 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[u9::new(RECURSIVE_P4_INDEX as u16)].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
         tlb::flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -293,7 +292,7 @@ impl PageTable {
         self.mapper.target_p4 = self.p4_table.clone();
 
         // restore recursive mapping to original p4 table
-        p4_table[u9::new(RECURSIVE_P4_INDEX as u16)].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
         tlb::flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
@@ -385,9 +384,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
         // (they were initialized in PageTable::new_table())
-        mapper.p4_mut().clear_entry(u9::new(KERNEL_TEXT_P4_INDEX as u16));
-        mapper.p4_mut().clear_entry(u9::new(KERNEL_HEAP_P4_INDEX as u16));
-        mapper.p4_mut().clear_entry(u9::new(KERNEL_STACK_P4_INDEX as u16));
+        mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
+        mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
 
         let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;

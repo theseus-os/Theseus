@@ -42,12 +42,13 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate fs_node; 
+extern crate fs_node;
+extern crate pause;
 
 
 
 use core::fmt;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use core::any::Any;
 use core::panic::PanicInfo;
 use core::ops::Deref;
@@ -57,6 +58,7 @@ use alloc::{
     string::String,
     sync::Arc,
 };
+use pause::spin_loop_hint;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};

@@ -47,6 +47,7 @@ extern crate frame_buffer;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
+extern crate pause;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -55,10 +56,10 @@ extern crate network_manager;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
-use core::sync::atomic::spin_loop_hint;
 use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use pause::spin_loop_hint;
 
 
 
@@ -152,7 +153,7 @@ pub fn init(
         //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
         // }
         // clear the 0th P4 entry, which covers any existing identity mappings
-        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0.into()); 
+        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0); 
     }
     
     // create a SIMD personality

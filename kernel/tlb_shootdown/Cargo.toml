@@ -27,6 +27,9 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.pause]
+path = "../pause"
+
 
 [lib]
 crate-type = ["rlib"]

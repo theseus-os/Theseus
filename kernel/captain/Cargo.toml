@@ -99,5 +99,8 @@ path = "../simd_personality"
 [dependencies.task_fs]
 path = "../task_fs"
 
+[dependencies.pause]
+path = "../pause"
+
 [lib]
 crate-type = ["rlib"]

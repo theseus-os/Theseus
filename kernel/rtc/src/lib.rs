@@ -12,7 +12,6 @@ extern crate spin;
 extern crate state_store;
 #[macro_use] extern crate log;
 extern crate x86_64;
-extern crate ux;
 
 use port_io::Port;
 use irq_safety::hold_interrupts;
@@ -20,7 +19,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 // use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
-use ux::u13;
 
 
 //standard port to write to on CMOS to select registers
@@ -188,10 +186,8 @@ fn log2(value: usize) -> usize {
 
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-pub fn set_rtc_frequency(rate: u13) -> Result<(), ()> {
-    // the `rate` arg being a `u13` prevents it from being greater than 8192 (2^13)
-    let rate: usize = rate.into();
-    if !(rate.is_power_of_two() && rate >= 2) {
+pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
+    if !(rate.is_power_of_two() && rate >= 2 && rate <= 8192) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
         return Err(());
     }
