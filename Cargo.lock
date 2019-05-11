@@ -14,6 +14,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "pause 0.1.0",
  "pic 0.1.0",
  "pit_clock 0.1.0",
  "sdt 0.1.0",
@@ -31,6 +32,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "pause 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -155,6 +157,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "network_manager 0.1.0",
  "ota_update_client 0.1.0",
+ "pause 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
@@ -775,7 +778,6 @@ dependencies = [
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "type-name 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ux 0.1.3 (git+https://github.com/kevinaboos/uX?branch=usize_isize_conversions)",
  "x86_64 0.1.2",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
@@ -987,6 +989,10 @@ dependencies = [
  "vfs_node 0.1.0",
  "x86_64 0.1.2",
 ]
+
+[[package]]
+name = "pause"
+version = "0.1.0"
 
 [[package]]
 name = "pci"
@@ -1255,7 +1261,6 @@ dependencies = [
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "ux 0.1.3 (git+https://github.com/kevinaboos/uX?branch=usize_isize_conversions)",
  "x86_64 0.1.2",
 ]
 
@@ -1553,6 +1558,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "pause 0.1.0",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
@@ -1648,6 +1654,7 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "pause 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -1724,14 +1731,6 @@ dependencies = [
 [[package]]
 name = "util"
 version = "0.1.0"
-
-[[package]]
-name = "ux"
-version = "0.1.3"
-source = "git+https://github.com/kevinaboos/uX?branch=usize_isize_conversions#72ddac9cd61c8da24d2ba9d9592468ed71589299"
-dependencies = [
- "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "vfs_node"
@@ -1868,7 +1867,6 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 "checksum unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"
-"checksum ux 0.1.3 (git+https://github.com/kevinaboos/uX?branch=usize_isize_conversions)" = "<none>"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ca391c55768e479d5c2f8beb40c136df09257292a809ea514e82cfdfc15d00"
 "checksum xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)" = "<none>"

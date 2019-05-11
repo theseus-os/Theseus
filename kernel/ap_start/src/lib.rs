@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(asm)]
 
 #[macro_use] extern crate log;
 extern crate spin;
@@ -10,12 +11,14 @@ extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
 extern crate tlb_shootdown;
+extern crate pause;
 
-use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint};
+use core::sync::atomic::{AtomicBool, Ordering};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics, get_my_apic_id};
+use pause::spin_loop_hint;
 
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -50,14 +53,13 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
 
-    spawn::init(kernel_mmi_ref, apic_id, stack_start, stack_end).unwrap();
+    spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
     let lapic = {
-        let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap: couldn't get ref to kernel mmi");
         let mut kernel_mmi = kernel_mmi_ref.lock();
         LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
             .expect("kstart_ap(): failed to create LocalApic")

@@ -37,6 +37,9 @@ path = "../apic"
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
+[dependencies.pause]
+path = "../pause"
+
 
 [lib]
 crate-type = ["rlib"]

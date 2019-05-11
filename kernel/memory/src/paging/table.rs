@@ -12,7 +12,6 @@ use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
 use super::super::{VirtualAddress, FrameAllocator};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
-use ux::u9;
 
 
 // Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel, 
@@ -38,16 +37,16 @@ impl<L> Table<L>
         }
     }
 
-    pub fn copy_entry_from_table(&mut self, from_table: &Table<Level4>, index: u9) {
+    pub fn copy_entry_from_table(&mut self, from_table: &Table<Level4>, index: usize) {
         // simply copy the table entry, which is just a u64
         self[index] = from_table[index].copy();
     }
 
-    pub fn clear_entry(&mut self, index: u9) {
+    pub fn clear_entry(&mut self, index: usize) {
         self[index].set_unused();
     }
 
-    pub fn get_entry_value(&self, index: u9) -> u64 {
+    pub fn get_entry_value(&self, index: usize) -> u64 {
         self[index].value()
     }
 }
@@ -59,11 +58,11 @@ impl<L> Table<L>
     /// uses 'index' as an index into this table's list of 512 entries
     /// returns the virtual address of the next lowest page table 
     /// (so P4 would give P3, P3 -> P2, P2 -> P1).
-    fn next_table_address(&self, index: u9) -> Option<VirtualAddress> {
+    fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
         if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE) {
             let table_address = self as *const _ as usize;
-            let next_table_vaddr: usize = (table_address << 9) | ((index.into(): usize) << PAGE_SHIFT);
+            let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
         } else {
             None
@@ -71,17 +70,17 @@ impl<L> Table<L>
     }
 
     /// returns the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1)
-    pub fn next_table(&self, index: u9) -> Option<&Table<L::NextLevel>> {
+    pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
         self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
-    pub fn next_table_mut(&mut self, index: u9) -> Option<&mut Table<L::NextLevel>> {
+    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
         self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
     pub fn next_table_create<A>(&mut self,
-                                index: u9,
+                                index: usize,
                                 flags: EntryFlags,
                                 allocator: &mut A)
                                 -> &mut Table<L::NextLevel>
@@ -98,21 +97,21 @@ impl<L> Table<L>
     }
 }
 
-impl<L> Index<u9> for Table<L>
+impl<L> Index<usize> for Table<L>
     where L: TableLevel
 {
     type Output = Entry;
 
-    fn index(&self, index: u9) -> &Entry {
-        &self.entries[index.into(): usize]
+    fn index(&self, index: usize) -> &Entry {
+        &self.entries[index]
     }
 }
 
-impl<L> IndexMut<u9> for Table<L>
+impl<L> IndexMut<usize> for Table<L>
     where L: TableLevel
 {
-    fn index_mut(&mut self, index: u9) -> &mut Entry {
-        &mut self.entries[index.into(): usize]
+    fn index_mut(&mut self, index: usize) -> &mut Entry {
+        &mut self.entries[index]
     }
 }
 

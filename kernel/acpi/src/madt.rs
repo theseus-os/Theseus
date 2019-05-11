@@ -16,7 +16,7 @@ use super::sdt::Sdt;
 use super::{find_matching_sdts, load_table, get_sdt_signature};
 
 
-use core::sync::atomic::spin_loop_hint;
+use pause::spin_loop_hint;
 use ap_start::{kstart_ap, AP_READY_FLAG};
 
 
@@ -360,7 +360,7 @@ pub fn handle_ap_cores(
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let mut count = get_lapics().iter().count();
     while count < ap_count + 1 {
-        // trace!("BSP-known count: {}", count);
+        trace!("BSP-known count: {}", count);
         spin_loop_hint();
         count = get_lapics().iter().count();
     }
