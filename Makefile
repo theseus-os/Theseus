@@ -150,7 +150,7 @@ $(iso): build check_captain
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(GRUB_MKRESCUE) -d /usr/lib/grub/i386-pc -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
 ### Convenience target for building the ISO	using the above target
@@ -300,6 +300,23 @@ simd_personality_avx: build_avx build
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
+
+display_personality: build
+display_personality: build_3d_personality
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
+	@mkdir -p $(GRUB_ISOFILES)/namespaces/frame_buffer
+	@cp  $(OBJECT_FILES_BUILD_DIR)/k3d\#* $(GRUB_ISOFILES)/namespaces/frame_buffer
+# autogenerate the grub.cfg file
+	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@/usr/bin/grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	qemu-system-x86_64 $(QEMU_FLAGS)
+
+build_3d_personality : export THESEUS_CONFIG += personality_3d
+build_3d_personality : export KERNEL_PREFIX := k3d\#
+build_3d_personality : export APP_PREFIX := a3d\#
+build_3d_personality:
+	@$(MAKE) build
 
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
