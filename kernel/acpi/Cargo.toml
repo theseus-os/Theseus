@@ -49,6 +49,8 @@ path = "../sdt"
 [dependencies.hpet]
 path = "../hpet"
 
+[dependencies.pause]
+path = "../pause"
 
 [lib]
 crate-type = ["rlib"]

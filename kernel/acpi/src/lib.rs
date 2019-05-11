@@ -1,6 +1,7 @@
 //! Code to parse the ACPI tables, based off of Redox. 
 #![no_std]
 #![feature(const_fn)]
+#![feature(asm)]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
@@ -22,6 +23,7 @@ extern crate pic;
 extern crate apic;
 extern crate hpet;
 extern crate sdt;
+extern crate pause;
 
 
 macro_rules! try_opt {
