@@ -343,6 +343,7 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "frame_buffer 0.1.0",
+ "frame_buffer_3d 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
