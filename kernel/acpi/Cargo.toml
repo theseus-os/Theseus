@@ -46,6 +46,12 @@ path = "../ap_start"
 [dependencies.sdt]
 path = "../sdt"
 
+[dependencies.rsdp]
+path = "../rsdp"
+
+[dependencies.rsdt]
+path = "../rsdt"
+
 [dependencies.hpet]
 path = "../hpet"
 
