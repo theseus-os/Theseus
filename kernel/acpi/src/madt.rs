@@ -13,7 +13,7 @@ use pit_clock;
 use volatile::Volatile;
 
 use super::sdt::Sdt;
-use super::{find_matching_sdts, load_table, get_sdt_signature};
+use super::find_matching_sdts;
 
 
 use pause::spin_loop_hint;
@@ -56,7 +56,6 @@ impl Madt {
         
         let madt_sdt = find_matching_sdts("APIC");
         if madt_sdt.len() == 1 {
-            load_table(get_sdt_signature(madt_sdt[0]));
             let madt = try!(Madt::new(madt_sdt[0]).ok_or("Couldn't parse MADT (APIC) table, it was invalid."));
             let iter = madt.iter();
 

@@ -3,10 +3,12 @@
 #![no_std]
 
 use core::mem;
-use core::slice;
 
+/// The size in bytes of the ACPI SDT Header (`Sdt` struct).
+pub const SDT_SIZE_IN_BYTES: usize = core::mem::size_of::<Sdt>();
 
 /// An ACPI System Descriptor Table.
+/// This is the header (the first part) of every ACPI table.
 #[derive(Copy, Clone, Debug)]
 #[repr(packed)]
 pub struct Sdt {
@@ -24,7 +26,7 @@ pub struct Sdt {
 impl Sdt {
     /// Get the address of this tables data
     pub fn data_address(&self) -> usize {
-        self as *const _ as usize + mem::size_of::<Sdt>()
+        (self as *const Self as usize) + mem::size_of::<Sdt>()
     }
 
     /// Get the length of this tables data
@@ -38,11 +40,7 @@ impl Sdt {
         }
     }
 
-    pub fn data(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.data_address() as *const u8, self.data_len()) }
-    }
-
-    pub fn match_pattern(&self, signature: [u8; 4], oem_id: [u8; 6], oem_table_id: [u8; 8]) -> bool{
+    pub fn matches_pattern(&self, signature: [u8; 4], oem_id: [u8; 6], oem_table_id: [u8; 8]) -> bool{
         self.signature == signature && self.oem_id == oem_id && self.oem_table_id == oem_table_id
     }
 }

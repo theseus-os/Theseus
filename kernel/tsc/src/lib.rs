@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(asm)]
 
 #[macro_use] extern crate log;
 extern crate pit_clock;
@@ -41,23 +40,12 @@ impl TscTicks {
 
 
 
-/// Returns the current number of ticks from the TSC, i.e., `rdtsc`. 
+/// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
 pub fn tsc_ticks() -> TscTicks {
-    let mask: u64 = 0xFFFF_FFFF;
-    let high: u64;
-    let low: u64;
-    // SAFE: just using rdtsc asm instructions
-    unsafe {
-        // lfence is a cheaper fence instruction than cpuid
-        asm!("lfence; rdtsc"
-            : "={edx}"(high), "={eax}"(low)
-            :
-            : "rdx", "rax"
-            : "volatile"
-        );
-    }
-    
-    TscTicks( ((mask&high)<<32) | (mask&low) )
+    let mut val = 0;
+    // SAFE: just reading TSC value
+    let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) };
+    TscTicks(ticks)
 }
 
 /// Returns the frequency of the TSC for the system, 

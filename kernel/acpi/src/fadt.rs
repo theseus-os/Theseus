@@ -1,7 +1,7 @@
 use core::{mem, ptr};
 
 use super::sdt::Sdt;
-use super::{ACPI_TABLE, SDT_POINTERS, get_sdt, find_matching_sdts, get_sdt_signature, load_table};
+use super::{ACPI_TABLE, SDT_POINTERS, get_and_map_sdt, find_matching_sdts, get_sdt_signature};
 
 use memory::{PageTable, PhysicalAddress};
 
@@ -55,38 +55,6 @@ pub struct Fadt {
     pub flags: u32,
 }
 
-/* ACPI 2 structure
-#[repr(packed)]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct GenericAddressStructure {
-    address_space: u8,
-    bit_width: u8,
-    bit_offset: u8,
-    access_size: u8,
-    address: u64,
-}
-
-{
-    // 12 byte structure; see below for details
-    pub reset_reg: GenericAddressStructure,
-
-    pub reset_value: u8,
-    reserved3: [u8; 3],
-
-    // 64bit pointers - Available on ACPI 2.0+
-    pub x_firmware_control: u64,
-    pub x_dsdt: u64,
-
-    pub x_pm1a_event_block: GenericAddressStructure,
-    pub x_pm1b_event_block: GenericAddressStructure,
-    pub x_pm1a_control_block: GenericAddressStructure,
-    pub x_pm1b_control_block: GenericAddressStructure,
-    pub x_pm2_control_block: GenericAddressStructure,
-    pub x_pm_timer_block: GenericAddressStructure,
-    pub x_gpe0_block: GenericAddressStructure,
-    pub x_gpe1_block: GenericAddressStructure,
-}
-*/
 
 impl Fadt {
     pub fn new(sdt: &'static Sdt) -> Option<Fadt> {
@@ -100,7 +68,6 @@ impl Fadt {
     pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let fadt_sdt = find_matching_sdts("FACP");
         let fadt = if fadt_sdt.len() == 1 {
-            load_table(get_sdt_signature(fadt_sdt[0]));
             Fadt::new(fadt_sdt[0])
         } else {
             error!("Unable to find FADT");
@@ -110,7 +77,7 @@ impl Fadt {
         if let Some(fadt) = fadt {
             debug!("  FACP: {:X}  {:?}", fadt.dsdt, fadt);
 
-            let dsdt_sdt = try!(get_sdt(PhysicalAddress::new_canonical(fadt.dsdt as usize), page_table));
+            let dsdt_sdt = try!(get_and_map_sdt(PhysicalAddress::new_canonical(fadt.dsdt as usize), page_table));
 
             let signature = get_sdt_signature(dsdt_sdt);
             if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {

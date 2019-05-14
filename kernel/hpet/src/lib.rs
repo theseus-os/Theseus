@@ -186,7 +186,6 @@ impl HpetInner {
 
 #[repr(packed)]
 #[derive(Debug)]
-// #[derive(Clone, Copy, Default)]
 struct GenericAddressStructure {
     _address_space: u8,
     _bit_width: u8,

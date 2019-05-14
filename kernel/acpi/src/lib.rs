@@ -22,18 +22,10 @@ extern crate ap_start;
 extern crate pic; 
 extern crate apic;
 extern crate hpet;
-extern crate sdt;
 extern crate pause;
-
-
-macro_rules! try_opt {
-    ($e:expr) =>(
-        match $e {
-            Some(v) => v,
-            None => return None,
-        }
-    )
-}
+extern crate sdt;
+extern crate rsdp;
+extern crate rsdt;
 
 
 
@@ -43,25 +35,17 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 use spin::{Mutex, RwLock};
-
-
 use memory::{PageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use owning_ref::BoxRef;
+use rsdp::Rsdp;
 
 pub use self::fadt::Fadt;
 pub use self::madt::Madt;
-pub use self::rsdt::Rsdt;
-pub use self::xsdt::Xsdt;
-pub use self::rxsdt::Rxsdt;
-pub use self::rsdp::RSDP;
 use sdt::Sdt;
 
 
 mod fadt;
 pub mod madt;
-mod rsdt;
-mod xsdt;
-mod rxsdt;
-mod rsdp;
 
 
 /// The larger container that holds all data structure obtained from the ACPI table.
@@ -73,25 +57,33 @@ static ACPI_TABLE: Acpi = Acpi {
     fadt: RwLock::new(None),
 };
 
+
 lazy_static! {
+    /// The MappedPages that cover all APIC SDT (System Descriptor Tables).
+    /// This variable contains a mapping from the physical memory frame holding the SDT's physical address
+    /// to the virtual memory page (MappedPages) that cover it. 
     static ref ACPI_TABLE_MAPPED_PAGES: Mutex<BTreeMap<Frame, MappedPages>> = Mutex::new(BTreeMap::new());
 }
 
 
 
-fn get_sdt(sdt_address: PhysicalAddress, page_table: &mut PageTable) -> Result<&'static Sdt, &'static str> {
+fn get_and_map_sdt(
+    sdt_address: PhysicalAddress,
+    page_table: &mut PageTable
+) -> Result<&'static Sdt, &'static str> {
+// ) -> Result<BoxRef<MappedPages, Sdt>, &'static str> {
     
-    let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")).lock();
+    debug!("Mapping SDT at paddr: {:#X}", sdt_address);
     let addr_offset = sdt_address.frame_offset();
     let first_frame = Frame::containing_address(sdt_address);
 
-    // first, make sure the given sdt_address is mapped to a virtual memory Page, so we can access it
+    // first, make sure the given `sdt_address` is mapped to a virtual memory page, so we can access it
     let sdt_virt_addr = {
         let opt: Option<VirtualAddress> = {
             let frame_to_page_mappings = ACPI_TABLE_MAPPED_PAGES.lock();
             if let Some(mapped_page) = frame_to_page_mappings.get(&first_frame) {
                 // the given sdt_address has already been mapped
-                // trace!("get_sdt(): sdt_address {:#X} ({:?}) was already mapped to Page {:?}.", sdt_address, first_frame, mapped_page);
+                trace!("get_and_map_sdt(): sdt_address {:#X} ({:?}) was already mapped to Page {:?}.", sdt_address, first_frame, mapped_page);
                 Some(mapped_page.start_address() + addr_offset)
             }
             else {
@@ -104,11 +96,12 @@ fn get_sdt(sdt_address: PhysicalAddress, page_table: &mut PageTable) -> Result<&
         else {
             // here, the given sdt_address has not yet been mapped, so map it
             let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
+            let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?.lock();
             let mapped_page = try!(page_table.map_allocated_pages_to(
                 pages, Frame::range_inclusive(first_frame.clone(), first_frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
             );
             let vaddr = mapped_page.start_address() + addr_offset;
-            // trace!("get_sdt(): mapping sdt_address {:#X} ({:?}) to virt_addr {:#X}.", sdt_address, first_frame, vaddr);
+            trace!("get_and_map_sdt(): mapping sdt_address {:#X} ({:?}) to virt_addr {:#X}.", sdt_address, first_frame, vaddr);
             
             ACPI_TABLE_MAPPED_PAGES.lock().insert(first_frame.clone(), mapped_page);
 
@@ -118,20 +111,22 @@ fn get_sdt(sdt_address: PhysicalAddress, page_table: &mut PageTable) -> Result<&
 
     // SAFE: sdt_virt_addr was mapped above
     let sdt = unsafe { &*(sdt_virt_addr.value() as *const Sdt) };
-    // debug!("get_sdt(): sdt = {:?}", sdt);
+    debug!("SDT's length is {}, signature: {}", sdt.length, core::str::from_utf8(&sdt.signature).unwrap_or("Unknown"));
 
     // Map extra SDT frames if required
     let end_frame = Frame::containing_address(sdt_address + sdt.length as usize);
     for frame in Frame::range_inclusive(first_frame + 1, end_frame) { // +1 because we already mapped first_frame above
+        warn!("get_and_map_sdt():     SDT's extra length requires mapping frame {:?}!", frame);
         let mut frame_to_page_mappings = ACPI_TABLE_MAPPED_PAGES.lock();
         {
             if let Some(_mapped_page) = frame_to_page_mappings.get(&frame) {
-                // trace!("get_sdt():     extra length sdt_address {:?} was already mapped to {:?}!", frame, _mapped_page);
+                trace!("get_and_map_sdt():     extra length sdt_address {:?} was already mapped to {:?}!", frame, _mapped_page);
                 continue;
             }
         }
 
         let pages = try!(allocate_pages(1).ok_or("couldn't allocate_pages"));
+        let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?.lock();
         let mapped_page = try!(page_table.map_allocated_pages_to(
             pages, Frame::range_inclusive(frame.clone(), frame.clone()), EntryFlags::PRESENT | EntryFlags::NO_EXECUTE, allocator.deref_mut())
         );
@@ -142,104 +137,67 @@ fn get_sdt(sdt_address: PhysicalAddress, page_table: &mut PageTable) -> Result<&
 }
 
 
-/// Parse the ACPI tables to gather CPU, interrupt, and timer information
+/// Parses the system's ACPI tables 
 pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> {
     {
         let mut sdt_ptrs = SDT_POINTERS.write();
         *sdt_ptrs = Some(BTreeMap::new());
     }
 
-    {
-        let mut order = SDT_ORDER.write();
-        *order = Some(vec!());
+    // The first step is to search for the RSDP (Root System Descriptor Pointer),
+    // which contains the physical address of the RSDT (Root System Descriptor Table).
+    let rsdp = Rsdp::get_rsdp(page_table)?;
+    let rxsdt = rsdt::RsdtXsdt::create_and_map(rsdp.sdt_address(), page_table)?;
+
+    for (i, sdt_paddr) in rxsdt.sdt_addresses().enumerate() {
+        debug!("RXSDT[{}]: {:#X}", i, sdt_paddr);
+        get_and_map_sdt(sdt_paddr, page_table)?;
     }
 
-    // Search for RSDP
-    if let Some(rsdp) = RSDP::get_rsdp(page_table) {
-
-        let rxsdt = try!(get_sdt(rsdp.sdt_address(), page_table));
-        debug!("rxsdt: {:?}", rxsdt);
-
-        let rxsdt: Box<Rxsdt + Send + Sync> = {
-            if let Some(rsdt) = Rsdt::new(rxsdt) {
-                Box::new(rsdt)
-            } else if let Some(xsdt) = Xsdt::new(rxsdt) {
-                Box::new(xsdt)
-            } else {
-                error!("UNKNOWN RSDT OR XSDT SIGNATURE");
-                return Err("unknown rsdt/xsdt signature!");
-            }
-        };
-
-        // inform the frame allocator that the physical frames where the top-level RSDT/XSDT table exists
-        // is now off-limits and should not be touched
-        {
-            let rxsdt_area = PhysicalMemoryArea::new(rsdp.sdt_address(), rxsdt.length(), 1, 3); // TODO: FIXME:  use proper acpi number 
-            try!(
-                try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")).lock().add_area(rxsdt_area, false)
-            );
-        }
-
-        try!(rxsdt.map_all(page_table));
-
-        // {
-        //     let _mapped_pages = &*ACPI_TABLE_MAPPED_PAGES.lock();
-        //     debug!("ACPI_TABLE_MAPPED_PAGES = {:?}", _mapped_pages);
-        // }
-
-
-        for sdt_paddr in rxsdt.iter() {
-            let sdt_paddr = PhysicalAddress::new_canonical(sdt_paddr);
-            let sdt_vaddr: VirtualAddress = {
-                if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
-                    page.start_address() + sdt_paddr.frame_offset()
-                }
-                else {
-                    error!("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr: {:#X}", sdt_paddr);
-                    return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr");
-                }
-            };
-            let sdt = unsafe { &*(sdt_vaddr.value() as *const Sdt) };
-
-            let signature = get_sdt_signature(sdt);
-            if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {
-                ptrs.insert(signature, sdt);
-            }
-        }
-
-        // FADT is mandatory
-        Fadt::init(page_table)?;
-        
-        // HPET is optional
-        let hpet_result = {
-            let hpet_sdt = find_matching_sdts("HPET");
-            if hpet_sdt.len() == 1 {
-                load_table(get_sdt_signature(hpet_sdt[0]));
-                hpet::init(hpet_sdt[0], page_table)
+    for sdt_paddr in rxsdt.sdt_addresses() {
+        let sdt_vaddr: VirtualAddress = {
+            if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
+                page.start_address() + sdt_paddr.frame_offset()
             }
             else {
-                Err("unable to find HPET SDT")
+                error!("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr: {:#X}", sdt_paddr);
+                return Err("acpi::init(): ACPI_TABLE_MAPPED_PAGES didn't include a mapping for sdt_paddr");
             }
         };
-        if let Err(_e) = hpet_result {
-            warn!("This machine has no HPET.");
+        let sdt = unsafe { &*(sdt_vaddr.value() as *const Sdt) };
+
+        let signature = get_sdt_signature(sdt);
+        if let Some(ref mut ptrs) = *(SDT_POINTERS.write()) {
+            ptrs.insert(signature, sdt);
         }
-        
-
-        // MADT is mandatory
-        let madt_iter = Madt::init(page_table);
-        // Dmar::init(page_table);
-        // init_namespace();
-
-        madt_iter
-
-        // _rsdp_mapped_pages is dropped here and auto-unmapped
-
-    } 
-    else {
-        error!("NO RSDP FOUND");
-        Err("could not find RSDP")
     }
+
+    // FADT is mandatory
+    Fadt::init(page_table)?;
+    
+    // HPET is optional
+    let hpet_result = {
+        let hpet_sdt = find_matching_sdts("HPET");
+        if hpet_sdt.len() == 1 {
+            hpet::init(hpet_sdt[0], page_table)
+        }
+        else {
+            Err("unable to find HPET SDT")
+        }
+    };
+    if let Err(_e) = hpet_result {
+        warn!("This machine has no HPET.");
+    }
+    
+
+    // MADT is mandatory
+    let madt_iter = Madt::init(page_table);
+    // Dmar::init(page_table);
+    // init_namespace();
+
+    madt_iter
+
+    // _rsdp_mapped_pages is dropped here and auto-unmapped
 }
 
 
@@ -274,7 +232,6 @@ pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> 
 
 type SdtSignature = (String, [u8; 6], [u8; 8]);
 pub static SDT_POINTERS: RwLock<Option<BTreeMap<SdtSignature, &'static Sdt>>> = RwLock::new(None);
-pub static SDT_ORDER: RwLock<Option<Vec<SdtSignature>>> = RwLock::new(None);
 
 pub fn find_matching_sdts(name: &str) -> Vec<&'static Sdt> {
     let mut sdts: Vec<&'static Sdt> = vec!();
@@ -293,39 +250,4 @@ pub fn find_matching_sdts(name: &str) -> Vec<&'static Sdt> {
 pub fn get_sdt_signature(sdt: &'static Sdt) -> SdtSignature {
     let signature = String::from_utf8(sdt.signature.to_vec()).expect("Error converting signature to string");
     (signature, sdt.oem_id, sdt.oem_table_id)
-}
-
-pub fn load_table(signature: SdtSignature) {
-    let mut order = SDT_ORDER.write();
-
-    if let Some(ref mut o) = *order {
-        o.push(signature);
-    }
-}
-
-pub fn get_signature_from_index(index: usize) -> Option<SdtSignature> {
-    if let Some(ref order) = *(SDT_ORDER.read()) {
-        if index < order.len() {
-            Some(order[index].clone())
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
-pub fn get_index_from_signature(signature: SdtSignature) -> Option<usize> {
-    if let Some(ref order) = *(SDT_ORDER.read()) {
-        let mut i = order.len();
-        while i > 0 {
-            i -= 1;
-
-            if order[i] == signature {
-                return Some(i);
-            }
-        }
-    }
-
-    None
 }
