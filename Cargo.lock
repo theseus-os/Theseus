@@ -17,6 +17,8 @@ dependencies = [
  "pause 0.1.0",
  "pic 0.1.0",
  "pit_clock 0.1.0",
+ "rsdp 0.1.0",
+ "rsdt 0.1.0",
  "sdt 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1248,6 +1250,23 @@ dependencies = [
  "spawn 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "rsdp"
+version = "0.1.0"
+dependencies = [
+ "memory 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+]
+
+[[package]]
+name = "rsdt"
+version = "0.1.0"
+dependencies = [
+ "memory 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "sdt 0.1.0",
 ]
 
 [[package]]

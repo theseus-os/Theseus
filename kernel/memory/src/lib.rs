@@ -425,9 +425,6 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    // let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
-    // debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
-    
     let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
 
@@ -657,6 +654,14 @@ impl FrameIter {
             start: self.start.clone(),
             end: self.end.clone(),
         }
+    }
+
+    /// Returns the number of frames covered by this iterator. 
+    /// Use this instead of the Iterator trait's `count()` method.
+    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
+    pub fn size_in_frames(&self) -> usize {
+        // add 1 because it's an inclusive range
+        self.end.number - self.start.number + 1 
     }
 }
 
