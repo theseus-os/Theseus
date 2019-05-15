@@ -9,6 +9,9 @@ include cfg/Config.mk
 
 all: iso
 
+## test for Windows Subsystem for Linux (Linux on Windows)
+IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+
 
 ## Tool names/locations for cross-compiling on Mac OS (darwin)
 ## Note that the GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
@@ -341,7 +344,7 @@ preserve_old_modules:
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -352,7 +355,6 @@ doc: check_rustc
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You can also run 'make view-doc' to view it."
 
 docs: doc
 
@@ -360,7 +362,14 @@ docs: doc
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
 view-doc: doc
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+	@echo -e "Opening documentation index file in your browser..."
+ifneq ($(IS_WSL), )
+## building on WSL
+	@powershell.exe -c $(DOC_ROOT) &
+else
+## building on regular Linux or macOS
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+endif
 
 view-docs: view-doc
 
@@ -543,7 +552,6 @@ bochs: $(iso)
 
 
 
-IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
