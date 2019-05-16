@@ -635,6 +635,7 @@ impl SubAssign<usize> for Frame {
     }
 }
 
+/// An inclusive series of contiguous physical memory frames.
 #[derive(Debug)]
 pub struct FrameIter {
     pub start: Frame,
@@ -642,11 +643,20 @@ pub struct FrameIter {
 }
 
 impl FrameIter {
+    /// Returns the PhysicalAddress of the starting `Frame` in this `FrameIter`.
     pub fn start_address(&self) -> PhysicalAddress {
         self.start.start_address()
     }
 
-    /// Create a duplicate of this FrameIter. 
+    /// Returns a `FrameIter` that will always yield `None`.
+    pub fn empty() -> FrameIter {
+        FrameIter {
+            start: Frame { number: 1 },
+            end: Frame { number: 0 },
+        }
+    }
+
+    /// Create a duplicate of this `FrameIter`. 
     /// We do this instead of implementing/deriving the Clone trait
     /// because we want to prevent Rust from cloning `FrameIter`s implicitly.
     pub fn clone(&self) -> FrameIter {
@@ -656,12 +666,42 @@ impl FrameIter {
         }
     }
 
-    /// Returns the number of frames covered by this iterator. 
+    /// Returns the number of `Frame`s covered by this iterator. 
     /// Use this instead of the Iterator trait's `count()` method.
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
         // add 1 because it's an inclusive range
         self.end.number - self.start.number + 1 
+    }
+
+    /// Whether this `FrameIter` contains the given `Frame`.
+    pub fn contains(&self, frame: &Frame) -> bool {
+        frame >= &self.start && frame <= &self.end
+    }
+
+    /// Whether this `FrameIter` contains the given `PhysicalAddress`.
+    pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
+        self.contains(&Frame::containing_address(phys_addr))
+    }
+
+    /// Returns the offset of the given `PhysicalAddress` within this `FrameIter`,
+    /// i.e., the difference between `phys_addr` and `self.
+    pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
+        if self.contains_phys_addr(phys_addr) {
+            Some(phys_addr.value() - self.start_address().value())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a new, separate `FrameIter` that is extended to include the given `Frame`. 
+    pub fn to_extended(&self, frame_to_include: Frame) -> FrameIter {
+        let start = core::cmp::min(&self.start, &frame_to_include);
+        let end   = core::cmp::max(&self.end,   &frame_to_include);
+        FrameIter {
+            start: start.clone(),
+            end: end.clone()
+        }
     }
 }
 

@@ -1,0 +1,19 @@
+[package]
+name = "acpi_table_handler"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Functions for handling specific types of ACPI tables"
+build = "../../build.rs"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.acpi_table]
+path = "../acpi_table"
+
+[dependencies.rsdt]
+path = "../rsdt"

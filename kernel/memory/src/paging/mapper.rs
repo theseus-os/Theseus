@@ -7,9 +7,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::ptr::Unique;
-use core::ops::DerefMut;
 use core::mem;
+use core::ops::DerefMut;
+use core::ptr::Unique;
 use core::slice;
 use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
@@ -602,7 +602,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underyling memory region as a struct of the given type,
+    /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type,
     /// i.e., overlays a struct on top of this mapped memory region. 
     /// 
     /// # Arguments
@@ -680,7 +680,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underyling memory region as a slice of any type.
+    /// Reinterprets this `MappedPages`'s underlying memory region as a slice of any type.
     /// 
     /// # Arguments
     /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
@@ -691,9 +691,6 @@ impl MappedPages {
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
-    /// 
-    /// Note: it'd be great to merge this into [`as_type()`][#method.as_type], but I cannot figure out how to 
-    ///       specify the length of a slice in its static type definition notation, e.g., `&[u8; size]`.
     pub fn as_slice<T>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
@@ -762,7 +759,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underyling memory region as an executable function with any signature.
+    /// Reinterprets this `MappedPages`'s underlying memory region as an executable function with any signature.
     /// 
     /// # Arguments
     /// * `offset`: the offset (in number of bytes) into the memory region at which the function starts.

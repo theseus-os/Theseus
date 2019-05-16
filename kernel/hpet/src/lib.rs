@@ -47,7 +47,7 @@ pub fn get_hpet_mut() -> RwLockWriteGuard<'static, Option<BoxRefMut<MappedPages,
 
 /// A structure that offers access to HPET through its I/O registers, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
-#[repr(packed)]
+#[repr(C)]
 pub struct Hpet {
     /// The General Capabilities and ID Register, at offset 0x0.
     pub general_capabilities_and_id: ReadOnly<u64>,
