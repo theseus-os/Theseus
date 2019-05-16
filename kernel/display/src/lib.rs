@@ -131,21 +131,16 @@ impl VirtualFrameBuffer {
     }
 
     pub fn draw_rectangle(&self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        //let mut fb = frame_buffer::FRAME_BUFFER.lock();
         let index = self.physical_buffer.get_index_fn();
         let (buffer_width, buffer_height) = self.physical_buffer.get_resolution();
-        // let buffer = match fb.buffer(){
-        //     Ok(rs) => {rs},
-        //     Err(e) => { error!("Fail to get buffer: {}", e); return; }
-        // };
 
         let abs_start_x = start_x + self.x;
         let abs_start_y = start_y + self.y;
-        let abs_end_x:usize = {if start_x + width+self.x < buffer_width 
-            { start_x + width + self.x } 
+        let abs_end_x:usize = {if abs_start_x + width < buffer_width 
+            { abs_start_x + width} 
             else { buffer_width }};
-        let abs_end_y:usize = {if start_y + height + self.y < buffer_height 
-            { start_y + height + self.y } 
+        let abs_end_y:usize = {if abs_start_y + height < buffer_height 
+            { abs_start_y + height } 
             else { buffer_height }};
 
         let mut x = abs_start_x;
@@ -154,10 +149,8 @@ impl VirtualFrameBuffer {
             if x == abs_end_x {
                 break;
             }
-            buffer[index(self.x, abs_start_y)] = color;
-            buffer[index(self.x, abs_end_y-1)] = color;
-            // buffer[index(x, start_y)] = color;
-            // buffer[index(x, end_y-1)] = color;
+            buffer[index(x, abs_start_y)] = color;
+            buffer[index(x, abs_end_y-1)] = color;
             x += 1;
         }
 
@@ -168,8 +161,6 @@ impl VirtualFrameBuffer {
             }
             buffer[index(abs_start_x, y)] = color;
             buffer[index(abs_end_x-1, y)] = color;
-            // buffer[index(start_x, y)] = color;
-            // buffer[index(end_x-1, y)] = color;
             y += 1;
         }
     }
@@ -181,15 +172,8 @@ impl VirtualFrameBuffer {
         let mut x = abs_start_x;
         let mut y = abs_start_y;
 
-        // let mut fb = frame_buffer::FRAME_BUFFER.lock();
         let (buffer_width, buffer_height) = self.physical_buffer.get_resolution();
         let index = self.physical_buffer.get_index_fn();
-        // let buffer = match fb.buffer(){
-        //     Ok(rs) => {rs},
-        //     Err(e) => { error!("Fail to get buffer: {}", e); return; }
-        // };
-
-
         let abs_end_x:usize = {if start_x + width + self.x < buffer_width 
             { start_x + width + self.x} 
             else { buffer_width }};

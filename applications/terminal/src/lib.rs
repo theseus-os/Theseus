@@ -1034,9 +1034,9 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     let display_name = terminal.display_name.clone();
     { 
         let (width, height) = terminal.window.dimensions();
-        let width  = width  - 2*window_manager::WINDOW_MARGIN;
+        let width  = width/2  - 2*window_manager::WINDOW_MARGIN;
         let height = height - 2*window_manager::WINDOW_MARGIN;
-        let text_display =  TextDisplay::new(&display_name, width, height)?;
+        let text_display = TextDisplay::new(&display_name, width, height)?;
         match terminal.window.add_displayable(&display_name, 0, 0, text_display) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}

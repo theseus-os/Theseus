@@ -36,9 +36,6 @@ path = "../frame_buffer"
 [dependencies.window_manager]
 path = "../window_manager"
 
-#[dependencies.graph_drawer]
-#path = "../graph_drawer"
-
 [dependencies.input_event_manager]
 path = "../input_event_manager"
 

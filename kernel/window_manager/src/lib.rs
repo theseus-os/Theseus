@@ -71,7 +71,7 @@ struct WindowAllocator {
 /// If the caller a specific window size, it should call new_window()
 pub fn new_default_window() -> Result<WindowObj, &'static str> {
     let (window_width, window_height) = get_screen_size()?;
-    match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
+    match new_window(GAP_SIZE, GAP_SIZE, window_width/2 - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
         Ok(new_window) => {return Ok(new_window)}
         Err(err) => {return Err(err)}
     }
