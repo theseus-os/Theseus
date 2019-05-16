@@ -1,5 +1,5 @@
 
-use super::super::{FrameTextBuffer, WindowObj, display, DRAWER};
+use super::super::{FrameTextBuffer, WindowObj, display, VFRAME_BUFFER};
 use super::super::{String};
 use display::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
@@ -13,13 +13,14 @@ pub struct TextDisplay {
 
 impl TextDisplay
 {
-    pub fn new(name:&str, width:usize, height:usize) -> TextDisplay {
-        TextDisplay{
+    pub fn new(name:&str, width:usize, height:usize) -> Result <TextDisplay, &'static str> {
+        let tf = FrameTextBuffer::new()?;
+        Ok(TextDisplay{
             name:String::from(name),
             width:width,
             height:height,
-            textbuffer:FrameTextBuffer::new(),
-        }
+            textbuffer:tf,
+        })
     }
 
     /// takes in a str slice and display as much as it can to the text area
@@ -56,9 +57,12 @@ impl TextDisplay
         cursor.update(line as usize, column as usize, reset);
         match self.get_display_pos(window) {
             Ok((x, y)) => {
-                DRAWER.fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                match VFRAME_BUFFER.try(){
+                    Some(buffer) => buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
                         y + (line as usize) * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color),
+                    None => {error!("Fail to get the virtual frame buffer")}
+                }
             },
             Err(err) => {error!("could not update display forwards: {}", err);}
         }        
@@ -78,9 +82,13 @@ impl TextDisplay
             match self.get_display_pos(window) {
                 Ok((x, y)) => {
                     let color = if show { font_color } else { bg_color };
-                    DRAWER.fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
-                        y + (line as usize) * CHARACTER_HEIGHT, 
-                        CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+                    match VFRAME_BUFFER.try(){
+                        Some(buffer) => buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+                            y + (line as usize) * CHARACTER_HEIGHT, 
+                            CHARACTER_WIDTH, CHARACTER_HEIGHT, color),
+                        None => {error!("Fail to get the virtual frame buffer")}
+                    }
+
                 },
                 Err(_) => { }
             }                

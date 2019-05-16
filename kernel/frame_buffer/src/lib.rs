@@ -14,14 +14,19 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
+extern crate owning_ref;
 
-
-use spin::{Mutex};
+use owning_ref::BoxRefMut;
+use spin::{Mutex, Once};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
+
+
+static FRAME_BUFFER: Once<Buffer> = Once::new();
 
 
 const PIXEL_BYTES:usize = 4;
@@ -80,7 +85,19 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            FRAME_BUFFER.lock().set_mode_info(buffer_width, buffer_height, mapped_frame_buffer);
+            // let mut hpet = BoxRefMut::new(Box::new(hpet_page))
+            //     .try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr.value())))?;
+
+            let mut buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
+                try_map_mut(|mp| mp.as_slice_mut(0, buffer_width * buffer_height))?;
+            let buffer_ref = Arc::new(Mutex::new(buffer));
+            FRAME_BUFFER.call_once(|| 
+                Buffer {
+                    width:buffer_width,
+                    height:buffer_height,
+                    buffer_ref: buffer_ref
+                }
+            );
 
             Ok(())
         }
@@ -90,28 +107,25 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-//The only instance of the drawer structure
-pub static FRAME_BUFFER: Mutex<Buffer> = {
-    Mutex::new(Buffer {
-        width:0,
-        height:0,
-        pages:None,
-    })
-};
-
 pub struct Buffer {
     width:usize,
     height:usize,
-    pages:Option<MappedPages>
+    buffer_ref:Arc<Mutex<BoxRefMut<MappedPages, [u32]>>>,
 }
 
-impl Buffer {
+pub struct PhysicalFrameBuffer{
+    width:usize, 
+    height:usize,
+    pub buffer_ref:Arc<Mutex<BoxRefMut<MappedPages, [u32]>>>,
+}
+
+impl PhysicalFrameBuffer {
         // set the graphic mode information of the buffer
-    fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
-        self.width = width;
-        self.height = height;
-        self.pages = Some(pages);
-    }
+    // fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
+    //     self.width = width;
+    //     self.height = height;
+    //     self.pages = Some(pages);
+    // }
 
     /// Get the resolution of the screen
     pub fn get_resolution(&self) -> (usize, usize) {
@@ -123,29 +137,33 @@ impl Buffer {
         x < self.width && y < self.height
     }
 
-    fn draw(&mut self, index:usize, color:u32) {
-        match self.pages {
-            Some(ref mut pages) => {
-                let buffer = match (pages.as_slice_mut(0, self.width*self.height)) {
-                    Ok( bf) => { bf },
-                    Err(_) => { error!("Fail to transmute buffer"); return; }
-                };
-                buffer[index] = color;
-            },
-            None => { error!("Fail to get buffer") }
-        }
-    }
+    // fn draw(&mut self, index:usize, color:u32) -> Result<(), &'static str>{
+        
+    //     // match self.pages {
+    //     //     Some(ref mut pages) => {
+    //     //         let buffer = match (pages.as_slice_mut(0, self.width*self.height)) {
+    //     //             Ok( bf) => { bf },
+    //     //             Err(_) => { error!("Fail to transmute buffer"); return; }
+    //     //         };
+    //     //         buffer[index] = color;
+    //     //     },
+    //     //     None => { error!("Fail to get buffer") }
+    //     // }
+    //     let mut fb = try!(FRAME_BUFFER.try().ok_or("Fail to get access to the framebuffer")).lock();
+    //     fb.buffer_ref[index] = color;
+    //     Ok(())
+    // }
 
     // return the framebuffer
-    pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
-        match self.pages {
-            Some(ref mut pages) => {
-                let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
-                return Ok(buffer);
-            },
-            None => { return Err("no allocated pages in framebuffer") }
-        }
-    }
+    // pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
+    //     match self.pages {
+    //         Some(ref mut pages) => {
+    //             let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
+    //             return Ok(buffer);
+    //         },
+    //         None => { return Err("no allocated pages in framebuffer") }
+    //     }
+    // }
 
     // get the index computation function according to the width of the buffer
     // call it to get the index function before locking the buffer
@@ -156,10 +174,27 @@ impl Buffer {
 
 }
 
+pub fn get_buffer_ref() ->  Result<PhysicalFrameBuffer, &'static str> {
+    let mut fb = try!(FRAME_BUFFER.try().ok_or("Fail to get access to the framebuffer"));
+    let (width, height) = (fb.width, fb.height);
+//    let buffer_ref = fb.buffer.deref_mut();
+    Ok(PhysicalFrameBuffer{
+        width:width,
+        height:height,
+        buffer_ref:Arc::clone(&fb.buffer_ref),
+    })
+}
+
 
 pub fn draw_in_buffer(index:usize, color:u32,  buffer:&mut[u32]) {
     buffer[index] = color;
 }
+
+pub fn get_resolution() -> Result<(usize, usize), &'static str> {
+    let framebuffer = try!(FRAME_BUFFER.try().ok_or("Fail to get the physical frame buffer"));
+    Ok((framebuffer.width, framebuffer.height))
+}
+
 
 // Check if a point is in the screen
 pub fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {

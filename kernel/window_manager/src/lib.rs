@@ -33,7 +33,7 @@ extern crate pit_clock;
 //#[macro_use] extern crate util;
 
 extern crate acpi;
-
+extern crate frame_buffer;
 
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
@@ -41,7 +41,7 @@ use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display::text_buffer::{FrameTextBuffer};
-use display::Drawer;
+use display::VirtualFrameBuffer;
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -54,7 +54,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-static DRAWER:Drawer = Drawer{};
+static VFRAME_BUFFER:Once<Mutex<VirtualFrameBuffer>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
@@ -70,7 +70,7 @@ struct WindowAllocator {
 /// Applications call this function to request a new window object with a default size (mostly fills screen with GAP_SIZE around all borders)
 /// If the caller a specific window size, it should call new_window()
 pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = get_screen_size();
+    let (window_width, window_height) = get_screen_size()?;
     match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
         Ok(new_window) => {return Ok(new_window)}
         Err(err) => {return Err(err)}
@@ -128,14 +128,20 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
 }
 
 /// Returns the width and height (in pixels) of the screen 
-pub fn get_screen_size() -> (usize, usize) {
-    DRAWER.get_resolution()
+pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
+    frame_buffer::get_resolution()
 }
 
 impl WindowAllocator{
     
     // Allocate a new window and return it
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+        let (buffer_width, buffer_height) = get_screen_size()?;
+        
+        let vfb = VirtualFrameBuffer::new(0, 0, buffer_width, buffer_height)?;
+        VFRAME_BUFFER.call_once(||{
+            Mutex::new(vfb)
+        });
         /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
                 let index = frame_buffer::get_index_fn(drawer.width);
@@ -148,7 +154,7 @@ impl WindowAllocator{
                 buffer[index(0,0)] = 0x777777;
         }*/
 
-        let (buffer_width, buffer_height) = DRAWER.get_resolution();
+//        let (buffer_width, buffer_height) = DRAWER.get_resolution();
         if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
             return Err("Window size must be greater than the margin");
         }
@@ -393,7 +399,11 @@ impl WindowObj{
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return;
         }
-        DRAWER.draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        let buffer = match VFRAME_BUFFER.try(){
+            Some(buffer) => { buffer },
+            None => {error!("Fail to get the virtual frame buffer"); return;}
+        };
+        buffer.lock().draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
     }
 
     /// draw a line in a window
@@ -405,8 +415,15 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return;
         }
-        DRAWER.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        let buffer = match VFRAME_BUFFER.try(){
+            Some(buffer) => { 
+                buffer
+            },
+            None => {error!("Fail to get the virtual frame buffer"); return;}
+        };
+        buffer.lock().draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
+       
     }
 
     /// draw a square in a window
@@ -416,7 +433,11 @@ impl WindowObj{
             || y + height > inner.height - 2 {
             return;
         }
-        DRAWER.draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+        let buffer = match VFRAME_BUFFER.try(){
+            Some(buffer) => { buffer },
+            None => {error!("Fail to get the virtual frame buffer"); return;}
+        };
+        buffer.lock().draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
             color);
     }
 
@@ -529,13 +550,21 @@ impl WindowInner {
 
     // clean the content of a window
     fn clean(&self) {
-        DRAWER.fill_rectangle(self.x + self.margin, self.y + self.margin,
+        let buffer = match VFRAME_BUFFER.try(){
+            Some(buffer) => { buffer },
+            None => {error!("Fail to get the virtual frame buffer"); return;}
+        };
+        buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
             self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
     }
 
     // draw the border of the window
     fn draw_border(&self, color:u32) {
-        DRAWER.draw_rectangle(self.x, self.y, self.width, self.height, color);           }
+        let buffer = match VFRAME_BUFFER.try(){
+            Some(buffer) => { buffer },
+            None => {error!("Fail to get the virtual frame buffer"); return;}
+        };
+        buffer.lock().draw_rectangle(self.x, self.y, self.width, self.height, color);           }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {

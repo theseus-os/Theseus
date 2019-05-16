@@ -39,6 +39,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.display]
 path = "../display"
 
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
 [dependencies.acpi]
 path = "../acpi"
 
