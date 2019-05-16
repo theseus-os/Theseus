@@ -23,9 +23,12 @@ extern crate pic;
 extern crate apic;
 extern crate hpet;
 extern crate pause;
+extern crate acpi_table;
+extern crate acpi_table_handler;
 extern crate sdt;
 extern crate rsdp;
 extern crate rsdt;
+
 
 
 
@@ -35,17 +38,29 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 use spin::{Mutex, RwLock};
-use memory::{PageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
+use memory::{PageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, FrameIter, EntryFlags, FRAME_ALLOCATOR};
 use owning_ref::BoxRef;
 use rsdp::Rsdp;
 
 pub use self::fadt::Fadt;
 pub use self::madt::Madt;
+use acpi_table::AcpiTables;
+use acpi_table_handler::acpi_table_handler;
 use sdt::Sdt;
 
 
 mod fadt;
 pub mod madt;
+
+
+
+
+lazy_static! {
+    /// The singleton instance of the `AcpiTables` struct,
+    /// which contains the MappedPages and location of all discovered ACPI tables.
+    static ref ACPI_TABLES: Mutex<AcpiTables> = Mutex::new(AcpiTables::default());
+}
+
 
 
 /// The larger container that holds all data structure obtained from the ACPI table.
@@ -145,16 +160,24 @@ pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> 
     }
 
     // The first step is to search for the RSDP (Root System Descriptor Pointer),
-    // which contains the physical address of the RSDT (Root System Descriptor Table).
+    // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
     let rsdp = Rsdp::get_rsdp(page_table)?;
-    let rxsdt = rsdt::RsdtXsdt::create_and_map(rsdp.sdt_address(), page_table)?;
+    let rsdt_phys_addr = rsdp.sdt_address();
+    debug!("RXSDT is located in Frame {:#X}", rsdt_phys_addr);
 
-    for (i, sdt_paddr) in rxsdt.sdt_addresses().enumerate() {
+    // Now, we get the actual RSDT/XSDT
+    let mut acpi_tables = ACPI_TABLES.lock();
+    let (sdt_signature, sdt_total_length) = acpi_tables.map_new_table(rsdt_phys_addr, page_table)?;
+    acpi_table_handler(&mut acpi_tables, sdt_signature, sdt_total_length, rsdt_phys_addr)?;
+    let rxsdt = rsdt::RsdtXsdt::get(&acpi_tables).ok_or("couldn't get RSDT or XSDT from ACPI tables")?;
+
+    // The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.
+    for (i, sdt_paddr) in rxsdt.addresses().enumerate() {
         debug!("RXSDT[{}]: {:#X}", i, sdt_paddr);
         get_and_map_sdt(sdt_paddr, page_table)?;
     }
 
-    for sdt_paddr in rxsdt.sdt_addresses() {
+    for sdt_paddr in rxsdt.addresses() {
         let sdt_vaddr: VirtualAddress = {
             if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
                 page.start_address() + sdt_paddr.frame_offset()
