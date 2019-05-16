@@ -43,6 +43,12 @@ path = "../pic"
 [dependencies.ap_start]
 path = "../ap_start"
 
+[dependencies.acpi_table]
+path = "../acpi_table"
+
+[dependencies.acpi_table_handler]
+path = "../acpi_table_handler"
+
 [dependencies.sdt]
 path = "../sdt"
 
